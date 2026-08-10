@@ -9,6 +9,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\LoneWorkerSession;
 use App\Models\Site;
 use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -34,6 +35,7 @@ class LoneWorkerSignalService
 
     public function __construct(
         protected SignalProcessingService $signalProcessor,
+        protected UserSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -110,11 +112,11 @@ class LoneWorkerSignalService
         array $extraContext = [],
     ): void {
         $session->load([
-            'user:id,name,organization_id',
-            'site:id,name,tenant_id',
-            'client:id,first_name,last_name,organization_id,site_id',
-            'shift:id,organization_id,site_id,client_id,user_id',
-            'shift.client:id,organization_id,site_id',
+            'user:id,name,approved_at',
+            'site:id,name,is_active,archived,archived_at',
+            'client:id,first_name,last_name,site_id',
+            'shift:id,site_id,client_id,user_id',
+            'shift.client:id,site_id',
         ]);
         [$siteId, $siteName] = $this->canonicalSessionSite($session);
         $source = $this->getSignalSource();
@@ -217,37 +219,37 @@ class LoneWorkerSignalService
     /** @return array{int, string} */
     private function canonicalSessionSite(LoneWorkerSession $session): array
     {
-        $organizationId = $this->positiveId($session->user?->organization_id);
-        if (! $session->user || $organizationId === null) {
-            throw new RuntimeException('Lone worker signal requires a tenant-owned worker.');
+        $siteId = $this->positiveId($session->site_id);
+        if ($siteId === null) {
+            throw new RuntimeException('Lone worker signal requires an authoritative session Site.');
         }
 
-        $clientSiteId = null;
+        if (! $session->user || $session->user->approved_at === null) {
+            throw new RuntimeException('Lone worker signal requires an approved worker.');
+        }
+
+        if (! in_array($siteId, $this->siteAccess->accessibleSiteIds($session->user), true)) {
+            throw new RuntimeException('Lone worker signal worker does not have current access to the session Site.');
+        }
+
         if ($session->client_id !== null) {
-            $clientSiteId = $this->positiveId($session->client?->site_id);
-            if (! $session->client
-                || $this->positiveId($session->client->organization_id) !== $organizationId
-                || $clientSiteId === null) {
+            if (! $session->client || $this->positiveId($session->client->site_id) !== $siteId) {
                 throw new RuntimeException('Lone worker signal client provenance is invalid.');
             }
         }
 
-        $shiftSiteId = null;
-        $shiftClientSiteId = null;
         if ($session->shift_id !== null) {
             $shift = $session->shift;
             if (! $shift
-                || $this->positiveId($shift->organization_id) !== $organizationId
                 || $this->positiveId($shift->user_id) !== $this->positiveId($session->user_id)
                 || ! $this->nullableIdMatches($shift->client_id, $this->positiveId($session->client_id))) {
                 throw new RuntimeException('Lone worker signal shift provenance is invalid.');
             }
 
+            $shiftClientSiteId = null;
             if ($shift->client_id !== null) {
                 $shiftClientSiteId = $this->positiveId($shift->client?->site_id);
-                if (! $shift->client
-                    || $this->positiveId($shift->client->organization_id) !== $organizationId
-                    || $shiftClientSiteId === null) {
+                if (! $shift->client || $shiftClientSiteId === null) {
                     throw new RuntimeException('Lone worker signal shift client provenance is invalid.');
                 }
             }
@@ -262,25 +264,19 @@ class LoneWorkerSignalService
             if ($shiftSiteId === null) {
                 throw new RuntimeException('Lone worker signal shift has no authoritative site.');
             }
+            if ($shiftSiteId !== $siteId) {
+                throw new RuntimeException('Lone worker signal shift Site does not match the session Site.');
+            }
         }
 
-        $siteIds = collect([
-            $this->positiveId($session->site_id),
-            $clientSiteId,
-            $shiftSiteId,
-            $shiftClientSiteId,
-        ])->filter()->unique()->values();
-        if ($siteIds->count() !== 1) {
-            throw new RuntimeException('Lone worker signal session has contradictory site provenance.');
-        }
-
-        $siteId = (int) $siteIds->first();
         $site = Site::query()
             ->whereKey($siteId)
-            ->where('tenant_id', $organizationId)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
             ->first();
         if (! $site) {
-            throw new RuntimeException('Lone worker signal site does not belong to the worker tenant.');
+            throw new RuntimeException('Lone worker signal requires a current session Site.');
         }
 
         return [$siteId, (string) $site->name];
@@ -363,21 +359,23 @@ class LoneWorkerSignalService
     }
 
     /**
-     * Build idempotency key. Uses 15-minute windows for emergencies,
-     * 30-minute windows for overdue check-ins and session overruns.
+     * Build idempotency key. A session emergency owns one canonical alert for
+     * its full lifetime; scheduled conditions use 30-minute observation windows.
      */
     protected function buildIdempotencyKey(string $signalType, LoneWorkerSession $session): string
     {
-        $windowMinutes = $signalType === self::TYPE_EMERGENCY ? 15 : 30;
-        $window = now()->format('Y-m-d H:').(intdiv((int) now()->format('i'), $windowMinutes) * $windowMinutes);
-
-        return hash('sha256', implode('|', [
+        $parts = [
             'lone_worker',
             $signalType,
             $session->id,
-            $session->user_id,
-            $window,
-        ]));
+        ];
+
+        if ($signalType !== self::TYPE_EMERGENCY) {
+            $window = now()->format('Y-m-d H:').(intdiv((int) now()->format('i'), 30) * 30);
+            $parts[] = $window;
+        }
+
+        return hash('sha256', implode('|', $parts));
     }
 
     protected function getSignalSource(): SignalSource

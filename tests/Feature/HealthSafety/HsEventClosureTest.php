@@ -41,7 +41,6 @@ class HsEventClosureTest extends TestCase
             $user->roles()->attach($role);
         }
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => $user->organization_id,
             'user_id' => $user->id,
             'secondary_site_ids' => [],
         ]);

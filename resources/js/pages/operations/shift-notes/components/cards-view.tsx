@@ -19,6 +19,7 @@ import { useMemo, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import {
     HueAvatar,
     type ShiftNote,
@@ -31,7 +32,6 @@ import {
     typeMeta,
     ymd,
 } from './shared';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type NoteHandlers = {
     onOpen: (note: ShiftNote) => void;
@@ -64,7 +64,8 @@ export function EmptyState({
                     : 'Notes will appear here as support workers document their shifts.'}
             </p>
             {filtersActive ? (
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={onClearFilters}
                     className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
@@ -73,7 +74,8 @@ export function EmptyState({
                     Clear filters
                 </GuardrailButton>
             ) : canCreate ? (
-                <GuardrailButton unstyled
+                <GuardrailButton
+                    unstyled
                     type="button"
                     onClick={onAddNote}
                     className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
@@ -100,7 +102,8 @@ function ExpandableBody({ text, max = 320 }: { text: string; max?: number }) {
             <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap text-foreground/90">
                 {open ? text : `${text.slice(0, max)}…`}
             </p>
-            <GuardrailButton unstyled
+            <GuardrailButton
+                unstyled
                 type="button"
                 onClick={(e) => {
                     e.stopPropagation();
@@ -124,7 +127,8 @@ function ActionButton({
     children: React.ReactNode;
 }) {
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             type="button"
             onClick={(e) => {
                 e.stopPropagation();

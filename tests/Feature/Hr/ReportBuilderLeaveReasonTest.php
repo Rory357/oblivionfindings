@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -11,9 +12,10 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
+    $this->site = Site::factory()->create(['name' => 'Report Builder leave Site']);
     $this->staff = User::factory()->create(['approved_at' => now()]);
+    ensureCanonicalHrStaffProfile($this->staff, $this->site);
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'sick',
         'period' => 'full_day',
@@ -40,26 +42,25 @@ test('a non-HR report viewer cannot include the leave reason column', function (
     );
     $viewer = User::factory()->create(['approved_at' => now()]);
     $viewer->roles()->sync([$role->id]);
+    ensureCanonicalHrStaffProfile($viewer, $this->site);
 
     // The column picker must not offer "reason" for leave.
     $builder = $this->actingAs($viewer)->get('/hr/reports/builder')->assertOk();
     expect(collect($builder->inertiaProps('sources')['leave']['fields']))->not->toContain('reason');
 
-    // Even when "reason" is requested directly, the preview rows must omit it
-    // (and must NOT fall through to SELECT * and leak it instead).
-    $preview = $this->actingAs($viewer)->postJson('/hr/reports/builder/preview', [
+    // A crafted request for the hidden field fails closed instead of silently
+    // running a different definition.
+    $this->actingAs($viewer)->postJson('/hr/reports/builder/preview', [
         'report_type' => 'leave',
         'fields' => ['employee_name', 'leave_type', 'reason'],
-    ])->assertOk();
-
-    $rows = $preview->json('data');
-    expect($rows)->not->toBeEmpty();
-    expect($rows[0])->not->toHaveKey('reason');
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors('fields');
 });
 
 test('an HR (manage) report viewer keeps the leave reason column', function () {
     $hr = User::factory()->create(['approved_at' => now()]);
     $hr->roles()->sync([Role::where('name', 'hr')->firstOrFail()->id]);
+    ensureCanonicalHrStaffProfile($hr, $this->site);
 
     $builder = $this->actingAs($hr)->get('/hr/reports/builder')->assertOk();
     expect(collect($builder->inertiaProps('sources')['leave']['fields']))->toContain('reason');

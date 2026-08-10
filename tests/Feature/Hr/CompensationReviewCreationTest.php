@@ -1,6 +1,8 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -8,21 +10,24 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Compensation creation Site']);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+    ]);
 });
 
-test('creating a compensation review resolves the tenant and redirects to the reviews list', function () {
-    // hr_compensation_reviews.tenant_id is NOT NULL — a null write (from the
-    // old $user->tenant_id, which is always null) would fail the insert, and the
-    // old redirect targeted a non-existent route name (reviews.index).
+test('creating a compensation review persists and redirects to the reviews list', function () {
+    // The request must persist and target the canonical reviews route.
     $response = $this->actingAs($this->hr)->post('/hr/compensation/reviews', [
         'title' => 'FY2026 Annual Review',
         'review_cycle' => 'annual',
@@ -33,14 +38,13 @@ test('creating a compensation review resolves the tenant and redirects to the re
     $response->assertSessionHas('success');
 
     $this->assertDatabaseHas('hr_compensation_reviews', [
-        'tenant_id' => 1,
         'title' => 'FY2026 Annual Review',
         'review_cycle' => 'annual',
         'created_by' => $this->hr->id,
     ]);
 });
 
-test('creating a salary band resolves the tenant', function () {
+test('creating an application salary band persists successfully', function () {
     $response = $this->actingAs($this->hr)->post('/hr/compensation/bands', [
         'position_role' => 'support_worker',
         'band_name' => 'Band A',
@@ -55,7 +59,6 @@ test('creating a salary band resolves the tenant', function () {
     $response->assertSessionHas('success');
 
     $this->assertDatabaseHas('hr_salary_bands', [
-        'tenant_id' => 1,
         'band_name' => 'Band A',
         'position_role' => 'support_worker',
     ]);
@@ -63,7 +66,6 @@ test('creating a salary band resolves the tenant', function () {
 
 test('a user without hr.compensation.manage cannot create a review', function () {
     $worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);

@@ -163,28 +163,27 @@ export const STATUS_LABELS: Record<GridShiftStatus, string> = {
 export const STATUS_CTX_TONE: Record<
     GridShiftStatus,
     { bg: string; color: string }
-> =
-    {
-        scheduled: {
-            bg: 'color-mix(in oklch, var(--primary) 15%, transparent)',
-            color: 'var(--primary)',
-        },
-        in_progress: {
-            bg: 'var(--status-info-bg)',
-            color: 'var(--status-info)',
-        },
-        completed: {
-            bg: 'var(--status-success-bg)',
-            color: 'var(--status-success)',
-        },
-        open: {
-            bg: 'var(--status-warning-bg)',
-            color: 'var(--status-warning)',
-        },
-        draft: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
-        leave: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
-        cancelled: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
-    };
+> = {
+    scheduled: {
+        bg: 'color-mix(in oklch, var(--primary) 15%, transparent)',
+        color: 'var(--primary)',
+    },
+    in_progress: {
+        bg: 'var(--status-info-bg)',
+        color: 'var(--status-info)',
+    },
+    completed: {
+        bg: 'var(--status-success-bg)',
+        color: 'var(--status-success)',
+    },
+    open: {
+        bg: 'var(--status-warning-bg)',
+        color: 'var(--status-warning)',
+    },
+    draft: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
+    leave: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
+    cancelled: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
+};
 
 export type ShiftActionCallbacks = {
     onAssignOpen?: (s: GridShift) => void;

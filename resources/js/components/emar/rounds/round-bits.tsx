@@ -41,11 +41,26 @@ export function roundArcColor(status: RoundStatus): string {
     }
 }
 
-export function RoundStatusBadge({ status, className, showIcon = true }: { status: RoundStatus; className?: string; showIcon?: boolean }) {
+export function RoundStatusBadge({
+    status,
+    className,
+    showIcon = true,
+}: {
+    status: RoundStatus;
+    className?: string;
+    showIcon?: boolean;
+}) {
     const meta = roundStatusMeta(status);
-    const Icon = status === 'completed' ? Check : status === 'in_progress' ? Play : null;
+    const Icon =
+        status === 'completed' ? Check : status === 'in_progress' ? Play : null;
     return (
-        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', ROUND_TONE_BADGE[meta.tone], className)}>
+        <span
+            className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                ROUND_TONE_BADGE[meta.tone],
+                className,
+            )}
+        >
             {showIcon && Icon ? <Icon className="h-3 w-3" /> : null}
             {meta.label}
         </span>
@@ -54,10 +69,28 @@ export function RoundStatusBadge({ status, className, showIcon = true }: { statu
 
 export function DoseStatusBadge({ status }: { status: string }) {
     const meta = doseStatusMeta(status);
-    return <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', DOSE_TONE_BADGE[meta.tone])}>{meta.label}</span>;
+    return (
+        <span
+            className={cn(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                DOSE_TONE_BADGE[meta.tone],
+            )}
+        >
+            {meta.label}
+        </span>
+    );
 }
 
 export function DoseDot({ status, title }: { status: string; title?: string }) {
     const meta = doseStatusMeta(status);
-    return <span title={title} aria-hidden className={cn('inline-block h-2.5 w-2.5 rounded-full', DOSE_DOT_BG[meta.tone])} />;
+    return (
+        <span
+            title={title}
+            aria-hidden
+            className={cn(
+                'inline-block h-2.5 w-2.5 rounded-full',
+                DOSE_DOT_BG[meta.tone],
+            )}
+        />
+    );
 }

@@ -34,4 +34,9 @@ return [
         'secret' => env('IT_INBOUND_MAIL_SECRET'),
     ],
 
+    /* Normalised provider callback for delivered, failed, and bounced mail. */
+    'outbound_mail' => [
+        'status_secret' => env('IT_OUTBOUND_MAIL_STATUS_SECRET'),
+    ],
+
 ];

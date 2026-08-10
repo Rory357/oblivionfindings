@@ -10,6 +10,10 @@ on:
       - develop
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   mysql-bootstrap:
     runs-on: ubuntu-latest
@@ -59,6 +63,14 @@ jobs:
         run: |
           cp .env.example .env
           php artisan key:generate
+
+      # MySQL requires SUPER for CREATE TRIGGER while binary logging is enabled
+      # unless a server administrator explicitly trusts trigger creators. Keep
+      # the migration account unprivileged and provision the narrow server
+      # prerequisite used by the lifecycle/history guard migrations.
+      - name: Permit trusted trigger creation
+        run: |
+          mysql --host=127.0.0.1 --port=3306 -uroot -proot -e "SET GLOBAL log_bin_trust_function_creators = ON;"
 
       - name: Run Fresh Migrations And Seeders
         env:

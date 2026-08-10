@@ -11,18 +11,20 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\ProbationReviewDueNotification;
 use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Audit Probation Site']);
 });
 
 function af2bProfile(User $user, array $overrides = []): HrEmployeeProfile
 {
     return HrEmployeeProfile::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-AF2-'.$user->id,
         'work_email' => $user->email,
@@ -34,12 +36,19 @@ function af2bProfile(User $user, array $overrides = []): HrEmployeeProfile
     ], $overrides));
 }
 
-function af2HrUser(): User
+function af2HrUser(?Site $site = null): User
 {
-    $hr = User::factory()->create(['organization_id' => 1, 'role' => 'hr', 'approved_at' => now()]);
+    $hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $hr->roles()->syncWithoutDetaching([$hrRole->id]);
+    }
+    if ($site) {
+        af2bProfile($hr, [
+            'primary_site_id' => $site->id,
+            'position_title' => 'HR Administrator',
+            'position_role' => 'hr',
+        ]);
     }
 
     return $hr;
@@ -50,8 +59,8 @@ function af2HrUser(): User
 test('probation reminder notifies the manager and dedupes on re-run', function () {
     Notification::fake();
 
-    $manager = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
-    $worker = User::factory()->create(['organization_id' => 1, 'role' => 'support_worker', 'approved_at' => now()]);
+    $manager = User::factory()->create(['approved_at' => now()]);
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $profile = af2bProfile($worker, [
         'manager_user_id' => $manager->id,
         'probation_end_date' => now()->addDays(7)->toDateString(),
@@ -82,15 +91,14 @@ test('probation reminder notifies the manager and dedupes on re-run', function (
 test('probation reminder skips employees with a concluding probation review', function () {
     Notification::fake();
 
-    $manager = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
-    $worker = User::factory()->create(['organization_id' => 1, 'role' => 'support_worker', 'approved_at' => now()]);
+    $manager = User::factory()->create(['approved_at' => now()]);
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     af2bProfile($worker, [
         'manager_user_id' => $manager->id,
         'probation_end_date' => now()->subDays(3)->toDateString(),
     ]);
 
     HrProbationReview::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $worker->id,
         'reviewer_user_id' => $manager->id,
         'review_number' => 1,
@@ -108,10 +116,11 @@ test('probation reminder skips employees with a concluding probation review', fu
 /* ── Item 1b: extend recommendation moves the probation end date ─────────── */
 
 test('storeProbation with an extend recommendation moves probation_end_date and clears the reminder stamp', function () {
-    $hr = af2HrUser();
-    $worker = User::factory()->create(['organization_id' => 1, 'role' => 'support_worker', 'approved_at' => now()]);
+    $hr = af2HrUser($this->site);
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $originalEnd = now()->addDays(5)->startOfDay();
     $profile = af2bProfile($worker, [
+        'primary_site_id' => $this->site->id,
         'probation_end_date' => $originalEnd->toDateString(),
         'probation_reminder_sent_at' => now(),
     ]);
@@ -140,7 +149,6 @@ test('employee intake seeds hr_staff_compliance_status rows for the new hire', f
     $actor = af2HrUser();
 
     $requirement = HrComplianceRequirement::query()->create([
-        'tenant_id' => 1,
         'code' => 'FA-AF2',
         'name' => 'First Aid Certificate',
         'category' => 'Health & Safety',
@@ -151,7 +159,6 @@ test('employee intake seeds hr_staff_compliance_status rows for the new hire', f
         'created_by' => $actor->id,
     ]);
     HrComplianceMatrix::query()->create([
-        'tenant_id' => 1,
         'requirement_id' => $requirement->id,
         'role' => 'support_worker',
         'is_mandatory' => true,
@@ -163,14 +170,12 @@ test('employee intake seeds hr_staff_compliance_status rows for the new hire', f
         'support_worker',
         ['position_title' => 'Support Worker', 'position_role' => 'support_worker', 'employment_type' => 'full_time', 'start_date' => now()->toDateString()],
         $actor->id,
-        1,
         startOnboarding: false,
         sendInvite: false,
     );
 
     expect(
         HrStaffComplianceStatus::query()
-            ->where('tenant_id', 1)
             ->where('user_id', $profile->user_id)
             ->where('requirement_id', $requirement->id)
             ->exists(),
@@ -180,12 +185,11 @@ test('employee intake seeds hr_staff_compliance_status rows for the new hire', f
 /* ── Item 2: iCal feed — holidays layer + raised event limit ─────────────── */
 
 test('ical feed includes public holidays and emits more than the old 100-event cap', function () {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
     af2bProfile($user);
     $token = HrICalToken::query()->create(['user_id' => $user->id, 'token' => Str::random(64)]);
 
     HrPublicHoliday::query()->create([
-        'tenant_id' => 1,
         'name' => 'Matariki AF2',
         'date' => now()->addDays(10)->toDateString(),
         'is_national' => true,
@@ -193,17 +197,15 @@ test('ical feed includes public holidays and emits more than the old 100-event c
     ]);
 
     // 110 events — beyond the old limit(100); all must survive the raised cap.
-    $rows = collect(range(1, 110))->map(fn (int $i) => [
-        'tenant_id' => 1,
-        'title' => "AF2 event {$i}",
-        'event_type' => 'company',
-        'starts_at' => now()->addDays(1)->addMinutes($i),
-        'ends_at' => now()->addDays(1)->addMinutes($i + 30),
-        'created_by' => $user->id,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ])->all();
-    HrCalendarEvent::query()->insert($rows);
+    foreach (range(1, 110) as $i) {
+        HrCalendarEvent::query()->create([
+            'title' => "AF2 event {$i}",
+            'event_type' => 'company',
+            'starts_at' => now()->addDays(1)->addMinutes($i),
+            'ends_at' => now()->addDays(1)->addMinutes($i + 30),
+            'created_by' => $user->id,
+        ]);
+    }
 
     $response = $this->get("/hr/ical/{$token->token}");
 

@@ -6,9 +6,11 @@ use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +46,7 @@ class RecruitmentService
     /**
      * @throws \InvalidArgumentException
      */
-    public function createCandidate(array $data, ?int $tenantId, ?int $createdBy = null): HrCandidate
+    public function createCandidate(array $data, ?int $createdBy = null): HrCandidate
     {
         $firstName = trim((string) ($data['first_name'] ?? ''));
         $lastName = trim((string) ($data['last_name'] ?? ''));
@@ -55,7 +57,6 @@ class RecruitmentService
         }
 
         $duplicate = HrCandidate::query()
-            ->where('tenant_id', $tenantId)
             ->where('personal_email', $email)
             ->whereNotIn('status', ['withdrawn', 'rejected'])
             ->exists();
@@ -65,7 +66,6 @@ class RecruitmentService
         }
 
         return HrCandidate::create([
-            'tenant_id' => $tenantId,
             'first_name' => $firstName,
             'last_name' => $lastName,
             'preferred_name' => $data['preferred_name'] ?? null,
@@ -98,10 +98,37 @@ class RecruitmentService
             throw new \InvalidArgumentException('Position title is required for applications.');
         }
 
+        $requisition = null;
+        if (isset($data['requisition_id'])) {
+            $requisition = HrJobRequisition::query()->find($data['requisition_id']);
+            if (! $requisition) {
+                throw new \InvalidArgumentException('The selected requisition is unavailable.');
+            }
+        }
+
+        $targetSiteId = isset($data['target_site_id']) && is_numeric($data['target_site_id'])
+            ? (int) $data['target_site_id']
+            : ($requisition?->site_id ? (int) $requisition->site_id : null);
+        if ($targetSiteId === null || $targetSiteId <= 0) {
+            throw new \InvalidArgumentException('A target Site is required for every application.');
+        }
+        if ($requisition && (int) $requisition->site_id !== $targetSiteId) {
+            throw new \InvalidArgumentException('The application Site must match the requisition Site.');
+        }
+        $siteIsAvailable = Site::query()
+            ->whereKey($targetSiteId)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->exists();
+        if (! $siteIsAvailable) {
+            throw new \InvalidArgumentException('The selected Site is unavailable.');
+        }
+
         $duplicate = HrApplication::query()
             ->where('candidate_id', $candidate->id)
             ->where('position_title', $positionTitle)
-            ->where('target_site_id', $data['target_site_id'] ?? null)
+            ->where('target_site_id', $targetSiteId)
             ->whereNotIn('status', ['rejected', 'withdrawn', 'hired'])
             ->exists();
 
@@ -110,13 +137,12 @@ class RecruitmentService
         }
 
         return HrApplication::create([
-            'tenant_id' => $candidate->tenant_id,
             'candidate_id' => $candidate->id,
-            'requisition_id' => $data['requisition_id'] ?? null,
+            'requisition_id' => $requisition?->id,
             'interview_kit_id' => $data['interview_kit_id'] ?? null,
             'position_title' => $positionTitle,
             'position_role' => $data['position_role'] ?? 'support_worker',
-            'target_site_id' => $data['target_site_id'] ?? null,
+            'target_site_id' => $targetSiteId,
             'cv_storage_path' => $data['cv_storage_path'] ?? null,
             'cv_original_name' => $data['cv_original_name'] ?? null,
             'cover_letter' => $data['cover_letter'] ?? null,
@@ -219,7 +245,6 @@ class RecruitmentService
 
             AuditLogger::log('recruitment.offer_force_expired', $offer, [
                 'actor_id' => $actorId,
-                'organization_id' => $offer->application?->tenant_id,
                 'reason' => $reason,
                 'expired_at' => $offer->portal_expires_at?->toDateTimeString(),
             ]);
@@ -270,6 +295,7 @@ class RecruitmentService
             $candidate->loadMissing('documents');
             $workEmail = $offer->work_email ?: $candidate->personal_email;
             $roleName = $offer->position_role ?: 'support_worker';
+            $existingUserId = User::query()->where('email', $workEmail)->value('id');
 
             // Guard: never hijack a profile already linked to a *different* candidate.
             $existingProfile = HrEmployeeProfile::query()
@@ -306,10 +332,10 @@ class RecruitmentService
                     'candidate_id' => $candidate->id,
                 ],
                 actorId: $convertedBy,
-                tenantId: (int) $candidate->tenant_id,
                 startOnboarding: true,
                 sendInvite: true,
                 source: 'recruitment',
+                authorizedExistingUserId: $existingUserId ? (int) $existingUserId : null,
             );
 
             // Recruitment-specific follow-through (candidate lifecycle + docs).
@@ -407,7 +433,6 @@ class RecruitmentService
 
         foreach ($candidateDocs as $doc) {
             HrDocument::create([
-                'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
                 'title' => $doc->title ?: ($doc->category_label.' - '.$doc->original_name),
                 'category' => $categoryMap[$doc->category] ?? 'other',
@@ -427,10 +452,10 @@ class RecruitmentService
     /**
      * @return array<string, int>
      */
-    public function getPipelineSummary(?int $tenantId): array
+    public function getPipelineSummary(array $candidateIds): array
     {
         $counts = HrCandidate::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereKey($candidateIds)
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
@@ -540,7 +565,6 @@ class RecruitmentService
 
         return [
             'actor_id' => $advancedBy,
-            'organization_id' => $candidate->tenant_id,
             'application_id' => $application?->id,
             'interview_id' => $interview->id,
             'target_stage' => $targetStage,

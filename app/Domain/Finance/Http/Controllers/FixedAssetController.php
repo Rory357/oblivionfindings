@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFixedAsset;
+use App\Domain\Finance\Presenters\AssetFinanceTechnologyProjectionPresenter;
 use App\Domain\Finance\Services\FixedAssetService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -13,6 +14,7 @@ class FixedAssetController extends Controller
 {
     public function __construct(
         protected FixedAssetService $assetService,
+        private readonly AssetFinanceTechnologyProjectionPresenter $assetReconciliation,
     ) {}
 
     /**
@@ -38,7 +40,7 @@ class FixedAssetController extends Controller
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('asset_name', 'like', "%{$search}%")
-                  ->orWhere('asset_tag', 'like', "%{$search}%");
+                    ->orWhere('asset_tag', 'like', "%{$search}%");
             });
         }
 
@@ -202,33 +204,9 @@ class FixedAssetController extends Controller
         ]);
 
         $schedule = $this->assetService->getDepreciationSchedule($fixedAsset);
-
-        // Device health: follow FinFixedAsset → Asset → DeviceAssetLink → Device.
-        $linkedDevices = [];
-        if ($fixedAsset->linked_asset_id) {
-            $linkedDevices = \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
-                ->active()
-                ->forAsset($fixedAsset->linked_asset_id)
-                ->with('device:id,device_uid,name,domain,category,status,health_status,provider,last_seen_at,battery_level')
-                ->get()
-                ->map(fn ($link) => [
-                    'id' => $link->device?->id,
-                    'device_uid' => $link->device?->device_uid,
-                    'name' => $link->device?->name,
-                    'domain' => $link->device?->domain,
-                    'category' => $link->device?->category,
-                    'status' => $link->device?->status?->value,
-                    'health_status' => $link->device?->health_status?->value,
-                    'provider' => $link->device?->provider,
-                    'last_seen_at' => $link->device?->last_seen_at?->toISOString(),
-                    'battery_level' => $link->device?->battery_level,
-                    'link_type' => $link->link_type?->value,
-                    'detail_url' => $link->device ? "/security-devices/devices/{$link->device->id}" : null,
-                ])
-                ->filter(fn ($d) => $d['id'] !== null)
-                ->values()
-                ->all();
-        }
+        $reconciliation = $this->assetReconciliation->forFixedAsset($request->user(), $fixedAsset);
+        $fixedAsset->unsetRelation('linkedAsset');
+        $fixedAsset->makeHidden(['organization_id', 'linked_asset_id']);
 
         $orgId = $fixedAsset->organization_id;
         $canManage = (bool) $request->user()->can('update', $fixedAsset);
@@ -241,14 +219,7 @@ class FixedAssetController extends Controller
             // Reference data for the edit modal (only when the user can manage assets).
             'assetAccounts' => $canManage ? $this->glAccounts($orgId, 'asset') : [],
             'expenseAccounts' => $canManage ? $this->glAccounts($orgId, 'expense') : [],
-            'linkedAsset' => $fixedAsset->linkedAsset ? [
-                'id' => $fixedAsset->linkedAsset->id,
-                'name' => $fixedAsset->linkedAsset->name,
-                'asset_tag' => $fixedAsset->linkedAsset->asset_tag,
-                'category' => $fixedAsset->linkedAsset->category,
-                'status' => $fixedAsset->linkedAsset->status,
-            ] : null,
-            'linkedDevices' => $linkedDevices,
+            'assetReconciliation' => $reconciliation,
         ]);
     }
 

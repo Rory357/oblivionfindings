@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Services\Clients\ClientFormOptions;
 use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ShiftCoverageService;
-use Illuminate\Database\Eloquent\Builder;
 
 class SiteProfilePeoplePresenter
 {
@@ -29,7 +28,7 @@ class SiteProfilePeoplePresenter
         $canPlace = ! $site->archived && $canView && $user->canDo('clients.assignments.update');
         $canCreate = ! $site->archived && $canView && $user->canDo('clients.create');
         $options = ($canCreate || $canPlace)
-            ? $this->clientFormOptions->forOrganization($site->tenant_id ?? $user->organization_id)
+            ? $this->clientFormOptions->forViewer($user, $site->id)
             : null;
 
         $clients = $canView
@@ -64,7 +63,6 @@ class SiteProfilePeoplePresenter
         $available = $canPlace
             ? Client::query()
                 ->whereNull('site_id')
-                ->when($user->organization_id, fn (Builder $query, int $organizationId) => $query->where('organization_id', $organizationId))
                 ->orderBy('first_name')
                 ->orderBy('last_name')
                 ->limit(100)
@@ -96,13 +94,12 @@ class SiteProfilePeoplePresenter
             'placement_options' => $canPlace ? [
                 'rooms' => $site->houseRooms()->available()->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'notes']),
                 'service_contexts' => ServiceContext::query()
-                    ->forOrganization($site->tenant_id ?? $user->organization_id)
-                    ->where(fn (Builder $query) => $query->whereNull('site_id')->orWhere('site_id', $site->id))
+                    ->availableToSite($site->id)
                     ->where('is_active', true)
                     ->orderBy('name')
                     ->get(['id', 'name', 'type']),
                 'key_workers' => $this->clientWorkers
-                    ->queryForOrganization($site->tenant_id ?? $user->organization_id)
+                    ->queryForSite($site->id)
                     ->orderBy('name')
                     ->get(['id', 'name']),
             ] : null,

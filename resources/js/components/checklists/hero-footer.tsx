@@ -15,10 +15,10 @@ import { useRef, useState } from 'react';
 import { WeekPicker } from '@/components/rostering/week-picker';
 import { cn } from '@/lib/utils';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import { catColorVar } from './category';
 import { useChecklistConfig } from './context';
 import { Dropdown, type DropdownOption } from './primitives';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 export interface WeekInfo {
     label: string;
@@ -62,7 +62,11 @@ export function HeroFooter({
 
     const catOptions: DropdownOption[] = [
         { value: 'all', label: 'All categories' },
-        ...categories.map((c) => ({ value: c.key, label: c.label, dot: catColorVar(c.tone) })),
+        ...categories.map((c) => ({
+            value: c.key,
+            label: c.label,
+            dot: catColorVar(c.tone),
+        })),
     ];
 
     const siteOptions: DropdownOption[] = sites.map((s) => ({
@@ -81,15 +85,19 @@ export function HeroFooter({
             <div className="flex flex-col items-stretch gap-2.5 md:flex-row md:items-center md:justify-between">
                 {/* Week stepper */}
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={onPrevWeek}
                         className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
                     >
                         <ChevronLeft className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">{week.prevLabel}</span>
+                        <span className="hidden sm:inline">
+                            {week.prevLabel}
+                        </span>
                     </GuardrailButton>
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         ref={weekBtnRef}
                         type="button"
                         onClick={() => setPickerOpen((v) => !v)}
@@ -100,16 +108,22 @@ export function HeroFooter({
                         <CalendarRange className="h-3.5 w-3.5" />
                         <span>
                             {week.label}
-                            <span className="text-primary-foreground/60"> · {week.range}</span>
+                            <span className="text-primary-foreground/60">
+                                {' '}
+                                · {week.range}
+                            </span>
                         </span>
                         <ChevronDown className="h-3 w-3 text-primary-foreground/70" />
                     </GuardrailButton>
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={onNextWeek}
                         className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
                     >
-                        <span className="hidden sm:inline">{week.nextLabel}</span>
+                        <span className="hidden sm:inline">
+                            {week.nextLabel}
+                        </span>
                         <ChevronRight className="h-3.5 w-3.5" />
                     </GuardrailButton>
                     {pickerOpen ? (
@@ -130,18 +144,26 @@ export function HeroFooter({
                 {/* Search + category + scope */}
                 <div className="flex flex-wrap items-center gap-2 md:justify-end">
                     <div className="relative flex-1 md:flex-none">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
+                        <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
                         <input
                             value={query}
                             onChange={(e) => onQuery(e.target.value)}
-                            placeholder={site ? `Search ${site.name}…` : 'Search checklists, sites, categories…'}
-                            className={cn(onDarkInput, 'w-full pl-8 pr-8 md:w-56')}
+                            placeholder={
+                                site
+                                    ? `Search ${site.name}…`
+                                    : 'Search checklists, sites, categories…'
+                            }
+                            className={cn(
+                                onDarkInput,
+                                'w-full pr-8 pl-8 md:w-56',
+                            )}
                         />
                         {query ? (
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 type="button"
                                 onClick={() => onQuery('')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-primary-foreground/60 hover:text-primary-foreground"
+                                className="absolute top-1/2 right-2 -translate-y-1/2 text-primary-foreground/60 hover:text-primary-foreground"
                             >
                                 <X className="h-3.5 w-3.5" />
                             </GuardrailButton>
@@ -171,18 +193,27 @@ export function HeroFooter({
                                     ? 'bg-primary-foreground shadow-sm'
                                     : 'text-primary-foreground/75 hover:text-primary-foreground',
                             )}
-                            style={orgActive ? { color: 'var(--category-ops)' } : undefined}
+                            style={
+                                orgActive
+                                    ? { color: 'var(--category-ops)' }
+                                    : undefined
+                            }
                         >
                             <Network className="h-3.5 w-3.5" />
                             Org-wide
                         </Link>
                         {site ? (
                             <span
-                                className={cn(segBase, 'bg-primary-foreground shadow-sm')}
+                                className={cn(
+                                    segBase,
+                                    'bg-primary-foreground shadow-sm',
+                                )}
                                 style={{ color: 'var(--category-ops)' }}
                             >
                                 <Building2 className="h-3.5 w-3.5" />
-                                <span className="max-w-[120px] truncate">{site.name}</span>
+                                <span className="max-w-[120px] truncate">
+                                    {site.name}
+                                </span>
                             </span>
                         ) : null}
                     </div>
@@ -194,7 +225,9 @@ export function HeroFooter({
                             searchable
                             value=""
                             placeholder="Jump to a site…"
-                            onChange={(v) => router.visit(`/sites/${v}/checklists`)}
+                            onChange={(v) =>
+                                router.visit(`/sites/${v}/checklists`)
+                            }
                             align="right"
                             className="w-44"
                             menuWidth={260}

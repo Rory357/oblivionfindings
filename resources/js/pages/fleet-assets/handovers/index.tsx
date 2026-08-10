@@ -1,5 +1,4 @@
 import PageShell from '@/components/page-shell';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +29,7 @@ import {
     HeroShell,
     HeroStatusPill,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     ArrowLeftRight,
@@ -51,7 +51,11 @@ import { useEffect, useState } from 'react';
 
 type Handover = {
     id: number;
-    asset: { id: number; name: string; registration_number?: string | null } | null;
+    asset: {
+        id: number;
+        name: string;
+        registration_number?: string | null;
+    } | null;
     outgoing_user: { id: number; name: string } | null;
     incoming_user: { id: number; name: string } | null;
     odometer_km: number | null;
@@ -124,9 +128,15 @@ function conditionBadge(condition: string) {
             );
         case 'significant_damage':
         case 'needs_cleaning':
-            return <Badge variant="destructive">{condition.replace(/_/g, ' ')}</Badge>;
+            return (
+                <Badge variant="destructive">
+                    {condition.replace(/_/g, ' ')}
+                </Badge>
+            );
         default:
-            return <Badge variant="outline">{condition.replace(/_/g, ' ')}</Badge>;
+            return (
+                <Badge variant="outline">{condition.replace(/_/g, ' ')}</Badge>
+            );
     }
 }
 
@@ -195,10 +205,30 @@ const DAMAGE_AREAS = [
 ];
 
 const WIZARD_STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Vehicle, staff & odometer', icon: Car },
-    { key: 'condition', label: 'Fuel & condition', blurb: 'Fuel, exterior, interior', icon: Fuel },
-    { key: 'checklist', label: 'Checklist & damage', blurb: 'Items present, damage notes', icon: ClipboardCheck },
-    { key: 'review', label: 'Notes & review', blurb: 'Final check before submit', icon: FileText },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Vehicle, staff & odometer',
+        icon: Car,
+    },
+    {
+        key: 'condition',
+        label: 'Fuel & condition',
+        blurb: 'Fuel, exterior, interior',
+        icon: Fuel,
+    },
+    {
+        key: 'checklist',
+        label: 'Checklist & damage',
+        blurb: 'Items present, damage notes',
+        icon: ClipboardCheck,
+    },
+    {
+        key: 'review',
+        label: 'Notes & review',
+        blurb: 'Final check before submit',
+        icon: FileText,
+    },
 ];
 
 type DamageNote = {
@@ -265,9 +295,14 @@ function HandoverWizard({
     const vehicles = payload.vehicles ?? [];
     const users = payload.users ?? [];
     const currentUserName =
-        users.find((u) => u.id === payload.current_user_id)?.name ?? 'Current User';
-    const selectedVehicle = vehicles.find((v) => String(v.id) === form.data.asset_id);
-    const incomingUser = users.find((u) => String(u.id) === form.data.incoming_user_id);
+        users.find((u) => u.id === payload.current_user_id)?.name ??
+        'Current User';
+    const selectedVehicle = vehicles.find(
+        (v) => String(v.id) === form.data.asset_id,
+    );
+    const incomingUser = users.find(
+        (u) => String(u.id) === form.data.incoming_user_id,
+    );
 
     const addDamageNote = () => {
         form.setData('damage_notes', [
@@ -276,7 +311,11 @@ function HandoverWizard({
         ]);
     };
 
-    const updateDamageNote = (index: number, field: keyof DamageNote, value: string) => {
+    const updateDamageNote = (
+        index: number,
+        field: keyof DamageNote,
+        value: string,
+    ) => {
         const updated = [...form.data.damage_notes];
         updated[index] = { ...updated[index], [field]: value };
         form.setData('damage_notes', updated);
@@ -331,7 +370,9 @@ function HandoverWizard({
                     <Button
                         type="button"
                         onClick={() =>
-                            setStepIndex((i) => Math.min(WIZARD_STEPS.length - 1, i + 1))
+                            setStepIndex((i) =>
+                                Math.min(WIZARD_STEPS.length - 1, i + 1),
+                            )
                         }
                         disabled={!canContinue}
                     >
@@ -356,14 +397,19 @@ function HandoverWizard({
                             <Label>Vehicle *</Label>
                             <Select
                                 value={form.data.asset_id}
-                                onValueChange={(v) => form.setData('asset_id', v)}
+                                onValueChange={(v) =>
+                                    form.setData('asset_id', v)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select vehicle" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {vehicles.map((v) => (
-                                        <SelectItem key={v.id} value={String(v.id)}>
+                                        <SelectItem
+                                            key={v.id}
+                                            value={String(v.id)}
+                                        >
                                             {v.name}
                                             {v.registration_number
                                                 ? ` (${v.registration_number})`
@@ -380,7 +426,11 @@ function HandoverWizard({
                         </div>
                         <div>
                             <Label>Outgoing Staff</Label>
-                            <Input value={currentUserName} disabled className="bg-muted" />
+                            <Input
+                                value={currentUserName}
+                                disabled
+                                className="bg-muted"
+                            />
                             <p className="mt-1 text-xs text-muted-foreground">
                                 Auto-filled with current user
                             </p>
@@ -389,16 +439,25 @@ function HandoverWizard({
                             <Label>Incoming Staff</Label>
                             <Select
                                 value={form.data.incoming_user_id}
-                                onValueChange={(v) => form.setData('incoming_user_id', v)}
+                                onValueChange={(v) =>
+                                    form.setData('incoming_user_id', v)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select incoming staff" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {users
-                                        .filter((u) => u.id !== payload.current_user_id)
+                                        .filter(
+                                            (u) =>
+                                                u.id !==
+                                                payload.current_user_id,
+                                        )
                                         .map((u) => (
-                                            <SelectItem key={u.id} value={String(u.id)}>
+                                            <SelectItem
+                                                key={u.id}
+                                                value={String(u.id)}
+                                            >
                                                 {u.name}
                                             </SelectItem>
                                         ))}
@@ -415,7 +474,9 @@ function HandoverWizard({
                             <Input
                                 type="number"
                                 value={form.data.odometer_km}
-                                onChange={(e) => form.setData('odometer_km', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('odometer_km', e.target.value)
+                                }
                                 placeholder="Current km"
                             />
                             {form.errors.odometer_km && (
@@ -443,7 +504,12 @@ function HandoverWizard({
                                         key={level.value}
                                         type="button"
                                         variant="outline"
-                                        onClick={() => form.setData('fuel_level', level.value)}
+                                        onClick={() =>
+                                            form.setData(
+                                                'fuel_level',
+                                                level.value,
+                                            )
+                                        }
                                         className={cn(
                                             'h-auto flex-col rounded-xl border-2 px-3 py-4 whitespace-normal transition-all',
                                             form.data.fuel_level === level.value
@@ -461,11 +527,15 @@ function HandoverWizard({
                                                           ? 'bg-status-warning'
                                                           : 'bg-status-critical',
                                                 )}
-                                                style={{ height: `${level.pct}%` }}
+                                                style={{
+                                                    height: `${level.pct}%`,
+                                                }}
                                             />
                                             <div className="absolute -top-1.5 left-1/2 h-2 w-4 -translate-x-1/2 rounded-t border-2 border-current bg-background" />
                                         </div>
-                                        <span className="text-sm font-bold">{level.label}</span>
+                                        <span className="text-sm font-bold">
+                                            {level.label}
+                                        </span>
                                         <span className="text-[10px] text-muted-foreground">
                                             {level.pct}%
                                         </span>
@@ -481,26 +551,58 @@ function HandoverWizard({
 
                         {/* Exterior */}
                         <div>
-                            <Label className="mb-3 block">Exterior Condition *</Label>
+                            <Label className="mb-3 block">
+                                Exterior Condition *
+                            </Label>
                             <div className="grid grid-cols-3 gap-3">
                                 {[
-                                    { value: 'good', label: 'Good', borderColor: 'border-primary', bgColor: 'bg-primary/10 dark:bg-primary/20', textColor: 'text-primary dark:text-primary' },
-                                    { value: 'minor_damage', label: 'Minor Damage', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg', textColor: 'text-status-warning dark:text-status-warning' },
-                                    { value: 'significant_damage', label: 'Significant Damage', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg', textColor: 'text-status-critical dark:text-status-critical' },
+                                    {
+                                        value: 'good',
+                                        label: 'Good',
+                                        borderColor: 'border-primary',
+                                        bgColor:
+                                            'bg-primary/10 dark:bg-primary/20',
+                                        textColor:
+                                            'text-primary dark:text-primary',
+                                    },
+                                    {
+                                        value: 'minor_damage',
+                                        label: 'Minor Damage',
+                                        borderColor: 'border-status-warning/30',
+                                        bgColor: 'bg-status-warning-bg',
+                                        textColor:
+                                            'text-status-warning dark:text-status-warning',
+                                    },
+                                    {
+                                        value: 'significant_damage',
+                                        label: 'Significant Damage',
+                                        borderColor:
+                                            'border-status-critical/30',
+                                        bgColor: 'bg-status-critical-bg',
+                                        textColor:
+                                            'text-status-critical dark:text-status-critical',
+                                    },
                                 ].map((opt) => (
                                     <Button
                                         key={opt.value}
                                         type="button"
                                         variant="outline"
-                                        onClick={() => form.setData('exterior_condition', opt.value)}
+                                        onClick={() =>
+                                            form.setData(
+                                                'exterior_condition',
+                                                opt.value,
+                                            )
+                                        }
                                         className={cn(
                                             'h-auto flex-col gap-2 rounded-xl border-2 px-4 py-4 whitespace-normal transition-all',
-                                            form.data.exterior_condition === opt.value
+                                            form.data.exterior_condition ===
+                                                opt.value
                                                 ? `${opt.borderColor} ${opt.bgColor} ${opt.textColor} shadow-md`
                                                 : 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80',
                                         )}
                                     >
-                                        {form.data.exterior_condition === opt.value && (
+                                        {form.data.exterior_condition ===
+                                            opt.value && (
                                             <Check className="h-5 w-5" />
                                         )}
                                         {opt.label}
@@ -516,26 +618,58 @@ function HandoverWizard({
 
                         {/* Interior */}
                         <div>
-                            <Label className="mb-3 block">Interior Condition *</Label>
+                            <Label className="mb-3 block">
+                                Interior Condition *
+                            </Label>
                             <div className="grid grid-cols-3 gap-3">
                                 {[
-                                    { value: 'clean', label: 'Clean', borderColor: 'border-primary', bgColor: 'bg-primary/10 dark:bg-primary/20', textColor: 'text-primary dark:text-primary' },
-                                    { value: 'acceptable', label: 'Acceptable', borderColor: 'border-status-warning/30', bgColor: 'bg-status-warning-bg', textColor: 'text-status-warning dark:text-status-warning' },
-                                    { value: 'needs_cleaning', label: 'Needs Cleaning', borderColor: 'border-status-critical/30', bgColor: 'bg-status-critical-bg', textColor: 'text-status-critical dark:text-status-critical' },
+                                    {
+                                        value: 'clean',
+                                        label: 'Clean',
+                                        borderColor: 'border-primary',
+                                        bgColor:
+                                            'bg-primary/10 dark:bg-primary/20',
+                                        textColor:
+                                            'text-primary dark:text-primary',
+                                    },
+                                    {
+                                        value: 'acceptable',
+                                        label: 'Acceptable',
+                                        borderColor: 'border-status-warning/30',
+                                        bgColor: 'bg-status-warning-bg',
+                                        textColor:
+                                            'text-status-warning dark:text-status-warning',
+                                    },
+                                    {
+                                        value: 'needs_cleaning',
+                                        label: 'Needs Cleaning',
+                                        borderColor:
+                                            'border-status-critical/30',
+                                        bgColor: 'bg-status-critical-bg',
+                                        textColor:
+                                            'text-status-critical dark:text-status-critical',
+                                    },
                                 ].map((opt) => (
                                     <Button
                                         key={opt.value}
                                         type="button"
                                         variant="outline"
-                                        onClick={() => form.setData('interior_condition', opt.value)}
+                                        onClick={() =>
+                                            form.setData(
+                                                'interior_condition',
+                                                opt.value,
+                                            )
+                                        }
                                         className={cn(
                                             'h-auto flex-col gap-2 rounded-xl border-2 px-4 py-4 whitespace-normal transition-all',
-                                            form.data.interior_condition === opt.value
+                                            form.data.interior_condition ===
+                                                opt.value
                                                 ? `${opt.borderColor} ${opt.bgColor} ${opt.textColor} shadow-md`
                                                 : 'border-transparent bg-muted text-muted-foreground hover:bg-muted/80',
                                         )}
                                     >
-                                        {form.data.interior_condition === opt.value && (
+                                        {form.data.interior_condition ===
+                                            opt.value && (
                                             <Check className="h-5 w-5" />
                                         )}
                                         {opt.label}
@@ -557,13 +691,31 @@ function HandoverWizard({
                     <div className="space-y-6">
                         {/* Checklist */}
                         <div>
-                            <Label className="mb-3 block">Checklist Items</Label>
+                            <Label className="mb-3 block">
+                                Checklist Items
+                            </Label>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {[
-                                    { key: 'keys_present' as const, label: 'Keys Present', icon: Key },
-                                    { key: 'documents_present' as const, label: 'Documents Present', icon: FileText },
-                                    { key: 'first_aid_kit' as const, label: 'First Aid Kit', icon: ShieldPlus },
-                                    { key: 'fire_extinguisher' as const, label: 'Fire Extinguisher', icon: Flame },
+                                    {
+                                        key: 'keys_present' as const,
+                                        label: 'Keys Present',
+                                        icon: Key,
+                                    },
+                                    {
+                                        key: 'documents_present' as const,
+                                        label: 'Documents Present',
+                                        icon: FileText,
+                                    },
+                                    {
+                                        key: 'first_aid_kit' as const,
+                                        label: 'First Aid Kit',
+                                        icon: ShieldPlus,
+                                    },
+                                    {
+                                        key: 'fire_extinguisher' as const,
+                                        label: 'Fire Extinguisher',
+                                        icon: Flame,
+                                    },
                                 ].map((item) => {
                                     const IconComp = item.icon;
                                     return (
@@ -597,7 +749,10 @@ function HandoverWizard({
                                             <Switch
                                                 checked={form.data[item.key]}
                                                 onCheckedChange={() =>
-                                                    form.setData(item.key, !form.data[item.key])
+                                                    form.setData(
+                                                        item.key,
+                                                        !form.data[item.key],
+                                                    )
                                                 }
                                             />
                                         </div>
@@ -622,56 +777,74 @@ function HandoverWizard({
                             </div>
                             {form.data.damage_notes.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">
-                                    No damage noted. Click "Add Damage" to report any damage.
+                                    No damage noted. Click "Add Damage" to
+                                    report any damage.
                                 </p>
                             ) : (
                                 <div className="space-y-3">
-                                    {form.data.damage_notes.map((note, index) => (
-                                        <div
-                                            key={index}
-                                            className="flex items-start gap-3 rounded-lg border p-3"
-                                        >
-                                            <div className="flex-1 space-y-2">
-                                                <Select
-                                                    value={note.area}
-                                                    onValueChange={(v) =>
-                                                        updateDamageNote(index, 'area', v)
-                                                    }
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select area" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {DAMAGE_AREAS.map((area) => (
-                                                            <SelectItem key={area} value={area}>
-                                                                {area}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                <Input
-                                                    value={note.description}
-                                                    onChange={(e) =>
-                                                        updateDamageNote(
-                                                            index,
-                                                            'description',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    placeholder="Describe the damage..."
-                                                />
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeDamageNote(index)}
-                                                className="text-destructive hover:text-destructive"
+                                    {form.data.damage_notes.map(
+                                        (note, index) => (
+                                            <div
+                                                key={index}
+                                                className="flex items-start gap-3 rounded-lg border p-3"
                                             >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    ))}
+                                                <div className="flex-1 space-y-2">
+                                                    <Select
+                                                        value={note.area}
+                                                        onValueChange={(v) =>
+                                                            updateDamageNote(
+                                                                index,
+                                                                'area',
+                                                                v,
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select area" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {DAMAGE_AREAS.map(
+                                                                (area) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            area
+                                                                        }
+                                                                        value={
+                                                                            area
+                                                                        }
+                                                                    >
+                                                                        {area}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <Input
+                                                        value={note.description}
+                                                        onChange={(e) =>
+                                                            updateDamageNote(
+                                                                index,
+                                                                'description',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="Describe the damage..."
+                                                    />
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        removeDamageNote(index)
+                                                    }
+                                                    className="text-destructive hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        ),
+                                    )}
                                 </div>
                             )}
                             {form.errors.damage_notes && (
@@ -693,7 +866,9 @@ function HandoverWizard({
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                 rows={4}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Any additional observations or comments about the vehicle..."
                             />
                             {form.errors.notes && (
@@ -704,7 +879,11 @@ function HandoverWizard({
                         </div>
 
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <ReviewCard icon={Car} title="Details" onEdit={() => setStepIndex(0)}>
+                            <ReviewCard
+                                icon={Car}
+                                title="Details"
+                                onEdit={() => setStepIndex(0)}
+                            >
                                 <ReviewRow
                                     label="Vehicle"
                                     value={
@@ -713,8 +892,14 @@ function HandoverWizard({
                                             : undefined
                                     }
                                 />
-                                <ReviewRow label="Outgoing" value={currentUserName} />
-                                <ReviewRow label="Incoming" value={incomingUser?.name} />
+                                <ReviewRow
+                                    label="Outgoing"
+                                    value={currentUserName}
+                                />
+                                <ReviewRow
+                                    label="Incoming"
+                                    value={incomingUser?.name}
+                                />
                                 <ReviewRow
                                     label="Odometer"
                                     value={
@@ -729,14 +914,23 @@ function HandoverWizard({
                                 title="Fuel & condition"
                                 onEdit={() => setStepIndex(1)}
                             >
-                                <ReviewRow label="Fuel" value={fuelLabel(form.data.fuel_level)} />
+                                <ReviewRow
+                                    label="Fuel"
+                                    value={fuelLabel(form.data.fuel_level)}
+                                />
                                 <ReviewRow
                                     label="Exterior"
-                                    value={form.data.exterior_condition.replace(/_/g, ' ')}
+                                    value={form.data.exterior_condition.replace(
+                                        /_/g,
+                                        ' ',
+                                    )}
                                 />
                                 <ReviewRow
                                     label="Interior"
-                                    value={form.data.interior_condition.replace(/_/g, ' ')}
+                                    value={form.data.interior_condition.replace(
+                                        /_/g,
+                                        ' ',
+                                    )}
                                 />
                             </ReviewCard>
                             <ReviewCard
@@ -747,19 +941,35 @@ function HandoverWizard({
                             >
                                 <ReviewRow
                                     label="Keys"
-                                    value={form.data.keys_present ? 'Present' : 'Missing'}
+                                    value={
+                                        form.data.keys_present
+                                            ? 'Present'
+                                            : 'Missing'
+                                    }
                                 />
                                 <ReviewRow
                                     label="Documents"
-                                    value={form.data.documents_present ? 'Present' : 'Missing'}
+                                    value={
+                                        form.data.documents_present
+                                            ? 'Present'
+                                            : 'Missing'
+                                    }
                                 />
                                 <ReviewRow
                                     label="First aid kit"
-                                    value={form.data.first_aid_kit ? 'Present' : 'Missing'}
+                                    value={
+                                        form.data.first_aid_kit
+                                            ? 'Present'
+                                            : 'Missing'
+                                    }
                                 />
                                 <ReviewRow
                                     label="Fire extinguisher"
-                                    value={form.data.fire_extinguisher ? 'Present' : 'Missing'}
+                                    value={
+                                        form.data.fire_extinguisher
+                                            ? 'Present'
+                                            : 'Missing'
+                                    }
                                 />
                                 <ReviewRow
                                     label="Damage notes"
@@ -793,16 +1003,20 @@ export default function HandoverIndex({
     const allHandovers = Array.isArray(rawHandovers)
         ? rawHandovers
         : (rawHandovers?.data ?? []);
-    const paginationLinks = !Array.isArray(rawHandovers) ? (rawHandovers?.links ?? []) : [];
+    const paginationLinks = !Array.isArray(rawHandovers)
+        ? (rawHandovers?.links ?? [])
+        : [];
     const paginationMeta = !Array.isArray(rawHandovers)
         ? (rawHandovers?.meta ?? { current_page: 1, last_page: 1, total: 0 })
         : { current_page: 1, last_page: 1, total: 0 };
 
     const totalCount = stats?.total ?? allHandovers.length;
     const pendingCount =
-        stats?.pending ?? allHandovers.filter((h) => h.status === 'pending_acceptance').length;
+        stats?.pending ??
+        allHandovers.filter((h) => h.status === 'pending_acceptance').length;
     const disputedCount =
-        stats?.disputed ?? allHandovers.filter((h) => h.status === 'disputed').length;
+        stats?.disputed ??
+        allHandovers.filter((h) => h.status === 'disputed').length;
     const completed7d = stats?.completed_7d ?? 0;
 
     const applyFilter = (key: string, value: string) => {
@@ -842,12 +1056,15 @@ export default function HandoverIndex({
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={ArrowLeftRight} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Vehicle changeovers · accountability</HeroStatusPill>
+                            <HeroStatusPill>
+                                Vehicle changeovers · accountability
+                            </HeroStatusPill>
                             <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                                 Shift Handovers
                             </h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Record and accept vehicle condition at every shift change.
+                                Record and accept vehicle condition at every
+                                shift change.
                             </p>
                         </div>
                         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
@@ -861,7 +1078,9 @@ export default function HandoverIndex({
                                 label="Disputed"
                                 value={fmt(disputedCount)}
                                 caption="needs review"
-                                tone={disputedCount > 0 ? 'critical' : 'success'}
+                                tone={
+                                    disputedCount > 0 ? 'critical' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="Completed 7d"
@@ -899,14 +1118,19 @@ export default function HandoverIndex({
                         <Select
                             value={filters.vehicle_id || '__all__'}
                             onValueChange={(v) =>
-                                applyFilter('vehicle_id', v === '__all__' ? '' : v)
+                                applyFilter(
+                                    'vehicle_id',
+                                    v === '__all__' ? '' : v,
+                                )
                             }
                         >
                             <SelectTrigger>
                                 <SelectValue placeholder="All vehicles" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="__all__">All vehicles</SelectItem>
+                                <SelectItem value="__all__">
+                                    All vehicles
+                                </SelectItem>
                                 {(vehicles ?? []).map((v) => (
                                     <SelectItem key={v.id} value={String(v.id)}>
                                         {v.name}
@@ -929,10 +1153,18 @@ export default function HandoverIndex({
                                 <SelectValue placeholder="All statuses" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="__all__">All statuses</SelectItem>
-                                <SelectItem value="pending_acceptance">Pending</SelectItem>
-                                <SelectItem value="accepted">Accepted</SelectItem>
-                                <SelectItem value="disputed">Disputed</SelectItem>
+                                <SelectItem value="__all__">
+                                    All statuses
+                                </SelectItem>
+                                <SelectItem value="pending_acceptance">
+                                    Pending
+                                </SelectItem>
+                                <SelectItem value="accepted">
+                                    Accepted
+                                </SelectItem>
+                                <SelectItem value="disputed">
+                                    Disputed
+                                </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -943,7 +1175,9 @@ export default function HandoverIndex({
                         <Input
                             type="date"
                             value={filters.date_from ?? ''}
-                            onChange={(e) => applyFilter('date_from', e.target.value)}
+                            onChange={(e) =>
+                                applyFilter('date_from', e.target.value)
+                            }
                             className="w-[150px]"
                         />
                     </div>
@@ -954,7 +1188,9 @@ export default function HandoverIndex({
                         <Input
                             type="date"
                             value={filters.date_to ?? ''}
-                            onChange={(e) => applyFilter('date_to', e.target.value)}
+                            onChange={(e) =>
+                                applyFilter('date_to', e.target.value)
+                            }
                             className="w-[150px]"
                         />
                     </div>
@@ -963,89 +1199,151 @@ export default function HandoverIndex({
                 {/* Table with status color coding */}
                 <div className="overflow-hidden rounded-lg border">
                     <FleetResponsiveTable>
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
-                                <th className="px-3 py-2 text-left font-medium">Date</th>
-                                <th className="px-3 py-2 text-left font-medium">Vehicle</th>
-                                <th className="px-3 py-2 text-left font-medium">Outgoing Staff</th>
-                                <th className="px-3 py-2 text-left font-medium">Incoming Staff</th>
-                                <th className="px-3 py-2 text-left font-medium">Fuel</th>
-                                <th className="px-3 py-2 text-left font-medium">Condition</th>
-                                <th className="px-3 py-2 text-left font-medium">Status</th>
-                                <th className="px-3 py-2 text-right font-medium">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {allHandovers.length === 0 && (
-                                <tr>
-                                    <td
-                                        colSpan={8}
-                                        className="px-3 py-8 text-center text-muted-foreground"
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                    <th className="px-3 py-2 text-left font-medium">
+                                        Date
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium">
+                                        Vehicle
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium">
+                                        Outgoing Staff
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium">
+                                        Incoming Staff
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium">
+                                        Fuel
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium">
+                                        Condition
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium">
+                                        Status
+                                    </th>
+                                    <th className="px-3 py-2 text-right font-medium">
+                                        Actions
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {allHandovers.length === 0 && (
+                                    <tr>
+                                        <td
+                                            colSpan={8}
+                                            className="px-3 py-8 text-center text-muted-foreground"
+                                        >
+                                            No handovers found.
+                                        </td>
+                                    </tr>
+                                )}
+                                {allHandovers.map((h) => (
+                                    <tr
+                                        key={h.id}
+                                        className="border-b transition-colors hover:bg-muted/30"
                                     >
-                                        No handovers found.
-                                    </td>
-                                </tr>
-                            )}
-                            {allHandovers.map((h) => (
-                                <tr
-                                    key={h.id}
-                                    className="border-b transition-colors hover:bg-muted/30"
-                                >
-                                    <td data-fleet-row-time className="px-3 py-2 whitespace-nowrap">
-                                        {h.handed_over_at ? formatDate(h.handed_over_at) : '---'}
-                                    </td>
-                                    <td data-fleet-row-identity className="px-3 py-2">
-                                        <div className="font-medium">{h.asset?.name ?? '---'}</div>
-                                        {h.asset?.registration_number && (
-                                            <div className="text-xs text-muted-foreground">
-                                                {h.asset.registration_number}
+                                        <td
+                                            data-fleet-row-time
+                                            className="px-3 py-2 whitespace-nowrap"
+                                        >
+                                            {h.handed_over_at
+                                                ? formatDate(h.handed_over_at)
+                                                : '---'}
+                                        </td>
+                                        <td
+                                            data-fleet-row-identity
+                                            className="px-3 py-2"
+                                        >
+                                            <div className="font-medium">
+                                                {h.asset?.name ?? '---'}
                                             </div>
-                                        )}
-                                    </td>
-                                    <td className="px-3 py-2">{h.outgoing_user?.name ?? '---'}</td>
-                                    <td className="px-3 py-2">{h.incoming_user?.name ?? '---'}</td>
-                                    <td className="px-3 py-2">{fuelLabel(h.fuel_level)}</td>
-                                    <td className="px-3 py-2">
-                                        <div className="flex gap-1">
-                                            {conditionBadge(h.exterior_condition)}
-                                        </div>
-                                    </td>
-                                    <td data-fleet-row-status className="px-3 py-2">{statusBadge(h.status)}</td>
-                                    <td data-fleet-row-action className="px-3 py-2 text-right">
-                                        <Button variant="ghost" size="sm" asChild>
-                                            <Link href={`/fleet-assets/handovers/${h.id}`}>
-                                                <Eye className="mr-1 h-3.5 w-3.5" />
-                                                View
-                                            </Link>
-                                        </Button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                            {h.asset?.registration_number && (
+                                                <div className="text-xs text-muted-foreground">
+                                                    {
+                                                        h.asset
+                                                            .registration_number
+                                                    }
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {h.outgoing_user?.name ?? '---'}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {h.incoming_user?.name ?? '---'}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {fuelLabel(h.fuel_level)}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            <div className="flex gap-1">
+                                                {conditionBadge(
+                                                    h.exterior_condition,
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td
+                                            data-fleet-row-status
+                                            className="px-3 py-2"
+                                        >
+                                            {statusBadge(h.status)}
+                                        </td>
+                                        <td
+                                            data-fleet-row-action
+                                            className="px-3 py-2 text-right"
+                                        >
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                asChild
+                                            >
+                                                <Link
+                                                    href={`/fleet-assets/handovers/${h.id}`}
+                                                >
+                                                    <Eye className="mr-1 h-3.5 w-3.5" />
+                                                    View
+                                                </Link>
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </FleetResponsiveTable>
                 </div>
 
                 {/* Pagination */}
-                {(paginationMeta.last_page ?? 1) > 1 && paginationLinks.length > 0 && (
-                    <div className="flex items-center justify-center gap-1 pt-4">
-                        {paginationLinks.map((link, i) => (
-                            <Button
-                                key={i}
-                                variant={link.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url)}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
-                    </div>
-                )}
+                {(paginationMeta.last_page ?? 1) > 1 &&
+                    paginationLinks.length > 0 && (
+                        <div className="flex items-center justify-center gap-1 pt-4">
+                            {paginationLinks.map((link, i) => (
+                                <Button
+                                    key={i}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
+                                    size="sm"
+                                    disabled={!link.url}
+                                    onClick={() =>
+                                        link.url && router.get(link.url)
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    )}
 
                 {/* ── New handover wizard (retired /handovers/create page) ── */}
                 {wizard && can.manage && (
-                    <HandoverWizard payload={wizard} open={wizardOpen} onClose={closeWizard} />
+                    <HandoverWizard
+                        payload={wizard}
+                        open={wizardOpen}
+                        onClose={closeWizard}
+                    />
                 )}
             </PageShell>
         </AppLayout>

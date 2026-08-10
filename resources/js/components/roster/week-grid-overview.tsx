@@ -3,8 +3,8 @@ import { useMemo } from 'react';
 import StaffStatus from '@/components/staff-status';
 import { cn } from '@/lib/utils';
 
-import type { RosterShift } from './types';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import type { RosterShift } from './types';
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -55,10 +55,7 @@ export default function WeekGridOverview({
     today,
 }: WeekGridOverviewProps) {
     const todayDate = useMemo(() => new Date(`${today}T00:00:00`), [today]);
-    const weekStart = useMemo(
-        () => startOfMondayWeek(todayDate),
-        [todayDate],
-    );
+    const weekStart = useMemo(() => startOfMondayWeek(todayDate), [todayDate]);
     const days = useMemo(
         () =>
             Array.from({ length: 7 }, (_, i) => {
@@ -74,11 +71,7 @@ export default function WeekGridOverview({
         for (const day of days) {
             map[dayKey(day)] = [];
         }
-        const all = [
-            ...recentShifts,
-            ...todayShifts,
-            ...upcomingShifts,
-        ];
+        const all = [...recentShifts, ...todayShifts, ...upcomingShifts];
         for (const shift of all) {
             if (!shift.starts_at) continue;
             const start = new Date(shift.starts_at);
@@ -129,7 +122,7 @@ export default function WeekGridOverview({
                             <div className="flex items-baseline justify-between">
                                 <span
                                     className={cn(
-                                        'text-xs font-semibold uppercase tracking-wide',
+                                        'text-xs font-semibold tracking-wide uppercase',
                                         isToday
                                             ? 'text-primary'
                                             : 'text-muted-foreground',
@@ -149,7 +142,8 @@ export default function WeekGridOverview({
                             ) : (
                                 <div className="flex flex-col gap-1.5">
                                     {shifts.map((shift) => (
-                                        <GuardrailButton unstyled
+                                        <GuardrailButton
+                                            unstyled
                                             key={shift.id}
                                             type="button"
                                             onClick={() => onSelect(shift)}
@@ -157,7 +151,9 @@ export default function WeekGridOverview({
                                         >
                                             <div className="flex w-full items-center justify-between gap-1">
                                                 <span className="font-semibold tabular-nums">
-                                                    {formatTime(shift.starts_at)}
+                                                    {formatTime(
+                                                        shift.starts_at,
+                                                    )}
                                                 </span>
                                                 <StaffStatus
                                                     kind="shift"

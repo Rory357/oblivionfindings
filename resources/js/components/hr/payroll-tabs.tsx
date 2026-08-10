@@ -24,16 +24,26 @@ type HrCan = {
  * current page never hides its own tab.
  */
 export function PayrollTabs({ active }: { active: PayrollTab }) {
-    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can
-        ?.hr;
+    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth
+        ?.can?.hr;
 
     const all: Array<{ item: HrTabItem; show: boolean }> = [
         {
-            item: { id: 'runs', label: 'Runs', icon: Banknote, tone: 'primary' },
+            item: {
+                id: 'runs',
+                label: 'Runs',
+                icon: Banknote,
+                tone: 'primary',
+            },
             show: !!hr?.payroll?.view,
         },
         {
-            item: { id: 'payslips', label: 'Payslips', icon: FileText, tone: 'info' },
+            item: {
+                id: 'payslips',
+                label: 'Payslips',
+                icon: FileText,
+                tone: 'info',
+            },
             show: !!hr?.payslips?.view,
         },
     ];

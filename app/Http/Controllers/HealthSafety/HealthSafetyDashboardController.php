@@ -245,7 +245,10 @@ class HealthSafetyDashboardController extends Controller
                 'overdue_corrective_actions' => $this->dashboardService->overdueCorrectiveActions($siteScope),
                 'open_investigations' => $this->dashboardService->openInvestigations($siteScope),
                 'notifiable_events' => $this->dashboardService->notifiableEvents($siteScope, 10, $user),
-                'expiring' => $this->dashboardService->expiringFeed($siteScope),
+                'expiring' => $this->dashboardService->expiringFeed(
+                    $siteScope,
+                    viewer: $request->user(),
+                ),
             ],
             'frequency_operands' => $this->kpiService->nearMissOperands($from, $to, $siteScope),
             'hazard_burndown' => $this->kpiService->hazardBurndown(6, $siteScope),
@@ -483,10 +486,6 @@ class HealthSafetyDashboardController extends Controller
             );
 
             return [$requestedSiteId, [$requestedSiteId], $canViewAllSites];
-        }
-
-        if ($canViewAllSites && $this->siteAccess->isUnrestrictedPlatformUser($user)) {
-            return [null, null, true];
         }
 
         $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(

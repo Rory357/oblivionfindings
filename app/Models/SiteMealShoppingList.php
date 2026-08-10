@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,11 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SiteMealShoppingList extends Model
 {
     use AuditableChanges;
+    use WritesLegacyStorageContext;
 
     public const STATUSES = ['draft', 'ordered', 'received', 'cancelled'];
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'status',
         'covers_from',

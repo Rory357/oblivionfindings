@@ -1,8 +1,8 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle2, Circle, Clock3 } from 'lucide-react';
@@ -40,10 +40,13 @@ export default function OnboardingShow({ workflow }: Props) {
     return (
         <AppLayout>
             <Head title="Onboarding Workflow" />
-            <PageHero variant="compact"
-                title={workflow.client
-                    ? `${workflow.client.first_name} ${workflow.client.last_name} Onboarding`
-                    : `Onboarding Workflow #${workflow.id}`}
+            <PageHero
+                variant="compact"
+                title={
+                    workflow.client
+                        ? `${workflow.client.first_name} ${workflow.client.last_name} Onboarding`
+                        : `Onboarding Workflow #${workflow.id}`
+                }
                 description="Track checklist progress, due steps, and completion for this onboarding workflow."
                 backHref="/operations/onboarding"
                 actions={
@@ -51,7 +54,9 @@ export default function OnboardingShow({ workflow }: Props) {
                         <Button
                             size="sm"
                             onClick={() =>
-                                router.post(`/operations/onboarding/${workflow.id}/complete`)
+                                router.post(
+                                    `/operations/onboarding/${workflow.id}/complete`,
+                                )
                             }
                         >
                             Complete Workflow
@@ -61,7 +66,10 @@ export default function OnboardingShow({ workflow }: Props) {
             />
             <PageShell>
                 <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <Badge variant="outline" className="h-5 px-2 text-[10px] capitalize">
+                    <Badge
+                        variant="outline"
+                        className="h-5 px-2 text-[10px] capitalize"
+                    >
                         {workflow.status}
                     </Badge>
                     <span>Started {formatDate(workflow.started_at)}</span>
@@ -81,8 +89,13 @@ export default function OnboardingShow({ workflow }: Props) {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <p className="text-sm font-semibold">{step.step_name}</p>
-                                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">
+                                        <p className="text-sm font-semibold">
+                                            {step.step_name}
+                                        </p>
+                                        <Badge
+                                            variant="outline"
+                                            className="h-4 px-1.5 text-[9px] capitalize"
+                                        >
                                             {step.status}
                                         </Badge>
                                     </div>
@@ -91,7 +104,9 @@ export default function OnboardingShow({ workflow }: Props) {
                                             <Clock3 className="h-3 w-3" />
                                             Due {formatDate(step.due_date)}
                                         </span>
-                                        {step.notes && <span>{step.notes}</span>}
+                                        {step.notes && (
+                                            <span>{step.notes}</span>
+                                        )}
                                     </div>
                                 </div>
                             </CardContent>

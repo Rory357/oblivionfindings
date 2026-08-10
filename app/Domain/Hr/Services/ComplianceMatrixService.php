@@ -3,80 +3,164 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrComplianceRequirement;
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ComplianceMatrixService
 {
     public function __construct(
-        protected LiveComplianceValidator $liveValidator = new LiveComplianceValidator,
+        protected LiveComplianceValidator $liveValidator,
+        protected HrCurrentStaffService $currentStaff,
+        protected ComplianceRequirementApplicabilityService $applicability,
+        protected PeopleMutationLockService $mutationLocks,
     ) {}
 
     /**
-     * Evaluate all active employees against compliance matrix.
+     * Evaluate all current approved staff against the application matrix.
      */
-    public function evaluateAllStaff(?int $tenantId): int
+    public function evaluateAllStaff(): int
     {
-        $profiles = HrEmployeeProfile::query()
-            ->where('is_active', true)
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->with('user')
-            ->get();
-
         $count = 0;
-        foreach ($profiles as $profile) {
-            $user = $profile->user;
-            if (! $user) {
-                continue;
-            }
-            $this->evaluateStaff($user);
-            $count++;
-        }
+        $this->currentStaff->currentUsersQuery()
+            ->with([
+                'roles:id,name',
+                'hrEmployeeProfile.primarySite:id,type',
+            ])
+            ->orderBy('users.id')
+            ->chunkById(200, function ($users) use (&$count): void {
+                foreach ($users as $user) {
+                    $this->evaluateStaff($user);
+                    $count++;
+                }
+            }, 'users.id', 'id');
 
         return $count;
     }
 
     /**
-     * Evaluate a single staff member against the compliance matrix.
+     * Return exact summaries for the supplied current staff collection.
+     * Missing cached rows count as not started.
+     *
+     * @param  Collection<int, User>  $users
+     */
+    public function summariesForUsers(Collection $users): Collection
+    {
+        return $this->applicability->summariesForUsers($users);
+    }
+
+    /** @return Collection<int, Collection<int, array>> */
+    public function snapshotsForUsers(Collection $users): Collection
+    {
+        return $this->applicability->snapshotsForUsers($users);
+    }
+
+    /** @return Collection<int, HrComplianceRequirement> */
+    public function getApplicableRequirements(User $user): Collection
+    {
+        return $this->applicability->forUser($user);
+    }
+
+    /**
+     * Determine exact fully-compliant IDs from an already authorized staff set.
+     * Staff with no applicable requirements are deliberately not classified as
+     * fully compliant.
+     *
+     * @param  Collection<int, User>  $users
+     * @return array<int, int>
+     */
+    public function fullyCompliantUserIds(Collection $users): array
+    {
+        return $this->summariesForUsers($users)
+            ->filter(fn (array $summary) => $summary['fully_compliant'])
+            ->keys()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Return current staff IDs with at least one applicable hard-stop failure.
+     *
+     * @param  Collection<int, User>  $users
+     * @return array<int, int>
+     */
+    public function hardStopFailureUserIds(Collection $users): array
+    {
+        return $this->summariesForUsers($users)
+            ->filter(fn (array $summary) => $summary['hard_stop_failures'] > 0)
+            ->keys()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Exact per-person summary; intended for response shaping after the caller
+     * has already applied its Site-access boundary.
+     */
+    public function summaryForUser(User $user): array
+    {
+        return $this->summariesForUsers(collect([$user]))->get((int) $user->id, [
+            'total' => 0,
+            'compliant' => 0,
+            'expiring_soon' => 0,
+            'expired' => 0,
+            'not_started' => 0,
+            'hard_stop_failures' => 0,
+            'hard_stop_expiring' => 0,
+            'fully_compliant' => false,
+        ]);
+    }
+
+    /**
+     * Evaluate a single staff member against the application-wide matrix.
      */
     public function evaluateStaff(User $user): void
     {
-        $tenantId = $this->tenantIdForUser($user);
-        $requirements = $this->getApplicableRequirements($user);
-
-        foreach ($requirements as $requirement) {
-            $existing = HrStaffComplianceStatus::where('tenant_id', $tenantId)
-                ->where('user_id', $user->id)
-                ->where('requirement_id', $requirement->id)
-                ->first();
-
-            // A manually recorded status (or active exemption) is authoritative — the
-            // nightly source-record sweep must not clobber it. Re-derive only its
-            // status from its own dates so it still ages from compliant → expiring →
-            // expired, preserving the evidence file, notes and valid_from a manager set.
-            if ($existing && ($existing->evidence_type === 'manual' || $existing->exemption_reason)) {
-                $existing->update([
-                    'status' => $this->deriveManualStatus($existing, $requirement),
-                    'last_checked_at' => now(),
-                    'next_check_at' => now()->addDay(),
-                ]);
-
-                continue;
+        DB::transaction(function () use ($user): void {
+            // Use the same canonical User/Profile lock prefix as every manual
+            // compliance mutation. A nightly evaluator can therefore never
+            // overwrite a manual record created or edited concurrently.
+            $locked = $this->mutationLocks->lock([$user->id]);
+            $lockedUser = $locked['users']->get((int) $user->id);
+            if (! $lockedUser) {
+                return;
             }
 
-            $status = $this->checkRequirement($user, $requirement);
+            $lockedUser->load('roles:id,name');
+            $requirements = $this->getApplicableRequirements($lockedUser);
 
-            HrStaffComplianceStatus::updateOrCreate(
-                [
-                    'tenant_id' => $tenantId,
-                    'user_id' => $user->id,
+            foreach ($requirements as $requirement) {
+                $existing = HrStaffComplianceStatus::query()
+                    ->where('user_id', $lockedUser->id)
+                    ->where('requirement_id', $requirement->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                // A manually recorded status (or active exemption) is authoritative — the
+                // nightly source-record sweep must not clobber it. Re-derive only its
+                // status from its own dates so it still ages from compliant → expiring →
+                // expired, preserving the evidence file, notes and valid_from a manager set.
+                if ($existing && ($existing->evidence_type === 'manual' || $existing->exemption_reason)) {
+                    $existing->update([
+                        'status' => $this->deriveManualStatus($existing, $requirement),
+                        'last_checked_at' => now(),
+                        'next_check_at' => now()->addDay(),
+                    ]);
+
+                    continue;
+                }
+
+                $status = $this->checkRequirement($lockedUser, $requirement);
+                $statusRow = $existing ?? new HrStaffComplianceStatus([
+                    'user_id' => $lockedUser->id,
                     'requirement_id' => $requirement->id,
-                ],
-                [
+                ]);
+                $statusRow->fill([
                     'status' => $status['status'],
                     'evidence_type' => $status['evidence_type'],
                     'evidence_id' => $status['evidence_id'],
@@ -84,9 +168,9 @@ class ComplianceMatrixService
                     'expires_at' => $status['expires_at'],
                     'last_checked_at' => now(),
                     'next_check_at' => now()->addDay(),
-                ]
-            );
-        }
+                ])->save();
+            }
+        }, 3);
     }
 
     /**
@@ -199,9 +283,15 @@ class ComplianceMatrixService
      */
     public function getHardStopFailures(User $user): Collection
     {
+        $requirementIds = $this->applicability->forUser($user, true)->pluck('id');
+        if ($requirementIds->isEmpty()) {
+            return collect();
+        }
+
         if ($user->relationLoaded('hrComplianceStatuses')) {
             return $user->hrComplianceStatuses
                 ->filter(fn ($s) => in_array($s->status, ['expired', 'not_started'], true)
+                    && $requirementIds->contains($s->requirement_id)
                     && $s->requirement
                     && $s->requirement->hard_stop
                     && $s->requirement->is_active)
@@ -215,6 +305,7 @@ class ComplianceMatrixService
         }
 
         return HrStaffComplianceStatus::where('user_id', $user->id)
+            ->whereIn('requirement_id', $requirementIds)
             ->whereIn('status', ['expired', 'not_started'])
             ->whereHas('requirement', fn ($q) => $q->where('hard_stop', true)->where('is_active', true))
             ->with('requirement:id,code,name')
@@ -237,9 +328,18 @@ class ComplianceMatrixService
      */
     public function getSoftWarnings(User $user): Collection
     {
+        $requirementIds = $this->applicability->forUser($user)->pluck('id');
+        if ($requirementIds->isEmpty()) {
+            return collect();
+        }
+
         if ($user->relationLoaded('hrComplianceStatuses')) {
             return $user->hrComplianceStatuses
-                ->filter(function ($s) {
+                ->filter(function ($s) use ($requirementIds) {
+                    if (! $requirementIds->contains($s->requirement_id)) {
+                        return false;
+                    }
+
                     if ($s->status === 'expiring_soon') {
                         return true;
                     }
@@ -258,6 +358,7 @@ class ComplianceMatrixService
         }
 
         return HrStaffComplianceStatus::where('user_id', $user->id)
+            ->whereIn('requirement_id', $requirementIds)
             ->where(function ($q) {
                 $q->where('status', 'expiring_soon')
                     ->orWhere(function ($q2) {
@@ -278,44 +379,22 @@ class ComplianceMatrixService
     /**
      * Get compliance summary for a site.
      */
-    public function getComplianceSummary(?int $tenantId, ?int $siteId = null): array
+    public function getComplianceSummary(?int $siteId = null): array
     {
-        $query = HrStaffComplianceStatus::where('tenant_id', $tenantId);
+        $users = $this->currentStaff->currentUsersQuery()
+            ->when($siteId !== null, fn ($query) => $query->whereHas(
+                'hrEmployeeProfile',
+                fn ($profile) => $profile->atSite($siteId),
+            ))
+            ->get();
+        $summaries = $this->summariesForUsers($users);
 
         return [
-            'compliant' => (clone $query)->where('status', 'compliant')->count(),
-            'expiring_soon' => (clone $query)->where('status', 'expiring_soon')->count(),
-            'expired' => (clone $query)->where('status', 'expired')->count(),
-            'not_started' => (clone $query)->where('status', 'not_started')->count(),
+            'compliant' => (int) $summaries->sum('compliant'),
+            'expiring_soon' => (int) $summaries->sum('expiring_soon'),
+            'expired' => (int) $summaries->sum('expired'),
+            'not_started' => (int) $summaries->sum('not_started'),
         ];
-    }
-
-    protected function getApplicableRequirements(User $user): Collection
-    {
-        $roles = $user->roles->pluck('name')->toArray();
-        $tenantId = $this->tenantIdForUser($user);
-
-        return HrComplianceRequirement::where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->whereHas('matrixEntries', function ($q) use ($roles) {
-                $q->whereIn('role', $roles);
-            })
-            ->get();
-    }
-
-    protected function tenantIdForUser(User $user): ?int
-    {
-        $tenantId = $user->getAttribute('tenant_id');
-        if (is_numeric($tenantId)) {
-            return (int) $tenantId;
-        }
-
-        $organizationId = $user->getAttribute('organization_id');
-        if (is_numeric($organizationId)) {
-            return (int) $organizationId;
-        }
-
-        return null;
     }
 
     protected function checkRequirement(User $user, HrComplianceRequirement $requirement): array

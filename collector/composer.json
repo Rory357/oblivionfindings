@@ -1,0 +1,36 @@
+{
+    "name": "oblivionfindings/monitoring-collector",
+    "description": "Database-free remote monitoring collector for Oblivion Findings",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4",
+        "ext-curl": "*",
+        "ext-json": "*",
+        "ext-sockets": "*",
+        "ext-sodium": "*",
+        "symfony/process": "^7.3"
+    },
+    "require-dev": {
+        "pestphp/pest": "^4.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Oblivion\\Collector\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Oblivion\\Collector\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    }
+}

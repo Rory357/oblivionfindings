@@ -1,10 +1,6 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import {
     Dialog,
     DialogContent,
@@ -12,6 +8,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -19,23 +16,25 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateTimeLong } from '@/lib/datetime';
+import { Head, Link, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowLeft,
     Calendar,
     CheckCircle2,
     Clock,
     FileText,
-    MapPin,
-    Send,
-    Lock,
-    User,
     Image,
-    ArrowLeft,
+    Lock,
+    MapPin,
     Shield,
+    User,
     Zap,
 } from 'lucide-react';
 import { useState } from 'react';
-import { formatDateTimeLong } from '@/lib/datetime';
 
 type Site = {
     id: number;
@@ -80,10 +79,34 @@ type Props = {
 };
 
 const RISK_MATRIX: Record<string, Record<string, string>> = {
-    low: { rare: 'low', unlikely: 'low', possible: 'medium', likely: 'medium', almost_certain: 'high' },
-    medium: { rare: 'low', unlikely: 'medium', possible: 'medium', likely: 'high', almost_certain: 'high' },
-    high: { rare: 'medium', unlikely: 'medium', possible: 'high', likely: 'high', almost_certain: 'extreme' },
-    critical: { rare: 'high', unlikely: 'high', possible: 'extreme', likely: 'extreme', almost_certain: 'extreme' },
+    low: {
+        rare: 'low',
+        unlikely: 'low',
+        possible: 'medium',
+        likely: 'medium',
+        almost_certain: 'high',
+    },
+    medium: {
+        rare: 'low',
+        unlikely: 'medium',
+        possible: 'medium',
+        likely: 'high',
+        almost_certain: 'high',
+    },
+    high: {
+        rare: 'medium',
+        unlikely: 'medium',
+        possible: 'high',
+        likely: 'high',
+        almost_certain: 'extreme',
+    },
+    critical: {
+        rare: 'high',
+        unlikely: 'high',
+        possible: 'extreme',
+        likely: 'extreme',
+        almost_certain: 'extreme',
+    },
 };
 
 const sevKeys = ['low', 'medium', 'high', 'critical'];
@@ -103,11 +126,30 @@ const severityConfig: Record<string, { bg: string; text: string }> = {
     critical: { bg: 'bg-status-critical-bg', text: 'text-status-critical' },
 };
 
-const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
-    open: { bg: 'bg-status-critical-bg', text: 'text-status-critical', icon: AlertTriangle },
-    in_progress: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Clock },
-    mitigated: { bg: 'bg-primary/10', text: 'text-primary', icon: CheckCircle2 },
-    closed: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2 },
+const statusConfig: Record<
+    string,
+    { bg: string; text: string; icon: typeof Clock }
+> = {
+    open: {
+        bg: 'bg-status-critical-bg',
+        text: 'text-status-critical',
+        icon: AlertTriangle,
+    },
+    in_progress: {
+        bg: 'bg-status-info-bg',
+        text: 'text-status-info',
+        icon: Clock,
+    },
+    mitigated: {
+        bg: 'bg-primary/10',
+        text: 'text-primary',
+        icon: CheckCircle2,
+    },
+    closed: {
+        bg: 'bg-status-success-bg',
+        text: 'text-status-success',
+        icon: CheckCircle2,
+    },
 };
 
 const riskConfig: Record<string, { bg: string; text: string }> = {
@@ -126,14 +168,23 @@ const WORKFLOW_STEPS = [
 
 function matrixCellColor(rating: string) {
     switch (rating) {
-        case 'extreme': return 'bg-status-critical text-white';
-        case 'high': return 'bg-status-warning text-white';
-        case 'medium': return 'bg-status-warning-bg text-status-warning';
-        default: return 'bg-status-success-bg text-status-success';
+        case 'extreme':
+            return 'bg-status-critical text-white';
+        case 'high':
+            return 'bg-status-warning text-white';
+        case 'medium':
+            return 'bg-status-warning-bg text-status-warning';
+        default:
+            return 'bg-status-success-bg text-status-success';
     }
 }
 
-export default function HazardShow({ hazard, users, canAssign, canClose }: Props) {
+export default function HazardShow({
+    hazard,
+    users,
+    canAssign,
+    canClose,
+}: Props) {
     const [showAssignDialog, setShowAssignDialog] = useState(false);
     const [showCloseDialog, setShowCloseDialog] = useState(false);
 
@@ -150,46 +201,79 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
     const risk = riskConfig[hazard.risk_rating] ?? riskConfig.low;
     const StatusIcon = stat.icon;
 
-    const isOverdue = hazard.due_date && new Date(hazard.due_date) < new Date() &&
+    const isOverdue =
+        hazard.due_date &&
+        new Date(hazard.due_date) < new Date() &&
         !['closed', 'mitigated'].includes(hazard.status);
 
     const stepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === hazard.status);
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: hazard.site.name, href: `/sites/${hazard.site.id}` }, { title: 'Hazards', href: `/sites/${hazard.site.id}/hazards` }, { title: hazard.reference_number, href: `/hazards/${hazard.id}` }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                { title: hazard.site.name, href: `/sites/${hazard.site.id}` },
+                { title: 'Hazards', href: `/sites/${hazard.site.id}/hazards` },
+                {
+                    title: hazard.reference_number,
+                    href: `/hazards/${hazard.id}`,
+                },
+            ]}
+        >
             <Head title={`Hazard ${hazard.reference_number}`} />
 
             <div className="mx-auto max-w-4xl space-y-6 pb-8">
                 {/* Back button */}
-                <Link href={`/sites/${hazard.site.id}/hazards`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <Link
+                    href={`/sites/${hazard.site.id}/hazards`}
+                    className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
                     <ArrowLeft className="h-4 w-4" />
                     Back to Hazards
                 </Link>
 
                 {/* Header card */}
                 <Card className="overflow-hidden">
-                    <div className={`h-2 ${riskBarColors[hazard.risk_rating] ?? 'bg-muted'}`} />
+                    <div
+                        className={`h-2 ${riskBarColors[hazard.risk_rating] ?? 'bg-muted'}`}
+                    />
                     <CardContent className="pt-5">
                         <div className="flex items-start justify-between gap-4">
                             <div>
-                                <div className="flex items-center gap-2 flex-wrap mb-2">
-                                    <span className="text-lg font-semibold">{hazard.reference_number}</span>
-                                    <span className="text-muted-foreground">|</span>
-                                    <span className="text-lg capitalize">{hazard.custom_hazard_type || hazard.hazard_type.replace(/_/g, ' ')}</span>
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                    <span className="text-lg font-semibold">
+                                        {hazard.reference_number}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                        |
+                                    </span>
+                                    <span className="text-lg capitalize">
+                                        {hazard.custom_hazard_type ||
+                                            hazard.hazard_type.replace(
+                                                /_/g,
+                                                ' ',
+                                            )}
+                                    </span>
                                 </div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <Badge className={`${sev.bg} ${sev.text} border-0 text-[10px] font-medium`}>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Badge
+                                        className={`${sev.bg} ${sev.text} border-0 text-[10px] font-medium`}
+                                    >
                                         {hazard.severity}
                                     </Badge>
-                                    <Badge className={`${stat.bg} ${stat.text} border-0 text-[10px] font-medium`}>
+                                    <Badge
+                                        className={`${stat.bg} ${stat.text} border-0 text-[10px] font-medium`}
+                                    >
                                         <StatusIcon className="mr-1 h-3 w-3" />
                                         {hazard.status.replace(/_/g, ' ')}
                                     </Badge>
-                                    <Badge className={`${risk.bg} ${risk.text} border-0 text-[10px] font-medium`}>
+                                    <Badge
+                                        className={`${risk.bg} ${risk.text} border-0 text-[10px] font-medium`}
+                                    >
                                         {hazard.risk_rating} risk
                                     </Badge>
                                     {isOverdue && (
-                                        <Badge className="bg-status-critical-bg text-status-critical border-0 text-[10px] font-medium">
+                                        <Badge className="border-0 bg-status-critical-bg text-[10px] font-medium text-status-critical">
                                             <Clock className="mr-1 h-3 w-3" />
                                             Overdue
                                         </Badge>
@@ -198,17 +282,33 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                             </div>
                             <div className="flex items-center gap-2">
                                 {hazard.status !== 'closed' && canAssign && (
-                                    <Button variant="outline" size="sm" onClick={() => setShowAssignDialog(true)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            setShowAssignDialog(true)
+                                        }
+                                    >
                                         <User className="mr-1 h-4 w-4" />
-                                        {hazard.assigned_to ? 'Reassign' : 'Assign'}
+                                        {hazard.assigned_to
+                                            ? 'Reassign'
+                                            : 'Assign'}
                                     </Button>
                                 )}
-                                {['open', 'in_progress', 'mitigated'].includes(hazard.status) && canClose && (
-                                    <Button size="sm" onClick={() => setShowCloseDialog(true)}>
-                                        <CheckCircle2 className="mr-1 h-4 w-4" />
-                                        Close
-                                    </Button>
-                                )}
+                                {['open', 'in_progress', 'mitigated'].includes(
+                                    hazard.status,
+                                ) &&
+                                    canClose && (
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                setShowCloseDialog(true)
+                                            }
+                                        >
+                                            <CheckCircle2 className="mr-1 h-4 w-4" />
+                                            Close
+                                        </Button>
+                                    )}
                             </div>
                         </div>
                     </CardContent>
@@ -223,23 +323,32 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                                 const isReached = idx <= stepIndex;
                                 const isCurrent = idx === stepIndex;
                                 return (
-                                    <div key={step.key} className="flex items-center flex-1">
+                                    <div
+                                        key={step.key}
+                                        className="flex flex-1 items-center"
+                                    >
                                         <div className="flex flex-col items-center gap-1">
-                                            <div className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
-                                                isCurrent
-                                                    ? 'bg-primary text-primary-foreground border-primary'
-                                                    : isReached
-                                                        ? 'bg-primary/10 text-primary border-primary/30'
-                                                        : 'bg-muted text-muted-foreground border-muted'
-                                            }`}>
+                                            <div
+                                                className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
+                                                    isCurrent
+                                                        ? 'border-primary bg-primary text-primary-foreground'
+                                                        : isReached
+                                                          ? 'border-primary/30 bg-primary/10 text-primary'
+                                                          : 'border-muted bg-muted text-muted-foreground'
+                                                }`}
+                                            >
                                                 <StepIcon className="h-4 w-4" />
                                             </div>
-                                            <span className={`text-xs font-medium ${isCurrent ? 'text-primary' : isReached ? 'text-primary/70' : 'text-muted-foreground'}`}>
+                                            <span
+                                                className={`text-xs font-medium ${isCurrent ? 'text-primary' : isReached ? 'text-primary/70' : 'text-muted-foreground'}`}
+                                            >
                                                 {step.label}
                                             </span>
                                         </div>
                                         {idx < WORKFLOW_STEPS.length - 1 && (
-                                            <div className={`flex-1 h-0.5 mx-2 ${isReached && idx < stepIndex ? 'bg-primary/30' : 'bg-muted'}`} />
+                                            <div
+                                                className={`mx-2 h-0.5 flex-1 ${isReached && idx < stepIndex ? 'bg-primary/30' : 'bg-muted'}`}
+                                            />
                                         )}
                                     </div>
                                 );
@@ -252,7 +361,7 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                     {/* Risk matrix visual */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
+                            <CardTitle className="flex items-center gap-2 text-sm">
                                 <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                                 Risk Matrix
                             </CardTitle>
@@ -260,13 +369,23 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                         <CardContent>
                             <div className="flex items-start gap-4">
                                 <div className="flex-1 overflow-x-auto">
-                                    <table className="text-[10px] border-collapse w-full">
+                                    <table className="w-full border-collapse text-[10px]">
                                         <thead>
                                             <tr>
                                                 <th className="p-1.5" />
                                                 {likKeys.map((l) => (
-                                                    <th key={l} className="p-1.5 text-center font-medium text-muted-foreground capitalize">
-                                                        {l.replace('_', ' ').split(' ')[0]}
+                                                    <th
+                                                        key={l}
+                                                        className="p-1.5 text-center font-medium text-muted-foreground capitalize"
+                                                    >
+                                                        {
+                                                            l
+                                                                .replace(
+                                                                    '_',
+                                                                    ' ',
+                                                                )
+                                                                .split(' ')[0]
+                                                        }
                                                     </th>
                                                 ))}
                                             </tr>
@@ -274,18 +393,31 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                                         <tbody>
                                             {[...sevKeys].reverse().map((s) => (
                                                 <tr key={s}>
-                                                    <td className="p-1.5 font-medium text-muted-foreground capitalize pr-2 text-right">{s}</td>
+                                                    <td className="p-1.5 pr-2 text-right font-medium text-muted-foreground capitalize">
+                                                        {s}
+                                                    </td>
                                                     {likKeys.map((l) => {
-                                                        const cellRating = RISK_MATRIX[s]?.[l] ?? 'low';
-                                                        const isActive = s === hazard.severity && l === hazard.likelihood;
+                                                        const cellRating =
+                                                            RISK_MATRIX[s]?.[
+                                                                l
+                                                            ] ?? 'low';
+                                                        const isActive =
+                                                            s ===
+                                                                hazard.severity &&
+                                                            l ===
+                                                                hazard.likelihood;
                                                         return (
                                                             <td
                                                                 key={l}
-                                                                className={`p-1.5 text-center rounded ${matrixCellColor(cellRating)} ${
-                                                                    isActive ? 'ring-2 ring-offset-1 ring-ring font-bold text-xs' : ''
+                                                                className={`rounded p-1.5 text-center ${matrixCellColor(cellRating)} ${
+                                                                    isActive
+                                                                        ? 'text-xs font-bold ring-2 ring-ring ring-offset-1'
+                                                                        : ''
                                                                 }`}
                                                             >
-                                                                {cellRating.charAt(0).toUpperCase()}
+                                                                {cellRating
+                                                                    .charAt(0)
+                                                                    .toUpperCase()}
                                                             </td>
                                                         );
                                                     })}
@@ -296,16 +428,33 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                                 </div>
                                 <div className="space-y-2 text-xs">
                                     <div>
-                                        <div className="text-muted-foreground">Severity</div>
-                                        <Badge className={`${sev.bg} ${sev.text} border-0 text-[10px]`}>{hazard.severity}</Badge>
+                                        <div className="text-muted-foreground">
+                                            Severity
+                                        </div>
+                                        <Badge
+                                            className={`${sev.bg} ${sev.text} border-0 text-[10px]`}
+                                        >
+                                            {hazard.severity}
+                                        </Badge>
                                     </div>
                                     <div>
-                                        <div className="text-muted-foreground">Likelihood</div>
-                                        <span className="capitalize font-medium">{hazard.likelihood.replace(/_/g, ' ')}</span>
+                                        <div className="text-muted-foreground">
+                                            Likelihood
+                                        </div>
+                                        <span className="font-medium capitalize">
+                                            {hazard.likelihood.replace(
+                                                /_/g,
+                                                ' ',
+                                            )}
+                                        </span>
                                     </div>
                                     <div>
-                                        <div className="text-muted-foreground">Risk Rating</div>
-                                        <Badge className={`${risk.bg} ${risk.text} border-0 text-[10px] font-semibold`}>
+                                        <div className="text-muted-foreground">
+                                            Risk Rating
+                                        </div>
+                                        <Badge
+                                            className={`${risk.bg} ${risk.text} border-0 text-[10px] font-semibold`}
+                                        >
                                             {hazard.risk_rating.toUpperCase()}
                                         </Badge>
                                     </div>
@@ -317,15 +466,19 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                     {/* Details */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
+                            <CardTitle className="flex items-center gap-2 text-sm">
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                                 Details
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <div className="text-xs text-muted-foreground mb-1">Description</div>
-                                <p className="text-sm whitespace-pre-wrap">{hazard.description}</p>
+                                <div className="mb-1 text-xs text-muted-foreground">
+                                    Description
+                                </div>
+                                <p className="text-sm whitespace-pre-wrap">
+                                    {hazard.description}
+                                </p>
                             </div>
                             {hazard.location && (
                                 <div className="flex items-center gap-2 text-sm">
@@ -335,16 +488,27 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                             )}
                             <div className="flex items-center gap-2 text-sm">
                                 <User className="h-4 w-4 text-muted-foreground" />
-                                <span>Reported by {hazard.reported_by.name}</span>
+                                <span>
+                                    Reported by {hazard.reported_by.name}
+                                </span>
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                                <span>{formatDateTimeLong(hazard.created_at)}</span>
+                                <span>
+                                    {formatDateTimeLong(hazard.created_at)}
+                                </span>
                             </div>
                             {hazard.due_date && (
-                                <div className={`flex items-center gap-2 text-sm ${isOverdue ? 'text-status-critical font-medium' : ''}`}>
+                                <div
+                                    className={`flex items-center gap-2 text-sm ${isOverdue ? 'font-medium text-status-critical' : ''}`}
+                                >
                                     <Clock className="h-4 w-4" />
-                                    <span>Due {new Date(hazard.due_date).toLocaleDateString()}</span>
+                                    <span>
+                                        Due{' '}
+                                        {new Date(
+                                            hazard.due_date,
+                                        ).toLocaleDateString()}
+                                    </span>
                                 </div>
                             )}
                         </CardContent>
@@ -354,7 +518,7 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                     {hazard.photo_paths && hazard.photo_paths.length > 0 && (
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-sm flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
                                     <Image className="h-4 w-4 text-muted-foreground" />
                                     Photos ({hazard.photo_paths.length})
                                 </CardTitle>
@@ -362,8 +526,15 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                             <CardContent>
                                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                     {hazard.photo_paths.map((path, idx) => (
-                                        <div key={idx} className="aspect-square rounded-lg bg-muted overflow-hidden">
-                                            <img src={`/storage/${path}`} alt={`Hazard photo ${idx + 1}`} className="h-full w-full object-cover" />
+                                        <div
+                                            key={idx}
+                                            className="aspect-square overflow-hidden rounded-lg bg-muted"
+                                        >
+                                            <img
+                                                src={`/storage/${path}`}
+                                                alt={`Hazard photo ${idx + 1}`}
+                                                className="h-full w-full object-cover"
+                                            />
                                         </div>
                                     ))}
                                 </div>
@@ -374,28 +545,43 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                     {/* Assignment */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-sm flex items-center gap-2">
+                            <CardTitle className="flex items-center gap-2 text-sm">
                                 <User className="h-4 w-4 text-muted-foreground" />
                                 Assignment
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="flex items-center gap-3">
-                                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${hazard.assigned_to ? 'bg-status-info-bg text-status-info' : 'bg-muted text-muted-foreground'}`}>
+                                <div
+                                    className={`flex h-10 w-10 items-center justify-center rounded-full ${hazard.assigned_to ? 'bg-status-info-bg text-status-info' : 'bg-muted text-muted-foreground'}`}
+                                >
                                     <User className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <div className="text-sm font-medium">{hazard.assigned_to?.name || 'Unassigned'}</div>
+                                    <div className="text-sm font-medium">
+                                        {hazard.assigned_to?.name ||
+                                            'Unassigned'}
+                                    </div>
                                     {hazard.assigned_at && (
                                         <div className="text-xs text-muted-foreground">
-                                            Assigned on {new Date(hazard.assigned_at).toLocaleDateString()}
+                                            Assigned on{' '}
+                                            {new Date(
+                                                hazard.assigned_at,
+                                            ).toLocaleDateString()}
                                         </div>
                                     )}
                                 </div>
                             </div>
                             {hazard.status !== 'closed' && canAssign && (
-                                <Button variant="outline" size="sm" className="w-full" onClick={() => setShowAssignDialog(true)}>
-                                    {hazard.assigned_to ? 'Reassign' : 'Assign someone'}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => setShowAssignDialog(true)}
+                                >
+                                    {hazard.assigned_to
+                                        ? 'Reassign'
+                                        : 'Assign someone'}
                                 </Button>
                             )}
                         </CardContent>
@@ -405,14 +591,15 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                     {hazard.immediate_action_applied && (
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-sm flex items-center gap-2">
+                                <CardTitle className="flex items-center gap-2 text-sm">
                                     <Zap className="h-4 w-4 text-muted-foreground" />
                                     Immediate Action Taken
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <p className="text-sm whitespace-pre-wrap">
-                                    {hazard.immediate_action_taken || 'No details provided'}
+                                    {hazard.immediate_action_taken ||
+                                        'No details provided'}
                                 </p>
                             </CardContent>
                         </Card>
@@ -422,16 +609,21 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                     {hazard.resolution_summary && (
                         <Card className="border-status-success/30 bg-status-success-bg">
                             <CardHeader>
-                                <CardTitle className="text-sm flex items-center gap-2 text-status-success">
+                                <CardTitle className="flex items-center gap-2 text-sm text-status-success">
                                     <CheckCircle2 className="h-4 w-4" />
                                     Resolution
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-sm whitespace-pre-wrap">{hazard.resolution_summary}</p>
+                                <p className="text-sm whitespace-pre-wrap">
+                                    {hazard.resolution_summary}
+                                </p>
                                 {hazard.closed_at && (
-                                    <div className="text-xs text-muted-foreground mt-3">
-                                        Closed on {new Date(hazard.closed_at).toLocaleDateString()}
+                                    <div className="mt-3 text-xs text-muted-foreground">
+                                        Closed on{' '}
+                                        {new Date(
+                                            hazard.closed_at,
+                                        ).toLocaleDateString()}
                                     </div>
                                 )}
                             </CardContent>
@@ -458,22 +650,43 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                         <div className="space-y-1.5">
                             <Label>Assign to</Label>
                             <Select
-                                value={assignForm.data.assigned_to_user_id || undefined}
-                                onValueChange={(v) => assignForm.setData('assigned_to_user_id', v)}
+                                value={
+                                    assignForm.data.assigned_to_user_id ||
+                                    undefined
+                                }
+                                onValueChange={(v) =>
+                                    assignForm.setData('assigned_to_user_id', v)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select user..." />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {users.map((u) => (
-                                        <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                                        <SelectItem
+                                            key={u.id}
+                                            value={u.id.toString()}
+                                        >
+                                            {u.name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
-                            <Button type="submit" disabled={assignForm.processing}>Assign</Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowAssignDialog(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={assignForm.processing}
+                            >
+                                Assign
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -498,15 +711,31 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                             <Label>Resolution Summary</Label>
                             <Textarea
                                 value={closeForm.data.resolution_summary}
-                                onChange={(e) => closeForm.setData('resolution_summary', e.target.value)}
+                                onChange={(e) =>
+                                    closeForm.setData(
+                                        'resolution_summary',
+                                        e.target.value,
+                                    )
+                                }
                                 rows={4}
                                 placeholder="Describe how the hazard was resolved..."
                                 required
                             />
                         </div>
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setShowCloseDialog(false)}>Cancel</Button>
-                            <Button type="submit" disabled={closeForm.processing}>Close Hazard</Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setShowCloseDialog(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={closeForm.processing}
+                            >
+                                Close Hazard
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

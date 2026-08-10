@@ -33,7 +33,6 @@ class ClientSleepChartController extends Controller
         ClientSleepEntry::query()->create([
             ...$data,
             'client_id' => $client->id,
-            'organization_id' => $request->user()?->organization_id ?? $client->organization_id,
             'recorded_by' => $request->user()?->id,
         ]);
 

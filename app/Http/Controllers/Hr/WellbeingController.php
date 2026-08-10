@@ -2,30 +2,31 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrWellbeingCheckin;
 use App\Domain\Hr\Services\EngagementService;
+use App\Domain\Hr\Services\HrWellbeingAccessService;
 use App\Domain\Hr\Services\WellbeingCareService;
 use App\Domain\Hr\Services\WellbeingIndicatorService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WellbeingController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly WellbeingIndicatorService $wellbeingIndicatorService,
         private readonly EngagementService $engagementService,
         private readonly WellbeingCareService $careService,
+        private readonly HrWellbeingAccessService $access,
     ) {}
 
     public function index(Request $request)
@@ -33,7 +34,7 @@ class WellbeingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.wellbeing.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->access->currentStaff($user, $user);
         $canManage = $user->canDo('hr.performance.manage');
         $statusFilter = (string) $request->string('status', 'all');
         $ownerFilter = $request->integer('owner');
@@ -44,44 +45,47 @@ class WellbeingController extends Controller
             $statusFilter = 'all';
         }
 
-        $summary = $this->wellbeingIndicatorService->getSummary($tenantId);
-        $flaggedStaff = $this->wellbeingIndicatorService->getFlaggedStaff($tenantId)->take(30)->values();
+        $summary = $canManage
+            ? $this->wellbeingIndicatorService->getSummary($user)
+            : ['total_staff' => 0, 'flagged_red' => 0, 'flagged_amber' => 0, 'healthy' => 0];
+        $flaggedStaff = $canManage
+            ? $this->wellbeingIndicatorService->getFlaggedStaff($user)->take(30)->values()
+            : collect();
 
-        $activeStaffCount = HrEmployeeProfile::query()
-            ->where('is_active', true)
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->count();
+        $activeStaffCount = $canManage ? $this->access->staffOptions($user)->count() : 0;
 
         $surveys = HrEngagementSurvey::query()
             ->with('questions:id,survey_id,question_type')
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->when(! $canManage, fn ($query) => $query->whereIn('status', ['published', 'closed']))
             ->orderByRaw("CASE WHEN status = 'published' THEN 0 WHEN status = 'draft' THEN 1 WHEN status = 'closed' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')
-            ->limit($canManage ? 60 : 20)
-            ->get()
+            ->lazy(100)
+            ->filter(fn (HrEngagementSurvey $survey) => $canManage
+                ? $this->access->canManageSurvey($user, $survey)
+                : $this->engagementService->isCurrentRecipient($survey, $user))
+            ->take($canManage ? 60 : 20)
+            ->collect()
             ->map(fn (HrEngagementSurvey $survey) => $this->presentSurvey($survey, $user, $canManage, $activeStaffCount))
             ->values();
 
-        $actionPlans = HrEngagementActionPlan::query()
-            ->with(['owner:id,name', 'survey:id,title', 'staff:id,name', 'notes.author:id,name'])
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->when(! $canManage, fn ($query) => $query->where('owner_user_id', $user->id))
-            ->when($statusFilter !== 'all', fn ($query) => $query->where('status', $statusFilter))
-            ->when($canManage && $ownerFilter > 0, fn ($query) => $query->where('owner_user_id', $ownerFilter))
-            ->orderByRaw("CASE WHEN status = 'open' THEN 0 WHEN status = 'in_progress' THEN 1 ELSE 2 END")
-            ->orderBy('due_date')
-            ->limit(60)
-            ->get()
-            ->map(fn (HrEngagementActionPlan $plan) => $this->presentActionPlan($plan, $canManage, $user->id))
+        $visiblePlans = $this->access->visibleActionPlans($user, $canManage);
+        $visibleStaffIds = $this->access->staffOptions($user)->pluck('id');
+        $actionPlans = $visiblePlans
+            ->when($statusFilter !== 'all', fn (Collection $plans) => $plans->where('status', $statusFilter))
+            ->when($canManage && $ownerFilter > 0, fn (Collection $plans) => $plans->where('owner_user_id', $ownerFilter))
+            ->sortBy(fn (HrEngagementActionPlan $plan) => sprintf(
+                '%d|%s',
+                match ($plan->status) {
+                    'open' => 0, 'in_progress' => 1, default => 2
+                },
+                optional($plan->due_date)->toDateString() ?? '9999-12-31',
+            ))
+            ->take(60)
+            ->map(fn (HrEngagementActionPlan $plan) => $this->presentActionPlan($plan, $canManage, $user->id, $visibleStaffIds))
             ->values();
 
         // Owners that already hold plans (kept for backward-compatible filters).
-        $actionPlanOwners = HrEngagementActionPlan::query()
-            ->with('owner:id,name')
-            ->whereNotNull('owner_user_id')
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->get()
+        $actionPlanOwners = $visiblePlans
             ->map(fn (HrEngagementActionPlan $plan) => $plan->owner ? ['id' => $plan->owner->id, 'name' => $plan->owner->name] : null)
             ->filter()
             ->unique('id')
@@ -89,10 +93,10 @@ class WellbeingController extends Controller
             ->values();
 
         // Full active-staff list for assigning owners / picking subjects in the wizards.
-        $staffOptions = $this->ownerOptions($tenantId);
+        $staffOptions = $canManage ? $this->ownerOptions($user) : collect();
 
-        $slaSummary = $this->engagementService->actionPlanSlaSummary($tenantId, $user->id, $canManage);
-        $ownerWorkload = $canManage ? $this->engagementService->actionPlanOwnerWorkload($tenantId) : [];
+        $slaSummary = $this->engagementService->actionPlanSlaSummary($visiblePlans);
+        $ownerWorkload = $canManage ? $this->engagementService->actionPlanOwnerWorkload($visiblePlans) : [];
 
         // Latest published/closed survey with eNPS — feeds the hero stat.
         $latestEnps = null;
@@ -137,10 +141,10 @@ class WellbeingController extends Controller
             'staffOptions' => $staffOptions,
             'needs' => $needs,
             'templates' => $canManage ? $this->engagementService->templates() : [],
-            'sites' => $canManage ? $this->siteOptions($tenantId) : [],
+            'sites' => $canManage ? $this->siteOptions($user) : [],
             'activeStaffCount' => $activeStaffCount,
-            'tenantTrend' => $canManage ? $this->wellbeingIndicatorService->getTenantTrend($tenantId) : [],
-            'my' => $this->employeeView($user, $tenantId),
+            'trend' => $canManage ? $this->wellbeingIndicatorService->getTrend($user) : [],
+            'my' => $this->employeeView($user),
             'filters' => [
                 'status' => $statusFilter,
                 'owner' => $canManage && $ownerFilter > 0 ? $ownerFilter : null,
@@ -156,7 +160,7 @@ class WellbeingController extends Controller
      */
     private function presentSurvey(HrEngagementSurvey $survey, $user, bool $canManage, int $activeStaffCount): array
     {
-        $respondentHash = hash_hmac('sha256', $survey->id . ':' . $user->id, (string) config('app.key'));
+        $respondentHash = hash_hmac('sha256', $survey->id.':'.$user->id, (string) config('app.key'));
         $hasResponded = $survey->responses()
             ->where(function ($query) use ($survey, $user, $respondentHash) {
                 if ($survey->is_anonymous) {
@@ -224,7 +228,7 @@ class WellbeingController extends Controller
         $end = $survey->ends_at?->format('j M');
 
         if ($start && $end) {
-            return $start . ' – ' . $end;
+            return $start.' – '.$end;
         }
 
         return $start ?? $end ?? 'Not scheduled';
@@ -233,16 +237,20 @@ class WellbeingController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function presentActionPlan(HrEngagementActionPlan $plan, bool $canManage, int $viewerId): array
-    {
+    private function presentActionPlan(
+        HrEngagementActionPlan $plan,
+        bool $canManage,
+        int $viewerId,
+        Collection $visibleStaffIds,
+    ): array {
         $openStatuses = ['open', 'in_progress'];
         $daysUntilDue = $plan->due_date
             ? now()->startOfDay()->diffInDays($plan->due_date->copy()->startOfDay(), false)
             : null;
 
         $linkLabel = $plan->survey
-            ? ('From ' . $plan->survey->title)
-            : ($plan->staff ? ('From flag · ' . $plan->staff->name) : 'Standalone');
+            ? ('From '.$plan->survey->title)
+            : ($plan->staff ? ('From flag · '.$plan->staff->name) : 'Standalone');
 
         return [
             'id' => $plan->id,
@@ -264,7 +272,11 @@ class WellbeingController extends Controller
             'notes' => $plan->relationLoaded('notes')
                 ? $plan->notes->map(fn ($note) => [
                     'id' => $note->id,
-                    'author' => $note->author?->name ?? ($note->kind === 'system' ? 'System' : 'Unknown'),
+                    'author' => $note->kind === 'system'
+                        ? 'System'
+                        : ($note->author && $visibleStaffIds->contains($note->author->id)
+                            ? $note->author->name
+                            : 'Unavailable staff'),
                     'kind' => $note->kind,
                     'body' => $note->body,
                     'created_human' => $note->created_at ? Carbon::parse($note->created_at)->diffForHumans() : null,
@@ -273,34 +285,23 @@ class WellbeingController extends Controller
         ];
     }
 
-    private function ownerOptions(?int $tenantId): \Illuminate\Support\Collection
+    private function ownerOptions(User $viewer): Collection
     {
-        return HrEmployeeProfile::query()
-            ->where('is_active', true)
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->with('user:id,name')
-            ->get()
-            ->pluck('user')
-            ->filter()
-            ->unique('id')
-            ->sortBy('name')
-            ->values()
+        return $this->access->staffOptions($viewer)
             ->map(fn ($owner) => ['id' => $owner->id, 'name' => $owner->name]);
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function siteOptions(?int $tenantId): array
+    private function siteOptions(User $viewer): array
     {
-        return Site::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(function (Site $site) use ($tenantId) {
+        $staffIds = $this->access->staffOptions($viewer)->pluck('id');
+
+        return $this->access->visibleSites($viewer)
+            ->map(function (Site $site) use ($staffIds) {
                 $staff = HrEmployeeProfile::query()
-                    ->where('is_active', true)
-                    ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+                    ->whereIn('user_id', $staffIds)
                     ->where(function ($q) use ($site) {
                         $q->where('primary_site_id', $site->id)
                             ->orWhereJsonContains('secondary_site_ids', $site->id);
@@ -315,24 +316,24 @@ class WellbeingController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildNeeds(\Illuminate\Support\Collection $flagged, array $sla, \Illuminate\Support\Collection $surveys): array
+    private function buildNeeds(Collection $flagged, array $sla, Collection $surveys): array
     {
         $needs = [];
 
         $unackedRed = $flagged->filter(fn ($p) => $p['flag_level'] === 'red' && $p['latest_action'] === null)->count();
         if ($unackedRed > 0) {
-            $needs[] = ['key' => 'red', 'label' => $unackedRed . ' red ' . ($unackedRed === 1 ? 'flag' : 'flags') . ' unacknowledged', 'tab' => 'signals'];
+            $needs[] = ['key' => 'red', 'label' => $unackedRed.' red '.($unackedRed === 1 ? 'flag' : 'flags').' unacknowledged', 'tab' => 'signals'];
         }
 
         if (($sla['overdue'] ?? 0) > 0) {
-            $needs[] = ['key' => 'over', 'label' => $sla['overdue'] . ' ' . ($sla['overdue'] === 1 ? 'plan' : 'plans') . ' overdue', 'tab' => 'plans'];
+            $needs[] = ['key' => 'over', 'label' => $sla['overdue'].' '.($sla['overdue'] === 1 ? 'plan' : 'plans').' overdue', 'tab' => 'plans'];
         }
 
         $closing = $surveys->first(fn ($s) => $s['status'] === 'published' && $s['closes_in_days'] !== null && $s['closes_in_days'] >= 0 && $s['closes_in_days'] <= 3);
         if ($closing) {
             $label = $closing['closes_in_days'] === 0
-                ? $closing['title'] . ' closes today'
-                : $closing['title'] . ' closes in ' . $closing['closes_in_days'] . ' ' . ($closing['closes_in_days'] === 1 ? 'day' : 'days');
+                ? $closing['title'].' closes today'
+                : $closing['title'].' closes in '.$closing['closes_in_days'].' '.($closing['closes_in_days'] === 1 ? 'day' : 'days');
             $needs[] = ['key' => 'close', 'label' => $label, 'tab' => 'surveys'];
         }
 
@@ -345,18 +346,19 @@ class WellbeingController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function employeeView($user, ?int $tenantId): array
+    private function employeeView(User $user): array
     {
         $respondentKey = (string) config('app.key');
 
         $mySurveys = HrEngagementSurvey::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereIn('status', ['published', 'closed'])
             ->orderByDesc('created_at')
-            ->limit(10)
-            ->get()
+            ->lazy(100)
+            ->filter(fn (HrEngagementSurvey $survey) => $this->engagementService->isCurrentRecipient($survey, $user))
+            ->take(10)
+            ->collect()
             ->map(function (HrEngagementSurvey $survey) use ($user, $respondentKey) {
-                $hash = hash_hmac('sha256', $survey->id . ':' . $user->id, $respondentKey);
+                $hash = hash_hmac('sha256', $survey->id.':'.$user->id, $respondentKey);
                 $responded = $survey->responses()
                     ->where(fn ($q) => $survey->is_anonymous ? $q->where('respondent_hash', $hash) : $q->where('user_id', $user->id))
                     ->exists();
@@ -406,28 +408,19 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $this->access->currentStaff($user, $user);
 
-        $canDashboardView = $user->canDo('hr.wellbeing.view');
-        $canManage = $user->canDo('hr.performance.manage');
-        if (! $canDashboardView && ! $canManage && $survey->status === 'draft') {
-            abort(404);
-        }
+        $canManage = $user->canDo('hr.performance.manage')
+            && $this->access->canManageSurvey($user, $survey);
+        $isRecipient = $this->engagementService->isCurrentRecipient($survey, $user);
+        abort_unless(
+            $canManage || ($isRecipient && in_array($survey->status, ['published', 'closed'], true)),
+            404,
+        );
 
-        $survey->load(['questions', 'actionPlans.owner:id,name']);
-        $respondentHash = hash_hmac('sha256', $survey->id . ':' . $user->id, (string) config('app.key'));
-        $actionPlanOwners = HrEmployeeProfile::query()
-            ->where('is_active', true)
-            ->when($survey->tenant_id !== null, fn ($query) => $query->where('tenant_id', $survey->tenant_id))
-            ->with('user:id,name')
-            ->get()
-            ->pluck('user')
-            ->filter()
-            ->unique('id')
-            ->sortBy('name')
-            ->values()
-            ->map(fn ($owner) => ['id' => $owner->id, 'name' => $owner->name]);
+        $survey->load($canManage ? ['questions', 'actionPlans.owner:id,name'] : ['questions']);
+        $respondentHash = hash_hmac('sha256', $survey->id.':'.$user->id, (string) config('app.key'));
+        $actionPlanOwners = $canManage ? $this->ownerOptions($user) : collect();
 
         $response = $survey->responses()
             ->where(function ($query) use ($survey, $user, $respondentHash) {
@@ -457,15 +450,17 @@ class WellbeingController extends Controller
                     'is_required' => (bool) $question->is_required,
                     'sort_order' => (int) $question->sort_order,
                 ])->values(),
-                'action_plans' => $survey->actionPlans->map(fn (HrEngagementActionPlan $plan) => [
-                    'id' => $plan->id,
-                    'title' => $plan->title,
-                    'status' => $plan->status,
-                    'priority' => $plan->priority,
-                    'progress_percent' => (int) $plan->progress_percent,
-                    'due_date' => optional($plan->due_date)->toDateString(),
-                    'owner' => $plan->owner ? ['id' => $plan->owner->id, 'name' => $plan->owner->name] : null,
-                ])->values(),
+                'action_plans' => $canManage ? $survey->actionPlans
+                    ->filter(fn (HrEngagementActionPlan $plan) => $this->access->canAccessActionPlan($user, $plan))
+                    ->map(fn (HrEngagementActionPlan $plan) => [
+                        'id' => $plan->id,
+                        'title' => $plan->title,
+                        'status' => $plan->status,
+                        'priority' => $plan->priority,
+                        'progress_percent' => (int) $plan->progress_percent,
+                        'due_date' => optional($plan->due_date)->toDateString(),
+                        'owner' => $plan->owner ? ['id' => $plan->owner->id, 'name' => $plan->owner->name] : null,
+                    ])->values() : [],
             ],
             'existingResponse' => $response ? [
                 'id' => $response->id,
@@ -479,7 +474,7 @@ class WellbeingController extends Controller
                 ->get()
                 ->map(fn ($r, int $index) => [
                     'id' => $r->id,
-                    'respondent' => $survey->is_anonymous ? ('Respondent ' . ($index + 1)) : ($r->user?->name ?? 'Unknown'),
+                    'respondent' => $survey->is_anonymous ? ('Respondent '.($index + 1)) : ($r->user?->name ?? 'Unknown'),
                     'answers' => $r->answers ?? [],
                     'overall_score' => $r->overall_score,
                     'submitted_at' => optional($r->submitted_at)->toDateTimeString(),
@@ -487,15 +482,17 @@ class WellbeingController extends Controller
             'actionPlanOwners' => $actionPlanOwners,
             'can' => [
                 'manage' => $canManage,
-                'respond' => $survey->status === 'published',
+                'respond' => $isRecipient
+                    && $survey->status === 'published'
+                    && (! $survey->starts_at || ! $survey->starts_at->isFuture())
+                    && (! $survey->ends_at || ! $survey->ends_at->isPast()),
             ],
         ]);
     }
 
     public function storeSurvey(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $user = $this->manager($request);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -516,7 +513,12 @@ class WellbeingController extends Controller
             'questions.*.sort_order' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $validated['tenant_id'] = $this->resolveHrTenantIdForUser($user);
+        $validated['audience_type'] = $validated['audience_type'] ?? 'all';
+        $validated['audience_site_ids'] = $this->access->validateSurveyAudience(
+            $user,
+            $validated['audience_type'],
+            $validated['audience_site_ids'] ?? [],
+        );
         $publish = (bool) ($validated['publish'] ?? false);
 
         $survey = $this->engagementService->createSurvey($user, $validated);
@@ -532,10 +534,8 @@ class WellbeingController extends Controller
 
     public function updateSurvey(Request $request, HrEngagementSurvey $survey)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $user = $this->manager($request);
+        $survey = $this->access->surveyForManager($user, $survey);
 
         $validated = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -555,6 +555,11 @@ class WellbeingController extends Controller
             'questions.*.sort_order' => ['nullable', 'integer', 'min:1'],
         ]);
 
+        $audienceType = $validated['audience_type'] ?? $survey->audience_type ?? 'all';
+        $audienceSiteIds = $validated['audience_site_ids'] ?? $survey->audience_site_ids ?? [];
+        $validated['audience_type'] = $audienceType;
+        $validated['audience_site_ids'] = $this->access->validateSurveyAudience($user, $audienceType, $audienceSiteIds);
+
         $this->engagementService->updateSurvey($survey, $user, $validated);
 
         return redirect()->back()->with('success', 'Survey updated.');
@@ -562,10 +567,8 @@ class WellbeingController extends Controller
 
     public function publishSurvey(Request $request, HrEngagementSurvey $survey)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $user = $this->manager($request);
+        $survey = $this->access->surveyForManager($user, $survey);
 
         $this->engagementService->publishSurvey($survey, $user);
 
@@ -574,10 +577,8 @@ class WellbeingController extends Controller
 
     public function closeSurvey(Request $request, HrEngagementSurvey $survey)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $user = $this->manager($request);
+        $survey = $this->access->surveyForManager($user, $survey);
 
         $this->engagementService->closeSurvey($survey, $user);
 
@@ -588,8 +589,8 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $this->access->currentStaff($user, $user);
+        abort_unless($this->engagementService->isCurrentRecipient($survey, $user), 404);
 
         $validated = $request->validate([
             'answers' => ['required', 'array'],
@@ -602,15 +603,11 @@ class WellbeingController extends Controller
 
     public function storeActionPlan(Request $request, HrEngagementSurvey $survey)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $ownerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
+        $user = $this->manager($request);
+        $survey = $this->access->surveyForManager($user, $survey);
 
         $validated = $request->validate([
-            'owner_user_id' => ['required', 'integer', $ownerRule],
+            'owner_user_id' => ['required', 'integer'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'priority' => ['required', 'string', Rule::in(['low', 'medium', 'high'])],
@@ -618,24 +615,10 @@ class WellbeingController extends Controller
             'progress_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
             'due_date' => ['nullable', 'date'],
         ]);
+        $owner = $this->access->currentStaff($user, (int) $validated['owner_user_id']);
 
-        $plan = HrEngagementActionPlan::create([
-            'survey_id' => $survey->id,
-            'tenant_id' => $survey->tenant_id,
-            'owner_user_id' => $validated['owner_user_id'],
-            'source_type' => 'survey',
-            'source_id' => $survey->id,
-            'title' => $validated['title'],
-            'description' => $validated['description'] ?? null,
-            'priority' => $validated['priority'],
-            'status' => $validated['status'] ?? 'open',
-            'progress_percent' => (int) ($validated['progress_percent'] ?? 0),
-            'due_date' => $validated['due_date'] ?? null,
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
-        ]);
-
-        $this->careService->addPlanNote($plan, $user, 'Plan created from survey: ' . $survey->title . '.', 'system');
+        $validated['owner_user_id'] = $owner->id;
+        $plan = $this->careService->createSurveyPlan($user, $survey, $validated);
         $this->careService->notifyOwnerAssigned($plan, $user);
 
         return redirect()->back()->with('success', 'Action plan created.');
@@ -645,12 +628,12 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $plan->tenant_id);
+        $this->access->currentStaff($user, $user);
+        $plan = $this->access->actionPlan($user, $plan);
 
         $canManage = $user->canDo('hr.performance.manage');
         $isOwner = $plan->owner_user_id === $user->id;
-        abort_unless($canManage || $isOwner, 403);
+        abort_unless($canManage || $isOwner, 404);
 
         $validated = $request->validate([
             'title' => [$canManage ? 'sometimes' : 'prohibited', 'string', 'max:255'],
@@ -662,27 +645,7 @@ class WellbeingController extends Controller
             'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $note = $validated['note'] ?? null;
-        unset($validated['note']);
-
-        $previousStatus = $plan->status;
-        $payload = [
-            ...$validated,
-            'updated_by' => $user->id,
-        ];
-        if (($payload['status'] ?? null) === 'completed') {
-            $payload['completed_at'] = now()->toDateString();
-            $payload['progress_percent'] = 100;
-        }
-
-        $plan->update($payload);
-
-        if (array_key_exists('status', $validated) && $validated['status'] !== $previousStatus) {
-            $this->careService->addPlanNote($plan, $user, 'Status changed to ' . str_replace('_', ' ', $validated['status']) . '.', 'system');
-        }
-        if ($note !== null && trim($note) !== '') {
-            $this->careService->addPlanNote($plan, $user, trim($note), 'note');
-        }
+        $this->careService->updatePlan($plan, $user, $validated);
 
         return redirect()->back()->with('success', 'Action plan updated.');
     }
@@ -692,27 +655,25 @@ class WellbeingController extends Controller
     | Flag triage (acknowledge / snooze / dismiss / undo)
     |--------------------------------------------------------------------------
     */
-    public function acknowledgeFlag(Request $request, \App\Models\User $user)
+    public function acknowledgeFlag(Request $request, User $user)
     {
         return $this->storeFlagAction($request, $user, 'acknowledge');
     }
 
-    public function snoozeFlag(Request $request, \App\Models\User $user)
+    public function snoozeFlag(Request $request, User $user)
     {
         return $this->storeFlagAction($request, $user, 'snooze');
     }
 
-    public function dismissFlag(Request $request, \App\Models\User $user)
+    public function dismissFlag(Request $request, User $user)
     {
         return $this->storeFlagAction($request, $user, 'dismiss');
     }
 
-    private function storeFlagAction(Request $request, \App\Models\User $staff, string $action)
+    private function storeFlagAction(Request $request, User $staff, string $action)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertFlagSubjectInTenant($tenantId, $staff->id);
+        $actor = $this->manager($request);
+        $staff = $this->access->currentStaff($actor, $staff);
 
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:2000'],
@@ -721,32 +682,23 @@ class WellbeingController extends Controller
 
         $this->careService->recordFlagAction(
             $actor,
-            $tenantId,
             $staff->id,
             $action,
             $validated['reason'] ?? null,
             $validated['snooze_until'] ?? null,
         );
 
-        return redirect()->back()->with('success', 'Flag ' . $action . 'd.');
+        return redirect()->back()->with('success', 'Flag '.$action.'d.');
     }
 
-    public function undoFlag(Request $request, \App\Models\User $user)
+    public function undoFlag(Request $request, User $user)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertFlagSubjectInTenant($tenantId, $user->id);
+        $actor = $this->manager($request);
+        $user = $this->access->currentStaff($actor, $user);
 
         $this->careService->undoLastFlagAction($actor, $user->id);
 
         return redirect()->back()->with('success', 'Action undone.');
-    }
-
-    private function assertFlagSubjectInTenant(int $tenantId, int $staffUserId): void
-    {
-        $profileTenant = HrEmployeeProfile::query()->where('user_id', $staffUserId)->value('tenant_id');
-        $this->assertHrTenantAccess($tenantId, is_numeric($profileTenant) ? (int) $profileTenant : null);
     }
 
     /*
@@ -756,32 +708,28 @@ class WellbeingController extends Controller
     */
     public function storeCheckin(Request $request)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $staffRule = $staffIds !== [] ? Rule::in($staffIds) : Rule::exists('users', 'id');
+        $actor = $this->manager($request);
 
         $validated = $request->validate([
-            'staff_user_id' => ['required', 'integer', $staffRule],
+            'staff_user_id' => ['required', 'integer'],
             'type' => ['required', 'string', Rule::in(['1on1', 'welfare', 'return_to_work'])],
             'notes' => ['nullable', 'string', 'max:5000'],
             'mood' => ['nullable', 'string', Rule::in(['good', 'mixed', 'low'])],
             'follow_up_date' => ['nullable', 'date'],
             'is_private' => ['boolean'],
         ]);
+        $staff = $this->access->currentStaff($actor, (int) $validated['staff_user_id']);
+        $validated['staff_user_id'] = $staff->id;
 
-        $this->careService->createCheckin($actor, $tenantId, $validated);
+        $this->careService->createCheckin($actor, $validated);
 
         return redirect()->back()->with('success', 'Check-in logged.');
     }
 
     public function updateCheckin(Request $request, HrWellbeingCheckin $checkin)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $checkin->tenant_id);
+        $actor = $this->manager($request);
+        $checkin = $this->access->checkin($actor, $checkin);
 
         $validated = $request->validate([
             'type' => ['sometimes', 'string', Rule::in(['1on1', 'welfare', 'return_to_work'])],
@@ -800,10 +748,13 @@ class WellbeingController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor, 403);
-        // Only the staff member the check-in is about may acknowledge it, and never a private one.
-        abort_unless($checkin->staff_user_id === $actor->id && ! $checkin->is_private, 403);
+        $this->access->currentStaff($actor, $actor);
+        $checkin = HrWellbeingCheckin::query()
+            ->where('staff_user_id', $actor->id)
+            ->where('is_private', false)
+            ->findOrFail($checkin->getKey());
 
-        $this->careService->acknowledgeCheckin($checkin);
+        $this->careService->acknowledgeCheckin($checkin, $actor->id);
 
         return redirect()->back()->with('success', 'Check-in acknowledged.');
     }
@@ -815,21 +766,19 @@ class WellbeingController extends Controller
     */
     public function storeEapReferral(Request $request)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $staffRule = $staffIds !== [] ? Rule::in($staffIds) : Rule::exists('users', 'id');
+        $actor = $this->manager($request);
 
         $validated = $request->validate([
-            'staff_user_id' => ['required', 'integer', $staffRule],
+            'staff_user_id' => ['required', 'integer'],
             'reason_category' => ['required', 'string', Rule::in(['workload', 'personal', 'wellbeing', 'other'])],
             'provider' => ['nullable', 'string', 'max:255'],
             'consent_given' => ['accepted'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+        $staff = $this->access->currentStaff($actor, (int) $validated['staff_user_id']);
+        $validated['staff_user_id'] = $staff->id;
 
-        $this->careService->createEapReferral($actor, $tenantId, $validated);
+        $this->careService->createEapReferral($actor, $validated);
 
         return redirect()->back()->with('success', 'EAP referral submitted confidentially.');
     }
@@ -841,29 +790,39 @@ class WellbeingController extends Controller
     */
     public function storeStandaloneActionPlan(Request $request)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $ownerRule = $staffIds !== [] ? Rule::in($staffIds) : Rule::exists('users', 'id');
+        $actor = $this->manager($request);
 
         $validated = $request->validate([
-            'owner_user_id' => ['required', 'integer', $ownerRule],
-            'staff_user_id' => ['nullable', 'integer', $staffIds !== [] ? Rule::in($staffIds) : Rule::exists('users', 'id')],
-            'survey_id' => ['nullable', 'integer', Rule::exists('hr_engagement_surveys', 'id')],
+            'owner_user_id' => ['required', 'integer'],
+            'staff_user_id' => ['nullable', 'integer'],
+            'survey_id' => ['nullable', 'integer'],
             'source_type' => ['nullable', 'string', Rule::in(['survey', 'flag', 'manual'])],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'priority' => ['required', 'string', Rule::in(['low', 'medium', 'high'])],
             'due_date' => ['nullable', 'date'],
         ]);
-
-        if (! empty($validated['survey_id'])) {
-            $surveyTenant = HrEngagementSurvey::query()->whereKey($validated['survey_id'])->value('tenant_id');
-            $this->assertHrTenantAccess($tenantId, is_numeric($surveyTenant) ? (int) $surveyTenant : null);
+        $validated['owner_user_id'] = $this->access
+            ->currentStaff($actor, (int) $validated['owner_user_id'])
+            ->id;
+        if (! empty($validated['staff_user_id'])) {
+            $validated['staff_user_id'] = $this->access
+                ->currentStaff($actor, (int) $validated['staff_user_id'])
+                ->id;
         }
 
-        $plan = $this->careService->createStandalonePlan($actor, $tenantId, $validated);
+        if (! empty($validated['survey_id'])) {
+            $validated['survey_id'] = $this->access
+                ->surveyForManager($actor, (int) $validated['survey_id'])
+                ->id;
+        }
+        abort_unless(
+            ($validated['source_type'] ?? 'manual') !== 'flag' || ! empty($validated['staff_user_id']),
+            422,
+            'A flag-linked plan requires a staff subject.',
+        );
+
+        $plan = $this->careService->createStandalonePlan($actor, $validated);
         $this->careService->notifyOwnerAssigned($plan, $actor);
 
         return redirect()->back()->with('success', 'Action plan created.');
@@ -890,9 +849,9 @@ class WellbeingController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $plan->tenant_id);
-        abort_unless($actor->canDo('hr.performance.manage') || $plan->owner_user_id === $actor->id, 403);
+        $this->access->currentStaff($actor, $actor);
+        $plan = $this->access->actionPlan($actor, $plan);
+        abort_unless($actor->canDo('hr.performance.manage') || $plan->owner_user_id === $actor->id, 404);
 
         $validated = $request->validate(['body' => ['required', 'string', 'max:2000']]);
         $this->careService->addPlanNote($plan, $actor, trim($validated['body']), 'note');
@@ -900,12 +859,10 @@ class WellbeingController extends Controller
         return redirect()->back()->with('success', 'Note added.');
     }
 
-    private function authorisePlanManager(Request $request, HrEngagementActionPlan $plan): \App\Models\User
+    private function authorisePlanManager(Request $request, HrEngagementActionPlan $plan): User
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $plan->tenant_id);
+        $actor = $this->manager($request);
+        $this->access->actionPlan($actor, $plan);
 
         return $actor;
     }
@@ -917,10 +874,8 @@ class WellbeingController extends Controller
     */
     public function duplicateSurvey(Request $request, HrEngagementSurvey $survey)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $actor = $this->manager($request);
+        $survey = $this->access->surveyForManager($actor, $survey);
 
         $copy = $this->engagementService->duplicateSurvey($survey, $actor);
 
@@ -929,22 +884,18 @@ class WellbeingController extends Controller
 
     public function nudgeSurvey(Request $request, HrEngagementSurvey $survey)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $actor = $this->manager($request);
+        $survey = $this->access->surveyForManager($actor, $survey);
 
         $count = $this->engagementService->nudgeNonResponders($survey, $actor);
 
-        return redirect()->back()->with('success', $count > 0 ? ('Nudged ' . $count . ' non-' . ($count === 1 ? 'responder' : 'responders') . '.') : 'Everyone has already responded.');
+        return redirect()->back()->with('success', $count > 0 ? ('Nudged '.$count.' non-'.($count === 1 ? 'responder' : 'responders').'.') : 'Everyone has already responded.');
     }
 
     public function archiveSurvey(Request $request, HrEngagementSurvey $survey)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $actor = $this->manager($request);
+        $survey = $this->access->surveyForManager($actor, $survey);
 
         $this->engagementService->archiveSurvey($survey, $actor);
 
@@ -953,10 +904,8 @@ class WellbeingController extends Controller
 
     public function destroySurvey(Request $request, HrEngagementSurvey $survey)
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $actor = $this->manager($request);
+        $survey = $this->access->surveyForManager($actor, $survey);
 
         $this->engagementService->archiveDraftSurvey($survey, $actor);
 
@@ -965,16 +914,14 @@ class WellbeingController extends Controller
 
     public function exportSurvey(Request $request, HrEngagementSurvey $survey): StreamedResponse
     {
-        $actor = $request->user();
-        abort_unless($actor && $actor->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($actor);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $actor = $this->manager($request);
+        $survey = $this->access->surveyForManager($actor, $survey);
 
         $survey->load(['questions', 'responses']);
         $summary = $this->engagementService->summary($survey);
         $isAnonymous = (bool) $survey->is_anonymous;
 
-        $filename = 'survey-' . $survey->id . '-results.csv';
+        $filename = 'survey-'.$survey->id.'-results.csv';
 
         return response()->streamDownload(function () use ($survey, $summary, $isAnonymous) {
             $out = fopen('php://output', 'w');
@@ -996,5 +943,14 @@ class WellbeingController extends Controller
 
             fclose($out);
         }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->access->currentStaff($user, $user);
+
+        return $user;
     }
 }

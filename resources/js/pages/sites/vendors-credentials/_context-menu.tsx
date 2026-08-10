@@ -33,12 +33,17 @@ export function RowContextMenu({
     onClose: () => void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState({ x: menu?.x ?? 0, y: menu?.y ?? 0, ready: false });
+    const [pos, setPos] = useState({
+        x: menu?.x ?? 0,
+        y: menu?.y ?? 0,
+        ready: false,
+    });
 
     useEffect(() => {
         if (!menu) return;
         const onDown = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+            if (ref.current && !ref.current.contains(e.target as Node))
+                onClose();
         };
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -67,8 +72,10 @@ export function RowContextMenu({
         const pad = 10;
         let x = menu.x;
         let y = menu.y;
-        if (x + rect.width + pad > window.innerWidth) x = window.innerWidth - rect.width - pad;
-        if (y + rect.height + pad > window.innerHeight) y = window.innerHeight - rect.height - pad;
+        if (x + rect.width + pad > window.innerWidth)
+            x = window.innerWidth - rect.width - pad;
+        if (y + rect.height + pad > window.innerHeight)
+            y = window.innerHeight - rect.height - pad;
         setPos({ x: Math.max(pad, x), y: Math.max(pad, y), ready: true });
     }, [menu]);
 
@@ -80,16 +87,24 @@ export function RowContextMenu({
             ref={ref}
             role="menu"
             className="fixed z-50 min-w-[224px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl"
-            style={{ left: pos.x, top: pos.y, visibility: pos.ready ? 'visible' : 'hidden' }}
+            style={{
+                left: pos.x,
+                top: pos.y,
+                visibility: pos.ready ? 'visible' : 'hidden',
+            }}
         >
             <div className="mb-1 flex items-center gap-2 border-b border-border px-2.5 py-2">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <HeaderIcon className="h-3.5 w-3.5" />
                 </span>
                 <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold">{menu.header.title}</div>
+                    <div className="truncate text-sm font-semibold">
+                        {menu.header.title}
+                    </div>
                     {menu.header.sub ? (
-                        <div className="truncate text-xs text-muted-foreground">{menu.header.sub}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                            {menu.header.sub}
+                        </div>
                     ) : null}
                 </div>
             </div>

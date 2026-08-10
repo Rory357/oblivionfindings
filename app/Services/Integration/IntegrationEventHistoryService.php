@@ -11,14 +11,32 @@ use Illuminate\Support\Facades\Schema;
 
 class IntegrationEventHistoryService
 {
-    public function forDevice(?Device $device, array $filters = [], bool $includeEventType = false): Collection
-    {
+    public function forDevice(
+        ?Device $device,
+        array $filters = [],
+        bool $includeEventType = false,
+        ?int $retentionDays = null,
+    ): Collection {
         if (! $device) {
             return collect();
         }
 
-        $locations = $this->integrationEventLocations($device, $filters, $includeEventType)
-            ->merge($this->fleetTelemetryLocations($device, $filters, $includeEventType));
+        $retentionDays = max(
+            1,
+            $retentionDays ?? (int) config('fleet.retention.telemetry_days', 365),
+        );
+        $retentionCutoff = now()->subDays($retentionDays);
+        $locations = $this->integrationEventLocations(
+            $device,
+            $filters,
+            $includeEventType,
+            $retentionCutoff,
+        )->merge($this->fleetTelemetryLocations(
+            $device,
+            $filters,
+            $includeEventType,
+            $retentionCutoff,
+        ));
 
         return $locations
             ->sortByDesc(fn (array $location) => $location['timestamp'] ?? '')
@@ -26,8 +44,12 @@ class IntegrationEventHistoryService
             ->values();
     }
 
-    private function integrationEventLocations(Device $device, array $filters, bool $includeEventType): Collection
-    {
+    private function integrationEventLocations(
+        Device $device,
+        array $filters,
+        bool $includeEventType,
+        \DateTimeInterface $retentionCutoff,
+    ): Collection {
         if (! Schema::hasTable('integration_events')) {
             return collect();
         }
@@ -41,6 +63,7 @@ class IntegrationEventHistoryService
 
         $query = IntegrationEvent::query()
             ->select($this->selectColumns())
+            ->where('occurred_at', '>=', $retentionCutoff)
             ->where(function (Builder $query) use ($device, $legacyHardwareId, $hasCanonicalColumn): void {
                 if ($hasCanonicalColumn) {
                     $query->where('canonical_device_id', $device->id);
@@ -63,11 +86,11 @@ class IntegrationEventHistoryService
             });
 
         if (! empty($filters['date_from'])) {
-            $query->where('created_at', '>=', $filters['date_from']);
+            $query->where('occurred_at', '>=', $filters['date_from']);
         }
 
         if (! empty($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to'].' 23:59:59');
+            $query->where('occurred_at', '<=', $filters['date_to'].' 23:59:59');
         }
 
         if (! empty($filters['event_types'])) {
@@ -79,7 +102,7 @@ class IntegrationEventHistoryService
             }
         }
 
-        return $query->orderByDesc('created_at')
+        return $query->orderByDesc('occurred_at')
             ->limit(500)
             ->get()
             ->toBase()
@@ -88,8 +111,12 @@ class IntegrationEventHistoryService
             ->values();
     }
 
-    private function fleetTelemetryLocations(Device $device, array $filters, bool $includeEventType): Collection
-    {
+    private function fleetTelemetryLocations(
+        Device $device,
+        array $filters,
+        bool $includeEventType,
+        \DateTimeInterface $retentionCutoff,
+    ): Collection {
         if (! Schema::hasTable('fleet_telemetry_events')) {
             return collect();
         }
@@ -98,6 +125,7 @@ class IntegrationEventHistoryService
 
         $query = FleetTelemetryEvent::query()
             ->where('consent_blocked', false)
+            ->where('occurred_at', '>=', $retentionCutoff)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->where(function (Builder $query) use ($device, $legacyTrackerId): void {
@@ -167,7 +195,9 @@ class IntegrationEventHistoryService
             'address' => $address,
             'coordinates' => $coordinates,
             'display_location' => $address ?: $coordinates,
-            'timestamp' => $event->created_at?->toISOString() ?? $event->created_at,
+            'timestamp' => $event->occurred_at?->toISOString()
+                ?? $event->created_at?->toISOString()
+                ?? $event->created_at,
             'speed' => $payload['speed'] ?? $payload['speed_kph'] ?? null,
             'battery' => $payload['battery'] ?? $payload['battery_level'] ?? $payload['battery_pct'] ?? null,
         ];
@@ -243,6 +273,7 @@ class IntegrationEventHistoryService
             'id',
             'hardware_id',
             'event_type',
+            'occurred_at',
             'created_at',
             'raw_payload',
             'normalized_payload',

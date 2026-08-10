@@ -124,7 +124,7 @@ export function BehaviourAbcTab({
                         <Stethoscope className="h-[19px] w-[19px]" />
                     </span>
                     <div>
-                        <h2 className="text-lg font-semibold leading-tight">
+                        <h2 className="text-lg leading-tight font-semibold">
                             Behaviour observations
                         </h2>
                         <p className="text-sm text-muted-foreground">
@@ -165,10 +165,12 @@ export function BehaviourAbcTab({
                             <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-primary">
                                 <Stethoscope className="h-5 w-5" />
                             </span>
-                            <p className="text-sm font-medium">No ABC entries yet</p>
+                            <p className="text-sm font-medium">
+                                No ABC entries yet
+                            </p>
                             <p className="max-w-sm text-xs text-muted-foreground">
-                                Log an Antecedent → Behaviour → Consequence record to
-                                start building the behaviour picture.
+                                Log an Antecedent → Behaviour → Consequence
+                                record to start building the behaviour picture.
                             </p>
                             {canRecord ? (
                                 <Button
@@ -185,7 +187,8 @@ export function BehaviourAbcTab({
                     ) : (
                         <div className="divide-y">
                             {entries.map((e) => {
-                                const tone = INTENSITY_TONE[e.intensity ?? 'low'];
+                                const tone =
+                                    INTENSITY_TONE[e.intensity ?? 'low'];
                                 return (
                                     // eslint-disable-next-line no-restricted-syntax -- whole-row clickable ABC log card opening the entry dialog.
                                     <button
@@ -198,7 +201,9 @@ export function BehaviourAbcTab({
                                         <span
                                             className={cn(
                                                 'mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full',
-                                                INTENSITY_DOT[e.intensity ?? 'low'],
+                                                INTENSITY_DOT[
+                                                    e.intensity ?? 'low'
+                                                ],
                                             )}
                                         />
                                         <div className="min-w-0 flex-1">
@@ -207,13 +212,21 @@ export function BehaviourAbcTab({
                                                     {e.behaviour || 'Behaviour'}
                                                 </span>
                                                 {e.behaviour_function_label ? (
-                                                    <Badge variant="outline" className="text-[10px]">
-                                                        {e.behaviour_function_label}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="text-[10px]"
+                                                    >
+                                                        {
+                                                            e.behaviour_function_label
+                                                        }
                                                     </Badge>
                                                 ) : null}
                                                 <Badge
                                                     variant="outline"
-                                                    className={cn('text-[10px] capitalize', tone)}
+                                                    className={cn(
+                                                        'text-[10px] capitalize',
+                                                        tone,
+                                                    )}
                                                 >
                                                     {e.intensity ?? 'low'}
                                                 </Badge>
@@ -222,7 +235,8 @@ export function BehaviourAbcTab({
                                                         variant="outline"
                                                         className="gap-1 border-status-warning/40 text-[10px] text-status-warning"
                                                     >
-                                                        <AlertTriangle className="h-3 w-3" /> Escalated
+                                                        <AlertTriangle className="h-3 w-3" />{' '}
+                                                        Escalated
                                                     </Badge>
                                                 ) : null}
                                                 {e.harm_occurred ? (
@@ -230,21 +244,27 @@ export function BehaviourAbcTab({
                                                         variant="outline"
                                                         className="gap-1 border-status-critical/40 text-[10px] text-status-critical"
                                                     >
-                                                        <HeartCrack className="h-3 w-3" /> Harm
+                                                        <HeartCrack className="h-3 w-3" />{' '}
+                                                        Harm
                                                     </Badge>
                                                 ) : null}
-                                                {e.requires_followup && !e.followup_completed ? (
+                                                {e.requires_followup &&
+                                                !e.followup_completed ? (
                                                     <Badge
                                                         variant="outline"
                                                         className="gap-1 text-[10px]"
                                                     >
-                                                        <Flag className="h-3 w-3" /> Follow-up
+                                                        <Flag className="h-3 w-3" />{' '}
+                                                        Follow-up
                                                     </Badge>
                                                 ) : null}
                                             </div>
                                             <p className="mt-1 truncate text-xs text-muted-foreground">
-                                                {e.setting ? `${e.setting} · ` : ''}
-                                                A: {e.antecedent || '—'} → C: {e.consequence || '—'}
+                                                {e.setting
+                                                    ? `${e.setting} · `
+                                                    : ''}
+                                                A: {e.antecedent || '—'} → C:{' '}
+                                                {e.consequence || '—'}
                                             </p>
                                         </div>
                                         <div className="ml-2 flex shrink-0 items-center gap-2">
@@ -276,7 +296,9 @@ export function BehaviourAbcTab({
                                     variant="outline"
                                     size="sm"
                                     disabled={page <= 1}
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    onClick={() =>
+                                        setPage((p) => Math.max(1, p - 1))
+                                    }
                                 >
                                     Prev
                                 </Button>
@@ -284,7 +306,11 @@ export function BehaviourAbcTab({
                                     variant="outline"
                                     size="sm"
                                     disabled={page >= lastPage}
-                                    onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+                                    onClick={() =>
+                                        setPage((p) =>
+                                            Math.min(lastPage, p + 1),
+                                        )
+                                    }
                                 >
                                     Next
                                 </Button>

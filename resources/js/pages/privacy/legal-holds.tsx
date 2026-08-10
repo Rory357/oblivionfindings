@@ -1,13 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Scale, Plus, Lock } from 'lucide-react';
+import { Plus, Scale } from 'lucide-react';
 
 type Props = {
     filters: {
@@ -28,7 +34,11 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
     const can = auth?.can?.privacy ?? {};
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/privacy/legal-holds', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/privacy/legal-holds',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const getStatusColor = (status: string) => {
@@ -44,11 +54,11 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
 
     const getHoldTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
-            'litigation': 'Litigation',
-            'investigation': 'Investigation',
-            'regulatory': 'Regulatory',
-            'audit': 'Audit',
-            'other': 'Other',
+            litigation: 'Litigation',
+            investigation: 'Investigation',
+            regulatory: 'Regulatory',
+            audit: 'Audit',
+            other: 'Other',
         };
         return labels[type] || type;
     };
@@ -62,10 +72,12 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Legal Holds', href: '/privacy/legal-holds' }
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Privacy', href: '/privacy/dashboard' },
+                { title: 'Legal Holds', href: '/privacy/legal-holds' },
+            ]}
+        >
             <Head title="Legal Holds" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -74,14 +86,20 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                     title="Legal Holds"
                     description="Manage data preservation orders for litigation and investigations"
                     icon={<Scale className="h-7 w-7 text-white" />}
-                    stats={stats ? [
-                        { label: 'Total Holds', value: stats.total },
-                        { label: 'Active', value: stats.active },
-                    ] : undefined}
+                    stats={
+                        stats
+                            ? [
+                                  { label: 'Total Holds', value: stats.total },
+                                  { label: 'Active', value: stats.active },
+                              ]
+                            : undefined
+                    }
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
                             <Link href="/privacy/dashboard">
-                                <Button variant="outline" size="sm">Privacy Dashboard</Button>
+                                <Button variant="outline" size="sm">
+                                    Privacy Dashboard
+                                </Button>
                             </Link>
                             {can.manageLegalHolds && (
                                 <Link href="/privacy/legal-holds/create">
@@ -101,41 +119,69 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Search by reference or reason"
                                 value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ q: e.target.value })
+                                }
                             />
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status ?? ANY}
-                                onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="released">Released</SelectItem>
+                                    <SelectItem value="active">
+                                        Active
+                                    </SelectItem>
+                                    <SelectItem value="released">
+                                        Released
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Hold Type</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Hold Type
+                            </Label>
                             <Select
                                 value={filters.hold_type ?? ANY}
-                                onValueChange={(v) => onFilter({ hold_type: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        hold_type: v === ANY ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Type" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="litigation">Litigation</SelectItem>
-                                    <SelectItem value="investigation">Investigation</SelectItem>
-                                    <SelectItem value="regulatory">Regulatory</SelectItem>
+                                    <SelectItem value="litigation">
+                                        Litigation
+                                    </SelectItem>
+                                    <SelectItem value="investigation">
+                                        Investigation
+                                    </SelectItem>
+                                    <SelectItem value="regulatory">
+                                        Regulatory
+                                    </SelectItem>
                                     <SelectItem value="audit">Audit</SelectItem>
                                     <SelectItem value="other">Other</SelectItem>
                                 </SelectContent>
@@ -156,23 +202,35 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                                                 {hold.hold_reference}
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge className={getStatusColor(hold.status)}>
+                                                <Badge
+                                                    className={getStatusColor(
+                                                        hold.status,
+                                                    )}
+                                                >
                                                     {hold.status}
                                                 </Badge>
                                                 <Badge variant="outline">
-                                                    {getHoldTypeLabel(hold.hold_type)}
+                                                    {getHoldTypeLabel(
+                                                        hold.hold_type,
+                                                    )}
                                                 </Badge>
                                             </div>
                                             <div className="mt-2 text-sm text-muted-foreground">
                                                 {hold.reason}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                Imposed: {formatDate(hold.imposed_at)}
-                                                {hold.imposed_by && ` by ${hold.imposed_by.name}`}
-                                                {hold.review_date && ` • Review: ${formatDate(hold.review_date)}`}
+                                                Imposed:{' '}
+                                                {formatDate(hold.imposed_at)}
+                                                {hold.imposed_by &&
+                                                    ` by ${hold.imposed_by.name}`}
+                                                {hold.review_date &&
+                                                    ` • Review: ${formatDate(hold.review_date)}`}
                                             </div>
                                         </div>
-                                        <Link href={`/privacy/legal-holds/${hold.id}/edit`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link
+                                            href={`/privacy/legal-holds/${hold.id}/edit`}
+                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                        >
                                             Manage
                                         </Link>
                                     </div>
@@ -196,7 +254,17 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
                                 variant={l.active ? 'secondary' : 'outline'}
                                 size="sm"
                                 disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

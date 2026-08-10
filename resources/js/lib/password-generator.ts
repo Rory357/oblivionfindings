@@ -14,7 +14,9 @@ export type PasswordGeneratorOptions = {
     symbol?: boolean;
 };
 
-export function generatePassword(options: PasswordGeneratorOptions = {}): string {
+export function generatePassword(
+    options: PasswordGeneratorOptions = {},
+): string {
     const length = Math.max(8, Math.min(128, options.length ?? 20));
     const pools: string[] = [];
     if (options.upper !== false) pools.push(UPPER);

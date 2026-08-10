@@ -47,7 +47,8 @@ export default function PanicStatusBadge({
                         </div>
                         {lastSafetyEventAt && (
                             <div className="text-[11px] opacity-80">
-                                Triggered {formatRelativeTime(lastSafetyEventAt)}
+                                Triggered{' '}
+                                {formatRelativeTime(lastSafetyEventAt)}
                             </div>
                         )}
                     </div>

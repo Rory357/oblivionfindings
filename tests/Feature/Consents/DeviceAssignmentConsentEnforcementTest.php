@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
@@ -37,7 +38,11 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
         $this->admin = User::factory()->create();
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->client = Client::factory()->create();
+        $site = Site::factory()->create(['tenant_id' => 1]);
+        $this->client = Client::factory()->create([
+            'organization_id' => 1,
+            'site_id' => $site->id,
+        ]);
         $this->tracker = Device::factory()->tracking()->create();
     }
 
@@ -132,7 +137,7 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
 
     public function test_tracker_assigned_to_site_skips_client_consent_check(): void
     {
-        $site = \App\Models\Site::factory()->create();
+        $site = Site::factory()->create();
 
         $this->actingAs($this->admin)
             ->post("/security-devices/devices/{$this->tracker->id}/assign", [
@@ -148,7 +153,10 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
 
     private function givenConsentFor(Client $client, ?\DateTimeInterface $expiresAt = null): ClientConsent
     {
-        $consentType = ConsentType::factory()->create();
+        $consentType = ConsentType::factory()->create([
+            'name' => 'Personal Tracker (Wandering Risk)',
+            'purpose' => 'Client personal safety tracking',
+        ]);
 
         return ClientConsent::create([
             'client_id' => $client->id,

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Settings\UpdateItMailboxRequest;
 use App\Jobs\PollItMailboxJob;
 use App\Models\ItMailboxConnection;
@@ -21,18 +20,14 @@ use Inertia\Response;
  */
 class ItMailboxSettingsController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function index(Request $request): Response
     {
         $this->authorizeManage($request);
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
 
         // House rule: guard new-table reads so a request racing the deploy's
         // migration step renders empty instead of a 500.
         $connections = Schema::hasTable('it_mailbox_connections')
             ? ItMailboxConnection::query()
-                ->where('tenant_id', $tenantId)
                 ->get()
                 ->keyBy('provider')
             : collect();
@@ -68,7 +63,6 @@ class ItMailboxSettingsController extends Controller
         $validated = $request->validated();
 
         $connection = ItMailboxConnection::query()
-            ->where('tenant_id', $this->resolveHrTenantIdForUser($request->user()))
             ->where('provider', $provider)
             ->first();
 
@@ -96,6 +90,6 @@ class ItMailboxSettingsController extends Controller
 
     private function authorizeManage(Request $request): void
     {
-        abort_unless($request->user()?->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($request->user()?->canDo('integrations.manage_secrets'), 403);
     }
 }

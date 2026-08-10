@@ -3,7 +3,40 @@
  * layer panel, toolbar selects and grid views are intentional native
  * <button>/<div>/<select> layout cases, not shadcn primitives. Colours stay
  * token-based throughout (no raw hex). */
+import { CalendarAgenda } from '@/components/hr/calendar/calendar-agenda';
+import {
+    CalendarDetailPopover,
+    type EventDetail,
+} from '@/components/hr/calendar/calendar-detail-popover';
+import {
+    CalendarHero,
+    type UpNextEntry,
+} from '@/components/hr/calendar/calendar-hero';
+import { CalendarMonthGrid } from '@/components/hr/calendar/calendar-month-grid';
+import {
+    addDays,
+    colorVar,
+    dayStart,
+    fmtLong,
+    layerLabel,
+    secondaryFor,
+    startOfWeek,
+} from '@/components/hr/calendar/calendar-render';
+import { CalendarRenewals } from '@/components/hr/calendar/calendar-renewals';
+import { CalendarTimeGrid } from '@/components/hr/calendar/calendar-time-grid';
+import { CalendarYearPicker } from '@/components/hr/calendar/calendar-year-picker';
+import {
+    EventWizardDialog,
+    type CalendarEventInitial,
+    type EventCategoryOption,
+} from '@/components/hr/calendar/event-wizard-dialog';
+import { ICalSubscribeDialog } from '@/components/hr/calendar/ical-subscribe-dialog';
+import { type PersonOption } from '@/components/hr/people-picker';
 import PageShell from '@/components/page-shell';
+import {
+    ShiftContextMenu,
+    type ShiftCtxState,
+} from '@/components/rostering/shift-context-menu';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -21,51 +54,21 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { CalendarHero, type UpNextEntry } from '@/components/hr/calendar/calendar-hero';
+import AppLayout from '@/layouts/app-layout';
 import {
-    EventWizardDialog,
-    type CalendarEventInitial,
-    type EventCategoryOption,
-} from '@/components/hr/calendar/event-wizard-dialog';
-import { ICalSubscribeDialog } from '@/components/hr/calendar/ical-subscribe-dialog';
-import { CalendarMonthGrid } from '@/components/hr/calendar/calendar-month-grid';
-import { CalendarTimeGrid } from '@/components/hr/calendar/calendar-time-grid';
-import { CalendarAgenda } from '@/components/hr/calendar/calendar-agenda';
-import { CalendarRenewals } from '@/components/hr/calendar/calendar-renewals';
-import {
-    CalendarDetailPopover,
-    type EventDetail,
-} from '@/components/hr/calendar/calendar-detail-popover';
-import { CalendarYearPicker } from '@/components/hr/calendar/calendar-year-picker';
-import {
-    addDays,
-    colorVar,
-    dayStart,
-    fmtLong,
-    layerLabel,
-    secondaryFor,
-    startOfWeek,
-} from '@/components/hr/calendar/calendar-render';
-import { type PersonOption } from '@/components/hr/people-picker';
-import {
-    ShiftContextMenu,
-    type ShiftCtxState,
-} from '@/components/rostering/shift-context-menu';
-import {
-    LAYER_DISPLAY_ORDER,
-    DEFAULT_ACTIVE_LAYERS,
-    LAYER_META,
     CALENDAR_LAYERS,
+    DEFAULT_ACTIVE_LAYERS,
+    LAYER_DISPLAY_ORDER,
+    LAYER_META,
     type CalendarLayer,
     type CalendarLayerFeed,
 } from '@/lib/calendar/layer-feed';
-import AppLayout from '@/layouts/app-layout';
 import type { EventClickArg } from '@fullcalendar/core';
 import { Head, router } from '@inertiajs/react';
 import {
-    CalendarDays,
     Archive,
     ArchiveRestore,
+    CalendarDays,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
@@ -81,17 +84,17 @@ import {
     User as UserIcon,
     Users,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import {
-    type CSSProperties,
     useCallback,
     useEffect,
     useLayoutEffect,
     useMemo,
     useRef,
     useState,
+    type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 
 type BreadcrumbItem = { title: string; href: string };
 type IdName = { id: number; name: string };
@@ -174,7 +177,9 @@ function readInitialLayers(): CalendarLayer[] {
     if (!source) return [...DEFAULT_ACTIVE_LAYERS];
     const parsed = source
         .split(',')
-        .filter((l): l is CalendarLayer => (CALENDAR_LAYERS as readonly string[]).includes(l));
+        .filter((l): l is CalendarLayer =>
+            (CALENDAR_LAYERS as readonly string[]).includes(l),
+        );
     return parsed.length ? parsed : [...DEFAULT_ACTIVE_LAYERS];
 }
 
@@ -211,45 +216,77 @@ export default function CalendarIndex({
     useLayerStyles();
     const today = useMemo(() => new Date(), []);
 
-    const [tab, setTab] = useState<CalTab>(() => load<CalTab>(DEFAULT_TAB_KEY, 'calendar'));
+    const [tab, setTab] = useState<CalTab>(() =>
+        load<CalTab>(DEFAULT_TAB_KEY, 'calendar'),
+    );
     const [view, setView] = useState<CalView>('month');
     const [cursor, setCursor] = useState<Date>(() => new Date());
-    const [activeLayers, setActiveLayers] = useState<CalendarLayer[]>(readInitialLayers);
+    const [activeLayers, setActiveLayers] =
+        useState<CalendarLayer[]>(readInitialLayers);
     const [siteFilter, setSiteFilter] = useState('all');
     const [deptFilter, setDeptFilter] = useState('all');
     const [teamFilter, setTeamFilter] = useState('all');
     const [search, setSearch] = useState('');
-    const [panelOpen, setPanelOpen] = useState<boolean>(() => load(PANEL_KEY, true));
+    const [panelOpen, setPanelOpen] = useState<boolean>(() =>
+        load(PANEL_KEY, true),
+    );
     const [pinned, setPinned] = useState<Record<string, boolean>>(() =>
         load(PINNED_KEY, { calendar: false, agenda: false, renewals: false }),
     );
 
     const [events, setEvents] = useState<CalendarLayerFeed[]>([]);
-    const [agendaEvents, setAgendaEvents] = useState<CalendarLayerFeed[] | null>(null);
+    const [agendaEvents, setAgendaEvents] = useState<
+        CalendarLayerFeed[] | null
+    >(null);
     const [renewals, setRenewals] = useState<CalendarLayerFeed[] | null>(null);
     const [counts, setCounts] = useState<Record<string, number>>({});
     const [feedError, setFeedError] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const [wizardOpen, setWizardOpen] = useState(false);
-    const [editingEvent, setEditingEvent] = useState<CalendarEventInitial | null>(null);
+    const [editingEvent, setEditingEvent] =
+        useState<CalendarEventInitial | null>(null);
     const [createDate, setCreateDate] = useState<string | null>(null);
     const [subscribeOpen, setSubscribeOpen] = useState(false);
     const [archiveHistoryOpen, setArchiveHistoryOpen] = useState(false);
     const [scopePrompt, setScopePrompt] = useState<EventClickArg | null>(null);
     const [detail, setDetail] = useState<EventDetail | null>(null);
     const [ctxMenu, setCtxMenu] = useState<ShiftCtxState | null>(null);
-    const [quickAdd, setQuickAdd] = useState<{ date: string; x: number; y: number } | null>(null);
-    const [hover, setHover] = useState<{ e: CalendarLayerFeed; x: number; y: number } | null>(null);
+    const [quickAdd, setQuickAdd] = useState<{
+        date: string;
+        x: number;
+        y: number;
+    } | null>(null);
+    const [hover, setHover] = useState<{
+        e: CalendarLayerFeed;
+        x: number;
+        y: number;
+    } | null>(null);
     const [yearPickerOpen, setYearPickerOpen] = useState(false);
-    const [archiveTarget, setArchiveTarget] = useState<{ id: number; title: string } | null>(null);
-    const [dayDetail, setDayDetail] = useState<{ label: string; events: CalendarLayerFeed[] } | null>(null);
+    const [archiveTarget, setArchiveTarget] = useState<{
+        id: number;
+        title: string;
+    } | null>(null);
+    const [dayDetail, setDayDetail] = useState<{
+        label: string;
+        events: CalendarLayerFeed[];
+    } | null>(null);
 
     const clickedInfoRef = useRef<EventClickArg | null>(null);
     const searchRef = useRef<HTMLInputElement>(null);
-    const filtersRef = useRef({ activeLayers, siteFilter, deptFilter, teamFilter });
+    const filtersRef = useRef({
+        activeLayers,
+        siteFilter,
+        deptFilter,
+        teamFilter,
+    });
     useEffect(() => {
-        filtersRef.current = { activeLayers, siteFilter, deptFilter, teamFilter };
+        filtersRef.current = {
+            activeLayers,
+            siteFilter,
+            deptFilter,
+            teamFilter,
+        };
     });
 
     // Persist layer choice to localStorage + ?layers=
@@ -263,14 +300,21 @@ export default function CalendarIndex({
         window.localStorage.setItem(PANEL_KEY, JSON.stringify(panelOpen));
     }, [panelOpen]);
 
-    const buildFeedUrl = useCallback((from: string, to: string, layers: string) => {
-        const { siteFilter: s, deptFilter: d, teamFilter: t } = filtersRef.current;
-        const params = new URLSearchParams({ from, to, layers });
-        if (s !== 'all') params.set('site', s);
-        if (d !== 'all') params.set('department', d);
-        if (t !== 'all') params.set('team', t);
-        return `/hr/calendar/feed?${params.toString()}`;
-    }, []);
+    const buildFeedUrl = useCallback(
+        (from: string, to: string, layers: string) => {
+            const {
+                siteFilter: s,
+                deptFilter: d,
+                teamFilter: t,
+            } = filtersRef.current;
+            const params = new URLSearchParams({ from, to, layers });
+            if (s !== 'all') params.set('site', s);
+            if (d !== 'all') params.set('department', d);
+            if (t !== 'all') params.set('team', t);
+            return `/hr/calendar/feed?${params.toString()}`;
+        },
+        [],
+    );
 
     const fetchJson = useCallback(
         async (url: string): Promise<CalendarLayerFeed[]> => {
@@ -295,7 +339,9 @@ export default function CalendarIndex({
         const { from, to } = rangeFor(view, cursor);
         setLoading(true);
         try {
-            const evs = await fetchJson(buildFeedUrl(iso(from), iso(to), layers.join(',')));
+            const evs = await fetchJson(
+                buildFeedUrl(iso(from), iso(to), layers.join(',')),
+            );
             setFeedError(false);
             const tally: Record<string, number> = {};
             for (const e of evs) tally[e.layer] = (tally[e.layer] ?? 0) + 1;
@@ -317,7 +363,9 @@ export default function CalendarIndex({
         const from = iso(today);
         const to = iso(addDays(today, 30));
         try {
-            setAgendaEvents(await fetchJson(buildFeedUrl(from, to, layers.join(','))));
+            setAgendaEvents(
+                await fetchJson(buildFeedUrl(from, to, layers.join(','))),
+            );
         } catch {
             setAgendaEvents([]);
         }
@@ -327,7 +375,9 @@ export default function CalendarIndex({
         const from = iso(today);
         const to = iso(addDays(today, 90));
         try {
-            const evs = await fetchJson(`/hr/calendar/feed?from=${from}&to=${to}&layers=compliance`);
+            const evs = await fetchJson(
+                `/hr/calendar/feed?from=${from}&to=${to}&layers=compliance`,
+            );
             setRenewals(evs.sort((a, b) => a.start.localeCompare(b.start)));
         } catch {
             setRenewals([]);
@@ -362,7 +412,8 @@ export default function CalendarIndex({
     const go = useCallback(
         (dir: number) => {
             setCursor((c) => {
-                if (view === 'month') return new Date(c.getFullYear(), c.getMonth() + dir, 1);
+                if (view === 'month')
+                    return new Date(c.getFullYear(), c.getMonth() + dir, 1);
                 if (view === 'week') return addDays(c, 7 * dir);
                 return addDays(c, dir);
             });
@@ -375,7 +426,9 @@ export default function CalendarIndex({
         const onKey = (e: KeyboardEvent) => {
             const el = e.target as HTMLElement | null;
             const typing =
-                el?.tagName === 'INPUT' || el?.tagName === 'TEXTAREA' || el?.isContentEditable;
+                el?.tagName === 'INPUT' ||
+                el?.tagName === 'TEXTAREA' ||
+                el?.isContentEditable;
             if (e.key === 'Escape') {
                 setHover(null);
                 setDetail(null);
@@ -428,11 +481,15 @@ export default function CalendarIndex({
 
     const toggleLayer = (layer: CalendarLayer) => {
         setActiveLayers((prev) =>
-            prev.includes(layer) ? prev.filter((l) => l !== layer) : [...prev, layer],
+            prev.includes(layer)
+                ? prev.filter((l) => l !== layer)
+                : [...prev, layer],
         );
     };
     const ensureLayer = (layer: CalendarLayer) => {
-        setActiveLayers((prev) => (prev.includes(layer) ? prev : [...prev, layer]));
+        setActiveLayers((prev) =>
+            prev.includes(layer) ? prev : [...prev, layer],
+        );
     };
 
     const openCreate = (date?: string | null) => {
@@ -442,7 +499,11 @@ export default function CalendarIndex({
     };
 
     /* ── feed → EventClickArg adapter (shared with the wizard/popover wiring) ── */
-    const feedToInfo = (e: CalendarLayerFeed, x = 200, y = 200): EventClickArg =>
+    const feedToInfo = (
+        e: CalendarLayerFeed,
+        x = 200,
+        y = 200,
+    ): EventClickArg =>
         ({
             event: {
                 id: e.id,
@@ -450,7 +511,11 @@ export default function CalendarIndex({
                 startStr: e.start,
                 endStr: e.end,
                 allDay: e.allDay,
-                extendedProps: { ...e.extendedProps, layer: e.layer, deepLink: e.deepLink },
+                extendedProps: {
+                    ...e.extendedProps,
+                    layer: e.layer,
+                    deepLink: e.deepLink,
+                },
             },
             jsEvent: { clientX: x, clientY: y } as MouseEvent,
         }) as unknown as EventClickArg;
@@ -466,18 +531,33 @@ export default function CalendarIndex({
             description: (props.description as string) ?? null,
             event_type: (props.category as string) ?? 'company',
             starts_at: (props.startRaw as string) ?? info.event.startStr,
-            ends_at: (props.endRaw as string) ?? info.event.endStr ?? info.event.startStr,
+            ends_at:
+                (props.endRaw as string) ??
+                info.event.endStr ??
+                info.event.startStr,
             is_all_day: !!props.isAllDay,
             location: (props.location as string) ?? null,
             department_id: (props.departmentId as number) ?? null,
             site_id: (props.siteId as number) ?? null,
             rrule: (props.rrule as string) ?? null,
             recurrence_until: (props.recurrenceUntil as string) ?? null,
-            audience_type: (props.audienceType as 'org' | 'site' | 'department' | 'team' | 'people') ?? 'org',
+            audience_type:
+                (props.audienceType as
+                    | 'org'
+                    | 'site'
+                    | 'department'
+                    | 'team'
+                    | 'people') ?? 'org',
             audience_team: (props.audienceRef as string) ?? null,
             audience_user_ids: (props.attendeeUserIds as number[]) ?? [],
-            reminders: (props.reminders as { offset_minutes: number; channel: string }[]) ?? [],
-            attachments: (props.attachments as CalendarEventInitial['attachments']) ?? [],
+            reminders:
+                (props.reminders as {
+                    offset_minutes: number;
+                    channel: string;
+                }[]) ?? [],
+            attachments:
+                (props.attachments as CalendarEventInitial['attachments']) ??
+                [],
             scope,
             occurrence_date: (props.occurrenceDate as string) ?? null,
         };
@@ -489,7 +569,11 @@ export default function CalendarIndex({
         setWizardOpen(true);
     };
 
-    const detailFromInfo = (info: EventClickArg, x: number, y: number): EventDetail => {
+    const detailFromInfo = (
+        info: EventClickArg,
+        x: number,
+        y: number,
+    ): EventDetail => {
         const props = info.event.extendedProps as Record<string, unknown>;
         return {
             x,
@@ -538,12 +622,18 @@ export default function CalendarIndex({
                 department_id: init.department_id,
                 site_id: init.site_id,
             },
-            { preserveScroll: true, preserveState: true, onSuccess: () => refetch() },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => refetch(),
+            },
         );
     };
 
     const archiveFromInfo = (info: EventClickArg) => {
-        const id = Number((info.event.extendedProps as Record<string, unknown>).eventId);
+        const id = Number(
+            (info.event.extendedProps as Record<string, unknown>).eventId,
+        );
         if (id) setArchiveTarget({ id, title: info.event.title });
     };
 
@@ -563,30 +653,95 @@ export default function CalendarIndex({
         const items =
             e.layer === 'event' && can.manage
                 ? [
-                      { icon: <Eye className="h-3.5 w-3.5" />, label: 'Open', onClick: () => handleEventClick(info) },
-                      { icon: <Pencil className="h-3.5 w-3.5" />, label: 'Edit…', kbd: '↵', onClick: () => editFromInfo(info) },
-                      { icon: <Copy className="h-3.5 w-3.5" />, label: 'Duplicate', onClick: () => duplicateFromInfo(info) },
+                      {
+                          icon: <Eye className="h-3.5 w-3.5" />,
+                          label: 'Open',
+                          onClick: () => handleEventClick(info),
+                      },
+                      {
+                          icon: <Pencil className="h-3.5 w-3.5" />,
+                          label: 'Edit…',
+                          kbd: '↵',
+                          onClick: () => editFromInfo(info),
+                      },
+                      {
+                          icon: <Copy className="h-3.5 w-3.5" />,
+                          label: 'Duplicate',
+                          onClick: () => duplicateFromInfo(info),
+                      },
                       { sep: true as const },
-                      { icon: <Archive className="h-3.5 w-3.5" />, label: 'Archive', onClick: () => archiveFromInfo(info) },
+                      {
+                          icon: <Archive className="h-3.5 w-3.5" />,
+                          label: 'Archive',
+                          onClick: () => archiveFromInfo(info),
+                      },
                   ]
                 : [
-                      { icon: <Eye className="h-3.5 w-3.5" />, label: 'Open detail', onClick: () => handleEventClick(info) },
+                      {
+                          icon: <Eye className="h-3.5 w-3.5" />,
+                          label: 'Open detail',
+                          onClick: () => handleEventClick(info),
+                      },
                       ...(e.deepLink
-                          ? [{ icon: <ExternalLink className="h-3.5 w-3.5" />, label: 'Open in ' + meta.label.split(' ')[0], onClick: () => router.visit(e.deepLink as string) }]
+                          ? [
+                                {
+                                    icon: (
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                    ),
+                                    label:
+                                        'Open in ' + meta.label.split(' ')[0],
+                                    onClick: () =>
+                                        router.visit(e.deepLink as string),
+                                },
+                            ]
                           : []),
                   ];
         setDetail(null);
-        setCtxMenu({ x, y, tag: meta.label.split(' ')[0].toUpperCase().slice(0, 4), meta: e.title, items });
+        setCtxMenu({
+            x,
+            y,
+            tag: meta.label.split(' ')[0].toUpperCase().slice(0, 4),
+            meta: e.title,
+            items,
+        });
     };
 
     const openDayMenu = (date: Date, x: number, y: number) => {
         const items = [
             ...(can.manage
-                ? [{ icon: <Plus className="h-3.5 w-3.5" />, label: 'New event here', kbd: 'N', onClick: () => openCreate(iso(date)) }]
+                ? [
+                      {
+                          icon: <Plus className="h-3.5 w-3.5" />,
+                          label: 'New event here',
+                          kbd: 'N',
+                          onClick: () => openCreate(iso(date)),
+                      },
+                  ]
                 : []),
-            { icon: <CalendarDays className="h-3.5 w-3.5" />, label: 'View this day', onClick: () => { setView('day'); setCursor(date); } },
-            { icon: <UserIcon className="h-3.5 w-3.5" />, label: "Show who's off", onClick: () => { ensureLayer('leave'); toast.success('Leave layer focused'); } },
-            { icon: <Users className="h-3.5 w-3.5" />, label: 'Show coverage', onClick: () => { ensureLayer('shift'); toast.success('Shifts layer focused'); } },
+            {
+                icon: <CalendarDays className="h-3.5 w-3.5" />,
+                label: 'View this day',
+                onClick: () => {
+                    setView('day');
+                    setCursor(date);
+                },
+            },
+            {
+                icon: <UserIcon className="h-3.5 w-3.5" />,
+                label: "Show who's off",
+                onClick: () => {
+                    ensureLayer('leave');
+                    toast.success('Leave layer focused');
+                },
+            },
+            {
+                icon: <Users className="h-3.5 w-3.5" />,
+                label: 'Show coverage',
+                onClick: () => {
+                    ensureLayer('shift');
+                    toast.success('Shifts layer focused');
+                },
+            },
         ];
         setDetail(null);
         setCtxMenu({ x, y, tag: 'DAY', meta: fmtLong(date), items });
@@ -594,15 +749,32 @@ export default function CalendarIndex({
 
     const openTabMenu = (key: CalTab, x: number, y: number) => {
         const items = [
-            { icon: <Star className="h-3.5 w-3.5" />, label: 'Set as default view', onClick: () => { window.localStorage.setItem(DEFAULT_TAB_KEY, JSON.stringify(key)); toast.success('Default tab set'); } },
-            { icon: <Eye className="h-3.5 w-3.5" />, label: 'Open', onClick: () => setTab(key) },
+            {
+                icon: <Star className="h-3.5 w-3.5" />,
+                label: 'Set as default view',
+                onClick: () => {
+                    window.localStorage.setItem(
+                        DEFAULT_TAB_KEY,
+                        JSON.stringify(key),
+                    );
+                    toast.success('Default tab set');
+                },
+            },
+            {
+                icon: <Eye className="h-3.5 w-3.5" />,
+                label: 'Open',
+                onClick: () => setTab(key),
+            },
             {
                 icon: <Pin className="h-3.5 w-3.5" />,
                 label: pinned[key] ? 'Unpin' : 'Pin',
                 onClick: () =>
                     setPinned((p) => {
                         const next = { ...p, [key]: !p[key] };
-                        window.localStorage.setItem(PINNED_KEY, JSON.stringify(next));
+                        window.localStorage.setItem(
+                            PINNED_KEY,
+                            JSON.stringify(next),
+                        );
                         return next;
                     }),
             },
@@ -626,7 +798,9 @@ export default function CalendarIndex({
     /* ── derived ── */
     const visibleEvents = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return q ? events.filter((e) => e.title.toLowerCase().includes(q)) : events;
+        return q
+            ? events.filter((e) => e.title.toLowerCase().includes(q))
+            : events;
     }, [events, search]);
     const visibleAgenda = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -634,7 +808,10 @@ export default function CalendarIndex({
         return q ? base.filter((e) => e.title.toLowerCase().includes(q)) : base;
     }, [agendaEvents, search]);
 
-    const totalCount = useMemo(() => Object.values(counts).reduce((a, b) => a + b, 0), [counts]);
+    const totalCount = useMemo(
+        () => Object.values(counts).reduce((a, b) => a + b, 0),
+        [counts],
+    );
     const tabDefs: { key: CalTab; label: string; count: number }[] = [
         { key: 'calendar', label: 'Calendar', count: counts.event ?? 0 },
         { key: 'agenda', label: 'Agenda', count: totalCount },
@@ -643,7 +820,10 @@ export default function CalendarIndex({
 
     const periodTitle = useMemo(() => {
         if (view === 'month')
-            return cursor.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' });
+            return cursor.toLocaleDateString('en-NZ', {
+                month: 'long',
+                year: 'numeric',
+            });
         if (view === 'week') {
             const ws = startOfWeek(cursor);
             const we = addDays(ws, 6);
@@ -659,9 +839,12 @@ export default function CalendarIndex({
     }, [view, cursor]);
 
     const entryHandlers = {
-        onEntryClick: (e: CalendarLayerFeed, x: number, y: number) => handleEventClick(feedToInfo(e, x, y)),
-        onEntryCtx: (e: CalendarLayerFeed, x: number, y: number) => buildEntryMenu(e, x, y),
-        onEntryHover: (e: CalendarLayerFeed, x: number, y: number) => setHover({ e, x, y }),
+        onEntryClick: (e: CalendarLayerFeed, x: number, y: number) =>
+            handleEventClick(feedToInfo(e, x, y)),
+        onEntryCtx: (e: CalendarLayerFeed, x: number, y: number) =>
+            buildEntryMenu(e, x, y),
+        onEntryHover: (e: CalendarLayerFeed, x: number, y: number) =>
+            setHover({ e, x, y }),
         onEntryHoverEnd: () => setHover(null),
     };
 
@@ -679,19 +862,50 @@ export default function CalendarIndex({
                     siteCount={sites.length}
                     needs={[
                         ...(stats.coverageGapsToday > 0
-                            ? [{ key: 'gaps', label: `${stats.coverageGapsToday} coverage gap${stats.coverageGapsToday === 1 ? '' : 's'} today`, onClick: () => { ensureLayer('shift'); setTab('calendar'); setView('month'); setCursor(new Date()); } }]
+                            ? [
+                                  {
+                                      key: 'gaps',
+                                      label: `${stats.coverageGapsToday} coverage gap${stats.coverageGapsToday === 1 ? '' : 's'} today`,
+                                      onClick: () => {
+                                          ensureLayer('shift');
+                                          setTab('calendar');
+                                          setView('month');
+                                          setCursor(new Date());
+                                      },
+                                  },
+                              ]
                             : []),
                         ...(stats.renewalsSoon > 0
-                            ? [{ key: 'renewals', label: `${stats.renewalsSoon} renewal${stats.renewalsSoon === 1 ? '' : 's'} due soon`, onClick: () => setTab('renewals') }]
+                            ? [
+                                  {
+                                      key: 'renewals',
+                                      label: `${stats.renewalsSoon} renewal${stats.renewalsSoon === 1 ? '' : 's'} due soon`,
+                                      onClick: () => setTab('renewals'),
+                                  },
+                              ]
                             : []),
                     ]}
                     handlers={{
                         onNewEvent: can.manage ? () => openCreate() : undefined,
-                        onToday: () => { setTab('calendar'); setCursor(new Date()); },
+                        onToday: () => {
+                            setTab('calendar');
+                            setCursor(new Date());
+                        },
                         onSubscribe: () => setSubscribeOpen(true),
-                        onStatEvents: () => { setTab('calendar'); setView('week'); setCursor(new Date()); },
-                        onStatLeave: () => { ensureLayer('leave'); setTab('agenda'); },
-                        onStatGaps: () => { setTab('calendar'); ensureLayer('shift'); setCursor(new Date()); },
+                        onStatEvents: () => {
+                            setTab('calendar');
+                            setView('week');
+                            setCursor(new Date());
+                        },
+                        onStatLeave: () => {
+                            ensureLayer('leave');
+                            setTab('agenda');
+                        },
+                        onStatGaps: () => {
+                            setTab('calendar');
+                            ensureLayer('shift');
+                            setCursor(new Date());
+                        },
                         onStatRenewals: () => setTab('renewals'),
                         onUpNext,
                     }}
@@ -710,19 +924,29 @@ export default function CalendarIndex({
                                     e.preventDefault();
                                     openTabMenu(t.key, e.clientX, e.clientY);
                                 }}
-                                className="relative -mb-px inline-flex items-center gap-2 border-b-[2.5px] bg-transparent px-[15px] pb-3 pt-[11px] text-[13.5px] font-semibold"
+                                className="relative -mb-px inline-flex items-center gap-2 border-b-[2.5px] bg-transparent px-[15px] pt-[11px] pb-3 text-[13.5px] font-semibold"
                                 style={{
-                                    color: active ? 'var(--primary)' : 'var(--muted-foreground)',
-                                    borderBottomColor: active ? 'var(--primary)' : 'transparent',
+                                    color: active
+                                        ? 'var(--primary)'
+                                        : 'var(--muted-foreground)',
+                                    borderBottomColor: active
+                                        ? 'var(--primary)'
+                                        : 'transparent',
                                 }}
                             >
                                 {t.label}
-                                {pinned[t.key] ? <Star className="h-3 w-3 fill-current opacity-70" /> : null}
+                                {pinned[t.key] ? (
+                                    <Star className="h-3 w-3 fill-current opacity-70" />
+                                ) : null}
                                 <span
                                     className="inline-grid h-[19px] min-w-[19px] place-items-center rounded-full px-[5px] text-[11px] font-bold"
                                     style={{
-                                        background: active ? 'var(--accent)' : 'var(--muted)',
-                                        color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+                                        background: active
+                                            ? 'var(--accent)'
+                                            : 'var(--muted)',
+                                        color: active
+                                            ? 'var(--primary)'
+                                            : 'var(--muted-foreground)',
                                     }}
                                 >
                                     {t.count}
@@ -739,10 +963,16 @@ export default function CalendarIndex({
                 {tab === 'calendar' ? (
                     <div className="mt-4 flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-1">
-                            <ToolbarIconButton ariaLabel="Previous" onClick={() => go(-1)}>
+                            <ToolbarIconButton
+                                ariaLabel="Previous"
+                                onClick={() => go(-1)}
+                            >
                                 <ChevronLeft className="h-[17px] w-[17px]" />
                             </ToolbarIconButton>
-                            <ToolbarIconButton ariaLabel="Next" onClick={() => go(1)}>
+                            <ToolbarIconButton
+                                ariaLabel="Next"
+                                onClick={() => go(1)}
+                            >
                                 <ChevronRight className="h-[17px] w-[17px]" />
                             </ToolbarIconButton>
                             <button
@@ -772,60 +1002,87 @@ export default function CalendarIndex({
                                     <ArchiveRestore className="h-4 w-4" />
                                     Archived events
                                     {archivedEvents.length > 0 ? (
-                                        <span className="rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground">
+                                        <span className="rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground tabular-nums">
                                             {archivedEvents.length}
                                         </span>
                                     ) : null}
                                 </button>
                             ) : null}
                             <div className="relative">
-                                <Search className="pointer-events-none absolute left-[10px] top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-muted-foreground" />
+                                <Search className="pointer-events-none absolute top-1/2 left-[10px] h-[15px] w-[15px] -translate-y-1/2 text-muted-foreground" />
                                 <input
                                     ref={searchRef}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search events…"
-                                    className="h-[34px] w-[170px] rounded-[9px] border border-border bg-card pl-8 pr-[10px] text-[13px] text-foreground outline-none"
+                                    className="h-[34px] w-[170px] rounded-[9px] border border-border bg-card pr-[10px] pl-8 text-[13px] text-foreground outline-none"
                                 />
                             </div>
-                            <NativeSelect value={siteFilter} onChange={setSiteFilter}>
+                            <NativeSelect
+                                value={siteFilter}
+                                onChange={setSiteFilter}
+                            >
                                 <option value="all">All sites</option>
                                 {sites.map((s) => (
-                                    <option key={s.id} value={String(s.id)}>{s.name}</option>
+                                    <option key={s.id} value={String(s.id)}>
+                                        {s.name}
+                                    </option>
                                 ))}
                             </NativeSelect>
                             {departments.length > 0 ? (
-                                <NativeSelect value={deptFilter} onChange={setDeptFilter}>
+                                <NativeSelect
+                                    value={deptFilter}
+                                    onChange={setDeptFilter}
+                                >
                                     <option value="all">All departments</option>
                                     {departments.map((d) => (
-                                        <option key={d.id} value={String(d.id)}>{d.name}</option>
+                                        <option key={d.id} value={String(d.id)}>
+                                            {d.name}
+                                        </option>
                                     ))}
                                 </NativeSelect>
                             ) : null}
                             {teams.length > 0 ? (
-                                <NativeSelect value={teamFilter} onChange={setTeamFilter}>
+                                <NativeSelect
+                                    value={teamFilter}
+                                    onChange={setTeamFilter}
+                                >
                                     <option value="all">All teams</option>
                                     {teams.map((t) => (
-                                        <option key={t} value={t}>{t}</option>
+                                        <option key={t} value={t}>
+                                            {t}
+                                        </option>
                                     ))}
                                 </NativeSelect>
                             ) : null}
                             <div className="inline-flex gap-[2px] rounded-[10px] bg-muted p-[3px]">
-                                {(['month', 'week', 'day'] as CalView[]).map((v) => (
-                                    <button
-                                        key={v}
-                                        type="button"
-                                        onClick={() => setView(v)}
-                                        className="rounded-lg px-[13px] py-[6px] text-[12.5px] font-semibold capitalize"
-                                        style={
-                                            view === v
-                                                ? { background: 'var(--card)', color: 'var(--foreground)', boxShadow: '0 1px 2px rgba(0,0,0,.08)' }
-                                                : { background: 'transparent', color: 'var(--muted-foreground)' }
-                                        }
-                                    >
-                                        {v}
-                                    </button>
-                                ))}
+                                {(['month', 'week', 'day'] as CalView[]).map(
+                                    (v) => (
+                                        <button
+                                            key={v}
+                                            type="button"
+                                            onClick={() => setView(v)}
+                                            className="rounded-lg px-[13px] py-[6px] text-[12.5px] font-semibold capitalize"
+                                            style={
+                                                view === v
+                                                    ? {
+                                                          background:
+                                                              'var(--card)',
+                                                          color: 'var(--foreground)',
+                                                          boxShadow:
+                                                              '0 1px 2px rgba(0,0,0,.08)',
+                                                      }
+                                                    : {
+                                                          background:
+                                                              'transparent',
+                                                          color: 'var(--muted-foreground)',
+                                                      }
+                                            }
+                                        >
+                                            {v}
+                                        </button>
+                                    ),
+                                )}
                             </div>
                         </div>
                     </div>
@@ -854,7 +1111,14 @@ export default function CalendarIndex({
                         {feedError && tab === 'calendar' ? (
                             <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
                                 The calendar feed failed to load.{' '}
-                                <button type="button" onClick={() => { setFeedError(false); void fetchRange(); }} className="font-semibold text-primary underline">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setFeedError(false);
+                                        void fetchRange();
+                                    }}
+                                    className="font-semibold text-primary underline"
+                                >
                                     Retry
                                 </button>
                             </div>
@@ -867,10 +1131,17 @@ export default function CalendarIndex({
                                 loading={loading}
                                 handlers={{
                                     ...entryHandlers,
-                                    onDayNum: (d) => { setView('day'); setCursor(d); },
+                                    onDayNum: (d) => {
+                                        setView('day');
+                                        setCursor(d);
+                                    },
                                     onDayMenu: openDayMenu,
-                                    onAdd: (d, x, y) => setQuickAdd({ date: iso(d), x, y }),
-                                    onMore: (d) => { setView('day'); setCursor(d); },
+                                    onAdd: (d, x, y) =>
+                                        setQuickAdd({ date: iso(d), x, y }),
+                                    onMore: (d) => {
+                                        setView('day');
+                                        setCursor(d);
+                                    },
                                 }}
                             />
                         ) : tab === 'calendar' ? (
@@ -880,7 +1151,8 @@ export default function CalendarIndex({
                                 today={today}
                                 handlers={{
                                     ...entryHandlers,
-                                    onCreate: (d, _hour, x, y) => setQuickAdd({ date: iso(d), x, y }),
+                                    onCreate: (d, _hour, x, y) =>
+                                        setQuickAdd({ date: iso(d), x, y }),
                                 }}
                             />
                         ) : tab === 'agenda' ? (
@@ -888,8 +1160,10 @@ export default function CalendarIndex({
                                 events={visibleAgenda}
                                 today={today}
                                 handlers={{
-                                    onEntryClick: (e, x, y) => handleEventClick(feedToInfo(e, x, y)),
-                                    onEntryCtx: (e, x, y) => buildEntryMenu(e, x, y),
+                                    onEntryClick: (e, x, y) =>
+                                        handleEventClick(feedToInfo(e, x, y)),
+                                    onEntryCtx: (e, x, y) =>
+                                        buildEntryMenu(e, x, y),
                                     onDeepLink: (href) => router.visit(href),
                                 }}
                             />
@@ -919,43 +1193,80 @@ export default function CalendarIndex({
                     />
                 ) : null}
 
-                <ICalSubscribeDialog open={subscribeOpen} onClose={() => setSubscribeOpen(false)} url={ical.url} />
+                <ICalSubscribeDialog
+                    open={subscribeOpen}
+                    onClose={() => setSubscribeOpen(false)}
+                    url={ical.url}
+                />
 
-                <Dialog open={archiveHistoryOpen} onOpenChange={setArchiveHistoryOpen}>
+                <Dialog
+                    open={archiveHistoryOpen}
+                    onOpenChange={setArchiveHistoryOpen}
+                >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
                             <DialogTitle>Archived events</DialogTitle>
                             <DialogDescription>
-                                Archived events stay out of active calendars while their attendees, reminders, and attachments are retained.
+                                Archived events stay out of active calendars
+                                while their attendees, reminders, and
+                                attachments are retained.
                             </DialogDescription>
                         </DialogHeader>
                         {archivedEvents.length > 0 ? (
                             <ul className="max-h-[55vh] space-y-2 overflow-y-auto">
                                 {archivedEvents.map((event) => (
-                                    <li key={event.id} className="flex items-start justify-between gap-3 rounded-xl border border-border p-3">
+                                    <li
+                                        key={event.id}
+                                        className="flex items-start justify-between gap-3 rounded-xl border border-border p-3"
+                                    >
                                         <span className="min-w-0">
-                                            <span className="block truncate text-sm font-semibold text-foreground">{event.title}</span>
+                                            <span className="block truncate text-sm font-semibold text-foreground">
+                                                {event.title}
+                                            </span>
                                             <span className="mt-0.5 block text-xs text-muted-foreground">
-                                                Archived {event.archived_at ? fmtLong(new Date(event.archived_at)) : 'previously'}
-                                                {event.archived_by ? ` by ${event.archived_by}` : ''}
+                                                Archived{' '}
+                                                {event.archived_at
+                                                    ? fmtLong(
+                                                          new Date(
+                                                              event.archived_at,
+                                                          ),
+                                                      )
+                                                    : 'previously'}
+                                                {event.archived_by
+                                                    ? ` by ${event.archived_by}`
+                                                    : ''}
                                             </span>
                                             {event.archive_reason ? (
-                                                <span className="mt-1 block text-xs text-muted-foreground">Reason: {event.archive_reason}</span>
+                                                <span className="mt-1 block text-xs text-muted-foreground">
+                                                    Reason:{' '}
+                                                    {event.archive_reason}
+                                                </span>
                                             ) : null}
                                         </span>
                                         <button
                                             type="button"
-                                            onClick={() => router.post(`/hr/calendar/events/${event.id}/restore`, {}, {
-                                                preserveScroll: true,
-                                                onSuccess: () => {
-                                                    toast.success('Event restored');
-                                                    setArchiveHistoryOpen(false);
-                                                    refetch();
-                                                },
-                                            })}
+                                            onClick={() =>
+                                                router.post(
+                                                    `/hr/calendar/events/${event.id}/restore`,
+                                                    {},
+                                                    {
+                                                        preserveScroll: true,
+                                                        onSuccess: () => {
+                                                            toast.success(
+                                                                'Event restored',
+                                                            );
+                                                            setArchiveHistoryOpen(
+                                                                false,
+                                                            );
+                                                            refetch();
+                                                        },
+                                                    },
+                                                )
+                                            }
                                             className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-primary hover:bg-muted"
                                         >
-                                            <ArchiveRestore className="h-3.5 w-3.5" /> Restore
+                                            <ArchiveRestore className="h-3.5 w-3.5" />{' '}
+                                            Restore
                                         </button>
                                     </li>
                                 ))}
@@ -968,33 +1279,59 @@ export default function CalendarIndex({
                     </DialogContent>
                 </Dialog>
 
-                <Dialog open={!!scopePrompt} onOpenChange={(o) => !o && setScopePrompt(null)}>
+                <Dialog
+                    open={!!scopePrompt}
+                    onOpenChange={(o) => !o && setScopePrompt(null)}
+                >
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle>Edit recurring event</DialogTitle>
                             <DialogDescription>
-                                This event repeats. Choose which occurrences your changes apply to.
+                                This event repeats. Choose which occurrences
+                                your changes apply to.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex flex-col gap-2">
                             {(
                                 [
-                                    { scope: 'this', label: 'This event only', hint: 'Edit just this occurrence' },
-                                    { scope: 'following', label: 'This & following events', hint: 'Split the series from here' },
-                                    { scope: 'all', label: 'All events', hint: 'Edit the whole series' },
+                                    {
+                                        scope: 'this',
+                                        label: 'This event only',
+                                        hint: 'Edit just this occurrence',
+                                    },
+                                    {
+                                        scope: 'following',
+                                        label: 'This & following events',
+                                        hint: 'Split the series from here',
+                                    },
+                                    {
+                                        scope: 'all',
+                                        label: 'All events',
+                                        hint: 'Edit the whole series',
+                                    },
                                 ] as const
                             ).map((opt) => (
                                 <button
                                     key={opt.scope}
                                     type="button"
                                     onClick={() => {
-                                        if (scopePrompt) openEdit(buildInitial(scopePrompt, opt.scope));
+                                        if (scopePrompt)
+                                            openEdit(
+                                                buildInitial(
+                                                    scopePrompt,
+                                                    opt.scope,
+                                                ),
+                                            );
                                         setScopePrompt(null);
                                     }}
                                     className="flex items-center justify-between rounded-lg border border-border px-4 py-3 text-left transition-colors hover:bg-accent"
                                 >
-                                    <span className="text-sm font-semibold">{opt.label}</span>
-                                    <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                                    <span className="text-sm font-semibold">
+                                        {opt.label}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {opt.hint}
+                                    </span>
                                 </button>
                             ))}
                         </div>
@@ -1006,16 +1343,38 @@ export default function CalendarIndex({
                         detail={detail}
                         canManage={can.manage}
                         onClose={() => setDetail(null)}
-                        onEdit={() => { setDetail(null); if (clickedInfoRef.current) editFromInfo(clickedInfoRef.current); }}
-                        onDuplicate={() => { setDetail(null); if (clickedInfoRef.current) duplicateFromInfo(clickedInfoRef.current); }}
-                        onArchive={() => { setDetail(null); if (clickedInfoRef.current) archiveFromInfo(clickedInfoRef.current); }}
-                        onDeepLink={(href) => { setDetail(null); router.visit(href); }}
+                        onEdit={() => {
+                            setDetail(null);
+                            if (clickedInfoRef.current)
+                                editFromInfo(clickedInfoRef.current);
+                        }}
+                        onDuplicate={() => {
+                            setDetail(null);
+                            if (clickedInfoRef.current)
+                                duplicateFromInfo(clickedInfoRef.current);
+                        }}
+                        onArchive={() => {
+                            setDetail(null);
+                            if (clickedInfoRef.current)
+                                archiveFromInfo(clickedInfoRef.current);
+                        }}
+                        onDeepLink={(href) => {
+                            setDetail(null);
+                            router.visit(href);
+                        }}
                     />
                 ) : null}
 
-                {ctxMenu ? <ShiftContextMenu ctx={ctxMenu} onClose={() => setCtxMenu(null)} /> : null}
+                {ctxMenu ? (
+                    <ShiftContextMenu
+                        ctx={ctxMenu}
+                        onClose={() => setCtxMenu(null)}
+                    />
+                ) : null}
 
-                {hover ? <HoverPreview e={hover.e} x={hover.x} y={hover.y} /> : null}
+                {hover ? (
+                    <HoverPreview e={hover.e} x={hover.x} y={hover.y} />
+                ) : null}
 
                 {quickAdd ? (
                     <QuickAddPopover
@@ -1026,12 +1385,29 @@ export default function CalendarIndex({
                         onCreate={(title) => {
                             router.post(
                                 '/hr/calendar/events',
-                                { title, event_type: 'company', starts_at: `${quickAdd.date}T09:00`, ends_at: `${quickAdd.date}T10:00`, is_all_day: false },
-                                { preserveScroll: true, preserveState: true, onSuccess: () => { refetch(); toast.success('Event added'); } },
+                                {
+                                    title,
+                                    event_type: 'company',
+                                    starts_at: `${quickAdd.date}T09:00`,
+                                    ends_at: `${quickAdd.date}T10:00`,
+                                    is_all_day: false,
+                                },
+                                {
+                                    preserveScroll: true,
+                                    preserveState: true,
+                                    onSuccess: () => {
+                                        refetch();
+                                        toast.success('Event added');
+                                    },
+                                },
                             );
                             setQuickAdd(null);
                         }}
-                        onMore={() => { const d = quickAdd.date; setQuickAdd(null); openCreate(d); }}
+                        onMore={() => {
+                            const d = quickAdd.date;
+                            setQuickAdd(null);
+                            openCreate(d);
+                        }}
                     />
                 ) : null}
 
@@ -1055,12 +1431,17 @@ export default function CalendarIndex({
                     }}
                 />
 
-                <Dialog open={!!dayDetail} onOpenChange={(o) => !o && setDayDetail(null)}>
+                <Dialog
+                    open={!!dayDetail}
+                    onOpenChange={(o) => !o && setDayDetail(null)}
+                >
                     <DialogContent className="max-w-sm">
                         <DialogHeader>
                             <DialogTitle>{dayDetail?.label}</DialogTitle>
                             <DialogDescription>
-                                {dayDetail?.events.length} item{dayDetail?.events.length === 1 ? '' : 's'} on this day.
+                                {dayDetail?.events.length} item
+                                {dayDetail?.events.length === 1 ? '' : 's'} on
+                                this day.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="flex max-h-[60vh] flex-col gap-1.5 overflow-y-auto">
@@ -1068,14 +1449,29 @@ export default function CalendarIndex({
                                 <button
                                     key={e.id}
                                     type="button"
-                                    onClick={(ev) => { const x = ev.clientX; const y = ev.clientY; setDayDetail(null); handleEventClick(feedToInfo(e, x, y)); }}
+                                    onClick={(ev) => {
+                                        const x = ev.clientX;
+                                        const y = ev.clientY;
+                                        setDayDetail(null);
+                                        handleEventClick(feedToInfo(e, x, y));
+                                    }}
                                     className="flex items-center gap-2.5 rounded-lg border border-border px-3 py-2 text-left transition-colors hover:bg-accent"
-                                    style={{ borderLeftWidth: 3, borderLeftColor: colorVar(e) }}
+                                    style={{
+                                        borderLeftWidth: 3,
+                                        borderLeftColor: colorVar(e),
+                                    }}
                                 >
-                                    <span className="h-2 w-2 flex-none rounded-full" style={{ background: colorVar(e) }} />
+                                    <span
+                                        className="h-2 w-2 flex-none rounded-full"
+                                        style={{ background: colorVar(e) }}
+                                    />
                                     <span className="min-w-0 flex-1">
-                                        <span className="block truncate text-[13px] font-semibold">{e.title}</span>
-                                        <span className="block text-[11px] text-muted-foreground">{layerLabel(e)}</span>
+                                        <span className="block truncate text-[13px] font-semibold">
+                                            {e.title}
+                                        </span>
+                                        <span className="block text-[11px] text-muted-foreground">
+                                            {layerLabel(e)}
+                                        </span>
                                     </span>
                                 </button>
                             ))}
@@ -1083,12 +1479,18 @@ export default function CalendarIndex({
                     </DialogContent>
                 </Dialog>
 
-                <AlertDialog open={!!archiveTarget} onOpenChange={(o) => !o && setArchiveTarget(null)}>
+                <AlertDialog
+                    open={!!archiveTarget}
+                    onOpenChange={(o) => !o && setArchiveTarget(null)}
+                >
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>Archive event?</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Archiving “{archiveTarget?.title}” removes it from active calendars but retains attendees, reminders, and attachments. It can be restored later.
+                                Archiving “{archiveTarget?.title}” removes it
+                                from active calendars but retains attendees,
+                                reminders, and attachments. It can be restored
+                                later.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -1140,7 +1542,7 @@ function NativeSelect({
         <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="h-[34px] cursor-pointer appearance-none rounded-[9px] border border-border bg-card pl-[11px] pr-[28px] text-[12.5px] font-semibold text-foreground outline-none"
+            className="h-[34px] cursor-pointer appearance-none rounded-[9px] border border-border bg-card pr-[28px] pl-[11px] text-[12.5px] font-semibold text-foreground outline-none"
             style={{
                 backgroundImage:
                     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
@@ -1179,7 +1581,9 @@ function LayerPanel({
             style={{ boxShadow: '0 1px 3px rgba(0,0,0,.04)' }}
         >
             <div className="mb-1 flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Layers</span>
+                <span className="text-[11px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
+                    Layers
+                </span>
                 <button
                     type="button"
                     aria-label="Hide layers"
@@ -1204,23 +1608,43 @@ function LayerPanel({
                             onClick={() => onToggle(layer)}
                             aria-pressed={on}
                             className="flex items-center gap-2.5 rounded-[10px] px-[9px] py-2 text-left"
-                            style={{ background: on ? `color-mix(in oklch, ${sw} 8%, transparent)` : 'transparent' }}
+                            style={{
+                                background: on
+                                    ? `color-mix(in oklch, ${sw} 8%, transparent)`
+                                    : 'transparent',
+                            }}
                         >
                             <span
                                 className="grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px]"
-                                style={{ border: `1.5px solid ${on ? sw : 'var(--border)'}`, background: on ? sw : 'transparent' }}
+                                style={{
+                                    border: `1.5px solid ${on ? sw : 'var(--border)'}`,
+                                    background: on ? sw : 'transparent',
+                                }}
                             >
                                 {on ? (
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg
+                                        width="12"
+                                        height="12"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="var(--primary-foreground)"
+                                        strokeWidth="3.2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
                                         <path d="M20 6 9 17l-5-5" />
                                     </svg>
                                 ) : null}
                             </span>
                             <span className="min-w-0 flex-1 text-left">
-                                <span className="block truncate text-[12.5px] font-semibold text-foreground">{meta.label}</span>
-                                <span className="block text-[11px] text-muted-foreground">{LAYER_SUBLABEL[layer]}</span>
+                                <span className="block truncate text-[12.5px] font-semibold text-foreground">
+                                    {meta.label}
+                                </span>
+                                <span className="block text-[11px] text-muted-foreground">
+                                    {LAYER_SUBLABEL[layer]}
+                                </span>
                             </span>
-                            <span className="flex-none text-[11px] font-bold tabular-nums text-muted-foreground">
+                            <span className="flex-none text-[11px] font-bold text-muted-foreground tabular-nums">
                                 {counts[layer] ?? 0}
                             </span>
                         </button>
@@ -1228,11 +1652,14 @@ function LayerPanel({
                 })}
             </div>
             <div className="mt-3 border-t border-border pt-[11px]">
-                <div className="mb-[7px] text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                <div className="mb-[7px] text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
                     Read-only layers
                 </div>
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    Leave, shifts &amp; renewals are <strong className="text-foreground">view-only</strong> here — click one to open it in its home hub. Only HR events are editable on this page.
+                    Leave, shifts &amp; renewals are{' '}
+                    <strong className="text-foreground">view-only</strong> here
+                    — click one to open it in its home hub. Only HR events are
+                    editable on this page.
                 </p>
             </div>
         </aside>
@@ -1250,21 +1677,39 @@ function Legend({
 }) {
     return (
         <div className="mb-3 flex flex-wrap items-center gap-x-[14px] gap-y-1.5 px-0.5">
-            {LAYER_DISPLAY_ORDER.filter((l) => activeLayers.includes(l)).map((layer) => {
-                const meta = LAYER_META[layer];
-                return (
-                    <span key={layer} className="inline-flex items-center gap-[7px] text-[11.5px] font-semibold text-muted-foreground">
-                        <span className="h-[11px] w-[11px] rounded-[3px]" style={{ background: `var(--${meta.color})` }} />
-                        {meta.label}
-                    </span>
-                );
-            })}
-            <span className="inline-flex items-center gap-[7px] text-[11.5px] font-semibold" style={{ color: 'var(--status-critical)' }}>
-                <span className="h-[11px] w-[11px] rounded-[3px]" style={{ background: 'var(--status-critical)' }} />
+            {LAYER_DISPLAY_ORDER.filter((l) => activeLayers.includes(l)).map(
+                (layer) => {
+                    const meta = LAYER_META[layer];
+                    return (
+                        <span
+                            key={layer}
+                            className="inline-flex items-center gap-[7px] text-[11.5px] font-semibold text-muted-foreground"
+                        >
+                            <span
+                                className="h-[11px] w-[11px] rounded-[3px]"
+                                style={{ background: `var(--${meta.color})` }}
+                            />
+                            {meta.label}
+                        </span>
+                    );
+                },
+            )}
+            <span
+                className="inline-flex items-center gap-[7px] text-[11.5px] font-semibold"
+                style={{ color: 'var(--status-critical)' }}
+            >
+                <span
+                    className="h-[11px] w-[11px] rounded-[3px]"
+                    style={{ background: 'var(--status-critical)' }}
+                />
                 Coverage gap
             </span>
             {!panelOpen ? (
-                <button type="button" onClick={onShowPanel} className="ml-auto inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-primary">
+                <button
+                    type="button"
+                    onClick={onShowPanel}
+                    className="ml-auto inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-primary"
+                >
                     <LayersIcon className="h-[13px] w-[13px]" />
                     Layers
                 </button>
@@ -1273,7 +1718,15 @@ function Legend({
     );
 }
 
-function HoverPreview({ e, x, y }: { e: CalendarLayerFeed; x: number; y: number }) {
+function HoverPreview({
+    e,
+    x,
+    y,
+}: {
+    e: CalendarLayerFeed;
+    x: number;
+    y: number;
+}) {
     const c = colorVar(e);
     const start = new Date(e.start);
     const end = e.end ? new Date(e.end) : start;
@@ -1305,13 +1758,28 @@ function HoverPreview({ e, x, y }: { e: CalendarLayerFeed; x: number; y: number 
     return createPortal(
         <div style={style}>
             <div className="flex items-center gap-2">
-                <span className="h-[9px] w-[9px] flex-none rounded-[3px]" style={{ background: c }} />
-                <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-foreground">{e.title}</span>
+                <span
+                    className="h-[9px] w-[9px] flex-none rounded-[3px]"
+                    style={{ background: c }}
+                />
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-foreground">
+                    {e.title}
+                </span>
             </div>
-            <div className="mt-1.5 text-[11.5px] text-muted-foreground">{layerLabel(e)}</div>
-            <div className="text-[11.5px] font-semibold text-foreground">{when}</div>
-            {sub ? <div className="text-[11.5px] text-muted-foreground">{sub}</div> : null}
-            {meta ? <div className="mt-0.5 text-[11px] text-muted-foreground">{meta}</div> : null}
+            <div className="mt-1.5 text-[11.5px] text-muted-foreground">
+                {layerLabel(e)}
+            </div>
+            <div className="text-[11.5px] font-semibold text-foreground">
+                {when}
+            </div>
+            {sub ? (
+                <div className="text-[11.5px] text-muted-foreground">{sub}</div>
+            ) : null}
+            {meta ? (
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {meta}
+                </div>
+            ) : null}
         </div>,
         document.body,
     );
@@ -1334,7 +1802,10 @@ function QuickAddPopover({
 }) {
     const [title, setTitle] = useState('');
     const ref = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState<{ left: number; top: number }>({ left: x, top: y });
+    const [pos, setPos] = useState<{ left: number; top: number }>({
+        left: x,
+        top: y,
+    });
 
     useLayoutEffect(() => {
         const el = ref.current;
@@ -1342,14 +1813,17 @@ function QuickAddPopover({
         const r = el.getBoundingClientRect();
         let left = x;
         let top = y;
-        if (left + r.width > window.innerWidth - 8) left = window.innerWidth - r.width - 8;
-        if (top + r.height > window.innerHeight - 8) top = window.innerHeight - r.height - 8;
+        if (left + r.width > window.innerWidth - 8)
+            left = window.innerWidth - r.width - 8;
+        if (top + r.height > window.innerHeight - 8)
+            top = window.innerHeight - r.height - 8;
         setPos({ left: Math.max(8, left), top: Math.max(8, top) });
     }, [x, y]);
 
     useEffect(() => {
         const onDown = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+            if (ref.current && !ref.current.contains(e.target as Node))
+                onClose();
         };
         window.addEventListener('mousedown', onDown);
         return () => window.removeEventListener('mousedown', onDown);
@@ -1364,12 +1838,21 @@ function QuickAddPopover({
     return createPortal(
         <div
             ref={ref}
-            style={{ position: 'fixed', left: pos.left, top: pos.top, zIndex: 97 }}
+            style={{
+                position: 'fixed',
+                left: pos.left,
+                top: pos.top,
+                zIndex: 97,
+            }}
             className="w-[300px] overflow-hidden rounded-[15px] border border-border bg-card shadow-[var(--shadow-float)]"
         >
             <div className="border-b border-border bg-muted/40 px-4 py-3">
-                <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">New event</div>
-                <div className="mt-0.5 text-[12.5px] font-semibold text-foreground">{niceDate}</div>
+                <div className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
+                    New event
+                </div>
+                <div className="mt-0.5 text-[12.5px] font-semibold text-foreground">
+                    {niceDate}
+                </div>
             </div>
             <div className="p-3.5">
                 <input
@@ -1377,14 +1860,19 @@ function QuickAddPopover({
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter' && title.trim()) onCreate(title.trim());
+                        if (e.key === 'Enter' && title.trim())
+                            onCreate(title.trim());
                         if (e.key === 'Escape') onClose();
                     }}
                     placeholder="Add a title…"
                     className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
                 />
                 <div className="mt-2.5 flex items-center justify-between">
-                    <button type="button" onClick={onMore} className="text-[12px] font-semibold text-primary hover:underline">
+                    <button
+                        type="button"
+                        onClick={onMore}
+                        className="text-[12px] font-semibold text-primary hover:underline"
+                    >
                         More options →
                     </button>
                     <button

@@ -2,21 +2,25 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class RosterSuggestionRun extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyOrganizationStorageContext;
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_RUNNING = 'running';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_FAILED = 'failed';
+
     public const STATUS_EXPIRED = 'expired';
 
     protected $fillable = [
-        'organization_id',
         'site_id',
         'roster_period_id',
         'requested_by',

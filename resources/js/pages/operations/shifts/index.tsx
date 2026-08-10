@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     Calendar,
@@ -13,7 +12,9 @@ import {
     Users,
     X,
 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import PageShell from '@/components/page-shell';
 import { TabStrip } from '@/components/rostering/tab-strip';
 import AppLayout from '@/layouts/app-layout';
@@ -21,21 +22,21 @@ import {
     cancel as cancelShift,
     complete as completeShift,
     duplicate as duplicateShift,
-    index as shiftsIndex,
     reopen as reopenShift,
+    index as shiftsIndex,
     show as showShift,
     start as startShift,
 } from '@/routes/operations/shifts';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { CreateShiftDialog } from './components/create-shift-dialog';
-import { useCreateShiftLauncher } from './components/use-create-shift-launcher';
 import { DonutCard } from './components/donut-card';
+import { ShiftCalendarView } from './components/shift-calendar-view';
 import {
     ShiftContextMenu,
     type ContextMenuItem,
 } from './components/shift-context-menu';
-import { ShiftCalendarView } from './components/shift-calendar-view';
 import { ShiftDetailDialog } from './components/shift-detail-dialog';
 import { ShiftListView } from './components/shift-list-view';
 import {
@@ -45,8 +46,7 @@ import {
     type ShiftRow,
 } from './components/shift-row-types';
 import { ShiftsHero } from './components/shifts-hero';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
+import { useCreateShiftLauncher } from './components/use-create-shift-launcher';
 
 type Filters = {
     from: string;
@@ -200,9 +200,9 @@ export default function ShiftsIndex({
         y: number;
     } | null>(null);
     const [coverShift, setCoverShift] = useState<ShiftRow | null>(null);
-    const [broadcastingCoverIds, setBroadcastingCoverIds] = useState<Set<number>>(
-        () => new Set(),
-    );
+    const [broadcastingCoverIds, setBroadcastingCoverIds] = useState<
+        Set<number>
+    >(() => new Set());
     const [broadcastedCoverIds, setBroadcastedCoverIds] = useState<Set<number>>(
         () => new Set(),
     );
@@ -499,13 +499,17 @@ export default function ShiftsIndex({
                 label: 'Mark complete',
                 icon: CheckCircle,
                 onClick: () =>
-                    patchShift(completeShift.url(shift.id), 'Shift marked complete'),
+                    patchShift(
+                        completeShift.url(shift.id),
+                        'Shift marked complete',
+                    ),
             });
         } else if (shift.status === 'scheduled' && shift.staff) {
             items.push({
                 label: 'Start shift',
                 icon: CheckCircle,
-                onClick: () => patchShift(startShift.url(shift.id), 'Shift started'),
+                onClick: () =>
+                    patchShift(startShift.url(shift.id), 'Shift started'),
             });
         }
         items.push({
@@ -677,7 +681,9 @@ export default function ShiftsIndex({
                         segments={openBreakdown}
                         centerValue={stats.open}
                         centerLabel="open"
-                        cta={stats.open > 0 ? 'Find cover' : 'All shifts covered'}
+                        cta={
+                            stats.open > 0 ? 'Find cover' : 'All shifts covered'
+                        }
                         active={tab === 'open'}
                         onClick={() => setTab('open')}
                     />
@@ -694,7 +700,10 @@ export default function ShiftsIndex({
                     />
                 </div>
 
-                <GuardrailCard unstyled className="overflow-hidden rounded-xl border border-border bg-card">
+                <GuardrailCard
+                    unstyled
+                    className="overflow-hidden rounded-xl border border-border bg-card"
+                >
                     <div className="flex items-center justify-between px-2">
                         <TabStrip
                             value={tab}
@@ -739,8 +748,9 @@ export default function ShiftsIndex({
                                 },
                             ]}
                         />
-                        <div className="ml-2 hidden items-center gap-1 border-l border-border pl-2 pr-2 md:flex">
-                            <GuardrailButton unstyled
+                        <div className="ml-2 hidden items-center gap-1 border-l border-border pr-2 pl-2 md:flex">
+                            <GuardrailButton
+                                unstyled
                                 type="button"
                                 onClick={() => setViewMode('list')}
                                 className={[
@@ -753,7 +763,8 @@ export default function ShiftsIndex({
                             >
                                 <List className="h-4 w-4" /> List
                             </GuardrailButton>
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 type="button"
                                 onClick={() => setViewMode('calendar')}
                                 className={[
@@ -815,7 +826,8 @@ export default function ShiftsIndex({
                                     {dense ? 'Compact' : 'Comfortable'}
                                 </span>
                             </span>
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 type="button"
                                 onClick={() => setDense((x) => !x)}
                                 className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -909,9 +921,7 @@ export default function ShiftsIndex({
                     open={!!viewShift}
                     shift={viewShift}
                     onClose={() => setViewShift(null)}
-                    onEdit={
-                        viewShift ? () => openEdit(viewShift) : undefined
-                    }
+                    onEdit={viewShift ? () => openEdit(viewShift) : undefined}
                     onAct={(action) => {
                         if (!viewShift) return;
                         if (action === 'assign') {
@@ -954,4 +964,3 @@ export default function ShiftsIndex({
         </AppLayout>
     );
 }
-

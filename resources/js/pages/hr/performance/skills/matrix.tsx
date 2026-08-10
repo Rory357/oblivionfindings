@@ -1,3 +1,5 @@
+import { PerformanceTabs } from '@/components/hr';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -15,8 +17,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PerformanceTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -132,7 +132,8 @@ export default function SkillsMatrix({
             <Head title="Skills Matrix" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={Award}
                         title="Skills Matrix"
                         description={`Employee skills overview. ${can.assess ? 'Click a cell to assess.' : ''}`}
@@ -298,7 +299,9 @@ export default function SkillsMatrix({
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Proficiency Level</Label>
+                            <Label htmlFor="skill-proficiency-level">
+                                Proficiency Level
+                            </Label>
                             <Select
                                 value={assessData.proficiency_level}
                                 onValueChange={(v) =>
@@ -308,7 +311,7 @@ export default function SkillsMatrix({
                                     }))
                                 }
                             >
-                                <SelectTrigger>
+                                <SelectTrigger id="skill-proficiency-level">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -323,8 +326,12 @@ export default function SkillsMatrix({
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Notes</Label>
+                            <Label htmlFor="skill-assessment-notes">
+                                Notes
+                            </Label>
                             <Textarea
+                                id="skill-assessment-notes"
+                                name="notes"
                                 rows={2}
                                 value={assessData.notes}
                                 onChange={(e) =>

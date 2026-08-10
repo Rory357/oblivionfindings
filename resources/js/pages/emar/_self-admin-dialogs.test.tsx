@@ -4,7 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // ViewSelfAdminDialog's only Inertia touchpoint is router.visit (the View-client jump).
 const visit = vi.fn();
 vi.mock('@inertiajs/react', () => ({
-    router: { visit: (...args: unknown[]) => visit(...args), post: vi.fn(), put: vi.fn() },
+    router: {
+        visit: (...args: unknown[]) => visit(...args),
+        post: vi.fn(),
+        put: vi.fn(),
+    },
 }));
 
 import { ViewSelfAdminDialog, type SelfAdminRow } from './_self-admin-dialogs';
@@ -49,7 +53,15 @@ const baseRow: SelfAdminRow = {
     agreement_responsibilities: null,
     agreement_signed_at: null,
     agreement_signed_by_name: null,
-    client_medications: [{ id: 10, name: 'Paracetamol', dosage: '500mg', controlled: false, scope: 'self_managed' }],
+    client_medications: [
+        {
+            id: 10,
+            name: 'Paracetamol',
+            dosage: '500mg',
+            controlled: false,
+            scope: 'self_managed',
+        },
+    ],
 };
 
 afterEach(() => {
@@ -64,10 +76,20 @@ describe('ViewSelfAdminDialog', () => {
         const onReassess = vi.fn();
         const onSignAgreement = vi.fn();
         const onSetScope = vi.fn();
-        render(<ViewSelfAdminDialog assessment={baseRow} onClose={noop} onReassess={onReassess} onSignAgreement={onSignAgreement} onSetScope={onSetScope} />);
+        render(
+            <ViewSelfAdminDialog
+                assessment={baseRow}
+                onClose={noop}
+                onReassess={onReassess}
+                onSignAgreement={onSignAgreement}
+                onSetScope={onSetScope}
+            />,
+        );
 
         fireEvent.click(screen.getByRole('button', { name: /Reassess/i }));
-        fireEvent.click(screen.getByRole('button', { name: /Sign agreement/i }));
+        fireEvent.click(
+            screen.getByRole('button', { name: /Sign agreement/i }),
+        );
         fireEvent.click(screen.getByRole('button', { name: /Set scope/i }));
         expect(onReassess).toHaveBeenCalledTimes(1);
         expect(onSignAgreement).toHaveBeenCalledTimes(1);
@@ -75,13 +97,29 @@ describe('ViewSelfAdminDialog', () => {
     });
 
     it('jumps to the client profile MAR tab from the Options bar', () => {
-        render(<ViewSelfAdminDialog assessment={baseRow} onClose={noop} onReassess={noop} onSignAgreement={noop} onSetScope={noop} />);
+        render(
+            <ViewSelfAdminDialog
+                assessment={baseRow}
+                onClose={noop}
+                onReassess={noop}
+                onSignAgreement={noop}
+                onSetScope={noop}
+            />,
+        );
         fireEvent.click(screen.getByRole('button', { name: /^Client$/i }));
         expect(visit).toHaveBeenCalledWith('/operations/clients/7?tab=mar');
     });
 
     it('surfaces capacity sub-scores, capability checks and per-medication scope', () => {
-        render(<ViewSelfAdminDialog assessment={baseRow} onClose={noop} onReassess={noop} onSignAgreement={noop} onSetScope={noop} />);
+        render(
+            <ViewSelfAdminDialog
+                assessment={baseRow}
+                onClose={noop}
+                onReassess={noop}
+                onSignAgreement={noop}
+                onSetScope={noop}
+            />,
+        );
         // Capacity sub-scores section
         expect(screen.getByText('Cognitive capacity')).toBeTruthy();
         expect(screen.getByText('Swallowing')).toBeTruthy();
@@ -94,9 +132,23 @@ describe('ViewSelfAdminDialog', () => {
     });
 
     it('hides Sign agreement and shows the signed banner once the agreement is signed', () => {
-        const signed: SelfAdminRow = { ...baseRow, agreement_signed_at: '2026-06-02T09:00:00+12:00', agreement_signed_by_name: 'Nurse Joy' };
-        render(<ViewSelfAdminDialog assessment={signed} onClose={noop} onReassess={noop} onSignAgreement={noop} onSetScope={noop} />);
-        expect(screen.queryByRole('button', { name: /Sign agreement/i })).toBeNull();
+        const signed: SelfAdminRow = {
+            ...baseRow,
+            agreement_signed_at: '2026-06-02T09:00:00+12:00',
+            agreement_signed_by_name: 'Nurse Joy',
+        };
+        render(
+            <ViewSelfAdminDialog
+                assessment={signed}
+                onClose={noop}
+                onReassess={noop}
+                onSignAgreement={noop}
+                onSetScope={noop}
+            />,
+        );
+        expect(
+            screen.queryByRole('button', { name: /Sign agreement/i }),
+        ).toBeNull();
         expect(screen.getByText(/Agreement signed by Nurse Joy/i)).toBeTruthy();
     });
 });

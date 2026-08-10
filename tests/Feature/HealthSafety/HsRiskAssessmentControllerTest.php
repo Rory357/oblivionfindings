@@ -178,7 +178,8 @@ class HsRiskAssessmentControllerTest extends TestCase
 
     public function test_store_for_client_sets_polymorphic_assessable(): void
     {
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
 
         $this->actingAs($this->hsOfficer())
             ->post('/health-safety/risk-assessments', $this->validPayload([

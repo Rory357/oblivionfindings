@@ -85,9 +85,15 @@ const priorityVariant: Record<string, StatusVariant> = {
     low: 'neutral',
 };
 
-const label = (raw: string) => raw.replace(/[_-]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+const label = (raw: string) =>
+    raw.replace(/[_-]/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
-const go = (href: string) => router.get(href, {}, { preserveState: true, preserveScroll: true, replace: true });
+const go = (href: string) =>
+    router.get(
+        href,
+        {},
+        { preserveState: true, preserveScroll: true, replace: true },
+    );
 
 /** Minutes → compact en-NZ duration ("2h 14m", "45m", "—"). */
 function fmtMins(m: number | null): string {
@@ -121,11 +127,32 @@ export function ItOverview({
         <div className="flex flex-col gap-4">
             {/* KPI row */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                <Kpi label="Open" value={kpis.open} href="/it?tab=tickets&view=all_open" />
-                <Kpi label="Unassigned" value={kpis.unassigned} href="/it?tab=tickets&view=unassigned" />
-                <Kpi label="Breaching soon" value={kpis.at_risk} href="/it?tab=tickets&view=breaching" amber={kpis.at_risk > 0} />
-                <Kpi label="Breached" value={kpis.breached} href="/it?tab=tickets&view=breached" critical={kpis.breached > 0} />
-                <Kpi label="Avg first response · 30d" value={fmtMins(overview.avg_first_response_mins)} />
+                <Kpi
+                    label="Open"
+                    value={kpis.open}
+                    href="/it?tab=tickets&view=all_open"
+                />
+                <Kpi
+                    label="Unassigned"
+                    value={kpis.unassigned}
+                    href="/it?tab=tickets&view=unassigned"
+                />
+                <Kpi
+                    label="Breaching soon"
+                    value={kpis.at_risk}
+                    href="/it?tab=tickets&view=breaching"
+                    amber={kpis.at_risk > 0}
+                />
+                <Kpi
+                    label="Breached"
+                    value={kpis.breached}
+                    href="/it?tab=tickets&view=breached"
+                    critical={kpis.breached > 0}
+                />
+                <Kpi
+                    label="Avg first response · 30d"
+                    value={fmtMins(overview.avg_first_response_mins)}
+                />
             </div>
 
             {/* Needs attention lanes */}
@@ -145,8 +172,17 @@ export function ItOverview({
                             priority={t.priority}
                             onClick={() => onOpenTicket(t.id)}
                             meta={
-                                <StatusBadge variant={t.sla_state === 'breached' ? 'critical' : 'warning'} size="sm">
-                                    {t.sla_state === 'breached' ? 'Breached' : 'At risk'}
+                                <StatusBadge
+                                    variant={
+                                        t.sla_state === 'breached'
+                                            ? 'critical'
+                                            : 'warning'
+                                    }
+                                    size="sm"
+                                >
+                                    {t.sla_state === 'breached'
+                                        ? 'Breached'
+                                        : 'At risk'}
                                 </StatusBadge>
                             }
                         />
@@ -156,7 +192,11 @@ export function ItOverview({
                 <LaneCard
                     icon={Inbox}
                     title="Awaiting agent reply"
-                    tone={overview.awaiting_lane.length > 0 ? 'warning' : 'neutral'}
+                    tone={
+                        overview.awaiting_lane.length > 0
+                            ? 'warning'
+                            : 'neutral'
+                    }
                     viewHref="/it?tab=tickets&view=awaiting_reply"
                     empty="No tickets are waiting on a first response."
                     rows={overview.awaiting_lane}
@@ -167,7 +207,11 @@ export function ItOverview({
                             title={t.title}
                             priority={t.priority}
                             onClick={() => onOpenTicket(t.id)}
-                            meta={<span className="text-[11.5px] text-muted-foreground">{t.age ?? '—'}</span>}
+                            meta={
+                                <span className="text-[11.5px] text-muted-foreground">
+                                    {t.age ?? '—'}
+                                </span>
+                            }
                         />
                     )}
                 />
@@ -175,7 +219,9 @@ export function ItOverview({
                 <LaneCard
                     icon={Clock}
                     title="Aging · open >7 days"
-                    tone={overview.aging_lane.length > 0 ? 'warning' : 'neutral'}
+                    tone={
+                        overview.aging_lane.length > 0 ? 'warning' : 'neutral'
+                    }
                     viewHref="/it?tab=tickets&view=all_open&sort=created&dir=asc"
                     empty="Nothing has been sitting open for more than a week."
                     rows={overview.aging_lane}
@@ -188,7 +234,8 @@ export function ItOverview({
                             onClick={() => onOpenTicket(t.id)}
                             meta={
                                 <span className="text-[11.5px] text-muted-foreground">
-                                    {t.assignee ?? 'Unassigned'} · {t.age ?? '—'}
+                                    {t.assignee ?? 'Unassigned'} ·{' '}
+                                    {t.age ?? '—'}
                                 </span>
                             }
                         />
@@ -201,30 +248,50 @@ export function ItOverview({
                         <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
                             <AlarmClock className="h-3.5 w-3.5" />
                         </span>
-                        <span className="text-[13px] font-bold">Unassigned by priority</span>
+                        <span className="text-[13px] font-bold">
+                            Unassigned by priority
+                        </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {(['urgent', 'high', 'normal', 'low'] as const).map((pri) => {
-                            const n = overview.unassigned_by_priority[pri] ?? 0;
-                            return (
-                                <button
-                                    key={pri}
-                                    type="button"
-                                    onClick={() => go(`/it?tab=tickets&view=unassigned&ticket_priority=${pri}`)}
-                                    className="flex flex-col items-start gap-1 rounded-xl border border-border/70 px-3 py-2.5 text-left transition-colors hover:border-primary/50 hover:bg-muted/40"
-                                >
-                                    <span className="text-[20px] leading-none font-bold tabular-nums">{n}</span>
-                                    <StatusBadge variant={priorityVariant[pri] ?? 'neutral'} size="sm">
-                                        {label(pri)}
-                                    </StatusBadge>
-                                </button>
-                            );
-                        })}
+                        {(['urgent', 'high', 'normal', 'low'] as const).map(
+                            (pri) => {
+                                const n =
+                                    overview.unassigned_by_priority[pri] ?? 0;
+                                return (
+                                    <button
+                                        key={pri}
+                                        type="button"
+                                        onClick={() =>
+                                            go(
+                                                `/it?tab=tickets&view=unassigned&ticket_priority=${pri}`,
+                                            )
+                                        }
+                                        className="flex flex-col items-start gap-1 rounded-xl border border-border/70 px-3 py-2.5 text-left transition-colors hover:border-primary/50 hover:bg-muted/40"
+                                    >
+                                        <span className="text-[20px] leading-none font-bold tabular-nums">
+                                            {n}
+                                        </span>
+                                        <StatusBadge
+                                            variant={
+                                                priorityVariant[pri] ??
+                                                'neutral'
+                                            }
+                                            size="sm"
+                                        >
+                                            {label(pri)}
+                                        </StatusBadge>
+                                    </button>
+                                );
+                            },
+                        )}
                     </div>
                 </div>
             </div>
 
-            <ActivityFeed rows={overview.recent_activity} onOpenTicket={onOpenTicket} />
+            <ActivityFeed
+                rows={overview.recent_activity}
+                onOpenTicket={onOpenTicket}
+            />
         </div>
     );
 }
@@ -249,8 +316,12 @@ const ACTIVITY_ICON: Record<string, LucideIcon> = {
 };
 
 /** Compact past-tense phrase for the feed line (payload-aware where it helps). */
-function activityVerb(type: string, payload: Record<string, unknown> | null): string {
-    const to = payload && typeof payload.to === 'string' ? label(payload.to) : null;
+function activityVerb(
+    type: string,
+    payload: Record<string, unknown> | null,
+): string {
+    const to =
+        payload && typeof payload.to === 'string' ? label(payload.to) : null;
     switch (type) {
         case 'created':
             return 'raised this ticket';
@@ -298,7 +369,8 @@ function ActivityFeed({
             </div>
             {rows.length === 0 ? (
                 <p className="px-1 py-4 text-center text-[12px] text-muted-foreground">
-                    No ticket activity yet — it lands here as agents work the queue.
+                    No ticket activity yet — it lands here as agents work the
+                    queue.
                 </p>
             ) : (
                 <div className="flex flex-col">
@@ -315,13 +387,22 @@ function ActivityFeed({
                                     <Icon className="h-3 w-3" />
                                 </span>
                                 <span className="min-w-0 flex-1 truncate text-[12.5px]">
-                                    <span className="font-semibold">{row.actor ?? 'System'}</span>{' '}
-                                    <span className="text-muted-foreground">{activityVerb(row.type, row.payload)}</span>
+                                    <span className="font-semibold">
+                                        {row.actor ?? 'System'}
+                                    </span>{' '}
+                                    <span className="text-muted-foreground">
+                                        {activityVerb(row.type, row.payload)}
+                                    </span>
                                     {row.reference ? (
-                                        <span className="text-muted-foreground"> · {row.reference}</span>
+                                        <span className="text-muted-foreground">
+                                            {' '}
+                                            · {row.reference}
+                                        </span>
                                     ) : null}
                                 </span>
-                                <span className="flex-none text-[11px] text-muted-foreground">{row.at ?? ''}</span>
+                                <span className="flex-none text-[11px] text-muted-foreground">
+                                    {row.at ?? ''}
+                                </span>
                             </button>
                         );
                     })}
@@ -356,11 +437,17 @@ function Kpi({
     const inner = (
         <>
             <span className={valueClass}>{value}</span>
-            <span className="mt-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{lbl}</span>
+            <span className="mt-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {lbl}
+            </span>
         </>
     );
     if (!href) {
-        return <div className="flex flex-col items-start rounded-2xl border border-border bg-card px-4 py-3.5">{inner}</div>;
+        return (
+            <div className="flex flex-col items-start rounded-2xl border border-border bg-card px-4 py-3.5">
+                {inner}
+            </div>
+        );
     }
     return (
         <button
@@ -399,7 +486,9 @@ function LaneCard<T>({
     return (
         <div className="rounded-2xl border border-border bg-card p-4">
             <div className="mb-2 flex items-center gap-2">
-                <span className={`grid h-7 w-7 flex-none place-items-center rounded-lg ${iconTone}`}>
+                <span
+                    className={`grid h-7 w-7 flex-none place-items-center rounded-lg ${iconTone}`}
+                >
                     <Icon className="h-3.5 w-3.5" />
                 </span>
                 <span className="text-[13px] font-bold">{title}</span>
@@ -414,7 +503,9 @@ function LaneCard<T>({
                 ) : null}
             </div>
             {rows.length === 0 ? (
-                <p className="px-1 py-4 text-center text-[12px] text-muted-foreground">{empty}</p>
+                <p className="px-1 py-4 text-center text-[12px] text-muted-foreground">
+                    {empty}
+                </p>
             ) : (
                 <div className="flex flex-col">{rows.map(render)}</div>
             )}
@@ -443,10 +534,19 @@ function LaneRow({
         >
             <Timer className="h-3.5 w-3.5 flex-none text-muted-foreground" />
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12.5px] font-semibold">{title}</span>
-                {reference ? <span className="block truncate text-[11px] text-muted-foreground">{reference}</span> : null}
+                <span className="block truncate text-[12.5px] font-semibold">
+                    {title}
+                </span>
+                {reference ? (
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                        {reference}
+                    </span>
+                ) : null}
             </span>
-            <StatusBadge variant={priorityVariant[priority] ?? 'neutral'} size="sm">
+            <StatusBadge
+                variant={priorityVariant[priority] ?? 'neutral'}
+                size="sm"
+            >
                 {label(priority)}
             </StatusBadge>
             <span className="flex-none">{meta}</span>

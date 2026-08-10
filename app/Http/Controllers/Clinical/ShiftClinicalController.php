@@ -71,7 +71,7 @@ class ShiftClinicalController extends Controller
         $type = ObservationType::from($validated['observation_type']);
 
         if ($type->requiresClinicalPermission() && ! $user->canDo('clinical.observations.recordClinical')) {
-            abort(403, 'Clinical observation permission required for ' . $type->label());
+            abort(403, 'Clinical observation permission required for '.$type->label());
         }
 
         $client = $this->resolveObservationClient($shift, $validated['client_id'] ?? null);
@@ -96,7 +96,7 @@ class ShiftClinicalController extends Controller
             ], 201);
         }
 
-        return back()->with('success', $type->label() . ' recorded successfully.');
+        return back()->with('success', $type->label().' recorded successfully.');
     }
 
     protected function resolveObservationClient(Shift $shift, ?int $clientId): Client
@@ -147,7 +147,12 @@ class ShiftClinicalController extends Controller
             'severity' => ['required', Rule::in(AlertSeverity::ALL)],
             'occurred_at' => ['required', 'date'],
             'description' => ['required', 'string', 'max:5000'],
-            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => ClinicalEventType::tryFrom((string) $request->input('event_type'))?->requiresImmediateAction() ?? false),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'outcome' => ['nullable', 'string', 'max:5000'],
             'requires_followup' => ['nullable', 'boolean'],
             'followup_notes' => ['nullable', 'string', 'max:2000'],

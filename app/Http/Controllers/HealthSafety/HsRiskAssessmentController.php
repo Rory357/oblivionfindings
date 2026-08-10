@@ -10,12 +10,15 @@ use App\Http\Requests\HealthSafety\SupersedeHsRiskAssessmentRequest;
 use App\Http\Requests\HealthSafety\UpdateHsRiskAssessmentRequest;
 use App\Http\Requests\HealthSafety\UpdateResidualRiskRequest;
 use App\Models\Client;
+use App\Models\HsEvent;
 use App\Models\HsRiskAssessment;
 use App\Models\HsRiskAssessmentAttachment;
 use App\Models\Site;
 use App\Services\HealthSafety\HsRiskAssessmentService;
+use App\Services\UserSiteAccessService;
 use App\Support\HealthSafety\RiskAssessmentPresenter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -32,10 +35,13 @@ class HsRiskAssessmentController extends Controller
 {
     use ServesPrivateAttachments;
 
-    public function __construct(private readonly HsRiskAssessmentService $service) {}
+    public function __construct(
+        private readonly HsRiskAssessmentService $service,
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     /* ====================================================================== */
-    /*  Register                                                              */
+    /*  Register */
     /* ====================================================================== */
 
     public function index(Request $request): Response
@@ -56,7 +62,9 @@ class HsRiskAssessmentController extends Controller
 
         // Entity + search scope (NOT tab/status/level) — drives tab badges + hero so they
         // stay stable as the user flips status/level pills.
-        $base = fn (): Builder => $this->applyScope(HsRiskAssessment::query(), $filters);
+        $this->assertAccessibleFilters($request, $filters);
+
+        $base = fn (): Builder => $this->applyScope(HsRiskAssessment::query(), $filters, $request);
 
         $tabCounts = [
             'all' => (clone $base())->count(),
@@ -70,7 +78,7 @@ class HsRiskAssessmentController extends Controller
         $hero = $this->buildHero($base);
 
         // Displayed list — scope + tab + facet filters.
-        $list = $this->applyScope(HsRiskAssessment::query(), $filters);
+        $list = $this->applyScope(HsRiskAssessment::query(), $filters, $request);
         $this->applyTab($list, (string) $filters['tab']);
         $this->applyFacets($list, $filters);
 
@@ -84,7 +92,11 @@ class HsRiskAssessmentController extends Controller
 
         $detail = null;
         if ($request->filled('assessment')) {
-            $ra = HsRiskAssessment::query()->find((int) $request->input('assessment'));
+            $ra = $this->siteAccess->applyHsRiskAssessmentScope(
+                HsRiskAssessment::query(),
+                $request->user(),
+                $this->bypassPermissions(),
+            )->find((int) $request->input('assessment'));
             if ($ra) {
                 $detail = RiskAssessmentPresenter::detail($ra, $canManage);
             }
@@ -95,7 +107,9 @@ class HsRiskAssessmentController extends Controller
             'tabCounts' => $tabCounts,
             'hero' => $hero,
             'detail' => $detail,
-            'pickers' => RiskAssessmentPresenter::pickers(),
+            'pickers' => RiskAssessmentPresenter::siteScopedPickers(
+                $this->siteAccess->accessibleSiteIds($request->user(), $this->bypassPermissions()),
+            ),
             'can' => [
                 'manage' => $canManage,
                 'viewReports' => (bool) ($request->user()?->canDo('governance.view') ?? false),
@@ -105,8 +119,13 @@ class HsRiskAssessmentController extends Controller
     }
 
     /** JSON detail — fetched on demand by the embedded Client/Site profile sections. */
-    public function show(Request $request, HsRiskAssessment $assessment): \Illuminate\Http\JsonResponse
+    public function show(Request $request, HsRiskAssessment $assessment): JsonResponse
     {
+        $this->siteAccess->assertCanAccessHsRiskAssessment(
+            $request->user(),
+            $assessment,
+            $this->bypassPermissions(),
+        );
         $canManage = (bool) ($request->user()?->canDo('hazards.manage') ?? false);
 
         return response()->json([
@@ -115,12 +134,14 @@ class HsRiskAssessmentController extends Controller
     }
 
     /* ====================================================================== */
-    /*  Lifecycle write actions (all → HsRiskAssessmentService, ->back())     */
+    /*  Lifecycle write actions (all → HsRiskAssessmentService, ->back()) */
     /* ====================================================================== */
 
     public function store(StoreHsRiskAssessmentRequest $request): RedirectResponse
     {
-        $assessment = $this->service->create($this->mapAssessable($request->validated()));
+        $data = $request->validated();
+        $this->assertCanUseContext($request, $data);
+        $assessment = $this->service->create($this->mapAssessable($data));
 
         return back()
             ->with('success', 'Risk assessment created as a draft.')
@@ -129,11 +150,15 @@ class HsRiskAssessmentController extends Controller
 
     public function update(UpdateHsRiskAssessmentRequest $request, HsRiskAssessment $assessment): RedirectResponse
     {
+        $this->assertCanAccess($request, $assessment);
+
         if ($assessment->status !== HsRiskAssessment::STATUS_DRAFT) {
             return back()->with('error', 'Only draft assessments can be edited.');
         }
 
-        $data = $this->mapAssessable($request->validated());
+        $validated = $request->validated();
+        $this->assertCanUseContext($request, $validated);
+        $data = $this->mapAssessable($validated);
         $inherent = HsRiskAssessment::calculateScore((int) $data['likelihood'], (int) $data['consequence']);
         $residual = isset($data['residual_likelihood'], $data['residual_consequence'])
             ? HsRiskAssessment::calculateScore((int) $data['residual_likelihood'], (int) $data['residual_consequence'])
@@ -166,6 +191,8 @@ class HsRiskAssessmentController extends Controller
 
     public function activate(ActivateHsRiskAssessmentRequest $request, HsRiskAssessment $assessment): RedirectResponse
     {
+        $this->assertCanAccess($request, $assessment);
+
         try {
             $this->service->activate($assessment);
         } catch (\InvalidArgumentException $e) {
@@ -181,6 +208,8 @@ class HsRiskAssessmentController extends Controller
 
     public function markForReview(Request $request, HsRiskAssessment $assessment): RedirectResponse
     {
+        $this->assertCanAccess($request, $assessment);
+
         try {
             $this->service->markForReview($assessment);
         } catch (\InvalidArgumentException $e) {
@@ -192,6 +221,8 @@ class HsRiskAssessmentController extends Controller
 
     public function updateResidual(UpdateResidualRiskRequest $request, HsRiskAssessment $assessment): RedirectResponse
     {
+        $this->assertCanAccess($request, $assessment);
+
         $this->service->updateResidualRisk(
             $assessment,
             (int) $request->input('residual_likelihood'),
@@ -209,8 +240,12 @@ class HsRiskAssessmentController extends Controller
 
     public function supersede(SupersedeHsRiskAssessmentRequest $request, HsRiskAssessment $assessment): RedirectResponse
     {
+        $this->assertCanAccess($request, $assessment);
+        $data = $request->validated();
+        $this->assertCanUseContext($request, $data);
+
         try {
-            $new = $this->service->supersede($assessment, $this->mapAssessable($request->validated()));
+            $new = $this->service->supersede($assessment, $this->mapAssessable($data));
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -222,17 +257,19 @@ class HsRiskAssessmentController extends Controller
 
     public function archive(Request $request, HsRiskAssessment $assessment): RedirectResponse
     {
+        $this->assertCanAccess($request, $assessment);
         $this->service->archive($assessment);
 
         return back()->with('success', 'Assessment archived.');
     }
 
     /* ====================================================================== */
-    /*  Attachments (premium evidence upload)                                 */
+    /*  Attachments (premium evidence upload) */
     /* ====================================================================== */
 
     public function uploadAttachment(Request $request, HsRiskAssessment $assessment): RedirectResponse
     {
+        $this->assertCanAccess($request, $assessment);
         $data = $request->validate([
             'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,txt,png,jpg,jpeg,gif,webp,heic'], // 20 MB
             'kind' => ['nullable', 'string', 'max:30'],
@@ -261,6 +298,7 @@ class HsRiskAssessmentController extends Controller
 
     public function downloadAttachment(Request $request, HsRiskAssessment $assessment, HsRiskAssessmentAttachment $attachment): StreamedResponse
     {
+        $this->assertCanAccess($request, $assessment);
         abort_unless((int) $attachment->hs_risk_assessment_id === (int) $assessment->id, 404);
 
         // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
@@ -274,6 +312,7 @@ class HsRiskAssessmentController extends Controller
 
     public function destroyAttachment(Request $request, HsRiskAssessment $assessment, HsRiskAssessmentAttachment $attachment): RedirectResponse
     {
+        $this->assertCanAccess($request, $assessment);
         abort_unless((int) $attachment->hs_risk_assessment_id === (int) $assessment->id, 404);
 
         $disk = $attachment->disk ?: 'private';
@@ -286,7 +325,7 @@ class HsRiskAssessmentController extends Controller
     }
 
     /* ====================================================================== */
-    /*  Internals                                                             */
+    /*  Internals */
     /* ====================================================================== */
 
     /** Map the wizard's attach_type/attach_id onto the model's polymorphic columns. */
@@ -311,10 +350,16 @@ class HsRiskAssessmentController extends Controller
     }
 
     /** Entity + free-text scope shared by the list, tab counts and the hero. */
-    private function applyScope(Builder $query, array $filters): Builder
+    private function applyScope(Builder $query, array $filters, Request $request): Builder
     {
+        $this->siteAccess->applyHsRiskAssessmentScope(
+            $query,
+            $request->user(),
+            $this->bypassPermissions(),
+        );
+
         if ($filters['site_id']) {
-            $query->where('assessable_type', Site::class)->where('assessable_id', $filters['site_id']);
+            $this->siteAccess->applyHsRiskAssessmentSiteScopeForSiteIds($query, [$filters['site_id']]);
         }
         if ($filters['client_id']) {
             $query->where('assessable_type', Client::class)->where('assessable_id', $filters['client_id']);
@@ -332,6 +377,57 @@ class HsRiskAssessmentController extends Controller
         }
 
         return $query;
+    }
+
+    private function assertAccessibleFilters(Request $request, array $filters): void
+    {
+        if ($filters['site_id']) {
+            $this->siteAccess->assertCanAccessSiteId(
+                $request->user(),
+                $filters['site_id'],
+                $this->bypassPermissions(),
+            );
+        }
+        if ($filters['client_id']) {
+            $this->siteAccess->assertCanAccessClientId(
+                $request->user(),
+                $filters['client_id'],
+                $this->bypassPermissions(),
+            );
+        }
+        if ($filters['hs_event_id']) {
+            $event = HsEvent::query()->findOrFail($filters['hs_event_id']);
+            $this->siteAccess->assertCanAccessHsEvent(
+                $request->user(),
+                $event,
+                $this->bypassPermissions(),
+            );
+        }
+    }
+
+    private function assertCanAccess(Request $request, HsRiskAssessment $assessment): void
+    {
+        $this->siteAccess->assertCanAccessHsRiskAssessment(
+            $request->user(),
+            $assessment,
+            $this->bypassPermissions(),
+        );
+    }
+
+    private function assertCanUseContext(Request $request, array $data): void
+    {
+        $this->siteAccess->assertCanUseHsRiskAssessmentContext(
+            $request->user(),
+            (string) ($data['attach_type'] ?? 'standalone'),
+            isset($data['attach_id']) ? (int) $data['attach_id'] : null,
+            $this->bypassPermissions(),
+        );
+    }
+
+    /** @return array<int, string> */
+    private function bypassPermissions(): array
+    {
+        return ['healthSafety.viewAllSites'];
     }
 
     private function applyTab(Builder $query, string $tab): void

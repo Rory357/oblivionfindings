@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,6 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
@@ -82,6 +82,7 @@ type Props = {
     feedback: PaginatedData;
     stats: Stats;
     filters: Filters;
+    can?: { manage_feedback: boolean };
 };
 
 const typeLabels: Record<string, string> = {
@@ -97,8 +98,7 @@ const typeColors: Record<string, string> = {
     whanau: 'border-primary/30 text-primary/70 bg-primary/10',
     client: 'border-status-info/30 text-status-info bg-status-info',
     staff: 'border-status-success/30 text-status-success bg-status-success',
-    external:
-        'border-border/30 text-muted-foreground bg-muted-foreground/10',
+    external: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
     complaint:
         'border-status-critical/30 text-status-critical bg-status-critical',
     compliment:
@@ -187,6 +187,7 @@ export default function FeedbackIndex({
     feedback,
     stats,
     filters,
+    can = { manage_feedback: false },
 }: Props) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [respondingId, setRespondingId] = useState<number | null>(null);
@@ -289,195 +290,208 @@ export default function FeedbackIndex({
                         },
                     ]}
                     actions={
-                        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <Plus className="mr-1 h-4 w-4" />
-                                    Submit Feedback
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-lg">
-                                <DialogHeader>
-                                    <DialogTitle>Submit Feedback</DialogTitle>
-                                </DialogHeader>
-                                <form
-                                    onSubmit={submitFeedback}
-                                    className="space-y-3"
-                                >
-                                    <div>
-                                        <Label>Type</Label>
-                                        <Select
-                                            value={
-                                                feedbackForm.data.feedback_type
-                                            }
-                                            onValueChange={(v) =>
-                                                feedbackForm.setData(
-                                                    'feedback_type',
-                                                    v,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Object.entries(typeLabels).map(
-                                                    ([val, label]) => (
+                        can.manage_feedback ? (
+                            <Dialog
+                                open={dialogOpen}
+                                onOpenChange={setDialogOpen}
+                            >
+                                <DialogTrigger asChild>
+                                    <Button>
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Submit Feedback
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-lg">
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Submit Feedback
+                                        </DialogTitle>
+                                    </DialogHeader>
+                                    <form
+                                        onSubmit={submitFeedback}
+                                        className="space-y-3"
+                                    >
+                                        <div>
+                                            <Label>Type</Label>
+                                            <Select
+                                                value={
+                                                    feedbackForm.data
+                                                        .feedback_type
+                                                }
+                                                onValueChange={(v) =>
+                                                    feedbackForm.setData(
+                                                        'feedback_type',
+                                                        v,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.entries(
+                                                        typeLabels,
+                                                    ).map(([val, label]) => (
                                                         <SelectItem
                                                             key={val}
                                                             value={val}
                                                         >
                                                             {label}
                                                         </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="flex items-center gap-3">
-                                        <Switch
-                                            checked={
-                                                feedbackForm.data.is_anonymous
-                                            }
-                                            onCheckedChange={(v) =>
-                                                feedbackForm.setData(
-                                                    'is_anonymous',
-                                                    v,
-                                                )
-                                            }
-                                        />
-                                        <Label>Submit Anonymously</Label>
-                                    </div>
-
-                                    {!feedbackForm.data.is_anonymous && (
-                                        <div className="grid gap-3 sm:grid-cols-2">
-                                            <div>
-                                                <Label>Name</Label>
-                                                <Input
-                                                    value={
-                                                        feedbackForm.data
-                                                            .submitted_by_name
-                                                    }
-                                                    onChange={(e) =>
-                                                        feedbackForm.setData(
-                                                            'submitted_by_name',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label>Relationship</Label>
-                                                <Select
-                                                    value={
-                                                        feedbackForm.data
-                                                            .submitted_by_relationship
-                                                    }
-                                                    onValueChange={(v) =>
-                                                        feedbackForm.setData(
-                                                            'submitted_by_relationship',
-                                                            v,
-                                                        )
-                                                    }
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="whanau">
-                                                            Whanau
-                                                        </SelectItem>
-                                                        <SelectItem value="parent">
-                                                            Parent
-                                                        </SelectItem>
-                                                        <SelectItem value="sibling">
-                                                            Sibling
-                                                        </SelectItem>
-                                                        <SelectItem value="advocate">
-                                                            Advocate
-                                                        </SelectItem>
-                                                        <SelectItem value="staff">
-                                                            Staff
-                                                        </SelectItem>
-                                                        <SelectItem value="other">
-                                                            Other
-                                                        </SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
-                                    )}
 
-                                    <div>
-                                        <Label>Feedback</Label>
-                                        <Textarea
-                                            value={feedbackForm.data.content}
-                                            onChange={(e) =>
-                                                feedbackForm.setData(
-                                                    'content',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            rows={4}
-                                            required
-                                        />
-                                    </div>
+                                        <div className="flex items-center gap-3">
+                                            <Switch
+                                                checked={
+                                                    feedbackForm.data
+                                                        .is_anonymous
+                                                }
+                                                onCheckedChange={(v) =>
+                                                    feedbackForm.setData(
+                                                        'is_anonymous',
+                                                        v,
+                                                    )
+                                                }
+                                            />
+                                            <Label>Submit Anonymously</Label>
+                                        </div>
 
-                                    <div>
-                                        <Label>Rating</Label>
-                                        <StarRatingInput
-                                            value={feedbackForm.data.rating}
-                                            onChange={(v) =>
-                                                feedbackForm.setData(
-                                                    'rating',
-                                                    v,
-                                                )
-                                            }
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <Label>Category</Label>
-                                        <Select
-                                            value={feedbackForm.data.category}
-                                            onValueChange={(v) =>
-                                                feedbackForm.setData(
-                                                    'category',
-                                                    v,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {Object.entries(
-                                                    categoryLabels,
-                                                ).map(([val, label]) => (
-                                                    <SelectItem
-                                                        key={val}
-                                                        value={val}
+                                        {!feedbackForm.data.is_anonymous && (
+                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                <div>
+                                                    <Label>Name</Label>
+                                                    <Input
+                                                        value={
+                                                            feedbackForm.data
+                                                                .submitted_by_name
+                                                        }
+                                                        onChange={(e) =>
+                                                            feedbackForm.setData(
+                                                                'submitted_by_name',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>Relationship</Label>
+                                                    <Select
+                                                        value={
+                                                            feedbackForm.data
+                                                                .submitted_by_relationship
+                                                        }
+                                                        onValueChange={(v) =>
+                                                            feedbackForm.setData(
+                                                                'submitted_by_relationship',
+                                                                v,
+                                                            )
+                                                        }
                                                     >
-                                                        {label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                                        <SelectTrigger>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="whanau">
+                                                                Whanau
+                                                            </SelectItem>
+                                                            <SelectItem value="parent">
+                                                                Parent
+                                                            </SelectItem>
+                                                            <SelectItem value="sibling">
+                                                                Sibling
+                                                            </SelectItem>
+                                                            <SelectItem value="advocate">
+                                                                Advocate
+                                                            </SelectItem>
+                                                            <SelectItem value="staff">
+                                                                Staff
+                                                            </SelectItem>
+                                                            <SelectItem value="other">
+                                                                Other
+                                                            </SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                        )}
 
-                                    <Button
-                                        type="submit"
-                                        disabled={feedbackForm.processing}
-                                        className="w-full"
-                                    >
-                                        {feedbackForm.processing
-                                            ? 'Submitting...'
-                                            : 'Submit Feedback'}
-                                    </Button>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
+                                        <div>
+                                            <Label>Feedback</Label>
+                                            <Textarea
+                                                value={
+                                                    feedbackForm.data.content
+                                                }
+                                                onChange={(e) =>
+                                                    feedbackForm.setData(
+                                                        'content',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                rows={4}
+                                                required
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label>Rating</Label>
+                                            <StarRatingInput
+                                                value={feedbackForm.data.rating}
+                                                onChange={(v) =>
+                                                    feedbackForm.setData(
+                                                        'rating',
+                                                        v,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label>Category</Label>
+                                            <Select
+                                                value={
+                                                    feedbackForm.data.category
+                                                }
+                                                onValueChange={(v) =>
+                                                    feedbackForm.setData(
+                                                        'category',
+                                                        v,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.entries(
+                                                        categoryLabels,
+                                                    ).map(([val, label]) => (
+                                                        <SelectItem
+                                                            key={val}
+                                                            value={val}
+                                                        >
+                                                            {label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <Button
+                                            type="submit"
+                                            disabled={feedbackForm.processing}
+                                            className="w-full"
+                                        >
+                                            {feedbackForm.processing
+                                                ? 'Submitting...'
+                                                : 'Submit Feedback'}
+                                        </Button>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        ) : undefined
                     }
                 />
 
@@ -707,8 +721,8 @@ export default function FeedbackIndex({
                                     No feedback found
                                 </p>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    Submit feedback to start tracking quality
-                                    and engagement
+                                    No feedback matches the current Site and
+                                    filters.
                                 </p>
                             </CardContent>
                         </Card>
@@ -759,31 +773,46 @@ export default function FeedbackIndex({
                                                 {statusLabels[item.status] ||
                                                     item.status}
                                             </Badge>
-                                            <Select
-                                                value={item.status}
-                                                onValueChange={(v) =>
-                                                    updateStatus(item.id, v)
-                                                }
-                                            >
-                                                <SelectTrigger className="h-7 w-7 border-0 p-0 [&>svg]:hidden">
-                                                    <span className="sr-only">
-                                                        Change status
-                                                    </span>
-                                                    <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {Object.entries(
-                                                        statusLabels,
-                                                    ).map(([val, label]) => (
-                                                        <SelectItem
-                                                            key={val}
-                                                            value={val}
-                                                        >
-                                                            {label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                            {can.manage_feedback &&
+                                                item.status !== 'closed' && (
+                                                    <Select
+                                                        value={item.status}
+                                                        onValueChange={(v) =>
+                                                            updateStatus(
+                                                                item.id,
+                                                                v,
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger className="h-7 w-7 border-0 p-0 [&>svg]:hidden">
+                                                            <span className="sr-only">
+                                                                Change status
+                                                            </span>
+                                                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {Object.entries(
+                                                                statusLabels,
+                                                            ).map(
+                                                                ([
+                                                                    val,
+                                                                    label,
+                                                                ]) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            val
+                                                                        }
+                                                                        value={
+                                                                            val
+                                                                        }
+                                                                    >
+                                                                        {label}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
+                                                )}
                                         </div>
                                     </div>
 
@@ -850,7 +879,9 @@ export default function FeedbackIndex({
                                     )}
 
                                     {/* Respond button / form */}
-                                    {!item.response &&
+                                    {can.manage_feedback &&
+                                        item.status !== 'closed' &&
+                                        !item.response &&
                                         respondingId !== item.id && (
                                             <Button
                                                 variant="outline"
@@ -864,49 +895,55 @@ export default function FeedbackIndex({
                                             </Button>
                                         )}
 
-                                    {respondingId === item.id && (
-                                        <div className="space-y-2">
-                                            <Textarea
-                                                value={
-                                                    responseForm.data.response
-                                                }
-                                                onChange={(e) =>
-                                                    responseForm.setData(
-                                                        'response',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Write your response..."
-                                                rows={3}
-                                            />
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        submitResponse(item.id)
+                                    {can.manage_feedback &&
+                                        respondingId === item.id && (
+                                            <div className="space-y-2">
+                                                <Textarea
+                                                    value={
+                                                        responseForm.data
+                                                            .response
                                                     }
-                                                    disabled={
-                                                        responseForm.processing ||
-                                                        !responseForm.data.response.trim()
+                                                    onChange={(e) =>
+                                                        responseForm.setData(
+                                                            'response',
+                                                            e.target.value,
+                                                        )
                                                     }
-                                                >
-                                                    {responseForm.processing
-                                                        ? 'Sending...'
-                                                        : 'Send Response'}
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        setRespondingId(null);
-                                                        responseForm.reset();
-                                                    }}
-                                                >
-                                                    Cancel
-                                                </Button>
+                                                    placeholder="Write your response..."
+                                                    rows={3}
+                                                />
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            submitResponse(
+                                                                item.id,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            responseForm.processing ||
+                                                            !responseForm.data.response.trim()
+                                                        }
+                                                    >
+                                                        {responseForm.processing
+                                                            ? 'Sending...'
+                                                            : 'Send Response'}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            setRespondingId(
+                                                                null,
+                                                            );
+                                                            responseForm.reset();
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
                                 </CardContent>
                             </Card>
                         ))

@@ -364,7 +364,6 @@ class SiteProfileAttentionService
     private function hardware(Site $site): Collection
     {
         return Device::query()
-            ->forTenant((int) $site->tenant_id)
             ->needingAttention()
             ->whereHas('assignments', fn ($query) => $query
                 ->active()

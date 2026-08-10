@@ -608,7 +608,12 @@ class HsEventController extends Controller
             ),
         );
 
-        $riskAssessments = $hsEvent->riskAssessments()
+        $riskAssessmentQuery = $hsEvent->riskAssessments();
+        $this->siteAccess->applyHsRiskAssessmentSiteScopeForSiteIds(
+            $riskAssessmentQuery->getQuery(),
+            $hsEvent->site_id ? [(int) $hsEvent->site_id] : [],
+        );
+        $riskAssessments = $riskAssessmentQuery
             ->with(['assessedBy:id,name'])
             ->orderByDesc('created_at')
             ->get()
@@ -1222,6 +1227,11 @@ class HsEventController extends Controller
         $query = HsRiskAssessment::query()
             ->with(['assessedBy:id,name'])
             ->orderByDesc('created_at');
+        $this->siteAccess->applyHsRiskAssessmentScope(
+            $query,
+            $request->user(),
+            $this->hsEventBypassPermissions(),
+        );
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));

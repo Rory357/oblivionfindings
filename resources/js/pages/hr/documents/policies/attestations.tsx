@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +13,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { BookOpen, Search, ShieldCheck, X } from 'lucide-react';
@@ -80,14 +80,17 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={ShieldCheck}
                         title="Policy Attestations"
                         description="Track staff acknowledgement and attestation of organisational policies."
                         stats={[
                             {
                                 label: 'Attestations recorded',
-                                value: attestations.total ?? attestations.data.length,
+                                value:
+                                    attestations.total ??
+                                    attestations.data.length,
                             },
                         ]}
                         actions={
@@ -138,7 +141,9 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                                     <button
                                         type="button"
                                         aria-label="Clear policy filter"
-                                        onClick={() => onFilter({ policy_id: null })}
+                                        onClick={() =>
+                                            onFilter({ policy_id: null })
+                                        }
                                         className="ml-0.5 rounded hover:text-status-critical"
                                     >
                                         <X className="h-3 w-3" />

@@ -6,12 +6,20 @@ use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
+use App\Domain\SecurityDevices\Presenters\MaintenanceOperationsPresenter;
+use App\Domain\SecurityDevices\Services\DeviceMaintenanceLifecycleService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
 
 class MaintenanceHealthController extends Controller
 {
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceMaintenanceLifecycleService $lifecycle,
+    ) {}
+
     /**
      * Maintenance & Health dashboard page.
      */
@@ -19,22 +27,24 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.view'), 403);
+        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
+        $maintenanceScope = fn () => DeviceMaintenanceRecord::query()
+            ->whereIn('device_id', clone $visibleDeviceIds);
 
         // ── Stats ─────────────────────────────────────────────────
 
         $stats = [
-            'overdue' => DeviceMaintenanceRecord::overdue()->count(),
-            'upcoming' => DeviceMaintenanceRecord::upcoming(14)->count(),
-            'offline' => Device::where('status', DeviceStatus::Offline->value)->count(),
-            'degraded' => Device::where('status', DeviceStatus::Degraded->value)->count(),
-            'lowBattery' => Device::lowBattery()->count(),
-            'critical' => Device::where('health_status', HealthStatus::Critical->value)->count(),
+            'overdue' => $maintenanceScope()->overdue()->count(),
+            'upcoming' => $maintenanceScope()->upcoming(14)->count(),
+            'offline' => $this->access->visibleDevices($user)->where('status', DeviceStatus::Offline->value)->count(),
+            'degraded' => $this->access->visibleDevices($user)->where('status', DeviceStatus::Degraded->value)->count(),
+            'lowBattery' => $this->access->visibleDevices($user)->lowBattery()->count(),
+            'critical' => $this->access->visibleDevices($user)->where('health_status', HealthStatus::Critical->value)->count(),
         ];
 
         // ── Maintenance records (filterable) ──────────────────────
 
-        $mQuery = DeviceMaintenanceRecord::query()
-            ->with(['device:id,name,device_uid,domain,category', 'performedBy:id,name']);
+        $mQuery = $maintenanceScope()->with(['device:id,name,device_uid,domain,category', 'performedBy:id,name']);
 
         if ($request->filled('status') && $request->input('status') !== 'all') {
             $mQuery->where('status', $request->input('status'));
@@ -60,15 +70,20 @@ class MaintenanceHealthController extends Controller
         $sort = $request->input('sort', 'scheduled_for');
         $direction = $request->input('direction', 'asc');
         $allowedSorts = ['scheduled_for', 'completed_at', 'type', 'status', 'created_at'];
-        if (!in_array($sort, $allowedSorts)) { $sort = 'scheduled_for'; }
-        if (!in_array($direction, ['asc', 'desc'])) { $direction = 'asc'; }
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'scheduled_for';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'asc';
+        }
         $mQuery->orderBy($sort, $direction);
 
         $records = $mQuery->paginate(30)->withQueryString();
 
         // ── Devices needing health attention ──────────────────────
 
-        $attentionDevices = Device::needingAttention()
+        $attentionDevices = $this->access->visibleDevices($user)
+            ->needingAttention()
             ->with(['assignments' => fn ($q) => $q->active()])
             ->orderByRaw("FIELD(health_status, 'critical', 'warning', 'unknown', 'healthy')")
             ->limit(20)
@@ -87,7 +102,8 @@ class MaintenanceHealthController extends Controller
 
         // ── Low battery devices ───────────────────────────────────
 
-        $lowBatteryDevices = Device::lowBattery()
+        $lowBatteryDevices = $this->access->visibleDevices($user)
+            ->lowBattery()
             ->operational()
             ->orderBy('battery_level')
             ->limit(15)
@@ -101,6 +117,17 @@ class MaintenanceHealthController extends Controller
             ]);
 
         return Inertia::render('security-devices/maintenance-health', [
+            'pageMeta' => $request->routeIs('security-devices.maintenance')
+                ? [
+                    'title' => 'Maintenance',
+                    'description' => 'Device servicing, calibration, repair, and health-related work across the estate.',
+                    'href' => '/security-devices/maintenance',
+                ]
+                : [
+                    'title' => 'Maintenance & Health',
+                    'description' => 'Device maintenance scheduling, health monitoring, and operational attention tracking.',
+                    'href' => '/security-devices/maintenance-health',
+                ],
             'stats' => $stats,
             'records' => [
                 'data' => $records->getCollection()->map(fn (DeviceMaintenanceRecord $r) => [
@@ -142,29 +169,20 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
-            'type' => ['required', 'string', 'in:scheduled_service,repair,firmware_update,inspection,replacement,calibration,connectivity_check,battery_replacement'],
+            'type' => ['required', 'string', 'in:'.implode(',', MaintenanceOperationsPresenter::TYPES)],
             'status' => ['nullable', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'description' => ['required', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
-            'completed_at' => ['nullable', 'date'],
+            'completed_at' => ['nullable', 'date', 'before_or_equal:now'],
             'vendor_reference' => ['nullable', 'string', 'max:255'],
             'cost' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $validated['device_id'] = $device->id;
-        $validated['status'] = $validated['status'] ?? 'scheduled';
-
-        if (($validated['status'] ?? '') === 'completed' && empty($validated['completed_at'])) {
-            $validated['completed_at'] = now();
-        }
-        if (($validated['status'] ?? '') === 'completed') {
-            $validated['performed_by_user_id'] = $user->id;
-        }
-
-        DeviceMaintenanceRecord::create($validated);
+        $this->lifecycle->create($user, $device, $validated);
 
         return back()->with('success', 'Maintenance record created.');
     }
@@ -176,26 +194,22 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
+        $record->loadMissing('device:id');
+        abort_unless($record->device, 404);
+        $this->access->assertCanViewDevice($user, $record->device);
 
         $validated = $request->validate([
-            'type' => ['sometimes', 'string', 'in:scheduled_service,repair,firmware_update,inspection,replacement,calibration,connectivity_check,battery_replacement'],
+            'type' => ['sometimes', 'string', 'in:'.implode(',', MaintenanceOperationsPresenter::TYPES)],
             'status' => ['sometimes', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'description' => ['sometimes', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
-            'completed_at' => ['nullable', 'date'],
+            'completed_at' => ['nullable', 'date', 'before_or_equal:now'],
             'vendor_reference' => ['nullable', 'string', 'max:255'],
             'cost' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        if (($validated['status'] ?? '') === 'completed' && empty($validated['completed_at'])) {
-            $validated['completed_at'] = now();
-        }
-        if (($validated['status'] ?? '') === 'completed' && !$record->performed_by_user_id) {
-            $validated['performed_by_user_id'] = $user->id;
-        }
-
-        $record->update($validated);
+        $this->lifecycle->update($user, $record, $validated);
 
         return back()->with('success', 'Maintenance record updated.');
     }
@@ -207,12 +221,11 @@ class MaintenanceHealthController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.maintenance.manage'), 403);
+        $record->loadMissing('device:id');
+        abort_unless($record->device, 404);
+        $this->access->assertCanViewDevice($user, $record->device);
 
-        $record->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'performed_by_user_id' => $user->id,
-        ]);
+        $this->lifecycle->complete($user, $record);
 
         return back()->with('success', 'Maintenance marked as complete.');
     }

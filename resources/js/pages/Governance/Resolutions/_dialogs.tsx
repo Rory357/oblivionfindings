@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -18,10 +17,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { useForm } from '@inertiajs/react';
-import { Gavel, Loader2, ScrollText, Users, Vote, type LucideIcon } from 'lucide-react';
 import { store as storeResolution } from '@/routes/governance/resolutions';
+import { useForm } from '@inertiajs/react';
+import {
+    Gavel,
+    Loader2,
+    ScrollText,
+    Users,
+    Vote,
+    type LucideIcon,
+} from 'lucide-react';
 
 // ── Resolution type registry (Send-Kudos-style tile picker) ───────────────
 
@@ -59,8 +66,12 @@ export const RESOLUTION_TYPES: ResolutionTypeDef[] = [
     },
 ];
 
-export function getResolutionType(value: string | null | undefined): ResolutionTypeDef {
-    return RESOLUTION_TYPES.find((t) => t.key === value) ?? RESOLUTION_TYPES[0]!;
+export function getResolutionType(
+    value: string | null | undefined,
+): ResolutionTypeDef {
+    return (
+        RESOLUTION_TYPES.find((t) => t.key === value) ?? RESOLUTION_TYPES[0]!
+    );
 }
 
 // ── Form shape ────────────────────────────────────────────────────────────
@@ -99,7 +110,8 @@ function ResolutionTypePicker({
                 const Icon = t.icon;
                 const active = value === t.key;
                 return (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -116,7 +128,9 @@ function ResolutionTypePicker({
                             <Icon className={cn('h-4 w-4', t.accent)} />
                         </span>
                         <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium">{t.label}</span>
+                            <span className="block truncate text-sm font-medium">
+                                {t.label}
+                            </span>
                             <span className="block text-xs text-muted-foreground">
                                 {t.description}
                             </span>
@@ -140,14 +154,15 @@ function ResolutionFields({
     lockMeeting?: boolean;
 }) {
     const lockedMeeting = lockMeeting
-        ? meetings.find((m) => String(m.id) === form.data.meeting_id) ?? null
+        ? (meetings.find((m) => String(m.id) === form.data.meeting_id) ?? null)
         : null;
 
     return (
         <div className="space-y-4">
             <div>
                 <Label className="mb-2 block">
-                    Resolution type <span className="text-status-critical">*</span>
+                    Resolution type{' '}
+                    <span className="text-status-critical">*</span>
                 </Label>
                 <ResolutionTypePicker
                     value={form.data.type}
@@ -159,7 +174,8 @@ function ResolutionFields({
             <div className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                     <Label htmlFor="r-title">
-                        Resolution title <span className="text-status-critical">*</span>
+                        Resolution title{' '}
+                        <span className="text-status-critical">*</span>
                     </Label>
                     <Input
                         id="r-title"
@@ -177,7 +193,9 @@ function ResolutionFields({
                         id="r-description"
                         rows={4}
                         value={form.data.description}
-                        onChange={(e) => form.setData('description', e.target.value)}
+                        onChange={(e) =>
+                            form.setData('description', e.target.value)
+                        }
                         placeholder="What is being decided, and what context does the board need to vote?"
                     />
                     <FieldError message={form.errors.description} />
@@ -189,7 +207,9 @@ function ResolutionFields({
                         id="r-deadline"
                         type="datetime-local"
                         value={form.data.voting_deadline}
-                        onChange={(e) => form.setData('voting_deadline', e.target.value)}
+                        onChange={(e) =>
+                            form.setData('voting_deadline', e.target.value)
+                        }
                     />
                     <FieldError message={form.errors.voting_deadline} />
                 </div>
@@ -206,7 +226,10 @@ function ResolutionFields({
                                     <span className="truncate text-sm font-medium">
                                         {lockedMeeting.title}
                                     </span>
-                                    <Badge variant="outline" className="text-[10px]">
+                                    <Badge
+                                        variant="outline"
+                                        className="text-[10px]"
+                                    >
                                         From meeting
                                     </Badge>
                                 </div>
@@ -224,11 +247,16 @@ function ResolutionFields({
                                 <SelectValue placeholder="No linked meeting" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="none">No linked meeting</SelectItem>
+                                <SelectItem value="none">
+                                    No linked meeting
+                                </SelectItem>
                                 {meetings.map((m) => (
                                     <SelectItem key={m.id} value={String(m.id)}>
                                         {m.title} (
-                                        {new Date(m.scheduled_at).toLocaleDateString('en-NZ')})
+                                        {new Date(
+                                            m.scheduled_at,
+                                        ).toLocaleDateString('en-NZ')}
+                                        )
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -265,7 +293,10 @@ export function NewResolutionDialog({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
-                style={{ maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
             >
                 {isOpen && (
                     <NewResolutionBody
@@ -328,13 +359,17 @@ function NewResolutionBody({
                     New Resolution
                 </DialogTitle>
                 <DialogDescription>
-                    Pick the resolution type, then describe what the board is being asked to
-                    decide.
+                    Pick the resolution type, then describe what the board is
+                    being asked to decide.
                 </DialogDescription>
             </DialogHeader>
 
             <div className="mt-3">
-                <ResolutionFields form={form} meetings={meetings} lockMeeting={lockMeeting} />
+                <ResolutionFields
+                    form={form}
+                    meetings={meetings}
+                    lockMeeting={lockMeeting}
+                />
             </div>
 
             <DialogFooter className="mt-4">
@@ -342,7 +377,9 @@ function NewResolutionBody({
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
-                    {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {form.processing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Create resolution
                 </Button>
             </DialogFooter>

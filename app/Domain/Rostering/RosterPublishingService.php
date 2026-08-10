@@ -271,13 +271,11 @@ class RosterPublishingService
             ->get();
 
         $nextVersion = ((int) RosterPeriod::query()
-            ->where('organization_id', $locked->organization_id)
             ->where('site_id', $locked->site_id)
             ->whereDate('week_start', $locked->week_start)
             ->max('version')) + 1;
 
         $newPeriod = RosterPeriod::query()->create([
-            'organization_id' => $locked->organization_id,
             'site_id' => $locked->site_id,
             'week_start' => $locked->week_start,
             'week_end' => $locked->week_end ?? $locked->week_start->copy()->addDays(7),
@@ -338,7 +336,6 @@ class RosterPublishingService
         }
 
         $period = $this->periods->activeFor(
-            $shift->organization_id,
             (int) $shift->site_id,
             $shift->starts_at,
         );

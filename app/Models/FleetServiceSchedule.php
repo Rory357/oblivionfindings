@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FleetServiceSchedule extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $fillable = [
-        'tenant_id',
         'asset_id',
         'name',
         'interval_km',

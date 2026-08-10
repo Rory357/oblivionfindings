@@ -16,4 +16,5 @@ export const CHART_PALETTE: string[] = [
     'var(--status-warning)',
 ];
 
-export const chartColor = (index: number): string => CHART_PALETTE[index % CHART_PALETTE.length];
+export const chartColor = (index: number): string =>
+    CHART_PALETTE[index % CHART_PALETTE.length];

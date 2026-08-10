@@ -116,11 +116,17 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/time/clock-out', [MyHrController::class, 'clockOut'])->name('time.clock-out');
         Route::get('/time/shifts/{shift}/calendar', [MyHrController::class, 'shiftCalendar'])->name('time.shift-calendar');
         Route::get('/one', [MyHrController::class, 'one'])->name('one');
-        Route::post('/one/{note}/acknowledge', [MyHrController::class, 'acknowledgeOne'])->name('one.acknowledge');
-        Route::post('/kudos', [MyHrController::class, 'sendKudos'])->name('kudos');
+        Route::post('/one/{note}/acknowledge', [SupervisionController::class, 'acknowledge'])->name('one.acknowledge');
+        Route::post('/kudos', [MyHrController::class, 'sendKudos'])
+            ->middleware('permission:hr.recognition.give')
+            ->name('kudos');
         Route::get('/shoutouts', [MyHrController::class, 'shoutouts'])->name('shoutouts');
-        Route::post('/kudos/{kudos}/react', [MyHrController::class, 'reactKudos'])->name('kudos.react');
-        Route::post('/kudos/{kudos}/reply', [MyHrController::class, 'replyKudos'])->name('kudos.reply');
+        Route::post('/kudos/{kudos}/react', [MyHrController::class, 'reactKudos'])
+            ->middleware('permission:hr.recognition.give')
+            ->name('kudos.react');
+        Route::post('/kudos/{kudos}/reply', [MyHrController::class, 'replyKudos'])
+            ->middleware('permission:hr.recognition.give')
+            ->name('kudos.reply');
         Route::get('/documents', [MyHrController::class, 'documents'])->name('documents');
         Route::get('/documents/{document}/download', [MyHrController::class, 'downloadDocument'])->name('documents.download');
         Route::post('/documents/sign/{signature}', [MyHrController::class, 'signDocument'])->name('documents.sign');
@@ -256,18 +262,22 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.employees.viewAny')->group(function () {
         Route::get('/people', [EmployeeProfileController::class, 'index'])->name('people.index');
-        Route::get('/people/{profile}', [EmployeeProfileController::class, 'show'])->name('people.show');
+        Route::get('/people/{profile}', [EmployeeProfileController::class, 'show'])->name('people.show')->withTrashed();
 
         Route::get('/people/{profile}/documents', [HrDocumentController::class, 'profileDocuments'])->name('people.documents');
-        Route::get('/people/{profile}/documents/{document}/download', [HrDocumentController::class, 'download'])->name('people.documents.download');
+        Route::get('/people/{profile}/documents/{document}/download', [HrDocumentController::class, 'downloadForProfile'])->name('people.documents.download');
+        Route::get('/people/{profile}/custom-fields', [CustomFieldController::class, 'employeeFields'])
+            ->name('people.custom-fields')->withTrashed();
 
         Route::middleware('permission:hr.employees.manage')->group(function () {
             Route::post('/people', [EmployeeProfileController::class, 'store'])->name('people.store');
             Route::post('/people/bulk', [EmployeeProfileController::class, 'bulkAction'])->name('people.bulk');
             Route::get('/people/{profile}/edit', [EmployeeProfileController::class, 'edit'])->name('people.edit');
             Route::put('/people/{profile}', [EmployeeProfileController::class, 'update'])->name('people.update');
+            Route::put('/people/{profile}/custom-fields', [CustomFieldController::class, 'updateEmployeeFields'])
+                ->name('people.custom-fields.update');
             Route::patch('/people/{profile}/active', [EmployeeProfileController::class, 'setActive'])->name('people.active');
-            Route::post('/people/{profile}/rehire', [EmployeeProfileController::class, 'rehire'])->name('people.rehire');
+            Route::post('/people/{profile}/rehire', [EmployeeProfileController::class, 'rehire'])->name('people.rehire')->withTrashed();
             Route::post('/people/{profile}/invite', [EmployeeProfileController::class, 'resendInvite'])->name('people.invite');
             Route::post('/people/{profile}/documents', [HrDocumentController::class, 'storeForProfile'])->name('people.documents.store');
             Route::put('/people/{profile}/documents/{document}', [HrDocumentController::class, 'updateForProfile'])->name('people.documents.update');
@@ -284,24 +294,45 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
         Route::get('/compliance/calendar', [ComplianceCalendarController::class, 'index'])->name('compliance.calendar');
         Route::get('/compliance/export', [ComplianceExportController::class, 'export'])->name('compliance.export');
-        Route::get('/compliance/staff/{staff}', [ComplianceController::class, 'staffDetail'])->name('compliance.staff');
-        Route::get('/compliance/status/{status}/evidence', [ComplianceController::class, 'evidence'])->name('compliance.status.evidence');
+        Route::get('/compliance/staff/{staff}', [ComplianceController::class, 'staffDetail'])
+            ->whereNumber('staff')->name('compliance.staff');
+        Route::get('/compliance/staff/{invalidStaff}', [ComplianceController::class, 'concealInvalidStaff'])
+            ->where('invalidStaff', '[^/]+')->name('compliance.invalid.staff');
+        Route::get('/compliance/status/{status}/evidence', [ComplianceController::class, 'evidence'])
+            ->whereNumber('status')->name('compliance.status.evidence');
+        Route::get('/compliance/status/{invalidStatus}/evidence', [ComplianceController::class, 'concealInvalidStatus'])
+            ->where('invalidStatus', '[^/]+')->name('compliance.invalid.status.evidence');
         Route::post('/compliance/renewals/remind', [ComplianceController::class, 'renewalRemind'])->name('compliance.renewals.remind');
 
         Route::middleware('permission:hr.compliance.manage')->group(function () {
             Route::get('/compliance/matrix', [ComplianceMatrixController::class, 'index'])->name('compliance.matrix');
             Route::post('/compliance/requirements', [ComplianceMatrixController::class, 'storeRequirement'])->name('compliance.requirements.store');
-            Route::put('/compliance/requirements/{requirement}', [ComplianceMatrixController::class, 'updateRequirement'])->name('compliance.requirements.update');
-            Route::delete('/compliance/requirements/{requirement}', [ComplianceMatrixController::class, 'destroyRequirement'])->name('compliance.requirements.destroy');
+            Route::put('/compliance/requirements/{requirement}', [ComplianceMatrixController::class, 'updateRequirement'])
+                ->whereNumber('requirement')->name('compliance.requirements.update');
+            Route::put('/compliance/requirements/{invalidRequirement}', [ComplianceMatrixController::class, 'concealInvalidRequirement'])
+                ->where('invalidRequirement', '[^/]+')->name('compliance.invalid.requirements.update');
+            Route::delete('/compliance/requirements/{requirement}', [ComplianceMatrixController::class, 'destroyRequirement'])
+                ->whereNumber('requirement')->name('compliance.requirements.destroy');
+            Route::delete('/compliance/requirements/{invalidRequirement}', [ComplianceMatrixController::class, 'concealInvalidRequirement'])
+                ->where('invalidRequirement', '[^/]+')->name('compliance.invalid.requirements.destroy');
             Route::post('/compliance/matrix', [ComplianceMatrixController::class, 'updateMatrix'])->name('compliance.matrix.update');
 
             // Record / update / waive a per-staff compliance status (the write loop).
-            Route::post('/compliance/staff/{staff}/status', [ComplianceController::class, 'storeStatus'])->name('compliance.status.store');
-            Route::put('/compliance/status/{status}', [ComplianceController::class, 'updateStatus'])->name('compliance.status.update');
-            Route::post('/compliance/status/{status}/exempt', [ComplianceController::class, 'exempt'])->name('compliance.status.exempt');
+            Route::post('/compliance/staff/{staff}/status', [ComplianceController::class, 'storeStatus'])
+                ->whereNumber('staff')->name('compliance.status.store');
+            Route::post('/compliance/staff/{invalidStaff}/status', [ComplianceController::class, 'concealInvalidStaff'])
+                ->where('invalidStaff', '[^/]+')->name('compliance.invalid.status.store');
+            Route::put('/compliance/status/{status}', [ComplianceController::class, 'updateStatus'])
+                ->whereNumber('status')->name('compliance.status.update');
+            Route::put('/compliance/status/{invalidStatus}', [ComplianceController::class, 'concealInvalidStatus'])
+                ->where('invalidStatus', '[^/]+')->name('compliance.invalid.status.update');
+            Route::post('/compliance/status/{status}/exempt', [ComplianceController::class, 'exempt'])
+                ->whereNumber('status')->name('compliance.status.exempt');
+            Route::post('/compliance/status/{invalidStatus}/exempt', [ComplianceController::class, 'concealInvalidStatus'])
+                ->where('invalidStatus', '[^/]+')->name('compliance.invalid.status.exempt');
 
             // Bulk + assignment.
-            Route::post('/compliance/assign', [ComplianceController::class, 'assign'])->name('compliance.assign');
+            Route::post('/compliance/assign', [ComplianceMatrixController::class, 'assign'])->name('compliance.assign');
             Route::post('/compliance/bulk-record', [ComplianceController::class, 'bulkRecord'])->name('compliance.bulk.record');
             Route::post('/compliance/bulk-remind', [ComplianceController::class, 'bulkRemind'])->name('compliance.bulk.remind');
             Route::post('/compliance/bulk-exempt', [ComplianceController::class, 'bulkExempt'])->name('compliance.bulk.exempt');
@@ -488,11 +519,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::put('/probation/{review}', [PerformanceReviewController::class, 'updateProbation'])->name('probation.update');
         });
 
-        // Employee-side acknowledgements (any viewer can ack their own record)
-        Route::post('/reviews/{review}/acknowledge', [PerformanceReviewController::class, 'acknowledge'])->name('reviews.acknowledge');
-        Route::post('/supervision/{note}/acknowledge', [SupervisionController::class, 'acknowledge'])->name('supervision.acknowledge');
-        Route::get('/reviews/{review}/evidence', [PerformanceReviewController::class, 'downloadEvidence'])->name('reviews.evidence.show');
     });
+    Route::post('/performance/reviews/{review}/acknowledge', [PerformanceReviewController::class, 'acknowledge'])
+        ->name('performance.reviews.acknowledge');
+    Route::get('/performance/reviews/{review}/evidence', [PerformanceReviewController::class, 'downloadEvidence'])
+        ->name('performance.reviews.evidence.show');
+    Route::post('/performance/supervision/{note}/acknowledge', [SupervisionController::class, 'acknowledge'])
+        ->name('performance.supervision.acknowledge');
 
     /*
     |--------------------------------------------------------------------------
@@ -715,19 +748,31 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Directory
+    | Retired management directory alias and staff-card endpoints
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:hr.employees.viewAny')->group(function () {
         Route::get('/directory', [DirectoryController::class, 'index'])->name('directory.index');
-        Route::post('/directory/{profile}/photo', [DirectoryController::class, 'uploadPhoto'])->name('directory.uploadPhoto')
-            ->middleware('permission:hr.employees.manage');
     });
 
-    // Directory card detail (JSON) powering the self-service My HR directory
-    // modal — available to all staff (gated to staff in the controller).
-    // Personal contact and the compliance summary stay manager-only.
-    Route::get('/directory/{profile}', [DirectoryController::class, 'show'])->name('directory.show');
+    // Current, Site-visible staff cards and their protected photos. The
+    // operational directory page itself remains /hr/my/directory.
+    Route::get('/directory/{profile}/photo', [DirectoryController::class, 'photo'])
+        ->whereNumber('profile')->name('directory.photo');
+    Route::post('/directory/{profile}/photo', [DirectoryController::class, 'uploadPhoto'])
+        ->whereNumber('profile')->name('directory.uploadPhoto');
+    Route::get('/directory/{profile}', [DirectoryController::class, 'show'])
+        ->whereNumber('profile')->name('directory.show');
+    // Keep invalid identifiers indistinguishable from concealed records while
+    // retaining numeric constraints on every data-bearing route above.
+    // Use a distinct parameter name so Laravel does not replace the numeric
+    // route with this fallback in the route collection.
+    Route::get('/directory/{invalidProfile}/photo', [DirectoryController::class, 'concealInvalidProfile'])
+        ->where('invalidProfile', '[^/]+')->name('directory.invalid.photo.read');
+    Route::post('/directory/{invalidProfile}/photo', [DirectoryController::class, 'concealInvalidProfile'])
+        ->where('invalidProfile', '[^/]+')->name('directory.invalid.photo.write');
+    Route::get('/directory/{invalidProfile}', [DirectoryController::class, 'concealInvalidProfile'])
+        ->where('invalidProfile', '[^/]+')->name('directory.invalid.show');
 
     /*
     |--------------------------------------------------------------------------
@@ -931,13 +976,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/{pip}/complete', [PipController::class, 'complete'])->name('complete');
         });
 
-        Route::get('/milestones/{milestone}/evidence', [PipController::class, 'downloadMilestoneEvidence'])->name('milestones.evidence.show');
     });
 
     // PIP detail + acknowledge sit OUTSIDE the hr.performance.view gate: the
     // subject employee must be able to read and acknowledge their own plan
     // (NZ good-faith process). The controller enforces subject-or-manage access.
     Route::prefix('performance/pips')->name('pips.')->group(function () {
+        Route::get('/milestones/{milestone}/evidence', [PipController::class, 'downloadMilestoneEvidence'])->name('milestones.evidence.show');
         Route::post('/{pip}/acknowledge', [PipController::class, 'acknowledge'])->name('acknowledge');
         Route::get('/{pip}', [PipController::class, 'show'])->name('show');
     });
@@ -1092,11 +1137,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Skills Matrix
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.performance.view')->prefix('performance/skills')->name('performance.skills.')->group(function () {
+    Route::middleware('permission:hr.skills.view|hr.skills.manage|hr.performance.view|hr.performance.manage')->prefix('performance/skills')->name('performance.skills.')->group(function () {
         Route::get('/', [SkillsController::class, 'index'])->name('index');
         Route::get('/matrix', [SkillsController::class, 'matrix'])->name('matrix');
 
-        Route::middleware('permission:hr.performance.manage')->group(function () {
+        Route::middleware('permission:hr.skills.manage|hr.performance.manage')->group(function () {
             Route::post('/', [SkillsController::class, 'storeSkill'])->name('store');
             Route::post('/assess', [SkillsController::class, 'assessEmployee'])->name('assess');
         });
@@ -1321,7 +1366,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/reports/saved/{report}/run', [ReportBuilderController::class, 'run'])->name('reports.saved.run');
         Route::get('/reports/saved/{report}/export', [ReportBuilderController::class, 'export'])->name('reports.saved.export');
         Route::delete('/reports/saved/{report}', [ReportBuilderController::class, 'destroy'])->name('reports.saved.destroy');
-        Route::post('/reports/saved/{report}/schedule', [ReportBuilderController::class, 'schedule'])->name('reports.saved.schedule');
     });
 
     /*

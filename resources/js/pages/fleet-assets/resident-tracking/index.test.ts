@@ -10,9 +10,9 @@ const source = readFileSync(
 describe('Assign tracker workflow', () => {
     it('uses a labelled consent-aware wizard with review', () => {
         expect(source).toContain('title="Assign tracker to resident"');
-        expect(source).toContain('label: \'Resident & device\'');
-        expect(source).toContain('label: \'Consent check\'');
-        expect(source).toContain('label: \'Review\'');
+        expect(source).toContain("label: 'Resident & device'");
+        expect(source).toContain("label: 'Consent check'");
+        expect(source).toContain("label: 'Review'");
         expect(source).toContain('htmlFor="assign-tracker-resident"');
         expect(source).toContain('htmlFor="assign-tracker-device"');
         expect(source).toContain('id="assign-tracker-consent"');

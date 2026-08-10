@@ -93,6 +93,21 @@ class MedicationErrorsTest extends TestCase
         $this->assertSame('pending', $error->open_disclosure);
     }
 
+    public function test_serious_direct_incident_requires_an_actual_immediate_action_before_any_write(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+
+        $payload = $this->majorIncidentPayload($client);
+        unset($payload['immediate_action']);
+
+        $this->actingAs($user)
+            ->from('/emar/errors')
+            ->post('/emar/errors', $payload)
+            ->assertSessionHasErrors('immediate_action');
+
+        $this->assertNoMedicationErrorJourneyRecords();
+    }
+
     public function test_direct_incident_creation_projects_timeline_before_outer_commit_and_escalates_governance_once_after_commit(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedErrors();
@@ -566,6 +581,7 @@ class MedicationErrorsTest extends TestCase
         ['user' => $user, 'client' => $client] = $this->seedErrors();
         $error = MedicationError::query()->create([
             'client_id' => $client->id, 'error_type' => 'wrong_dose', 'severity' => 'critical', 'description' => 'Wrong strength dispensed.',
+            'immediate_action' => 'Clinical review completed.',
             'status' => 'reported', 'reported_by' => $user->id, 'reported_at' => now(),
         ]);
         $this->assertNull($error->client_incident_id);
@@ -581,9 +597,47 @@ class MedicationErrorsTest extends TestCase
 
         $incident = ClientIncident::query()->findOrFail($error->client_incident_id);
         $this->assertSame($client->id, $incident->client_id);
+        $this->assertSame($client->site_id, $incident->site_id);
         $this->assertSame('medication_error', $incident->type);
         $this->assertSame($user->id, (int) $incident->reported_by);
         $this->assertSame('critical', $incident->severity);
+        $this->assertSame('Clinical review completed.', $incident->immediate_action_taken);
+    }
+
+    public function test_linking_a_serious_error_requires_and_persists_the_actual_immediate_action(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedErrors();
+        $error = MedicationError::query()->create([
+            'client_id' => $client->id,
+            'error_type' => 'wrong_dose',
+            'severity' => 'major',
+            'description' => 'Wrong strength dispensed.',
+            'status' => 'reported',
+            'reported_by' => $user->id,
+            'reported_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->from('/emar/errors')
+            ->post("/emar/errors/{$error->id}/link-incident")
+            ->assertSessionHasErrors('immediate_action');
+
+        $this->assertDatabaseCount('client_incidents', 0);
+
+        $this->actingAs($user)
+            ->post("/emar/errors/{$error->id}/link-incident", [
+                'immediate_action' => 'The client was assessed and the prescriber was contacted.',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(
+            'The client was assessed and the prescriber was contacted.',
+            $error->fresh()->immediate_action,
+        );
+        $this->assertSame(
+            'The client was assessed and the prescriber was contacted.',
+            ClientIncident::query()->sole()->immediate_action_taken,
+        );
     }
 
     public function test_link_incident_is_idempotent_when_already_linked(): void

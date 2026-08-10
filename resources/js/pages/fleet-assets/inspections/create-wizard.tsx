@@ -55,9 +55,24 @@ export type WizardPreTripResult = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'vehicle', label: 'Vehicle & type', blurb: 'Which vehicle, which check', icon: Car },
-    { key: 'checklist', label: 'Checklist', blurb: 'Exterior, interior, under bonnet', icon: ClipboardCheck },
-    { key: 'review', label: 'Details & review', blurb: 'Notes, extras and confirm', icon: FileCheck },
+    {
+        key: 'vehicle',
+        label: 'Vehicle & type',
+        blurb: 'Which vehicle, which check',
+        icon: Car,
+    },
+    {
+        key: 'checklist',
+        label: 'Checklist',
+        blurb: 'Exterior, interior, under bonnet',
+        icon: ClipboardCheck,
+    },
+    {
+        key: 'review',
+        label: 'Details & review',
+        blurb: 'Notes, extras and confirm',
+        icon: FileCheck,
+    },
 ];
 
 // Standard vehicle inspection checklist (identical to the retired create page)
@@ -67,12 +82,21 @@ const CHECKLIST_SECTIONS = [
         color: 'bg-status-info',
         items: [
             { key: 'tyres_condition', label: 'Tyres - Condition & Pressure' },
-            { key: 'lights_front', label: 'Lights - Front (headlights, indicators)' },
-            { key: 'lights_rear', label: 'Lights - Rear (tail, brake, indicators)' },
+            {
+                key: 'lights_front',
+                label: 'Lights - Front (headlights, indicators)',
+            },
+            {
+                key: 'lights_rear',
+                label: 'Lights - Rear (tail, brake, indicators)',
+            },
             { key: 'body_damage', label: 'Body Damage' },
             { key: 'windscreen', label: 'Windscreen (chips, cracks)' },
             { key: 'mirrors', label: 'Mirrors (side & rear-view)' },
-            { key: 'number_plates', label: 'Number Plates (visible & legible)' },
+            {
+                key: 'number_plates',
+                label: 'Number Plates (visible & legible)',
+            },
         ],
     },
     {
@@ -118,7 +142,10 @@ function allItemKeys(): string[] {
     return CHECKLIST_SECTIONS.flatMap((s) => s.items.map((i) => i.key));
 }
 
-function buildInitialChecklist(): Record<string, { result: ChecklistResult; notes: string }> {
+function buildInitialChecklist(): Record<
+    string,
+    { result: ChecklistResult; notes: string }
+> {
     const obj: Record<string, { result: ChecklistResult; notes: string }> = {};
     for (const key of allItemKeys()) {
         obj[key] = { result: 'pass', notes: '' };
@@ -161,11 +188,18 @@ export function InspectionCreateWizard({
     });
 
     const isPostTrip = form.data.inspection_type === 'post-trip';
-    const hasAnyFail = Object.values(form.data.checklist).some((v) => v.result === 'fail');
-    const selectedVehicle = vehicles.find((v) => String(v.id) === form.data.asset_id) ?? null;
+    const hasAnyFail = Object.values(form.data.checklist).some(
+        (v) => v.result === 'fail',
+    );
+    const selectedVehicle =
+        vehicles.find((v) => String(v.id) === form.data.asset_id) ?? null;
     const stepOneValid = form.data.asset_id !== '';
 
-    const setChecklistItem = (key: string, field: 'result' | 'notes', value: string) => {
+    const setChecklistItem = (
+        key: string,
+        field: 'result' | 'notes',
+        value: string,
+    ) => {
         const updated = { ...form.data.checklist };
         updated[key] = { ...updated[key], [field]: value };
         form.setData('checklist', updated);
@@ -181,9 +215,16 @@ export function InspectionCreateWizard({
             // Store redirects to the new inspection's show page on success; on
             // validation failure, jump back to the step that owns the first error.
             onError: (errors) => {
-                if (errors.asset_id || errors.inspection_type || errors.odometer || errors.overall_condition) {
+                if (
+                    errors.asset_id ||
+                    errors.inspection_type ||
+                    errors.odometer ||
+                    errors.overall_condition
+                ) {
                     setStepIndex(0);
-                } else if (Object.keys(errors).some((k) => k.startsWith('checklist'))) {
+                } else if (
+                    Object.keys(errors).some((k) => k.startsWith('checklist'))
+                ) {
                     setStepIndex(1);
                 } else {
                     setStepIndex(2);
@@ -218,7 +259,10 @@ export function InspectionCreateWizard({
             }}
             footerStart={
                 stepIndex > 0 ? (
-                    <Button variant="ghost" onClick={() => setStepIndex(stepIndex - 1)}>
+                    <Button
+                        variant="ghost"
+                        onClick={() => setStepIndex(stepIndex - 1)}
+                    >
                         <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
                     </Button>
                 ) : (
@@ -231,12 +275,20 @@ export function InspectionCreateWizard({
                 <>
                     {stepIndex > 0 ? resultBadge : null}
                     {stepIndex < STEPS.length - 1 ? (
-                        <Button onClick={() => setStepIndex(stepIndex + 1)} disabled={!stepOneValid}>
+                        <Button
+                            onClick={() => setStepIndex(stepIndex + 1)}
+                            disabled={!stepOneValid}
+                        >
                             Continue <ArrowRight className="ml-1.5 h-4 w-4" />
                         </Button>
                     ) : (
-                        <Button onClick={submit} disabled={form.processing || !stepOneValid}>
-                            {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !stepOneValid}
+                        >
+                            {form.processing && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
                             Submit inspection
                         </Button>
                     )}
@@ -249,39 +301,75 @@ export function InspectionCreateWizard({
                         <div>
                             <Label className="mb-1.5 block">Vehicle *</Label>
                             <Select
-                                value={form.data.asset_id === '' ? NONE : form.data.asset_id}
-                                onValueChange={(v) => form.setData('asset_id', v === NONE ? '' : v)}
+                                value={
+                                    form.data.asset_id === ''
+                                        ? NONE
+                                        : form.data.asset_id
+                                }
+                                onValueChange={(v) =>
+                                    form.setData(
+                                        'asset_id',
+                                        v === NONE ? '' : v,
+                                    )
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select vehicle" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={NONE}>Select vehicle</SelectItem>
+                                    <SelectItem value={NONE}>
+                                        Select vehicle
+                                    </SelectItem>
                                     {vehicles.map((v) => (
-                                        <SelectItem key={v.id} value={String(v.id)}>
+                                        <SelectItem
+                                            key={v.id}
+                                            value={String(v.id)}
+                                        >
                                             {v.name}
-                                            {v.registration_number ? ` (${v.registration_number})` : ''}
+                                            {v.registration_number
+                                                ? ` (${v.registration_number})`
+                                                : ''}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            {form.errors.asset_id && <p className="mt-1 text-xs text-destructive">{form.errors.asset_id}</p>}
+                            {form.errors.asset_id && (
+                                <p className="mt-1 text-xs text-destructive">
+                                    {form.errors.asset_id}
+                                </p>
+                            )}
                         </div>
 
                         <div>
-                            <Label className="mb-1.5 block">Inspection type *</Label>
+                            <Label className="mb-1.5 block">
+                                Inspection type *
+                            </Label>
                             <div className="grid grid-cols-2 gap-3">
                                 {[
-                                    { value: 'pre-trip', label: 'Pre-Trip', blurb: 'Before heading out' },
-                                    { value: 'post-trip', label: 'Post-Trip', blurb: 'On return' },
+                                    {
+                                        value: 'pre-trip',
+                                        label: 'Pre-Trip',
+                                        blurb: 'Before heading out',
+                                    },
+                                    {
+                                        value: 'post-trip',
+                                        label: 'Post-Trip',
+                                        blurb: 'On return',
+                                    },
                                 ].map((opt) => {
-                                    const active = form.data.inspection_type === opt.value;
+                                    const active =
+                                        form.data.inspection_type === opt.value;
                                     return (
                                         // eslint-disable-next-line no-restricted-syntax -- Send-Kudos-style type tile picker, not a shadcn Button.
                                         <button
                                             key={opt.value}
                                             type="button"
-                                            onClick={() => form.setData('inspection_type', opt.value)}
+                                            onClick={() =>
+                                                form.setData(
+                                                    'inspection_type',
+                                                    opt.value,
+                                                )
+                                            }
                                             className={cn(
                                                 'rounded-xl border-2 px-4 py-4 text-left transition-all',
                                                 active
@@ -289,10 +377,19 @@ export function InspectionCreateWizard({
                                                     : 'border-transparent bg-muted hover:bg-muted/80',
                                             )}
                                         >
-                                            <span className={cn('block text-sm font-bold', active ? 'text-primary' : 'text-foreground')}>
+                                            <span
+                                                className={cn(
+                                                    'block text-sm font-bold',
+                                                    active
+                                                        ? 'text-primary'
+                                                        : 'text-foreground',
+                                                )}
+                                            >
                                                 {opt.label}
                                             </span>
-                                            <span className="block text-xs text-muted-foreground">{opt.blurb}</span>
+                                            <span className="block text-xs text-muted-foreground">
+                                                {opt.blurb}
+                                            </span>
                                         </button>
                                     );
                                 })}
@@ -301,29 +398,47 @@ export function InspectionCreateWizard({
 
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
-                                <Label className="mb-1.5 block">Odometer reading (km)</Label>
+                                <Label className="mb-1.5 block">
+                                    Odometer reading (km)
+                                </Label>
                                 <Input
                                     type="number"
                                     min="0"
                                     value={form.data.odometer}
-                                    onChange={(e) => form.setData('odometer', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('odometer', e.target.value)
+                                    }
                                     placeholder="Current km"
                                 />
-                                {form.errors.odometer && <p className="mt-1 text-xs text-destructive">{form.errors.odometer}</p>}
+                                {form.errors.odometer && (
+                                    <p className="mt-1 text-xs text-destructive">
+                                        {form.errors.odometer}
+                                    </p>
+                                )}
                             </div>
                             <div>
-                                <Label className="mb-1.5 block">Overall condition *</Label>
+                                <Label className="mb-1.5 block">
+                                    Overall condition *
+                                </Label>
                                 <Select
                                     value={form.data.overall_condition}
-                                    onValueChange={(v) => form.setData('overall_condition', v)}
+                                    onValueChange={(v) =>
+                                        form.setData('overall_condition', v)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="good">Good</SelectItem>
-                                        <SelectItem value="fair">Fair</SelectItem>
-                                        <SelectItem value="poor">Poor</SelectItem>
+                                        <SelectItem value="good">
+                                            Good
+                                        </SelectItem>
+                                        <SelectItem value="fair">
+                                            Fair
+                                        </SelectItem>
+                                        <SelectItem value="poor">
+                                            Poor
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -337,69 +452,118 @@ export function InspectionCreateWizard({
                     <div className="space-y-5">
                         {CHECKLIST_SECTIONS.map((section) => {
                             const sectionPassCount = section.items.filter(
-                                (item) => form.data.checklist[item.key]?.result === 'pass',
+                                (item) =>
+                                    form.data.checklist[item.key]?.result ===
+                                    'pass',
                             ).length;
                             return (
-                                <div key={section.section} className="overflow-hidden rounded-xl border border-border">
-                                    <div className={cn('flex items-center justify-between px-4 py-2.5 text-primary-foreground', section.color)}>
-                                        <span className="text-sm font-semibold">{section.section}</span>
+                                <div
+                                    key={section.section}
+                                    className="overflow-hidden rounded-xl border border-border"
+                                >
+                                    <div
+                                        className={cn(
+                                            'flex items-center justify-between px-4 py-2.5 text-primary-foreground',
+                                            section.color,
+                                        )}
+                                    >
+                                        <span className="text-sm font-semibold">
+                                            {section.section}
+                                        </span>
                                         <span className="text-xs opacity-90">
-                                            {sectionPassCount}/{section.items.length} passed
+                                            {sectionPassCount}/
+                                            {section.items.length} passed
                                         </span>
                                     </div>
                                     <div className="space-y-3 p-3">
                                         {section.items.map((item) => {
-                                            const val = form.data.checklist[item.key];
+                                            const val =
+                                                form.data.checklist[item.key];
                                             return (
-                                                <div key={item.key} className="rounded-lg border border-border p-3">
-                                                    <span className="text-sm font-medium">{item.label}</span>
+                                                <div
+                                                    key={item.key}
+                                                    className="rounded-lg border border-border p-3"
+                                                >
+                                                    <span className="text-sm font-medium">
+                                                        {item.label}
+                                                    </span>
                                                     <div className="mt-2 grid grid-cols-3 gap-2">
                                                         <Button
                                                             type="button"
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => setChecklistItem(item.key, 'result', 'pass')}
+                                                            onClick={() =>
+                                                                setChecklistItem(
+                                                                    item.key,
+                                                                    'result',
+                                                                    'pass',
+                                                                )
+                                                            }
                                                             className={cn(
                                                                 'rounded-lg border-2 transition-all',
-                                                                val?.result === 'pass'
+                                                                val?.result ===
+                                                                    'pass'
                                                                     ? 'border-primary bg-primary/10 text-primary'
                                                                     : 'border-transparent bg-muted hover:border-primary',
                                                             )}
                                                         >
-                                                            <CheckCircle className="mr-1 h-3.5 w-3.5" /> Pass
+                                                            <CheckCircle className="mr-1 h-3.5 w-3.5" />{' '}
+                                                            Pass
                                                         </Button>
                                                         <Button
                                                             type="button"
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => setChecklistItem(item.key, 'result', 'fail')}
+                                                            onClick={() =>
+                                                                setChecklistItem(
+                                                                    item.key,
+                                                                    'result',
+                                                                    'fail',
+                                                                )
+                                                            }
                                                             className={cn(
                                                                 'rounded-lg border-2 transition-all',
-                                                                val?.result === 'fail'
+                                                                val?.result ===
+                                                                    'fail'
                                                                     ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
                                                                     : 'border-transparent bg-muted hover:border-status-critical/30',
                                                             )}
                                                         >
-                                                            <XCircle className="mr-1 h-3.5 w-3.5" /> Fail
+                                                            <XCircle className="mr-1 h-3.5 w-3.5" />{' '}
+                                                            Fail
                                                         </Button>
                                                         <Button
                                                             type="button"
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() => setChecklistItem(item.key, 'result', 'na')}
+                                                            onClick={() =>
+                                                                setChecklistItem(
+                                                                    item.key,
+                                                                    'result',
+                                                                    'na',
+                                                                )
+                                                            }
                                                             className={cn(
                                                                 'rounded-lg border-2 transition-all',
-                                                                val?.result === 'na'
+                                                                val?.result ===
+                                                                    'na'
                                                                     ? 'border-border bg-muted text-foreground'
                                                                     : 'border-transparent bg-muted hover:border-border',
                                                             )}
                                                         >
-                                                            <MinusCircle className="mr-1 h-3.5 w-3.5" /> N/A
+                                                            <MinusCircle className="mr-1 h-3.5 w-3.5" />{' '}
+                                                            N/A
                                                         </Button>
                                                     </div>
                                                     <Input
                                                         value={val?.notes ?? ''}
-                                                        onChange={(e) => setChecklistItem(item.key, 'notes', e.target.value)}
+                                                        onChange={(e) =>
+                                                            setChecklistItem(
+                                                                item.key,
+                                                                'notes',
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         placeholder="Notes (optional)"
                                                         className="mt-2 h-8 text-xs"
                                                     />
@@ -419,25 +583,42 @@ export function InspectionCreateWizard({
                     <div className="space-y-5">
                         {isPostTrip && preTripResults && (
                             <div className="rounded-md border border-status-info/30 bg-status-info-bg p-3">
-                                <div className="mb-1 text-sm font-medium text-status-info">Pre-trip comparison</div>
+                                <div className="mb-1 text-sm font-medium text-status-info">
+                                    Pre-trip comparison
+                                </div>
                                 <div className="grid gap-2 text-xs sm:grid-cols-3">
                                     <div>
-                                        <span className="text-muted-foreground">Pre-trip odometer:</span>{' '}
-                                        <span className="font-medium">{preTripResults.odometer ?? '—'} km</span>
+                                        <span className="text-muted-foreground">
+                                            Pre-trip odometer:
+                                        </span>{' '}
+                                        <span className="font-medium">
+                                            {preTripResults.odometer ?? '—'} km
+                                        </span>
                                     </div>
                                     <div>
-                                        <span className="text-muted-foreground">Pre-trip condition:</span>{' '}
-                                        <span className="font-medium capitalize">{preTripResults.overall_condition ?? '—'}</span>
+                                        <span className="text-muted-foreground">
+                                            Pre-trip condition:
+                                        </span>{' '}
+                                        <span className="font-medium capitalize">
+                                            {preTripResults.overall_condition ??
+                                                '—'}
+                                        </span>
                                     </div>
                                     <div>
-                                        <span className="text-muted-foreground">Pre-trip result:</span>{' '}
+                                        <span className="text-muted-foreground">
+                                            Pre-trip result:
+                                        </span>{' '}
                                         <span
                                             className={cn(
                                                 'font-medium',
-                                                preTripResults.passed ? 'text-status-success' : 'text-status-critical',
+                                                preTripResults.passed
+                                                    ? 'text-status-success'
+                                                    : 'text-status-critical',
                                             )}
                                         >
-                                            {preTripResults.passed ? 'All clear' : 'Issues found'}
+                                            {preTripResults.passed
+                                                ? 'All clear'
+                                                : 'Issues found'}
                                         </span>
                                     </div>
                                 </div>
@@ -448,42 +629,81 @@ export function InspectionCreateWizard({
                             <div className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div>
-                                        <Label className="mb-1.5 block">Fuel level on return</Label>
+                                        <Label className="mb-1.5 block">
+                                            Fuel level on return
+                                        </Label>
                                         <Select
-                                            value={form.data.fuel_level_return === '' ? NONE : form.data.fuel_level_return}
-                                            onValueChange={(v) => form.setData('fuel_level_return', v === NONE ? '' : v)}
+                                            value={
+                                                form.data.fuel_level_return ===
+                                                ''
+                                                    ? NONE
+                                                    : form.data
+                                                          .fuel_level_return
+                                            }
+                                            onValueChange={(v) =>
+                                                form.setData(
+                                                    'fuel_level_return',
+                                                    v === NONE ? '' : v,
+                                                )
+                                            }
                                         >
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select fuel level" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value={NONE}>Not recorded</SelectItem>
-                                                <SelectItem value="full">Full</SelectItem>
-                                                <SelectItem value="3/4">3/4</SelectItem>
-                                                <SelectItem value="1/2">1/2</SelectItem>
-                                                <SelectItem value="1/4">1/4</SelectItem>
-                                                <SelectItem value="empty">Empty</SelectItem>
+                                                <SelectItem value={NONE}>
+                                                    Not recorded
+                                                </SelectItem>
+                                                <SelectItem value="full">
+                                                    Full
+                                                </SelectItem>
+                                                <SelectItem value="3/4">
+                                                    3/4
+                                                </SelectItem>
+                                                <SelectItem value="1/2">
+                                                    1/2
+                                                </SelectItem>
+                                                <SelectItem value="1/4">
+                                                    1/4
+                                                </SelectItem>
+                                                <SelectItem value="empty">
+                                                    Empty
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                 </div>
                                 <div>
-                                    <Label className="mb-1.5 block">Any new damage?</Label>
+                                    <Label className="mb-1.5 block">
+                                        Any new damage?
+                                    </Label>
                                     <textarea
                                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                         rows={2}
                                         value={form.data.new_damage}
-                                        onChange={(e) => form.setData('new_damage', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'new_damage',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Describe any new damage noticed during/after the trip..."
                                     />
                                 </div>
                                 <div>
-                                    <Label className="mb-1.5 block">Items left in vehicle</Label>
+                                    <Label className="mb-1.5 block">
+                                        Items left in vehicle
+                                    </Label>
                                     <textarea
                                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                         rows={2}
                                         value={form.data.items_left}
-                                        onChange={(e) => form.setData('items_left', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'items_left',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="List any personal items or equipment left in the vehicle..."
                                     />
                                 </div>
@@ -491,18 +711,26 @@ export function InspectionCreateWizard({
                         )}
 
                         <div>
-                            <Label className="mb-1.5 block">Notes / comments</Label>
+                            <Label className="mb-1.5 block">
+                                Notes / comments
+                            </Label>
                             <textarea
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                 rows={3}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Any additional observations, concerns, or comments..."
                             />
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <ReviewCard icon={Car} title="Vehicle & type" onEdit={() => setStepIndex(0)}>
+                            <ReviewCard
+                                icon={Car}
+                                title="Vehicle & type"
+                                onEdit={() => setStepIndex(0)}
+                            >
                                 <ReviewRow
                                     label="Vehicle"
                                     value={
@@ -511,11 +739,30 @@ export function InspectionCreateWizard({
                                             : undefined
                                     }
                                 />
-                                <ReviewRow label="Type" value={isPostTrip ? 'Post-Trip' : 'Pre-Trip'} />
-                                <ReviewRow label="Odometer" value={form.data.odometer ? `${form.data.odometer} km` : undefined} />
-                                <ReviewRow label="Condition" value={form.data.overall_condition} />
+                                <ReviewRow
+                                    label="Type"
+                                    value={
+                                        isPostTrip ? 'Post-Trip' : 'Pre-Trip'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Odometer"
+                                    value={
+                                        form.data.odometer
+                                            ? `${form.data.odometer} km`
+                                            : undefined
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Condition"
+                                    value={form.data.overall_condition}
+                                />
                             </ReviewCard>
-                            <ReviewCard icon={ClipboardCheck} title="Checklist" onEdit={() => setStepIndex(1)}>
+                            <ReviewCard
+                                icon={ClipboardCheck}
+                                title="Checklist"
+                                onEdit={() => setStepIndex(1)}
+                            >
                                 <ReviewRow
                                     label="Result"
                                     value={
@@ -525,17 +772,29 @@ export function InspectionCreateWizard({
                                             ) : (
                                                 <CheckCircle className="h-3.5 w-3.5 text-status-success" />
                                             )}
-                                            {hasAnyFail ? 'Issues found' : 'All clear'}
+                                            {hasAnyFail
+                                                ? 'Issues found'
+                                                : 'All clear'}
                                         </span>
                                     }
                                 />
                                 <ReviewRow
                                     label="Failed items"
-                                    value={String(Object.values(form.data.checklist).filter((v) => v.result === 'fail').length)}
+                                    value={String(
+                                        Object.values(
+                                            form.data.checklist,
+                                        ).filter((v) => v.result === 'fail')
+                                            .length,
+                                    )}
                                 />
                                 <ReviewRow
                                     label="N/A items"
-                                    value={String(Object.values(form.data.checklist).filter((v) => v.result === 'na').length)}
+                                    value={String(
+                                        Object.values(
+                                            form.data.checklist,
+                                        ).filter((v) => v.result === 'na')
+                                            .length,
+                                    )}
                                 />
                             </ReviewCard>
                         </div>

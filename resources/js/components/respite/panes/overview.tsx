@@ -3,6 +3,8 @@
  * merged "needs your attention" action list, bed occupancy per home, and a
  * this-week arrivals/departures summary. Everything deep-links into a tab.
  */
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
     ArrowRight,
@@ -23,8 +25,6 @@ import {
 import type { ComponentType } from 'react';
 import { fmtRange, Pill, relTime, type Tone } from '../shared';
 import type { RespiteTab, RespiteWorkspaceData } from '../types';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 const TONE_BG: Record<Tone, string> = {
     success: 'bg-status-success-bg text-status-success',
@@ -242,7 +242,8 @@ export function OverviewPane({
                             key={s.label}
                             className="flex flex-1 items-stretch"
                         >
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 type="button"
                                 onClick={() => goTab(s.tab)}
                                 className="flex-1 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
@@ -287,7 +288,8 @@ export function OverviewPane({
                     </div>
                     <div className="grid gap-2">
                         {actions.slice(0, 8).map((a, i) => (
-                            <GuardrailCard unstyled
+                            <GuardrailCard
+                                unstyled
                                 key={i}
                                 className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
                             >
@@ -307,7 +309,8 @@ export function OverviewPane({
                                         {a.sub}
                                     </div>
                                 </div>
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => goTab(a.tab)}
                                     className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold hover:bg-muted"

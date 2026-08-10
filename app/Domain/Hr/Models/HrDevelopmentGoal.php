@@ -3,16 +3,18 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 class HrDevelopmentGoal extends Model
 {
-    use AuditableChanges, HasFactory, SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected $fillable = [
         'tenant_id',
@@ -57,11 +59,11 @@ class HrDevelopmentGoal extends Model
     ];
 
     /** The next review date from a base date + the plan's cadence. */
-    public function nextReviewFrom(\DateTimeInterface $base): ?\Illuminate\Support\Carbon
+    public function nextReviewFrom(\DateTimeInterface $base): ?Carbon
     {
         $days = self::REVIEW_CADENCE_DAYS[$this->review_frequency] ?? null;
 
-        return $days ? \Illuminate\Support\Carbon::parse($base)->addDays($days) : null;
+        return $days ? Carbon::parse($base)->addDays($days) : null;
     }
 
     public function employee(): BelongsTo
@@ -84,11 +86,6 @@ class HrDevelopmentGoal extends Model
     public function competency(): BelongsTo
     {
         return $this->belongsTo(HrCompetency::class, 'competency_id');
-    }
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function scopeOpen(Builder $query): Builder

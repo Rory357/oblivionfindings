@@ -1,7 +1,9 @@
 <?php
 
 use App\Domain\Hr\Models\HrCompetency;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -14,11 +16,17 @@ beforeEach(function () {
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    $site = Site::factory()->create(['name' => 'Competency edit Site']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $site->id,
+        'start_date' => today()->subYear(),
+        'is_active' => true,
+    ]);
 });
 
 test('a competency can be edited via the now-wired update endpoint', function () {
     $competency = HrCompetency::query()->create([
-        'tenant_id' => 1,
         'name' => 'Medication Administration',
         'description' => 'Original description.',
         'category' => 'Clinical',
@@ -59,7 +67,6 @@ test('a competency can be created (the create path no longer 500s)', function ()
 
 test('the competency index renders for a manager', function () {
     HrCompetency::query()->create([
-        'tenant_id' => 1,
         'name' => 'Teamwork',
         'category' => 'Behavioural',
         'proficiency_levels' => ['Low', 'High'],

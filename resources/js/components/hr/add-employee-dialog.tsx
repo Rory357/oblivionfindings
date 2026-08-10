@@ -42,7 +42,12 @@ export interface AddEmployeeFormData {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'person', label: 'Person', blurb: 'Name & contact', icon: UsersRound },
+    {
+        key: 'person',
+        label: 'Person',
+        blurb: 'Name & contact',
+        icon: UsersRound,
+    },
     { key: 'job', label: 'Job', blurb: 'Role & placement', icon: Briefcase },
     {
         key: 'rtw',
@@ -102,7 +107,7 @@ export function AddEmployeeDialog({
         role: 'support_worker',
         position_id: '',
         employment_type: 'full_time',
-        department: '',
+        department_id: '',
         team: '',
         primary_site_id: '',
         manager_user_id: '',
@@ -130,6 +135,7 @@ export function AddEmployeeDialog({
         form.transform((data) => ({
             ...data,
             position_id: data.position_id || null,
+            department_id: data.department_id || null,
             primary_site_id: data.primary_site_id || null,
             manager_user_id: data.manager_user_id || null,
             work_rights_status: data.work_rights_status || null,
@@ -160,7 +166,9 @@ export function AddEmployeeDialog({
     };
 
     const canSubmit =
-        form.data.name.trim() !== '' && form.data.email.trim() !== '';
+        form.data.name.trim() !== '' &&
+        form.data.email.trim() !== '' &&
+        form.data.primary_site_id !== '';
 
     const managerOptions: PersonOption[] = formData.managers.map((m) => ({
         value: m.value,
@@ -185,12 +193,15 @@ export function AddEmployeeDialog({
         );
 
     const needsVisa = VISA_STATUSES.includes(form.data.work_rights_status);
-    const linkConflict = form.errors.email?.includes('Link to existing') ?? false;
+    const linkConflict =
+        form.errors.email?.includes('Link to existing') ?? false;
 
     const positionLabel =
         formData.positions.find((p) => String(p.id) === form.data.position_id)
             ?.title ?? '—';
-    const departmentLabel = form.data.department || '—';
+    const departmentLabel =
+        departments.find((d) => String(d.id) === form.data.department_id)
+            ?.name ?? '—';
     const siteLabel =
         sites.find((s) => String(s.id) === form.data.primary_site_id)?.name ??
         '—';
@@ -276,7 +287,11 @@ export function AddEmployeeDialog({
                         blurb="Their name and a work email — a sign-in account is created automatically."
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Full name" required error={form.errors.name}>
+                        <Field
+                            label="Full name"
+                            required
+                            error={form.errors.name}
+                        >
                             <Input
                                 value={form.data.name}
                                 onChange={(e) =>
@@ -355,9 +370,7 @@ export function AddEmployeeDialog({
                         >
                             <SelectInput
                                 value={form.data.position_id}
-                                onChange={(v) =>
-                                    form.setData('position_id', v)
-                                }
+                                onChange={(v) => form.setData('position_id', v)}
                                 placeholder="Select a position"
                                 options={formData.positions.map((p) => ({
                                     value: String(p.id),
@@ -382,21 +395,23 @@ export function AddEmployeeDialog({
                         <Field
                             label="Department"
                             hint="optional"
-                            error={form.errors.department}
+                            error={form.errors.department_id}
                         >
                             <SelectInput
-                                value={form.data.department}
-                                onChange={(v) => form.setData('department', v)}
+                                value={form.data.department_id}
+                                onChange={(v) =>
+                                    form.setData('department_id', v)
+                                }
                                 placeholder="Select a department"
                                 options={departments.map((d) => ({
-                                    value: d.name,
+                                    value: String(d.id),
                                     label: d.name,
                                 }))}
                             />
                         </Field>
                         <Field
                             label="Primary site"
-                            hint="optional"
+                            required
                             error={form.errors.primary_site_id}
                         >
                             <SelectInput
@@ -411,10 +426,16 @@ export function AddEmployeeDialog({
                                 }))}
                             />
                         </Field>
-                        <Field label="Team" hint="optional" error={form.errors.team}>
+                        <Field
+                            label="Team"
+                            hint="optional"
+                            error={form.errors.team}
+                        >
                             <Input
                                 value={form.data.team}
-                                onChange={(e) => form.setData('team', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('team', e.target.value)
+                                }
                                 placeholder="e.g. Community Support"
                                 maxLength={255}
                             />
@@ -510,8 +531,8 @@ export function AddEmployeeDialog({
                             </>
                         ) : null}
                         <InfoCard icon={ShieldCheck} tone="info">
-                            Visa expiry feeds compliance reminders so nobody works
-                            past their right-to-work date.
+                            Visa expiry feeds compliance reminders so nobody
+                            works past their right-to-work date.
                         </InfoCard>
                     </div>
                 </WizardStepPane>
@@ -642,7 +663,10 @@ export function AddEmployeeDialog({
                                 label="Start date"
                                 value={form.data.start_date}
                             />
-                            <ReviewRow label="Reports to" value={managerLabel} />
+                            <ReviewRow
+                                label="Reports to"
+                                value={managerLabel}
+                            />
                         </ReviewCard>
                         <ReviewCard
                             icon={ShieldCheck}
@@ -695,7 +719,8 @@ export function AddEmployeeDialog({
                         {linkConflict ? (
                             <InfoCard icon={Link2} tone="warn">
                                 <div className="font-semibold text-foreground">
-                                    This email already belongs to a staff member.
+                                    This email already belongs to a staff
+                                    member.
                                 </div>
                                 <p className="mt-0.5">
                                     Link to and update their existing record
@@ -726,9 +751,7 @@ export function AddEmployeeDialog({
                                 label="Send login invite"
                                 desc="Email a set-your-password link so they can sign in."
                                 checked={form.data.send_invite}
-                                onChange={(v) =>
-                                    form.setData('send_invite', v)
-                                }
+                                onChange={(v) => form.setData('send_invite', v)}
                             />
                         </div>
                     </div>

@@ -7,10 +7,11 @@ use App\Models\Client;
 use App\Models\Role;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -33,7 +34,6 @@ beforeEach(function () {
     }
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'employee_number' => 'EMP90001',
         'work_email' => "worker-{$this->staff->id}@example.test",
@@ -51,7 +51,6 @@ test('payroll run items apply multi rate rules per timesheet instead of single r
     $client = Client::factory()->create();
 
     HrPayRateRule::query()->create([
-        'tenant_id' => 1,
         'name' => 'Default Support Rule',
         'is_active' => true,
         'priority' => 100,
@@ -65,7 +64,6 @@ test('payroll run items apply multi rate rules per timesheet instead of single r
     ]);
 
     HrPayRateRule::query()->create([
-        'tenant_id' => 1,
         'name' => 'Public Holiday Rule',
         'is_active' => true,
         'priority' => 10,
@@ -110,7 +108,7 @@ test('payroll run items apply multi rate rules per timesheet instead of single r
     ]);
 
     $service = app(PayrollExportService::class);
-    $items = $service->getRunItems(1, now()->subWeek()->startOfDay(), now()->endOfDay());
+    $items = $service->getRunItems(now()->subWeek()->startOfDay(), now()->endOfDay());
 
     expect($items)->toHaveKey($this->staff->id);
     expect((float) $items[$this->staff->id]['gross_pay'])->toBe(720.00);
@@ -136,7 +134,7 @@ test('payroll run cannot be locked when linked timesheets fail validation', func
     ]);
 
     $service = app(PayrollExportService::class);
-    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
 
     // Simulate post-run mutation that should block lock.
     $timesheet->update(['status' => 'draft']);
@@ -153,7 +151,6 @@ test('locking a run cascades linked approved timesheets to paid', function () {
     $client = Client::factory()->create();
 
     HrPayRateRule::query()->create([
-        'tenant_id' => 1,
         'name' => 'Default Support Rule',
         'is_active' => true,
         'priority' => 100,
@@ -182,7 +179,7 @@ test('locking a run cascades linked approved timesheets to paid', function () {
     ]);
 
     $service = app(PayrollExportService::class);
-    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
     $service->lockRun($run->fresh(), $this->hr->id);
 
     $timesheet->refresh();
@@ -195,7 +192,6 @@ test('paid cascade is idempotent', function () {
     $client = Client::factory()->create();
 
     HrPayRateRule::query()->create([
-        'tenant_id' => 1,
         'name' => 'Default Support Rule',
         'is_active' => true,
         'priority' => 100,
@@ -224,7 +220,7 @@ test('paid cascade is idempotent', function () {
     ]);
 
     $service = app(PayrollExportService::class);
-    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
     $service->lockRun($run->fresh(), $this->hr->id);
 
     // Re-running the cascade on an already-paid run marks nothing new and does not error.
@@ -236,7 +232,6 @@ test('timesheets outside the run period are not marked paid', function () {
     $client = Client::factory()->create();
 
     HrPayRateRule::query()->create([
-        'tenant_id' => 1,
         'name' => 'Default Support Rule',
         'is_active' => true,
         'priority' => 100,
@@ -280,7 +275,7 @@ test('timesheets outside the run period are not marked paid', function () {
     ]);
 
     $service = app(PayrollExportService::class);
-    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
     $service->lockRun($run->fresh(), $this->hr->id);
 
     $inPeriod->refresh();
@@ -296,7 +291,6 @@ test('paid cascade bypasses the workflow guard for a pre-stamped approved timesh
     $client = Client::factory()->create();
 
     HrPayRateRule::query()->create([
-        'tenant_id' => 1,
         'name' => 'Default Support Rule',
         'is_active' => true,
         'priority' => 100,
@@ -331,7 +325,7 @@ test('paid cascade bypasses the workflow guard for a pre-stamped approved timesh
     ])->saveQuietly();
 
     $service = app(PayrollExportService::class);
-    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
 
     // Must not throw despite the pre-existing payroll stamp.
     $service->lockRun($run->fresh(), $this->hr->id);
@@ -348,7 +342,6 @@ test('locking a run generates payslips so the GL journal has data to read', func
     $client = Client::factory()->create();
 
     HrPayRateRule::query()->create([
-        'tenant_id' => 1,
         'name' => 'Default Support Rule',
         'is_active' => true,
         'priority' => 100,
@@ -377,7 +370,7 @@ test('locking a run generates payslips so the GL journal has data to read', func
     ]);
 
     $service = app(PayrollExportService::class);
-    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $run = $service->createRun(now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
 
     expect($run->fresh()->payslips()->count())->toBe(0);
 

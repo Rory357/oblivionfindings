@@ -444,7 +444,7 @@ const Home: React.FC = () => {
                                     {[
                                         'Real-time view of visits, incidents and tasks',
                                         'Automated alerts for overdue actions',
-                                        'Mobile-friendly for staff on the move',
+                                        'Secure web access for staff and managers',
                                         'Instant reports for inspections and audits',
                                     ].map((item, index) => (
                                         <div

@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import axios from 'axios';
@@ -50,18 +50,30 @@ type Props = {
     can: RoadmapCan;
 };
 
-type PlanAction = 'submit-manager' | 'submit-executive' | 'approve' | 'publish' | 'revise';
+type PlanAction =
+    | 'submit-manager'
+    | 'submit-executive'
+    | 'approve'
+    | 'publish'
+    | 'revise';
 
 function availableActions(plan: PlanDetail, can: RoadmapCan): PlanAction[] {
     const actions: PlanAction[] = [];
 
-    if (plan.status === 'draft' && can.manageRoadmap) actions.push('submit-manager');
-    if (plan.status === 'manager_review' && can.manageRoadmap) actions.push('submit-executive');
-    if (['draft', 'manager_review', 'exec_review'].includes(plan.status) && can.approveRoadmap) {
+    if (plan.status === 'draft' && can.manageRoadmap)
+        actions.push('submit-manager');
+    if (plan.status === 'manager_review' && can.manageRoadmap)
+        actions.push('submit-executive');
+    if (
+        ['draft', 'manager_review', 'exec_review'].includes(plan.status) &&
+        can.approveRoadmap
+    ) {
         actions.push('approve');
     }
-    if (plan.status === 'approved' && can.approveRoadmap) actions.push('publish');
-    if (plan.status === 'published' && can.approveRoadmap) actions.push('revise');
+    if (plan.status === 'approved' && can.approveRoadmap)
+        actions.push('publish');
+    if (plan.status === 'published' && can.approveRoadmap)
+        actions.push('revise');
 
     return actions;
 }
@@ -93,14 +105,22 @@ export default function QuarterlyPlanShow({ item, can }: Props) {
             await axios.post(
                 endpoint,
                 action === 'revise'
-                    ? { change_summary: 'Revision requested from roadmap plan detail.' }
+                    ? {
+                          change_summary:
+                              'Revision requested from roadmap plan detail.',
+                      }
                     : {},
                 { headers: { Accept: 'application/json' } },
             );
             toast.success(`Plan action completed: ${actionLabel(action)}.`);
             router.reload({ preserveScroll: true });
         } catch (error) {
-            toast.error(extractErrorMessage(error, `Failed plan action: ${actionLabel(action)}.`));
+            toast.error(
+                extractErrorMessage(
+                    error,
+                    `Failed plan action: ${actionLabel(action)}.`,
+                ),
+            );
         } finally {
             setLoadingAction(null);
         }
@@ -110,8 +130,11 @@ export default function QuarterlyPlanShow({ item, can }: Props) {
 
     return (
         <AppLayout>
-            <Head title={`FY${item.fiscal_year} Q${item.quarter} Roadmap Plan`} />
-            <PageHero variant="compact"
+            <Head
+                title={`FY${item.fiscal_year} Q${item.quarter} Roadmap Plan`}
+            />
+            <PageHero
+                variant="compact"
                 title={`FY${item.fiscal_year} Q${item.quarter} Roadmap Plan`}
                 description={`Revision ${item.revision_no} ${statusLabel(item.status)} plan detail.`}
                 backHref="/roadmap/quarterly-plans"
@@ -120,9 +143,15 @@ export default function QuarterlyPlanShow({ item, can }: Props) {
                 <Card className="mb-4">
                     <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                         <div className="flex flex-wrap gap-2">
-                            <Badge variant="outline">Revision {item.revision_no}</Badge>
-                            <Badge variant="outline">{statusLabel(item.status)}</Badge>
-                            <Badge variant="outline">{statusLabel(item.preset_profile)}</Badge>
+                            <Badge variant="outline">
+                                Revision {item.revision_no}
+                            </Badge>
+                            <Badge variant="outline">
+                                {statusLabel(item.status)}
+                            </Badge>
+                            <Badge variant="outline">
+                                {statusLabel(item.preset_profile)}
+                            </Badge>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             {actions.map((action) => (
@@ -146,7 +175,9 @@ export default function QuarterlyPlanShow({ item, can }: Props) {
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <Table data-testid="quarterly-plan-detail-table">
-                                <caption className="sr-only">Roadmap quarterly plan items</caption>
+                                <caption className="sr-only">
+                                    Roadmap quarterly plan items
+                                </caption>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Rank</TableHead>
@@ -160,26 +191,50 @@ export default function QuarterlyPlanShow({ item, can }: Props) {
                                 <TableBody>
                                     {item.items.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-muted-foreground">
+                                            <TableCell
+                                                colSpan={6}
+                                                className="text-muted-foreground"
+                                            >
                                                 This plan has no items yet.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                     {item.items.map((planItem) => (
                                         <TableRow key={planItem.id}>
-                                            <TableCell>{planItem.rank ?? '-'}</TableCell>
+                                            <TableCell>
+                                                {planItem.rank ?? '-'}
+                                            </TableCell>
                                             <TableCell className="max-w-[420px]">
                                                 <div className="font-medium">
-                                                    {planItem.initiative?.title ?? 'Unknown initiative'}
+                                                    {planItem.initiative
+                                                        ?.title ??
+                                                        'Unknown initiative'}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    {planItem.initiative?.code ?? `INIT-${planItem.initiative?.id ?? planItem.id}`}
+                                                    {planItem.initiative
+                                                        ?.code ??
+                                                        `INIT-${planItem.initiative?.id ?? planItem.id}`}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{statusLabel(planItem.initiative?.status)}</TableCell>
-                                            <TableCell>{planItem.score_at_snapshot ?? '-'}</TableCell>
-                                            <TableCell>{formatCurrency(planItem.planned_capex)}</TableCell>
-                                            <TableCell>{formatCurrency(planItem.planned_opex)}</TableCell>
+                                            <TableCell>
+                                                {statusLabel(
+                                                    planItem.initiative?.status,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {planItem.score_at_snapshot ??
+                                                    '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatCurrency(
+                                                    planItem.planned_capex,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {formatCurrency(
+                                                    planItem.planned_opex,
+                                                )}
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>

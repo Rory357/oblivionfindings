@@ -33,21 +33,56 @@ import {
 const ALL_SITES = 'all';
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'type', label: 'Type', blurb: 'What kind of update', icon: MessageSquarePlus },
-    { key: 'compose', label: 'Compose', blurb: 'Write your update', icon: Pencil },
-    { key: 'review', label: 'Review', blurb: 'Confirm & post', icon: ClipboardCheck },
+    {
+        key: 'type',
+        label: 'Type',
+        blurb: 'What kind of update',
+        icon: MessageSquarePlus,
+    },
+    {
+        key: 'compose',
+        label: 'Compose',
+        blurb: 'Write your update',
+        icon: Pencil,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & post',
+        icon: ClipboardCheck,
+    },
 ];
 
 type ComposeKind = 'update' | 'question' | 'win';
 
-const KIND_TILES: { key: ComposeKind; label: string; description: string; icon: IconType }[] = [
-    { key: 'update', label: 'Update', description: 'Share news with your team', icon: MessageSquarePlus },
-    { key: 'question', label: 'Question', description: 'Ask the wider team', icon: HelpCircle },
-    { key: 'win', label: 'Win', description: 'Celebrate a team win', icon: Trophy },
+const KIND_TILES: {
+    key: ComposeKind;
+    label: string;
+    description: string;
+    icon: IconType;
+}[] = [
+    {
+        key: 'update',
+        label: 'Update',
+        description: 'Share news with your team',
+        icon: MessageSquarePlus,
+    },
+    {
+        key: 'question',
+        label: 'Question',
+        description: 'Ask the wider team',
+        icon: HelpCircle,
+    },
+    {
+        key: 'win',
+        label: 'Win',
+        description: 'Celebrate a team win',
+        icon: Trophy,
+    },
 ];
 
 const KIND_PLACEHOLDER: Record<ComposeKind, string> = {
-    update: "Share an update with your team…",
+    update: 'Share an update with your team…',
     question: 'What would you like to ask the team?',
     win: 'What did the team achieve? 🎉',
 };
@@ -215,7 +250,8 @@ export function ComposeWizard({
                             disabled={!stepValid(wizard.index)}
                             className={cn(
                                 'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground',
-                                !stepValid(wizard.index) && 'cursor-not-allowed opacity-50',
+                                !stepValid(wizard.index) &&
+                                    'cursor-not-allowed opacity-50',
                             )}
                         >
                             Continue
@@ -270,7 +306,9 @@ export function ComposeWizard({
                             />
                         ) : (
                             <FileDropzone
-                                onFiles={(files) => setData('attachment', files[0] ?? null)}
+                                onFiles={(files) =>
+                                    setData('attachment', files[0] ?? null)
+                                }
                                 accept="image/*"
                                 multiple={false}
                                 title="Add a photo"
@@ -279,8 +317,15 @@ export function ComposeWizard({
                         )}
                     </Field>
                     {sites.length > 0 ? (
-                        <Field label="Audience" hint="Who sees this — the whole org or a single site.">
-                            <Segmented value={audience} onChange={setAudience} options={audienceOptions} />
+                        <Field
+                            label="Audience"
+                            hint="Who sees this — the whole org or a single site."
+                        >
+                            <Segmented
+                                value={audience}
+                                onChange={setAudience}
+                                options={audienceOptions}
+                            />
                         </Field>
                     ) : null}
                 </WizardStepPane>
@@ -293,13 +338,24 @@ export function ComposeWizard({
                         title="Review & post"
                         blurb="This will appear on the community wall."
                     />
-                    <ReviewCard icon={MessageSquarePlus} title="Update" onEdit={() => wizard.goTo(1)}>
+                    <ReviewCard
+                        icon={MessageSquarePlus}
+                        title="Update"
+                        onEdit={() => wizard.goTo(1)}
+                    >
                         <ReviewRow label="Type" value={kindLabel} />
                         <ReviewRow label="Message" value={form.data.content} />
-                        <ReviewRow label="Photo" value={form.data.attachment?.name} />
+                        <ReviewRow
+                            label="Photo"
+                            value={form.data.attachment?.name}
+                        />
                         <ReviewRow
                             label="Audience"
-                            value={audienceOptions.find((o) => o.value === audience)?.label}
+                            value={
+                                audienceOptions.find(
+                                    (o) => o.value === audience,
+                                )?.label
+                            }
                         />
                     </ReviewCard>
                 </WizardStepPane>

@@ -1,12 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+import AppLayout from '@/layouts/app-layout';
+import { Head, useForm } from '@inertiajs/react';
 import { LayoutGrid, Map, MapPin, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmAction } from '../_confirm-action';
@@ -74,14 +74,16 @@ export default function SiteZones({ site, zones }: Props) {
         deleteForm.delete(`/sites/${site.id}/zones/${zone.id}`);
     };
 
-    const activeZones = zones.filter(z => z.is_active);
+    const activeZones = zones.filter((z) => z.is_active);
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Sites', href: '/sites' },
-            { title: site.name, href: `/sites/${site.id}` },
-            { title: 'Zones', href: `#` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Sites', href: '/sites' },
+                { title: site.name, href: `/sites/${site.id}` },
+                { title: 'Zones', href: `#` },
+            ]}
+        >
             <Head title={`${site.name} - Zones`} />
 
             <PageLayout
@@ -97,7 +99,7 @@ export default function SiteZones({ site, zones }: Props) {
                         ]}
                         actions={
                             <Button size="sm" onClick={() => setShowForm(true)}>
-                                <Plus className="w-4 h-4 mr-1" />
+                                <Plus className="mr-1 h-4 w-4" />
                                 Add Zone
                             </Button>
                         }
@@ -108,14 +110,22 @@ export default function SiteZones({ site, zones }: Props) {
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Card>
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{zones.length}</div>
-                            <div className="text-sm text-muted-foreground">Total Zones</div>
+                            <div className="text-2xl font-bold">
+                                {zones.length}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Total Zones
+                            </div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-status-success border-status-success/20">
+                    <Card className="border-status-success/20 bg-status-success">
                         <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-success">{activeZones.length}</div>
-                            <div className="text-sm text-muted-foreground">Active</div>
+                            <div className="text-2xl font-bold text-status-success">
+                                {activeZones.length}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Active
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -124,8 +134,16 @@ export default function SiteZones({ site, zones }: Props) {
                 {showForm && (
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>{editingZone ? 'Edit Zone' : 'Add Zone'}</CardTitle>
-                            <Button variant="ghost" size="sm" onClick={resetForm}>Cancel</Button>
+                            <CardTitle>
+                                {editingZone ? 'Edit Zone' : 'Add Zone'}
+                            </CardTitle>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={resetForm}
+                            >
+                                Cancel
+                            </Button>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={handleSubmit} className="space-y-4">
@@ -134,7 +152,12 @@ export default function SiteZones({ site, zones }: Props) {
                                         <Label>Zone Name *</Label>
                                         <Input
                                             value={form.data.name}
-                                            onChange={(e) => form.setData('name', e.target.value)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'name',
+                                                    e.target.value,
+                                                )
+                                            }
                                             placeholder="e.g., Workshop Area A"
                                             required
                                         />
@@ -143,7 +166,12 @@ export default function SiteZones({ site, zones }: Props) {
                                         <Label>Zone Type</Label>
                                         <Input
                                             value={form.data.zone_type}
-                                            onChange={(e) => form.setData('zone_type', e.target.value)}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'zone_type',
+                                                    e.target.value,
+                                                )
+                                            }
                                             placeholder="e.g., Workshop, Café, Storage"
                                         />
                                     </div>
@@ -152,12 +180,20 @@ export default function SiteZones({ site, zones }: Props) {
                                     <Label>Description</Label>
                                     <Textarea
                                         value={form.data.description}
-                                        onChange={(e) => form.setData('description', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'description',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Description of the zone, equipment, or purpose"
                                         rows={3}
                                     />
                                 </div>
-                                <Button type="submit" disabled={form.processing}>
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                >
                                     {editingZone ? 'Save Changes' : 'Add Zone'}
                                 </Button>
                             </form>
@@ -168,34 +204,52 @@ export default function SiteZones({ site, zones }: Props) {
                 {/* Zones Grid */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Zones ({activeZones.length})</CardTitle>
+                        <CardTitle className="text-base">
+                            Zones ({activeZones.length})
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {activeZones.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">
-                                <LayoutGrid className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                            <div className="py-8 text-center text-muted-foreground">
+                                <LayoutGrid className="mx-auto mb-3 h-12 w-12 opacity-50" />
                                 <p>No zones configured yet</p>
                             </div>
                         ) : (
                             <div className="grid gap-3 sm:grid-cols-2">
-                                {activeZones.map(zone => (
-                                    <Card key={zone.id} className="hover:bg-muted/50 transition-colors">
+                                {activeZones.map((zone) => (
+                                    <Card
+                                        key={zone.id}
+                                        className="transition-colors hover:bg-muted/50"
+                                    >
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between">
                                                 <div className="flex-1">
-                                                    <div className="font-medium">{zone.name}</div>
+                                                    <div className="font-medium">
+                                                        {zone.name}
+                                                    </div>
                                                     {zone.zone_type && (
-                                                        <Badge variant="outline" className="mt-2">
-                                                            <MapPin className="w-3 h-3 mr-1" />
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="mt-2"
+                                                        >
+                                                            <MapPin className="mr-1 h-3 w-3" />
                                                             {zone.zone_type}
                                                         </Badge>
                                                     )}
                                                     {zone.description && (
-                                                        <div className="text-sm text-muted-foreground mt-2">{zone.description}</div>
+                                                        <div className="mt-2 text-sm text-muted-foreground">
+                                                            {zone.description}
+                                                        </div>
                                                     )}
                                                 </div>
-                                                <div className="flex gap-1 ml-2">
-                                                    <Button variant="ghost" size="sm" onClick={() => startEdit(zone)}>
+                                                <div className="ml-2 flex gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            startEdit(zone)
+                                                        }
+                                                    >
                                                         Edit
                                                     </Button>
                                                     <ConfirmAction
@@ -203,16 +257,20 @@ export default function SiteZones({ site, zones }: Props) {
                                                         description={`Deactivate "${zone.name}" for this site?`}
                                                         confirmLabel="Deactivate"
                                                         onConfirm={() =>
-                                                            handleDeactivate(zone)
+                                                            handleDeactivate(
+                                                                zone,
+                                                            )
                                                         }
                                                     >
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="text-status-critical hover:text-status-critical hover:bg-status-critical"
-                                                            disabled={deleteForm.processing}
+                                                            className="text-status-critical hover:bg-status-critical hover:text-status-critical"
+                                                            disabled={
+                                                                deleteForm.processing
+                                                            }
                                                         >
-                                                            <Trash2 className="w-4 h-4" />
+                                                            <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     </ConfirmAction>
                                                 </div>

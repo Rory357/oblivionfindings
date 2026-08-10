@@ -9,7 +9,11 @@ interface PageContentProps {
     className?: string;
 }
 
-export function PageContent({ children, width = 'full', className }: PageContentProps) {
+export function PageContent({
+    children,
+    width = 'full',
+    className,
+}: PageContentProps) {
     return (
         <div
             className={cn(

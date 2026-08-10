@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCustomFieldDefinition;
 use App\Domain\Hr\Models\HrCustomFieldValue;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Controllers\Controller;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -14,7 +14,7 @@ use Inertia\Inertia;
 
 class CustomFieldController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
 
     /**
      * List all custom field definitions.
@@ -24,7 +24,7 @@ class CustomFieldController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
 
-        $definitions = HrCustomFieldDefinition::forTenant($this->resolveHrTenantIdForUser($user))
+        $definitions = HrCustomFieldDefinition::query()
             ->ordered()
             ->with('creator:id,name')
             ->get();
@@ -54,16 +54,16 @@ class CustomFieldController extends Controller
 
         $fieldKey = Str::slug($validated['name'], '_');
 
-        // Ensure unique field_key per tenant
+        // Field keys identify one application-wide profile schema. The global
+        // database constraint remains the race-safe final authority.
         $suffix = 0;
         $baseKey = $fieldKey;
-        while (HrCustomFieldDefinition::forTenant($this->resolveHrTenantIdForUser($user))->where('field_key', $fieldKey)->exists()) {
+        while (HrCustomFieldDefinition::query()->where('field_key', $fieldKey)->exists()) {
             $suffix++;
-            $fieldKey = $baseKey . '_' . $suffix;
+            $fieldKey = $baseKey.'_'.$suffix;
         }
 
         HrCustomFieldDefinition::create([
-            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'name' => $validated['name'],
             'field_key' => $fieldKey,
             'field_type' => $validated['field_type'],
@@ -85,7 +85,6 @@ class CustomFieldController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $definition->tenant_id);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -110,7 +109,6 @@ class CustomFieldController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.settings.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $definition->tenant_id);
 
         $definition->delete(); // cascadeOnDelete handles values
 
@@ -125,9 +123,11 @@ class CustomFieldController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
+        $profile = $this->siteAccess
+            ->applyHistoricalStaffProfileScope(HrEmployeeProfile::withTrashed(), $user)
+            ->findOrFail($profile->getKey());
 
-        $definitions = HrCustomFieldDefinition::forTenant($this->resolveHrTenantIdForUser($user))
+        $definitions = HrCustomFieldDefinition::query()
             ->active()
             ->ordered()
             ->get();
@@ -152,11 +152,19 @@ class CustomFieldController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $profile->tenant_id);
+        $profile = $this->siteAccess
+            ->applyCurrentStaffProfileScope(HrEmployeeProfile::query(), $user)
+            ->findOrFail($profile->getKey());
 
         $validated = $request->validate([
             'fields' => ['required', 'array'],
-            'fields.*.definition_id' => ['required', 'integer', 'exists:hr_custom_field_definitions,id'],
+            'fields.*.definition_id' => [
+                'required',
+                'integer',
+                'distinct',
+                Rule::exists('hr_custom_field_definitions', 'id')
+                    ->where(fn ($query) => $query->where('is_active', true)),
+            ],
             'fields.*.value' => ['nullable', 'string'],
         ]);
 

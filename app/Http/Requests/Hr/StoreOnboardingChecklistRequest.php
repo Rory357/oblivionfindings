@@ -38,7 +38,6 @@ class StoreOnboardingChecklistRequest extends FormRequest
                 Rule::requiredIf(! $isNew),
                 'nullable',
                 'integer',
-                'exists:hr_employee_profiles,id',
             ],
 
             // New-hire branch (shared with Add Employee)
@@ -47,18 +46,17 @@ class StoreOnboardingChecklistRequest extends FormRequest
             'position_title' => ['nullable', 'string', 'max:255'],
             'role' => ['nullable', 'string', 'max:100'],
             'employment_type' => ['nullable', 'string', 'max:50'],
-            'primary_site_id' => ['nullable', 'integer', 'exists:sites,id'],
-            'manager_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'primary_site_id' => [Rule::requiredIf($isNew), 'nullable', 'integer'],
+            'manager_user_id' => ['nullable', 'integer'],
             'start_date' => ['nullable', 'date'],
 
             // Checklist options (both branches)
-            'template_id' => ['nullable', 'integer', 'exists:hr_onboarding_templates,id'],
+            'template_id' => ['nullable', 'integer'],
             'assign_compliance' => ['sometimes', 'boolean'],
             'send_welcome_email' => ['sometimes', 'boolean'],
             'welcome_email_id' => [
                 'nullable',
                 'integer',
-                'exists:hr_onboarding_emails,id',
                 'required_if:send_welcome_email,true',
             ],
         ];

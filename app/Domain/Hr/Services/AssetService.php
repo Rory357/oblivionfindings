@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Notifications\AssetAssignedNotification;
 use App\Models\Asset;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,20 +19,58 @@ use Illuminate\Support\Str;
 class AssetService
 {
     /**
+     * Fail closed whenever a caller attempts to mutate a record whose lifecycle
+     * belongs to a canonical source module.
+     */
+    public function assertHrLifecycleOwned(HrAsset $asset): void
+    {
+        if ($asset->isFleetLinked()) {
+            throw new \LogicException(
+                "Asset '{$asset->asset_tag}' is owned by Fleet & Assets. Manage its lifecycle in the canonical Asset record."
+            );
+        }
+
+        if ($asset->isLegacyTechnology()) {
+            throw new \LogicException(
+                "Historical technology record '{$asset->asset_tag}' is read-only until it is reconciled to Security & Devices."
+            );
+        }
+
+        if (! $asset->isHrLifecycleOwned()) {
+            throw new \LogicException(
+                "Historical asset record '{$asset->asset_tag}' is read-only until it is reconciled to its canonical register."
+            );
+        }
+    }
+
+    /**
      * Assign an asset to an employee, optionally capturing a return-by date and an
      * in-app acknowledgement (e-signature) at the point of handover.
      */
     public function assignAsset(HrAsset $asset, HrEmployeeProfile $profile, array $data): HrAssetAssignment
     {
-        if ($asset->status !== 'available') {
-            throw new \LogicException("Asset '{$asset->asset_tag}' is not available for assignment (current status: {$asset->status}).");
-        }
-
         $assignment = DB::transaction(function () use ($asset, $profile, $data) {
+            $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $lockedProfile = HrEmployeeProfile::query()->lockForUpdate()->findOrFail($profile->getKey());
+
+            $this->assertHrLifecycleOwned($lockedAsset);
+
+            if ($lockedAsset->status !== 'available') {
+                throw new \LogicException("Asset '{$lockedAsset->asset_tag}' is not available for assignment (current status: {$lockedAsset->status}).");
+            }
+
+            $activeAssignment = HrAssetAssignment::query()
+                ->where('asset_id', $lockedAsset->id)
+                ->whereNull('returned_at')
+                ->lockForUpdate()
+                ->first(['id']);
+            if ($activeAssignment !== null) {
+                throw new \LogicException("Asset '{$lockedAsset->asset_tag}' already has an active assignment.");
+            }
+
             $assignment = HrAssetAssignment::create([
-                'tenant_id' => $asset->tenant_id,
-                'asset_id' => $asset->id,
-                'employee_profile_id' => $profile->id,
+                'asset_id' => $lockedAsset->id,
+                'employee_profile_id' => $lockedProfile->id,
                 'assigned_at' => $data['assigned_at'] ?? now(),
                 'due_at' => $data['due_at'] ?? null,
                 'acknowledged_at' => $data['acknowledged_at'] ?? null,
@@ -42,7 +81,7 @@ class AssetService
                 'notes' => $data['notes'] ?? null,
             ]);
 
-            $asset->update(['status' => 'assigned']);
+            $lockedAsset->update(['status' => 'assigned']);
 
             return $assignment;
         });
@@ -63,7 +102,6 @@ class AssetService
         }
 
         $checklist = HrOffboardingChecklist::query()
-            ->where('tenant_id', $asset->tenant_id)
             ->where('employee_profile_id', $profile->id)
             ->whereIn('status', ['pending', 'in_progress'])
             ->latest('id')
@@ -85,22 +123,31 @@ class AssetService
      */
     public function returnAsset(HrAssetAssignment $assignment, array $data): HrAssetAssignment
     {
-        if ($assignment->returned_at !== null) {
-            throw new \LogicException('This asset assignment has already been returned.');
-        }
-
         return DB::transaction(function () use ($assignment, $data) {
-            $assignment->update([
+            $lockedAssignment = HrAssetAssignment::query()
+                ->lockForUpdate()
+                ->findOrFail($assignment->getKey());
+            $lockedAsset = HrAsset::query()
+                ->lockForUpdate()
+                ->findOrFail($lockedAssignment->asset_id);
+
+            $this->assertHrLifecycleOwned($lockedAsset);
+
+            if ($lockedAssignment->returned_at !== null) {
+                throw new \LogicException('This asset assignment has already been returned.');
+            }
+
+            $lockedAssignment->update([
                 'returned_at' => $data['returned_at'] ?? now(),
                 'condition_on_return' => $data['condition_on_return'] ?? null,
-                'notes' => $data['notes'] ?? $assignment->notes,
+                'notes' => $data['notes'] ?? $lockedAssignment->notes,
             ]);
 
             // A damaged/lost return routes onward to a repair log or retirement; the
             // caller decides. Default returns the asset to the available pool.
-            $assignment->asset->update(['status' => $data['next_status'] ?? 'available']);
+            $lockedAsset->update(['status' => $data['next_status'] ?? 'available']);
 
-            return $assignment->fresh();
+            return $lockedAssignment->fresh();
         });
     }
 
@@ -110,14 +157,24 @@ class AssetService
      */
     public function logMaintenance(HrAsset $asset, array $data): HrAssetMaintenanceLog
     {
-        if (! in_array($asset->status, ['available', 'maintenance'], true)) {
-            throw new \LogicException("Only an available asset can be sent for repair (current status: {$asset->status}). Return it from the employee first.");
-        }
-
         return DB::transaction(function () use ($asset, $data) {
+            $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
+            if (! in_array($lockedAsset->status, ['available', 'maintenance'], true)) {
+                throw new \LogicException("Only an available asset can be sent for repair (current status: {$lockedAsset->status}). Return it from the employee first.");
+            }
+
+            $openLog = HrAssetMaintenanceLog::query()
+                ->where('asset_id', $lockedAsset->id)
+                ->whereNull('completed_at')
+                ->lockForUpdate()
+                ->first(['id']);
+            if ($openLog !== null) {
+                throw new \LogicException("Asset '{$lockedAsset->asset_tag}' already has an open maintenance record.");
+            }
+
             $log = HrAssetMaintenanceLog::create([
-                'tenant_id' => $asset->tenant_id,
-                'asset_id' => $asset->id,
+                'asset_id' => $lockedAsset->id,
                 'type' => $data['type'] ?? 'repair',
                 'vendor' => $data['vendor'] ?? null,
                 'cost' => $data['cost'] ?? null,
@@ -129,7 +186,7 @@ class AssetService
                 'attachments' => $data['attachments'] ?? null,
             ]);
 
-            $asset->update(['status' => 'maintenance']);
+            $lockedAsset->update(['status' => 'maintenance']);
 
             return $log;
         });
@@ -140,12 +197,19 @@ class AssetService
      */
     public function returnToService(HrAsset $asset, array $data = []): HrAsset
     {
-        if ($asset->status !== 'maintenance') {
-            throw new \LogicException("Only an asset in maintenance can be returned to service (current status: {$asset->status}).");
-        }
-
         return DB::transaction(function () use ($asset, $data) {
-            $log = $asset->openMaintenanceLog()->first();
+            $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
+            if ($lockedAsset->status !== 'maintenance') {
+                throw new \LogicException("Only an asset in maintenance can be returned to service (current status: {$lockedAsset->status}).");
+            }
+
+            $log = HrAssetMaintenanceLog::query()
+                ->where('asset_id', $lockedAsset->id)
+                ->whereNull('completed_at')
+                ->latest('created_at')
+                ->lockForUpdate()
+                ->first();
             if ($log) {
                 $log->update([
                     'completed_at' => $data['completed_at'] ?? now()->toDateString(),
@@ -156,12 +220,12 @@ class AssetService
                 ]);
             }
 
-            $asset->update([
+            $lockedAsset->update([
                 'status' => 'available',
-                'condition' => $data['condition'] ?? $asset->condition,
+                'condition' => $data['condition'] ?? $lockedAsset->condition,
             ]);
 
-            return $asset->fresh();
+            return $lockedAsset->fresh();
         });
     }
 
@@ -171,17 +235,21 @@ class AssetService
      */
     public function sendToMaintenance(HrAsset $asset, array $data = []): HrAsset
     {
-        if ($asset->status !== 'available') {
-            throw new \LogicException("Only an available asset can be sent to maintenance (current status: {$asset->status}).");
-        }
+        return DB::transaction(function () use ($asset, $data): HrAsset {
+            $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
+            if ($lockedAsset->status !== 'available') {
+                throw new \LogicException("Only an available asset can be sent to maintenance (current status: {$lockedAsset->status}).");
+            }
 
-        $attrs = ['status' => 'maintenance'];
-        if (! empty($data['notes'])) {
-            $attrs['notes'] = $data['notes'];
-        }
-        $asset->update($attrs);
+            $attrs = ['status' => 'maintenance'];
+            if (! empty($data['notes'])) {
+                $attrs['notes'] = $data['notes'];
+            }
+            $lockedAsset->update($attrs);
 
-        return $asset->fresh();
+            return $lockedAsset->fresh();
+        });
     }
 
     /**
@@ -190,17 +258,21 @@ class AssetService
      */
     public function returnFromMaintenance(HrAsset $asset, array $data = []): HrAsset
     {
-        if ($asset->status !== 'maintenance') {
-            throw new \LogicException("Only an asset in maintenance can be returned to service (current status: {$asset->status}).");
-        }
+        return DB::transaction(function () use ($asset, $data): HrAsset {
+            $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
+            if ($lockedAsset->status !== 'maintenance') {
+                throw new \LogicException("Only an asset in maintenance can be returned to service (current status: {$lockedAsset->status}).");
+            }
 
-        $attrs = ['status' => 'available'];
-        if (! empty($data['notes'])) {
-            $attrs['notes'] = $data['notes'];
-        }
-        $asset->update($attrs);
+            $attrs = ['status' => 'available'];
+            if (! empty($data['notes'])) {
+                $attrs['notes'] = $data['notes'];
+            }
+            $lockedAsset->update($attrs);
 
-        return $asset->fresh();
+            return $lockedAsset->fresh();
+        });
     }
 
     /**
@@ -209,22 +281,35 @@ class AssetService
      */
     public function retireAsset(HrAsset $asset, array $data = []): HrAsset
     {
-        if (! in_array($asset->status, ['available', 'maintenance'], true)) {
-            throw new \LogicException("Cannot retire a '{$asset->status}' asset. Return it from assignment first.");
-        }
+        return DB::transaction(function () use ($asset, $data): HrAsset {
+            $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            $this->assertHrLifecycleOwned($lockedAsset);
+            if (! in_array($lockedAsset->status, ['available', 'maintenance'], true)) {
+                throw new \LogicException("Cannot retire a '{$lockedAsset->status}' asset. Return it from assignment first.");
+            }
 
-        $attrs = [
-            'status' => 'retired',
-            'disposal_reason' => $data['disposal_reason'] ?? null,
-            'disposed_at' => $data['disposed_at'] ?? now()->toDateString(),
-            'disposal_value' => $data['disposal_value'] ?? null,
-        ];
-        if (! empty($data['notes'])) {
-            $attrs['notes'] = $data['notes'];
-        }
-        $asset->update($attrs);
+            $activeAssignment = HrAssetAssignment::query()
+                ->where('asset_id', $lockedAsset->id)
+                ->whereNull('returned_at')
+                ->lockForUpdate()
+                ->first(['id']);
+            if ($activeAssignment !== null) {
+                throw new \LogicException('Cannot retire an asset with an active assignment. Return it first.');
+            }
 
-        return $asset->fresh();
+            $attrs = [
+                'status' => 'retired',
+                'disposal_reason' => $data['disposal_reason'] ?? null,
+                'disposed_at' => $data['disposed_at'] ?? now()->toDateString(),
+                'disposal_value' => $data['disposal_value'] ?? null,
+            ];
+            if (! empty($data['notes'])) {
+                $attrs['notes'] = $data['notes'];
+            }
+            $lockedAsset->update($attrs);
+
+            return $lockedAsset->fresh();
+        });
     }
 
     /**
@@ -232,11 +317,19 @@ class AssetService
      */
     public function ensureQrToken(HrAsset $asset): string
     {
-        if (! $asset->qr_token) {
-            $asset->update(['qr_token' => (string) Str::uuid()]);
+        if ($asset->qr_token) {
+            return $asset->qr_token;
         }
 
-        return $asset->qr_token;
+        return DB::transaction(function () use ($asset): string {
+            $lockedAsset = HrAsset::query()->lockForUpdate()->findOrFail($asset->getKey());
+            if (! $lockedAsset->qr_token) {
+                $this->assertHrLifecycleOwned($lockedAsset);
+                $lockedAsset->update(['qr_token' => (string) Str::uuid()]);
+            }
+
+            return (string) $lockedAsset->qr_token;
+        });
     }
 
     /**
@@ -251,30 +344,18 @@ class AssetService
     }
 
     /**
-     * Get all available assets for a tenant.
-     */
-    public function getAvailableAssets(?int $tenantId): Collection
-    {
-        return HrAsset::forTenant($tenantId)
-            ->available()
-            ->orderBy('category')
-            ->orderBy('name')
-            ->get();
-    }
-
-    /**
-     * Tenant-wide aggregates for the hero band + overview tab. Counts the whole
-     * register, never the current page — fixes the page-only count bug.
+     * Access-scoped aggregates for the hero band + overview tab. Counts the
+     * complete visible register, never only the current page.
      *
      * @return array<string,mixed>
      */
-    public function aggregates(?int $tenantId): array
+    public function aggregates(Builder $visibleAssets): array
     {
         $now = CarbonImmutable::now()->startOfDay();
         $in30 = $now->addDays(30);
         $in90 = $now->addDays(90);
 
-        $base = HrAsset::forTenant($tenantId);
+        $base = clone $visibleAssets;
 
         $byStatus = (clone $base)
             ->selectRaw('status, count(*) as c')
@@ -308,13 +389,17 @@ class AssetService
             ->whereBetween('warranty_expiry', [$now, $in90])
             ->count();
 
-        $overdue = (int) HrAssetAssignment::forTenant($tenantId)
+        $visibleAssetIds = (clone $visibleAssets)->select('hr_assets.id');
+
+        $overdue = (int) HrAssetAssignment::query()
+            ->whereIn('asset_id', clone $visibleAssetIds)
             ->whereNull('returned_at')
             ->whereNotNull('due_at')
             ->where('due_at', '<', $now)
             ->count();
 
-        $leavers = (int) HrAssetAssignment::forTenant($tenantId)
+        $leavers = (int) HrAssetAssignment::query()
+            ->whereIn('asset_id', clone $visibleAssetIds)
             ->whereNull('returned_at')
             ->whereHas('employeeProfile', fn ($q) => $q->where('is_active', false))
             ->count();
@@ -356,11 +441,12 @@ class AssetService
      *
      * @return array<int,array<string,mixed>>
      */
-    public function searchFleetAssets(string $query, int $limit = 20): array
+    public function searchFleetAssets(string $query, array $allowedAssetIds, int $limit = 20): array
     {
         $q = trim($query);
 
         return Asset::query()
+            ->whereKey($allowedAssetIds)
             ->whereIn('category', ['vehicle', 'key'])
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($w) use ($q) {
@@ -389,13 +475,12 @@ class AssetService
     private const WARRANTY_THRESHOLDS = [30, 14, 7];
 
     /**
-     * Build the full list of "attention" alerts across a tenant (or all tenants
-     * when null) for the daily reminder job: warranties hitting a threshold,
-     * overdue returns, overdue repairs and leaver-held assets.
+     * Build the full application reminder list. Site provenance is carried on
+     * each alert so delivery can be authorised per recipient.
      *
      * @return array<int,array<string,mixed>>
      */
-    public function dueAlerts(?int $tenantId): array
+    public function dueAlerts(): array
     {
         $today = CarbonImmutable::now()->startOfDay();
         $alerts = [];
@@ -405,15 +490,17 @@ class AssetService
             ->mapWithKeys(fn ($d) => [$today->addDays($d)->toDateString() => $d]);
 
         HrAsset::query()
-            ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
             ->whereNotNull('warranty_expiry')
             ->where('status', '!=', 'retired')
             ->whereIn('warranty_expiry', $warrantyDates->keys()->all())
-            ->get(['id', 'tenant_id', 'name', 'asset_tag', 'warranty_expiry'])
+            ->with(['assignments' => fn ($query) => $query
+                ->whereNull('returned_at')
+                ->with('employeeProfile:id,primary_site_id,secondary_site_ids')])
+            ->get(['id', 'name', 'asset_tag', 'warranty_expiry'])
             ->each(function (HrAsset $a) use (&$alerts, $warrantyDates) {
                 $days = $warrantyDates[$a->warranty_expiry->toDateString()] ?? null;
                 $alerts[] = [
-                    'tenant_id' => $a->tenant_id,
+                    'site_ids' => $this->siteIdsForAssignments($a->assignments),
                     'kind' => 'warranty',
                     'asset_id' => $a->id,
                     'title' => 'Warranty expiring',
@@ -426,13 +513,16 @@ class AssetService
 
         // Overdue returns + leaver-held (active assignments).
         HrAssetAssignment::query()
-            ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
             ->whereNull('returned_at')
             ->where(function ($q) use ($today) {
                 $q->where('due_at', '<', $today)
                     ->orWhereHas('employeeProfile', fn ($p) => $p->where('is_active', false));
             })
-            ->with(['asset:id,name,asset_tag', 'employeeProfile.user:id,name', 'employeeProfile:id,user_id,is_active'])
+            ->with([
+                'asset:id,name,asset_tag',
+                'employeeProfile.user:id,name',
+                'employeeProfile:id,user_id,is_active,primary_site_id,secondary_site_ids',
+            ])
             ->get()
             ->each(function (HrAssetAssignment $asg) use (&$alerts, $today) {
                 if (! $asg->asset) {
@@ -444,7 +534,7 @@ class AssetService
 
                 if ($isLeaver) {
                     $alerts[] = [
-                        'tenant_id' => $asg->tenant_id,
+                        'site_ids' => $this->siteIdsForProfile($asg->employeeProfile),
                         'kind' => 'leaver',
                         'asset_id' => $asg->asset_id,
                         'title' => 'Recover asset from leaver',
@@ -456,7 +546,7 @@ class AssetService
                 } elseif ($isOverdue) {
                     $overdueDays = (int) abs($today->diffInDays($asg->due_at));
                     $alerts[] = [
-                        'tenant_id' => $asg->tenant_id,
+                        'site_ids' => $this->siteIdsForProfile($asg->employeeProfile),
                         'kind' => 'overdue',
                         'asset_id' => $asg->asset_id,
                         'title' => 'Asset return overdue',
@@ -470,7 +560,6 @@ class AssetService
 
         // Overdue repairs (open maintenance logs past expected-back date).
         HrAssetMaintenanceLog::query()
-            ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
             ->whereNull('completed_at')
             ->whereNotNull('expected_back_at')
             ->whereDate('expected_back_at', '<', $today->toDateString())
@@ -481,7 +570,7 @@ class AssetService
                     return;
                 }
                 $alerts[] = [
-                    'tenant_id' => $log->tenant_id,
+                    'site_ids' => [],
                     'kind' => 'maintenance',
                     'asset_id' => $log->asset_id,
                     'title' => 'Repair overdue',
@@ -512,7 +601,7 @@ class AssetService
             ->get()
             ->filter(fn (HrAssetAssignment $asg) => $asg->asset !== null)
             ->map(fn (HrAssetAssignment $asg) => [
-                'tenant_id' => $asg->tenant_id,
+                'site_ids' => $this->siteIdsForProfile($profile),
                 'kind' => 'leaver',
                 'asset_id' => $asg->asset_id,
                 'title' => 'Recover asset from leaver',
@@ -521,6 +610,31 @@ class AssetService
                 'dedupe_key' => "leaver:{$asg->asset_id}",
                 'scope' => 'daily',
             ])
+            ->values()
+            ->all();
+    }
+
+    /** @param Collection<int, HrAssetAssignment> $assignments @return list<int> */
+    private function siteIdsForAssignments(Collection $assignments): array
+    {
+        return $assignments
+            ->flatMap(fn (HrAssetAssignment $assignment): array => $this->siteIdsForProfile($assignment->employeeProfile))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** @return list<int> */
+    private function siteIdsForProfile(?HrEmployeeProfile $profile): array
+    {
+        if (! $profile) {
+            return [];
+        }
+
+        return collect([$profile->primary_site_id, ...($profile->secondary_site_ids ?? [])])
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
             ->values()
             ->all();
     }

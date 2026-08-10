@@ -1,160 +1,247 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { HandCoins, ArrowLeft } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { PageProps } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { ArrowLeft, HandCoins } from 'lucide-react';
 
 interface Approval {
-  id: number;
-  reference: string;
-  title: string;
-  description: string | null;
-  category: string;
-  amount: number;
-  currency: string;
-  status: string;
-  valid_until: string | null;
+    id: number;
+    reference: string;
+    title: string;
+    description: string | null;
+    category: string;
+    amount: number;
+    currency: string;
+    status: string;
+    valid_until: string | null;
 }
 
 interface Props extends PageProps {
-  approval: Approval;
-  categories: Record<string, string>;
-  thresholds: Record<string, number>;
+    approval: Approval;
+    categories: Record<string, string>;
+    thresholds: Record<string, number>;
 }
 
-export default function EditSpendApproval({ auth, approval, categories, thresholds }: Props) {
-  const form = useForm({
-    title: approval.title,
-    description: approval.description ?? '',
-    category: approval.category,
-    amount: String(approval.amount),
-    currency: approval.currency,
-    valid_until: approval.valid_until ?? '',
-  });
+export default function EditSpendApproval({
+    auth,
+    approval,
+    categories,
+    thresholds,
+}: Props) {
+    const form = useForm({
+        title: approval.title,
+        description: approval.description ?? '',
+        category: approval.category,
+        amount: String(approval.amount),
+        currency: approval.currency,
+        valid_until: approval.valid_until ?? '',
+    });
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    form.put(`/governance/spend-approvals/${approval.id}`);
-  };
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.put(`/governance/spend-approvals/${approval.id}`);
+    };
 
-  const numericAmount = Number(form.data.amount) || 0;
-  const threshold = thresholds[form.data.category as keyof typeof thresholds] ?? 0;
-  const requiresBoard = numericAmount >= threshold;
+    const numericAmount = Number(form.data.amount) || 0;
+    const threshold =
+        thresholds[form.data.category as keyof typeof thresholds] ?? 0;
+    const requiresBoard = numericAmount >= threshold;
 
-  return (
-    <AppLayout
-      user={auth.user}
-      breadcrumbs={[
-        { title: 'Governance', href: '/governance/dashboard' },
-        { title: 'Spend Approvals', href: '/governance/spend-approvals' },
-        { title: approval.reference, href: `/governance/spend-approvals/${approval.id}` },
-        { title: 'Edit', href: `/governance/spend-approvals/${approval.id}/edit` },
-      ]}
-    >
-      <Head title={`Edit Spend Approval — ${approval.reference}`} />
+    return (
+        <AppLayout
+            user={auth.user}
+            breadcrumbs={[
+                { title: 'Governance', href: '/governance/dashboard' },
+                {
+                    title: 'Spend Approvals',
+                    href: '/governance/spend-approvals',
+                },
+                {
+                    title: approval.reference,
+                    href: `/governance/spend-approvals/${approval.id}`,
+                },
+                {
+                    title: 'Edit',
+                    href: `/governance/spend-approvals/${approval.id}/edit`,
+                },
+            ]}
+        >
+            <Head title={`Edit Spend Approval — ${approval.reference}`} />
 
-      <PageLayout
-        hero={
-          <PageHero
-            icon={HandCoins}
-            category="governance"
-            title={`Edit ${approval.reference}`}
-            description="Update the draft. You can only edit while the request is in draft state."
-            actions={
-              <Button asChild variant="outline">
-                <Link href={`/governance/spend-approvals/${approval.id}`}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                </Link>
-              </Button>
-            }
-          />
-        }
-      >
-        <form onSubmit={submit}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Request details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div>
-                  <Label htmlFor="title">Title</Label>
-                  <Input id="title" value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} required />
-                  {form.errors.title && <p className="mt-1 text-xs text-status-critical">{form.errors.title}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="category">Category</Label>
-                  <Select value={form.data.category} onValueChange={(v) => form.setData('category', v)}>
-                    <SelectTrigger id="category"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(categories).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={HandCoins}
+                        category="governance"
+                        title={`Edit ${approval.reference}`}
+                        description="Update the draft. You can only edit while the request is in draft state."
+                        actions={
+                            <Button asChild variant="outline">
+                                <Link
+                                    href={`/governance/spend-approvals/${approval.id}`}
+                                >
+                                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
+                <form onSubmit={submit}>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Request details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-4 lg:grid-cols-2">
+                                <div>
+                                    <Label htmlFor="title">Title</Label>
+                                    <Input
+                                        id="title"
+                                        value={form.data.title}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'title',
+                                                e.target.value,
+                                            )
+                                        }
+                                        required
+                                    />
+                                    {form.errors.title && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.title}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label htmlFor="category">Category</Label>
+                                    <Select
+                                        value={form.data.category}
+                                        onValueChange={(v) =>
+                                            form.setData('category', v)
+                                        }
+                                    >
+                                        <SelectTrigger id="category">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(categories).map(
+                                                ([value, label]) => (
+                                                    <SelectItem
+                                                        key={value}
+                                                        value={value}
+                                                    >
+                                                        {label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div>
-                  <Label htmlFor="amount">Amount (NZD)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.data.amount}
-                    onChange={(e) => form.setData('amount', e.target.value)}
-                    required
-                  />
-                  {form.errors.amount && <p className="mt-1 text-xs text-status-critical">{form.errors.amount}</p>}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Threshold for this category:{' '}
-                    {new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(threshold)}
-                  </p>
-                  {requiresBoard && numericAmount > 0 && (
-                    <p className="mt-1 text-xs font-medium text-status-warning">
-                      ⚠ This amount exceeds the threshold and will require a board resolution.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="valid_until">Valid until (optional)</Label>
-                  <Input
-                    id="valid_until"
-                    type="date"
-                    value={form.data.valid_until}
-                    onChange={(e) => form.setData('valid_until', e.target.value)}
-                  />
-                </div>
-              </div>
+                            <div className="grid gap-4 lg:grid-cols-2">
+                                <div>
+                                    <Label htmlFor="amount">Amount (NZD)</Label>
+                                    <Input
+                                        id="amount"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={form.data.amount}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'amount',
+                                                e.target.value,
+                                            )
+                                        }
+                                        required
+                                    />
+                                    {form.errors.amount && (
+                                        <p className="mt-1 text-xs text-status-critical">
+                                            {form.errors.amount}
+                                        </p>
+                                    )}
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Threshold for this category:{' '}
+                                        {new Intl.NumberFormat('en-NZ', {
+                                            style: 'currency',
+                                            currency: 'NZD',
+                                        }).format(threshold)}
+                                    </p>
+                                    {requiresBoard && numericAmount > 0 && (
+                                        <p className="mt-1 text-xs font-medium text-status-warning">
+                                            ⚠ This amount exceeds the threshold
+                                            and will require a board resolution.
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label htmlFor="valid_until">
+                                        Valid until (optional)
+                                    </Label>
+                                    <Input
+                                        id="valid_until"
+                                        type="date"
+                                        value={form.data.valid_until}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'valid_until',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </div>
 
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  rows={5}
-                  value={form.data.description}
-                  onChange={(e) => form.setData('description', e.target.value)}
-                />
-              </div>
+                            <div>
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea
+                                    id="description"
+                                    rows={5}
+                                    value={form.data.description}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'description',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                            </div>
 
-              <div className="flex items-center justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => window.history.back()}>Cancel</Button>
-                <Button type="submit" disabled={form.processing}>
-                  {form.processing ? 'Saving…' : 'Save Changes'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </form>
-      </PageLayout>
-    </AppLayout>
-  );
+                            <div className="flex items-center justify-end gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => window.history.back()}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={form.processing}
+                                >
+                                    {form.processing
+                                        ? 'Saving…'
+                                        : 'Save Changes'}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </form>
+            </PageLayout>
+        </AppLayout>
+    );
 }

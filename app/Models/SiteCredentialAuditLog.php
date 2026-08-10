@@ -2,17 +2,21 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SiteCredentialAuditLog extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'credential_id',
         'tenant_id',
+        'site_id',
+        'credential_label',
+        'credential_type',
         'user_id',
         'action',
         'ip_address',
@@ -29,6 +33,11 @@ class SiteCredentialAuditLog extends Model
     public function credential(): BelongsTo
     {
         return $this->belongsTo(SiteCredential::class, 'credential_id');
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
     }
 
     public function user(): BelongsTo

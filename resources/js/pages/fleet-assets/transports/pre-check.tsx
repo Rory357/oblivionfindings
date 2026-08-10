@@ -1,11 +1,11 @@
 import PageShell from '@/components/page-shell';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, router, useForm } from '@inertiajs/react';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import { Head, router } from '@inertiajs/react';
 import {
     CheckCircle,
     Loader2,
@@ -63,35 +63,40 @@ const CHECKLIST_ITEMS: ChecklistItem[] = [
     {
         key: 'care_needs_reviewed',
         label: 'Care Needs Reviewed',
-        description: 'Confirm care needs and support requirements have been reviewed for this transport.',
+        description:
+            'Confirm care needs and support requirements have been reviewed for this transport.',
         icon: User,
         required: true,
     },
     {
         key: 'emergency_contacts_accessible',
         label: 'Emergency Contacts Accessible',
-        description: 'Emergency contact numbers are saved and accessible during the journey.',
+        description:
+            'Emergency contact numbers are saved and accessible during the journey.',
         icon: Phone,
         required: true,
     },
     {
         key: 'medication_packed',
         label: 'Medication Packed',
-        description: 'All required medications are packed for the journey duration.',
+        description:
+            'All required medications are packed for the journey duration.',
         icon: Pill,
         required: false, // conditional on medications existing
     },
     {
         key: 'vehicle_accessibility_confirmed',
         label: 'Vehicle Accessibility Confirmed',
-        description: 'Vehicle is suitable for resident mobility needs (ramp, harness, etc.).',
+        description:
+            'Vehicle is suitable for resident mobility needs (ramp, harness, etc.).',
         icon: Shield,
         required: true,
     },
     {
         key: 'seatbelt_harness_check',
         label: 'Seatbelt / Harness Check',
-        description: 'Seatbelt or harness is properly fitted and secure before departure.',
+        description:
+            'Seatbelt or harness is properly fitted and secure before departure.',
         icon: Shield,
         required: true,
     },
@@ -124,7 +129,9 @@ export default function TransportPreCheck({
 
     // Determine if all required checks are passed
     const relevantItems = CHECKLIST_ITEMS.filter(
-        (item) => item.required || (item.key === 'medication_packed' && hasMedications),
+        (item) =>
+            item.required ||
+            (item.key === 'medication_packed' && hasMedications),
     );
     const allPassed = relevantItems.every((item) => checks[item.key] === true);
 
@@ -145,7 +152,10 @@ export default function TransportPreCheck({
             breadcrumbs={[
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Transport Logs', href: '/fleet-assets/transports' },
-                { title: `Transport #${t.id ?? ''}`, href: `/fleet-assets/transports/${t.id}` },
+                {
+                    title: `Transport #${t.id ?? ''}`,
+                    href: `/fleet-assets/transports/${t.id}`,
+                },
                 { title: 'Pre-Transport Check', href: '#' },
             ]}
         >
@@ -163,9 +173,12 @@ export default function TransportPreCheck({
                         <div className="flex items-center gap-3">
                             <CheckCircle className="h-6 w-6 text-status-success" />
                             <div>
-                                <p className="font-semibold text-status-success dark:text-status-success">Pre-Check Completed</p>
+                                <p className="font-semibold text-status-success dark:text-status-success">
+                                    Pre-Check Completed
+                                </p>
                                 <p className="text-sm text-status-success dark:text-status-success">
-                                    All safety checks have been completed for this transport.
+                                    All safety checks have been completed for
+                                    this transport.
                                 </p>
                             </div>
                         </div>
@@ -183,11 +196,20 @@ export default function TransportPreCheck({
                                         <User className="h-6 w-6 text-primary dark:text-primary" />
                                     </div>
                                     <div>
-                                        <p className="text-lg font-semibold">{t.resident_name ?? '---'}</p>
+                                        <p className="text-lg font-semibold">
+                                            {t.resident_name ?? '---'}
+                                        </p>
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Badge variant="secondary" className="capitalize">{t.transport_type ?? ''}</Badge>
+                                            <Badge
+                                                variant="secondary"
+                                                className="capitalize"
+                                            >
+                                                {t.transport_type ?? ''}
+                                            </Badge>
                                             {t.asset && (
-                                                <span>Vehicle: {t.asset.name}</span>
+                                                <span>
+                                                    Vehicle: {t.asset.name}
+                                                </span>
                                             )}
                                         </div>
                                     </div>
@@ -199,7 +221,11 @@ export default function TransportPreCheck({
                         <div className="space-y-3">
                             {CHECKLIST_ITEMS.map((item) => {
                                 // Skip medication check if no medications
-                                if (item.key === 'medication_packed' && !hasMedications) return null;
+                                if (
+                                    item.key === 'medication_packed' &&
+                                    !hasMedications
+                                )
+                                    return null;
 
                                 const checked = checks[item.key];
                                 const Icon = item.icon;
@@ -209,48 +235,86 @@ export default function TransportPreCheck({
                                         key={item.key}
                                         className={cn(
                                             'border-2 transition-colors',
-                                            checked === true && 'border-status-success/30 bg-status-success-bg dark:border-status-success/30',
-                                            checked === false && 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30',
+                                            checked === true &&
+                                                'border-status-success/30 bg-status-success-bg dark:border-status-success/30',
+                                            checked === false &&
+                                                'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30',
                                             checked === null && 'border-border',
                                         )}
                                     >
                                         <CardContent className="p-4">
                                             <div className="flex items-center justify-between gap-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={cn(
-                                                        'flex h-10 w-10 items-center justify-center rounded-full',
-                                                        checked === true && 'bg-status-success-bg',
-                                                        checked === false && 'bg-status-critical-bg',
-                                                        checked === null && 'bg-muted',
-                                                    )}>
-                                                        <Icon className={cn(
-                                                            'h-5 w-5',
-                                                            checked === true && 'text-status-success',
-                                                            checked === false && 'text-status-critical',
-                                                            checked === null && 'text-muted-foreground',
-                                                        )} />
+                                                    <div
+                                                        className={cn(
+                                                            'flex h-10 w-10 items-center justify-center rounded-full',
+                                                            checked === true &&
+                                                                'bg-status-success-bg',
+                                                            checked === false &&
+                                                                'bg-status-critical-bg',
+                                                            checked === null &&
+                                                                'bg-muted',
+                                                        )}
+                                                    >
+                                                        <Icon
+                                                            className={cn(
+                                                                'h-5 w-5',
+                                                                checked ===
+                                                                    true &&
+                                                                    'text-status-success',
+                                                                checked ===
+                                                                    false &&
+                                                                    'text-status-critical',
+                                                                checked ===
+                                                                    null &&
+                                                                    'text-muted-foreground',
+                                                            )}
+                                                        />
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium">{item.label}</p>
-                                                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                                                        <p className="font-medium">
+                                                            {item.label}
+                                                        </p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {item.description}
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <div className="flex gap-2">
                                                     <Button
-                                                        variant={checked === true ? 'default' : 'outline'}
+                                                        variant={
+                                                            checked === true
+                                                                ? 'default'
+                                                                : 'outline'
+                                                        }
                                                         size="lg"
-                                                        onClick={() => toggleCheck(item.key, true)}
+                                                        onClick={() =>
+                                                            toggleCheck(
+                                                                item.key,
+                                                                true,
+                                                            )
+                                                        }
                                                         className={cn(
                                                             'h-14 w-14 p-0',
-                                                            checked === true && 'bg-status-success hover:bg-status-success',
+                                                            checked === true &&
+                                                                'bg-status-success hover:bg-status-success',
                                                         )}
                                                     >
                                                         <CheckCircle className="h-6 w-6" />
                                                     </Button>
                                                     <Button
-                                                        variant={checked === false ? 'destructive' : 'outline'}
+                                                        variant={
+                                                            checked === false
+                                                                ? 'destructive'
+                                                                : 'outline'
+                                                        }
                                                         size="lg"
-                                                        onClick={() => toggleCheck(item.key, false)}
+                                                        onClick={() =>
+                                                            toggleCheck(
+                                                                item.key,
+                                                                false,
+                                                            )
+                                                        }
                                                         className="h-14 w-14 p-0"
                                                     >
                                                         <XCircle className="h-6 w-6" />
@@ -293,14 +357,23 @@ export default function TransportPreCheck({
                             </CardHeader>
                             <CardContent>
                                 {(care_needs ?? []).length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No specific care needs recorded.</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No specific care needs recorded.
+                                    </p>
                                 ) : (
                                     <div className="space-y-2">
                                         {(care_needs ?? []).map((need) => (
-                                            <div key={need.id} className="rounded-md bg-muted/40 p-3">
-                                                <p className="text-sm font-medium">{need.label}</p>
+                                            <div
+                                                key={need.id}
+                                                className="rounded-md bg-muted/40 p-3"
+                                            >
+                                                <p className="text-sm font-medium">
+                                                    {need.label}
+                                                </p>
                                                 {need.notes && (
-                                                    <p className="mt-1 text-xs text-muted-foreground">{need.notes}</p>
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {need.notes}
+                                                    </p>
                                                 )}
                                             </div>
                                         ))}
@@ -319,17 +392,27 @@ export default function TransportPreCheck({
                             </CardHeader>
                             <CardContent>
                                 {(emergency_contacts ?? []).length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No emergency contacts on file.</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        No emergency contacts on file.
+                                    </p>
                                 ) : (
                                     <div className="space-y-2">
-                                        {(emergency_contacts ?? []).map((contact, i) => (
-                                            <div key={i} className="rounded-md bg-muted/40 p-3">
-                                                <p className="text-sm font-medium">{contact.name}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {contact.relation} &middot; {contact.phone}
-                                                </p>
-                                            </div>
-                                        ))}
+                                        {(emergency_contacts ?? []).map(
+                                            (contact, i) => (
+                                                <div
+                                                    key={i}
+                                                    className="rounded-md bg-muted/40 p-3"
+                                                >
+                                                    <p className="text-sm font-medium">
+                                                        {contact.name}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {contact.relation}{' '}
+                                                        &middot; {contact.phone}
+                                                    </p>
+                                                </div>
+                                            ),
+                                        )}
                                     </div>
                                 )}
                             </CardContent>
@@ -347,10 +430,18 @@ export default function TransportPreCheck({
                                 <CardContent>
                                     <div className="space-y-2">
                                         {(medications ?? []).map((med, i) => (
-                                            <div key={i} className="rounded-md bg-muted/40 p-3">
-                                                <p className="text-sm font-medium">{med.name}</p>
+                                            <div
+                                                key={i}
+                                                className="rounded-md bg-muted/40 p-3"
+                                            >
+                                                <p className="text-sm font-medium">
+                                                    {med.name}
+                                                </p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    {[med.dosage, med.frequency].filter(Boolean).join(' - ') || 'No details'}
+                                                    {[med.dosage, med.frequency]
+                                                        .filter(Boolean)
+                                                        .join(' - ') ||
+                                                        'No details'}
                                                 </p>
                                             </div>
                                         ))}

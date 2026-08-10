@@ -52,18 +52,23 @@ export function SlaChip({ ticket }: { ticket: SlaFields }) {
         ticket.status !== 'waiting';
     useMinuteTick(live);
 
-    if (SETTLED.includes(ticket.status) || ticket.sla_state === 'met') return null;
+    if (SETTLED.includes(ticket.status) || ticket.sla_state === 'met')
+        return null;
 
     const due = ticket.first_responded_at
         ? ticket.resolution_due_at
         : (ticket.first_response_due_at ?? ticket.resolution_due_at);
-    const clock = ticket.first_responded_at || !ticket.first_response_due_at ? 'Resolution' : 'Response';
+    const clock =
+        ticket.first_responded_at || !ticket.first_response_due_at
+            ? 'Resolution'
+            : 'Response';
     if (!due) return null; // legacy row — no targets stamped
 
     if (ticket.status === 'waiting') {
         return (
             <StatusBadge variant="neutral" size="sm">
-                <CirclePause className="mr-1 h-3 w-3" /> Clock paused — with requester
+                <CirclePause className="mr-1 h-3 w-3" /> Clock paused — with
+                requester
             </StatusBadge>
         );
     }
@@ -74,7 +79,8 @@ export function SlaChip({ ticket }: { ticket: SlaFields }) {
         return (
             <StatusBadge variant="critical" size="sm">
                 <TimerOff className="mr-1 h-3 w-3" />
-                {clock} overdue{remaining < 0 ? ` ${formatSpan(-remaining)}` : ''}
+                {clock} overdue
+                {remaining < 0 ? ` ${formatSpan(-remaining)}` : ''}
             </StatusBadge>
         );
     }
@@ -82,7 +88,9 @@ export function SlaChip({ ticket }: { ticket: SlaFields }) {
         return (
             <StatusBadge variant="warning" size="sm">
                 <Timer className="mr-1 h-3 w-3" />
-                {remaining > 0 ? `${clock} due in ${formatSpan(remaining)}` : `${clock} due now`}
+                {remaining > 0
+                    ? `${clock} due in ${formatSpan(remaining)}`
+                    : `${clock} due now`}
             </StatusBadge>
         );
     }
@@ -92,7 +100,9 @@ export function SlaChip({ ticket }: { ticket: SlaFields }) {
     return (
         <StatusBadge variant="neutral" size="sm">
             <Clock className="mr-1 h-3 w-3" />
-            {remaining > 0 ? `${clock} due in ${formatSpan(remaining)}` : 'On track'}
+            {remaining > 0
+                ? `${clock} due in ${formatSpan(remaining)}`
+                : 'On track'}
         </StatusBadge>
     );
 }

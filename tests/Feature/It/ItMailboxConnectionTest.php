@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Http;
 function itMailboxConnection(array $overrides = []): ItMailboxConnection
 {
     return ItMailboxConnection::create(array_merge([
-        'tenant_id' => 1,
         'provider' => ItMailboxConnection::PROVIDER_MICROSOFT,
         'status' => ItMailboxConnection::STATUS_CONNECTED,
         'access_token' => 'access-123',
@@ -36,7 +35,7 @@ test('needsRefresh trips inside the 5-minute expiry window and on a missing expi
     expect(itMailboxConnection()->needsRefresh())->toBeFalse(); // expires in 1h
 
     $stale = itMailboxConnection([
-        'provider' => ItMailboxConnection::PROVIDER_GOOGLE, // dodge the (tenant, provider) unique
+        'provider' => ItMailboxConnection::PROVIDER_GOOGLE, // dodge the legacy composite provider unique
         'token_expires_at' => now()->addMinutes(2),
     ]);
     expect($stale->needsRefresh())->toBeTrue();

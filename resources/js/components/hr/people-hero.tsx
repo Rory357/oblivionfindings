@@ -6,7 +6,6 @@
  * cases. Colours stay token-based (primary / status-* / --hr-amber injected as a
  * CSS var) so tenant white-label theming still propagates. Mirrors the My HR
  * hero gradient (resources/js/components/hr/my-hr-hero.tsx). */
-import { router } from '@inertiajs/react';
 import {
     Download,
     Send,
@@ -51,7 +50,8 @@ const HERO_STYLE: CSSProperties = {
     ['--hr-amber' as string]: 'oklch(0.86 0.13 90)',
     background:
         'linear-gradient(120deg, color-mix(in oklch, var(--primary) 72%, black 22%), var(--primary) 58%, color-mix(in oklch, var(--primary) 90%, white 8%))',
-    boxShadow: '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
+    boxShadow:
+        '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -134,7 +134,7 @@ export function PeopleHero({
                             <Users className="h-[26px] w-[26px]" />
                         </span>
                         <div className="min-w-0">
-                            <h1 className="text-[28px] font-bold leading-[1.05] tracking-tight">
+                            <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">
                                 People
                             </h1>
                             <p className="mt-1.5 text-[13px] font-medium text-primary-foreground/75">
@@ -146,7 +146,7 @@ export function PeopleHero({
                     </div>
 
                     {/* stats */}
-                    <div className="-ml-3 mt-[18px] flex flex-wrap gap-0.5">
+                    <div className="mt-[18px] -ml-3 flex flex-wrap gap-0.5">
                         <HeroStat
                             label="Active"
                             value={summary.active}
@@ -208,7 +208,7 @@ export function PeopleHero({
                     {/* needs attention */}
                     {needs.length > 0 ? (
                         <div className="mt-[18px] flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/50">
+                            <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/50 uppercase">
                                 Needs attention
                             </span>
                             {needs.map((chip) => (
@@ -216,7 +216,7 @@ export function PeopleHero({
                                     key={chip.key}
                                     type="button"
                                     onClick={chip.onClick}
-                                    className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/[0.13] py-1.5 pl-2.5 pr-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
+                                    className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/[0.13] py-1.5 pr-3 pl-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
                                 >
                                     <span className="h-1.5 w-1.5 flex-none rounded-full bg-[color:var(--hr-amber)] shadow-[0_0_0_3px_color-mix(in_oklch,var(--hr-amber)_32%,transparent)]" />
                                     {chip.label}
@@ -227,9 +227,9 @@ export function PeopleHero({
                 </div>
 
                 {/* ── right rail: workforce mix / compliance ── */}
-                <div className="flex w-full flex-none flex-col border-t border-primary-foreground/15 bg-black/[0.08] p-[22px_24px] sm:w-[320px] sm:border-l sm:border-t-0">
+                <div className="flex w-full flex-none flex-col border-t border-primary-foreground/15 bg-black/[0.08] p-[22px_24px] sm:w-[320px] sm:border-t-0 sm:border-l">
                     <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/55">
+                        <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/55 uppercase">
                             Workforce
                         </span>
                         <div className="inline-flex gap-0.5 rounded-lg bg-primary-foreground/[0.12] p-0.5">
@@ -247,7 +247,10 @@ export function PeopleHero({
                     </div>
 
                     {right === 'donut' ? (
-                        <MixDonut total={totalPeople} typeCounts={summary.type_counts} />
+                        <MixDonut
+                            total={totalPeople}
+                            typeCounts={summary.type_counts}
+                        />
                     ) : (
                         <ComplianceRing summary={summary} needs={needs} />
                     )}
@@ -327,7 +330,7 @@ function MixDonut({
                     ))}
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-[26px] font-extrabold leading-none tabular-nums">
+                    <span className="text-[26px] leading-none font-extrabold tabular-nums">
                         {total}
                     </span>
                     <span className="text-[10px] font-semibold text-primary-foreground/60">
@@ -348,7 +351,9 @@ function MixDonut({
                         <span className="flex-1 whitespace-nowrap">
                             {typeLabel(seg.key)}
                         </span>
-                        <span className="font-bold tabular-nums">{seg.count}</span>
+                        <span className="font-bold tabular-nums">
+                            {seg.count}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -399,7 +404,7 @@ function ComplianceRing({
                     />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-[24px] font-extrabold leading-none tabular-nums">
+                    <span className="text-[24px] leading-none font-extrabold tabular-nums">
                         {pct}%
                     </span>
                     <span className="text-[9px] font-semibold text-primary-foreground/60">
@@ -446,7 +451,7 @@ function HeroStat({
 }) {
     const inner = (
         <>
-            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+            <span className="text-[10px] font-bold tracking-[0.09em] whitespace-nowrap text-primary-foreground/60 uppercase">
                 {label}
             </span>
             <span

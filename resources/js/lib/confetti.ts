@@ -17,7 +17,8 @@ const PIECE_COLORS = [
 ];
 
 export function fireConfetti(pieces = 110): void {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    if (typeof window === 'undefined' || typeof document === 'undefined')
+        return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
     const container = document.createElement('div');

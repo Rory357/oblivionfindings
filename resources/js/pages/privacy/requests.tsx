@@ -1,13 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Shield, AlertTriangle, Clock, FileText } from 'lucide-react';
+import { AlertTriangle, Clock, FileText } from 'lucide-react';
 
 type Props = {
     filters: {
@@ -25,7 +31,11 @@ type Props = {
     };
 };
 
-export default function DataSubjectRequests({ filters, requests, stats }: Props) {
+export default function DataSubjectRequests({
+    filters,
+    requests,
+    stats,
+}: Props) {
     const ANY = '__any__';
     const STATUS_LABELS: Record<string, string> = {
         received: 'received',
@@ -40,7 +50,11 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
     const can = auth?.can?.privacy ?? {};
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/privacy/requests', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/privacy/requests',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const getStatusColor = (status: string) => {
@@ -64,13 +78,13 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
 
     const getRequestTypeLabel = (type: string) => {
         const labels: Record<string, string> = {
-            'access': 'Access · IPP 6',
-            'rectification': 'Correction · IPP 7',
-            'erasure': 'Deletion',
-            'restriction': 'Restriction of use',
-            'portability': 'Portability',
-            'objection': 'Objection',
-            'automated_decision': 'Automated decision',
+            access: 'Access · IPP 6',
+            rectification: 'Correction · IPP 7',
+            erasure: 'Deletion',
+            restriction: 'Restriction of use',
+            portability: 'Portability',
+            objection: 'Objection',
+            automated_decision: 'Automated decision',
         };
         return labels[type] || type;
     };
@@ -78,15 +92,19 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
     const getDaysRemaining = (dueDate: string) => {
         const due = new Date(dueDate);
         const today = new Date();
-        const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const diff = Math.ceil(
+            (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+        );
         return diff;
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Privacy Requests', href: '/privacy/requests' }
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Privacy', href: '/privacy/dashboard' },
+                { title: 'Privacy Requests', href: '/privacy/requests' },
+            ]}
+        >
             <Head title="Privacy Requests" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -95,19 +113,33 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                     title="Privacy Requests"
                     description="Privacy Act 2020 IPP 6/7 access and correction — 20 working-day response target"
                     icon={<FileText className="h-7 w-7 text-white" />}
-                    stats={stats ? [
-                        { label: 'Open', value: stats.open },
-                        { label: 'Overdue', value: stats.overdue },
-                        { label: 'Completed (30d)', value: stats.completed_30_days },
-                        { label: 'Pending', value: stats.pending_verification },
-                    ] : undefined}
+                    stats={
+                        stats
+                            ? [
+                                  { label: 'Open', value: stats.open },
+                                  { label: 'Overdue', value: stats.overdue },
+                                  {
+                                      label: 'Completed (30d)',
+                                      value: stats.completed_30_days,
+                                  },
+                                  {
+                                      label: 'Pending',
+                                      value: stats.pending_verification,
+                                  },
+                              ]
+                            : undefined
+                    }
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
                             <Link href="/privacy/dashboard">
-                                <Button variant="outline" size="sm">Privacy Dashboard</Button>
+                                <Button variant="outline" size="sm">
+                                    Privacy Dashboard
+                                </Button>
                             </Link>
                             <Link href="/privacy/breaches">
-                                <Button variant="outline" size="sm">Data Breaches</Button>
+                                <Button variant="outline" size="sm">
+                                    Data Breaches
+                                </Button>
                             </Link>
                             {can.processRequests && (
                                 <Link href="/privacy/requests/create">
@@ -127,45 +159,87 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                         <div className="sm:col-span-2">
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Search by reference or requester name"
                                 value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ q: e.target.value })
+                                }
                             />
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Request Type</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Request Type
+                            </Label>
                             <Select
                                 value={filters.request_type ?? ANY}
-                                onValueChange={(v) => onFilter({ request_type: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        request_type: v === ANY ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Type" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="access">Access (IPP 6)</SelectItem>
-                                    <SelectItem value="rectification">Correction (IPP 7)</SelectItem>
-                                    <SelectItem value="erasure">Deletion</SelectItem>
-                                    <SelectItem value="restriction">Restriction</SelectItem>
-                                    <SelectItem value="portability">Portability</SelectItem>
-                                    <SelectItem value="objection">Objection</SelectItem>
-                                    <SelectItem value="automated_decision">Automated decision</SelectItem>
+                                    <SelectItem value="access">
+                                        Access (IPP 6)
+                                    </SelectItem>
+                                    <SelectItem value="rectification">
+                                        Correction (IPP 7)
+                                    </SelectItem>
+                                    <SelectItem value="erasure">
+                                        Deletion
+                                    </SelectItem>
+                                    <SelectItem value="restriction">
+                                        Restriction
+                                    </SelectItem>
+                                    <SelectItem value="portability">
+                                        Portability
+                                    </SelectItem>
+                                    <SelectItem value="objection">
+                                        Objection
+                                    </SelectItem>
+                                    <SelectItem value="automated_decision">
+                                        Automated decision
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status ?? ANY}
-                                onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === ANY ? null : v })
+                                }
                             >
-                                    <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {['received', 'under_review', 'identity_verification', 'in_progress', 'completed', 'rejected', 'withdrawn'].map((s) => (
-                                        <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
+                                    {[
+                                        'received',
+                                        'under_review',
+                                        'identity_verification',
+                                        'in_progress',
+                                        'completed',
+                                        'rejected',
+                                        'withdrawn',
+                                    ].map((s) => (
+                                        <SelectItem key={s} value={s}>
+                                            {STATUS_LABELS[s]}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -175,13 +249,17 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
 
                 <div className="space-y-2">
                     {requests.data.map((request: any) => {
-                        const daysRemaining = getDaysRemaining(request.extended_due_date || request.due_date);
+                        const daysRemaining = getDaysRemaining(
+                            request.extended_due_date || request.due_date,
+                        );
                         const isOverdue = daysRemaining < 0;
-                        const isDueSoon = daysRemaining >= 0 && daysRemaining <= 7;
-                        const isIdentityVerified = request.identity_verified === 'verified'
-                            || request.identity_verified === true
-                            || request.identity_verified === 1
-                            || request.identity_verified === '1';
+                        const isDueSoon =
+                            daysRemaining >= 0 && daysRemaining <= 7;
+                        const isIdentityVerified =
+                            request.identity_verified === 'verified' ||
+                            request.identity_verified === true ||
+                            request.identity_verified === 1 ||
+                            request.identity_verified === '1';
 
                         return (
                             <Card key={request.id}>
@@ -190,47 +268,88 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 font-semibold">
-                                                    {isOverdue && <AlertTriangle className="h-4 w-4 text-status-critical" />}
+                                                    {isOverdue && (
+                                                        <AlertTriangle className="h-4 w-4 text-status-critical" />
+                                                    )}
                                                     {request.reference_number}
                                                 </div>
                                                 <div className="mt-2 flex flex-wrap gap-2">
-                                                    <Badge className={getStatusColor(request.status)}>
-                                                        {STATUS_LABELS[request.status] ?? request.status.replace(/_/g, ' ')}
+                                                    <Badge
+                                                        className={getStatusColor(
+                                                            request.status,
+                                                        )}
+                                                    >
+                                                        {STATUS_LABELS[
+                                                            request.status
+                                                        ] ??
+                                                            request.status.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            )}
                                                     </Badge>
-                                                    <Badge variant="outline" className="border-status-info/30 bg-status-info-bg text-status-info">
-                                                        {getRequestTypeLabel(request.request_type)}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-status-info/30 bg-status-info-bg text-status-info"
+                                                    >
+                                                        {getRequestTypeLabel(
+                                                            request.request_type,
+                                                        )}
                                                     </Badge>
                                                     {isOverdue && (
-                                                        <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-status-critical/30 bg-status-critical-bg text-status-critical"
+                                                        >
                                                             <AlertTriangle className="mr-1 h-3 w-3" />
-                                                            {Math.abs(daysRemaining)} days overdue
+                                                            {Math.abs(
+                                                                daysRemaining,
+                                                            )}{' '}
+                                                            days overdue
                                                         </Badge>
                                                     )}
-                                                    {!isOverdue && isDueSoon && (
-                                                        <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-status-warning">
-                                                            <Clock className="mr-1 h-3 w-3" />
-                                                            {daysRemaining} days remaining
-                                                        </Badge>
-                                                    )}
+                                                    {!isOverdue &&
+                                                        isDueSoon && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                                            >
+                                                                <Clock className="mr-1 h-3 w-3" />
+                                                                {daysRemaining}{' '}
+                                                                days remaining
+                                                            </Badge>
+                                                        )}
                                                     {isIdentityVerified && (
-                                                        <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-status-success/30 bg-status-success-bg text-status-success"
+                                                        >
                                                             Identity Verified
                                                         </Badge>
                                                     )}
                                                     {request.extension_requested && (
-                                                        <Badge variant="outline" className="border-primary bg-primary/10 text-primary">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-primary bg-primary/10 text-primary"
+                                                        >
                                                             Extended Deadline
                                                         </Badge>
                                                     )}
                                                 </div>
                                                 <div className="mt-2 text-xs text-muted-foreground">
-                                                    Requester: {request.subject_name}
-                                                    {request.received_at && ` • Received: ${new Date(request.received_at).toLocaleDateString()}`}
-                                                    {request.due_date && ` • Due: ${new Date(request.extended_due_date || request.due_date).toLocaleDateString()}`}
-                                                    {request.assigned_to && ` • Assigned: ${request.assigned_to.name}`}
+                                                    Requester:{' '}
+                                                    {request.subject_name}
+                                                    {request.received_at &&
+                                                        ` • Received: ${new Date(request.received_at).toLocaleDateString()}`}
+                                                    {request.due_date &&
+                                                        ` • Due: ${new Date(request.extended_due_date || request.due_date).toLocaleDateString()}`}
+                                                    {request.assigned_to &&
+                                                        ` • Assigned: ${request.assigned_to.name}`}
                                                 </div>
                                             </div>
-                                            <Link href={`/privacy/requests/${request.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                            <Link
+                                                href={`/privacy/requests/${request.id}`}
+                                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                            >
                                                 View
                                             </Link>
                                         </div>
@@ -255,7 +374,17 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                 variant={l.active ? 'secondary' : 'outline'}
                                 size="sm"
                                 disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

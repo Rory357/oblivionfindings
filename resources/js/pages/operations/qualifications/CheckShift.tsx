@@ -1,10 +1,15 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, ShieldCheck, XCircle } from 'lucide-react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ShieldCheck,
+    XCircle,
+} from 'lucide-react';
 
 type Shift = {
     id: number;
@@ -42,11 +47,16 @@ function formatDateTime(value: string | null): string {
     });
 }
 
-export default function QualificationCheckShift({ shift, results = [], allMandatoryMet }: Props) {
+export default function QualificationCheckShift({
+    shift,
+    results = [],
+    allMandatoryMet,
+}: Props) {
     return (
         <AppLayout>
             <Head title={`Qualification Check #${shift.id}`} />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title="Qualification Check"
                 description="Confirm assigned worker credentials against client requirements."
                 backHref={`/operations/shifts/${shift.id}`}
@@ -59,22 +69,46 @@ export default function QualificationCheckShift({ shift, results = [], allMandat
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div>
-                                <p className="text-xs text-muted-foreground">Client</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Client
+                                </p>
                                 <p className="font-medium">
-                                    {shift.client ? `${shift.client.first_name} ${shift.client.last_name}` : 'No client'}
+                                    {shift.client
+                                        ? `${shift.client.first_name} ${shift.client.last_name}`
+                                        : 'No client'}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Worker</p>
-                                <p className="font-medium">{shift.staff?.name ?? 'Unassigned'}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Worker
+                                </p>
+                                <p className="font-medium">
+                                    {shift.staff?.name ?? 'Unassigned'}
+                                </p>
                             </div>
                             <div>
-                                <p className="text-xs text-muted-foreground">Scheduled</p>
-                                <p className="font-medium">{formatDateTime(shift.starts_at)} - {formatDateTime(shift.ends_at)}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    Scheduled
+                                </p>
+                                <p className="font-medium">
+                                    {formatDateTime(shift.starts_at)} -{' '}
+                                    {formatDateTime(shift.ends_at)}
+                                </p>
                             </div>
-                            <Badge variant={allMandatoryMet ? 'default' : 'destructive'} className="gap-1">
-                                {allMandatoryMet ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                                {allMandatoryMet ? 'Mandatory requirements met' : 'Mandatory gaps found'}
+                            <Badge
+                                variant={
+                                    allMandatoryMet ? 'default' : 'destructive'
+                                }
+                                className="gap-1"
+                            >
+                                {allMandatoryMet ? (
+                                    <CheckCircle2 className="h-3 w-3" />
+                                ) : (
+                                    <AlertTriangle className="h-3 w-3" />
+                                )}
+                                {allMandatoryMet
+                                    ? 'Mandatory requirements met'
+                                    : 'Mandatory gaps found'}
                             </Badge>
                         </CardContent>
                     </Card>
@@ -90,29 +124,74 @@ export default function QualificationCheckShift({ shift, results = [], allMandat
                             {results.length === 0 && (
                                 <div className="rounded-lg border border-dashed p-8 text-center">
                                     <ShieldCheck className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                                    <p className="text-sm font-medium">No requirements configured for this client.</p>
-                                    <Link href="/operations/qualifications" className="mt-1 block text-xs text-muted-foreground hover:underline">
+                                    <p className="text-sm font-medium">
+                                        No requirements configured for this
+                                        client.
+                                    </p>
+                                    <Link
+                                        href="/operations/qualifications"
+                                        className="mt-1 block text-xs text-muted-foreground hover:underline"
+                                    >
                                         Review qualification requirements
                                     </Link>
                                 </div>
                             )}
                             {results.map((result) => {
-                                const Icon = result.met ? CheckCircle2 : XCircle;
+                                const Icon = result.met
+                                    ? CheckCircle2
+                                    : XCircle;
                                 return (
-                                    <div key={result.requirement.id} className="flex items-start gap-3 rounded-lg border p-3">
-                                        <Icon className={result.met ? 'mt-0.5 h-5 w-5 text-status-success' : 'mt-0.5 h-5 w-5 text-status-critical'} />
+                                    <div
+                                        key={result.requirement.id}
+                                        className="flex items-start gap-3 rounded-lg border p-3"
+                                    >
+                                        <Icon
+                                            className={
+                                                result.met
+                                                    ? 'mt-0.5 h-5 w-5 text-status-success'
+                                                    : 'mt-0.5 h-5 w-5 text-status-critical'
+                                            }
+                                        />
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="font-medium">{result.requirement.qualification_name}</p>
-                                                <Badge variant={result.is_mandatory ? 'destructive' : 'outline'} className="h-5 text-[10px]">
-                                                    {result.is_mandatory ? 'Mandatory' : 'Optional'}
+                                                <p className="font-medium">
+                                                    {
+                                                        result.requirement
+                                                            .qualification_name
+                                                    }
+                                                </p>
+                                                <Badge
+                                                    variant={
+                                                        result.is_mandatory
+                                                            ? 'destructive'
+                                                            : 'outline'
+                                                    }
+                                                    className="h-5 text-[10px]"
+                                                >
+                                                    {result.is_mandatory
+                                                        ? 'Mandatory'
+                                                        : 'Optional'}
                                                 </Badge>
-                                                <Badge variant={result.met ? 'default' : 'secondary'} className="h-5 text-[10px]">
-                                                    {result.met ? 'Met' : 'Missing'}
+                                                <Badge
+                                                    variant={
+                                                        result.met
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
+                                                    className="h-5 text-[10px]"
+                                                >
+                                                    {result.met
+                                                        ? 'Met'
+                                                        : 'Missing'}
                                                 </Badge>
                                             </div>
                                             {result.requirement.description && (
-                                                <p className="mt-1 text-sm text-muted-foreground">{result.requirement.description}</p>
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    {
+                                                        result.requirement
+                                                            .description
+                                                    }
+                                                </p>
                                             )}
                                         </div>
                                     </div>

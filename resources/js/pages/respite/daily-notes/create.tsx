@@ -1,15 +1,21 @@
-import AppLayout from '@/layouts/app-layout';
+import DictateButton from '@/components/dictate-button';
+import DraftResumePrompt from '@/components/draft-resume-prompt';
+import DraftSavedIndicator from '@/components/draft-saved-indicator';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import DictateButton from '@/components/dictate-button';
-import DraftSavedIndicator from '@/components/draft-saved-indicator';
-import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
@@ -53,11 +59,20 @@ const hasDraftContent = (d: DailyNoteDraft): boolean =>
         d.mobility
     );
 
-export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods, wellbeingLevels, mobilityLevels }: Props) {
+export default function DailyNoteCreate({
+    stays,
+    stayId,
+    clientId,
+    shiftPeriods,
+    wellbeingLevels,
+    mobilityLevels,
+}: Props) {
     const page = usePage().props as { auth?: { user?: { id?: number } } };
     const userId = page.auth?.user?.id ?? 0;
     const resolveClientId = (selectedStayId: string): string => {
-        const selectedStay = stays.find((stay: any) => String(stay.id) === selectedStayId);
+        const selectedStay = stays.find(
+            (stay: any) => String(stay.id) === selectedStayId,
+        );
 
         if (selectedStay?.client?.id != null) {
             return String(selectedStay.client.id);
@@ -66,27 +81,32 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
         return clientId || '';
     };
 
-    const { data, setData, post, processing, errors } = useForm<DailyNoteDraft>({
-        stay_id: stayId || '',
-        client_id: stayId ? resolveClientId(stayId) : clientId || '',
-        note_date: '',
-        shift_period: '',
-        mood: '',
-        appetite: '',
-        sleep_quality: '',
-        engagement: '',
-        mobility: '',
-        activities: '',
-        observations: '',
-        concerns: '',
-        goals_progress: '',
-        incident_occurred: false,
-        sensitive_flag: false,
-    });
+    const { data, setData, post, processing, errors } = useForm<DailyNoteDraft>(
+        {
+            stay_id: stayId || '',
+            client_id: stayId ? resolveClientId(stayId) : clientId || '',
+            note_date: '',
+            shift_period: '',
+            mood: '',
+            appetite: '',
+            sleep_quality: '',
+            engagement: '',
+            mobility: '',
+            activities: '',
+            observations: '',
+            concerns: '',
+            goals_progress: '',
+            incident_occurred: false,
+            sensitive_flag: false,
+        },
+    );
 
     const draftKey = `oblivion:respite-daily-note:v1:u${userId}`;
     const [bootstrapped, setBootstrapped] = useState(false);
-    const [resumePayload, setResumePayload] = useState<{ data: DailyNoteDraft; savedAt: number } | null>(null);
+    const [resumePayload, setResumePayload] = useState<{
+        data: DailyNoteDraft;
+        savedAt: number;
+    } | null>(null);
 
     const { savedAt, load, clear } = useFormAutosave<DailyNoteDraft>(
         data,
@@ -97,7 +117,10 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
     useEffect(() => {
         const existing = load();
         if (existing && hasDraftContent(existing.data as DailyNoteDraft)) {
-            setResumePayload({ data: existing.data as DailyNoteDraft, savedAt: existing.savedAt });
+            setResumePayload({
+                data: existing.data as DailyNoteDraft,
+                savedAt: existing.savedAt,
+            });
         } else {
             setBootstrapped(true);
         }
@@ -106,7 +129,9 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
 
     const resumeDraft = () => {
         if (!resumePayload) return;
-        (Object.keys(resumePayload.data) as Array<keyof DailyNoteDraft>).forEach((k) => {
+        (
+            Object.keys(resumePayload.data) as Array<keyof DailyNoteDraft>
+        ).forEach((k) => {
             setData(k, resumePayload.data[k] as never);
         });
         setResumePayload(null);
@@ -126,24 +151,37 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
     ) => (
         <div>
             <Label>{label}</Label>
-            <Select value={data[field]} onValueChange={(value) => setData(field, value)}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+            <Select
+                value={data[field]}
+                onValueChange={(value) => setData(field, value)}
+            >
+                <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                </SelectTrigger>
                 <SelectContent>
                     {Object.entries(options).map(([value, optionLabel]) => (
-                        <SelectItem key={value} value={value}>{optionLabel}</SelectItem>
+                        <SelectItem key={value} value={value}>
+                            {optionLabel}
+                        </SelectItem>
                     ))}
                 </SelectContent>
             </Select>
-            {errors[field] && <div className="mt-1 text-xs text-status-critical">{errors[field]}</div>}
+            {errors[field] && (
+                <div className="mt-1 text-xs text-status-critical">
+                    {errors[field]}
+                </div>
+            )}
         </div>
     );
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'Daily Notes', href: '/respite/daily-notes' },
-            { title: 'New Note', href: '/respite/daily-notes/create' },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Daily Notes', href: '/respite/daily-notes' },
+                { title: 'New Note', href: '/respite/daily-notes/create' },
+            ]}
+        >
             <Head title="New Daily Note" />
 
             <PageLayout
@@ -177,7 +215,9 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                 >
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Shift Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Shift Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-3">
@@ -187,40 +227,77 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                         value={data.stay_id}
                                         onValueChange={(value) => {
                                             setData('stay_id', value);
-                                            setData('client_id', resolveClientId(value));
+                                            setData(
+                                                'client_id',
+                                                resolveClientId(value),
+                                            );
                                         }}
                                     >
-                                        <SelectTrigger><SelectValue placeholder="Select a stay" /></SelectTrigger>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a stay" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {stays.map((s: any) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.client?.first_name} {s.client?.last_name}
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
+                                                    {s.client?.first_name}{' '}
+                                                    {s.client?.last_name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
+                                    {errors.stay_id && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.stay_id}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Note Date</Label>
                                     <Input
                                         type="date"
                                         value={data.note_date}
-                                        onChange={(e) => setData('note_date', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('note_date', e.target.value)
+                                        }
                                     />
-                                    {errors.note_date && <div className="mt-1 text-xs text-status-critical">{errors.note_date}</div>}
+                                    {errors.note_date && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.note_date}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Shift Period</Label>
-                                    <Select value={data.shift_period} onValueChange={(v) => setData('shift_period', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
+                                    <Select
+                                        value={data.shift_period}
+                                        onValueChange={(v) =>
+                                            setData('shift_period', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select shift" />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            {Object.entries(shiftPeriods).map(([value, label]) => (
-                                                <SelectItem key={value} value={value}>{label}</SelectItem>
-                                            ))}
+                                            {Object.entries(shiftPeriods).map(
+                                                ([value, label]) => (
+                                                    <SelectItem
+                                                        key={value}
+                                                        value={value}
+                                                    >
+                                                        {label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
                                         </SelectContent>
                                     </Select>
-                                    {errors.shift_period && <div className="mt-1 text-xs text-status-critical">{errors.shift_period}</div>}
+                                    {errors.shift_period && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.shift_period}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -228,24 +305,60 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
 
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Wellbeing</CardTitle>
+                            <CardTitle className="text-base">
+                                Wellbeing
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {renderWellbeingSelect('mood', 'Mood', wellbeingLevels.mood ?? {})}
-                            {renderWellbeingSelect('appetite', 'Appetite', wellbeingLevels.appetite ?? {})}
-                            {renderWellbeingSelect('sleep_quality', 'Sleep Quality', wellbeingLevels.sleep_quality ?? {})}
-                            {renderWellbeingSelect('engagement', 'Engagement', wellbeingLevels.engagement ?? {})}
+                            {renderWellbeingSelect(
+                                'mood',
+                                'Mood',
+                                wellbeingLevels.mood ?? {},
+                            )}
+                            {renderWellbeingSelect(
+                                'appetite',
+                                'Appetite',
+                                wellbeingLevels.appetite ?? {},
+                            )}
+                            {renderWellbeingSelect(
+                                'sleep_quality',
+                                'Sleep Quality',
+                                wellbeingLevels.sleep_quality ?? {},
+                            )}
+                            {renderWellbeingSelect(
+                                'engagement',
+                                'Engagement',
+                                wellbeingLevels.engagement ?? {},
+                            )}
                             <div>
                                 <Label>Mobility</Label>
-                                <Select value={data.mobility} onValueChange={(v) => setData('mobility', v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                                <Select
+                                    value={data.mobility}
+                                    onValueChange={(v) =>
+                                        setData('mobility', v)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        {Object.entries(mobilityLevels).map(([value, label]) => (
-                                            <SelectItem key={value} value={value}>{label}</SelectItem>
-                                        ))}
+                                        {Object.entries(mobilityLevels).map(
+                                            ([value, label]) => (
+                                                <SelectItem
+                                                    key={value}
+                                                    value={value}
+                                                >
+                                                    {label}
+                                                </SelectItem>
+                                            ),
+                                        )}
                                     </SelectContent>
                                 </Select>
-                                {errors.mobility && <div className="mt-1 text-xs text-status-critical">{errors.mobility}</div>}
+                                {errors.mobility && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.mobility}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -260,64 +373,99 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                     <Label>Activities</Label>
                                     <DictateButton
                                         value={data.activities}
-                                        onChange={(next) => setData('activities', next)}
+                                        onChange={(next) =>
+                                            setData('activities', next)
+                                        }
                                         fieldLabel="Activities"
                                     />
                                 </div>
                                 <Textarea
                                     value={data.activities}
-                                    onChange={(e) => setData('activities', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('activities', e.target.value)
+                                    }
                                     rows={3}
                                 />
-                                {errors.activities && <div className="mt-1 text-xs text-status-critical">{errors.activities}</div>}
+                                {errors.activities && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.activities}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between">
                                     <Label>Observations</Label>
                                     <DictateButton
                                         value={data.observations}
-                                        onChange={(next) => setData('observations', next)}
+                                        onChange={(next) =>
+                                            setData('observations', next)
+                                        }
                                         fieldLabel="Observations"
                                     />
                                 </div>
                                 <Textarea
                                     value={data.observations}
-                                    onChange={(e) => setData('observations', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('observations', e.target.value)
+                                    }
                                     rows={3}
                                 />
-                                {errors.observations && <div className="mt-1 text-xs text-status-critical">{errors.observations}</div>}
+                                {errors.observations && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.observations}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between">
                                     <Label>Concerns</Label>
                                     <DictateButton
                                         value={data.concerns}
-                                        onChange={(next) => setData('concerns', next)}
+                                        onChange={(next) =>
+                                            setData('concerns', next)
+                                        }
                                         fieldLabel="Concerns"
                                     />
                                 </div>
                                 <Textarea
                                     value={data.concerns}
-                                    onChange={(e) => setData('concerns', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('concerns', e.target.value)
+                                    }
                                     rows={3}
                                 />
-                                {errors.concerns && <div className="mt-1 text-xs text-status-critical">{errors.concerns}</div>}
+                                {errors.concerns && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.concerns}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <div className="flex items-center justify-between">
                                     <Label>Goals Progress</Label>
                                     <DictateButton
                                         value={data.goals_progress}
-                                        onChange={(next) => setData('goals_progress', next)}
+                                        onChange={(next) =>
+                                            setData('goals_progress', next)
+                                        }
                                         fieldLabel="Goals progress"
                                     />
                                 </div>
                                 <Textarea
                                     value={data.goals_progress}
-                                    onChange={(e) => setData('goals_progress', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'goals_progress',
+                                            e.target.value,
+                                        )
+                                    }
                                     rows={3}
                                 />
-                                {errors.goals_progress && <div className="mt-1 text-xs text-status-critical">{errors.goals_progress}</div>}
+                                {errors.goals_progress && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.goals_progress}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -331,7 +479,12 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                 <input
                                     type="checkbox"
                                     checked={data.incident_occurred}
-                                    onChange={(e) => setData('incident_occurred', e.target.checked)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'incident_occurred',
+                                            e.target.checked,
+                                        )
+                                    }
                                     className="rounded border-border"
                                 />
                                 Incident occurred
@@ -340,7 +493,12 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                                 <input
                                     type="checkbox"
                                     checked={data.sensitive_flag}
-                                    onChange={(e) => setData('sensitive_flag', e.target.checked)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'sensitive_flag',
+                                            e.target.checked,
+                                        )
+                                    }
                                     className="rounded border-border"
                                 />
                                 Sensitive
@@ -349,7 +507,10 @@ export default function DailyNoteCreate({ stays, stayId, clientId, shiftPeriods,
                     </Card>
 
                     <div className="flex items-center justify-between gap-2">
-                        <DraftSavedIndicator savedAt={savedAt} className="sm:hidden" />
+                        <DraftSavedIndicator
+                            savedAt={savedAt}
+                            className="sm:hidden"
+                        />
                         <div className="ml-auto">
                             <Button type="submit" disabled={processing}>
                                 Save Daily Note

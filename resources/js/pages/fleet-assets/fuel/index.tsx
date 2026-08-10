@@ -1,14 +1,5 @@
 import { FLEET_COLORS, HorizontalBarChart } from '@/components/fleet-charts';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetStatCard } from '@/components/fleet-stat-card';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,18 +14,23 @@ import {
 } from '@/components/ui/select';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import {
-    formatCurrency,
-    formatDate,
-    formatDistance,
-} from '@/lib/fleet-utils';
 import { toDateInput } from '@/lib/datetime';
+import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     CheckCircle,
     ChevronDown,
-    ChevronUp,
     ChevronsUpDown,
+    ChevronUp,
     Download,
     Fuel,
     Plus,
@@ -260,9 +256,9 @@ export default function FuelIndex({
     };
     const canReviewFuel = Boolean(
         form.data.asset_id &&
-            form.data.logged_at &&
-            form.data.quantity_litres &&
-            form.data.total_cost,
+        form.data.logged_at &&
+        form.data.quantity_litres &&
+        form.data.total_cost,
     );
     const selectedFuelVehicle = vehicles.find(
         (vehicle) => String(vehicle.id) === form.data.asset_id,
@@ -281,7 +277,9 @@ export default function FuelIndex({
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={Fuel} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Fuel register · this month</HeroStatusPill>
+                            <HeroStatusPill>
+                                Fuel register · this month
+                            </HeroStatusPill>
                             <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                                 Fuel Management
                             </h1>
@@ -310,7 +308,9 @@ export default function FuelIndex({
                                 label="Entries 30d"
                                 value={fmt(hero.entries_30d)}
                                 caption="fill-ups logged"
-                                tone={hero.entries_30d > 0 ? 'success' : 'neutral'}
+                                tone={
+                                    hero.entries_30d > 0 ? 'success' : 'neutral'
+                                }
                             />
                             <HeroClusterTile
                                 label="Avg $/L"
@@ -334,7 +334,11 @@ export default function FuelIndex({
                                 Log fuel
                             </Button>
                         )}
-                        <FleetHeroAction href={csvHref()} icon={Download} external>
+                        <FleetHeroAction
+                            href={csvHref()}
+                            icon={Download}
+                            external
+                        >
                             Export CSV
                         </FleetHeroAction>
                     </div>
@@ -352,10 +356,15 @@ export default function FuelIndex({
                         steps={fuelLogSteps}
                         stepIndex={fuelStepIndex}
                         onStepClick={(index) => {
-                            if (index === 0 || canReviewFuel) setFuelStepIndex(index);
+                            if (index === 0 || canReviewFuel)
+                                setFuelStepIndex(index);
                         }}
                         footerStart={
-                            <Button type="button" variant="outline" onClick={closeFuelDialog}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={closeFuelDialog}
+                            >
                                 Cancel
                             </Button>
                         }
@@ -382,7 +391,9 @@ export default function FuelIndex({
                                         onClick={handleSubmit}
                                         disabled={form.processing}
                                     >
-                                        {form.processing ? 'Saving…' : 'Save fuel log'}
+                                        {form.processing
+                                            ? 'Saving…'
+                                            : 'Save fuel log'}
                                     </Button>
                                 </>
                             )
@@ -390,293 +401,252 @@ export default function FuelIndex({
                     >
                         {fuelStepIndex === 0 ? (
                             <WizardStepPane>
-                                            <div className="grid gap-4 py-4">
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="asset_id">
-                                                        Vehicle *
-                                                    </Label>
-                                                    <Select
-                                                        value={
-                                                            form.data.asset_id
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            form.setData(
-                                                                'asset_id',
-                                                                v,
-                                                            )
-                                                        }
+                                <div className="grid gap-4 py-4">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="asset_id">
+                                            Vehicle *
+                                        </Label>
+                                        <Select
+                                            value={form.data.asset_id}
+                                            onValueChange={(v) =>
+                                                form.setData('asset_id', v)
+                                            }
+                                        >
+                                            <SelectTrigger id="asset_id">
+                                                <SelectValue placeholder="Select vehicle" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {vehicles.map((v) => (
+                                                    <SelectItem
+                                                        key={v.id}
+                                                        value={String(v.id)}
                                                     >
-                                                        <SelectTrigger id="asset_id">
-                                                            <SelectValue placeholder="Select vehicle" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {vehicles.map(
-                                                                (v) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            v.id
-                                                                        }
-                                                                        value={String(
-                                                                            v.id,
-                                                                        )}
-                                                                    >
-                                                                        {v.name}
-                                                                    </SelectItem>
-                                                                ),
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    {form.errors.asset_id && (
-                                                        <p className="text-xs text-destructive">
-                                                            {
-                                                                form.errors
-                                                                    .asset_id
-                                                            }
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="logged_at">
-                                                            Date *
-                                                        </Label>
-                                                        <Input
-                                                            id="logged_at"
-                                                            type="date"
-                                                            value={
-                                                                form.data
-                                                                    .logged_at
-                                                            }
-                                                            onChange={(e) =>
-                                                                form.setData(
-                                                                    'logged_at',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        />
-                                                        {form.errors
-                                                            .logged_at && (
-                                                            <p className="text-xs text-destructive">
-                                                                {
-                                                                    form.errors
-                                                                        .logged_at
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="odometer_km">
-                                                            Odometer (km)
-                                                        </Label>
-                                                        <Input
-                                                            id="odometer_km"
-                                                            type="number"
-                                                            step="0.1"
-                                                            placeholder="e.g. 45230"
-                                                            value={
-                                                                form.data
-                                                                    .odometer_km
-                                                            }
-                                                            onChange={(e) =>
-                                                                form.setData(
-                                                                    'odometer_km',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="quantity_litres">
-                                                            Litres *
-                                                        </Label>
-                                                        <Input
-                                                            id="quantity_litres"
-                                                            type="number"
-                                                            step="0.01"
-                                                            placeholder="e.g. 55.5"
-                                                            value={
-                                                                form.data
-                                                                    .quantity_litres
-                                                            }
-                                                            onChange={(e) =>
-                                                                form.setData(
-                                                                    'quantity_litres',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        />
-                                                        {form.errors
-                                                            .quantity_litres && (
-                                                            <p className="text-xs text-destructive">
-                                                                {
-                                                                    form.errors
-                                                                        .quantity_litres
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="total_cost">
-                                                            Total Cost ($) *
-                                                        </Label>
-                                                        <Input
-                                                            id="total_cost"
-                                                            type="number"
-                                                            step="0.01"
-                                                            placeholder="e.g. 120.50"
-                                                            value={
-                                                                form.data
-                                                                    .total_cost
-                                                            }
-                                                            onChange={(e) =>
-                                                                form.setData(
-                                                                    'total_cost',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        />
-                                                        {form.errors
-                                                            .total_cost && (
-                                                            <p className="text-xs text-destructive">
-                                                                {
-                                                                    form.errors
-                                                                        .total_cost
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="fuel_type">
-                                                            Fuel Type
-                                                        </Label>
-                                                        <Select
-                                                            value={
-                                                                form.data
-                                                                    .fuel_type
-                                                            }
-                                                            onValueChange={(
-                                                                v,
-                                                            ) =>
-                                                                form.setData(
-                                                                    'fuel_type',
-                                                                    v,
-                                                                )
-                                                            }
-                                                        >
-                                                            <SelectTrigger id="fuel_type">
-                                                                <SelectValue placeholder="Select type" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="petrol">
-                                                                    Petrol
-                                                                </SelectItem>
-                                                                <SelectItem value="diesel">
-                                                                    Diesel
-                                                                </SelectItem>
-                                                                <SelectItem value="electric">
-                                                                    Electric
-                                                                </SelectItem>
-                                                                <SelectItem value="hybrid">
-                                                                    Hybrid
-                                                                </SelectItem>
-                                                                <SelectItem value="lpg">
-                                                                    LPG
-                                                                </SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="station_name">
-                                                            Station
-                                                        </Label>
-                                                        <Input
-                                                            id="station_name"
-                                                            placeholder="e.g. BP Penrose"
-                                                            value={
-                                                                form.data
-                                                                    .station_name
-                                                            }
-                                                            onChange={(e) =>
-                                                                form.setData(
-                                                                    'station_name',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="notes">
-                                                        Notes
-                                                    </Label>
-                                                    <Input
-                                                        id="notes"
-                                                        placeholder="Optional notes..."
-                                                        value={form.data.notes}
-                                                        onChange={(e) =>
-                                                            form.setData(
-                                                                'notes',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        id="full_tank"
-                                                        type="checkbox"
-                                                        className="rounded border-border"
-                                                        checked={
-                                                            form.data.full_tank
-                                                        }
-                                                        onChange={(e) =>
-                                                            form.setData(
-                                                                'full_tank',
-                                                                e.target
-                                                                    .checked,
-                                                            )
-                                                        }
-                                                    />
-                                                    <Label
-                                                        htmlFor="full_tank"
-                                                        className="text-sm font-normal"
-                                                    >
-                                                        Full tank fill-up
-                                                    </Label>
-                                                </div>
-                                            </div>
+                                                        {v.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {form.errors.asset_id && (
+                                            <p className="text-xs text-destructive">
+                                                {form.errors.asset_id}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="logged_at">
+                                                Date *
+                                            </Label>
+                                            <Input
+                                                id="logged_at"
+                                                type="date"
+                                                value={form.data.logged_at}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'logged_at',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            {form.errors.logged_at && (
+                                                <p className="text-xs text-destructive">
+                                                    {form.errors.logged_at}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="odometer_km">
+                                                Odometer (km)
+                                            </Label>
+                                            <Input
+                                                id="odometer_km"
+                                                type="number"
+                                                step="0.1"
+                                                placeholder="e.g. 45230"
+                                                value={form.data.odometer_km}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'odometer_km',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="quantity_litres">
+                                                Litres *
+                                            </Label>
+                                            <Input
+                                                id="quantity_litres"
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="e.g. 55.5"
+                                                value={
+                                                    form.data.quantity_litres
+                                                }
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'quantity_litres',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            {form.errors.quantity_litres && (
+                                                <p className="text-xs text-destructive">
+                                                    {
+                                                        form.errors
+                                                            .quantity_litres
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="total_cost">
+                                                Total Cost ($) *
+                                            </Label>
+                                            <Input
+                                                id="total_cost"
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="e.g. 120.50"
+                                                value={form.data.total_cost}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'total_cost',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            {form.errors.total_cost && (
+                                                <p className="text-xs text-destructive">
+                                                    {form.errors.total_cost}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="fuel_type">
+                                                Fuel Type
+                                            </Label>
+                                            <Select
+                                                value={form.data.fuel_type}
+                                                onValueChange={(v) =>
+                                                    form.setData('fuel_type', v)
+                                                }
+                                            >
+                                                <SelectTrigger id="fuel_type">
+                                                    <SelectValue placeholder="Select type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="petrol">
+                                                        Petrol
+                                                    </SelectItem>
+                                                    <SelectItem value="diesel">
+                                                        Diesel
+                                                    </SelectItem>
+                                                    <SelectItem value="electric">
+                                                        Electric
+                                                    </SelectItem>
+                                                    <SelectItem value="hybrid">
+                                                        Hybrid
+                                                    </SelectItem>
+                                                    <SelectItem value="lpg">
+                                                        LPG
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="station_name">
+                                                Station
+                                            </Label>
+                                            <Input
+                                                id="station_name"
+                                                placeholder="e.g. BP Penrose"
+                                                value={form.data.station_name}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'station_name',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="notes">Notes</Label>
+                                        <Input
+                                            id="notes"
+                                            placeholder="Optional notes..."
+                                            value={form.data.notes}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'notes',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            id="full_tank"
+                                            type="checkbox"
+                                            className="rounded border-border"
+                                            checked={form.data.full_tank}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'full_tank',
+                                                    e.target.checked,
+                                                )
+                                            }
+                                        />
+                                        <Label
+                                            htmlFor="full_tank"
+                                            className="text-sm font-normal"
+                                        >
+                                            Full tank fill-up
+                                        </Label>
+                                    </div>
+                                </div>
                             </WizardStepPane>
                         ) : (
                             <WizardStepPane>
                                 <dl className="grid gap-4 rounded-xl border border-border bg-card/70 p-4 text-sm sm:grid-cols-2">
                                     <div>
-                                        <dt className="text-muted-foreground">Vehicle</dt>
+                                        <dt className="text-muted-foreground">
+                                            Vehicle
+                                        </dt>
                                         <dd className="font-medium">
-                                            {selectedFuelVehicle?.name ?? 'Selected vehicle'}
+                                            {selectedFuelVehicle?.name ??
+                                                'Selected vehicle'}
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-muted-foreground">Date</dt>
-                                        <dd className="font-medium">{form.data.logged_at}</dd>
+                                        <dt className="text-muted-foreground">
+                                            Date
+                                        </dt>
+                                        <dd className="font-medium">
+                                            {form.data.logged_at}
+                                        </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-muted-foreground">Fuel</dt>
+                                        <dt className="text-muted-foreground">
+                                            Fuel
+                                        </dt>
                                         <dd className="font-medium">
                                             {form.data.quantity_litres} L
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-muted-foreground">Total cost</dt>
-                                        <dd className="font-medium">${form.data.total_cost}</dd>
+                                        <dt className="text-muted-foreground">
+                                            Total cost
+                                        </dt>
+                                        <dd className="font-medium">
+                                            ${form.data.total_cost}
+                                        </dd>
                                     </div>
                                 </dl>
                             </WizardStepPane>
@@ -767,95 +737,109 @@ export default function FuelIndex({
                     {/* Fuel Log Table */}
                     <div className="overflow-hidden rounded-lg border">
                         <FleetResponsiveTable>
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
-                                    {renderSortHeader('logged_at', 'Date')}
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Vehicle
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Odometer
-                                    </th>
-                                    {renderSortHeader(
-                                        'quantity_litres',
-                                        'Litres',
-                                        'text-right',
-                                    )}
-                                    {renderSortHeader(
-                                        'total_cost',
-                                        'Cost',
-                                        'text-right',
-                                    )}
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Cost/L
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Logged By
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {fuelLogs.length > 0 ? (
-                                    fuelLogs.map((log) => (
-                                        <tr
-                                            key={log.id}
-                                            className="border-b transition-colors hover:bg-muted/30"
-                                        >
-                                            <td data-fleet-row-time className="px-4 py-3">
-                                                {log.logged_at
-                                                    ? formatDate(log.logged_at)
-                                                    : '---'}
-                                            </td>
-                                            <td data-fleet-row-identity data-fleet-row-action className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <Fuel className="h-4 w-4 text-muted-foreground" />
-                                                    <span className="font-medium">
-                                                        {log.asset?.name ??
-                                                            '---'}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                {log.odometer_km != null
-                                                    ? `${formatDistance(Number(log.odometer_km))}`
-                                                    : '---'}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                {Number(
-                                                    log.quantity_litres ?? 0,
-                                                ).toFixed(1)}{' '}
-                                                L
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                $
-                                                {Number(
-                                                    log.total_cost ?? 0,
-                                                ).toFixed(2)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                $
-                                                {Number(
-                                                    log.cost_per_litre ?? 0,
-                                                ).toFixed(3)}
-                                            </td>
-                                            <td data-fleet-row-status className="px-4 py-3">
-                                                Logged by {log.user?.name ?? '---'}
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                        {renderSortHeader('logged_at', 'Date')}
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Vehicle
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Odometer
+                                        </th>
+                                        {renderSortHeader(
+                                            'quantity_litres',
+                                            'Litres',
+                                            'text-right',
+                                        )}
+                                        {renderSortHeader(
+                                            'total_cost',
+                                            'Cost',
+                                            'text-right',
+                                        )}
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Cost/L
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Logged By
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {fuelLogs.length > 0 ? (
+                                        fuelLogs.map((log) => (
+                                            <tr
+                                                key={log.id}
+                                                className="border-b transition-colors hover:bg-muted/30"
+                                            >
+                                                <td
+                                                    data-fleet-row-time
+                                                    className="px-4 py-3"
+                                                >
+                                                    {log.logged_at
+                                                        ? formatDate(
+                                                              log.logged_at,
+                                                          )
+                                                        : '---'}
+                                                </td>
+                                                <td
+                                                    data-fleet-row-identity
+                                                    data-fleet-row-action
+                                                    className="px-4 py-3"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Fuel className="h-4 w-4 text-muted-foreground" />
+                                                        <span className="font-medium">
+                                                            {log.asset?.name ??
+                                                                '---'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    {log.odometer_km != null
+                                                        ? `${formatDistance(Number(log.odometer_km))}`
+                                                        : '---'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    {Number(
+                                                        log.quantity_litres ??
+                                                            0,
+                                                    ).toFixed(1)}{' '}
+                                                    L
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    $
+                                                    {Number(
+                                                        log.total_cost ?? 0,
+                                                    ).toFixed(2)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    $
+                                                    {Number(
+                                                        log.cost_per_litre ?? 0,
+                                                    ).toFixed(3)}
+                                                </td>
+                                                <td
+                                                    data-fleet-row-status
+                                                    className="px-4 py-3"
+                                                >
+                                                    Logged by{' '}
+                                                    {log.user?.name ?? '---'}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td
+                                                colSpan={7}
+                                                className="px-4 py-8 text-center text-muted-foreground"
+                                            >
+                                                No fuel logs found.
                                             </td>
                                         </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td
-                                            colSpan={7}
-                                            className="px-4 py-8 text-center text-muted-foreground"
-                                        >
-                                            No fuel logs found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                    )}
+                                </tbody>
+                            </table>
                         </FleetResponsiveTable>
                     </div>
 

@@ -1,8 +1,14 @@
-import { useMemo, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
+import { Badge } from '@/components/ui/badge';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { TabsContent } from '@/components/ui/tabs';
+import { Link } from '@inertiajs/react';
 import {
     BookOpen,
     Calendar,
@@ -10,10 +16,9 @@ import {
     FileText,
     LayoutGrid,
     ShieldAlert,
-    Vote,
 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { BoardPriorityCard, type WorkflowAction } from './BoardPriorityCard';
-import { Link } from '@inertiajs/react';
 
 interface PriorityOverviewPanelProps {
     actions: WorkflowAction[];
@@ -24,14 +29,35 @@ interface PriorityOverviewPanelProps {
     };
 }
 
-type TabKey = 'all' | 'meetings' | 'actions' | 'risks' | 'compliance' | 'policies';
+type TabKey =
+    | 'all'
+    | 'meetings'
+    | 'actions'
+    | 'risks'
+    | 'compliance'
+    | 'policies';
 
-const TAB_DEFS: Array<{ key: TabKey; label: string; icon: PageTabItem['icon']; areas?: string[] }> = [
+const TAB_DEFS: Array<{
+    key: TabKey;
+    label: string;
+    icon: PageTabItem['icon'];
+    areas?: string[];
+}> = [
     { key: 'all', label: 'All', icon: LayoutGrid },
     { key: 'meetings', label: 'Meetings', icon: Calendar, areas: ['Meetings'] },
-    { key: 'actions', label: 'Actions', icon: ClipboardList, areas: ['Action Items'] },
+    {
+        key: 'actions',
+        label: 'Actions',
+        icon: ClipboardList,
+        areas: ['Action Items'],
+    },
     { key: 'risks', label: 'Risks', icon: ShieldAlert, areas: ['Risks'] },
-    { key: 'compliance', label: 'Compliance', icon: FileText, areas: ['Compliance'] },
+    {
+        key: 'compliance',
+        label: 'Compliance',
+        icon: FileText,
+        areas: ['Compliance'],
+    },
     { key: 'policies', label: 'Policies', icon: BookOpen, areas: ['Policies'] },
 ];
 
@@ -84,7 +110,10 @@ function EmptyForTab({ tab }: { tab: TabKey }) {
  * Sites module uses, so visual styling is identical (underlined trigger,
  * primary fill on active, dropdown overflow on narrow screens).
  */
-export function PriorityOverviewPanel({ actions, summary }: PriorityOverviewPanelProps) {
+export function PriorityOverviewPanel({
+    actions,
+    summary,
+}: PriorityOverviewPanelProps) {
     const [tab, setTab] = useState<TabKey>('all');
 
     const counts = useMemo(() => {
@@ -125,9 +154,12 @@ export function PriorityOverviewPanel({ actions, summary }: PriorityOverviewPane
             <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <CardTitle className="text-lg">Priority Overview</CardTitle>
+                        <CardTitle className="text-lg">
+                            Priority Overview
+                        </CardTitle>
                         <CardDescription>
-                            Board decisions, risks and obligations ranked by urgency.
+                            Board decisions, risks and obligations ranked by
+                            urgency.
                         </CardDescription>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -148,16 +180,27 @@ export function PriorityOverviewPanel({ actions, summary }: PriorityOverviewPane
                 </div>
             </CardHeader>
             <CardContent>
-                <PageTabs value={tab} onValueChange={(v) => setTab(v as TabKey)} items={tabs}>
+                <PageTabs
+                    value={tab}
+                    onValueChange={(v) => setTab(v as TabKey)}
+                    items={tabs}
+                >
                     {TAB_DEFS.map((def) => (
-                        <TabsContent key={def.key} value={def.key} className="space-y-3">
+                        <TabsContent
+                            key={def.key}
+                            value={def.key}
+                            className="space-y-3"
+                        >
                             {filtered.length === 0 ? (
                                 <EmptyForTab tab={def.key} />
                             ) : (
                                 filterFor(def.key, actions)
                                     .slice(0, 10)
                                     .map((action) => (
-                                        <BoardPriorityCard key={action.id} action={action} />
+                                        <BoardPriorityCard
+                                            key={action.id}
+                                            action={action}
+                                        />
                                     ))
                             )}
                             {filtered.length > 10 && def.key === tab ? (

@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SsoGroupMapping extends Model
 {
+    use WritesLegacyOrganizationStorageContext;
+
     protected $fillable = [
-        'organization_id',
         'provider',
         'external_group_id',
         'external_group_name',

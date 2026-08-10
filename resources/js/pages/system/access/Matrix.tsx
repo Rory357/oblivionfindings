@@ -1,18 +1,6 @@
 import { PageHero, PageLayout } from '@/components/page';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-import { useState, useMemo } from 'react';
-import {
-    Check,
-    X,
-    LayoutGrid,
-    Settings,
-    Search,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
@@ -20,6 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
     Table,
     TableBody,
@@ -34,6 +23,11 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head } from '@inertiajs/react';
+import { Check, LayoutGrid, Search, Settings, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -63,8 +57,15 @@ type Props = {
     rolePermissions: Record<number, number[]>; // role_id -> [permission_id, ...]
 };
 
-export default function PermissionsMatrix({ roles, permissions, permissionGroups, rolePermissions }: Props) {
-    const [selectedRoles, setSelectedRoles] = useState<number[]>(roles.map((r) => r.id));
+export default function PermissionsMatrix({
+    roles,
+    permissions,
+    permissionGroups,
+    rolePermissions,
+}: Props) {
+    const [selectedRoles, setSelectedRoles] = useState<number[]>(
+        roles.map((r) => r.id),
+    );
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
@@ -73,8 +74,12 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
             const matchesSearch =
                 searchQuery === '' ||
                 perm.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (perm.description && perm.description.toLowerCase().includes(searchQuery.toLowerCase()));
-            const matchesGroup = selectedGroup === null || perm.group === selectedGroup;
+                (perm.description &&
+                    perm.description
+                        .toLowerCase()
+                        .includes(searchQuery.toLowerCase()));
+            const matchesGroup =
+                selectedGroup === null || perm.group === selectedGroup;
             return matchesSearch && matchesGroup;
         });
     }, [permissions, searchQuery, selectedGroup]);
@@ -96,7 +101,9 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
 
     const toggleRole = (roleId: number) => {
         setSelectedRoles((prev) =>
-            prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
+            prev.includes(roleId)
+                ? prev.filter((id) => id !== roleId)
+                : [...prev, roleId],
         );
     };
 
@@ -126,7 +133,8 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                             <CardTitle>Roles</CardTitle>
                         </div>
                         <CardDescription>
-                            Select roles to display in the matrix. Roles are ordered by level (highest to lowest).
+                            Select roles to display in the matrix. Roles are
+                            ordered by level (highest to lowest).
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -135,12 +143,23 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                                 <Button
                                     key={role.id}
                                     type="button"
-                                    variant={selectedRoles.includes(role.id) ? 'default' : 'secondary'}
+                                    variant={
+                                        selectedRoles.includes(role.id)
+                                            ? 'default'
+                                            : 'secondary'
+                                    }
                                     onClick={() => toggleRole(role.id)}
                                     className="h-auto rounded-full px-3 py-1.5"
                                 >
                                     {role.label}
-                                    <Badge variant={selectedRoles.includes(role.id) ? 'secondary' : 'outline'} className="text-xs">
+                                    <Badge
+                                        variant={
+                                            selectedRoles.includes(role.id)
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
+                                        className="text-xs"
+                                    >
                                         L{role.level}
                                     </Badge>
                                 </Button>
@@ -150,9 +169,9 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                 </Card>
 
                 {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col gap-4 sm:flex-row">
                     <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search permissions..."
                             value={searchQuery}
@@ -162,7 +181,9 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                     </div>
                     <div className="flex gap-2">
                         <Button
-                            variant={selectedGroup === null ? 'default' : 'outline'}
+                            variant={
+                                selectedGroup === null ? 'default' : 'outline'
+                            }
                             size="sm"
                             onClick={() => setSelectedGroup(null)}
                         >
@@ -171,9 +192,17 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                         {permissionGroups.slice(0, 5).map((group) => (
                             <Button
                                 key={group}
-                                variant={selectedGroup === group ? 'default' : 'outline'}
+                                variant={
+                                    selectedGroup === group
+                                        ? 'default'
+                                        : 'outline'
+                                }
                                 size="sm"
-                                onClick={() => setSelectedGroup(group === selectedGroup ? null : group)}
+                                onClick={() =>
+                                    setSelectedGroup(
+                                        group === selectedGroup ? null : group,
+                                    )
+                                }
                             >
                                 {group.replace(/_/g, ' ')}
                             </Button>
@@ -194,15 +223,22 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="w-[300px] bg-muted/50">Permission</TableHead>
+                                        <TableHead className="w-[300px] bg-muted/50">
+                                            Permission
+                                        </TableHead>
                                         {visibleRoles.map((role) => (
                                             <TableHead
                                                 key={role.id}
-                                                className="text-center min-w-[100px] bg-muted/50"
+                                                className="min-w-[100px] bg-muted/50 text-center"
                                             >
                                                 <div className="flex flex-col items-center">
-                                                    <span className="text-xs">{role.label}</span>
-                                                    <Badge variant="outline" className="text-[10px] mt-1">
+                                                    <span className="text-xs">
+                                                        {role.label}
+                                                    </span>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="mt-1 text-[10px]"
+                                                    >
                                                         L{role.level}
                                                     </Badge>
                                                 </div>
@@ -211,61 +247,109 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {Object.entries(groupedPermissions).map(([group, perms]) => (
-                                        <>
-                                            <TableRow key={group} className="bg-muted/30">
-                                                <TableCell
-                                                    colSpan={visibleRoles.length + 1}
-                                                    className="font-medium text-sm py-2"
+                                    {Object.entries(groupedPermissions).map(
+                                        ([group, perms]) => (
+                                            <>
+                                                <TableRow
+                                                    key={group}
+                                                    className="bg-muted/30"
                                                 >
-                                                    {group.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                                                </TableCell>
-                                            </TableRow>
-                                            {perms.map((perm) => (
-                                                <TableRow key={perm.id} className="hover:bg-muted/50">
-                                                    <TableCell className="py-2">
-                                                        <TooltipProvider>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <div className="cursor-help">
-                                                                        <div className="font-medium text-sm">
-                                                                            {perm.key.split('.').pop()?.replace(/_/g, ' ')}
-                                                                        </div>
-                                                                        <div className="font-mono text-xs text-muted-foreground">
-                                                                            {perm.key}
-                                                                        </div>
-                                                                    </div>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent side="right" className="max-w-xs">
-                                                                    <p>{perm.description || 'No description'}</p>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </TooltipProvider>
-                                                    </TableCell>
-                                                    {visibleRoles.map((role) => (
-                                                        <TableCell key={role.id} className="text-center py-2">
-                                                            {hasPermission(role.id, perm.id) ? (
-                                                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-status-success-bg text-status-success">
-                                                                    <Check className="h-4 w-4" />
-                                                                </div>
-                                                            ) : (
-                                                                <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground">
-                                                                    <X className="h-4 w-4" />
-                                                                </div>
+                                                    <TableCell
+                                                        colSpan={
+                                                            visibleRoles.length +
+                                                            1
+                                                        }
+                                                        className="py-2 text-sm font-medium"
+                                                    >
+                                                        {group
+                                                            .replace(/_/g, ' ')
+                                                            .replace(
+                                                                /\b\w/g,
+                                                                (l) =>
+                                                                    l.toUpperCase(),
                                                             )}
-                                                        </TableCell>
-                                                    ))}
+                                                    </TableCell>
                                                 </TableRow>
-                                            ))}
-                                        </>
-                                    ))}
+                                                {perms.map((perm) => (
+                                                    <TableRow
+                                                        key={perm.id}
+                                                        className="hover:bg-muted/50"
+                                                    >
+                                                        <TableCell className="py-2">
+                                                            <TooltipProvider>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger
+                                                                        asChild
+                                                                    >
+                                                                        <div className="cursor-help">
+                                                                            <div className="text-sm font-medium">
+                                                                                {perm.key
+                                                                                    .split(
+                                                                                        '.',
+                                                                                    )
+                                                                                    .pop()
+                                                                                    ?.replace(
+                                                                                        /_/g,
+                                                                                        ' ',
+                                                                                    )}
+                                                                            </div>
+                                                                            <div className="font-mono text-xs text-muted-foreground">
+                                                                                {
+                                                                                    perm.key
+                                                                                }
+                                                                            </div>
+                                                                        </div>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent
+                                                                        side="right"
+                                                                        className="max-w-xs"
+                                                                    >
+                                                                        <p>
+                                                                            {perm.description ||
+                                                                                'No description'}
+                                                                        </p>
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </TooltipProvider>
+                                                        </TableCell>
+                                                        {visibleRoles.map(
+                                                            (role) => (
+                                                                <TableCell
+                                                                    key={
+                                                                        role.id
+                                                                    }
+                                                                    className="py-2 text-center"
+                                                                >
+                                                                    {hasPermission(
+                                                                        role.id,
+                                                                        perm.id,
+                                                                    ) ? (
+                                                                        <div className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-status-success-bg text-status-success">
+                                                                            <Check className="h-4 w-4" />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                                                            <X className="h-4 w-4" />
+                                                                        </div>
+                                                                    )}
+                                                                </TableCell>
+                                                            ),
+                                                        )}
+                                                    </TableRow>
+                                                ))}
+                                            </>
+                                        ),
+                                    )}
                                     {filteredPermissions.length === 0 && (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={visibleRoles.length + 1}
-                                                className="text-center py-8 text-muted-foreground"
+                                                colSpan={
+                                                    visibleRoles.length + 1
+                                                }
+                                                className="py-8 text-center text-muted-foreground"
                                             >
-                                                No permissions match your search.
+                                                No permissions match your
+                                                search.
                                             </TableCell>
                                         </TableRow>
                                     )}

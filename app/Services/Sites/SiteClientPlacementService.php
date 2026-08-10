@@ -19,20 +19,14 @@ class SiteClientPlacementService
     public function place(Site $site, array $placement, User $actor): Client
     {
         return DB::transaction(function () use ($site, $placement, $actor) {
-            $organizationId = $site->tenant_id ?? $actor->organization_id;
             $room = $this->resolveRoom(
                 $site,
                 (int) $placement['client_id'],
                 $placement['room_id'] ?? null,
-                $organizationId,
             );
             $client = Client::query()
                 ->whereKey($placement['client_id'])
                 ->whereNull('site_id')
-                ->when(
-                    $organizationId !== null,
-                    fn ($query) => $query->where('organization_id', $organizationId),
-                )
                 ->lockForUpdate()
                 ->first();
 
@@ -45,11 +39,10 @@ class SiteClientPlacementService
             $serviceContextId = $this->resolveServiceContextId(
                 $site,
                 $placement['service_context_id'] ?? null,
-                $organizationId,
             );
             $keyWorkerId = $this->resolveKeyWorkerId(
+                $site,
                 $placement['key_worker_id'] ?? null,
-                $organizationId,
             );
 
             $client->forceFill([
@@ -80,14 +73,9 @@ class SiteClientPlacementService
         array $assignment = [],
     ): SiteHouseRoom {
         return DB::transaction(function () use ($site, $room, $clientId, $actor, $assignment) {
-            $organizationId = $site->tenant_id ?? $actor->organization_id;
             $lockedRoom = SiteHouseRoom::query()
                 ->whereKey($room->id)
                 ->where('site_id', $site->id)
-                ->when(
-                    $organizationId !== null,
-                    fn ($query) => $query->where('tenant_id', $organizationId),
-                )
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -101,10 +89,6 @@ class SiteClientPlacementService
                 ? Client::query()
                     ->whereKey($clientId)
                     ->where('site_id', $site->id)
-                    ->when(
-                        $organizationId !== null,
-                        fn ($query) => $query->where('organization_id', $organizationId),
-                    )
                     ->lockForUpdate()
                     ->first()
                 : null;
@@ -142,7 +126,6 @@ class SiteClientPlacementService
         Site $site,
         int $clientId,
         mixed $roomId,
-        ?int $organizationId,
     ): ?SiteHouseRoom {
         if (! $roomId) {
             return null;
@@ -151,10 +134,6 @@ class SiteClientPlacementService
         $room = SiteHouseRoom::query()
             ->whereKey((int) $roomId)
             ->where('site_id', $site->id)
-            ->when(
-                $organizationId !== null,
-                fn ($query) => $query->where('tenant_id', $organizationId),
-            )
             ->where('is_active', true)
             ->where('is_assignable', true)
             ->where(fn ($query) => $query
@@ -175,14 +154,13 @@ class SiteClientPlacementService
     private function resolveServiceContextId(
         Site $site,
         mixed $serviceContextId,
-        ?int $organizationId,
     ): ?int {
         if (! $serviceContextId) {
             return null;
         }
 
         $id = ServiceContext::query()
-            ->forOrganization($organizationId)
+            ->availableToSite($site->id)
             ->whereKey((int) $serviceContextId)
             ->where('is_active', true)
             ->where(fn ($query) => $query
@@ -242,7 +220,6 @@ class SiteClientPlacementService
 
         if ($client && $client->id !== $previousClientId) {
             $room->history()->create([
-                'tenant_id' => $site->tenant_id,
                 'client_id' => $client->id,
                 'assigned_from' => $assignedFrom,
                 'assigned_until' => $assignedUntil,
@@ -254,18 +231,14 @@ class SiteClientPlacementService
         return $room->refresh();
     }
 
-    private function resolveKeyWorkerId(mixed $keyWorkerId, ?int $organizationId): ?int
+    private function resolveKeyWorkerId(Site $site, mixed $keyWorkerId): ?int
     {
         if (! $keyWorkerId) {
             return null;
         }
 
-        $id = app(ClientWorkerEligibility::class)
-            ->queryForOrganization($organizationId)
-            ->whereKey((int) $keyWorkerId)
-            ->value('id');
-
-        if (! $id) {
+        $id = (int) $keyWorkerId;
+        if (! app(ClientWorkerEligibility::class)->containsForSite($site->id, $id)) {
             throw ValidationException::withMessages([
                 'key_worker_id' => 'This key worker is no longer eligible.',
             ]);

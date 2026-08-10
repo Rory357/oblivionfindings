@@ -331,12 +331,17 @@ abstract class TestCase extends BaseTestCase
             return;
         }
 
-        try {
-            $kernel = $app->make(Kernel::class);
-            $kernel->call('migrate', ['--force' => true, '--no-interaction' => true]);
-        } catch (\Throwable) {
-            // Best-effort: if the migrator can't run here we fall back to the
-            // schema-dump-only state, which matches the prior behaviour.
+        $kernel = $app->make(Kernel::class);
+        $exitCode = $kernel->call('migrate', ['--force' => true, '--no-interaction' => true]);
+
+        if ($exitCode !== 0) {
+            $output = trim($kernel->output());
+
+            throw new \RuntimeException(sprintf(
+                'Pending test database migrations failed with exit code %d.%s',
+                $exitCode,
+                $output === '' ? '' : PHP_EOL.$output,
+            ));
         }
 
         static::$pendingMigrationsApplied = true;
@@ -416,10 +421,13 @@ abstract class TestCase extends BaseTestCase
         string $password,
         string $database,
     ): bool {
-        $schemaPath = Application::inferBasePath()
-            .DIRECTORY_SEPARATOR.'database'
-            .DIRECTORY_SEPARATOR.'schema'
-            .DIRECTORY_SEPARATOR.'mysql-schema.sql';
+        $configuredSchemaPath = trim((string) ($this->environmentValue('MYSQL_TEST_SCHEMA_PATH') ?? ''));
+        $schemaPath = $configuredSchemaPath !== ''
+            ? $configuredSchemaPath
+            : Application::inferBasePath()
+                .DIRECTORY_SEPARATOR.'database'
+                .DIRECTORY_SEPARATOR.'schema'
+                .DIRECTORY_SEPARATOR.'mysql-schema.sql';
 
         if (! is_file($schemaPath)) {
             return false;

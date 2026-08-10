@@ -20,7 +20,6 @@ class CareNoteTemplateController extends Controller
         $search = trim((string) ($filters['q'] ?? ''));
 
         $templates = CareNoteTemplate::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'))
             ->when(($filters['status'] ?? null) === 'active', fn ($q) => $q->where('is_active', true))
             ->when(($filters['status'] ?? null) === 'inactive', fn ($q) => $q->where('is_active', false))
@@ -68,7 +67,6 @@ class CareNoteTemplateController extends Controller
         ]);
 
         CareNoteTemplate::create([
-            'organization_id' => $auth->organization_id,
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'fields' => $data['fields'],
@@ -84,9 +82,7 @@ class CareNoteTemplateController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canAccessTemplates($auth), 403);
 
-        $template = CareNoteTemplate::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($template);
+        $template = CareNoteTemplate::query()->findOrFail($template);
 
         return inertia('operations/note-templates/Edit', [
             'template' => $template,
@@ -98,9 +94,7 @@ class CareNoteTemplateController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canAccessTemplates($auth), 403);
 
-        $template = CareNoteTemplate::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($template);
+        $template = CareNoteTemplate::query()->findOrFail($template);
 
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -119,9 +113,7 @@ class CareNoteTemplateController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canAccessTemplates($auth), 403);
 
-        $template = CareNoteTemplate::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($template);
+        $template = CareNoteTemplate::query()->findOrFail($template);
 
         $template->delete();
 

@@ -1,12 +1,14 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->manager = User::factory()->create([
         'name' => 'HR Manager',
@@ -17,27 +19,39 @@ beforeEach(function () {
     if ($adminRole) {
         $this->manager->roles()->syncWithoutDetaching([$adminRole->id]);
     }
+    $this->site = Site::factory()->create(['name' => 'People Actions Test Site']);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $this->manager->id,
+        'employee_number' => 'EMP-ACTIONS-VIEWER',
+        'work_email' => $this->manager->email,
+        'position_title' => 'HR Manager',
+        'position_role' => 'hr',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
+    ]);
 });
 
 function makeStaffProfile(string $name, array $overrides = []): HrEmployeeProfile
 {
     $staff = User::factory()->create([
         'name' => $name,
-        'email' => str($name)->slug() . '@example.test',
+        'email' => str($name)->slug().'@example.test',
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
 
     return HrEmployeeProfile::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
-        'employee_number' => 'EMP-' . $staff->id,
+        'employee_number' => 'EMP-'.$staff->id,
         'work_email' => $staff->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
         'start_date' => now()->subMonth()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => Site::query()->orderBy('id')->value('id'),
     ], $overrides));
 }
 
@@ -122,6 +136,9 @@ test('bulk deactivate sets selected profiles inactive', function () {
 
 test('bulk assign_site moves selected profiles to the chosen site', function () {
     $site = Site::factory()->create(['name' => 'Rata House']);
+    $this->manager->hrEmployeeProfile->update([
+        'secondary_site_ids' => [$site->id],
+    ]);
     $a = makeStaffProfile('Movable Worker');
 
     $this->actingAs($this->manager)
@@ -150,7 +167,7 @@ test('bulk actions write an audit-log row per profile', function () {
         ->assertRedirect();
 
     foreach ([$a, $b] as $profile) {
-        expect(\App\Models\AuditLog::query()
+        expect(AuditLog::query()
             ->where('action', 'hremployeeprofile.update')
             ->where('auditable_id', $profile->id)
             ->exists())->toBeTrue();

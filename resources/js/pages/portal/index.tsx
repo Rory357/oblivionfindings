@@ -1,11 +1,11 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, usePage } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useInitials } from '@/hooks/use-initials';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { Heart, Users } from 'lucide-react';
 
 type PortalClient = {
@@ -54,7 +54,9 @@ export default function PortalIndex({ clients }: Props) {
                             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                                 <Users className="h-6 w-6 text-muted-foreground" />
                             </div>
-                            <CardTitle className="text-base">No linked clients</CardTitle>
+                            <CardTitle className="text-base">
+                                No linked clients
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p className="text-sm text-muted-foreground">
@@ -71,35 +73,53 @@ export default function PortalIndex({ clients }: Props) {
                             >
                                 <CardHeader className="flex flex-row items-center gap-4 space-y-0">
                                     <Avatar className="h-12 w-12">
-                                        {c.avatar && <AvatarImage src={c.avatar} alt={c.name} />}
+                                        {c.avatar && (
+                                            <AvatarImage
+                                                src={c.avatar}
+                                                alt={c.name}
+                                            />
+                                        )}
                                         <AvatarFallback className="bg-primary/10 text-primary">
                                             {getInitials(c.name)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="min-w-0 flex-1">
-                                        <CardTitle className="truncate text-base">{c.name}</CardTitle>
+                                        <CardTitle className="truncate text-base">
+                                            {c.name}
+                                        </CardTitle>
                                         <div className="mt-1 flex flex-wrap items-center gap-1.5">
                                             {c.relation && (
-                                                <Badge variant="outline" className="capitalize">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="capitalize"
+                                                >
                                                     {c.relation}
                                                 </Badge>
                                             )}
-                                            {c.status?.toLowerCase() === 'active' && (
+                                            {c.status?.toLowerCase() ===
+                                                'active' && (
                                                 <Badge className="bg-status-success-bg text-status-success hover:bg-status-success-bg dark:bg-status-success-bg dark:text-status-success">
                                                     Active
                                                 </Badge>
                                             )}
-                                            {c.status && c.status.toLowerCase() !== 'active' && (
-                                                <Badge variant="secondary" className="capitalize">
-                                                    {c.status}
-                                                </Badge>
-                                            )}
+                                            {c.status &&
+                                                c.status.toLowerCase() !==
+                                                    'active' && (
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="capitalize"
+                                                    >
+                                                        {c.status}
+                                                    </Badge>
+                                                )}
                                         </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
                                     <Button asChild className="w-full">
-                                        <Link href={`/portal/clients/${c.id}/dashboard`}>
+                                        <Link
+                                            href={`/portal/clients/${c.id}/dashboard`}
+                                        >
                                             View Dashboard
                                         </Link>
                                     </Button>

@@ -281,6 +281,20 @@ class IncidentJourneyService
         return new IncidentJourney($incident, $alert, $hsEvent);
     }
 
+    public function hsEventIsCanonicalForIncident(ClientIncident $incident, HsEvent $event): bool
+    {
+        try {
+            $this->assertHsEventMatchesIncidentForRead(
+                $incident,
+                $event,
+            );
+        } catch (\DomainException) {
+            return false;
+        }
+
+        return true;
+    }
+
     public function incidentForAlert(ControlRoomAlert $alert): ?ClientIncident
     {
         $direct = ClientIncident::query()
@@ -436,18 +450,6 @@ class IncidentJourneyService
                 ->whereIn('id', $legacyIncidentIds)
                 ->get()
                 ->keyBy(fn (ClientIncident $incident): int => (int) $incident->id);
-        $directClientIds = $alerts
-            ->pluck('client_id')
-            ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
-            ->map(fn ($id): int => (int) $id)
-            ->unique()
-            ->values();
-        $currentClientOrganizationIds = $directClientIds->isEmpty()
-            ? collect()
-            : Client::query()
-                ->whereIn('id', $directClientIds)
-                ->pluck('organization_id', 'id');
-
         $records = $alerts->map(function (ControlRoomAlert $alert) use (
             $directEvents,
             $directIncidents,
@@ -491,7 +493,7 @@ class IncidentJourneyService
                 ->values()
                 ->all(),
         );
-        $journeyIncidents->loadMissing('client:id,organization_id');
+        $journeyIncidents->loadMissing('client:id,site_id');
         $directHsIds = $journeyIncidents
             ->pluck('hs_event_id')
             ->filter(fn ($id): bool => is_numeric($id))
@@ -550,7 +552,6 @@ class IncidentJourneyService
                 ->groupBy(fn (ControlRoomAlert $alert): int => (int) data_get($alert->context, 'incident_id'));
 
         $resolved = $records->map(function (array $record) use (
-            $currentClientOrganizationIds,
             $journeyEventsById,
             $journeyEventsByKey,
             $legacyJourneyAlerts,
@@ -571,12 +572,9 @@ class IncidentJourneyService
                     ->get($this->hsIdempotencyKey($incident))
                     ?->first();
                 if ($journeyEvent !== null) {
-                    $isDirectLink = $incident->hs_event_id !== null
-                        && (int) $incident->hs_event_id === (int) $journeyEvent->id;
                     $this->assertHsEventMatchesIncidentForRead(
                         $incident,
                         $journeyEvent,
-                        requireCanonicalTuple: ! $isDirectLink,
                     );
                 }
 
@@ -599,14 +597,12 @@ class IncidentJourneyService
                 $this->alertProvenance->assertHealthSafetyEventTuple(
                     $alert,
                     $directEvent,
-                    $currentClientOrganizationIds,
                 );
             }
             if ($journeyEvent !== null) {
                 $this->alertProvenance->assertHealthSafetyEventTuple(
                     $alert,
                     $journeyEvent,
-                    $currentClientOrganizationIds,
                 );
             }
             if ($directEvent !== null
@@ -640,23 +636,18 @@ class IncidentJourneyService
 
     public function closeGate(ClientIncident $incident): JourneyGate
     {
-        return $this->buildCloseGate($incident, requireCanonicalTuple: true);
+        return $this->buildCloseGate($incident);
     }
 
     public function closeGateForDisplay(ClientIncident $incident): JourneyGate
     {
-        return $this->buildCloseGate($incident, requireCanonicalTuple: false);
+        return $this->buildCloseGate($incident);
     }
 
-    private function buildCloseGate(
-        ClientIncident $incident,
-        bool $requireCanonicalTuple,
-    ): JourneyGate {
+    private function buildCloseGate(ClientIncident $incident): JourneyGate
+    {
         $incident = ClientIncident::query()->findOrFail($incident->getKey());
-        $hsEvent = $this->readHsEventForIncident(
-            $incident,
-            requireCanonicalTuple: $requireCanonicalTuple,
-        );
+        $hsEvent = $this->readHsEventForIncident($incident);
         $reviewComplete = in_array($incident->status, ['reviewed', 'closed'], true)
             && $incident->reviewed_at !== null
             && $incident->reviewed_by !== null;
@@ -822,7 +813,7 @@ class IncidentJourneyService
             && $immediateAction === ''
         ) {
             throw new \DomainException(
-                'Immediate action is required for a high or critical Control Room incident.',
+                'Immediate action is required for a high or critical incident.',
             );
         }
         if ($hasImmediateActionInput) {
@@ -873,16 +864,16 @@ class IncidentJourneyService
 
     private function assertSeriousIncidentHasImmediateAction(
         ClientIncident $incident,
-        ControlRoomAlert $alert,
+        ?ControlRoomAlert $alert = null,
     ): void {
         $severity = HsEventService::normaliseSeverity((string) $incident->severity);
-        $isSerious = $alert->severity === HsEvent::SEVERITY_CRITICAL
+        $isSerious = $alert?->severity === HsEvent::SEVERITY_CRITICAL
             || in_array($severity, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true);
         if ($isSerious
             && blank($incident->immediate_action_taken)
         ) {
             throw new \DomainException(
-                'Immediate action is required for a high or critical Control Room incident.',
+                'Immediate action is required for a high or critical incident.',
             );
         }
     }
@@ -909,8 +900,44 @@ class IncidentJourneyService
             : 'control_room';
     }
 
+    private function ensureCanonicalIncidentSite(ClientIncident $incident): void
+    {
+        if ($incident->site_id !== null) {
+            return;
+        }
+
+        $client = Client::query()
+            ->select(['id', 'site_id'])
+            ->whereKey($incident->client_id)
+            ->lockForUpdate()
+            ->first();
+        if ($client?->site_id === null) {
+            throw new \DomainException(
+                'A canonical Site is required before an incident can enter the H&S journey.',
+            );
+        }
+
+        $incident->forceFill(['site_id' => (int) $client->site_id])->saveQuietly();
+        $incident->site_id = (int) $client->site_id;
+    }
+
     private function lockedOrCreatedHsEvent(ClientIncident $incident, ?User $actor): HsEvent
     {
+        $historicSourceEvent = $incident->site_id === null
+            ? $this->lockedExactSourceHsEventForSiteRecovery($incident)
+            : null;
+        if ($historicSourceEvent?->site_id !== null) {
+            // A source-owned H&S event is the surviving incident-time snapshot.
+            // Restore it before any fallback can consult the client's current Site.
+            $incident->forceFill(['site_id' => (int) $historicSourceEvent->site_id])->saveQuietly();
+            $incident->site_id = (int) $historicSourceEvent->site_id;
+        }
+
+        $this->ensureCanonicalIncidentSite($incident);
+        if ($incident->isSubmitted()) {
+            $this->assertSeriousIncidentHasImmediateAction($incident);
+        }
+
         $this->ensureOfficialIncidentReference($incident);
         $hsEvent = null;
 
@@ -926,7 +953,7 @@ class IncidentJourneyService
         }
 
         if ($hsEvent === null) {
-            $hsEvent = HsEvent::query()
+            $hsEvent = $historicSourceEvent ?? HsEvent::query()
                 ->where('idempotency_key', $this->hsIdempotencyKey($incident))
                 ->lockForUpdate()
                 ->first();
@@ -939,7 +966,6 @@ class IncidentJourneyService
                 'severity' => $this->hsSeverity($incident),
                 'occurred_at' => $incident->occurred_at,
                 'reported_at' => $incident->submitted_at ?? $incident->created_at,
-                'organization_id' => $this->incidentOrganizationId($incident),
                 'site_id' => $this->incidentSiteId($incident),
                 'client_id' => $incident->client_id,
                 'staff_id' => $incident->reported_by,
@@ -971,6 +997,41 @@ class IncidentJourneyService
         }
 
         return $hsEvent;
+    }
+
+    private function lockedExactSourceHsEventForSiteRecovery(ClientIncident $incident): ?HsEvent
+    {
+        $events = HsEvent::query()
+            ->where('source_type', ClientIncident::class)
+            ->where('source_id', $incident->id)
+            ->orderBy('id')
+            ->limit(2)
+            ->lockForUpdate()
+            ->get();
+
+        if ($events->count() > 1) {
+            throw new \DomainException(
+                'Incident journey conflict: multiple H&S events claim the incident source tuple.',
+            );
+        }
+
+        $event = $events->first();
+        if ($event === null) {
+            return null;
+        }
+
+        if (! $this->hsTupleIsCanonical($incident, $event)) {
+            throw new \DomainException(
+                'Incident journey conflict: the historic H&S event does not own the canonical incident tuple.',
+            );
+        }
+
+        $this->assertHsEventMatchesIncidentForRead(
+            $incident,
+            $event,
+        );
+
+        return $event;
     }
 
     private function ensureOfficialIncidentReference(ClientIncident $incident): void
@@ -1518,37 +1579,25 @@ class IncidentJourneyService
         return ($rank[$current] ?? 0) >= ($rank[$target] ?? 0) ? $current : $target;
     }
 
-    private function incidentSiteId(ClientIncident $incident): ?int
+    private function incidentSiteId(ClientIncident $incident): int
     {
-        if ($incident->site_id !== null) {
-            return (int) $incident->site_id;
+        if ($incident->site_id === null) {
+            throw new \DomainException(
+                'A canonical Site is required before an incident can enter the H&S journey.',
+            );
         }
 
-        $clientSiteId = Client::query()->whereKey($incident->client_id)->value('site_id');
-
-        return $clientSiteId === null ? null : (int) $clientSiteId;
+        return (int) $incident->site_id;
     }
 
-    private function incidentOrganizationId(ClientIncident $incident): ?int
+    private function readHsEventForIncident(ClientIncident $incident): ?HsEvent
     {
-        $organizationId = Client::query()
-            ->whereKey($incident->client_id)
-            ->value('organization_id');
-
-        return is_numeric($organizationId) ? (int) $organizationId : null;
-    }
-
-    private function readHsEventForIncident(
-        ClientIncident $incident,
-        bool $requireCanonicalTuple = false,
-    ): ?HsEvent {
         if ($incident->hs_event_id !== null) {
             $direct = HsEvent::query()->find($incident->hs_event_id);
             if ($direct !== null) {
                 $this->assertHsEventMatchesIncidentForRead(
                     $incident,
                     $direct,
-                    $requireCanonicalTuple,
                 );
 
                 return $direct;
@@ -1564,7 +1613,6 @@ class IncidentJourneyService
             $this->assertHsEventMatchesIncidentForRead(
                 $incident,
                 $fallback,
-                requireCanonicalTuple: true,
             );
         }
 
@@ -1574,17 +1622,17 @@ class IncidentJourneyService
     private function assertHsEventMatchesIncidentForRead(
         ClientIncident $incident,
         HsEvent $event,
-        bool $requireCanonicalTuple,
     ): void {
-        if ($requireCanonicalTuple) {
-            $sourceType = ltrim((string) $event->source_type, '\\');
-            if ($sourceType !== ClientIncident::class
-                || (int) $event->source_id !== (int) $incident->id
-            ) {
-                throw new \DomainException(
-                    'Incident journey conflict: the direct H&S event does not match the canonical incident tuple.',
-                );
-            }
+        $tuple = $this->canonicalHsTuple($incident);
+        $sourceType = ltrim((string) $event->source_type, '\\');
+        if ($sourceType !== $tuple['source_type']
+            || (int) $event->source_id !== $tuple['source_id']
+            || $event->event_category !== $tuple['event_category']
+            || $event->idempotency_key !== $tuple['idempotency_key']
+        ) {
+            throw new \DomainException(
+                'Incident journey conflict: the direct H&S event does not match the canonical incident tuple.',
+            );
         }
 
         if ($incident->control_room_alert_id !== null
@@ -1596,30 +1644,20 @@ class IncidentJourneyService
             );
         }
 
-        if ($requireCanonicalTuple) {
-            foreach (['client_id', 'site_id'] as $column) {
-                if ($incident->{$column} !== null
-                    && $event->{$column} !== null
-                    && (int) $incident->{$column} !== (int) $event->{$column}
-                ) {
-                    throw new \DomainException(
-                        "Incident journey conflict: the direct H&S event {$column} does not match the incident.",
-                    );
-                }
-            }
+        $incidentClientId = $incident->client_id === null ? null : (int) $incident->client_id;
+        $eventClientId = $event->client_id === null ? null : (int) $event->client_id;
+        if ($incidentClientId !== $eventClientId) {
+            throw new \DomainException(
+                'Incident journey conflict: the direct H&S event client_id does not match the incident.',
+            );
         }
 
-        $incidentOrganizationId = $incident->client_id === null
-            ? null
-            : ($incident->relationLoaded('client')
-                ? $incident->client?->organization_id
-                : $incident->client()->value('organization_id'));
-        if ($incidentOrganizationId !== null
-            && $event->organization_id !== null
-            && (int) $incidentOrganizationId !== (int) $event->organization_id
+        if ($incident->site_id !== null
+            && ($event->site_id === null
+                || (int) $incident->site_id !== (int) $event->site_id)
         ) {
             throw new \DomainException(
-                'Incident journey conflict: the direct H&S event organization does not match the incident.',
+                'Incident journey conflict: the direct H&S event site_id does not match the incident.',
             );
         }
     }

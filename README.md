@@ -2,6 +2,8 @@
 
 Laravel 12, Inertia, React, and TypeScript application for frontline care operations. The app contains worker-facing flows such as My Day and My Roster, manager operations such as rostering and shifts, plus governance, finance, care, incidents, control room, privacy, and reporting surfaces.
 
+Oblivion Findings is a **single-tenant application** for one operating organisation across multiple sites. Site access, roles, canonical ownership, direct-object denial, and privacy boundaries provide authorization. Legacy `tenant_id` / `organization_id` columns must not be used to infer or design a multi-tenant product. See `docs/architecture/single-tenant-application.md`.
+
 ## Stack
 
 - PHP 8.2+, Laravel 12, Pest/PHPUnit, Laravel Dusk.
@@ -57,11 +59,13 @@ Playwright is the canonical e2e harness for new browser coverage. Dusk remains f
 - `docs/testing.md` - testing quick reference, Playwright notes, and screenshot baseline policy.
 - `docs/architecture/shifts-module-map.md` - current shifts and rostering route/module map.
 - `docs/architecture/shifts-route-deprecation.md` - legacy shifts redirect policy.
+- `docs/architecture/single-tenant-application.md` - mandatory product and authorization boundary for all new work.
 - `docs/route-ownership.md` - route ownership and canonical surface guidance.
 
 ## Maintenance Rules
 
 - Keep worker-facing flows under `/my-day` and `/my-roster`; manager flows stay under `/operations/*`.
+- Do not introduce multi-tenant product assumptions or cross-tenant acceptance fixtures; use site, role, ownership, and privacy boundaries.
 - When the test tree changes, update `docs/TEST_SUITE_SUMMARY.md` and `docs/testing.md`.
 - Do not delete Dusk tests until the parity inventory says the behavior is covered elsewhere and the replacement suite has proven green.
 - Regenerate the portable schema after structural migrations with `php artisan rostering:dump-schema-portable`.

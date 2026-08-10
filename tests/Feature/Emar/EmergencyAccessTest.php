@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BreakGlassAccessEvent;
 use App\Models\BreakGlassFlagDismissal;
 use App\Models\BreakGlassPolicy;
@@ -33,6 +34,7 @@ class EmergencyAccessTest extends TestCase
         $user = $this->makeRoleUser('admin');
         $this->grantPermissions($user, ['medications.breakglass', 'medications.audit.view']);
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#5E35B1']);
+        $this->attachCurrentSiteAssignment($user, $site, 'registered_nurse');
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $access = ClientBreakGlassAccess::query()->create([
             'client_id' => $client->id, 'user_id' => $user->id, 'reason' => 'Clinical urgency — resident unwell',
@@ -86,8 +88,9 @@ class EmergencyAccessTest extends TestCase
 
     public function test_grant_persists_structured_fields_and_cosign(): void
     {
-        ['user' => $user, 'client' => $client] = $this->seedAccess();
-        $cosigner = User::factory()->create(['organization_id' => $user->organization_id, 'approved_at' => now()]);
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->seedAccess();
+        $cosigner = $this->makeRoleUser('provider_manager');
+        $this->attachCurrentSiteAssignment($cosigner, $site, 'provider_manager');
 
         $this->actingAs($user)
             ->from('/emar/emergency-access')
@@ -120,6 +123,23 @@ class EmergencyAccessTest extends TestCase
             ->from('/emar/emergency-access')
             ->post("/clients/{$client->id}/break-glass", [
                 'reason' => 'x', 'authorization_mode' => 'co_sign', 'co_signed_by' => $user->id,
+            ])
+            ->assertSessionHasErrors('co_signed_by');
+    }
+
+    public function test_cosign_requires_an_approved_user_with_access_to_the_client_site(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAccess();
+        $otherSite = Site::factory()->create(['is_active' => true]);
+        $outsideApprover = $this->makeRoleUser('provider_manager');
+        $this->attachCurrentSiteAssignment($outsideApprover, $otherSite, 'provider_manager');
+
+        $this->actingAs($user)
+            ->from('/emar/emergency-access')
+            ->post("/clients/{$client->id}/break-glass", [
+                'reason' => 'Urgent medication support',
+                'authorization_mode' => 'co_sign',
+                'co_signed_by' => $outsideApprover->id,
             ])
             ->assertSessionHasErrors('co_signed_by');
     }
@@ -199,7 +219,14 @@ class EmergencyAccessTest extends TestCase
     public function test_page_serves_approvers_and_awaiting_review(): void
     {
         ['user' => $user, 'site' => $site, 'access' => $access] = $this->seedAccess();
-        User::factory()->create(['organization_id' => $user->organization_id, 'approved_at' => now()]);
+        $approver = $this->makeRoleUser('provider_manager');
+        $this->attachCurrentSiteAssignment($approver, $site, 'provider_manager');
+        $outsideApprover = $this->makeRoleUser('provider_manager');
+        $this->attachCurrentSiteAssignment(
+            $outsideApprover,
+            Site::factory()->create(['is_active' => true]),
+            'provider_manager',
+        );
         $access->forceFill(['expires_at' => now()->subMinutes(5)])->save(); // expired, unreviewed
 
         $this->actingAs($user)
@@ -207,7 +234,8 @@ class EmergencyAccessTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('can_review', true)
-                ->has('approvers')
+                ->has('approvers', 1)
+                ->where('approvers.0.id', $approver->id)
                 ->where('stats.awaiting_review', 1)
             );
     }
@@ -226,6 +254,61 @@ class EmergencyAccessTest extends TestCase
             );
     }
 
+    public function test_break_glass_discovery_and_grants_follow_canonical_site_access(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $visibleSite = Site::factory()->create(['is_active' => true]);
+        $hiddenSite = Site::factory()->create(['is_active' => true]);
+        $worker = $this->makeRoleUser('support_worker');
+        $this->grantPermissions($worker, ['medications.breakglass']);
+        $this->attachCurrentSiteAssignment($worker, $visibleSite, 'support_worker');
+        $visibleClient = Client::factory()->create([
+            'site_id' => $visibleSite->id,
+            'first_name' => 'Visible',
+            'last_name' => 'Resident',
+        ]);
+        $hiddenClient = Client::factory()->create([
+            'site_id' => $hiddenSite->id,
+            'first_name' => 'Hidden',
+            'last_name' => 'Resident',
+        ]);
+        ClientBreakGlassAccess::query()->create([
+            'client_id' => $visibleClient->id,
+            'user_id' => $worker->id,
+            'reason' => 'Visible Site emergency',
+            'expires_at' => now()->addHour(),
+        ]);
+        ClientBreakGlassAccess::query()->create([
+            'client_id' => $hiddenClient->id,
+            'user_id' => $worker->id,
+            'reason' => 'Hidden Site emergency',
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $response = $this->actingAs($worker)
+            ->get('/emar/emergency-access?q=Resident')
+            ->assertOk();
+
+        $response->assertInertia(function (Assert $page) use ($hiddenClient, $hiddenSite, $visibleClient, $visibleSite): void {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame([$visibleSite->id], collect($props['sites'])->pluck('id')->all());
+            $this->assertSame([$visibleClient->id], collect($props['results'])->pluck('id')->all());
+            $this->assertSame([$visibleClient->id], collect($props['activeAccesses'])->pluck('client_id')->all());
+            $this->assertSame([$visibleClient->id], collect($props['auditLog'])->pluck('client_id')->all());
+            $this->assertNotContains($hiddenSite->id, collect($props['sites'])->pluck('id')->all());
+            $this->assertNotContains($hiddenClient->id, collect($props['results'])->pluck('id')->all());
+        });
+
+        $this->actingAs($worker)
+            ->get('/emar/emergency-access?site_id='.$hiddenSite->id)
+            ->assertForbidden();
+
+        $this->actingAs($worker)
+            ->post("/clients/{$hiddenClient->id}/break-glass", ['reason' => 'Out of Site scope'])
+            ->assertForbidden();
+    }
+
     public function test_policy_payload_falls_back_to_constant_defaults(): void
     {
         ['user' => $user, 'site' => $site] = $this->seedAccess();
@@ -241,7 +324,7 @@ class EmergencyAccessTest extends TestCase
             );
     }
 
-    public function test_admin_updates_org_policy_and_it_is_served_and_enforced(): void
+    public function test_admin_updates_the_application_policy_and_it_is_served_and_enforced(): void
     {
         ['user' => $user, 'client' => $client] = $this->seedAccess();
 
@@ -258,11 +341,11 @@ class EmergencyAccessTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('break_glass_policies', [
-            'organization_id' => $user->organization_id,
             'default_minutes' => 45,
             'max_minutes' => 90,
             'repeat_threshold_count' => 2,
         ]);
+        $this->assertDatabaseCount('break_glass_policies', 1);
 
         // Enforced: a grant beyond the new max is rejected by validation.
         $this->actingAs($user)
@@ -272,6 +355,12 @@ class EmergencyAccessTest extends TestCase
 
         // Served back to the page.
         $this->actingAs($user)
+            ->get('/emar/emergency-access')
+            ->assertInertia(fn (Assert $page) => $page->where('policy.max_minutes', 90));
+
+        $otherAdmin = $this->makeRoleUser('admin');
+        $this->grantPermissions($otherAdmin, ['medications.breakglass', 'medications.audit.view']);
+        $this->actingAs($otherAdmin)
             ->get('/emar/emergency-access')
             ->assertInertia(fn (Assert $page) => $page->where('policy.max_minutes', 90));
     }
@@ -297,7 +386,6 @@ class EmergencyAccessTest extends TestCase
     {
         ['user' => $user, 'client' => $client] = $this->seedAccess();
         BreakGlassPolicy::query()->create(array_merge(BreakGlassPolicy::defaults(), [
-            'organization_id' => $user->organization_id,
             'repeat_threshold_count' => 2,
         ]));
         // seedAccess already created one grant by $user; a second crosses the lowered threshold.
@@ -318,7 +406,7 @@ class EmergencyAccessTest extends TestCase
     {
         ['user' => $user, 'client' => $client] = $this->seedAccess();
         BreakGlassPolicy::query()->create(array_merge(BreakGlassPolicy::defaults(), [
-            'organization_id' => $user->organization_id, 'repeat_threshold_count' => 2,
+            'repeat_threshold_count' => 2,
         ]));
         ClientBreakGlassAccess::query()->create([
             'client_id' => $client->id, 'user_id' => $user->id, 'reason' => 'second', 'expires_at' => now()->addHour(),
@@ -346,7 +434,7 @@ class EmergencyAccessTest extends TestCase
     {
         ['user' => $user, 'client' => $client] = $this->seedAccess();
         BreakGlassPolicy::query()->create(array_merge(BreakGlassPolicy::defaults(), [
-            'organization_id' => $user->organization_id, 'repeat_threshold_count' => 2,
+            'repeat_threshold_count' => 2,
         ]));
         ClientBreakGlassAccess::query()->create([
             'client_id' => $client->id, 'user_id' => $user->id, 'reason' => 'second', 'expires_at' => now()->addHour(),
@@ -354,7 +442,7 @@ class EmergencyAccessTest extends TestCase
 
         // A stale acknowledgement (before the latest activity) must NOT suppress the signal.
         BreakGlassFlagDismissal::query()->create([
-            'organization_id' => $user->organization_id, 'signal_type' => 'repeat', 'signal_key' => (string) $user->id,
+            'signal_type' => 'repeat', 'signal_key' => (string) $user->id,
             'dismissed_by' => $user->id, 'dismissed_through' => now()->subMinutes(30),
         ]);
 
@@ -373,6 +461,21 @@ class EmergencyAccessTest extends TestCase
             ->post('/emar/break-glass-flags/dismiss', ['type' => 'repeat', 'key' => '1']);
 
         $this->assertContains($response->status(), [403, 404]);
+        $this->assertDatabaseCount('break_glass_flag_dismissals', 0);
+    }
+
+    public function test_reviewer_cannot_acknowledge_a_signal_that_does_not_exist(): void
+    {
+        ['user' => $user] = $this->seedAccess();
+
+        $this->actingAs($user)
+            ->post('/emar/break-glass-flags/dismiss', [
+                'type' => 'repeat',
+                'key' => (string) $user->id,
+                'reason' => 'Forged acknowledgement',
+            ])
+            ->assertNotFound();
+
         $this->assertDatabaseCount('break_glass_flag_dismissals', 0);
     }
 
@@ -446,6 +549,21 @@ class EmergencyAccessTest extends TestCase
         }
 
         return $user;
+    }
+
+    private function attachCurrentSiteAssignment(User $user, Site $site, string $positionRole): HrEmployeeProfile
+    {
+        return HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'position_role' => $positionRole,
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+            'end_date' => null,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
     }
 
     /**

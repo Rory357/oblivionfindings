@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\Role;
@@ -18,34 +19,39 @@ beforeEach(function () {
 
     $this->admin = User::factory()->create([
         'role' => 'admin',
-        'organization_id' => 41,
         'approved_at' => now(),
     ]);
     $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
 
     $this->site = Site::factory()->create([
-        'tenant_id' => 41,
         'type' => 'house',
     ]);
 });
 
-function sitePlacementWorker(int $organizationId): User
+function sitePlacementWorker(Site $site): User
 {
     $worker = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => $organizationId,
         'approved_at' => now(),
     ]);
     $worker->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
-    return $worker;
+    return $worker->fresh(['hrEmployeeProfile']);
 }
 
 test('site profile has no duplicate client creation endpoint', function () {
     expect(Route::has('sites.clients.store'))->toBeFalse();
 });
 
-test('canonical full client creation records the authenticated organization', function () {
+test('canonical full client creation records the selected Site', function () {
     $this->actingAs($this->admin)
         ->post(route('clients.store'), [
             '_modal' => true,
@@ -61,21 +67,20 @@ test('canonical full client creation records the authenticated organization', fu
         'first_name' => 'Aroha',
         'last_name' => 'Rangi',
         'site_id' => $this->site->id,
-        'organization_id' => 41,
     ]);
 });
 
-test('canonical full client creation rejects foreign and occupied placement options', function () {
-    $foreignSite = Site::factory()->create(['tenant_id' => 99, 'type' => 'house']);
-    $foreignContext = ServiceContext::create([
-        'site_id' => $foreignSite->id,
+test('canonical full client creation rejects cross-Site and occupied placement options', function () {
+    $otherSite = Site::factory()->create(['type' => 'house']);
+    $otherContext = ServiceContext::create([
+        'site_id' => $otherSite->id,
         'type' => 'residential',
-        'name' => 'Foreign residential care',
+        'name' => 'Other Site residential care',
         'is_active' => true,
     ]);
-    $foreignFence = AssetGeofence::query()->create([
-        'site_id' => $foreignSite->id,
-        'name' => 'Foreign home fence',
+    $otherFence = AssetGeofence::query()->create([
+        'site_id' => $otherSite->id,
+        'name' => 'Other Site home fence',
         'type' => 'circle',
         'scope' => 'house',
         'shape' => ['lat' => -41.2866, 'lng' => 174.7756, 'radius_m' => 50],
@@ -83,13 +88,11 @@ test('canonical full client creation rejects foreign and occupied placement opti
         'is_active' => true,
     ]);
     $occupant = Client::factory()->create([
-        'organization_id' => 99,
-        'site_id' => $foreignSite->id,
+        'site_id' => $otherSite->id,
     ]);
     $occupiedRoom = SiteHouseRoom::create([
-        'site_id' => $foreignSite->id,
-        'tenant_id' => 99,
-        'name' => 'Occupied foreign room',
+        'site_id' => $otherSite->id,
+        'name' => 'Occupied room at another Site',
         'assigned_client_id' => $occupant->id,
         'is_active' => true,
         'is_assignable' => true,
@@ -99,37 +102,34 @@ test('canonical full client creation rejects foreign and occupied placement opti
         ->from(route('clients.index'))
         ->post(route('clients.store'), [
             '_modal' => true,
-            'site_id' => $foreignSite->id,
+            'site_id' => $this->site->id,
             'room_id' => $occupiedRoom->id,
-            'service_context_id' => $foreignContext->id,
-            'house_geofence_id' => $foreignFence->id,
-            'first_name' => 'Foreign',
+            'service_context_id' => $otherContext->id,
+            'house_geofence_id' => $otherFence->id,
+            'first_name' => 'Cross-Site',
             'last_name' => 'Placement',
             'status' => 'onboarding',
         ])
         ->assertRedirect(route('clients.index'))
         ->assertSessionHasErrors([
-            'site_id',
             'room_id',
             'service_context_id',
             'house_geofence_id',
         ]);
 
     $this->assertDatabaseMissing('clients', [
-        'first_name' => 'Foreign',
+        'first_name' => 'Cross-Site',
         'last_name' => 'Placement',
     ]);
 });
 
 test('links an unassigned client with placement metadata atomically', function () {
     $client = Client::factory()->create([
-        'organization_id' => 41,
         'site_id' => null,
         'room_id' => null,
     ]);
     $room = SiteHouseRoom::create([
         'site_id' => $this->site->id,
-        'tenant_id' => 41,
         'name' => 'Bedroom 1',
         'is_active' => true,
         'is_assignable' => true,
@@ -140,7 +140,7 @@ test('links an unassigned client with placement metadata atomically', function (
         'name' => 'Residential care',
         'is_active' => true,
     ]);
-    $worker = sitePlacementWorker(41);
+    $worker = sitePlacementWorker($this->site);
 
     $this->actingAs($this->admin)
         ->from(route('sites.show', $this->site))
@@ -166,65 +166,60 @@ test('links an unassigned client with placement metadata atomically', function (
     ]);
 });
 
-test('rejects clients and service contexts outside the site tenant', function () {
-    $foreignSite = Site::factory()->create(['tenant_id' => 99, 'type' => 'house']);
-    $foreignClient = Client::factory()->create([
-        'organization_id' => 99,
-        'site_id' => null,
+test('rejects clients and service contexts owned by another Site', function () {
+    $otherSite = Site::factory()->create(['type' => 'house']);
+    $otherClient = Client::factory()->create([
+        'site_id' => $otherSite->id,
     ]);
-    $foreignContext = ServiceContext::create([
-        'site_id' => $foreignSite->id,
+    $otherContext = ServiceContext::create([
+        'site_id' => $otherSite->id,
         'type' => 'residential',
-        'name' => 'Foreign residential care',
+        'name' => 'Other Site residential care',
         'is_active' => true,
     ]);
 
     $this->actingAs($this->admin)
         ->from(route('sites.show', $this->site))
         ->post(route('sites.clients.link', $this->site), [
-            'client_id' => $foreignClient->id,
-            'service_context_id' => $foreignContext->id,
+            'client_id' => $otherClient->id,
+            'service_context_id' => $otherContext->id,
         ])
         ->assertRedirect(route('sites.show', $this->site))
         ->assertSessionHasErrors(['client_id', 'service_context_id']);
 
-    expect($foreignClient->fresh()->site_id)->toBeNull();
+    expect($otherClient->fresh()->site_id)->toBe($otherSite->id);
 });
 
-test('rejects occupied or foreign rooms and unauthorized key workers', function () {
+test('rejects occupied or other-Site rooms and unavailable key workers', function () {
     $client = Client::factory()->create([
-        'organization_id' => 41,
         'site_id' => null,
     ]);
     $occupant = Client::factory()->create([
-        'organization_id' => 41,
         'site_id' => $this->site->id,
     ]);
     $occupiedRoom = SiteHouseRoom::create([
         'site_id' => $this->site->id,
-        'tenant_id' => 41,
         'name' => 'Occupied room',
         'assigned_client_id' => $occupant->id,
         'is_active' => true,
         'is_assignable' => true,
     ]);
-    $foreignSite = Site::factory()->create(['tenant_id' => 99, 'type' => 'house']);
-    $foreignRoom = SiteHouseRoom::create([
-        'site_id' => $foreignSite->id,
-        'tenant_id' => 99,
-        'name' => 'Foreign room',
+    $otherSite = Site::factory()->create(['type' => 'house']);
+    $otherRoom = SiteHouseRoom::create([
+        'site_id' => $otherSite->id,
+        'name' => 'Room at another Site',
         'is_active' => true,
         'is_assignable' => true,
     ]);
-    $foreignWorker = sitePlacementWorker(99);
+    $unavailableWorker = sitePlacementWorker($otherSite);
 
-    foreach ([$occupiedRoom, $foreignRoom] as $room) {
+    foreach ([$occupiedRoom, $otherRoom] as $room) {
         $this->actingAs($this->admin)
             ->from(route('sites.show', $this->site))
             ->post(route('sites.clients.link', $this->site), [
                 'client_id' => $client->id,
                 'room_id' => $room->id,
-                'key_worker_id' => $foreignWorker->id,
+                'key_worker_id' => $unavailableWorker->id,
             ])
             ->assertRedirect(route('sites.show', $this->site))
             ->assertSessionHasErrors(['room_id', 'key_worker_id']);
@@ -236,12 +231,10 @@ test('rejects occupied or foreign rooms and unauthorized key workers', function 
 
 test('unlink clears the room assignment without deleting the client', function () {
     $client = Client::factory()->create([
-        'organization_id' => 41,
         'site_id' => $this->site->id,
     ]);
     $room = SiteHouseRoom::create([
         'site_id' => $this->site->id,
-        'tenant_id' => 41,
         'name' => 'Bedroom 2',
         'assigned_client_id' => $client->id,
         'assigned_from' => now()->toDateString(),
@@ -266,13 +259,11 @@ test('unlink clears the room assignment without deleting the client', function (
 
 test('room assignment keeps the room and client placement fields in sync', function () {
     $client = Client::factory()->create([
-        'organization_id' => 41,
         'site_id' => $this->site->id,
         'room_id' => null,
     ]);
     $room = SiteHouseRoom::create([
         'site_id' => $this->site->id,
-        'tenant_id' => 41,
         'name' => 'Bedroom 3',
         'is_active' => true,
         'is_assignable' => true,
@@ -292,16 +283,13 @@ test('room assignment keeps the room and client placement fields in sync', funct
 
 test('room reassignment clears both sides of the previous placement', function () {
     $previous = Client::factory()->create([
-        'organization_id' => 41,
         'site_id' => $this->site->id,
     ]);
     $replacement = Client::factory()->create([
-        'organization_id' => 41,
         'site_id' => $this->site->id,
     ]);
     $room = SiteHouseRoom::create([
         'site_id' => $this->site->id,
-        'tenant_id' => 41,
         'name' => 'Bedroom 4',
         'assigned_client_id' => $previous->id,
         'assigned_from' => now()->subMonth()->toDateString(),
@@ -322,18 +310,16 @@ test('room reassignment clears both sides of the previous placement', function (
         ->and($room->fresh()->assigned_client_id)->toBe($replacement->id);
 });
 
-test('room assignment rejects clients outside the site organization and clears client state on unassign', function () {
+test('room assignment rejects clients owned by another Site and clears client state on unassign', function () {
     $client = Client::factory()->create([
-        'organization_id' => 41,
         'site_id' => $this->site->id,
     ]);
-    $foreignClient = Client::factory()->create([
-        'organization_id' => 99,
-        'site_id' => null,
+    $otherSite = Site::factory()->create(['type' => 'house']);
+    $otherClient = Client::factory()->create([
+        'site_id' => $otherSite->id,
     ]);
     $room = SiteHouseRoom::create([
         'site_id' => $this->site->id,
-        'tenant_id' => 41,
         'name' => 'Bedroom 5',
         'assigned_client_id' => $client->id,
         'assigned_from' => now()->toDateString(),
@@ -345,13 +331,13 @@ test('room assignment rejects clients outside the site organization and clears c
     $this->actingAs($this->admin)
         ->from(route('sites.rooms.index', $this->site))
         ->post(route('sites.rooms.assign', [$this->site, $room]), [
-            'client_id' => $foreignClient->id,
+            'client_id' => $otherClient->id,
         ])
         ->assertRedirect(route('sites.rooms.index', $this->site))
         ->assertSessionHasErrors('client_id');
 
     expect($room->fresh()->assigned_client_id)->toBe($client->id)
-        ->and($foreignClient->fresh()->room_id)->toBeNull();
+        ->and($otherClient->fresh()->room_id)->toBeNull();
 
     $this->actingAs($this->admin)
         ->post(route('sites.rooms.assign', [$this->site, $room]), [

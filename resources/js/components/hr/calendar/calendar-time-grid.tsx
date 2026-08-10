@@ -5,7 +5,13 @@
 import { type CSSProperties } from 'react';
 
 import { type CalendarLayerFeed } from '@/lib/calendar/layer-feed';
-import { barStyle, colorVar, dotStyle, fmtTime, sameDay } from './calendar-render';
+import {
+    barStyle,
+    colorVar,
+    dotStyle,
+    fmtTime,
+    sameDay,
+} from './calendar-render';
 
 const H0 = 6; // 6am
 const H1 = 21; // 9pm
@@ -39,7 +45,8 @@ export function CalendarTimeGrid({
     const hours: number[] = [];
     for (let h = H0; h <= H1; h++) hours.push(h);
 
-    const dotBorder = '1px dotted color-mix(in oklch, var(--primary) 12%, transparent)';
+    const dotBorder =
+        '1px dotted color-mix(in oklch, var(--primary) 12%, transparent)';
 
     const nowTop = (today.getHours() + today.getMinutes() / 60 - H0) * HOUR_H;
 
@@ -54,7 +61,13 @@ export function CalendarTimeGrid({
             }}
         >
             {/* all-day row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr', borderBottom: '1px solid var(--border)' }}>
+            <div
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: '56px 1fr',
+                    borderBottom: '1px solid var(--border)',
+                }}
+            >
                 <div
                     style={{
                         display: 'flex',
@@ -72,7 +85,9 @@ export function CalendarTimeGrid({
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: cols }}>
                     {days.map((d, i) => {
-                        const items = events.filter((e) => e.allDay && onSameLocalDay(e, d));
+                        const items = events.filter(
+                            (e) => e.allDay && onSameLocalDay(e, d),
+                        );
                         return (
                             <div
                                 key={i}
@@ -93,17 +108,34 @@ export function CalendarTimeGrid({
                                             type="button"
                                             onClick={(ev) => {
                                                 ev.stopPropagation();
-                                                handlers.onEntryClick(e, ev.clientX, ev.clientY);
+                                                handlers.onEntryClick(
+                                                    e,
+                                                    ev.clientX,
+                                                    ev.clientY,
+                                                );
                                             }}
                                             onContextMenu={(ev) => {
                                                 ev.preventDefault();
                                                 ev.stopPropagation();
-                                                handlers.onEntryCtx(e, ev.clientX, ev.clientY);
+                                                handlers.onEntryCtx(
+                                                    e,
+                                                    ev.clientX,
+                                                    ev.clientY,
+                                                );
                                             }}
-                                            style={barStyle(c, !!e.extendedProps.pending)}
+                                            style={barStyle(
+                                                c,
+                                                !!e.extendedProps.pending,
+                                            )}
                                         >
                                             <span style={dotStyle(c)} />
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            <span
+                                                style={{
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
                                                 {e.title}
                                             </span>
                                         </button>
@@ -116,13 +148,26 @@ export function CalendarTimeGrid({
             </div>
 
             {/* day headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr', borderBottom: '1px solid var(--border)' }}>
+            <div
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: '56px 1fr',
+                    borderBottom: '1px solid var(--border)',
+                }}
+            >
                 <div />
                 <div style={{ display: 'grid', gridTemplateColumns: cols }}>
                     {days.map((d, i) => {
                         const isToday = sameDay(d, today);
                         return (
-                            <div key={i} style={{ borderLeft: dotBorder, padding: '7px 4px', textAlign: 'center' }}>
+                            <div
+                                key={i}
+                                style={{
+                                    borderLeft: dotBorder,
+                                    padding: '7px 4px',
+                                    textAlign: 'center',
+                                }}
+                            >
                                 <div
                                     style={{
                                         fontSize: 10,
@@ -132,7 +177,9 @@ export function CalendarTimeGrid({
                                         color: 'var(--muted-foreground)',
                                     }}
                                 >
-                                    {d.toLocaleDateString('en-NZ', { weekday: 'short' })}
+                                    {d.toLocaleDateString('en-NZ', {
+                                        weekday: 'short',
+                                    })}
                                 </div>
                                 <div
                                     style={
@@ -149,7 +196,12 @@ export function CalendarTimeGrid({
                                                   fontSize: 14,
                                                   fontWeight: 700,
                                               }
-                                            : { fontSize: 16, fontWeight: 700, marginTop: 2, color: 'var(--foreground)' }
+                                            : {
+                                                  fontSize: 16,
+                                                  fontWeight: 700,
+                                                  marginTop: 2,
+                                                  color: 'var(--foreground)',
+                                              }
                                     }
                                 >
                                     {d.getDate()}
@@ -162,7 +214,13 @@ export function CalendarTimeGrid({
 
             {/* scroll body */}
             <div style={{ maxHeight: 560, overflowY: 'auto' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '56px 1fr', position: 'relative' }}>
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: '56px 1fr',
+                        position: 'relative',
+                    }}
+                >
                     {/* hour labels */}
                     <div>
                         {hours.map((h) => {
@@ -188,7 +246,13 @@ export function CalendarTimeGrid({
                     </div>
 
                     {/* day columns */}
-                    <div style={{ display: 'grid', gridTemplateColumns: cols, position: 'relative' }}>
+                    <div
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: cols,
+                            position: 'relative',
+                        }}
+                    >
                         {days.map((d, i) => {
                             const isToday = sameDay(d, today);
                             const colStyle: CSSProperties = {
@@ -196,17 +260,34 @@ export function CalendarTimeGrid({
                                 borderLeft: dotBorder,
                                 cursor: 'copy',
                             };
-                            if (isToday) colStyle.background = 'color-mix(in oklch, var(--primary) 2.5%, transparent)';
-                            const timed = events.filter((e) => !e.allDay && onSameLocalDay(e, d));
+                            if (isToday)
+                                colStyle.background =
+                                    'color-mix(in oklch, var(--primary) 2.5%, transparent)';
+                            const timed = events.filter(
+                                (e) => !e.allDay && onSameLocalDay(e, d),
+                            );
                             return (
                                 <div
                                     key={i}
                                     style={colStyle}
                                     onClick={(ev) => {
-                                        const rect = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+                                        const rect = (
+                                            ev.currentTarget as HTMLElement
+                                        ).getBoundingClientRect();
                                         const y = ev.clientY - rect.top;
-                                        const hour = Math.max(H0, Math.min(20, H0 + Math.floor(y / HOUR_H)));
-                                        handlers.onCreate(d, hour, ev.clientX, ev.clientY);
+                                        const hour = Math.max(
+                                            H0,
+                                            Math.min(
+                                                20,
+                                                H0 + Math.floor(y / HOUR_H),
+                                            ),
+                                        );
+                                        handlers.onCreate(
+                                            d,
+                                            hour,
+                                            ev.clientX,
+                                            ev.clientY,
+                                        );
                                     }}
                                 >
                                     {hours.map((h) => (
@@ -214,7 +295,8 @@ export function CalendarTimeGrid({
                                             key={h}
                                             style={{
                                                 height: HOUR_H,
-                                                borderTop: '1px solid color-mix(in oklch, var(--border) 35%, transparent)',
+                                                borderTop:
+                                                    '1px solid color-mix(in oklch, var(--border) 35%, transparent)',
                                             }}
                                         />
                                     ))}
@@ -227,9 +309,11 @@ export function CalendarTimeGrid({
                                                 right: 0,
                                                 top: nowTop,
                                                 height: 2,
-                                                background: 'var(--status-critical)',
+                                                background:
+                                                    'var(--status-critical)',
                                                 zIndex: 5,
-                                                boxShadow: '0 0 0 1px color-mix(in oklch, var(--status-critical) 30%, transparent)',
+                                                boxShadow:
+                                                    '0 0 0 1px color-mix(in oklch, var(--status-critical) 30%, transparent)',
                                             }}
                                         />
                                     ) : null}
@@ -244,8 +328,19 @@ export function CalendarTimeGrid({
                                               : colorVar(e);
                                         const s = new Date(e.start);
                                         const en = e.end ? new Date(e.end) : s;
-                                        const top = Math.max(0, (s.getHours() + s.getMinutes() / 60 - H0) * HOUR_H);
-                                        const h = Math.max(22, ((en.getTime() - s.getTime()) / 3_600_000) * HOUR_H);
+                                        const top = Math.max(
+                                            0,
+                                            (s.getHours() +
+                                                s.getMinutes() / 60 -
+                                                H0) *
+                                                HOUR_H,
+                                        );
+                                        const h = Math.max(
+                                            22,
+                                            ((en.getTime() - s.getTime()) /
+                                                3_600_000) *
+                                                HOUR_H,
+                                        );
                                         const block: CSSProperties = isShift
                                             ? {
                                                   position: 'absolute',
@@ -286,22 +381,57 @@ export function CalendarTimeGrid({
                                                 type="button"
                                                 onClick={(ev) => {
                                                     ev.stopPropagation();
-                                                    handlers.onEntryClick(e, ev.clientX, ev.clientY);
+                                                    handlers.onEntryClick(
+                                                        e,
+                                                        ev.clientX,
+                                                        ev.clientY,
+                                                    );
                                                 }}
                                                 onContextMenu={(ev) => {
                                                     ev.preventDefault();
                                                     ev.stopPropagation();
-                                                    handlers.onEntryCtx(e, ev.clientX, ev.clientY);
+                                                    handlers.onEntryCtx(
+                                                        e,
+                                                        ev.clientX,
+                                                        ev.clientY,
+                                                    );
                                                 }}
-                                                onMouseEnter={(ev) => handlers.onEntryHover?.(e, ev.clientX, ev.clientY)}
-                                                onMouseLeave={() => handlers.onEntryHoverEnd?.()}
+                                                onMouseEnter={(ev) =>
+                                                    handlers.onEntryHover?.(
+                                                        e,
+                                                        ev.clientX,
+                                                        ev.clientY,
+                                                    )
+                                                }
+                                                onMouseLeave={() =>
+                                                    handlers.onEntryHoverEnd?.()
+                                                }
                                                 title={e.title}
                                                 style={block}
                                             >
-                                                <span style={{ display: 'block', fontSize: 11, fontWeight: 700, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {isGap ? '⚠ Unfilled' : e.title}
+                                                <span
+                                                    style={{
+                                                        display: 'block',
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        lineHeight: 1.2,
+                                                        overflow: 'hidden',
+                                                        textOverflow:
+                                                            'ellipsis',
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    {isGap
+                                                        ? '⚠ Unfilled'
+                                                        : e.title}
                                                 </span>
-                                                <span style={{ display: 'block', fontSize: 10, opacity: 0.8 }}>
+                                                <span
+                                                    style={{
+                                                        display: 'block',
+                                                        fontSize: 10,
+                                                        opacity: 0.8,
+                                                    }}
+                                                >
                                                     {fmtTime(s)}–{fmtTime(en)}
                                                 </span>
                                             </button>

@@ -110,7 +110,9 @@ export function PeoplePicker({
                                     key={p.value}
                                     value={`${p.label} ${p.sub ?? ''}`}
                                     onSelect={() => {
-                                        onChange(p.value === value ? '' : p.value);
+                                        onChange(
+                                            p.value === value ? '' : p.value,
+                                        );
                                         setOpen(false);
                                     }}
                                 >

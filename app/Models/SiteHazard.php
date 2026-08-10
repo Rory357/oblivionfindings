@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,15 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SiteHazard extends Model
 {
-    use HasFactory;
-    use AuditableChanges;
-    use SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected $table = 'site_hazards';
 
     protected $fillable = [
         'site_id',
-        'tenant_id',
         'reference_number',
         'hazard_type',
         'custom_hazard_type',

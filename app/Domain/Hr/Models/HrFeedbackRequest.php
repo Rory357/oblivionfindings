@@ -2,7 +2,11 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Domain\Hr\Services\FeedbackService;
+use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrFeedbackRequest extends Model
 {
-    use HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'tenant_id',
@@ -33,7 +37,7 @@ class HrFeedbackRequest extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function subject(): BelongsTo
@@ -70,7 +74,7 @@ class HrFeedbackRequest extends Model
             return collect($this->questions_snapshot)->pluck('question', 'key')->all();
         }
 
-        return \App\Domain\Hr\Services\FeedbackService::FEEDBACK_QUESTIONS;
+        return FeedbackService::FEEDBACK_QUESTIONS;
     }
 
     public function responses(): HasMany
@@ -79,20 +83,15 @@ class HrFeedbackRequest extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
-
-    public function scopePending($query)
+    public function scopePending(Builder $query): Builder
     {
         return $query->where('status', 'pending');
     }
 
-    public function scopeCompleted($query)
+    public function scopeCompleted(Builder $query): Builder
     {
         return $query->where('status', 'completed');
     }

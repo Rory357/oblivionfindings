@@ -56,11 +56,22 @@ export type CalendarGap = {
     assignedStaff: number | null;
     preferredClientId: number | null;
     recommendedFillAction: string | null;
-    roleShortages: Array<{ key: string; label?: string | null; missing?: number }>;
+    roleShortages: Array<{
+        key: string;
+        label?: string | null;
+        missing?: number;
+    }>;
 };
 
 export type CalendarStatusMeta = {
-    key: 'open' | 'live' | 'scheduled' | 'completed' | 'cancelled' | 'draft' | 'replacement';
+    key:
+        | 'open'
+        | 'live'
+        | 'scheduled'
+        | 'completed'
+        | 'cancelled'
+        | 'draft'
+        | 'replacement';
     label: string;
     accent: string;
     tint: string;

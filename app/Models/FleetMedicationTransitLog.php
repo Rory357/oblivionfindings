@@ -3,15 +3,16 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FleetMedicationTransitLog extends Model
 {
     use AuditableChanges;
+    use WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'transport_id',
         'outing_id',
         'client_id',

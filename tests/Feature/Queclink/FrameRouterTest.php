@@ -1,14 +1,21 @@
 <?php
 
+use App\Domain\SecurityDevices\Enums\LinkType;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
-use App\Models\AssetTracker;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkRawFrame;
+use App\Models\User;
+use App\Services\Queclink\ConfigurationSnapshotService;
+use App\Services\Queclink\Exceptions\IntakeRejected;
 use App\Services\Queclink\Listener\ConnectionState;
 use App\Services\Queclink\Listener\FrameRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -53,17 +60,22 @@ it('answers a heartbeat with +SACK even for an unpaired pending device', functio
 
 it('routes a paired device into the Fleet telemetry pipeline', function () {
     $asset = Asset::factory()->create(['category' => 'vehicle']);
-    AssetTracker::create([
-        'asset_id' => $asset->id,
-        'vendor' => 'queclink',
-        'device_uid' => '864696060004173',
+    $canonicalDevice = Device::factory()->tracking()->create([
+        'provider' => 'queclink',
         'imei' => '864696060004173',
-        'status' => 'paired',
-        'paired_at' => now(),
+        'device_uid' => '864696060004173',
+        'category' => 'vehicle_tracker',
+    ]);
+    DeviceAssetLink::create([
+        'device_id' => $canonicalDevice->id,
+        'asset_id' => $asset->id,
+        'link_type' => LinkType::InstalledIn,
+        'linked_at' => now(),
     ]);
     QueclinkDevice::create([
         'imei' => '864696060004173',
         'status' => QueclinkDevice::STATUS_PAIRED,
+        'device_id' => $canonicalDevice->id,
     ]);
 
     $frame = '+RESP:GTFRI,8020090100,864696060004173,GV500CG,11985,10,1,1,42.5,180,118.5,174.7633,-36.8485,20230808022509,0460,0001,DF5C,02A90902,01,15,0.0,20230808022510,0120$';
@@ -73,6 +85,8 @@ it('routes a paired device into the Fleet telemetry pipeline', function () {
     $event = FleetTelemetryEvent::first();
     expect($event)->not->toBeNull()
         ->and($event->asset_id)->toBe($asset->id)
+        ->and($event->asset_tracker_id)->toBeNull()
+        ->and($event->device_id)->toBe($canonicalDevice->id)
         ->and($event->vendor)->toBe('queclink')
         ->and($event->event_type)->toBe('location_report')
         ->and($event->consent_blocked)->toBeFalse()
@@ -90,16 +104,125 @@ it('does not ingest telemetry for unpaired devices but still logs the frame', fu
     expect(QueclinkRawFrame::outbound()->first()->raw_frame)->toBe('+SACK:0119$');
 });
 
-it('stores binary probe frames as hex text instead of throwing while logging them', function () {
-    $responses = $this->router->handleInbound("\x16\x03\x01\x02\x97\xFF$", $this->state);
+it('does not ingest a paired provider projection without its canonical Device binding', function () {
+    QueclinkDevice::create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+        'device_id' => null,
+    ]);
 
-    expect($responses)->toBe([]);
+    $responses = $this->router->handleInbound(
+        '+RESP:GTFRI,8020090100,864696060004173,GV500CG,11985,10,1,1,42.5,180,118.5,174.7633,-36.8485,20230808022509,0460,0001,DF5C,02A90902,01,15,0.0,20230808022510,0120$',
+        $this->state,
+    );
 
-    $rawFrame = QueclinkRawFrame::first();
-    expect($rawFrame)->not->toBeNull()
-        ->and($rawFrame->parse_ok)->toBeFalse()
-        ->and($rawFrame->parse_error)->toContain('HEX frame detected')
-        ->and($rawFrame->raw_frame)->toBe('0x1603010297FF24');
+    expect($responses)->toBe(['+SACK:0120$'])
+        ->and(FleetTelemetryEvent::count())->toBe(0)
+        ->and(QueclinkRawFrame::inbound()->count())->toBe(1);
+});
+
+it('rejects malformed binary probe frames before persistence', function () {
+    expect(fn () => $this->router->handleInbound("\x16\x03\x01\x02\x97\xFF$", $this->state))
+        ->toThrow(IntakeRejected::class);
+
+    expect(QueclinkRawFrame::count())->toBe(0)
+        ->and(QueclinkDevice::count())->toBe(0);
+});
+
+it('rejects server-originated frame types before any intake persistence', function () {
+    expect(fn () => $this->router->handleInbound(
+        'AT+GTRTO,Secret42,1,0001$',
+        $this->state,
+    ))->toThrow(IntakeRejected::class);
+
+    expect(fn () => $this->router->handleInbound(
+        '+SACK:GTHBD,8020090100,09CF$',
+        $this->state,
+    ))->toThrow(IntakeRejected::class);
+
+    expect(QueclinkRawFrame::count())->toBe(0)
+        ->and(QueclinkDevice::count())->toBe(0);
+});
+
+it('rejects overlong persisted protocol fields before resolving a provider device', function () {
+    expect(fn () => $this->router->handleInbound(
+        '+RESP:GTTOOLONG12,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    ))->toThrow(IntakeRejected::class);
+
+    expect(QueclinkRawFrame::count())->toBe(0)
+        ->and(QueclinkDevice::count())->toBe(0);
+});
+
+it('does not let an empty delimiter extend the accepted-frame idle deadline', function () {
+    $this->state->lastActivityAt = 100.0;
+
+    expect(fn () => $this->router->handleInbound('$', $this->state))
+        ->toThrow(IntakeRejected::class)
+        ->and($this->state->lastActivityAt)->toBe(100.0)
+        ->and(QueclinkRawFrame::count())->toBe(0);
+});
+
+it('captures immutable canonical assignment and binding lineage on every stored frame', function () {
+    $staff = User::factory()->create();
+    $canonicalDevice = Device::factory()->tracking()->create();
+    $assignment = DeviceAssignment::query()->create([
+        'device_id' => $canonicalDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_STAFF,
+        'assignable_id' => $staff->id,
+        'assignment_type' => 'permanent',
+        'assigned_at' => now()->subMinute(),
+        'retention_days' => 30,
+    ]);
+    $bindingUuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    QueclinkDevice::query()->create([
+        'imei' => '864696060004173',
+        'status' => QueclinkDevice::STATUS_PAIRED,
+        'device_id' => $canonicalDevice->id,
+        'binding_uuid' => $bindingUuid,
+    ]);
+
+    $this->router->handleInbound(
+        '+RESP:GTHBD,8020090100,864696060004173,GV500CG,20230811075652,09CF$',
+        $this->state,
+    );
+
+    QueclinkRawFrame::query()->get()->each(function (QueclinkRawFrame $frame) use (
+        $canonicalDevice,
+        $assignment,
+        $bindingUuid,
+    ): void {
+        expect($frame->canonical_device_id)->toBe($canonicalDevice->id)
+            ->and($frame->device_assignment_id)->toBe($assignment->id)
+            ->and($frame->binding_uuid)->toBe($bindingUuid);
+    });
+});
+
+it('protects inbound configuration bytes while retaining an internal configuration projection', function () {
+    $raw = '+RESP:GTALM,970204,867963069916998,GL30MEU,1,1,CFG,NewPass99,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,10,1,,1,2,1,0,20260518031500,0A10$';
+
+    $this->router->handleInbound($raw, $this->state);
+
+    $device = QueclinkDevice::query()->where('imei', '867963069916998')->firstOrFail();
+    $frame = QueclinkRawFrame::query()->inbound()->where('command_word', 'GTALM')->sole();
+    $stored = DB::table('queclink_raw_frames')->where('id', $frame->id)->first();
+    expect($stored)->not->toBeNull()
+        ->and((string) $stored->raw_frame)->toBe('[encrypted sensitive frame]')
+        ->and((string) $stored->encrypted_raw_frame)->not->toContain('NewPass99')
+        ->and((string) $stored->parsed_payload)->not->toContain('NewPass99')
+        ->and((string) $stored->encrypted_parsed_payload)->not->toContain('NewPass99')
+        ->and($frame->toArray())->not->toHaveKeys([
+            'raw_frame',
+            'encrypted_raw_frame',
+            'parsed_payload',
+            'encrypted_parsed_payload',
+        ])
+        ->and($frame->raw_frame)->toBe($raw)
+        ->and(data_get($frame->protectedParsedPayload(), 'config_text'))->toContain('NewPass99');
+
+    $snapshot = app(ConfigurationSnapshotService::class)->latestForDevice($device);
+    expect($snapshot['available'])->toBeTrue()
+        ->and((array) data_get($snapshot, 'summary.global'))->not->toHaveKey('new_password');
 });
 
 it('marks the device disconnected when the connection drops', function () {
@@ -112,15 +235,6 @@ it('marks the device disconnected when the connection drops', function () {
 });
 
 it('dispatches queued commands when a paired device sends a frame', function () {
-    $asset = Asset::factory()->create();
-    AssetTracker::create([
-        'asset_id' => $asset->id,
-        'vendor' => 'queclink',
-        'device_uid' => '864696060004173',
-        'imei' => '864696060004173',
-        'status' => 'paired',
-        'paired_at' => now(),
-    ]);
     $qd = QueclinkDevice::create([
         'imei' => '864696060004173',
         'status' => QueclinkDevice::STATUS_PAIRED,

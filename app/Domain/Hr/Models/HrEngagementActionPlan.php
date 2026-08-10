@@ -3,8 +3,8 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrEngagementActionPlan extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'survey_id',
@@ -56,10 +56,5 @@ class HrEngagementActionPlan extends Model
     public function notes(): HasMany
     {
         return $this->hasMany(HrEngagementActionPlanNote::class, 'plan_id')->latest();
-    }
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

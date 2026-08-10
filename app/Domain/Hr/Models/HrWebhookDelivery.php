@@ -2,22 +2,28 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrWebhookDelivery extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_RETRYING = 'retrying';
+
     public const STATUS_SUCCESS = 'success';
+
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
         'endpoint_id',
         'tenant_id',
+        'retry_of_id',
         'event_type',
         'event_uuid',
         'payload',
@@ -48,8 +54,13 @@ class HrWebhookDelivery extends Model
         return $this->belongsTo(HrWebhookEndpoint::class, 'endpoint_id');
     }
 
-    public function scopeForTenant($query, ?int $tenantId)
+    public function retriedDelivery(): BelongsTo
     {
-        return $query->where('tenant_id', $tenantId);
+        return $this->belongsTo(self::class, 'retry_of_id');
+    }
+
+    public function retry(): HasOne
+    {
+        return $this->hasOne(self::class, 'retry_of_id');
     }
 }

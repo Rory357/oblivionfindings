@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Client;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrTimeEntry extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
@@ -133,11 +134,6 @@ class HrTimeEntry extends Model
     /* ------------------------------------------------------------------ */
     /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeForUser($query, int $userId)
     {

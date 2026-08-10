@@ -64,8 +64,8 @@ import {
     Pill,
     Plus,
     Timer,
-    User as UserIcon,
     UserCheck,
+    User as UserIcon,
     Users,
     Wrench,
 } from 'lucide-react';
@@ -152,7 +152,9 @@ function PulseDot({ stale = false }: { stale?: boolean }) {
             <span
                 className={cn(
                     'absolute inline-flex h-full w-full rounded-full opacity-75',
-                    stale ? 'bg-status-warning' : 'animate-ping bg-status-success',
+                    stale
+                        ? 'bg-status-warning'
+                        : 'animate-ping bg-status-success',
                 )}
             />
             <span
@@ -239,7 +241,9 @@ function SessionsCard({
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <div className="font-medium">
-                                            {formatDateTime(session.clock_in_at)}
+                                            {formatDateTime(
+                                                session.clock_in_at,
+                                            )}
                                         </div>
                                         <div className="mt-0.5 text-xs text-muted-foreground">
                                             {session.clock_out_at
@@ -261,7 +265,8 @@ function SessionsCard({
                                             className="inline-flex items-center gap-1.5"
                                         >
                                             <span className="underline">
-                                                Timesheet #{session.timesheet_id}
+                                                Timesheet #
+                                                {session.timesheet_id}
                                             </span>
                                             {session.timesheet_status ? (
                                                 <TimesheetStatusBadge
@@ -518,8 +523,7 @@ function HandoversList({
     const personName = (
         staff: { id: number; name: string } | null,
         fallback: string,
-    ) =>
-        staff ? (staff.id === currentUserId ? 'You' : staff.name) : fallback;
+    ) => (staff ? (staff.id === currentUserId ? 'You' : staff.name) : fallback);
 
     // Actionable first: your pending acknowledgements, then other pending,
     // then acknowledged — newest within each group.
@@ -577,7 +581,10 @@ function HandoversList({
                                     aria-label={`Open handover for ${clientName(h.client)}`}
                                     onClick={() => onOpen(h)}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
+                                        if (
+                                            e.key === 'Enter' ||
+                                            e.key === ' '
+                                        ) {
                                             e.preventDefault();
                                             onOpen(h);
                                         }
@@ -899,8 +906,7 @@ export default function AttendanceIndex({
         router.reload({ only: ['catalogue'], onSuccess: launch });
     };
 
-    const detailHandover =
-        handovers.find((h) => h.id === detailId) ?? null;
+    const detailHandover = handovers.find((h) => h.id === detailId) ?? null;
 
     /* ── context menus (ShiftContextMenu host) ── */
     const openCtx = (
@@ -999,8 +1005,7 @@ export default function AttendanceIndex({
                         setFixSessions([
                             {
                                 id: s.id,
-                                user_name:
-                                    s.user_name ?? `User #${s.user_id}`,
+                                user_name: s.user_name ?? `User #${s.user_id}`,
                                 clock_in_at: s.clock_in_at,
                                 clock_out_at: null,
                                 break_minutes: 0,
@@ -1261,7 +1266,9 @@ export default function AttendanceIndex({
                                         <Button
                                             size="sm"
                                             className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                            onClick={() => setClockOutOpen(true)}
+                                            onClick={() =>
+                                                setClockOutOpen(true)
+                                            }
                                             data-test="attendance-clock-out"
                                         >
                                             <LogOut className="mr-1 h-4 w-4" />
@@ -1504,7 +1511,9 @@ export default function AttendanceIndex({
                     editing={editingHandover}
                     catalogue={catalogue}
                     currentUser={currentUser}
-                    preselectClientId={pendingClientId ?? openSession?.client_id ?? null}
+                    preselectClientId={
+                        pendingClientId ?? openSession?.client_id ?? null
+                    }
                     onAddClient={() => setAddClientOpen(true)}
                     onSubmitted={() => {
                         setTab('handovers');

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Loader2, Search, UserCheck, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
     EligibilityStatusBadge,
@@ -227,18 +227,18 @@ export function ReassignDialog({
                     </div>
                 ) : locked ? (
                     <div className="py-8 text-center text-sm text-muted-foreground">
-                        This shift is completed or cancelled, so it can no longer
-                        be reassigned.
+                        This shift is completed or cancelled, so it can no
+                        longer be reassigned.
                     </div>
                 ) : (
                     <div className="min-w-0 space-y-2 py-1">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <input
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Search staff…"
-                                className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none"
+                                className="w-full rounded-md border border-input bg-background py-2 pr-3 pl-9 text-sm focus:border-primary focus:outline-none"
                             />
                         </div>
                         <div className="max-h-[340px] min-w-0 space-y-1 overflow-y-auto">

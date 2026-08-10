@@ -2,12 +2,17 @@
 
 namespace Tests\Feature\Portal;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\FamilyPortalSetting;
 use App\Models\NextOfKin;
+use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -20,15 +25,14 @@ class PortalSurfaceTest extends TestCase
 
     public function test_portal_calendar_events_accept_positive_timezone_offsets(): void
     {
-        $portalUser = User::factory()->create([
-            'approved_at' => now(),
-        ]);
+        $client = $this->makePortalClient();
+        $portalUser = $this->makePortalUser($client);
         $staffUser = User::factory()->create([
             'approved_at' => now(),
+            'role' => 'support_worker',
         ]);
-        $client = Client::factory()->create();
+        $this->assignWorkerToSite($staffUser, $client->site);
 
-        $client->portalUsers()->attach($portalUser->id, ['relation' => 'next_of_kin']);
         NextOfKin::query()->create([
             'client_id' => $client->id,
             'user_id' => $portalUser->id,
@@ -57,6 +61,7 @@ class PortalSurfaceTest extends TestCase
 
         $shift = Shift::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $client->site_id,
             'user_id' => $staffUser->id,
             'status' => 'scheduled',
             'starts_at' => '2026-04-24 13:38:00',
@@ -75,18 +80,17 @@ class PortalSurfaceTest extends TestCase
 
     public function test_portal_messages_include_shift_staff_in_care_team_picker(): void
     {
-        $portalUser = User::factory()->create([
-            'approved_at' => now(),
-        ]);
+        $client = $this->makePortalClient();
+        $portalUser = $this->makePortalUser($client);
         $staffUser = User::factory()->create([
             'approved_at' => now(),
+            'role' => 'support_worker',
         ]);
-        $client = Client::factory()->create();
-
-        $client->portalUsers()->attach($portalUser->id, ['relation' => 'next_of_kin']);
+        $this->assignWorkerToSite($staffUser, $client->site);
 
         Shift::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $client->site_id,
             'user_id' => $staffUser->id,
             'status' => 'scheduled',
             'starts_at' => now()->addDay(),
@@ -106,18 +110,14 @@ class PortalSurfaceTest extends TestCase
 
     public function test_portal_location_normalizes_active_consent_for_the_ui(): void
     {
-        $portalUser = User::factory()->create([
-            'approved_at' => now(),
-        ]);
-        $client = Client::factory()->create();
+        $client = $this->makePortalClient();
+        $portalUser = $this->makePortalUser($client);
         $consentType = ConsentType::factory()->create([
             'name' => 'Asset Location Tracking (Safety)',
         ]);
         $givenAt = now()->subHour()->startOfSecond();
 
-        $client->portalUsers()->attach($portalUser->id, ['relation' => 'next_of_kin']);
-
-        ClientConsent::create([
+        $consent = ClientConsent::create([
             'client_id' => $client->id,
             'consent_type_id' => $consentType->id,
             'status' => 'given',
@@ -129,6 +129,14 @@ class PortalSurfaceTest extends TestCase
             'created_by' => $portalUser->id,
             'updated_by' => $portalUser->id,
         ]);
+        $device = Device::factory()->tracking()->create();
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+            'assignable_id' => $client->id,
+            'assigned_at' => now(),
+            'consent_id' => $consent->id,
+        ]);
 
         $this->actingAs($portalUser)
             ->get("/portal/clients/{$client->id}/location")
@@ -138,5 +146,40 @@ class PortalSurfaceTest extends TestCase
                 ->where('trackingConsent.status', 'active')
                 ->where('trackingConsent.given_at', $givenAt->toISOString())
             );
+    }
+
+    private function makePortalClient(): Client
+    {
+        return Client::factory()->create([
+            'site_id' => Site::factory()->create()->id,
+        ]);
+    }
+
+    private function makePortalUser(Client $client): User
+    {
+        $user = User::factory()->create([
+            'approved_at' => now(),
+            'role' => 'next_of_kin',
+        ]);
+        $role = Role::query()->firstOrCreate(
+            ['name' => 'next_of_kin'],
+            ['label' => 'Next of Kin', 'level' => 1, 'type' => 'system'],
+        );
+        $user->roles()->syncWithoutDetaching([$role->id]);
+        $client->portalUsers()->attach($user->id, ['relation' => 'next_of_kin']);
+
+        return $user;
+    }
+
+    private function assignWorkerToSite(User $worker, Site $site): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
     }
 }

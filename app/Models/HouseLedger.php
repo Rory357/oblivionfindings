@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,11 +10,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HouseLedger extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
-        'site_id',
         'opening_balance',
         'current_balance',
         'currency',

@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientExcursionRequest;
 use App\Models\ClientLeaveRequest;
@@ -38,10 +39,22 @@ function grantSensitiveProfilePermissions(User $user, array $permissions): void
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
+function scopeSensitiveProfileUserToSite(User $user, Site $site, string $positionRole): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'position_role' => $positionRole,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
+
 function seedSensitiveProfileSentinels(Client $client, User $author): void
 {
     ClientOnboardingWorkflow::query()->create([
-        'organization_id' => $client->organization_id,
         'client_id' => $client->id,
         'status' => 'in_progress',
         'started_at' => now(),
@@ -50,7 +63,6 @@ function seedSensitiveProfileSentinels(Client $client, User $author): void
         'created_by' => $author->id,
     ]);
     ClientLeaveRequest::withoutEvents(fn () => ClientLeaveRequest::query()->create([
-        'organization_id' => $client->organization_id,
         'client_id' => $client->id,
         'starts_on' => now()->addDay(),
         'ends_on' => now()->addDays(2),
@@ -61,7 +73,6 @@ function seedSensitiveProfileSentinels(Client $client, User $author): void
         'requested_by' => $author->id,
     ]));
     ClientExcursionRequest::withoutEvents(fn () => ClientExcursionRequest::query()->create([
-        'organization_id' => $client->organization_id,
         'client_id' => $client->id,
         'starts_at' => now()->addDay(),
         'destination' => 'Restricted excursion',
@@ -70,7 +81,6 @@ function seedSensitiveProfileSentinels(Client $client, User $author): void
         'requested_by' => $author->id,
     ]));
     ClientRoutine::withoutEvents(fn () => ClientRoutine::query()->create([
-        'organization_id' => $client->organization_id,
         'client_id' => $client->id,
         'time_block' => 'morning',
         'body' => 'Restricted morning routine',
@@ -78,7 +88,6 @@ function seedSensitiveProfileSentinels(Client $client, User $author): void
         'updated_by' => $author->id,
     ]));
     ClientMealLog::withoutEvents(fn () => ClientMealLog::query()->create([
-        'organization_id' => $client->organization_id,
         'client_id' => $client->id,
         'meal_type' => 'breakfast',
         'status' => 'eaten',
@@ -126,18 +135,20 @@ function seedSensitiveProfileSentinels(Client $client, User $author): void
 }
 
 it('omits every unrelated care and governance prop from a finance-only profile', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    $finance = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $author = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $finance = User::factory()->create(['role' => 'finance', 'approved_at' => now()]);
     grantSensitiveProfilePermissions($finance, [
         'clients.viewAny',
         'client_funds.manage',
     ]);
     $worker = User::factory()->create([
-        'organization_id' => 1,
+        'role' => 'support_worker',
+        'approved_at' => now(),
         'email' => 'restricted-worker@example.test',
     ]);
     $client = Client::factory()->create([
-        'organization_id' => 1,
+        'site_id' => $site->id,
         'risk_level' => 'critical',
         'safeguarding_flag' => true,
         'mobility_needs' => 'Restricted mobility need',
@@ -147,6 +158,9 @@ it('omits every unrelated care and governance prop from a finance-only profile',
         'fluid_intake_min_ml' => 1200,
         'seizure_duration_escalation_seconds' => 180,
     ]);
+    scopeSensitiveProfileUserToSite($author, $site, 'support_worker');
+    scopeSensitiveProfileUserToSite($finance, $site, 'finance');
+    scopeSensitiveProfileUserToSite($worker, $site, 'support_worker');
     $client->supportWorkers()->attach($worker->id);
     seedSensitiveProfileSentinels($client, $author);
 
@@ -183,12 +197,14 @@ it('omits every unrelated care and governance prop from a finance-only profile',
 });
 
 it('does not let an Inertia partial request bypass the transport section gate', function () {
-    $finance = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $finance = User::factory()->create(['role' => 'finance', 'approved_at' => now()]);
     grantSensitiveProfilePermissions($finance, [
         'clients.viewAny',
         'client_funds.manage',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    scopeSensitiveProfileUserToSite($finance, $site, 'finance');
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $this->actingAs($finance)
         ->get(
             "/operations/clients/{$client->id}",
@@ -204,13 +220,15 @@ it('does not let an Inertia partial request bypass the transport section gate', 
 });
 
 it('redacts list safety summaries and create pickers without their capabilities', function () {
-    $finance = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $finance = User::factory()->create(['role' => 'finance', 'approved_at' => now()]);
     grantSensitiveProfilePermissions($finance, [
         'clients.viewAny',
         'client_funds.manage',
     ]);
+    scopeSensitiveProfileUserToSite($finance, $site, 'finance');
     $client = Client::factory()->create([
-        'organization_id' => 1,
+        'site_id' => $site->id,
         'risk_level' => 'critical',
         'safeguarding_flag' => true,
     ]);
@@ -245,37 +263,40 @@ it('redacts list safety summaries and create pickers without their capabilities'
             ->missing('defaultServiceContextId'));
 });
 
-it('scopes risk-assessment picker records to the profile organisation', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+it('scopes risk-assessment picker records to the profile Site', function () {
+    $accessibleSite = Site::factory()->create(['is_active' => true]);
+    $otherSite = Site::factory()->create(['is_active' => true]);
+    $manager = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
     grantSensitiveProfilePermissions($manager, [
-        'clients.viewAny',
+        'clients.viewAssigned',
         'hazards.view',
         'hazards.manage',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
-    $site = Site::factory()->create(['tenant_id' => 1, 'is_active' => true]);
-    $foreignSite = Site::factory()->create(['tenant_id' => 2, 'is_active' => true]);
-    $event = HsEvent::factory()->create(['organization_id' => 1]);
-    $foreignEvent = HsEvent::factory()->create(['organization_id' => 2]);
+    scopeSensitiveProfileUserToSite($manager, $accessibleSite, 'coordinator');
+    $client = Client::factory()->create(['site_id' => $accessibleSite->id]);
+    $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $client->supportWorkers()->attach($manager->id);
+    $event = HsEvent::factory()->create(['site_id' => $accessibleSite->id]);
+    $otherEvent = HsEvent::factory()->create(['site_id' => $otherSite->id]);
 
     $this->actingAs($manager)
         ->get("/operations/clients/{$client->id}")
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('ra_pickers.sites', fn ($sites) => collect($sites)->pluck('id')->contains($site->id)
-                && ! collect($sites)->pluck('id')->contains($foreignSite->id))
+            ->where('ra_pickers.sites', fn ($sites) => collect($sites)->pluck('id')->contains($accessibleSite->id)
+                && ! collect($sites)->pluck('id')->contains($otherSite->id))
             ->where('ra_pickers.clients', fn ($clients) => collect($clients)->pluck('id')->contains($client->id)
-                && ! collect($clients)->pluck('id')->contains($foreignClient->id))
+                && ! collect($clients)->pluck('id')->contains($otherClient->id))
             ->where('ra_pickers.events', fn ($events) => collect($events)->pluck('id')->contains($event->id)
-                && ! collect($events)->pluck('id')->contains($foreignEvent->id)));
+                && ! collect($events)->pluck('id')->contains($otherEvent->id)));
 });
 
 it('retains assigned care context without exposing unrelated governance sections', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $author = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
+        'approved_at' => now(),
     ]);
     grantSensitiveProfilePermissions($worker, [
         'clients.viewAssigned',
@@ -285,7 +306,9 @@ it('retains assigned care context without exposing unrelated governance sections
         'assets.viewAssigned',
         'assets.telemetry.view',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    scopeSensitiveProfileUserToSite($author, $site, 'support_worker');
+    scopeSensitiveProfileUserToSite($worker, $site, 'support_worker');
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $client->supportWorkers()->attach($worker->id);
     seedSensitiveProfileSentinels($client, $author);
 

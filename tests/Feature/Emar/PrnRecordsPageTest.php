@@ -56,6 +56,8 @@ class PrnRecordsPageTest extends TestCase
                 ->where('pending_reviews.0.administration_id', fn ($v) => $v > 0)
                 ->has('witnesses')
                 ->has('clients', 1)
+                ->has('sites', 1)
+                ->where('sites.0.id', $site->id)
             );
     }
 

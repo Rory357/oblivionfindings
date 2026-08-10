@@ -24,7 +24,7 @@ class IncidentJourneyPresenter
 
         $incident->loadMissing([
             'site:id,name',
-            'client:id,first_name,last_name,site_id,organization_id',
+            'client:id,first_name,last_name,site_id',
             'client.site:id,name',
             'shift:id,site_id',
             'reporter:id,name',

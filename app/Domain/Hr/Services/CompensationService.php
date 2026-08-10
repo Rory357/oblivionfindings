@@ -12,12 +12,18 @@ use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Notifications\CompensationAppliedNotification;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class CompensationService
 {
+    public function __construct(private readonly HrPerformanceAccessService $access) {}
+
     /**
      * Record a compensation change for an employee and update their profile.
      */
@@ -25,7 +31,6 @@ class CompensationService
     {
         return DB::transaction(function () use ($profile, $data) {
             $history = HrCompensationHistory::create([
-                'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
                 'change_type' => $data['change_type'],
                 'previous_hourly_rate' => $profile->hourly_rate,
@@ -49,12 +54,11 @@ class CompensationService
     }
 
     /**
-     * Get the active salary band for a given role within a tenant.
+     * Get the active application salary band for a given role.
      */
-    public function getSalaryBandForRole(?int $tenantId, string $role): ?HrSalaryBand
+    public function getSalaryBandForRole(string $role): ?HrSalaryBand
     {
-        return HrSalaryBand::forTenant($tenantId)
-            ->where('position_role', $role)
+        return HrSalaryBand::query()->where('position_role', $role)
             ->active()
             ->first();
     }
@@ -104,24 +108,33 @@ class CompensationService
     }
 
     /**
-     * Full hub-hero stat set (band-health placement + cross-hub aggregates),
-     * shared by every Compensation & Benefits surface so the hero is identical
-     * across the hub. Salary fields are encrypted → placement runs in PHP.
+     * Canonical compensation hero for the current application and the viewer's
+     * complete Site-visible staff population.
      *
-     * @param  \Illuminate\Support\Collection<int, HrEmployeeProfile>|null  $employees
-     *   Pre-loaded active employees (bands() already has them) so we don't decrypt
-     *   the whole workforce twice in one request. Loaded on demand when null.
+     * @param  Collection<int, HrEmployeeProfile>|null  $employees
      * @return array<string, int|float>
      */
-    public function heroStats(int $tenantId, User $user, ?\Illuminate\Support\Collection $employees = null): array
+    public function heroStatsFor(User $user, ?Collection $employees = null): array
     {
-        $employees ??= HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->active()
+        if (! $user->canDo('hr.compensation.view')) {
+            return [
+                'bands_total' => 0,
+                'roles_covered' => 0,
+                'people_placed' => 0,
+                'people_in_band' => 0,
+                'people_out_of_band' => 0,
+                'band_health' => 100,
+                ...$this->hubAggregatesFor($user),
+            ];
+        }
+
+        $employees ??= $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->get(['id', 'position_role', 'annual_salary', 'hourly_rate']);
 
-        $activeBands = HrSalaryBand::query()->forTenant($tenantId)->active()
-            ->orderByDesc('effective_from')->get();
+        $activeBands = HrSalaryBand::query()->active()
+            ->orderByDesc('effective_from')
+            ->get();
         $activeByRole = $activeBands->groupBy('position_role');
 
         $placed = 0;
@@ -131,13 +144,13 @@ class CompensationService
             if (! $band) {
                 continue;
             }
-            foreach ($people as $p) {
-                $pos = $this->bandPlacement($p, $band)['position'];
-                if ($pos === null) {
+            foreach ($people as $profile) {
+                $position = $this->bandPlacement($profile, $band)['position'];
+                if ($position === null) {
                     continue;
                 }
                 $placed++;
-                if ($pos !== 'in') {
+                if ($position !== 'in') {
                     $outOfBand++;
                 }
             }
@@ -149,50 +162,36 @@ class CompensationService
             'people_placed' => $placed,
             'people_in_band' => max(0, $placed - $outOfBand),
             'people_out_of_band' => $outOfBand,
-            'band_health' => $placed > 0 ? (int) round((($placed - $outOfBand) / $placed) * 100) : 100,
-            ...$this->hubAggregates($tenantId, $user),
+            'band_health' => $placed === 0
+                ? 100
+                : (int) round((($placed - $outOfBand) / $placed) * 100),
+            ...$this->hubAggregatesFor($user),
         ];
     }
 
-    /**
-     * Cross-hub hero aggregates: reviews in flight, items awaiting approval,
-     * reimbursed this month, claims overdue. Counts respect the viewer's gates so
-     * a comp-only user never sees benefits/expenses numbers they can't open.
-     *
-     * @return array<string, int|float>
-     */
-    public function hubAggregates(int $tenantId, User $user): array
+    /** @return array<string, int|float> */
+    public function hubAggregatesFor(User $user): array
     {
-        $reviewsInFlight = HrCompensationReview::query()
-            ->where('tenant_id', $tenantId)
-            ->whereIn('status', ['planning', 'in_progress', 'approved'])
-            ->count();
-
-        $canExpenses = $user->canDo('hr.expenses.view');
-        // "Awaiting my approval" must count only what this viewer can actually
-        // approve — expense approval is a distinct perm from view, and bonus
-        // approval rides on compensation.manage.
+        $reviewsInFlight = $user->canDo('hr.compensation.view')
+            ? $this->visibleCompensationReviews($user)
+                ->whereIn('status', ['planning', 'in_progress', 'approved'])
+                ->count()
+            : 0;
         $awaitingClaims = $user->canDo('hr.expenses.approve')
-            ? HrExpenseClaim::query()->where('tenant_id', $tenantId)->where('status', 'submitted')->count()
+            ? $this->visibleExpenseClaims($user)->where('status', 'submitted')->count()
             : 0;
         $pendingBonuses = $user->canDo('hr.compensation.manage')
-            ? HrBonusPayment::query()->where('tenant_id', $tenantId)->where('status', 'pending')->count()
+            ? $this->visibleBonuses($user)->where('status', 'pending')->count()
             : 0;
-
-        // Month boundary in the worker timezone (paid_at is stored UTC), so the
-        // "this month" KPI doesn't slip by ~13h at month edges in NZ.
         $monthStart = Carbon::now(config('app.worker_timezone'))->startOfMonth()->utc();
-        $reimbursed = $canExpenses
-            ? (float) HrExpenseClaim::query()
-                ->where('tenant_id', $tenantId)
+        $reimbursed = $user->canDo('hr.expenses.view')
+            ? (float) $this->visibleExpenseClaims($user)
                 ->whereNotNull('paid_at')
                 ->where('paid_at', '>=', $monthStart)
                 ->sum('total_amount')
             : 0.0;
-
-        $claimsOverdue = $canExpenses
-            ? HrExpenseClaim::query()
-                ->where('tenant_id', $tenantId)
+        $claimsOverdue = $user->canDo('hr.expenses.view')
+            ? $this->visibleExpenseClaims($user)
                 ->where('status', 'submitted')
                 ->where('submitted_at', '<', Carbon::now()->subDays(7))
                 ->count()
@@ -206,82 +205,137 @@ class CompensationService
         ];
     }
 
-    /**
-     * Per-tab record counts for the hub tab-strip badges.
-     *
-     * @return array<string, int>
-     */
-    public function tabCounts(int $tenantId): array
+    /** @return array<string, int> */
+    public function tabCountsFor(User $user): array
     {
         return [
-            'bands' => HrSalaryBand::query()->forTenant($tenantId)->active()->count(),
-            'reviews' => HrCompensationReview::query()->where('tenant_id', $tenantId)->count(),
-            'bonuses' => HrBonusPayment::query()->where('tenant_id', $tenantId)->count(),
-            'benefits' => HrBenefitEnrollment::query()->where('tenant_id', $tenantId)->where('status', 'active')->count(),
-            'expenses' => HrExpenseClaim::query()->where('tenant_id', $tenantId)->count(),
+            'bands' => $user->canDo('hr.compensation.view') ? HrSalaryBand::query()->active()->count() : 0,
+            'reviews' => $user->canDo('hr.compensation.view')
+                ? $this->visibleCompensationReviews($user)->count()
+                : 0,
+            'bonuses' => $user->canDo('hr.compensation.view')
+                ? $this->visibleBonuses($user)->count()
+                : 0,
+            'benefits' => $user->canDo('hr.benefits.view')
+                ? $this->access->applyBenefitEnrollmentScope(HrBenefitEnrollment::query(), $user)->active()->count()
+                : 0,
+            'expenses' => $user->canDo('hr.expenses.view')
+                ? $this->visibleExpenseClaims($user)->count()
+                : 0,
         ];
+    }
+
+    /** @return Builder<HrCompensationReview> */
+    public function visibleCompensationReviews(User $user): Builder
+    {
+        return $this->access->applyCompensationReviewScope(HrCompensationReview::query(), $user);
+    }
+
+    /** @return Builder<HrBonusPayment> */
+    public function visibleBonuses(User $user): Builder
+    {
+        return $this->access->applyBonusScope(HrBonusPayment::query(), $user);
+    }
+
+    /** @return Builder<HrCompensationHistory> */
+    public function visibleCompensationHistory(User $user): Builder
+    {
+        return $this->access->applyCompensationHistoryScope(HrCompensationHistory::query(), $user);
+    }
+
+    /** @return Builder<HrExpenseClaim> */
+    public function visibleExpenseClaims(User $user): Builder
+    {
+        return $this->access->applyExpenseClaimScope(HrExpenseClaim::query(), $user);
     }
 
     /**
      * Create a new compensation review cycle.
      */
-    public function createCompensationReview(array $data): HrCompensationReview
+    public function createCompensationReview(array $data, User $actor): HrCompensationReview
     {
-        return DB::transaction(function () use ($data) {
+        return DB::transaction(function () use ($data, $actor): HrCompensationReview {
+            $this->access->currentStaff($actor, $actor);
+            $items = collect($data['items'] ?? []);
+            $profileIds = $items
+                ->pluck('employee_profile_id')
+                ->map(fn ($id): int => (int) $id)
+                ->values();
+            if ($profileIds->unique()->count() !== $profileIds->count()) {
+                throw ValidationException::withMessages([
+                    'items' => 'Each employee can appear only once in a compensation review.',
+                ]);
+            }
+
+            $profiles = $this->access
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $actor)
+                ->whereKey($profileIds->all())
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            if ($profiles->count() !== $profileIds->count()) {
+                throw (new ModelNotFoundException)->setModel(HrEmployeeProfile::class);
+            }
+
             $review = HrCompensationReview::create([
-                'tenant_id' => $data['tenant_id'],
                 'title' => $data['title'],
                 'review_cycle' => $data['review_cycle'],
                 'effective_date' => $data['effective_date'],
                 'status' => $data['status'] ?? 'planning',
                 'budget_amount' => $data['budget_amount'] ?? null,
                 'notes' => $data['notes'] ?? null,
-                'created_by' => $data['created_by'] ?? null,
+                'created_by' => $actor->id,
             ]);
 
-            if (! empty($data['items'])) {
-                foreach ($data['items'] as $item) {
-                    $review->items()->create([
-                        'employee_profile_id' => $item['employee_profile_id'],
-                        'current_salary' => $item['current_salary'],
-                        'proposed_salary' => $item['proposed_salary'],
-                        'change_percentage' => $item['change_percentage'],
-                        'justification' => $item['justification'] ?? null,
-                        'status' => 'pending',
-                    ]);
-                }
+            foreach ($items as $item) {
+                $profile = $profiles->get((int) $item['employee_profile_id']);
+                $currentSalary = (float) ($profile->annual_salary ?? 0);
+                $proposedSalary = (float) $item['proposed_salary'];
+                $review->items()->create([
+                    'employee_profile_id' => $profile->id,
+                    'current_salary' => $currentSalary,
+                    'proposed_salary' => $proposedSalary,
+                    'change_percentage' => $currentSalary > 0
+                        ? round((($proposedSalary - $currentSalary) / $currentSalary) * 100, 2)
+                        : 0,
+                    'justification' => $item['justification'] ?? null,
+                    'status' => 'pending',
+                ]);
             }
 
             return $review->load('items');
-        });
+        }, attempts: 1);
     }
 
     /**
      * Approve a compensation review: mark its pending line-items approved and flip
      * the review to 'approved' so it becomes eligible for applyCompensationReview().
      */
-    public function approveCompensationReview(HrCompensationReview $review, int $approverId): void
+    public function approveCompensationReview(HrCompensationReview $review, User $actor): void
     {
-        if (! in_array($review->status, ['planning', 'in_progress'], true)) {
-            throw new \LogicException("Cannot approve a '{$review->status}' compensation review. Only planning or in-progress reviews can be approved.");
-        }
+        DB::transaction(function () use ($review, $actor): void {
+            [$locked, $items] = $this->lockFullyVisibleReview($review, $actor);
+            if (! in_array($locked->status, ['planning', 'in_progress'], true)) {
+                throw new \LogicException("Cannot approve a '{$locked->status}' compensation review. Only planning or in-progress reviews can be approved.");
+            }
+            if ($items->isEmpty()) {
+                throw new \LogicException('A compensation review must contain at least one employee before approval.');
+            }
 
-        DB::transaction(function () use ($review, $approverId) {
             // Update each pending item through the model so the change is audited.
-            $review->items()
+            $items
                 ->where('status', 'pending')
-                ->get()
-                ->each(function ($item) use ($approverId) {
+                ->each(function (HrCompensationReviewItem $item) use ($actor): void {
                     $item->update([
                         'status' => 'approved',
-                        'approved_by' => $approverId,
+                        'approved_by' => $actor->id,
                     ]);
                 });
 
             // The reviews table has no approved_by column — approver attribution
             // lives on each line-item; the review only tracks its status.
-            $review->update(['status' => 'approved']);
-        });
+            $locked->update(['status' => 'approved']);
+        }, attempts: 1);
     }
 
     /**
@@ -289,50 +343,89 @@ class CompensationService
      * sign off lines individually before approving the whole review; apply only
      * touches approved items.
      */
-    public function approveReviewItem(HrCompensationReviewItem $item, int $approverId): void
-    {
-        if ($item->status !== 'pending') {
-            throw new \LogicException("Only a pending line can be approved (this one is '{$item->status}').");
-        }
+    public function approveReviewItem(
+        HrCompensationReview $review,
+        HrCompensationReviewItem $item,
+        User $actor,
+    ): void {
+        DB::transaction(function () use ($review, $item, $actor): void {
+            $this->access->currentStaff($actor, $actor);
+            $lockedReview = $this->access
+                ->applyCompensationReviewScope(HrCompensationReview::query(), $actor)
+                ->lockForUpdate()
+                ->findOrFail($review->getKey());
+            $lockedItem = $this->access
+                ->applyCompensationReviewItemScope(HrCompensationReviewItem::query(), $actor)
+                ->where('compensation_review_id', $lockedReview->id)
+                ->lockForUpdate()
+                ->findOrFail($item->getKey());
 
-        $item->update(['status' => 'approved', 'approved_by' => $approverId]);
+            if ($lockedItem->status !== 'pending') {
+                throw new \LogicException("Only a pending line can be approved (this one is '{$lockedItem->status}').");
+            }
+
+            $lockedItem->update(['status' => 'approved', 'approved_by' => $actor->id]);
+        }, attempts: 1);
     }
 
     /**
      * Reject a single review line-item (pending → rejected) so it is excluded
      * from apply. The reason is recorded on the line's justification trail.
      */
-    public function rejectReviewItem(HrCompensationReviewItem $item, int $approverId, ?string $reason = null): void
-    {
-        if ($item->status !== 'pending') {
-            throw new \LogicException("Only a pending line can be rejected (this one is '{$item->status}').");
-        }
+    public function rejectReviewItem(
+        HrCompensationReview $review,
+        HrCompensationReviewItem $item,
+        User $actor,
+        ?string $reason = null,
+    ): void {
+        DB::transaction(function () use ($review, $item, $actor, $reason): void {
+            $this->access->currentStaff($actor, $actor);
+            $lockedReview = $this->access
+                ->applyCompensationReviewScope(HrCompensationReview::query(), $actor)
+                ->lockForUpdate()
+                ->findOrFail($review->getKey());
+            $lockedItem = $this->access
+                ->applyCompensationReviewItemScope(HrCompensationReviewItem::query(), $actor)
+                ->where('compensation_review_id', $lockedReview->id)
+                ->lockForUpdate()
+                ->findOrFail($item->getKey());
 
-        $item->update([
-            'status' => 'rejected',
-            'approved_by' => $approverId,
-            'justification' => $reason !== null && $reason !== ''
-                ? trim(($item->justification ? $item->justification."\n" : '')."Rejected: {$reason}")
-                : $item->justification,
-        ]);
+            if ($lockedItem->status !== 'pending') {
+                throw new \LogicException("Only a pending line can be rejected (this one is '{$lockedItem->status}').");
+            }
+
+            $lockedItem->update([
+                'status' => 'rejected',
+                'approved_by' => $actor->id,
+                'justification' => $reason !== null && $reason !== ''
+                    ? trim(($lockedItem->justification ? $lockedItem->justification."\n" : '')."Rejected: {$reason}")
+                    : $lockedItem->justification,
+            ]);
+        }, attempts: 1);
     }
 
     /**
      * Apply an approved compensation review: bulk-update profiles and create history entries.
      */
-    public function applyCompensationReview(HrCompensationReview $review): void
+    public function applyCompensationReview(HrCompensationReview $review, User $actor): void
     {
-        if ($review->status !== 'approved') {
-            throw new \LogicException("Cannot apply a '{$review->status}' compensation review. It must be approved first.");
-        }
-
         $applied = [];
 
-        DB::transaction(function () use ($review, &$applied) {
-            $approvedItems = $review->items()->where('status', 'approved')->get();
+        DB::transaction(function () use ($review, $actor, &$applied): void {
+            [$locked, $items] = $this->lockFullyVisibleReview($review, $actor);
+            if ($locked->status !== 'approved') {
+                throw new \LogicException("Cannot apply a '{$locked->status}' compensation review. It must be approved first.");
+            }
+            $approvedItems = $items->where('status', 'approved');
+            if ($approvedItems->isEmpty()) {
+                throw new \LogicException('A compensation review must contain at least one approved employee before it can be applied.');
+            }
 
             foreach ($approvedItems as $item) {
-                $profile = HrEmployeeProfile::findOrFail($item->employee_profile_id);
+                $profile = $this->access
+                    ->applyCurrentProfileScope(HrEmployeeProfile::query(), $actor)
+                    ->lockForUpdate()
+                    ->findOrFail($item->employee_profile_id);
 
                 // proposed_salary is an ANNUAL figure (the builder seeds it from
                 // annual_salary and places it against the band's annual range).
@@ -350,10 +443,10 @@ class CompensationService
                     'new_hourly_rate' => $newHourly,
                     'new_annual_salary' => $proposedAnnual,
                     'change_percentage' => $item->change_percentage,
-                    'reason' => $item->justification ?? "Applied from compensation review: {$review->title}",
-                    'effective_date' => $review->effective_date,
+                    'reason' => $item->justification ?? "Applied from compensation review: {$locked->title}",
+                    'effective_date' => $locked->effective_date,
                     'approved_by' => $item->approved_by,
-                    'created_by' => $review->created_by,
+                    'created_by' => $locked->created_by,
                 ]);
 
                 $applied[] = [
@@ -363,8 +456,8 @@ class CompensationService
                 ];
             }
 
-            $review->update(['status' => 'applied']);
-        });
+            $locked->update(['status' => 'applied']);
+        }, attempts: 1);
 
         // Pay changes carry a statutory expectation of notice — tell each
         // affected employee after commit (best-effort).
@@ -387,5 +480,30 @@ class CompensationService
                 ]);
             }
         }
+    }
+
+    /**
+     * @return array{HrCompensationReview, Collection<int, HrCompensationReviewItem>}
+     */
+    private function lockFullyVisibleReview(HrCompensationReview $review, User $actor): array
+    {
+        $this->access->currentStaff($actor, $actor);
+        $locked = $this->access
+            ->applyCompensationReviewScope(HrCompensationReview::query(), $actor)
+            ->lockForUpdate()
+            ->findOrFail($review->getKey());
+        $items = HrCompensationReviewItem::query()
+            ->where('compensation_review_id', $locked->id)
+            ->lockForUpdate()
+            ->get();
+        $visibleItemIds = $this->access
+            ->applyCompensationReviewItemScope(HrCompensationReviewItem::query(), $actor)
+            ->where('compensation_review_id', $locked->id)
+            ->pluck('id');
+        if ($visibleItemIds->count() !== $items->count()) {
+            throw (new ModelNotFoundException)->setModel(HrCompensationReview::class);
+        }
+
+        return [$locked, $items];
     }
 }

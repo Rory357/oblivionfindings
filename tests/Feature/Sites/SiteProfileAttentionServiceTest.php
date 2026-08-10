@@ -134,7 +134,6 @@ class SiteProfileAttentionServiceTest extends TestCase
         ]);
 
         $device = Device::factory()->offline()->create([
-            'tenant_id' => $this->site->tenant_id,
             'name' => 'Front entrance camera',
             'health_status' => HealthStatus::Critical,
         ]);

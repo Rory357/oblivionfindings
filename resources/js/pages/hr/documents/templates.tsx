@@ -1,3 +1,5 @@
+import { DocumentsTabs } from '@/components/hr';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,8 +12,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero, PageLayout } from '@/components/page';
-import { DocumentsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
@@ -86,13 +86,18 @@ export default function DocumentTemplates({
             <Head title="Document Templates" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={FileText}
                         title="Document Templates"
                         description="Manage templates for HR documents and letters."
                         stats={[
                             { label: 'Templates', value: templates.total },
-                            { label: 'Active', value: templates.data.filter((t) => t.is_active).length },
+                            {
+                                label: 'Active',
+                                value: templates.data.filter((t) => t.is_active)
+                                    .length,
+                            },
                         ]}
                         actions={
                             can.manage ? (

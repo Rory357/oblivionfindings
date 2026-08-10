@@ -38,11 +38,9 @@ class DietaryTagController extends Controller
             'description' => 'nullable|string|max:500',
         ]);
 
-        $tenantId = auth()->user()?->tenant_id;
         $key = ($data['key'] ?? null) ?: Str::slug($data['label'], '_');
 
         $tag = MealDietaryTag::create([
-            'tenant_id' => $tenantId,
             'key' => $key,
             'label' => $data['label'],
             'kind' => $data['kind'],

@@ -1,15 +1,24 @@
 /* eslint-disable no-restricted-syntax -- Detail-as-modal on the shared
  * WizardShell chrome (sections rail + ReviewCards + footer status chips +
  * Options bar). Semantic tokens only. */
-import { Button } from '@/components/ui/button';
+import {
+    PrivacyActionModal,
+    type PrivacyActionKind,
+} from '@/components/privacy/privacy-action-modal';
 import {
     PrivacyAttachmentsPane,
     type PrivacyAttachableType,
     type PrivacyAttachmentItem,
 } from '@/components/privacy/privacy-attachments-pane';
-import { PrivacyActionModal, type PrivacyActionKind } from '@/components/privacy/privacy-action-modal';
-import { ReviewCard, ReviewRow, WizardShell, type WizardStep } from '@/components/wizard/shell';
+import { Button } from '@/components/ui/button';
 import { type IconType } from '@/components/wizard/primitives';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    type WizardStep,
+} from '@/components/wizard/shell';
+import { cn } from '@/lib/utils';
 import {
     breachStatus,
     dpiaOutcome,
@@ -23,7 +32,6 @@ import {
     titleCase,
     type PrivacyTone,
 } from '@/pages/privacy/privacy-shared';
-import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -32,8 +40,8 @@ import {
     Clock,
     Download,
     ExternalLink,
-    Fingerprint,
     FileText,
+    Fingerprint,
     Gauge,
     History,
     ListChecks,
@@ -63,8 +71,20 @@ export type PrivacyCan = {
     conductDPIA: boolean;
 };
 
-type Section = { key: string; label: string; blurb: string; icon: IconType; render: () => ReactNode };
-type OptionBtn = { key: PrivacyActionKind; label: string; icon: IconType; tone?: 'primary' | 'critical'; show: boolean };
+type Section = {
+    key: string;
+    label: string;
+    blurb: string;
+    icon: IconType;
+    render: () => ReactNode;
+};
+type OptionBtn = {
+    key: PrivacyActionKind;
+    label: string;
+    icon: IconType;
+    tone?: 'primary' | 'critical';
+    show: boolean;
+};
 
 export function PrivacyDetailDialog({
     detail,
@@ -107,7 +127,12 @@ export function PrivacyDetailDialog({
         blurb: `${detail.attachments.length || 'No'} attached`,
         icon: Paperclip,
         render: () => (
-            <PrivacyAttachmentsPane attachableType={attachableType} attachableId={detail.id} attachments={detail.attachments} canManage={canManage} />
+            <PrivacyAttachmentsPane
+                attachableType={attachableType}
+                attachableId={detail.id}
+                attachments={detail.attachments}
+                canManage={canManage}
+            />
         ),
     };
     const history: Section = {
@@ -118,9 +143,15 @@ export function PrivacyDetailDialog({
         render: () => <Timeline events={detail.timeline} />,
     };
 
-    const { railIcon, railTitle, railSub, sections, chips, options } = buildKind(detail, canManage);
+    const { railIcon, railTitle, railSub, sections, chips, options } =
+        buildKind(detail, canManage);
     const allSections = [...sections, docs, history];
-    const steps: WizardStep[] = allSections.map((s) => ({ key: s.key, label: s.label, blurb: s.blurb, icon: s.icon }));
+    const steps: WizardStep[] = allSections.map((s) => ({
+        key: s.key,
+        label: s.label,
+        blurb: s.blurb,
+        icon: s.icon,
+    }));
     const shown = options.filter((o) => o.show);
 
     return (
@@ -137,10 +168,19 @@ export function PrivacyDetailDialog({
                 stepIndex={section}
                 onStepClick={setSection}
                 pct={null}
-                footerStart={<div className="flex flex-wrap items-center gap-1.5">{chips}</div>}
+                footerStart={
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {chips}
+                    </div>
+                }
                 footerEnd={
                     <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => router.visit(openFullUrl(detail))}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => router.visit(openFullUrl(detail))}
+                        >
                             <ExternalLink className="h-4 w-4" /> Open full page
                         </Button>
                         {shown.map((o) => (
@@ -148,7 +188,13 @@ export function PrivacyDetailDialog({
                                 key={o.key}
                                 type="button"
                                 size="sm"
-                                variant={o.tone === 'critical' ? 'destructive' : o.tone === 'primary' ? 'default' : 'outline'}
+                                variant={
+                                    o.tone === 'critical'
+                                        ? 'destructive'
+                                        : o.tone === 'primary'
+                                          ? 'default'
+                                          : 'outline'
+                                }
                                 onClick={() => setAction(o.key)}
                             >
                                 <o.icon className="h-4 w-4" /> {o.label}
@@ -157,10 +203,19 @@ export function PrivacyDetailDialog({
                     </div>
                 }
             >
-                <div className="grid gap-3 sm:grid-cols-2">{allSections[section]?.render()}</div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    {allSections[section]?.render()}
+                </div>
             </WizardShell>
 
-            {action ? <PrivacyActionModal kind={action} recordId={detail.id} open onClose={() => setAction(null)} /> : null}
+            {action ? (
+                <PrivacyActionModal
+                    kind={action}
+                    recordId={detail.id}
+                    open
+                    onClose={() => setAction(null)}
+                />
+            ) : null}
         </>
     );
 }
@@ -169,7 +224,10 @@ export function PrivacyDetailDialog({
 /*  Per-kind sections, chips, options                                 */
 /* ------------------------------------------------------------------ */
 
-function buildKind(d: PrivacyDetail, canManage: boolean): {
+function buildKind(
+    d: PrivacyDetail,
+    canManage: boolean,
+): {
     railIcon: IconType;
     railTitle: string;
     railSub: string;
@@ -190,15 +248,44 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                 <>
                     <Chip tone={st.tone}>{st.label}</Chip>
                     <Chip tone={ty.tone}>{ty.label}</Chip>
-                    {d.is_overdue ? <Chip tone="critical">Overdue · 20 wd</Chip> : null}
+                    {d.is_overdue ? (
+                        <Chip tone="critical">Overdue · 20 wd</Chip>
+                    ) : null}
                 </>
             ),
             options: [
-                { key: 'verify', label: 'Verify identity', icon: Fingerprint, tone: 'primary', show: canManage && open && !verified },
-                { key: 'extend', label: 'Extend', icon: Clock, show: canManage && open },
-                { key: 'complete', label: 'Complete', icon: Check, show: canManage && open },
-                { key: 'refuse', label: 'Refuse', icon: Ban, tone: 'critical', show: canManage && open },
-                { key: 'export', label: 'Export package', icon: Download, show: canManage },
+                {
+                    key: 'verify',
+                    label: 'Verify identity',
+                    icon: Fingerprint,
+                    tone: 'primary',
+                    show: canManage && open && !verified,
+                },
+                {
+                    key: 'extend',
+                    label: 'Extend',
+                    icon: Clock,
+                    show: canManage && open,
+                },
+                {
+                    key: 'complete',
+                    label: 'Complete',
+                    icon: Check,
+                    show: canManage && open,
+                },
+                {
+                    key: 'refuse',
+                    label: 'Refuse',
+                    icon: Ban,
+                    tone: 'critical',
+                    show: canManage && open,
+                },
+                {
+                    key: 'export',
+                    label: 'Export package',
+                    icon: Download,
+                    show: canManage,
+                },
             ],
             sections: [
                 {
@@ -209,17 +296,39 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                     render: () => (
                         <>
                             <ReviewCard icon={FileText} title="Request">
-                                <ReviewRow label="Reference" value={d.reference} />
+                                <ReviewRow
+                                    label="Reference"
+                                    value={d.reference}
+                                />
                                 <ReviewRow label="Type" value={ty.label} />
-                                <ReviewRow label="Received" value={fmtDate(d.received_at)} />
-                                <ReviewRow label="Assigned to" value={d.assigned_to} />
+                                <ReviewRow
+                                    label="Received"
+                                    value={fmtDate(d.received_at)}
+                                />
+                                <ReviewRow
+                                    label="Assigned to"
+                                    value={d.assigned_to}
+                                />
                             </ReviewCard>
                             <ReviewCard icon={Users} title="Subject">
-                                <ReviewRow label="Name" value={d.subject_name} />
-                                <ReviewRow label="Email" value={d.subject_email} />
-                                <ReviewRow label="Linked client" value={d.client?.name} />
+                                <ReviewRow
+                                    label="Name"
+                                    value={d.subject_name}
+                                />
+                                <ReviewRow
+                                    label="Email"
+                                    value={d.subject_email}
+                                />
+                                <ReviewRow
+                                    label="Linked client"
+                                    value={d.client?.name}
+                                />
                             </ReviewCard>
-                            <Prose title="Request details" icon={ListChecks} text={d.request_details} />
+                            <Prose
+                                title="Request details"
+                                icon={ListChecks}
+                                text={d.request_details}
+                            />
                         </>
                     ),
                 },
@@ -229,12 +338,37 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                     blurb: verified ? 'Verified' : 'Pending',
                     icon: Fingerprint,
                     render: () => (
-                        <ReviewCard icon={Fingerprint} title="Identity verification" span>
-                            <ReviewRow label="Status" value={<Chip tone={verified ? 'success' : 'warning'}>{verified ? 'Verified' : 'Pending'}</Chip>} />
-                            <ReviewRow label="Method" value={d.verification_method} />
-                            <ReviewRow label="Verified by" value={d.verified_by} />
-                            <ReviewRow label="When" value={fmtDateTime(d.identity_verified_at)} />
-                            <ReviewRow label="Basis" value="IPP 6 — confirm identity before release" />
+                        <ReviewCard
+                            icon={Fingerprint}
+                            title="Identity verification"
+                            span
+                        >
+                            <ReviewRow
+                                label="Status"
+                                value={
+                                    <Chip
+                                        tone={verified ? 'success' : 'warning'}
+                                    >
+                                        {verified ? 'Verified' : 'Pending'}
+                                    </Chip>
+                                }
+                            />
+                            <ReviewRow
+                                label="Method"
+                                value={d.verification_method}
+                            />
+                            <ReviewRow
+                                label="Verified by"
+                                value={d.verified_by}
+                            />
+                            <ReviewRow
+                                label="When"
+                                value={fmtDateTime(d.identity_verified_at)}
+                            />
+                            <ReviewRow
+                                label="Basis"
+                                value="IPP 6 — confirm identity before release"
+                            />
                         </ReviewCard>
                     ),
                 },
@@ -245,21 +379,66 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                     icon: Clock,
                     render: () => (
                         <>
-                            <ReviewCard icon={Clock} title="Statutory deadline" span>
-                                <ReviewRow label="Received" value={fmtDate(d.received_at)} />
+                            <ReviewCard
+                                icon={Clock}
+                                title="Statutory deadline"
+                                span
+                            >
+                                <ReviewRow
+                                    label="Received"
+                                    value={fmtDate(d.received_at)}
+                                />
                                 <ReviewRow
                                     label="Due date"
-                                    value={<span className={cn(d.is_overdue && 'font-bold text-status-critical')}>{fmtDate(d.deadline)}</span>}
+                                    value={
+                                        <span
+                                            className={cn(
+                                                d.is_overdue &&
+                                                    'font-bold text-status-critical',
+                                            )}
+                                        >
+                                            {fmtDate(d.deadline)}
+                                        </span>
+                                    }
                                 />
-                                {d.extended_due_date ? <ReviewRow label="Extended to" value={fmtDate(d.extended_due_date)} /> : null}
-                                <ReviewRow label="Basis" value="IPP 6 · 20 working days" />
-                                <ReviewRow label="Days remaining" value={d.is_overdue ? 'Overdue' : `${d.days_remaining} days`} />
+                                {d.extended_due_date ? (
+                                    <ReviewRow
+                                        label="Extended to"
+                                        value={fmtDate(d.extended_due_date)}
+                                    />
+                                ) : null}
+                                <ReviewRow
+                                    label="Basis"
+                                    value="IPP 6 · 20 working days"
+                                />
+                                <ReviewRow
+                                    label="Days remaining"
+                                    value={
+                                        d.is_overdue
+                                            ? 'Overdue'
+                                            : `${d.days_remaining} days`
+                                    }
+                                />
                             </ReviewCard>
-                            {d.status === 'completed' ? <Prose title="Completion notes" icon={Check} text={d.completion_notes} /> : null}
+                            {d.status === 'completed' ? (
+                                <Prose
+                                    title="Completion notes"
+                                    icon={Check}
+                                    text={d.completion_notes}
+                                />
+                            ) : null}
                             {d.status === 'rejected' ? (
                                 <>
-                                    <Prose title="Refusal reason" icon={Ban} text={d.rejection_reason} />
-                                    <Prose title="Legal basis" icon={Scale} text={d.rejection_legal_basis} />
+                                    <Prose
+                                        title="Refusal reason"
+                                        icon={Ban}
+                                        text={d.rejection_reason}
+                                    />
+                                    <Prose
+                                        title="Legal basis"
+                                        icon={Scale}
+                                        text={d.rejection_legal_basis}
+                                    />
                                 </>
                             ) : null}
                         </>
@@ -279,15 +458,41 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
             chips: (
                 <>
                     <Chip tone={st.tone}>{st.label}</Chip>
-                    {d.severity ? <Chip tone="neutral">{titleCase(d.severity)}</Chip> : null}
-                    {d.opc_required && !d.opc_notified_at ? <Chip tone="critical">OPC due</Chip> : null}
-                    {d.subject_required && !d.subject_notified_at ? <Chip tone="warning">Subjects due</Chip> : null}
+                    {d.severity ? (
+                        <Chip tone="neutral">{titleCase(d.severity)}</Chip>
+                    ) : null}
+                    {d.opc_required && !d.opc_notified_at ? (
+                        <Chip tone="critical">OPC due</Chip>
+                    ) : null}
+                    {d.subject_required && !d.subject_notified_at ? (
+                        <Chip tone="warning">Subjects due</Chip>
+                    ) : null}
                 </>
             ),
             options: [
-                { key: 'notify-opc', label: 'Notify OPC', icon: ShieldAlert, tone: 'critical', show: canManage && d.opc_required && !d.opc_notified_at },
-                { key: 'notify-subjects', label: 'Notify subjects', icon: Mail, show: canManage && d.subject_required && !d.subject_notified_at },
-                { key: 'resolve', label: 'Resolve', icon: Check, tone: 'primary', show: canManage && open },
+                {
+                    key: 'notify-opc',
+                    label: 'Notify OPC',
+                    icon: ShieldAlert,
+                    tone: 'critical',
+                    show: canManage && d.opc_required && !d.opc_notified_at,
+                },
+                {
+                    key: 'notify-subjects',
+                    label: 'Notify subjects',
+                    icon: Mail,
+                    show:
+                        canManage &&
+                        d.subject_required &&
+                        !d.subject_notified_at,
+                },
+                {
+                    key: 'resolve',
+                    label: 'Resolve',
+                    icon: Check,
+                    tone: 'primary',
+                    show: canManage && open,
+                },
             ],
             sections: [
                 {
@@ -298,17 +503,48 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                     render: () => (
                         <>
                             <ReviewCard icon={AlertTriangle} title="Breach">
-                                <ReviewRow label="Reference" value={d.reference} />
-                                <ReviewRow label="Status" value={<Chip tone={st.tone}>{st.label}</Chip>} />
-                                <ReviewRow label="Severity" value={d.severity ? titleCase(d.severity) : null} />
-                                <ReviewRow label="Discovered" value={fmtDate(d.discovered_at)} />
-                                <ReviewRow label="Discovered by" value={d.discovered_by} />
+                                <ReviewRow
+                                    label="Reference"
+                                    value={d.reference}
+                                />
+                                <ReviewRow
+                                    label="Status"
+                                    value={
+                                        <Chip tone={st.tone}>{st.label}</Chip>
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Severity"
+                                    value={
+                                        d.severity
+                                            ? titleCase(d.severity)
+                                            : null
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Discovered"
+                                    value={fmtDate(d.discovered_at)}
+                                />
+                                <ReviewRow
+                                    label="Discovered by"
+                                    value={d.discovered_by}
+                                />
                             </ReviewCard>
                             <ReviewCard icon={Users} title="Impact">
-                                <ReviewRow label="Individuals affected" value={d.approximate_individuals_affected} />
-                                <ReviewRow label="Data categories" value={joinArr(d.affected_data_categories)} />
+                                <ReviewRow
+                                    label="Individuals affected"
+                                    value={d.approximate_individuals_affected}
+                                />
+                                <ReviewRow
+                                    label="Data categories"
+                                    value={joinArr(d.affected_data_categories)}
+                                />
                             </ReviewCard>
-                            <Prose title="Nature of breach" icon={FileText} text={d.nature_of_breach} />
+                            <Prose
+                                title="Nature of breach"
+                                icon={FileText}
+                                text={d.nature_of_breach}
+                            />
                         </>
                     ),
                 },
@@ -319,9 +555,23 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                     icon: ShieldCheck,
                     render: () => (
                         <>
-                            <Prose title="Likely consequences" icon={AlertTriangle} text={d.likely_consequences} />
-                            <Prose title="Measures taken" icon={ShieldCheck} text={d.measures_taken} />
-                            {d.resolution_notes ? <Prose title="Resolution notes" icon={Check} text={d.resolution_notes} /> : null}
+                            <Prose
+                                title="Likely consequences"
+                                icon={AlertTriangle}
+                                text={d.likely_consequences}
+                            />
+                            <Prose
+                                title="Measures taken"
+                                icon={ShieldCheck}
+                                text={d.measures_taken}
+                            />
+                            {d.resolution_notes ? (
+                                <Prose
+                                    title="Resolution notes"
+                                    icon={Check}
+                                    text={d.resolution_notes}
+                                />
+                            ) : null}
                         </>
                     ),
                 },
@@ -332,15 +582,43 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                     icon: Mail,
                     render: () => (
                         <>
-                            <ReviewCard icon={ShieldAlert} title="Privacy Commissioner (OPC)">
-                                <ReviewRow label="Required" value={d.opc_required ? 'Yes — as soon as practicable' : 'No'} />
-                                <ReviewRow label="Notified" value={fmtDate(d.opc_notified_at)} />
-                                <ReviewRow label="Reference" value={d.authority_reference} />
+                            <ReviewCard
+                                icon={ShieldAlert}
+                                title="Privacy Commissioner (OPC)"
+                            >
+                                <ReviewRow
+                                    label="Required"
+                                    value={
+                                        d.opc_required
+                                            ? 'Yes — as soon as practicable'
+                                            : 'No'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Notified"
+                                    value={fmtDate(d.opc_notified_at)}
+                                />
+                                <ReviewRow
+                                    label="Reference"
+                                    value={d.authority_reference}
+                                />
                             </ReviewCard>
-                            <ReviewCard icon={Mail} title="Affected individuals">
-                                <ReviewRow label="Required" value={d.subject_required ? 'Yes' : 'No'} />
-                                <ReviewRow label="Notified" value={fmtDate(d.subject_notified_at)} />
-                                <ReviewRow label="Method" value={d.notification_method} />
+                            <ReviewCard
+                                icon={Mail}
+                                title="Affected individuals"
+                            >
+                                <ReviewRow
+                                    label="Required"
+                                    value={d.subject_required ? 'Yes' : 'No'}
+                                />
+                                <ReviewRow
+                                    label="Notified"
+                                    value={fmtDate(d.subject_notified_at)}
+                                />
+                                <ReviewRow
+                                    label="Method"
+                                    value={d.notification_method}
+                                />
                             </ReviewCard>
                         </>
                     ),
@@ -361,7 +639,15 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                     <Chip tone="info">{titleCase(d.hold_type ?? '')}</Chip>
                 </>
             ),
-            options: [{ key: 'release', label: 'Release hold', icon: Ban, tone: 'critical', show: canManage && d.status === 'active' }],
+            options: [
+                {
+                    key: 'release',
+                    label: 'Release hold',
+                    icon: Ban,
+                    tone: 'critical',
+                    show: canManage && d.status === 'active',
+                },
+            ],
             sections: [
                 {
                     key: 'overview',
@@ -371,20 +657,66 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                     render: () => (
                         <>
                             <ReviewCard icon={Scale} title="Legal hold">
-                                <ReviewRow label="Reference" value={d.reference} />
-                                <ReviewRow label="Type" value={titleCase(d.hold_type ?? '')} />
-                                <ReviewRow label="Status" value={<Chip tone={st.tone}>{st.label}</Chip>} />
-                                <ReviewRow label="Imposed" value={fmtDate(d.imposed_at)} />
-                                <ReviewRow label="Imposed by" value={d.imposed_by} />
+                                <ReviewRow
+                                    label="Reference"
+                                    value={d.reference}
+                                />
+                                <ReviewRow
+                                    label="Type"
+                                    value={titleCase(d.hold_type ?? '')}
+                                />
+                                <ReviewRow
+                                    label="Status"
+                                    value={
+                                        <Chip tone={st.tone}>{st.label}</Chip>
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Imposed"
+                                    value={fmtDate(d.imposed_at)}
+                                />
+                                <ReviewRow
+                                    label="Imposed by"
+                                    value={d.imposed_by}
+                                />
                             </ReviewCard>
-                            <ReviewCard icon={ShieldCheck} title="Authority & review">
-                                <ReviewRow label="Legal authority" value={d.legal_authority} />
-                                <ReviewRow label="Review date" value={fmtDate(d.review_date)} />
-                                {d.status === 'released' ? <ReviewRow label="Released" value={fmtDate(d.released_at)} /> : null}
-                                {d.status === 'released' ? <ReviewRow label="Released by" value={d.released_by} /> : null}
+                            <ReviewCard
+                                icon={ShieldCheck}
+                                title="Authority & review"
+                            >
+                                <ReviewRow
+                                    label="Legal authority"
+                                    value={d.legal_authority}
+                                />
+                                <ReviewRow
+                                    label="Review date"
+                                    value={fmtDate(d.review_date)}
+                                />
+                                {d.status === 'released' ? (
+                                    <ReviewRow
+                                        label="Released"
+                                        value={fmtDate(d.released_at)}
+                                    />
+                                ) : null}
+                                {d.status === 'released' ? (
+                                    <ReviewRow
+                                        label="Released by"
+                                        value={d.released_by}
+                                    />
+                                ) : null}
                             </ReviewCard>
-                            <Prose title="Reason" icon={ListChecks} text={d.reason} />
-                            {d.release_reason ? <Prose title="Release reason" icon={Ban} text={d.release_reason} /> : null}
+                            <Prose
+                                title="Reason"
+                                icon={ListChecks}
+                                text={d.reason}
+                            />
+                            {d.release_reason ? (
+                                <Prose
+                                    title="Release reason"
+                                    icon={Ban}
+                                    text={d.release_reason}
+                                />
+                            ) : null}
                         </>
                     ),
                 },
@@ -407,8 +739,19 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
             </>
         ),
         options: [
-            { key: 'approve', label: 'Approve', icon: Check, tone: 'primary', show: canManage && inReview },
-            { key: 'review', label: 'Send for review', icon: ShieldAlert, show: canManage && inReview },
+            {
+                key: 'approve',
+                label: 'Approve',
+                icon: Check,
+                tone: 'primary',
+                show: canManage && inReview,
+            },
+            {
+                key: 'review',
+                label: 'Send for review',
+                icon: ShieldAlert,
+                show: canManage && inReview,
+            },
         ],
         sections: [
             {
@@ -421,17 +764,41 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                         <ReviewCard icon={ShieldCheck} title="Assessment">
                             <ReviewRow label="Reference" value={d.reference} />
                             <ReviewRow label="Name" value={d.assessment_name} />
-                            <ReviewRow label="Project / process" value={d.project_or_process} />
-                            <ReviewRow label="Type" value={titleCase(d.assessment_type ?? '')} />
+                            <ReviewRow
+                                label="Project / process"
+                                value={d.project_or_process}
+                            />
+                            <ReviewRow
+                                label="Type"
+                                value={titleCase(d.assessment_type ?? '')}
+                            />
                             <ReviewRow label="Assessor" value={d.assessor} />
-                            <ReviewRow label="Date" value={fmtDate(d.assessment_date)} />
+                            <ReviewRow
+                                label="Date"
+                                value={fmtDate(d.assessment_date)}
+                            />
                         </ReviewCard>
                         <ReviewCard icon={Check} title="Outcome">
-                            <ReviewRow label="Outcome" value={<Chip tone={oc.tone}>{oc.label}</Chip>} />
-                            <ReviewRow label="Approved by" value={d.approved_by} />
-                            <ReviewRow label="Review date" value={fmtDate(d.review_date)} />
+                            <ReviewRow
+                                label="Outcome"
+                                value={<Chip tone={oc.tone}>{oc.label}</Chip>}
+                            />
+                            <ReviewRow
+                                label="Approved by"
+                                value={d.approved_by}
+                            />
+                            <ReviewRow
+                                label="Review date"
+                                value={fmtDate(d.review_date)}
+                            />
                         </ReviewCard>
-                        {d.description ? <Prose title="Description" icon={FileText} text={d.description} /> : null}
+                        {d.description ? (
+                            <Prose
+                                title="Description"
+                                icon={FileText}
+                                text={d.description}
+                            />
+                        ) : null}
                     </>
                 ),
             },
@@ -442,11 +809,25 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                 icon: ListChecks,
                 render: () => (
                     <>
-                        <Prose title="Processing purpose" icon={ListChecks} text={d.processing_purpose} />
-                        <Prose title="Legal basis" icon={Scale} text={d.legal_basis} />
+                        <Prose
+                            title="Processing purpose"
+                            icon={ListChecks}
+                            text={d.processing_purpose}
+                        />
+                        <Prose
+                            title="Legal basis"
+                            icon={Scale}
+                            text={d.legal_basis}
+                        />
                         <ReviewCard icon={Users} title="Scope">
-                            <ReviewRow label="Personal data types" value={joinArr(d.personal_data_types)} />
-                            <ReviewRow label="Who is affected" value={joinArr(d.data_subjects)} />
+                            <ReviewRow
+                                label="Personal data types"
+                                value={joinArr(d.personal_data_types)}
+                            />
+                            <ReviewRow
+                                label="Who is affected"
+                                value={joinArr(d.data_subjects)}
+                            />
                         </ReviewCard>
                     </>
                 ),
@@ -459,12 +840,38 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
                 render: () => (
                     <>
                         <ReviewCard icon={Gauge} title="Risk rating" span>
-                            <ReviewRow label="Overall risk" value={<Chip tone={risk.tone}>{risk.label}</Chip>} />
-                            <ReviewRow label="Residual risk" value={d.residual_risk_level ? riskLevel(d.residual_risk_level).label : null} />
+                            <ReviewRow
+                                label="Overall risk"
+                                value={
+                                    <Chip tone={risk.tone}>{risk.label}</Chip>
+                                }
+                            />
+                            <ReviewRow
+                                label="Residual risk"
+                                value={
+                                    d.residual_risk_level
+                                        ? riskLevel(d.residual_risk_level).label
+                                        : null
+                                }
+                            />
                         </ReviewCard>
-                        <Prose title="Identified risks" icon={AlertTriangle} text={joinList(d.identified_risks)} />
-                        <Prose title="Mitigation measures" icon={ShieldCheck} text={joinList(d.mitigation_measures)} />
-                        {d.review_notes ? <Prose title="Review notes" icon={History} text={d.review_notes} /> : null}
+                        <Prose
+                            title="Identified risks"
+                            icon={AlertTriangle}
+                            text={joinList(d.identified_risks)}
+                        />
+                        <Prose
+                            title="Mitigation measures"
+                            icon={ShieldCheck}
+                            text={joinList(d.mitigation_measures)}
+                        />
+                        {d.review_notes ? (
+                            <Prose
+                                title="Review notes"
+                                icon={History}
+                                text={d.review_notes}
+                            />
+                        ) : null}
                     </>
                 ),
             },
@@ -477,30 +884,73 @@ function buildKind(d: PrivacyDetail, canManage: boolean): {
 /* ------------------------------------------------------------------ */
 
 function Chip({ tone, children }: { tone: PrivacyTone; children: ReactNode }) {
-    return <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold', PRIVACY_PILL[tone])}>{children}</span>;
+    return (
+        <span
+            className={cn(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                PRIVACY_PILL[tone],
+            )}
+        >
+            {children}
+        </span>
+    );
 }
 
-function Prose({ title, icon: Icon, text }: { title: string; icon: IconType; text?: string | null }) {
+function Prose({
+    title,
+    icon: Icon,
+    text,
+}: {
+    title: string;
+    icon: IconType;
+    text?: string | null;
+}) {
     return (
         <ReviewCard icon={Icon} title={title} span>
-            {text ? <p className="text-[13px] leading-relaxed whitespace-pre-line text-foreground">{text}</p> : <p className="text-[13px] text-muted-foreground">—</p>}
+            {text ? (
+                <p className="text-[13px] leading-relaxed whitespace-pre-line text-foreground">
+                    {text}
+                </p>
+            ) : (
+                <p className="text-[13px] text-muted-foreground">—</p>
+            )}
         </ReviewCard>
     );
 }
 
-function Timeline({ events }: { events: { at: string; label: string; tone: PrivacyTone }[] }) {
-    if (!events.length) return <div className="sm:col-span-2 rounded-xl border border-dashed border-border p-4 text-center text-[13px] text-muted-foreground">No history yet.</div>;
+function Timeline({
+    events,
+}: {
+    events: { at: string; label: string; tone: PrivacyTone }[];
+}) {
+    if (!events.length)
+        return (
+            <div className="rounded-xl border border-dashed border-border p-4 text-center text-[13px] text-muted-foreground sm:col-span-2">
+                No history yet.
+            </div>
+        );
     return (
-        <ol className="sm:col-span-2 flex flex-col gap-0">
+        <ol className="flex flex-col gap-0 sm:col-span-2">
             {events.map((e, i) => (
                 <li key={i} className="flex gap-3 pb-4 last:pb-0">
                     <div className="flex flex-col items-center">
-                        <span className={cn('mt-1 h-2.5 w-2.5 shrink-0 rounded-full', dotFor(e.tone))} />
-                        {i < events.length - 1 ? <span className="w-px flex-1 bg-border" /> : null}
+                        <span
+                            className={cn(
+                                'mt-1 h-2.5 w-2.5 shrink-0 rounded-full',
+                                dotFor(e.tone),
+                            )}
+                        />
+                        {i < events.length - 1 ? (
+                            <span className="w-px flex-1 bg-border" />
+                        ) : null}
                     </div>
                     <div className="-mt-0.5">
-                        <div className="text-[13px] font-semibold text-foreground">{e.label}</div>
-                        <div className="text-xs text-muted-foreground">{fmtDateTime(e.at)}</div>
+                        <div className="text-[13px] font-semibold text-foreground">
+                            {e.label}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            {fmtDateTime(e.at)}
+                        </div>
                     </div>
                 </li>
             ))}
@@ -517,8 +967,14 @@ const DOT: Record<PrivacyTone, string> = {
 };
 const dotFor = (t: PrivacyTone) => DOT[t];
 
-const joinArr = (a?: string[]): string | null => (Array.isArray(a) && a.length ? a.join(', ') : null);
-const joinList = (a?: string[] | string): string | null => (Array.isArray(a) ? (a.length ? a.map((x) => `• ${x}`).join('\n') : null) : (a ?? null) || null);
+const joinArr = (a?: string[]): string | null =>
+    Array.isArray(a) && a.length ? a.join(', ') : null;
+const joinList = (a?: string[] | string): string | null =>
+    Array.isArray(a)
+        ? a.length
+            ? a.map((x) => `• ${x}`).join('\n')
+            : null
+        : (a ?? null) || null;
 
 function openFullUrl(d: PrivacyDetail): string {
     switch (d.kind) {

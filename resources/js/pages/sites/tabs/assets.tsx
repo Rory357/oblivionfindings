@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from '@inertiajs/react';
 import { ArrowUpRight, Plus } from 'lucide-react';
 import { formatRegisterDate, registerLabel } from './safety-register';
+import { SiteProfileLockedState } from './site-profile-states';
 
 type SiteAssetRow = {
     id: number;
@@ -20,14 +21,25 @@ type SiteAssetRow = {
     href: string;
 };
 
-export type SiteAssetsData = {
-    locked?: boolean;
-    items: SiteAssetRow[];
-    can_create: boolean;
-    href: string;
-};
+export type SiteAssetsData =
+    | {
+          locked: true;
+          items: never[];
+          can_create: false;
+          href: null;
+      }
+    | {
+          locked?: false;
+          items: SiteAssetRow[];
+          can_create: boolean;
+          href: string;
+      };
 
 export function SiteProfileAssets({ data }: { data: SiteAssetsData }) {
+    if (data.locked) {
+        return <SiteProfileLockedState label="Site assets" />;
+    }
+
     return (
         <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

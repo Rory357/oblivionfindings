@@ -16,7 +16,9 @@ class AlertsEventsControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -324,6 +326,43 @@ class AlertsEventsControllerTest extends TestCase
             $types = $page->toArray()['props']['filterOptions']['eventTypes'];
             $this->assertContains('alarm_trigger', $types);
             $this->assertContains('heartbeat', $types);
+        });
+    }
+
+    public function test_events_stats_and_filter_options_cover_the_single_application_registry_for_all_sites_users(): void
+    {
+
+        $primaryDevice = Device::factory()->create(['name' => 'Primary sensor']);
+        $unrelatedDevice = Device::factory()->create(['name' => 'Unrelated sensor']);
+
+        DeviceEvent::create([
+            'device_id' => $primaryDevice->id,
+            'event_type' => 'primary_event',
+            'severity' => 'critical',
+            'source' => 'primary-source',
+            'occurred_at' => now(),
+        ]);
+        DeviceEvent::create([
+            'device_id' => $unrelatedDevice->id,
+            'event_type' => 'unrelated_event',
+            'severity' => 'critical',
+            'source' => 'unrelated-source',
+            'occurred_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)->get('/security-devices/alerts-events');
+
+        $response->assertInertia(function ($page) {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame(2, $props['stats']['total24h']);
+            $this->assertSame(2, $props['stats']['critical24h']);
+            $this->assertEqualsCanonicalizing(
+                ['Primary sensor', 'Unrelated sensor'],
+                collect($props['events']['data'])->pluck('device_name')->all(),
+            );
+            $this->assertSame(['primary_event', 'unrelated_event'], $props['filterOptions']['eventTypes']);
+            $this->assertSame(['primary-source', 'unrelated-source'], $props['filterOptions']['sources']);
         });
     }
 

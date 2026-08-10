@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { shortModelType } from './audit-log';
 
 describe('HR canonical audit model labels', () => {
-    it('renders organization-scoped system events without an auditable model', () => {
+    it('renders application events without an auditable model', () => {
         expect(shortModelType(null)).toBe('System');
         expect(shortModelType(undefined)).toBe('System');
     });

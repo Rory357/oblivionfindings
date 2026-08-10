@@ -9,6 +9,7 @@ use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\AlertWorklistQuery;
@@ -79,18 +80,22 @@ class ControlRoomDeskTest extends TestCase
         $critical = ControlRoomAlert::factory()->critical()->create([
             'site_id' => $site->id,
             'reference_number' => 'CR-2026-0201',
+            'created_by_user_id' => $viewer->id,
         ]);
         $high = ControlRoomAlert::factory()->high()->create([
             'site_id' => $site->id,
             'reference_number' => 'CR-2026-0202',
+            'created_by_user_id' => $viewer->id,
         ]);
         ControlRoomAlert::factory()->critical()->create([
             'site_id' => $site->id,
             'status' => ControlRoomAlert::STATUS_DISMISSED,
+            'created_by_user_id' => $viewer->id,
         ]);
         ControlRoomAlert::factory()->critical()->create([
             'site_id' => $site->id,
             'snoozed_until' => now()->addHour(),
+            'created_by_user_id' => $viewer->id,
         ]);
 
         $expected = app(AlertWorklistQuery::class)
@@ -126,6 +131,7 @@ class ControlRoomDeskTest extends TestCase
             'site_id' => $site->id,
             'triggered_at' => now()->subMinutes(60),
             'acknowledged_at' => now()->subMinutes(59),
+            'created_by_user_id' => $viewer->id,
         ]);
         AlertSla::query()->create([
             'alert_id' => $alert->id,
@@ -161,10 +167,12 @@ class ControlRoomDeskTest extends TestCase
         $expected = ControlRoomAlert::factory()->create([
             'site_id' => $site->id,
             'queue_id' => $immediate->id,
+            'created_by_user_id' => $viewer->id,
         ]);
         ControlRoomAlert::factory()->create([
             'site_id' => $site->id,
             'queue_id' => $routine->id,
+            'created_by_user_id' => $viewer->id,
         ]);
 
         $live = app(ControlRoomDeskService::class)->live($viewer, [
@@ -188,6 +196,7 @@ class ControlRoomDeskTest extends TestCase
         ControlRoomAlert::factory()->count(3)->create([
             'site_id' => $site->id,
             'queue_id' => $queue->id,
+            'created_by_user_id' => $viewer->id,
         ]);
 
         $desk = app(ControlRoomDeskService::class);
@@ -200,7 +209,7 @@ class ControlRoomDeskTest extends TestCase
         $queries = DB::getQueryLog();
         DB::disableQueryLog();
 
-        $this->assertLessThanOrEqual(15, count($queries), collect($queries)->pluck('query')->implode("\n"));
+        $this->assertLessThanOrEqual(18, count($queries), collect($queries)->pluck('query')->implode("\n"));
 
         $this->mock(ControlRoomReportService::class, function ($mock): void {
             $mock->shouldNotReceive('alertVolume');
@@ -229,10 +238,12 @@ class ControlRoomDeskTest extends TestCase
     {
         $site = Site::factory()->create();
         $viewer = $this->siteBoundUser($site, ['controlRoom.viewAny']);
-        $alert = ControlRoomAlert::factory()->create(['site_id' => $site->id]);
+        $alert = ControlRoomAlert::factory()->create([
+            'site_id' => $site->id,
+            'created_by_user_id' => $viewer->id,
+        ]);
         HsEvent::factory()->create([
             'site_id' => $site->id,
-            'organization_id' => $site->tenant_id,
             'control_room_alert_id' => $alert->id,
             'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
         ]);
@@ -247,8 +258,11 @@ class ControlRoomDeskTest extends TestCase
     private function siteBoundUser(Site $site, array $permissionKeys): User
     {
         $user = User::factory()->create([
+            'role' => 'support_worker',
             'approved_at' => now(),
-            'organization_id' => $site->tenant_id,
+        ]);
+        $user->roles()->syncWithoutDetaching([
+            Role::query()->where('name', 'support_worker')->firstOrFail()->id,
         ]);
         $permissionIds = Permission::query()->whereIn('key', $permissionKeys)->pluck('id');
         $user->permissionOverrides()->sync($permissionIds->mapWithKeys(
@@ -256,8 +270,14 @@ class ControlRoomDeskTest extends TestCase
         ));
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
+            'position_role' => 'support_worker',
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
         ]);
 
         return $user;

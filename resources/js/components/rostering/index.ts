@@ -5,28 +5,24 @@ export {
     type FillBySite,
     type ShiftTypeSlice,
 } from './analytics-pane';
-export { avatarHueStyle } from './avatar-hue';
-export { CalendarPane, type CalendarPaneProps } from './calendar-pane';
-export {
-    calendarStatusMeta,
-    type CalendarGap,
-    type CalendarShift,
-} from './calendar-shared';
-export {
-    DayDetailDialog,
-    type DayDetailDialogProps,
-} from './day-detail-dialog';
 export {
     AvailabilityPane,
     type AvailabilityLeaveRequest,
     type AvailabilityPaneProps,
     type AvailabilityStaffMember,
 } from './availability-pane';
+export { avatarHueStyle } from './avatar-hue';
 export {
     BroadcastDialog,
     type BroadcastDialogProps,
     type BroadcastShift,
 } from './broadcast-dialog';
+export { CalendarPane, type CalendarPaneProps } from './calendar-pane';
+export {
+    calendarStatusMeta,
+    type CalendarGap,
+    type CalendarShift,
+} from './calendar-shared';
 export {
     CapacityHeatmapPane,
     type CapacityRow as CapacityHeatmapRow,
@@ -43,6 +39,10 @@ export {
     type CoverageCellState,
     type CoverageRow,
 } from './coverage-pane';
+export {
+    DayDetailDialog,
+    type DayDetailDialogProps,
+} from './day-detail-dialog';
 export { Donut, DonutLegend, type DonutSegment } from './donut';
 export { DonutCard, type DonutCardTone } from './donut-card';
 export {
@@ -114,12 +114,12 @@ export { SiteFilter, type SiteOption } from './site-filter';
 export { TabStrip, type RosterTabItem, type RosterTabTone } from './tab-strip';
 export {
     TemplateDetailDialog,
-    type TemplateDetailDialogProps,
     TemplateWizardDialog,
-    type TemplateWizardDialogProps,
     type TemplateClientOption,
+    type TemplateDetailDialogProps,
     type TemplateServiceContextOption,
     type TemplateStaffOption,
+    type TemplateWizardDialogProps,
 } from './template-dialogs';
 export {
     TemplatesPane,
@@ -134,8 +134,8 @@ export {
     type UnassignMakeOpenShift,
 } from './unassign-make-open-dialog';
 export {
-    buildShiftActions,
     WeekGridPane,
+    buildShiftActions,
     type GridConflictPeer,
     type GridShift,
     type GridShiftStatus,

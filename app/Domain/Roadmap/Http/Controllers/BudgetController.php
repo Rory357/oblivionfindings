@@ -17,7 +17,6 @@ class BudgetController extends Controller
         $data = $request->validate([
             'new_envelope' => ['nullable', 'numeric', 'min:0'],
             'use_governance_budget' => ['nullable', 'boolean'],
-            'tenant_id' => ['nullable', 'integer'],
         ]);
 
         $envelope = (float) ($data['new_envelope'] ?? 0);
@@ -34,10 +33,7 @@ class BudgetController extends Controller
             return response()->json(['message' => 'A budget envelope amount is required.'], 422);
         }
 
-        $result = $this->budgetReplanService->replanForBudgetCut(
-            $envelope,
-            $data['tenant_id'] ?? ($request->user()?->tenant_id ?? null),
-        );
+        $result = $this->budgetReplanService->replanForBudgetCut($envelope);
 
         return response()->json([
             'result' => $result,

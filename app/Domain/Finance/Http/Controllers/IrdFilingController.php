@@ -6,14 +6,19 @@ use App\Domain\Finance\Models\FinGstReturn;
 use App\Domain\Finance\Models\FinIrdFiling;
 use App\Domain\Finance\Services\IrdFilingService;
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Hr\Services\HrPayrollAccessService;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class IrdFilingController extends Controller
 {
+    private const DUPLICATE_PAYDAY_MESSAGE = 'A payday filing already exists for this payroll run.';
+
     public function __construct(
         protected IrdFilingService $irdFilingService,
+        private readonly HrPayrollAccessService $payrollAccess,
     ) {}
 
     /**
@@ -21,9 +26,9 @@ class IrdFilingController extends Controller
      */
     public function index(Request $request)
     {
-        $orgId = $request->user()->organization_id;
+        $user = $request->user();
 
-        $query = FinIrdFiling::forOrganization($orgId);
+        $query = FinIrdFiling::query();
 
         if ($request->filled('filing_type')) {
             $query->ofType($request->input('filing_type'));
@@ -41,21 +46,21 @@ class IrdFilingController extends Controller
             ->withQueryString();
 
         // Get GST returns that are filed but don't have an IRD filing yet
-        $availableGstReturns = FinGstReturn::forOrganization($orgId)
+        $availableGstReturns = FinGstReturn::query()
             ->whereIn('status', ['draft', 'filed'])
             ->whereDoesntHave('irdFilings')
             ->orderByDesc('period_end')
             ->get(['id', 'period_start', 'period_end', 'gst_payable', 'status', 'ird_period']);
 
         // Posted payroll runs (GL journal posted) that don't yet have a payday
-        // filing. Tenant resolves to the org id in this app (see ResolvesHrTenant).
-        $filedRunIds = FinIrdFiling::forOrganization($orgId)
+        // filing. Finance permission grants the destination action; HR payroll
+        // permission and canonical Site ownership independently gate the source.
+        $filedRunIds = FinIrdFiling::query()
             ->ofType('payday')
             ->whereNotNull('payroll_run_id')
             ->pluck('payroll_run_id');
 
-        $availablePayrollRuns = HrPayrollRun::query()
-            ->where('tenant_id', $orgId)
+        $availablePayrollRuns = $this->payrollAccess->visibleRunsQuery($user)
             ->whereNotNull('journal_id')
             ->whereNotIn('id', $filedRunIds)
             ->orderByDesc('period_end')
@@ -76,9 +81,7 @@ class IrdFilingController extends Controller
      */
     public function export(Request $request)
     {
-        $orgId = $request->user()->organization_id;
-
-        $query = FinIrdFiling::forOrganization($orgId);
+        $query = FinIrdFiling::query();
 
         if ($request->filled('filing_type')) {
             $query->ofType($request->input('filing_type'));
@@ -117,10 +120,7 @@ class IrdFilingController extends Controller
             'ird_number' => ['required', 'string', 'min:8', 'max:11'],
         ]);
 
-        $orgId = $request->user()->organization_id;
-
         $filing = $this->irdFilingService->createGstFiling(
-            $orgId,
             $gstReturn,
             $validated['ird_number'],
         );
@@ -134,6 +134,9 @@ class IrdFilingController extends Controller
      */
     public function createFromPayrollRun(Request $request, HrPayrollRun $run)
     {
+        $user = $request->user();
+        $run = $this->payrollAccess->payrollRun($user, $run);
+
         $validated = $request->validate([
             'ird_number' => ['required', 'string', 'min:8', 'max:11'],
         ]);
@@ -144,13 +147,30 @@ class IrdFilingController extends Controller
             'Payroll run must be posted to the GL before a payday filing can be created.',
         );
 
-        $orgId = $request->user()->organization_id;
-
-        $filing = $this->irdFilingService->createPaydayFiling(
-            $orgId,
-            $run,
-            $validated['ird_number'],
+        abort_if(
+            FinIrdFiling::query()
+                ->ofType('payday')
+                ->where('payroll_run_id', $run->id)
+                ->exists(),
+            422,
+            self::DUPLICATE_PAYDAY_MESSAGE,
         );
+
+        try {
+            $filing = $this->irdFilingService->createPaydayFiling(
+                $run,
+                $validated['ird_number'],
+            );
+        } catch (UniqueConstraintViolationException $exception) {
+            $duplicateExists = FinIrdFiling::query()
+                ->where('payroll_run_id', $run->id)
+                ->exists();
+            if (! $duplicateExists) {
+                throw $exception;
+            }
+
+            abort(422, self::DUPLICATE_PAYDAY_MESSAGE);
+        }
 
         return redirect()->route('finance.ird-filings.show', $filing)
             ->with('success', 'Payday filing created from payroll run.');

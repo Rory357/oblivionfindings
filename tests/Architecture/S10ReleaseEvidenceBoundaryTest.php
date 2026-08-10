@@ -1,0 +1,166 @@
+<?php
+
+it('binds UniFi Milesight and native Queclink evidence to one protected deployed release', function (): void {
+    $root = dirname(__DIR__, 2);
+    $authority = (string) file_get_contents($root.'/app/Support/Monitoring/S10ReleaseAuthorityVerifier.php');
+    $processEnvironment = (string) file_get_contents($root.'/app/Support/Monitoring/S10ProcessEnvironment.php');
+    $protectedRuntimeEnvironment = (string) file_get_contents($root.'/app/Support/Monitoring/S10ProtectedRuntimeEnvironment.php');
+    $nativeProcess = (string) file_get_contents($root.'/app/Support/Monitoring/S10NativeProcessRunner.php');
+    $script = (string) file_get_contents($root.'/scripts/monitoring/verify-s10-release-evidence.php');
+    $runbook = (string) file_get_contents($root.'/docs/runbooks/monitoring/s10-release-evidence.md');
+
+    expect($authority)->toContain(
+        "AUTHORITY_PATH = '/etc/oblivion/security-devices-s10-release-authority.json'",
+        "PHP_OS_FAMILY !== 'Linux'",
+        'is_link(self::AUTHORITY_PATH)',
+        '@lstat(self::AUTHORITY_PATH)',
+        "@fopen(self::AUTHORITY_PATH, 'rb')",
+        '($mode & 0170000) === 0100000',
+        '($mode & 0022) === 0',
+        "(\$metadata['owner_uid'] ?? null) === 0",
+        '(new StrictJsonObjectDecoder)->decode($rawAuthority)',
+        "'security_devices_s10_release_authority_v1'",
+        "'release_revision'",
+        "'environment_reference_sha256'",
+        "'runtime_environment_sha256'",
+        "'authority_reference'",
+        'MAXIMUM_AUTHORITY_SECONDS = 86_400',
+        'public function identitiesRemainPinned(array $snapshots): bool',
+        'count($snapshots) !== 4',
+    )->not->toContain(
+        'getenv(',
+        '$_ENV',
+        '$_SERVER',
+    );
+
+    expect($processEnvironment)->toContain(
+        "PHP_BINARY_VARIABLE = 'OBLIVION_S10_PHP_BINARY'",
+        "SYSTEM_PATH = '/usr/bin:/bin'",
+        "str_starts_with(strtoupper(\$key), 'GIT_')",
+        "str_starts_with(\$key, 'BASH_FUNC_')",
+        "'GIT_DIR'",
+        "'GIT_WORK_TREE'",
+        "'GIT_INDEX_FILE'",
+        "'GIT_OBJECT_DIRECTORY'",
+        "'GIT_ALTERNATE_OBJECT_DIRECTORIES'",
+        "'GIT_COMMON_DIR'",
+        "'GIT_CONFIG_COUNT'",
+        "'GIT_CONFIG_KEY_0'",
+        "'GIT_CONFIG_VALUE_0'",
+        "'BASH_ENV'",
+        "'ENV'",
+        "'SHELLOPTS'",
+        "'BASHOPTS'",
+        "'CDPATH'",
+        "'GLOBIGNORE'",
+        "'PHPRC'",
+        "'PHP_INI_SCAN_DIR'",
+        '$overrides[$key] = false',
+        "\$overrides['GIT_OPTIONAL_LOCKS'] = '0'",
+        'public static function runtimeEnvironment(string $phpBinary): array',
+    );
+
+    expect($protectedRuntimeEnvironment)->toContain(
+        "ENVIRONMENT_PATH = '/etc/oblivion/security-devices-s10-release-runtime.json'",
+        "CONFIG_CACHE_BYPASS_PATH = '/run/oblivion-s10-release-no-config-cache.php'",
+        'StrictJsonObjectDecoder',
+        'hash_equals($expectedSha256, hash(\'sha256\', $rawEnvironment))',
+        '($metadata[\'owner_uid\'] ?? null) === 0',
+        '($metadata[\'mode\'] & 0777) === 0600',
+        '($environment[\'APP_ENV\'] ?? null) !== \'production\'',
+        '($environment[\'DB_CONNECTION\'] ?? null) !== \'mysql\'',
+        '($environment[\'MONITORING_COLLECTOR_REPLAY_STORE\'] ?? null) !== \'redis\'',
+        "'PHPRC'",
+        "'APP_CONFIG_CACHE'",
+        "'LD_PRELOAD'",
+        "'HTTPS_PROXY'",
+        "'PATH' => S10ProcessEnvironment::SYSTEM_PATH",
+        "'APP_CONFIG_CACHE' => self::CONFIG_CACHE_BYPASS_PATH",
+        'file_exists(self::CONFIG_CACHE_BYPASS_PATH)',
+        'is_link(self::CONFIG_CACHE_BYPASS_PATH)',
+    )->not->toContain('getenv(', '$_ENV', '$_SERVER');
+
+    expect($nativeProcess)->toContain(
+        'proc_open(',
+        "'bypass_shell' => true",
+        'microtime(true) + $timeoutSeconds',
+        '@proc_terminate($process)',
+        'strlen($stdout) > $maximumOutputBytes',
+        "'successful' => \$exitCode === 0",
+    )->not->toContain(
+        'Symfony',
+        'vendor/autoload.php',
+    );
+
+    expect($script)->toContain(
+        'new S10ReleaseAuthorityVerifier',
+        '$protocolBefore = $identitySnapshot();',
+        '$protocolAfter = $identitySnapshot();',
+        '$queclinkBefore = $identitySnapshot();',
+        '$queclinkAfter = $identitySnapshot();',
+        '$authorityVerifier->identitiesRemainPinned($snapshots)',
+        "'rev-parse', '--verify', 'HEAD'",
+        "'rev-parse', '--verify', 'refs/remotes/origin/main'",
+        "'rev-parse', '--show-toplevel'",
+        "'status', '--porcelain=v1', '--untracked-files=all'",
+        "S10_GIT_BINARY = '/usr/bin/git'",
+        "S10_BASH_BINARY = '/usr/bin/bash'",
+        "S10_PHP_BINARY = '/usr/bin/php8.4'",
+        'S10_CHILD_BOOTSTRAP',
+        "'/app/Support/Monitoring/S10NativeProcessRunner.php'",
+        "'/app/Support/Monitoring/S10ProtectedRuntimeEnvironment.php'",
+        'is_link($path) || ! is_file($path)',
+        'require_once $path',
+        'S10ProcessEnvironment::sanitized([], $resolvedPhpBinary)',
+        'new S10ProtectedRuntimeEnvironment',
+        '(string) $protocolBefore[\'runtime_environment_sha256\']',
+        '(string) $queclinkBefore[\'runtime_environment_sha256\']',
+        'new S10NativeProcessRunner',
+        '$processRunner->run(',
+        "'--noprofile'",
+        "'--norc'",
+        "'-p'",
+        'readonly S10_CHILD_PHP_BINARY="$OBLIVION_S10_PHP_BINARY"',
+        'readonly -f php',
+        "'core.fsmonitor=false'",
+        "'core.untrackedCache=false'",
+        "trim(\$result['stderr'])",
+        "'/scripts/monitoring/verify-protocol-policy-evidence.sh'",
+        "'/scripts/monitoring/verify-queclink-native-listener-evidence.sh'",
+        "\$integerArgument('protocol-samples', 15, 15, 120)",
+        "\$integerArgument('interval-seconds', 60, 60, 60)",
+        "\$integerArgument('window-minutes', 60, 60, 60)",
+        "\$integerArgument('max-frame-age', 900, 60, 900)",
+        '(new StrictJsonObjectDecoder)->decode($protocolRaw)',
+        '(new StrictJsonObjectDecoder)->decode($queclinkRaw)',
+        "'provider_api_contracts' => ['unifi', 'milesight']",
+        "'queclink_transport' => 'native_tcp'",
+        "'release_revision' => \$protocolBefore['release_revision']",
+        "'environment_reference_sha256' => \$protocolBefore['environment_reference_sha256']",
+        "'runtime_environment_sha256' => \$protocolBefore['runtime_environment_sha256']",
+        "'sha256' => hash('sha256', \$protocolRaw)",
+        "'sha256' => hash('sha256', \$queclinkRaw)",
+        "fopen(\$artifactPath, 'x+b')",
+        "'output_storage_semantics' => 'collision_safe_exclusive_create'",
+        "'worm_receipt_verified' => false",
+        "'s10_release_evidence' => true",
+    )->not->toContain(
+        'provider_queclink',
+        'MONITORING_S10_AUTHORITY_PATH',
+        '--authority=',
+        'getenv(',
+        'file_put_contents',
+        'vendor/autoload.php',
+        'new Process(',
+        'Symfony',
+    );
+
+    expect($runbook)->toContain(
+        '`/etc/oblivion/security-devices-s10-release-authority.json`',
+        'verify-s10-release-evidence.php',
+        '`provider_api_contracts: [unifi, milesight]`',
+        '`queclink_transport: native_tcp`',
+        'does not create or claim a Queclink',
+        'exact deployed revision and value-free environment reference',
+    );
+});

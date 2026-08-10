@@ -23,7 +23,7 @@ class UpdateOnboardingTaskRequest extends FormRequest
             'due_date' => ['nullable', 'date'],
             'is_required' => ['sometimes', 'boolean'],
             'sign_off_required' => ['sometimes', 'boolean'],
-            'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'assigned_to_user_id' => ['nullable', 'integer'],
             'assigned_to_role' => ['nullable', 'string', 'max:100'],
         ];
     }

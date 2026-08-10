@@ -15,7 +15,12 @@ interface HoverActionProps {
  * 28×28 icon button used inline in stream rows. Idle = transparent; on hover
  * the tone tints the background and the icon takes the tone's foreground.
  */
-export function HoverAction({ icon: Icon, label, tone = 'default', onClick }: HoverActionProps) {
+export function HoverAction({
+    icon: Icon,
+    label,
+    tone = 'default',
+    onClick,
+}: HoverActionProps) {
     const [hover, setHover] = useState(false);
     const palette = TONE_CLASSES[tone];
     return (

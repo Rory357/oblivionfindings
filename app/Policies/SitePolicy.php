@@ -8,6 +8,8 @@ use App\Services\UserSiteAccessService;
 
 class SitePolicy
 {
+    private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
+
     public function viewAny(User $user): bool
     {
         return $user->canDo('sites.viewAny')
@@ -20,8 +22,7 @@ class SitePolicy
             return false;
         }
 
-        return $this->canAccessTenant($user, $site)
-            && $this->canViewType($user, $site->type)
+        return $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
     }
 
@@ -34,7 +35,6 @@ class SitePolicy
     {
         return ! $site->archived
             && $user->canDo('sites.update')
-            && $this->canAccessTenant($user, $site)
             && $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
     }
@@ -42,7 +42,6 @@ class SitePolicy
     public function delete(User $user, Site $site): bool
     {
         return $user->canDo('sites.archive')
-            && $this->canAccessTenant($user, $site)
             && $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
     }
@@ -50,25 +49,11 @@ class SitePolicy
     public function archive(User $user, Site $site): bool
     {
         return $user->canDo('sites.archive')
-            && $this->canAccessTenant($user, $site)
             && $this->canViewType($user, $site->type)
             && $this->canAccessAssignedSite($user, $site);
     }
 
-    private function canAccessTenant(User $user, Site $site): bool
-    {
-        if ($this->siteAccess()->isUnrestrictedPlatformUser($user)) {
-            return true;
-        }
-
-        $organizationId = $user->organization_id;
-
-        return $organizationId !== null
-            && $site->tenant_id !== null
-            && (int) $site->tenant_id === (int) $organizationId;
-    }
-
-    private function canViewType(User $user, string $type): bool
+    private function canViewType(User $user, ?string $type): bool
     {
         $typePermissions = [
             'head_office' => 'sites.type.head_office.view',
@@ -89,11 +74,11 @@ class SitePolicy
 
     private function canAccessAssignedSite(User $user, Site $site): bool
     {
-        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
-
-        if ($accessibleSiteIds === []) {
+        if ($this->siteAccess()->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
             return true;
         }
+
+        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
 
         return in_array((int) $site->id, $accessibleSiteIds, true);
     }

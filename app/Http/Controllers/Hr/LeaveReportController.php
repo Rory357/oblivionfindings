@@ -12,8 +12,6 @@ use Inertia\Inertia;
 
 class LeaveReportController extends Controller
 {
-    use Concerns\ResolvesHrTenant;
-
     public function __construct(
         private LeaveReportService $reportService,
         private LeaveService $leaveService,
@@ -27,17 +25,14 @@ class LeaveReportController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.viewAny'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        abort_unless($tenantId, 403, 'Unable to determine tenant context for leave reports.');
         $year = (int) $request->query('year', now()->year);
 
-        $absenteeism = $this->reportService->getAbsenteeismReport($tenantId, $year);
-        $bradfordFactor = $this->reportService->getBradfordFactor($tenantId, $year);
-        $utilization = $this->reportService->getLeaveUtilizationReport($tenantId, $year);
+        $absenteeism = $this->reportService->getAbsenteeismReport($year);
+        $bradfordFactor = $this->reportService->getBradfordFactor($year);
+        $utilization = $this->reportService->getLeaveUtilizationReport($year);
 
         // Leave-by-type breakdown for the donut (approved + pending, this year).
         $typeBreakdown = HrLeaveRequest::query()
-            ->where('tenant_id', $tenantId)
             ->whereIn('status', ['approved', 'pending'])
             ->whereYear('starts_at', $year)
             ->selectRaw('leave_type, COUNT(*) as count')
@@ -56,7 +51,7 @@ class LeaveReportController extends Controller
             'utilization' => $utilization,
             'typeBreakdown' => $typeBreakdown,
             'year' => $year,
-            'hero' => $this->leaveService->hubHeroData($tenantId, $user, $canApprove),
+            'hero' => $this->leaveService->hubHeroData($user, $canApprove),
             'can' => [
                 'manage' => $canManage,
                 'approve' => $canApprove,
@@ -72,13 +67,11 @@ class LeaveReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        abort_unless($tenantId, 403);
         $year = (int) $request->query('year', now()->year);
         $format = strtolower((string) $request->query('format', 'csv'));
 
-        $bradford = $this->reportService->getBradfordFactor($tenantId, $year)['employees'] ?? [];
-        $utilization = $this->reportService->getLeaveUtilizationReport($tenantId, $year)['employees'] ?? [];
+        $bradford = $this->reportService->getBradfordFactor($year)['employees'] ?? [];
+        $utilization = $this->reportService->getLeaveUtilizationReport($year)['employees'] ?? [];
 
         $sections = [
             [

@@ -2,23 +2,23 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * An inbound email the helpdesk ingested (§P-S4). `processed` created or
- * threaded a ticket; `unmatched` couldn't be tied to a requester/ticket;
- * `rejected` failed signature/validation. Body is a short preview only.
+ * threaded a ticket; `quarantined` was retained as bounded evidence without
+ * message content; `rejected` failed transport signature/validation.
  */
 class ItInboundEmail extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
-    public const STATUSES = ['processed', 'unmatched', 'rejected'];
+    public const STATUSES = ['processed', 'quarantined', 'unmatched', 'rejected'];
 
     protected $fillable = [
-        'tenant_id',
         'it_ticket_id',
         'from_email',
         'subject',
@@ -26,6 +26,7 @@ class ItInboundEmail extends Model
         'in_reply_to',
         'body_preview',
         'status',
+        'quarantine_reason',
         'received_at',
     ];
 

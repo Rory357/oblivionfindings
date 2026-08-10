@@ -6,21 +6,34 @@ use App\Models\AssetGeofence;
 use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\SiteHouseRoom;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 
 class ClientFormOptions
 {
     public function __construct(
         private readonly ClientWorkerEligibility $workers,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /** @return array<string, mixed> */
-    public function forOrganization(?int $organizationId): array
+    public function forViewer(?User $viewer, ?int $siteId = null): array
     {
+        $availableSiteIds = $this->siteAccess->accessibleSiteIds(
+            $viewer,
+            ['clients.create'],
+        );
+        if ($siteId !== null) {
+            $availableSiteIds = in_array($siteId, $availableSiteIds, true)
+                ? [$siteId]
+                : [];
+        }
+
         $defaultServiceContextId = ServiceContext::defaultId();
         if (
             $defaultServiceContextId !== null
             && ! ServiceContext::query()
-                ->forOrganization($organizationId)
+                ->availableToSites($availableSiteIds)
                 ->whereKey($defaultServiceContextId)
                 ->exists()
         ) {
@@ -29,7 +42,7 @@ class ClientFormOptions
 
         return [
             'sites' => Site::query()
-                ->forTenant($organizationId)
+                ->whereIn('id', $availableSiteIds)
                 ->where('is_active', true)
                 ->with(['houseRooms' => fn ($query) => $query
                     ->where('is_active', true)
@@ -49,19 +62,21 @@ class ClientFormOptions
                     ])->values(),
                 ]),
             'serviceContexts' => ServiceContext::query()
-                ->forOrganization($organizationId)
+                ->availableToSites($availableSiteIds)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get(['id', 'type', 'name']),
-            'keyWorkers' => $this->workers
-                ->queryForOrganization($organizationId)
+                ->get(['id', 'site_id', 'type', 'name']),
+            'keyWorkers' => ($siteId !== null
+                ? $this->workers->queryForSite($siteId)
+                : $this->workers->queryForViewer($viewer, ['clients.create']))
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'geofences' => AssetGeofence::query()
-                ->forOrganization($organizationId)
                 ->where('is_active', true)
+                ->whereIn('site_id', $availableSiteIds)
+                ->whereIn('scope', ['house', 'resident'])
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'site_id', 'name']),
             'defaultServiceContextId' => $defaultServiceContextId,
         ];
     }

@@ -2,13 +2,18 @@
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
+use App\Models\SiteCredential;
+use App\Models\SiteVendor;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function siteNavUser(string $roleName): User
@@ -108,21 +113,19 @@ test('legacy /sites/vendors-credentials redirects to canonical /vendors', functi
 });
 
 test('/vendors for a vendor-only user: sends vendors, empty credentials, can flags reflect scope', function () {
-    $site = \App\Models\Site::factory()->create(['type' => 'house', 'is_active' => true]);
-    \App\Models\SiteVendor::create([
+    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    SiteVendor::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
         'is_active' => true,
     ]);
-    \App\Models\SiteCredential::create([
+    SiteCredential::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'label' => 'Should not be visible',
         'credential_type' => 'password',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('x'),
+        'encrypted_value' => Crypt::encryptString('x'),
     ]);
 
     $user = siteNavUser('support_worker');
@@ -147,21 +150,19 @@ test('/vendors for a vendor-only user: sends vendors, empty credentials, can fla
 });
 
 test('/vendors for a credential-only user: sends credentials, empty vendors, can flags reflect scope', function () {
-    $site = \App\Models\Site::factory()->create(['type' => 'house', 'is_active' => true]);
-    \App\Models\SiteVendor::create([
+    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    SiteVendor::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
         'is_active' => true,
     ]);
-    \App\Models\SiteCredential::create([
+    SiteCredential::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
     ]);
 
     $user = siteNavUser('support_worker');
@@ -187,21 +188,19 @@ test('/vendors for a credential-only user: sends credentials, empty vendors, can
 });
 
 test('/vendors for a both-permission user: sends both sides populated', function () {
-    $site = \App\Models\Site::factory()->create(['type' => 'house', 'is_active' => true]);
-    \App\Models\SiteVendor::create([
+    $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+    SiteVendor::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
         'is_active' => true,
     ]);
-    \App\Models\SiteCredential::create([
+    SiteCredential::create([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        'encrypted_value' => Crypt::encryptString('1234'),
     ]);
 
     $user = siteNavUser('admin');

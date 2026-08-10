@@ -22,12 +22,7 @@ beforeEach(function () {
  */
 function makeWatcherUser(array $permissionKeys, ?Site $site = null): User
 {
-    $attributes = ['approved_at' => now()];
-    if ($site) {
-        $attributes['organization_id'] = $site->tenant_id;
-    }
-
-    $user = User::factory()->create($attributes);
+    $user = User::factory()->create(['approved_at' => now()]);
 
     foreach ($permissionKeys as $permissionKey) {
         $permission = Permission::query()->firstOrCreate(
@@ -39,28 +34,29 @@ function makeWatcherUser(array $permissionKeys, ?Site $site = null): User
 
     if ($site) {
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => $site->tenant_id,
             'user_id' => $user->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
         ]);
     }
 
     return $user;
 }
 
-function makeWatcherIncident(Site $site, array $overrides = []): ClientIncident
+/** @param array<string, mixed> $attributes */
+function makeWatcherIncident(Site $site, array $attributes = []): ClientIncident
 {
-    $client = Client::factory()->create([
-        'organization_id' => $site->tenant_id,
-        'site_id' => $site->id,
-    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
 
-    return ClientIncident::factory()->create(array_merge([
+    return ClientIncident::factory()->create([
         'client_id' => $client->id,
         'site_id' => $site->id,
         'status' => 'submitted',
-    ], $overrides));
+        ...$attributes,
+    ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,9 +149,7 @@ it('scopes the following filter to the acting user — a second user\'s watch do
 
 it('rejects watching an incident outside the viewer site scope', function () {
     $localSite = Site::factory()->create();
-    $foreignSite = Site::factory()->create([
-        'tenant_id' => $localSite->tenant_id,
-    ]);
+    $foreignSite = Site::factory()->create();
     $user = makeWatcherUser(['incidents.viewAny'], $localSite);
     $incident = makeWatcherIncident($foreignSite);
 

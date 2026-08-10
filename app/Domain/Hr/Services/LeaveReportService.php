@@ -4,18 +4,15 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
-use App\Models\User;
-use Illuminate\Support\Facades\DB;
 
 class LeaveReportService
 {
     /**
      * Monthly sick-leave counts and top absentees for a given year.
      */
-    public function getAbsenteeismReport(int $tenantId, int $year): array
+    public function getAbsenteeismReport(int $year): array
     {
         $monthlyCounts = HrLeaveRequest::query()
-            ->forTenant($tenantId)
             ->where('leave_type', 'sick')
             ->where('status', 'approved')
             ->whereYear('starts_at', $year)
@@ -37,7 +34,6 @@ class LeaveReportService
         }
 
         $topAbsentees = HrLeaveRequest::query()
-            ->where('hr_leave_requests.tenant_id', $tenantId)
             ->where('leave_type', 'sick')
             ->where('status', 'approved')
             ->whereYear('starts_at', $year)
@@ -65,11 +61,10 @@ class LeaveReportService
     /**
      * Bradford Factor per employee: spells (S), days (D), factor (S² x D), risk level.
      */
-    public function getBradfordFactor(int $tenantId, int $year): array
+    public function getBradfordFactor(int $year): array
     {
         // Group contiguous sick-leave requests into "spells" per employee
         $requests = HrLeaveRequest::query()
-            ->where('hr_leave_requests.tenant_id', $tenantId)
             ->where('leave_type', 'sick')
             ->where('status', 'approved')
             ->whereYear('starts_at', $year)
@@ -123,10 +118,9 @@ class LeaveReportService
     /**
      * Leave utilisation per employee: entitlement, taken, remaining, % used by type.
      */
-    public function getLeaveUtilizationReport(int $tenantId, int $year): array
+    public function getLeaveUtilizationReport(int $year): array
     {
         $balances = HrLeaveBalance::query()
-            ->where('hr_leave_balances.tenant_id', $tenantId)
             ->where('year', $year)
             ->join('users', 'users.id', '=', 'hr_leave_balances.user_id')
             ->select(
@@ -185,7 +179,7 @@ class LeaveReportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     private function bradfordRiskLevel(int $factor): string

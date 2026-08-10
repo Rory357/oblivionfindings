@@ -178,7 +178,7 @@ class SiteProfileAdminPresenter
             'site' => ['id' => $site->id, 'name' => $site->name, 'type' => $site->type],
             'vendors' => $vendors,
             'credentials' => $credentials,
-            'credentialTypeOptions' => $canViewCredentials ? CredentialType::pickerOptionsForTenant($user->organization_id) : collect(),
+            'credentialTypeOptions' => $canViewCredentials ? CredentialType::pickerOptions() : collect(),
             'can' => [
                 'vendors' => $canViewVendors,
                 'credentials' => $canViewCredentials,

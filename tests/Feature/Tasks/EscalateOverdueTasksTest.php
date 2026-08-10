@@ -18,12 +18,7 @@ beforeEach(function () {
 /** A user with the given permission keys granted via overrides. */
 function makeEscalationUser(array $permissionKeys, ?Site $site = null): User
 {
-    $attributes = ['approved_at' => now()];
-    if ($site) {
-        $attributes['organization_id'] = $site->tenant_id;
-    }
-
-    $user = User::factory()->create($attributes);
+    $user = User::factory()->create(['approved_at' => now()]);
 
     foreach ($permissionKeys as $permissionKey) {
         $permission = Permission::query()->firstOrCreate(
@@ -35,10 +30,14 @@ function makeEscalationUser(array $permissionKeys, ?Site $site = null): User
 
     if ($site) {
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => $site->tenant_id,
             'user_id' => $user->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
         ]);
     }
 
@@ -48,7 +47,6 @@ function makeEscalationUser(array $permissionKeys, ?Site $site = null): User
 function makeEscalationIncident(Site $site): ClientIncident
 {
     $client = Client::factory()->create([
-        'organization_id' => $site->tenant_id,
         'site_id' => $site->id,
     ]);
 
@@ -119,9 +117,7 @@ it('escalates a 3-day-overdue item to level 2', function () {
 
 it('prunes an out-of-scope watcher before overdue task notifications are sent', function () {
     $localSite = Site::factory()->create();
-    $foreignSite = Site::factory()->create([
-        'tenant_id' => $localSite->tenant_id,
-    ]);
+    $foreignSite = Site::factory()->create();
     $assignee = makeEscalationUser([
         'controlRoom.viewAny',
         'controlRoom.alerts.view',

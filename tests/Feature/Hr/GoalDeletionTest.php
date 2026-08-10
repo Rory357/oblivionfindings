@@ -1,8 +1,10 @@
 <?php
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrGoal;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -17,11 +19,25 @@ beforeEach(function () {
     ]);
 
     $this->worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->site = Site::factory()->create(['name' => 'Goal deletion Site']);
+    goalDeletionProfile($this->hr, $this->site);
+    goalDeletionProfile($this->worker, $this->site);
 });
+
+function goalDeletionProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
 
 test('a manager can soft-delete an OKR objective and it leaves the goals list', function () {
     $goal = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'created_by' => $this->hr->id,
         'title' => 'Objective to remove',
@@ -46,7 +62,6 @@ test('a manager can soft-delete an OKR objective and it leaves the goals list', 
 
 test('a manager can soft-delete a development plan and it leaves the development list', function () {
     $plan = HrDevelopmentGoal::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->worker->id,
         'manager_user_id' => $this->hr->id,
         'title' => 'Development plan to remove',
@@ -74,7 +89,6 @@ test('a manager can soft-delete a development plan and it leaves the development
 
 test('a non-manager cannot delete an OKR objective', function () {
     $goal = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'created_by' => $this->hr->id,
         'title' => 'Objective protected from workers',
@@ -94,7 +108,6 @@ test('a non-manager cannot delete an OKR objective', function () {
 
 test('a non-manager cannot delete a development plan', function () {
     $plan = HrDevelopmentGoal::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->worker->id,
         'manager_user_id' => $this->hr->id,
         'title' => 'Development plan protected from workers',

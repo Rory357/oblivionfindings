@@ -8,7 +8,7 @@ class UpdateItMailboxRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->canDo('integrations.manage_tenant_secrets') ?? false;
+        return $this->user()?->canDo('integrations.manage_secrets') ?? false;
     }
 
     /** @return array<string, array<int, string>> */

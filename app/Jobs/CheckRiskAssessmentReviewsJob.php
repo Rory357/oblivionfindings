@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\HsRiskAssessment;
 use App\Services\HealthSafety\HsSignalService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -20,25 +21,29 @@ class CheckRiskAssessmentReviewsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function handle(HsSignalService $signalService): void
+    public function handle(HsSignalService $signalService, UserSiteAccessService $siteAccess): void
     {
-        $overdueAssessments = HsRiskAssessment::query()
+        $query = HsRiskAssessment::query()
             ->active()
-            ->dueForReview()
-            ->with(['hsEvent:id,site_id'])
+            ->dueForReview();
+        $siteAccess->applyHsRiskAssessmentApplicationScope($query);
+
+        $overdueAssessments = $query
+            ->with(['hsEvent:id,site_id', 'assessable'])
             ->get();
 
         $count = 0;
 
         foreach ($overdueAssessments as $assessment) {
             $daysOverdue = (int) $assessment->review_due_at->diffInDays(now());
+            $siteId = $siteAccess->effectiveHsRiskAssessmentSiteId($assessment);
 
             $signalService->emitRiskReviewOverdue(
                 $assessment->id,
                 $assessment->reference_number ?? "RA-{$assessment->id}",
                 $daysOverdue,
                 $assessment->risk_level ?? 'medium',
-                $assessment->hsEvent?->site_id,
+                $siteId,
                 [
                     'risk_score' => $assessment->risk_score,
                     'residual_risk_level' => $assessment->residual_risk_level,

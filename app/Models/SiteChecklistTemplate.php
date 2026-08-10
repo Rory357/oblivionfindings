@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,10 +10,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SiteChecklistTemplate extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'key',
         'name',
@@ -54,7 +54,7 @@ class SiteChecklistTemplate extends Model
     {
         return $query->where(function ($q) use ($type) {
             $q->where('applicable_to_type', $type)
-              ->orWhere('applicable_to_type', 'all');
+                ->orWhere('applicable_to_type', 'all');
         });
     }
 
@@ -67,7 +67,7 @@ class SiteChecklistTemplate extends Model
     {
         return $query->where(function ($q) use ($siteId) {
             $q->whereNull('site_id')
-              ->orWhere('site_id', $siteId);
+                ->orWhere('site_id', $siteId);
         });
     }
 }

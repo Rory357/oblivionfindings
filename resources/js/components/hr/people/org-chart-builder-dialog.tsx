@@ -138,7 +138,11 @@ function BuilderRow({
             </button>
             <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-md bg-primary/10 text-[11px] font-semibold text-primary">
                 {node.photo_url ? (
-                    <img src={node.photo_url} alt="" className="h-full w-full object-cover" />
+                    <img
+                        src={node.photo_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                    />
                 ) : (
                     initials(node.name)
                 )}

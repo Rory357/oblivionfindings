@@ -11,11 +11,13 @@ use App\Models\SiteCredentialAuditLog;
 use App\Models\SiteVendor;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class SiteVendorController extends Controller
 {
     use ResolvesAllowedSiteTypes;
+
     public function globalIndex(Request $request, UserSiteAccessService $siteAccess)
     {
         $user = $request->user();
@@ -127,7 +129,7 @@ class SiteVendorController extends Controller
             'serviceTypes' => $serviceTypes,
             'credentialTypes' => $credentialTypes,
             'credentialTypeOptions' => $canCredentials
-                ? CredentialType::pickerOptionsForTenant($user?->organization_id)
+                ? CredentialType::pickerOptions()
                 : collect(),
             // 'tab' is a UI deep-link hint (e.g. from the Site Calendar
             // credential/vendor reminders); the page whitelists it by permission.
@@ -141,7 +143,7 @@ class SiteVendorController extends Controller
                 'vendorsManage' => $canSiteWrite && (bool) ($user?->canDo('vendors.manage') ?? false),
                 'credentialsManage' => $canSiteWrite && (bool) ($user?->canDo('credentials.manage') ?? false),
                 'credentialsReveal' => $canSiteWrite && (bool) ($user?->canDo('credentials.reveal') ?? false),
-                // Type registry is tenant-global config, not site-scoped.
+                // Type catalogue is application-wide configuration.
                 'manageCredentialTypes' => (bool) ($user?->canDo('credentials.manage') ?? false),
             ],
         ]);
@@ -153,7 +155,7 @@ class SiteVendorController extends Controller
      */
     public function toggleVendorFlags(Request $request, Site $site, SiteVendor $vendor)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('vendors.manage') || abort(403);
         abort_unless($vendor->site_id === $site->id, 404);
 
@@ -166,7 +168,9 @@ class SiteVendorController extends Controller
             return back(303);
         }
 
-        $vendor->update($validated);
+        DB::transaction(function () use ($site, $validated, $vendor): void {
+            $this->lockedVendor($site, (int) $vendor->id)->update($validated);
+        }, attempts: 1);
 
         return back(303)->with('success', 'Vendor updated.');
     }
@@ -185,11 +189,11 @@ class SiteVendorController extends Controller
         $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
 
         $logs = SiteCredentialAuditLog::query()
-            ->with(['user:id,name', 'credential:id,label,credential_type,site_id', 'credential.site:id,name,type'])
-            ->whereHas('credential.site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->with(['user:id,name', 'site:id,name,type', 'credential:id,label,credential_type,site_id'])
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             // Per-user assignment scoping, matching globalIndex / the per-site flow.
-            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereHas('credential', fn ($c) => $c->whereIn('site_id', $accessibleSiteIds)))
-            ->when($request->site_id, fn ($q) => $q->whereHas('credential', fn ($c) => $c->where('site_id', (int) $request->site_id)))
+            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereIn('site_id', $accessibleSiteIds))
+            ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
             // Routine page-load views are not a "reveal/copy/rotation/change" —
             // excluding them keeps high-signal security events from being
             // evicted from the recent window.
@@ -213,9 +217,9 @@ class SiteVendorController extends Controller
                         'name' => $name,
                         'initials' => $initials !== '' ? $initials : '?',
                     ],
-                    'target' => $log->credential?->label ?? 'Deleted credential',
-                    'target_type' => $log->credential?->credential_type ?? 'credential',
-                    'site_name' => $log->credential?->site?->name ?? '—',
+                    'target' => $log->credential_label ?? $log->credential?->label ?? 'Deleted credential',
+                    'target_type' => $log->credential_type ?? $log->credential?->credential_type ?? 'credential',
+                    'site_name' => $log->site?->name ?? '—',
                     'ip' => $log->ip_address ?? '—',
                     'result' => in_array($log->action, ['reauth_failed', 'denied'], true) ? 'denied' : 'ok',
                 ];
@@ -227,7 +231,7 @@ class SiteVendorController extends Controller
 
     public function index(Request $request, Site $site)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
 
         // The per-site vendors index has been retired in favour of the unified
         // Vendor Directory & Access Vault (sites.vendors.global). The vendor
@@ -240,7 +244,7 @@ class SiteVendorController extends Controller
 
     public function store(Request $request, Site $site)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('vendors.manage') || abort(403);
 
         $validated = $request->validate([
@@ -260,19 +264,20 @@ class SiteVendorController extends Controller
         $validated['is_preferred'] = $validated['is_preferred'] ?? false;
         $validated = $this->prepareVendorComplianceData($validated, $request);
 
-        SiteVendor::create([
-            ...$validated,
-            'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
-            'is_active' => true,
-        ]);
+        DB::transaction(function () use ($site, $validated): void {
+            SiteVendor::query()->create([
+                ...$validated,
+                'site_id' => $site->id,
+                'is_active' => true,
+            ]);
+        }, attempts: 1);
 
         return back(303)->with('success', 'Vendor added successfully.');
     }
 
     public function update(Request $request, Site $site, SiteVendor $vendor)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('vendors.manage') || abort(403);
         abort_unless($vendor->site_id === $site->id, 404);
 
@@ -291,28 +296,35 @@ class SiteVendorController extends Controller
             ...$this->vendorComplianceRules(),
         ]);
 
-        $validated = $this->prepareVendorComplianceData($validated, $request, $vendor);
-
-        $vendor->update($validated);
+        DB::transaction(function () use ($request, $site, $validated, $vendor): void {
+            $locked = $this->lockedVendor($site, (int) $vendor->id);
+            $locked->update($this->prepareVendorComplianceData($validated, $request, $locked));
+        }, attempts: 1);
 
         return back(303)->with('success', 'Vendor updated successfully.');
     }
 
     public function destroy(Request $request, Site $site, SiteVendor $vendor)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('vendors.manage') || abort(403);
         abort_unless($vendor->site_id === $site->id, 404);
 
-        // Check if vendor has credentials
-        if ($vendor->credentials()->count() > 0) {
+        $deleted = DB::transaction(function () use ($site, $vendor): bool {
+            $locked = $this->lockedVendor($site, (int) $vendor->id);
+            if ($locked->credentials()->exists()) {
+                return false;
+            }
+
+            return (bool) $locked->delete();
+        }, attempts: 1);
+
+        if (! $deleted) {
             return back(303)->with(
                 'error',
                 'Cannot delete vendor with associated credentials. Please delete credentials first.',
             );
         }
-
-        $vendor->delete();
 
         return back(303)->with('success', 'Vendor deleted successfully.');
     }
@@ -391,4 +403,16 @@ class SiteVendorController extends Controller
         return $validated;
     }
 
+    private function lockedVendor(Site $site, int $vendorId): SiteVendor
+    {
+        return SiteVendor::query()
+            ->where('site_id', $site->id)
+            ->lockForUpdate()
+            ->findOrFail($vendorId);
+    }
+
+    private function concealSite(Request $request, Site $site): void
+    {
+        abort_unless($request->user()?->can('view', $site) === true, 404);
+    }
 }

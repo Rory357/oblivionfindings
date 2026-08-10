@@ -2,10 +2,12 @@
 
 namespace Tests\Unit\Services;
 
+use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
+use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
@@ -71,6 +73,8 @@ class ShiftStaffEligibilityServiceTest extends TestCase
     public function test_compliance_requirement_failure_blocks_assignment(): void
     {
         $staff = User::factory()->create();
+        $role = Role::firstOrCreate(['name' => 'support_worker']);
+        $staff->roles()->syncWithoutDetaching([$role->id]);
         $requirement = HrComplianceRequirement::query()->create([
             'tenant_id' => 1,
             'code' => 'med_training',
@@ -80,6 +84,14 @@ class ShiftStaffEligibilityServiceTest extends TestCase
             'renewal_reminder_days' => 30,
             'hard_stop' => true,
             'is_active' => true,
+        ]);
+
+        HrComplianceMatrix::query()->create([
+            'tenant_id' => 1,
+            'requirement_id' => $requirement->id,
+            'role' => $role->name,
+            'site_type' => 'all',
+            'is_mandatory' => true,
         ]);
 
         HrStaffComplianceStatus::query()->create([

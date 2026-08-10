@@ -14,10 +14,13 @@ use App\Models\WorkCapacityAssessment;
 use App\Models\WorkplaceInjury;
 use App\Models\WorkplaceInjuryAttachment;
 use App\Services\HealthSafety\HsKpiService;
+use App\Services\HealthSafety\WorkplaceInjuryJourneyService;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -34,6 +37,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ReturnToWorkController extends Controller
 {
     use ServesPrivateAttachments;
+
+    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
 
     /** Canonical injury_type → human label (15 enum values). */
     private const TYPE_LABELS = [
@@ -74,7 +79,11 @@ class ReturnToWorkController extends Controller
         'closed' => [],
     ];
 
-    public function __construct(private readonly HsKpiService $kpi) {}
+    public function __construct(
+        private readonly HsKpiService $kpi,
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly WorkplaceInjuryJourneyService $journey,
+    ) {}
 
     /* ================================================================== */
     /*  Register */
@@ -84,6 +93,17 @@ class ReturnToWorkController extends Controller
     {
         $tab = (string) $request->input('tab', 'all');
         $siteId = $request->filled('site_id') ? (int) $request->input('site_id') : null;
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+        if ($siteId) {
+            $this->siteAccess->assertCanAccessSiteId(
+                $request->user(),
+                $siteId,
+                self::SITE_BYPASS_PERMISSIONS,
+            );
+        }
 
         // ── List query (scope + tab + refinements + paginate) ──
         $injuries = $this->applyRefinements(
@@ -110,6 +130,11 @@ class ReturnToWorkController extends Controller
 
         $rtwReviewDue = ReturnToWorkPlan::query()
             ->whereNotNull('next_review_date')->whereDate('next_review_date', '<=', now())->where('status', 'active')
+            ->whereHas('workplaceInjury', fn (Builder $q) => $this->siteAccess->applyWorkplaceInjuryScope(
+                $q,
+                $request->user(),
+                self::SITE_BYPASS_PERMISSIONS,
+            ))
             ->when($siteId, fn (Builder $q) => $q->whereHas('workplaceInjury', fn (Builder $w) => $w->where('site_id', $siteId)))
             ->count();
 
@@ -140,8 +165,8 @@ class ReturnToWorkController extends Controller
             'badges' => [
                 'worksafe_awaiting' => $worksafeAwaiting,
                 'acc_open' => $accOpen,
-                'ltifr' => $this->kpi->ltifr(null, null, $siteId),
-                'trifr' => $this->kpi->trifr(null, null, $siteId),
+                'ltifr' => $this->kpi->ltifr(null, null, $siteId ?? $accessibleSiteIds),
+                'trifr' => $this->kpi->trifr(null, null, $siteId ?? $accessibleSiteIds),
                 'lost_time_days' => $lostTimeDays,
             ],
         ];
@@ -149,9 +174,15 @@ class ReturnToWorkController extends Controller
         // ── Detail-over-list (?injury=) ──
         $detail = null;
         if ($request->filled('injury')) {
-            $target = WorkplaceInjury::find($request->integer('injury'));
-            $detail = $target ? $this->buildInjuryDetail($target) : null;
+            $target = WorkplaceInjury::findOrFail($request->integer('injury'));
+            $this->assertCanAccessInjury($request, $target);
+            $detail = $this->buildInjuryDetail($target);
         }
+
+        $siteQuery = Site::query()->select('id', 'name')->where('is_active', true);
+        $this->siteAccess->applySiteScope($siteQuery, $request->user(), self::SITE_BYPASS_PERMISSIONS);
+        $staffQuery = User::query()->select('id', 'name');
+        $this->siteAccess->applyStaffScope($staffQuery, $request->user(), self::SITE_BYPASS_PERMISSIONS);
 
         return Inertia::render('health-safety/injuries/index', [
             'injuries' => $injuries,
@@ -172,9 +203,9 @@ class ReturnToWorkController extends Controller
                 'type' => $request->input('type'),
                 'body_part' => $request->input('body_part'),
             ],
-            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
-            'incidents' => $this->incidentOptions(),
+            'sites' => $siteQuery->orderBy('name')->get(),
+            'staff' => $staffQuery->orderBy('name')->get(),
+            'incidents' => $this->incidentOptions($request, $siteId),
             'detail' => $detail,
             'can' => ['manage' => (bool) ($request->user()?->canDo('hazards.manage') ?? false)],
         ]);
@@ -187,8 +218,19 @@ class ReturnToWorkController extends Controller
     private function scopedBase(Request $request): Builder
     {
         $query = WorkplaceInjury::query();
+        $this->siteAccess->applyWorkplaceInjuryScope(
+            $query,
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
         if ($request->filled('site_id')) {
-            $query->where('site_id', (int) $request->input('site_id'));
+            $siteId = (int) $request->input('site_id');
+            $this->siteAccess->assertCanAccessSiteId(
+                $request->user(),
+                $siteId,
+                self::SITE_BYPASS_PERMISSIONS,
+            );
+            $query->where('site_id', $siteId);
         }
         [$from, $to] = $this->resolveRange($request);
         if ($from) {
@@ -281,18 +323,34 @@ class ReturnToWorkController extends Controller
     }
 
     /** Recent client incidents for the wizard's "link to incident" picker. */
-    private function incidentOptions()
+    private function incidentOptions(Request $request, ?int $selectedSiteId = null)
     {
-        return ClientIncident::query()
+        $query = ClientIncident::query();
+        $this->siteAccess->applyClientIncidentScope(
+            $query,
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+
+        return $query
             ->latest('occurred_at')
             ->limit(100)
-            ->get(['id', 'reference_number', 'type', 'title', 'occurred_at'])
+            ->get(['id', 'client_id', 'site_id', 'shift_id', 'reference_number', 'type', 'title', 'occurred_at'])
+            ->filter(function (ClientIncident $incident) use ($selectedSiteId): bool {
+                try {
+                    $siteId = $this->siteAccess->effectiveClientIncidentSiteId($incident);
+                } catch (\LogicException) {
+                    return false;
+                }
+
+                return $selectedSiteId === null || $siteId === $selectedSiteId;
+            })
             ->map(fn (ClientIncident $c) => [
                 'id' => $c->id,
                 'label' => $c->reference_number ?? 'INC-'.str_pad((string) $c->id, 4, '0', STR_PAD_LEFT),
                 'title' => $c->title ?: ucfirst(str_replace('_', ' ', (string) $c->type)),
                 'occurred_at' => optional($c->occurred_at)->toIso8601String(),
-            ]);
+            ])->values();
     }
 
     /* ================================================================== */
@@ -442,13 +500,26 @@ class ReturnToWorkController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $injury = WorkplaceInjury::create(array_merge($validated, [
-            'status' => 'reported',
-            'lost_time_days' => 0,
-            // ACC is "lodged" when a claim number is captured at intake.
-            'acc_claim_lodged' => filled($validated['acc_claim_number'] ?? null),
-            'created_by' => $request->user()->id,
-        ]));
+        $this->assertWriteContext(
+            $request,
+            (int) $validated['site_id'],
+            (int) $validated['user_id'],
+            isset($validated['related_incident_id']) ? (int) $validated['related_incident_id'] : null,
+        );
+
+        $injury = DB::transaction(function () use ($request, $validated): WorkplaceInjury {
+            $injury = WorkplaceInjury::create(array_merge($validated, [
+                'status' => 'reported',
+                'lost_time_days' => 0,
+                // ACC is "lodged" when a claim number is captured at intake.
+                'acc_claim_lodged' => filled($validated['acc_claim_number'] ?? null),
+                'created_by' => $request->user()->id,
+            ]));
+
+            $this->journey->synchronize($injury);
+
+            return $injury;
+        }, 3);
 
         if ($request->boolean('stay')) {
             return back()->with('success', 'Workplace injury recorded.')->with('created_injury_id', $injury->id);
@@ -461,6 +532,8 @@ class ReturnToWorkController extends Controller
 
     public function update(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
+        $this->assertCanAccessInjury($request, $injury);
+
         $validated = $request->validate([
             // Edit-mode content fields (the wizard PUTs these).
             'user_id' => ['sometimes', 'exists:users,id'],
@@ -485,8 +558,25 @@ class ReturnToWorkController extends Controller
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
-        $validated['updated_by'] = $request->user()->id;
-        $injury->update($validated);
+        DB::transaction(function () use ($injury, $request, $validated): void {
+            $locked = WorkplaceInjury::query()->lockForUpdate()->findOrFail($injury->id);
+            $this->assertCanAccessInjury($request, $locked);
+
+            $siteId = (int) ($validated['site_id'] ?? $locked->site_id);
+            $staffId = (int) ($validated['user_id'] ?? $locked->user_id);
+            $incidentId = array_key_exists('related_incident_id', $validated)
+                ? ($validated['related_incident_id'] ? (int) $validated['related_incident_id'] : null)
+                : ($locked->related_incident_id ? (int) $locked->related_incident_id : null);
+
+            if (array_key_exists('site_id', $validated) || array_key_exists('user_id', $validated)) {
+                $this->assertWriteContext($request, $siteId, $staffId, $incidentId);
+            } elseif (array_key_exists('related_incident_id', $validated)) {
+                $this->assertLinkedIncidentAtSite($request, $incidentId, $siteId);
+            }
+
+            $locked->update(array_merge($validated, ['updated_by' => $request->user()->id]));
+            $this->journey->synchronize($locked->fresh());
+        }, 3);
 
         return back()->with('success', 'Injury record updated.');
     }
@@ -497,6 +587,8 @@ class ReturnToWorkController extends Controller
      */
     public function transitionStatus(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
+        $this->assertCanAccessInjury($request, $injury);
+
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:reported,under_treatment,return_to_work,recovered,closed'],
         ]);
@@ -558,8 +650,10 @@ class ReturnToWorkController extends Controller
     }
 
     /** Detail is modal-first — the full page is retired. Deep-link opens the dialog over the register. */
-    public function show(WorkplaceInjury $injury): RedirectResponse
+    public function show(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
+        $this->assertCanAccessInjury($request, $injury);
+
         return redirect()->route('health-safety.injuries.index', ['injury' => $injury->id]);
     }
 
@@ -569,6 +663,8 @@ class ReturnToWorkController extends Controller
 
     public function storeRtwPlan(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
+        $this->assertCanAccessInjury($request, $injury);
+
         $validated = $request->validate([
             'plan_start_date' => ['required', 'date'],
             'plan_end_date' => ['nullable', 'date', 'after_or_equal:plan_start_date'],
@@ -587,8 +683,14 @@ class ReturnToWorkController extends Controller
             'manager_id' => ['nullable', 'exists:users,id'],
         ]);
 
+        $workerId = (int) ($validated['worker_id'] ?? $injury->user_id);
+        $this->assertStaffAtInjurySite($request, $injury, $workerId);
+        if (! empty($validated['manager_id'])) {
+            $this->assertStaffAtInjurySite($request, $injury, (int) $validated['manager_id']);
+        }
+
         $injury->returnToWorkPlans()->create(array_merge($validated, [
-            'worker_id' => $validated['worker_id'] ?? $injury->user_id,
+            'worker_id' => $workerId,
             'status' => 'active',
             'created_by' => $request->user()->id,
         ]));
@@ -598,6 +700,10 @@ class ReturnToWorkController extends Controller
 
     public function updateRtwPlan(Request $request, ReturnToWorkPlan $rtwPlan): RedirectResponse
     {
+        $injury = $rtwPlan->workplaceInjury;
+        abort_unless($injury, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        $this->assertCanAccessInjury($request, $injury);
+
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:active,in_progress,completed,cancelled'],
             'plan_start_date' => ['sometimes', 'date'],
@@ -624,6 +730,8 @@ class ReturnToWorkController extends Controller
 
     public function storeCapacityAssessment(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
+        $this->assertCanAccessInjury($request, $injury);
+
         $validated = $request->validate([
             'assessment_date' => ['required', 'date'],
             'user_id' => ['nullable', 'exists:users,id'],
@@ -636,8 +744,11 @@ class ReturnToWorkController extends Controller
             'assessment_summary' => ['nullable', 'string', 'max:5000'],
         ]);
 
+        $assessorId = (int) ($validated['user_id'] ?? $injury->user_id);
+        $this->assertStaffAtInjurySite($request, $injury, $assessorId);
+
         $injury->capacityAssessments()->create(array_merge($validated, [
-            'user_id' => $validated['user_id'] ?? $injury->user_id,
+            'user_id' => $assessorId,
             'created_by' => $request->user()->id,
         ]));
 
@@ -646,6 +757,10 @@ class ReturnToWorkController extends Controller
 
     public function storeModifiedDuty(Request $request, ReturnToWorkPlan $rtwPlan): RedirectResponse
     {
+        $injury = $rtwPlan->workplaceInjury;
+        abort_unless($injury, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        $this->assertCanAccessInjury($request, $injury);
+
         $validated = $request->validate([
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
@@ -656,8 +771,11 @@ class ReturnToWorkController extends Controller
             'user_id' => ['nullable', 'exists:users,id'],
         ]);
 
+        $workerId = (int) ($validated['user_id'] ?? $rtwPlan->worker_id);
+        $this->assertStaffAtInjurySite($request, $injury, $workerId);
+
         $rtwPlan->modifiedDuties()->create(array_merge($validated, [
-            'user_id' => $validated['user_id'] ?? $rtwPlan->worker_id,
+            'user_id' => $workerId,
             'status' => 'active',
             'created_by' => $request->user()->id,
         ]));
@@ -671,6 +789,8 @@ class ReturnToWorkController extends Controller
 
     public function uploadAttachment(Request $request, WorkplaceInjury $injury): RedirectResponse
     {
+        $this->assertCanAccessInjury($request, $injury);
+
         $validated = $request->validate([
             // Allowlist the expected evidence formats — never accept scriptable types
             // (svg/html). Files are stored on the private disk and streamed through the
@@ -702,6 +822,7 @@ class ReturnToWorkController extends Controller
 
     public function downloadAttachment(Request $request, WorkplaceInjury $injury, WorkplaceInjuryAttachment $attachment): StreamedResponse
     {
+        $this->assertCanAccessInjury($request, $injury);
         abort_unless((int) $attachment->workplace_injury_id === (int) $injury->id, 404);
 
         // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
@@ -715,6 +836,7 @@ class ReturnToWorkController extends Controller
 
     public function destroyAttachment(Request $request, WorkplaceInjury $injury, WorkplaceInjuryAttachment $attachment): RedirectResponse
     {
+        $this->assertCanAccessInjury($request, $injury);
         abort_unless((int) $attachment->workplace_injury_id === (int) $injury->id, 404);
 
         $disk = $attachment->disk ?: 'private';
@@ -724,5 +846,57 @@ class ReturnToWorkController extends Controller
         $attachment->delete();
 
         return back()->with('success', 'Document removed.');
+    }
+
+    private function assertCanAccessInjury(Request $request, WorkplaceInjury $injury): void
+    {
+        $this->siteAccess->assertCanAccessWorkplaceInjury(
+            $request->user(),
+            $injury,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    private function assertWriteContext(
+        Request $request,
+        int $siteId,
+        int $staffId,
+        ?int $incidentId,
+    ): void {
+        $this->siteAccess->assertCanUseCurrentStaffAtSite(
+            $request->user(),
+            $staffId,
+            $siteId,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+        $this->assertLinkedIncidentAtSite($request, $incidentId, $siteId);
+    }
+
+    private function assertLinkedIncidentAtSite(Request $request, ?int $incidentId, int $siteId): void
+    {
+        if ($incidentId === null) {
+            return;
+        }
+
+        $incident = ClientIncident::query()->findOrFail($incidentId);
+        $this->siteAccess->assertCanUseClientIncidentAtSite(
+            $request->user(),
+            $incident,
+            $siteId,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    private function assertStaffAtInjurySite(
+        Request $request,
+        WorkplaceInjury $injury,
+        int $staffId,
+    ): void {
+        $this->siteAccess->assertCanUseCurrentStaffAtSite(
+            $request->user(),
+            $staffId,
+            (int) $injury->site_id,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
     }
 }

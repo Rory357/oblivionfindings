@@ -240,13 +240,12 @@ class SiteProfileOperationsPresenter
             return ['locked' => true];
         }
 
-        $tenantId = (int) ($user->tenant_id ?? $user->organization_id ?? $site->tenant_id ?? 1);
         $typePlan = $this->typePlans->summaryFor($site);
         $currentPlan = $this->typePlans->currentEditable($site);
         $devicePins = $currentPlan
             ? $currentPlan->pins()->where('kind', SiteTypePlanPin::KIND_DEVICE)->get()->keyBy('device_id')
             : collect();
-        $devices = $this->devices->forSite($tenantId, $site->id)
+        $devices = $this->devices->visibleForSite($user, $site->id)
             ->with(['assignments' => fn ($query) => $query->active()])
             ->orderBy('category')
             ->orderBy('name')

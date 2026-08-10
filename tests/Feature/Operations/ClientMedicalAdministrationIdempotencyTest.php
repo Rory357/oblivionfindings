@@ -2,11 +2,14 @@
 
 namespace Tests\Feature\Operations;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
@@ -19,7 +22,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected User $operator;
 
     protected Client $client;
 
@@ -32,11 +35,38 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
         $this->seed(RbacSeeder::class);
         Cache::flush();
 
-        $this->admin = User::factory()->create([
-            'role' => 'admin',
+        $site = Site::factory()->create([
+            'name' => 'Operations eMAR Home',
+            'is_active' => true,
+        ]);
+        $this->operator = User::factory()->create([
+            'role' => 'support_worker',
             'approved_at' => now(),
         ]);
-        $this->admin->roles()->attach(Role::query()->where('name', 'admin')->first());
+        $this->operator->roles()->syncWithoutDetaching([
+            Role::query()->where('name', 'support_worker')->firstOrFail()->id,
+        ]);
+        $permissionIds = Permission::query()
+            ->whereIn('key', [
+                'clients.viewAssigned',
+                'medications.view',
+                'medications.administer.record',
+            ])
+            ->pluck('id');
+        $this->operator->permissionOverrides()->sync($permissionIds->mapWithKeys(
+            fn ($permissionId) => [$permissionId => ['allowed' => true]],
+        ));
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->operator->id,
+            'position_role' => 'support_worker',
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $this->operator->id,
+            'updated_by' => $this->operator->id,
+        ]);
 
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'Operations MAR',
@@ -45,8 +75,10 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
         ]);
 
         $this->client = Client::factory()->create([
+            'site_id' => $site->id,
             'service_context_id' => $serviceContext->id,
         ]);
+        $this->client->supportWorkers()->syncWithoutDetaching([$this->operator->id]);
 
         $this->medication = ClientMedication::query()->create([
             'client_id' => $this->client->id,
@@ -85,7 +117,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
 
         $url = "/operations/clients/{$this->client->id}/medical/medications/{$this->medication->id}/administrations";
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->postJson($url, $payload)
             ->assertOk()
             ->assertJsonPath('success', true)
@@ -93,7 +125,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
 
         Cache::forget('emar:idempotency:administration:'.$payload['client_request_uuid']);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->postJson($url, $payload)
             ->assertOk()
             ->assertJsonPath('success', true)
@@ -114,14 +146,14 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
         ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id,
             'client_medication_id' => $this->medication->id,
-            'administered_by' => $this->admin->id,
+            'administered_by' => $this->operator->id,
             'scheduled_for' => $scheduledFor,
             'administered_at' => $scheduledFor,
             'status' => 'given',
             'dose_given' => '500mg',
         ]);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->postJson(
                 "/operations/clients/{$this->client->id}/medical/medications/{$this->medication->id}/administrations",
                 [

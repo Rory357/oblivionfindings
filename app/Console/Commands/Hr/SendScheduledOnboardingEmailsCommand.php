@@ -37,7 +37,7 @@ class SendScheduledOnboardingEmailsCommand extends Command
 
         $checklists = HrOnboardingChecklist::query()
             ->whereIn('status', ['pending', 'in_progress'])
-            ->with('employeeProfile:id,tenant_id,user_id,position_title,start_date,manager_user_id')
+            ->with('employeeProfile:id,user_id,position_title,start_date,end_date,is_active,manager_user_id,primary_site_id,secondary_site_ids')
             ->get();
 
         $dispatched = 0;
@@ -45,18 +45,22 @@ class SendScheduledOnboardingEmailsCommand extends Command
         foreach ($checklists as $checklist) {
             $profile = $checklist->employeeProfile;
 
-            if (! $profile || ! $profile->start_date) {
+            $siteIds = collect([
+                $profile?->primary_site_id,
+                ...($profile?->secondary_site_ids ?? []),
+            ])->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0);
+            if (! $profile
+                || ! $profile->start_date
+                || ! $profile->is_active
+                || ($profile->end_date && $profile->end_date->isBefore($today))
+                || $siteIds->isEmpty()
+            ) {
                 continue;
             }
 
             $startDate = Carbon::parse($profile->start_date)->startOfDay();
 
             foreach ($emails as $email) {
-                // Templates carrying an explicit tenant only apply to that tenant.
-                if ($email->tenant_id !== null && $email->tenant_id !== $profile->tenant_id) {
-                    continue;
-                }
-
                 $sendOn = $startDate->copy()->subDays((int) $email->send_days_before_start);
 
                 if (! $sendOn->isSameDay($today)) {

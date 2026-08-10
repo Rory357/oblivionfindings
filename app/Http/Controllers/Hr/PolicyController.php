@@ -2,25 +2,27 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrPolicyVersion;
 use App\Domain\Hr\Notifications\PolicyAttestationRequiredNotification;
+use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Inertia\Inertia;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class PolicyController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(private readonly HrCurrentStaffService $currentStaff) {}
 
-    /** Seed categories offered by the policy wizard alongside tenant-created ones. */
+    /** Seed categories offered by the policy wizard alongside application-created ones. */
     private const DEFAULT_CATEGORIES = [
         ['value' => 'employment', 'label' => 'Employment'],
         ['value' => 'health_and_safety', 'label' => 'Health & Safety'],
@@ -40,9 +42,7 @@ class PolicyController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $policies = HrPolicy::forTenant($tenantId)
+        $policies = HrPolicy::query()
             ->with('currentVersion')
             ->when($request->query('category'), fn ($q, $cat) => $q->where('category', $cat))
             ->when($request->boolean('active_only', true), fn ($q) => $q->active())
@@ -50,7 +50,7 @@ class PolicyController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $categories = HrPolicy::forTenant($tenantId)
+        $categories = HrPolicy::query()
             ->selectRaw('DISTINCT category')
             ->pluck('category')
             ->filter()
@@ -59,17 +59,17 @@ class PolicyController extends Controller
 
         // Hero stats — computed over the whole register, not the current page.
         $stats = [
-            'total' => HrPolicy::forTenant($tenantId)->count(),
-            'active' => HrPolicy::forTenant($tenantId)->active()->count(),
-            'need_attestation' => HrPolicy::forTenant($tenantId)->active()->where('requires_attestation', true)->count(),
-            'attestations' => HrPolicyAttestation::where('tenant_id', $tenantId)->count(),
+            'total' => HrPolicy::query()->count(),
+            'active' => HrPolicy::query()->active()->count(),
+            'need_attestation' => HrPolicy::query()->active()->where('requires_attestation', true)->count(),
+            'attestations' => HrPolicyAttestation::query()->count(),
         ];
 
         // Wizard edit-mode prefill: ?edit={id} may point at a policy outside the
         // current page of results, so ship the requested record explicitly.
         $editPolicy = null;
         if ($request->query('edit') && $user->canDo('hr.policies.manage')) {
-            $editPolicy = HrPolicy::forTenant($tenantId)
+            $editPolicy = HrPolicy::query()
                 ->select(['id', 'title', 'category', 'is_active', 'requires_attestation', 'attestation_frequency_months'])
                 ->find($request->query('edit'));
         }
@@ -110,8 +110,6 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         return redirect()->route('hr.policies.index', ['edit' => $policy->id]);
     }
@@ -123,9 +121,6 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
-
         $policy->load([
             'currentVersion',
             'versions' => fn ($q) => $q->orderByDesc('version_number'),
@@ -155,7 +150,6 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -177,51 +171,53 @@ class PolicyController extends Controller
             'document.required' => 'Please upload a PDF document.',
         ]);
 
-        // Handle PDF upload
-        $documentPath = null;
-        if ($request->hasFile('document')) {
-            $file = $request->file('document');
-            
-            // Verify file uploaded successfully
-            if (!$file->isValid()) {
-                return redirect()->back()->withErrors(['document' => 'The file failed to upload. Error: ' . $file->getErrorMessage()]);
-            }
-            
-            $filename = Str::slug($data['title']) . '-' . time() . '.' . $file->getClientOriginalExtension();
-            
-            try {
-                $documentPath = $file->storeAs('policies/' . $tenantId, $filename, 'private');
-            } catch (\Exception $e) {
-                return redirect()->back()->withErrors(['document' => 'Failed to save the file: ' . $e->getMessage()]);
-            }
+        $file = $request->file('document');
+        if (! $file?->isValid()) {
+            return redirect()->back()->withErrors([
+                'document' => 'The file failed to upload. Error: '.($file?->getErrorMessage() ?? 'unknown upload error'),
+            ]);
         }
-        
-        $policy = HrPolicy::create([
-            'tenant_id' => $tenantId,
-            'title' => $data['title'],
-            'slug' => Str::slug($data['title']),
-            'category' => $data['category'],
-            'is_active' => true,
-            'requires_attestation' => $data['requires_attestation'] ?? false,
-            'attestation_frequency_months' => $data['attestation_frequency_months'] ?? null,
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
-        ]);
 
-        // Create the first version automatically
-        $version = HrPolicyVersion::create([
-            'policy_id' => $policy->id,
-            'version_number' => 1,
-            'content_summary' => $data['content_summary'] ?? '',
-            'document_path' => $documentPath,
-            'effective_from' => $data['effective_from'] ?? now(),
-            'is_current' => true,
-            'published_by' => $user->id,
-        ]);
+        try {
+            $documentPath = $this->storePrivatePolicyPdf($file);
+        } catch (\Throwable $exception) {
+            return redirect()->back()->withErrors([
+                'document' => 'Failed to save the file: '.$exception->getMessage(),
+            ]);
+        }
+
+        try {
+            [$policy, $version] = DB::transaction(function () use ($data, $documentPath, $user): array {
+                $policy = HrPolicy::query()->create([
+                    'title' => $data['title'],
+                    'slug' => $this->uniquePolicySlug($data['title']),
+                    'category' => $data['category'],
+                    'is_active' => true,
+                    'requires_attestation' => $data['requires_attestation'] ?? false,
+                    'attestation_frequency_months' => $data['attestation_frequency_months'] ?? null,
+                    'created_by' => $user->id,
+                    'updated_by' => $user->id,
+                ]);
+
+                $version = $policy->versions()->create([
+                    'version_number' => 1,
+                    'content_summary' => $data['content_summary'] ?? '',
+                    'document_path' => $documentPath,
+                    'effective_from' => $data['effective_from'] ?? now(),
+                    'is_current' => true,
+                    'published_by' => $user->id,
+                ]);
+
+                return [$policy, $version];
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($documentPath);
+            throw $exception;
+        }
 
         // Attestation awareness: publishing a version that requires attestation
         // tells affected staff straight away (best-effort, queued).
-        $this->notifyAttestationRequired($policy, $version, $tenantId);
+        $this->notifyAttestationRequired($policy, $version);
 
         return redirect()->route('hr.policies.index')->with('success', 'Policy created successfully.');
     }
@@ -233,8 +229,6 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -245,7 +239,7 @@ class PolicyController extends Controller
         ]);
 
         if (isset($data['title'])) {
-            $data['slug'] = Str::slug($data['title']);
+            $data['slug'] = $this->uniquePolicySlug($data['title'], $policy->id);
         }
 
         $data['updated_by'] = $user->id;
@@ -262,8 +256,6 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $data = $request->validate([
             'content_summary' => ['nullable', 'string', 'max:5000'],
@@ -271,38 +263,61 @@ class PolicyController extends Controller
             'effective_from' => ['required', 'date'],
         ]);
 
-        // Handle PDF upload
-        $documentPath = null;
+        $newDocumentPath = null;
         if ($request->hasFile('document')) {
             $file = $request->file('document');
-            
-            if (!$file->isValid()) {
+
+            if (! $file->isValid()) {
                 return redirect()->back()->withErrors(['document' => 'The file failed to upload.']);
             }
-            
-            $filename = Str::slug($policy->title) . '-v' . ($policy->versions()->max('version_number') + 1) . '-' . time() . '.' . $file->getClientOriginalExtension();
-            $documentPath = $file->storeAs('policies/' . $tenantId, $filename, 'private');
+
+            try {
+                $newDocumentPath = $this->storePrivatePolicyPdf($file);
+            } catch (\Throwable $exception) {
+                return redirect()->back()->withErrors([
+                    'document' => 'Failed to save the file: '.$exception->getMessage(),
+                ]);
+            }
         }
 
-        // Determine the next version number
-        $latestVersion = $policy->versions()->max('version_number') ?? 0;
+        try {
+            [$policy, $version] = DB::transaction(function () use ($data, $newDocumentPath, $policy, $user): array {
+                $lockedPolicy = HrPolicy::query()->lockForUpdate()->findOrFail($policy->id);
+                $currentVersion = $lockedPolicy->versions()
+                    ->where('is_current', true)
+                    ->lockForUpdate()
+                    ->first();
+                $documentPath = $newDocumentPath ?? $currentVersion?->document_path;
 
-        // Mark all existing versions as not current
-        $policy->versions()->update(['is_current' => false]);
+                if (! $documentPath) {
+                    throw ValidationException::withMessages([
+                        'document' => 'Upload a PDF because this policy has no retained document.',
+                    ]);
+                }
 
-        $version = HrPolicyVersion::create([
-            'policy_id' => $policy->id,
-            'version_number' => $latestVersion + 1,
-            'content_summary' => $data['content_summary'] ?? '',
-            'document_path' => $documentPath,
-            'effective_from' => $data['effective_from'],
-            'is_current' => true,
-            'published_by' => $user->id,
-        ]);
+                $latestVersion = (int) ($lockedPolicy->versions()->max('version_number') ?? 0);
+                $lockedPolicy->versions()->where('is_current', true)->update(['is_current' => false]);
+                $version = $lockedPolicy->versions()->create([
+                    'version_number' => $latestVersion + 1,
+                    'content_summary' => $data['content_summary'] ?? '',
+                    'document_path' => $documentPath,
+                    'effective_from' => $data['effective_from'],
+                    'is_current' => true,
+                    'published_by' => $user->id,
+                ]);
+
+                return [$lockedPolicy, $version];
+            });
+        } catch (\Throwable $exception) {
+            if ($newDocumentPath) {
+                Storage::disk('private')->delete($newDocumentPath);
+            }
+            throw $exception;
+        }
 
         // Attestation awareness: a new current version resets everyone's
         // attestation — tell affected staff (best-effort, queued).
-        $this->notifyAttestationRequired($policy, $version, $tenantId);
+        $this->notifyAttestationRequired($policy, $version);
 
         return redirect()->back()->with('success', 'New policy version published.');
     }
@@ -313,21 +328,13 @@ class PolicyController extends Controller
      * hiccup never blocks the publish. No-op unless the policy is active and
      * flagged requires_attestation.
      */
-    private function notifyAttestationRequired(HrPolicy $policy, HrPolicyVersion $version, int $tenantId): void
+    private function notifyAttestationRequired(HrPolicy $policy, HrPolicyVersion $version): void
     {
         if (! $policy->requires_attestation || ! $policy->is_active) {
             return;
         }
 
-        $staff = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->whereNotNull('user_id')
-            ->with('user:id,name,email')
-            ->get()
-            ->pluck('user')
-            ->filter()
-            ->unique('id');
+        $staff = $this->currentStaff->currentUsers();
 
         foreach ($staff as $member) {
             try {
@@ -355,8 +362,6 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $policy->update([
             'is_active' => false,
@@ -373,21 +378,19 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('hr.policies.view') || $user->canDo('hr.policies.attest'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $version = $policy->currentVersion;
-        abort_if(!$version || !$version->document_path, 404, 'No document available for this policy.');
+        abort_if(! $version || ! $version->document_path, 404, 'No document available for this policy.');
 
         $path = $version->document_path;
 
-        if (!Storage::disk('private')->exists($path)) {
+        if (! Storage::disk('private')->exists($path)) {
             abort(404, 'Document not found.');
         }
 
         return Storage::disk('private')->response($path, basename($path), [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . basename($path) . '"',
+            'Content-Disposition' => 'inline; filename="'.basename($path).'"',
         ]);
     }
 
@@ -398,22 +401,55 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
-        abort_unless($version->policy_id === $policy->id, 404);
+        $documentPath = DB::transaction(function () use ($policy, $version): ?string {
+            $lockedPolicy = HrPolicy::query()->lockForUpdate()->findOrFail($policy->id);
+            $lockedVersion = $lockedPolicy->versions()->lockForUpdate()->findOrFail($version->id);
 
-        // Don't allow deleting the current version
-        if ($version->is_current) {
+            if ($lockedVersion->is_current) {
+                return null;
+            }
+
+            $path = $lockedVersion->document_path;
+            $lockedVersion->delete();
+
+            return $path;
+        });
+
+        if ($documentPath === null) {
             return redirect()->back()->with('error', 'Cannot delete the current version. Set another version as current first.');
         }
 
-        // Delete the file
-        if ($version->document_path) {
-            Storage::disk('private')->delete($version->document_path);
+        if (! HrPolicyVersion::query()->where('document_path', $documentPath)->exists()) {
+            Storage::disk('private')->delete($documentPath);
         }
 
-        $version->delete();
-
         return redirect()->back()->with('success', 'Version deleted successfully.');
+    }
+
+    private function uniquePolicySlug(string $title, ?int $ignorePolicyId = null): string
+    {
+        $base = Str::slug($title) ?: 'policy';
+        $candidate = $base;
+        $suffix = 0;
+
+        while (HrPolicy::query()
+            ->when($ignorePolicyId !== null, fn ($query) => $query->where('id', '!=', $ignorePolicyId))
+            ->where('slug', $candidate)
+            ->exists()) {
+            $candidate = $base.'-'.++$suffix;
+        }
+
+        return $candidate;
+    }
+
+    private function storePrivatePolicyPdf(UploadedFile $file): string
+    {
+        $path = $file->storeAs('policies', Str::uuid().'.pdf', 'private');
+
+        if (! is_string($path) || $path === '') {
+            throw new \RuntimeException('The private policy file could not be stored.');
+        }
+
+        return $path;
     }
 }

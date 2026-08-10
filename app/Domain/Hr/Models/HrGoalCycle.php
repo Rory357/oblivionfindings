@@ -2,7 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class HrGoalCycle extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $table = 'hr_goal_cycles';
 
     protected $fillable = [
@@ -44,11 +46,6 @@ class HrGoalCycle extends Model
     public function childCycles(): HasMany
     {
         return $this->hasMany(self::class, 'parent_cycle_id');
-    }
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     /** Whether the supplied date falls inside this cycle's window. */

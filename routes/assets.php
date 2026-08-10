@@ -6,7 +6,6 @@ use App\Http\Controllers\AssetInspectionController;
 use App\Http\Controllers\AssetMaintenanceController;
 use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AssetQrController;
-use App\Http\Controllers\AssetTrackerController;
 use App\Http\Controllers\AssetTelemetryIngestController;
 use App\Http\Controllers\AssetScanEventController;
 use App\Http\Controllers\AssetOwnershipController;
@@ -197,16 +196,6 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/assets/{asset}/documents/{document}', [AssetDocumentController::class, 'destroy'])
             ->whereNumber('asset')
             ->name('assets.documents.destroy');
-    });
-
-    Route::middleware('permission:assets.trackers.manage')->group(function () {
-        Route::post('/assets/{asset}/trackers/pair', [AssetTrackerController::class, 'store'])
-            ->whereNumber('asset')
-            ->name('assets.trackers.pair');
-        Route::post('/assets/{asset}/trackers/{tracker}/unpair', [AssetTrackerController::class, 'unpair'])
-            ->whereNumber('asset')
-            ->whereNumber('tracker')
-            ->name('assets.trackers.unpair');
     });
 
     Route::middleware('permission:assets.scan.record')->group(function () {

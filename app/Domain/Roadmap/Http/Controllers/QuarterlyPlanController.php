@@ -22,10 +22,7 @@ class QuarterlyPlanController extends Controller
 
     public function index(Request $request): JsonResponse|Response
     {
-        $tenantId = $this->tenantId($request);
-
         $query = QuarterlyRoadmapPlan::query()
-            ->forTenant($tenantId)
             ->withCount('items')
             ->when($request->filled('fiscal_year'), fn ($q) => $q->where('fiscal_year', $request->integer('fiscal_year')))
             ->when($request->filled('quarter'), fn ($q) => $q->where('quarter', $request->integer('quarter')))
@@ -61,7 +58,6 @@ class QuarterlyPlanController extends Controller
             (int) $data['fiscal_year'],
             (int) $data['quarter'],
             $data['preset'] ?? 'board_ceo',
-            $data['tenant_id'] ?? $this->tenantId($request),
             $request->user()?->id,
         );
 
@@ -70,7 +66,6 @@ class QuarterlyPlanController extends Controller
 
     public function show(Request $request, QuarterlyRoadmapPlan $plan)
     {
-        $this->assertTenant($request, $plan->tenant_id);
         $item = $plan->load('items.initiative');
 
         if ($this->shouldReturnJson($request)) {
@@ -85,8 +80,6 @@ class QuarterlyPlanController extends Controller
 
     public function submitManagerReview(Request $request, QuarterlyRoadmapPlan $plan)
     {
-        $this->assertTenant($request, $plan->tenant_id);
-
         try {
             return response()->json([
                 'item' => $this->plannerService->submitForManagerReview($plan, $request->user()?->id),
@@ -98,8 +91,6 @@ class QuarterlyPlanController extends Controller
 
     public function submitExecutiveReview(Request $request, QuarterlyRoadmapPlan $plan)
     {
-        $this->assertTenant($request, $plan->tenant_id);
-
         try {
             return response()->json([
                 'item' => $this->plannerService->submitForExecutiveReview($plan, $request->user()?->id),
@@ -111,8 +102,6 @@ class QuarterlyPlanController extends Controller
 
     public function approve(Request $request, QuarterlyRoadmapPlan $plan)
     {
-        $this->assertTenant($request, $plan->tenant_id);
-
         try {
             return response()->json([
                 'item' => $this->plannerService->approve($plan, $request->user()?->id),
@@ -124,8 +113,6 @@ class QuarterlyPlanController extends Controller
 
     public function publish(Request $request, QuarterlyRoadmapPlan $plan)
     {
-        $this->assertTenant($request, $plan->tenant_id);
-
         try {
             return response()->json([
                 'item' => $this->plannerService->publish($plan, $request->user()?->id),
@@ -137,8 +124,6 @@ class QuarterlyPlanController extends Controller
 
     public function revise(Request $request, QuarterlyRoadmapPlan $plan)
     {
-        $this->assertTenant($request, $plan->tenant_id);
-
         $data = $request->validate([
             'change_summary' => ['nullable', 'string'],
         ]);
@@ -153,24 +138,6 @@ class QuarterlyPlanController extends Controller
             ], 201);
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
-        }
-    }
-
-    protected function tenantId(Request $request): ?int
-    {
-        if ($request->filled('tenant_id')) {
-            return (int) $request->integer('tenant_id');
-        }
-
-        return $request->user()?->tenant_id ?? null;
-    }
-
-    protected function assertTenant(Request $request, ?int $resourceTenantId): void
-    {
-        $tenantId = $this->tenantId($request);
-
-        if ($tenantId !== null && $resourceTenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(403, 'Tenant scope mismatch.');
         }
     }
 

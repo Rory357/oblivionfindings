@@ -11,6 +11,7 @@ use App\Models\FleetWorkOrder;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -23,7 +24,7 @@ class FleetHeroRolloutContractTest extends TestCase
     /** @param array<int, string> $extraPermissionKeys */
     private function makeFleetUser(array $extraPermissionKeys = []): User
     {
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $user = User::factory()->create(['approved_at' => now()]);
 
@@ -376,17 +377,12 @@ class FleetHeroRolloutContractTest extends TestCase
         );
     }
 
-    public function test_driver_detail_and_mobile_dashboard_use_the_fleet_hero_family(): void
+    public function test_driver_detail_uses_the_desktop_fleet_hero_family(): void
     {
         $driverSource = file_get_contents(resource_path('js/pages/fleet-assets/drivers/show.tsx'));
-        $mobileSource = file_get_contents(resource_path('js/pages/fleet-assets/mobile/dashboard.tsx'));
 
         $this->assertIsString($driverSource);
         $this->assertStringContainsString('<FleetCompactHero', $driverSource);
         $this->assertStringContainsString('data-fleet-narrow-strategy="horizontal-scroll"', $driverSource);
-
-        $this->assertIsString($mobileSource);
-        $this->assertStringContainsString('data-fleet-mobile-hero', $mobileSource);
-        $this->assertStringContainsString('text-primary-foreground', $mobileSource);
     }
 }

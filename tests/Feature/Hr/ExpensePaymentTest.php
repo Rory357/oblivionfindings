@@ -2,8 +2,10 @@
 
 use App\Domain\Finance\Jobs\PostExpenseJournalJob;
 use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -12,9 +14,9 @@ use Illuminate\Support\Facades\Queue;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Expense payment Site']);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -23,16 +25,26 @@ beforeEach(function () {
     ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'position_role' => 'hr_manager',
+        'is_active' => true,
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->worker->id,
+        'primary_site_id' => $this->site->id,
+        'position_role' => 'support_worker',
+        'is_active' => true,
     ]);
 });
 
 function makeExpenseClaimForPayment(int $ownerId, array $overrides = []): HrExpenseClaim
 {
     return HrExpenseClaim::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $ownerId,
         'claim_number' => 'EXP-PAY-'.fake()->unique()->numberBetween(1000, 999999),
         'title' => 'Travel claim',
@@ -114,7 +126,7 @@ test('approving a claim posts exactly one GL journal (no observer double-post)',
     Queue::assertNotPushed(ProcessFinancialEventJob::class);
 });
 
-test('the expenses index lists tenant claims (regression: was whereNull)', function () {
+test('the expenses index lists Site-visible claims', function () {
     $claim = makeExpenseClaimForPayment($this->worker->id, ['status' => 'submitted']);
 
     $response = $this->actingAs($this->hr)->get('/hr/compensation/expenses');

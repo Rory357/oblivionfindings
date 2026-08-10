@@ -21,7 +21,6 @@ beforeEach(function () {
 function makeDept(string $name, ?int $parentId = null): HrDepartment
 {
     return HrDepartment::query()->create([
-        'tenant_id' => 1,
         'name' => $name,
         'parent_id' => $parentId,
         'is_active' => true,
@@ -33,9 +32,8 @@ function staffInDept(HrDepartment $dept): void
 {
     $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
-        'employee_number' => 'EMP-' . $user->id,
+        'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
         'department_id' => $dept->id,
         'position_title' => 'Support Worker',
@@ -89,7 +87,7 @@ test('show returns rolled-up headcount, children and linked positions', function
     staffInDept($b); // 1 direct in A, 1 in child B → roll-up = 2
 
     HrPosition::query()->create([
-        'tenant_id' => 1, 'title' => 'Care Lead', 'code' => 'CL-1',
+        'title' => 'Care Lead', 'code' => 'CL-1',
         'department' => 'Care', 'employment_type' => 'full_time', 'fte' => 1.0,
         'headcount_budget' => 1, 'is_active' => true, 'created_by' => $this->actor->id,
     ]);
@@ -118,8 +116,8 @@ test('store persists a cost centre', function () {
 });
 
 test('a department can be linked to sites and the View returns them', function () {
-    $siteA = Site::factory()->create(['tenant_id' => 1, 'type' => 'house', 'name' => 'Kauri House']);
-    $siteB = Site::factory()->create(['tenant_id' => 1, 'type' => 'house', 'name' => 'Rata House']);
+    $siteA = Site::factory()->create(['type' => 'house', 'name' => 'Kauri House']);
+    $siteB = Site::factory()->create(['type' => 'house', 'name' => 'Rata House']);
 
     $this->actingAs($this->actor)
         ->post('/hr/departments', [
@@ -153,8 +151,8 @@ test('the people page keys the edit dialogs so they re-init per target', functio
 });
 
 test('updating a department re-syncs its sites', function () {
-    $siteA = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
-    $siteB = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+    $siteA = Site::factory()->create(['type' => 'house']);
+    $siteB = Site::factory()->create(['type' => 'house']);
     $dept = makeDept('Clinical');
     $dept->sites()->sync([$siteA->id]);
 

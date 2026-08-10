@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,7 +19,7 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected User $actor;
 
     protected Client $client;
 
@@ -30,11 +32,21 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
         $this->seed(RbacSeeder::class);
         Cache::flush();
 
-        $this->admin = User::factory()->create([
-            'role' => 'admin',
+        $this->actor = User::factory()->create([
+            'role' => 'support_worker',
             'approved_at' => now(),
         ]);
-        $this->admin->roles()->attach(Role::query()->where('name', 'admin')->first());
+        $this->actor->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+
+        $site = Site::factory()->create(['name' => 'API Idempotency Site']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->actor->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
 
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'API Idempotency',
@@ -44,7 +56,9 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
 
         $this->client = Client::factory()->create([
             'service_context_id' => $serviceContext->id,
+            'site_id' => $site->id,
         ]);
+        $this->client->supportWorkers()->attach($this->actor->id);
 
         $this->medication = ClientMedication::query()->create([
             'client_id' => $this->client->id,
@@ -73,14 +87,14 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
 
         $url = "/api/medications/clients/{$this->client->id}/medications/{$this->medication->id}/administrations";
 
-        $this->actingAs($this->admin, 'sanctum')
+        $this->actingAs($this->actor, 'sanctum')
             ->postJson($url, $payload)
             ->assertOk()
             ->assertJsonPath('sync.status', 'synced');
 
         Cache::forget('emar:idempotency:administration:'.$payload['client_request_uuid']);
 
-        $this->actingAs($this->admin, 'sanctum')
+        $this->actingAs($this->actor, 'sanctum')
             ->postJson($url, $payload)
             ->assertOk()
             ->assertJsonPath('sync.status', 'duplicate')
@@ -111,7 +125,7 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
             'queued_offline' => false,
         ];
 
-        $this->actingAs($this->admin, 'sanctum')
+        $this->actingAs($this->actor, 'sanctum')
             ->postJson(
                 "/api/medications/clients/{$this->client->id}/medications/{$this->medication->id}/administrations",
                 $payload,
@@ -137,13 +151,13 @@ class MedicationsApiControllerIdempotencyTest extends TestCase
         ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id,
             'client_medication_id' => $this->medication->id,
-            'administered_by' => $this->admin->id,
+            'administered_by' => $this->actor->id,
             'scheduled_for' => $scheduledFor,
             'administered_at' => $scheduledFor,
             'status' => 'given',
         ]);
 
-        $this->actingAs($this->admin, 'sanctum')
+        $this->actingAs($this->actor, 'sanctum')
             ->postJson(
                 "/api/medications/clients/{$this->client->id}/medications/{$this->medication->id}/administrations",
                 [

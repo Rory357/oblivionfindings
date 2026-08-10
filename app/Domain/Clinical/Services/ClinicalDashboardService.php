@@ -25,8 +25,11 @@ use App\Models\ClientSeizureEntry;
 use App\Models\ClientSleepEntry;
 use App\Models\MedicationPrnEffectiveness;
 use App\Models\RestraintEvent;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Lightweight dashboard metrics for the Health & Clinical module.
@@ -36,6 +39,12 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
  */
 class ClinicalDashboardService
 {
+    private const CLIENT_SITE_BYPASS_PERMISSIONS = ['clients.viewAny'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /**
      * @return array{
      *     protocols_active: int,
@@ -438,14 +447,18 @@ class ClinicalDashboardService
 
     /**
      * Cross-client clinical risk-assessments register (FRAT / Braden / MUST /
-     * IDDSI). Org-scoped via organization_id; the controller serialises rows.
+     * IDDSI), scoped through each Client's canonical Site.
      *
      * @param  array<string, mixed>  $filters
      */
-    public function getAssessmentsRegister(int $organizationId, array $filters = [], int $perPage = 25): LengthAwarePaginator
+    public function getAssessmentsRegister(User $user, array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
         return ClinicalRiskAssessment::query()
-            ->where('organization_id', $organizationId)
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                self::CLIENT_SITE_BYPASS_PERMISSIONS,
+            ))
             ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'assessor:id,name'])
             ->withCount('attachments')
             ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
@@ -462,9 +475,14 @@ class ClinicalDashboardService
      *
      * @return array{total: int, high_risk: int, review_due: int, by_type: array<string, int>}
      */
-    public function getAssessmentsRegisterStats(int $organizationId): array
+    public function getAssessmentsRegisterStats(User $user): array
     {
-        $scope = fn () => ClinicalRiskAssessment::query()->where('organization_id', $organizationId);
+        $scope = fn () => ClinicalRiskAssessment::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                self::CLIENT_SITE_BYPASS_PERMISSIONS,
+            ));
 
         return [
             'total' => $scope()->count(),
@@ -483,10 +501,13 @@ class ClinicalDashboardService
      *
      * @return array<string, mixed>
      */
-    public function getAssessmentsFilterOptions(): array
+    public function getAssessmentsFilterOptions(User $user): array
     {
         return [
-            'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'clients' => $this->siteAccess
+                ->applyClientScope(Client::query(), $user, self::CLIENT_SITE_BYPASS_PERMISSIONS)
+                ->orderBy('first_name')
+                ->get(['id', 'first_name', 'last_name']),
             'types' => array_map(fn (ClinicalAssessmentType $t) => [
                 'value' => $t->value,
                 'label' => $t->label(),
@@ -505,15 +526,21 @@ class ClinicalDashboardService
 
     /**
      * Read-only Care Plans review/sign-off lens (links out to /operations/care-plans).
-     * Org-scoped via CarePlan.organization_id.
+     * Scoped to Clients at Sites visible to the viewer.
      *
      * @return array{plans: array<int, array<string, mixed>>, stats: array{active: int, reviews_overdue: int, awaiting_sign_off: int}}
      */
-    public function getCarePlanLens(int $organizationId): array
+    public function getCarePlanLens(User $user): array
     {
-        $plans = CarePlan::query()
-            ->where('organization_id', $organizationId)
+        $activePlans = fn (): Builder => CarePlan::query()
             ->where('status', 'active')
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                self::CLIENT_SITE_BYPASS_PERMISSIONS,
+            ));
+
+        $plans = $activePlans()
             ->with(['client:id,first_name,last_name', 'reviewer:id,name'])
             ->withCount(['signOffs', 'goals'])
             ->orderByRaw('next_review_at IS NULL, next_review_at asc')
@@ -531,14 +558,12 @@ class ClinicalDashboardService
                 'client' => $p->client ? ['id' => $p->client->id, 'name' => trim("{$p->client->first_name} {$p->client->last_name}")] : null,
             ]);
 
-        $scope = fn () => CarePlan::query()->where('organization_id', $organizationId)->where('status', 'active');
-
         return [
             'plans' => $plans->all(),
             'stats' => [
-                'active' => $scope()->count(),
-                'reviews_overdue' => $scope()->where('next_review_at', '<', now())->count(),
-                'awaiting_sign_off' => $scope()->doesntHave('signOffs')->count(),
+                'active' => $activePlans()->count(),
+                'reviews_overdue' => $activePlans()->where('next_review_at', '<', now())->count(),
+                'awaiting_sign_off' => $activePlans()->doesntHave('signOffs')->count(),
             ],
         ];
     }

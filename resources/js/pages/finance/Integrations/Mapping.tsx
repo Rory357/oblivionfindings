@@ -1,11 +1,14 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
     Table,
     TableBody,
@@ -14,7 +17,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { ArrowLeftRight, Save, Link2 } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, useForm } from '@inertiajs/react';
+import { ArrowLeftRight, Link2, Save } from 'lucide-react';
 import { FormEvent } from 'react';
 
 type LocalAccount = {
@@ -48,24 +54,38 @@ const typeColors: Record<string, string> = {
     asset: 'bg-status-info-bg text-status-info border-status-info/30',
     liability: 'bg-primary/10 text-primary border-primary/30',
     equity: 'bg-primary/10 text-primary border-primary/30',
-    revenue: 'bg-status-success-bg text-status-success border-status-success/30',
-    expense: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    revenue:
+        'bg-status-success-bg text-status-success border-status-success/30',
+    expense:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
 };
 
-export default function AccountMapping({ integration, localAccounts }: PageProps) {
+export default function AccountMapping({
+    integration,
+    localAccounts,
+}: PageProps) {
     const providerName = providerLabels[integration.provider];
-    const externalIdLabel = integration.provider === 'xero' ? 'Xero Account ID' : 'MYOB Account UID';
+    const externalIdLabel =
+        integration.provider === 'xero'
+            ? 'Xero Account ID'
+            : 'MYOB Account UID';
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Integrations', href: '/finance/integrations' },
-        { title: `${providerName} Mapping`, href: `/finance/integrations/${integration.id}/mapping` },
+        {
+            title: `${providerName} Mapping`,
+            href: `/finance/integrations/${integration.id}/mapping`,
+        },
     ];
 
     // Build initial mapping from existing data
     const initialMapping: Record<string, string> = {};
     localAccounts.forEach((account) => {
-        const mapped = integration.account_mapping[String(account.id)] ?? account.external_id ?? '';
+        const mapped =
+            integration.account_mapping[String(account.id)] ??
+            account.external_id ??
+            '';
         initialMapping[String(account.id)] = mapped;
     });
 
@@ -101,10 +121,14 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
         });
     }
 
-    const mappedCount = Object.values(data.account_mapping).filter((v) => v && v.trim()).length;
+    const mappedCount = Object.values(data.account_mapping).filter(
+        (v) => v && v.trim(),
+    ).length;
 
     // Group accounts by type
-    const groupedAccounts = localAccounts.reduce<Record<string, LocalAccount[]>>((acc, account) => {
+    const groupedAccounts = localAccounts.reduce<
+        Record<string, LocalAccount[]>
+    >((acc, account) => {
         const type = account.type;
         if (!acc[type]) acc[type] = [];
         acc[type].push(account);
@@ -119,7 +143,8 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/integrations"
                         title={`${providerName} Account Mapping`}
@@ -127,9 +152,13 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
                         actions={
                             <>
                                 <Badge variant="outline">
-                                    {mappedCount} / {localAccounts.length} mapped
+                                    {mappedCount} / {localAccounts.length}{' '}
+                                    mapped
                                 </Badge>
-                                <Button onClick={handleSubmit} disabled={processing}>
+                                <Button
+                                    onClick={handleSubmit}
+                                    disabled={processing}
+                                >
                                     <Save className="mr-2 h-4 w-4" />
                                     {processing ? 'Saving...' : 'Save Mapping'}
                                 </Button>
@@ -138,7 +167,6 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
                     />
                 }
             >
-
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -146,8 +174,9 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
                             <div>
                                 <CardTitle>Account Mapping</CardTitle>
                                 <CardDescription>
-                                    Enter the {externalIdLabel} for each local account.
-                                    Leave blank to skip accounts you don't want to sync.
+                                    Enter the {externalIdLabel} for each local
+                                    account. Leave blank to skip accounts you
+                                    don't want to sync.
                                 </CardDescription>
                             </div>
                         </div>
@@ -156,26 +185,40 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
                         <form onSubmit={handleSubmit}>
                             {typeOrder.map((type) => {
                                 const accounts = groupedAccounts[type];
-                                if (!accounts || accounts.length === 0) return null;
+                                if (!accounts || accounts.length === 0)
+                                    return null;
 
                                 return (
                                     <div key={type} className="mb-6">
-                                        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                                            <Badge variant="outline" className={typeColors[type]}>
+                                        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                                            <Badge
+                                                variant="outline"
+                                                className={typeColors[type]}
+                                            >
                                                 {type}
                                             </Badge>
-                                            <span>({accounts.length} accounts)</span>
+                                            <span>
+                                                ({accounts.length} accounts)
+                                            </span>
                                         </h3>
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead className="w-24">Code</TableHead>
-                                                    <TableHead>Account Name</TableHead>
-                                                    <TableHead className="w-32">Sub Type</TableHead>
+                                                    <TableHead className="w-24">
+                                                        Code
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Account Name
+                                                    </TableHead>
+                                                    <TableHead className="w-32">
+                                                        Sub Type
+                                                    </TableHead>
                                                     <TableHead className="w-20 text-center">
                                                         <Link2 className="mx-auto h-4 w-4" />
                                                     </TableHead>
-                                                    <TableHead className="w-72">{externalIdLabel}</TableHead>
+                                                    <TableHead className="w-72">
+                                                        {externalIdLabel}
+                                                    </TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -188,20 +231,41 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
                                                             {account.name}
                                                         </TableCell>
                                                         <TableCell className="text-sm text-muted-foreground">
-                                                            {account.sub_type?.replace(/_/g, ' ') || '-'}
+                                                            {account.sub_type?.replace(
+                                                                /_/g,
+                                                                ' ',
+                                                            ) || '-'}
                                                         </TableCell>
                                                         <TableCell className="text-center">
-                                                            {data.account_mapping[String(account.id)] ? (
+                                                            {data
+                                                                .account_mapping[
+                                                                String(
+                                                                    account.id,
+                                                                )
+                                                            ] ? (
                                                                 <ArrowLeftRight className="mx-auto h-4 w-4 text-status-success" />
                                                             ) : (
-                                                                <span className="text-muted-foreground/30">-</span>
+                                                                <span className="text-muted-foreground/30">
+                                                                    -
+                                                                </span>
                                                             )}
                                                         </TableCell>
                                                         <TableCell>
                                                             <Input
-                                                                value={data.account_mapping[String(account.id)] || ''}
+                                                                value={
+                                                                    data
+                                                                        .account_mapping[
+                                                                        String(
+                                                                            account.id,
+                                                                        )
+                                                                    ] || ''
+                                                                }
                                                                 onChange={(e) =>
-                                                                    handleMappingChange(account.id, e.target.value)
+                                                                    handleMappingChange(
+                                                                        account.id,
+                                                                        e.target
+                                                                            .value,
+                                                                    )
                                                                 }
                                                                 placeholder={`${providerName} ID`}
                                                                 className="h-8 text-sm"

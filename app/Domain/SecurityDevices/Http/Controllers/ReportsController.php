@@ -2,11 +2,14 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
+use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -19,7 +22,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *   • Device events (rolling 90 days)
  *   • Maintenance records
  *
- * Exports are streamed as CSV, so they remain cheap on large tenants.
+ * Exports are streamed as CSV, so they remain cheap across a large estate.
  * Report design favours stability over breadth — a broader per-domain
  * reporting surface will live in a dedicated Reporting module when that
  * exists.
@@ -28,25 +31,25 @@ class ReportsController extends Controller
 {
     private const EVENTS_WINDOW_DAYS = 90;
 
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+    ) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('securityDevices.reports.view'), 403);
 
-        $tenantId = $this->resolveTenantId($user);
+        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
 
         $stats = [
-            'devices' => Device::query()
-                ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
-                ->count(),
+            'devices' => (clone $visibleDeviceIds)->count(),
             'events_90d' => DeviceEvent::query()
-                // device_events has no tenant_id column; scope through the
-                // canonical Device row, which does.
-                ->whereHas('device', fn ($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q)
+                ->whereIn('device_id', clone $visibleDeviceIds)
                 ->where('occurred_at', '>=', now()->subDays(self::EVENTS_WINDOW_DAYS))
                 ->count(),
             'maintenance' => DeviceMaintenanceRecord::query()
-                ->whereHas('device', fn ($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q)
+                ->whereIn('device_id', clone $visibleDeviceIds)
                 ->count(),
         ];
 
@@ -61,8 +64,8 @@ class ReportsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('securityDevices.reports.view'), 403);
 
-        $tenantId = $this->resolveTenantId($user);
         $filename = 'security-devices-inventory-'.now()->format('Y-m-d').'.csv';
+        $selectedIds = $this->selectedDeviceIds($request);
 
         $columns = [
             'id',
@@ -88,8 +91,8 @@ class ReportsController extends Controller
             'created_at',
         ];
 
-        $query = Device::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
+        $query = $this->access->visibleDevices($user)
+            ->when($selectedIds !== null, fn ($q) => $q->whereIn('id', $selectedIds))
             ->orderBy('id');
 
         return $this->streamCsv($filename, $columns, $query->cursor(), function (Device $d) use ($columns) {
@@ -104,6 +107,7 @@ class ReportsController extends Controller
                 }
                 $row[] = $value ?? '';
             }
+
             return $row;
         });
     }
@@ -113,7 +117,17 @@ class ReportsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('securityDevices.reports.view'), 403);
 
-        $tenantId = $this->resolveTenantId($user);
+        $filters = $request->validate([
+            'domain' => ['nullable', Rule::enum(DeviceDomain::class)],
+            'device_id' => ['nullable', 'integer', 'min:1'],
+            'severity' => ['nullable', 'string', 'max:50'],
+            'event_type' => ['nullable', 'string', 'max:100'],
+            'source' => ['nullable', 'string', 'max:100'],
+        ]);
+        $visibleDeviceIds = $this->access->visibleDevices($user)
+            ->when($filters['domain'] ?? null, fn ($query, string $domain) => $query->where('domain', $domain))
+            ->when($filters['device_id'] ?? null, fn ($query, int $deviceId) => $query->whereKey($deviceId))
+            ->select('devices.id');
         $since = now()->subDays(self::EVENTS_WINDOW_DAYS);
         $filename = 'security-devices-events-'.self::EVENTS_WINDOW_DAYS.'d-'.now()->format('Y-m-d').'.csv';
 
@@ -129,10 +143,12 @@ class ReportsController extends Controller
         ];
 
         $query = DeviceEvent::query()
-            // device_events has no tenant_id column; scope through device.
-            ->whereHas('device', fn ($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q)
+            ->whereIn('device_id', $visibleDeviceIds)
             ->where('occurred_at', '>=', $since)
-            ->with(['device:id,name,tenant_id'])
+            ->when($filters['severity'] ?? null, fn ($query, string $severity) => $query->where('severity', $severity))
+            ->when($filters['event_type'] ?? null, fn ($query, string $eventType) => $query->where('event_type', $eventType))
+            ->when($filters['source'] ?? null, fn ($query, string $source) => $query->where('source', $source))
+            ->with(['device:id,name'])
             ->orderBy('occurred_at', 'desc');
 
         return $this->streamCsv($filename, $columns, $query->cursor(), function (DeviceEvent $e) {
@@ -154,7 +170,7 @@ class ReportsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('securityDevices.reports.view'), 403);
 
-        $tenantId = $this->resolveTenantId($user);
+        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
         $filename = 'security-devices-maintenance-'.now()->format('Y-m-d').'.csv';
 
         $columns = [
@@ -172,7 +188,7 @@ class ReportsController extends Controller
         ];
 
         $query = DeviceMaintenanceRecord::query()
-            ->whereHas('device', fn ($q) => $tenantId ? $q->where('tenant_id', $tenantId) : $q)
+            ->whereIn('device_id', $visibleDeviceIds)
             ->with(['device:id,name', 'performedBy:id,name'])
             ->orderBy('scheduled_for', 'desc');
 
@@ -208,18 +224,33 @@ class ReportsController extends Controller
             $out = fopen('php://output', 'w');
             // BOM so Excel opens UTF-8 CSVs cleanly.
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, $header);
+            $this->putCsv($out, $header);
             foreach ($source as $row) {
-                fputcsv($out, $rowMapper($row));
+                $this->putCsv($out, $rowMapper($row));
             }
             fclose($out);
         }, $filename, $headers);
     }
 
-    private function resolveTenantId($user): ?int
+    /** @return array<int, int>|null */
+    private function selectedDeviceIds(Request $request): ?array
     {
-        $tenantId = $user->tenant_id ?? $user->organization_id ?? null;
+        if (! $request->has('ids')) {
+            return null;
+        }
 
-        return $tenantId !== null ? (int) $tenantId : null;
+        $validated = $request->validate([
+            'ids' => ['required', 'string', 'regex:/^\d+(,\d+)*$/'],
+        ]);
+
+        $ids = collect(explode(',', $validated['ids']))
+            ->map(fn (string $id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+
+        abort_if($ids->count() > 500, 422, 'Select no more than 500 devices per export.');
+
+        return $ids->all();
     }
 }

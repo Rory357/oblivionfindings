@@ -174,7 +174,8 @@ export default function GlobalVendorsCredentials({
         // Deep-links (e.g. the Site Calendar credential/vendor reminders) can
         // request a starting tab via ?tab=; honour it only when the viewer can
         // actually see that tab, otherwise fall back to the permission default.
-        if (filters.tab === 'credentials' && can.credentials) return 'credentials';
+        if (filters.tab === 'credentials' && can.credentials)
+            return 'credentials';
         if (filters.tab === 'vendors' && can.vendors) return 'vendors';
         return can.vendors ? 'vendors' : 'credentials';
     });

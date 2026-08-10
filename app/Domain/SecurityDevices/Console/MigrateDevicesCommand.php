@@ -2,13 +2,19 @@
 
 namespace App\Domain\SecurityDevices\Console;
 
+use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Models\Client;
+use App\Services\ConsentValidationService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,14 +46,28 @@ class MigrateDevicesCommand extends Command
     // ── Counters ──────────────────────────────────────────────────
 
     private int $locationHardwareScanned = 0;
+
     private int $controlRoomDevicesScanned = 0;
+
     private int $assetTrackersScanned = 0;
+
     private int $devicesCreated = 0;
+
     private int $duplicatesMerged = 0;
+
     private int $assignmentsCreated = 0;
+
     private int $assetLinksCreated = 0;
+
     private int $skipped = 0;
+
     private array $warnings = [];
+
+    public function __construct(
+        private readonly DeviceAssignmentService $deviceAssignments,
+    ) {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -89,13 +109,13 @@ class MigrateDevicesCommand extends Command
             $existing = Device::where('legacy_location_hardware_id', $row->id)->first();
             if ($existing) {
                 $this->skipped++;
+
                 continue;
             }
 
             [$domain, $category, $subcategory] = $this->mapLocationHardwareCategory($row->category);
 
             $deviceData = [
-                'tenant_id' => $row->tenant_id,
                 'name' => $row->name,
                 'domain' => $domain,
                 'category' => $category,
@@ -115,19 +135,20 @@ class MigrateDevicesCommand extends Command
 
             // Extract extra fields from external_ref if available.
             $extRef = $deviceData['external_ref'] ?? [];
-            if (!empty($extRef['firmware_version'])) {
+            if (! empty($extRef['firmware_version'])) {
                 $deviceData['firmware_version'] = $extRef['firmware_version'];
             }
-            if (!empty($extRef['model'])) {
+            if (! empty($extRef['model'])) {
                 $deviceData['model'] = $extRef['model'];
             }
-            if (!empty($extRef['ip'])) {
+            if (! empty($extRef['ip'])) {
                 $deviceData['ip_address'] = $extRef['ip'];
             }
 
             if ($dryRun) {
                 $this->devicesCreated++;
                 $this->planAssignmentsForLocationHardware($row, null, $dryRun);
+
                 continue;
             }
 
@@ -145,7 +166,8 @@ class MigrateDevicesCommand extends Command
     {
         // Site assignment.
         if ($row->site_id) {
-            if (!$dryRun && $device) {
+            $created = $dryRun;
+            if (! $dryRun && $device) {
                 $assignableType = 'site';
                 $assignableId = $row->site_id;
 
@@ -155,14 +177,17 @@ class MigrateDevicesCommand extends Command
                     $assignableId = $row->room_id;
                 }
 
-                DeviceAssignment::create([
-                    'device_id' => $device->id,
-                    'assignable_type' => $assignableType,
-                    'assignable_id' => $assignableId,
-                    'assigned_at' => $row->created_at ?? now(),
-                ]);
+                $created = $this->createAssignment(
+                    $device,
+                    $assignableType,
+                    (int) $assignableId,
+                    $row->created_at ?? now(),
+                    context: "location_hardware #{$row->id}",
+                );
             }
-            $this->assignmentsCreated++;
+            if ($created) {
+                $this->assignmentsCreated++;
+            }
         }
 
         // Person assignment (staff or client).
@@ -174,15 +199,19 @@ class MigrateDevicesCommand extends Command
             };
 
             if ($targetType) {
-                if (!$dryRun && $device) {
-                    DeviceAssignment::create([
-                        'device_id' => $device->id,
-                        'assignable_type' => $targetType,
-                        'assignable_id' => $row->linked_person_id,
-                        'assigned_at' => $row->created_at ?? now(),
-                    ]);
+                $created = $dryRun;
+                if (! $dryRun && $device) {
+                    $created = $this->createAssignment(
+                        $device,
+                        $targetType,
+                        (int) $row->linked_person_id,
+                        $row->created_at ?? now(),
+                        context: "location_hardware #{$row->id}",
+                    );
                 }
-                $this->assignmentsCreated++;
+                if ($created) {
+                    $this->assignmentsCreated++;
+                }
             } else {
                 $this->addWarning("location_hardware #{$row->id}: unknown linked_person_type '{$row->linked_person_type}'");
             }
@@ -192,7 +221,7 @@ class MigrateDevicesCommand extends Command
         if ($row->linked_asset_id) {
             $linkType = ($row->category === 'tracker') ? LinkType::InstalledIn : LinkType::Primary;
 
-            if (!$dryRun && $device) {
+            if (! $dryRun && $device) {
                 DeviceAssetLink::create([
                     'device_id' => $device->id,
                     'asset_id' => $row->linked_asset_id,
@@ -215,6 +244,7 @@ class MigrateDevicesCommand extends Command
             // Idempotency: skip if already migrated.
             if ($row->canonical_device_id ?? null) {
                 $this->skipped++;
+
                 continue;
             }
 
@@ -223,23 +253,23 @@ class MigrateDevicesCommand extends Command
 
             if ($match) {
                 // Merge signal-pipeline fields into existing device.
-                if (!$dryRun) {
+                if (! $dryRun) {
                     DB::transaction(function () use ($match, $row) {
                         $updates = [];
 
                         // Merge health/signal fields if the CR device has newer data.
-                        if ($row->last_signal_at && (!$match->last_signal_at || $row->last_signal_at > $match->last_signal_at->toDateTimeString())) {
+                        if ($row->last_signal_at && (! $match->last_signal_at || $row->last_signal_at > $match->last_signal_at->toDateTimeString())) {
                             $updates['last_signal_at'] = $row->last_signal_at;
                         }
                         if ($row->battery_level !== null && $match->battery_level === null) {
                             $updates['battery_level'] = $row->battery_level;
                             $updates['battery_updated_at'] = $row->battery_updated_at;
                         }
-                        if ($row->latitude && !$match->latitude) {
+                        if ($row->latitude && ! $match->latitude) {
                             $updates['latitude'] = $row->latitude;
                             $updates['longitude'] = $row->longitude;
                         }
-                        if ($row->location_description && !$match->location_description) {
+                        if ($row->location_description && ! $match->location_description) {
                             $updates['location_description'] = $row->location_description;
                         }
 
@@ -253,6 +283,7 @@ class MigrateDevicesCommand extends Command
                     });
                 }
                 $this->duplicatesMerged++;
+
                 continue;
             }
 
@@ -260,7 +291,6 @@ class MigrateDevicesCommand extends Command
             [$domain, $category, $subcategory] = $this->mapControlRoomDeviceType($row->type);
 
             $deviceData = [
-                'tenant_id' => 1, // CR devices don't have tenant_id; default to 1.
                 'name' => $row->name,
                 'domain' => $domain,
                 'category' => $category,
@@ -284,6 +314,7 @@ class MigrateDevicesCommand extends Command
             if ($dryRun) {
                 $this->devicesCreated++;
                 $this->planAssignmentsForControlRoomDevice($row, null, $dryRun);
+
                 continue;
             }
 
@@ -304,20 +335,22 @@ class MigrateDevicesCommand extends Command
     private function planAssignmentsForControlRoomDevice(object $row, ?Device $device, bool $dryRun): void
     {
         if ($row->site_id) {
-            if (!$dryRun && $device) {
+            if (! $dryRun && $device) {
                 // Only create if device doesn't already have a site assignment (from Phase A merge).
                 $existingAssignment = DeviceAssignment::where('device_id', $device->id)
                     ->whereNull('released_at')
                     ->first();
 
-                if (!$existingAssignment) {
-                    DeviceAssignment::create([
-                        'device_id' => $device->id,
-                        'assignable_type' => 'site',
-                        'assignable_id' => $row->site_id,
-                        'assigned_at' => $row->created_at ?? now(),
-                    ]);
-                    $this->assignmentsCreated++;
+                if (! $existingAssignment) {
+                    if ($this->createAssignment(
+                        $device,
+                        DeviceAssignment::TARGET_SITE,
+                        (int) $row->site_id,
+                        $row->created_at ?? now(),
+                        context: "control_room_device #{$row->id}",
+                    )) {
+                        $this->assignmentsCreated++;
+                    }
                 }
             } else {
                 $this->assignmentsCreated++;
@@ -325,26 +358,30 @@ class MigrateDevicesCommand extends Command
         }
 
         if ($row->client_id) {
-            if (!$dryRun && $device) {
-                DeviceAssignment::create([
-                    'device_id' => $device->id,
-                    'assignable_type' => 'client',
-                    'assignable_id' => $row->client_id,
-                    'assigned_at' => $row->created_at ?? now(),
-                ]);
+            $created = $dryRun;
+            if (! $dryRun && $device) {
+                $created = $this->createAssignment(
+                    $device,
+                    DeviceAssignment::TARGET_CLIENT,
+                    (int) $row->client_id,
+                    $row->created_at ?? now(),
+                    context: "control_room_device #{$row->id}",
+                );
             }
-            $this->assignmentsCreated++;
+            if ($created) {
+                $this->assignmentsCreated++;
+            }
         }
 
         if ($row->asset_id) {
-            if (!$dryRun && $device) {
+            if (! $dryRun && $device) {
                 // Check if link already exists (from Phase A).
                 $existingLink = DeviceAssetLink::where('device_id', $device->id)
                     ->where('asset_id', $row->asset_id)
                     ->whereNull('unlinked_at')
                     ->exists();
 
-                if (!$existingLink) {
+                if (! $existingLink) {
                     DeviceAssetLink::create([
                         'device_id' => $device->id,
                         'asset_id' => $row->asset_id,
@@ -372,6 +409,7 @@ class MigrateDevicesCommand extends Command
             $existing = Device::where('legacy_asset_tracker_id', $row->id)->first();
             if ($existing) {
                 $this->skipped++;
+
                 continue;
             }
 
@@ -379,7 +417,7 @@ class MigrateDevicesCommand extends Command
             $match = $this->findDuplicateForTracker($row);
 
             if ($match) {
-                if (!$dryRun) {
+                if (! $dryRun) {
                     DB::transaction(function () use ($match, $row) {
                         $match->update([
                             'legacy_asset_tracker_id' => $row->id,
@@ -392,7 +430,7 @@ class MigrateDevicesCommand extends Command
                             ->whereNull('unlinked_at')
                             ->exists();
 
-                        if (!$existingLink) {
+                        if (! $existingLink) {
                             DeviceAssetLink::create([
                                 'device_id' => $match->id,
                                 'asset_id' => $row->asset_id,
@@ -408,18 +446,13 @@ class MigrateDevicesCommand extends Command
                     $this->assetLinksCreated++;
                 }
                 $this->duplicatesMerged++;
+
                 continue;
             }
 
-            // No duplicate — create new device.
-            // Resolve tenant_id from the linked asset.
-            $tenantId = DB::table('assets')->where('id', $row->asset_id)->value('site_id');
-            $tenantId = $tenantId
-                ? (DB::table('sites')->where('id', $tenantId)->value('tenant_id') ?? 1)
-                : 1;
-
+            // No duplicate — create a new device. Its canonical asset link below
+            // supplies operational provenance; legacy storage stays application-level.
             $deviceData = [
-                'tenant_id' => $tenantId,
                 'name' => "Tracker {$row->device_uid}",
                 'domain' => 'tracking',
                 'category' => 'vehicle_tracker',
@@ -438,6 +471,7 @@ class MigrateDevicesCommand extends Command
             if ($dryRun) {
                 $this->devicesCreated++;
                 $this->assetLinksCreated++; // will create link
+
                 continue;
             }
 
@@ -466,13 +500,14 @@ class MigrateDevicesCommand extends Command
      */
     private function maybeCreateConsentAssignment(Device $device, object $trackerRow): void
     {
-        if (!$trackerRow->consent_id) {
+        if (! $trackerRow->consent_id) {
             return;
         }
 
         $consent = DB::table('client_consents')->where('id', $trackerRow->consent_id)->first();
-        if (!$consent || !$consent->client_id) {
+        if (! $consent || ! $consent->client_id) {
             $this->addWarning("asset_tracker #{$trackerRow->id}: consent_id {$trackerRow->consent_id} has no client_id");
+
             return;
         }
 
@@ -483,16 +518,56 @@ class MigrateDevicesCommand extends Command
             ->whereNull('released_at')
             ->exists();
 
-        if (!$existing) {
-            DeviceAssignment::create([
-                'device_id' => $device->id,
-                'assignable_type' => 'client',
-                'assignable_id' => $consent->client_id,
-                'assigned_at' => $trackerRow->paired_at ?? $trackerRow->created_at ?? now(),
-                'consent_id' => $trackerRow->consent_id,
-            ]);
-            $this->assignmentsCreated++;
+        if (! $existing) {
+            if ($this->createAssignment(
+                $device,
+                DeviceAssignment::TARGET_CLIENT,
+                (int) $consent->client_id,
+                $trackerRow->paired_at ?? $trackerRow->created_at ?? now(),
+                (int) $trackerRow->consent_id,
+                "asset_tracker #{$trackerRow->id}",
+            )) {
+                $this->assignmentsCreated++;
+            }
         }
+    }
+
+    private function createAssignment(
+        Device $device,
+        string $assignableType,
+        int $assignableId,
+        mixed $assignedAt,
+        ?int $consentId = null,
+        string $context = 'legacy device migration',
+    ): bool {
+        if ($assignableType === DeviceAssignment::TARGET_CLIENT
+            && $device->domain === 'tracking'
+            && $consentId === null) {
+            $client = Client::query()->find($assignableId);
+            $consentId = $client
+                ? ConsentValidationService::latestValidTrackingConsentForClient($client)?->id
+                : null;
+        }
+
+        try {
+            $this->deviceAssignments->assign(
+                device: $device,
+                assignableType: $assignableType,
+                assignableId: $assignableId,
+                assignedByUserId: null,
+                assignmentType: AssignmentType::Permanent,
+                consentId: $consentId,
+                assignedAt: $assignedAt instanceof \DateTimeInterface
+                    ? $assignedAt
+                    : Carbon::parse($assignedAt),
+            );
+        } catch (\InvalidArgumentException $exception) {
+            $this->addWarning("{$context}: assignment skipped — {$exception->getMessage()}");
+
+            return false;
+        }
+
+        return true;
     }
 
     // ── Deduplication ─────────────────────────────────────────────
@@ -514,9 +589,10 @@ class MigrateDevicesCommand extends Command
                 ->get()
                 ->filter(function (Device $d) use ($crRow) {
                     $ref = $d->external_ref;
-                    if (!is_array($ref)) {
+                    if (! is_array($ref)) {
                         return false;
                     }
+
                     // Check if any value in external_ref matches the CR external_ref.
                     return in_array($crRow->external_ref, $ref, true)
                         || ($ref['provider_entity_id'] ?? null) === $crRow->external_ref
@@ -528,9 +604,10 @@ class MigrateDevicesCommand extends Command
             }
             if ($candidates->count() > 1) {
                 $this->addWarning(
-                    "control_room_device #{$crRow->id}: ambiguous match by vendor+external_ref " .
+                    "control_room_device #{$crRow->id}: ambiguous match by vendor+external_ref ".
                     "(vendor={$crRow->vendor}, ref={$crRow->external_ref}) — {$candidates->count()} candidates. Skipping merge."
                 );
+
                 return null;
             }
         }
@@ -550,7 +627,7 @@ class MigrateDevicesCommand extends Command
             }
             if ($candidates->count() > 1) {
                 $this->addWarning(
-                    "control_room_device #{$crRow->id}: ambiguous match by name+site " .
+                    "control_room_device #{$crRow->id}: ambiguous match by name+site ".
                     "(name={$crRow->name}, site={$crRow->site_id}) — {$candidates->count()} candidates. Skipping merge."
                 );
             }
@@ -591,7 +668,7 @@ class MigrateDevicesCommand extends Command
             }
             if ($candidates->count() > 1) {
                 $this->addWarning(
-                    "asset_tracker #{$trackerRow->id}: ambiguous match by vendor+device_uid " .
+                    "asset_tracker #{$trackerRow->id}: ambiguous match by vendor+device_uid ".
                     "(vendor={$trackerRow->vendor}, uid={$trackerRow->device_uid}) — {$candidates->count()} candidates."
                 );
             }
@@ -611,17 +688,17 @@ class MigrateDevicesCommand extends Command
     private function mapLocationHardwareCategory(string $legacyCategory): array
     {
         return match ($legacyCategory) {
-            'gateway'  => ['it_infrastructure', 'network', 'router'],
-            'switch'   => ['it_infrastructure', 'network', 'switch'],
-            'ap'       => ['it_infrastructure', 'network', 'wireless_ap'],
-            'camera'   => ['security', 'cctv', 'dome_camera'],        // default to dome; refine manually
-            'door'     => ['security', 'access_control', 'card_reader'], // door controller → access_control
-            'sensor'   => ['iot_healthcare', 'environmental', 'temperature'], // generic sensor → safe default
-            'nvr'      => ['security', 'cctv', 'nvr'],
-            'ai'       => ['it_infrastructure', 'server', 'physical_server'], // AI device → server
-            'tracker'  => ['tracking', 'personal_tracker', 'wearable_gps'],   // default; may be vehicle_tracker
-            'other'    => ['facilities', 'building_safety', null],            // catch-all
-            default    => ['facilities', 'building_safety', null],
+            'gateway' => ['it_infrastructure', 'network', 'router'],
+            'switch' => ['it_infrastructure', 'network', 'switch'],
+            'ap' => ['it_infrastructure', 'network', 'wireless_ap'],
+            'camera' => ['security', 'cctv', 'dome_camera'],        // default to dome; refine manually
+            'door' => ['security', 'access_control', 'card_reader'], // door controller → access_control
+            'sensor' => ['iot_healthcare', 'environmental', 'temperature'], // generic sensor → safe default
+            'nvr' => ['security', 'cctv', 'nvr'],
+            'ai' => ['it_infrastructure', 'server', 'physical_server'], // AI device → server
+            'tracker' => ['tracking', 'personal_tracker', 'wearable_gps'],   // default; may be vehicle_tracker
+            'other' => ['facilities', 'building_safety', null],            // catch-all
+            default => ['facilities', 'building_safety', null],
         };
     }
 
@@ -633,16 +710,16 @@ class MigrateDevicesCommand extends Command
     private function mapControlRoomDeviceType(string $type): array
     {
         return match ($type) {
-            'camera'           => ['security', 'cctv', 'dome_camera'],
-            'door'             => ['security', 'access_control', 'card_reader'],
-            'sensor'           => ['iot_healthcare', 'environmental', 'temperature'],
-            'alarm_panel'      => ['security', 'alarm', 'panel'],
-            'bed_sensor'       => ['iot_healthcare', 'bed_sensor', 'pressure_mat'],
+            'camera' => ['security', 'cctv', 'dome_camera'],
+            'door' => ['security', 'access_control', 'card_reader'],
+            'sensor' => ['iot_healthcare', 'environmental', 'temperature'],
+            'alarm_panel' => ['security', 'alarm', 'panel'],
+            'bed_sensor' => ['iot_healthcare', 'bed_sensor', 'pressure_mat'],
             'personal_tracker' => ['tracking', 'personal_tracker', 'wearable_gps'],
-            'vehicle_tracker'  => ['tracking', 'vehicle_tracker', 'hardwired_gps'],
-            'environmental'    => ['iot_healthcare', 'environmental', 'temperature'],
-            'network'          => ['it_infrastructure', 'network', 'switch'],
-            default            => ['facilities', 'building_safety', null],
+            'vehicle_tracker' => ['tracking', 'vehicle_tracker', 'hardwired_gps'],
+            'environmental' => ['iot_healthcare', 'environmental', 'temperature'],
+            'network' => ['it_infrastructure', 'network', 'switch'],
+            default => ['facilities', 'building_safety', null],
         };
     }
 
@@ -651,41 +728,41 @@ class MigrateDevicesCommand extends Command
     private function mapLocationHardwareStatus(string $status): string
     {
         return match ($status) {
-            'online'  => DeviceStatus::Active->value,
+            'online' => DeviceStatus::Active->value,
             'offline' => DeviceStatus::Offline->value,
             'retired' => DeviceStatus::Decommissioned->value,
-            default   => DeviceStatus::Active->value, // 'unknown' → active (benefit of doubt)
+            default => DeviceStatus::Active->value, // 'unknown' → active (benefit of doubt)
         };
     }
 
     private function mapControlRoomStatus(string $status): string
     {
         return match ($status) {
-            'online'      => DeviceStatus::Active->value,
-            'offline'     => DeviceStatus::Offline->value,
+            'online' => DeviceStatus::Active->value,
+            'offline' => DeviceStatus::Offline->value,
             'maintenance' => DeviceStatus::Maintenance->value,
-            'retired'     => DeviceStatus::Decommissioned->value,
-            default       => DeviceStatus::Active->value,
+            'retired' => DeviceStatus::Decommissioned->value,
+            default => DeviceStatus::Active->value,
         };
     }
 
     private function mapTrackerStatus(string $status): string
     {
         return match ($status) {
-            'paired'    => DeviceStatus::Active->value,
+            'paired' => DeviceStatus::Active->value,
             'suspended' => DeviceStatus::Maintenance->value,
-            'unpaired'  => DeviceStatus::InStock->value,
-            default     => DeviceStatus::Active->value,
+            'unpaired' => DeviceStatus::InStock->value,
+            default => DeviceStatus::Active->value,
         };
     }
 
     private function inferHealthFromStatus(string $status): string
     {
         return match ($status) {
-            'online'  => HealthStatus::Healthy->value,
+            'online' => HealthStatus::Healthy->value,
             'offline' => HealthStatus::Warning->value,
             'retired' => HealthStatus::Unknown->value,
-            default   => HealthStatus::Unknown->value,
+            default => HealthStatus::Unknown->value,
         };
     }
 
@@ -712,6 +789,7 @@ class MigrateDevicesCommand extends Command
 
         if ($count === 0) {
             $this->info('No migrated devices found.');
+
             return self::SUCCESS;
         }
 
@@ -734,7 +812,7 @@ class MigrateDevicesCommand extends Command
         return self::SUCCESS;
     }
 
-    private function migratedDeviceIdsForRollback(): \Illuminate\Support\Collection
+    private function migratedDeviceIdsForRollback(): Collection
     {
         $canonicalDeviceIds = Device::query()
             ->where(function ($q) {
@@ -788,7 +866,7 @@ class MigrateDevicesCommand extends Command
             $this->info('');
             $this->warn('Warnings requiring manual review:');
             foreach ($this->warnings as $i => $warning) {
-                $this->line("  " . ($i + 1) . ". {$warning}");
+                $this->line('  '.($i + 1).". {$warning}");
             }
         }
 

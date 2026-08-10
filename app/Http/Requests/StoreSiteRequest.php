@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\SiteContact;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreSiteRequest extends FormRequest
 {
@@ -40,7 +42,7 @@ class StoreSiteRequest extends FormRequest
             'primary_contact_user_id' => ['nullable', 'exists:users,id'],
             'contacts' => ['nullable', 'array'],
             'contacts.*.id' => ['nullable', 'integer'],
-            'contacts.*.type' => ['nullable', 'string', 'max:50'],
+            'contacts.*.type' => ['required_with:contacts.*', 'string', Rule::in(SiteContact::TYPES)],
             'contacts.*.name' => ['required_with:contacts.*', 'string', 'max:255'],
             'contacts.*.role' => ['nullable', 'string', 'max:255'],
             'contacts.*.phone' => ['nullable', 'string', 'max:60'],

@@ -5,6 +5,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Services\CompensationService;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -14,21 +15,25 @@ beforeEach(function () {
     Storage::fake('private');
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Deferred retention Site']);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+    ]);
 });
 
 test('calendar removal archives and restores the event without deleting retained evidence', function () {
-    $invitee = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $invitee = User::factory()->create(['approved_at' => now()]);
     $event = HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'title' => 'Retained evidence hui',
         'event_type' => 'company',
@@ -48,7 +53,6 @@ test('calendar removal archives and restores the event without deleting retained
     $path = "hr/calendar/1/retained-{$event->id}.pdf";
     Storage::disk('private')->put($path, '%PDF-1.4 retained');
     $attachment = $event->attachments()->create([
-        'tenant_id' => 1,
         'uploaded_by' => $this->hr->id,
         'disk' => 'private',
         'original_name' => 'retained.pdf',
@@ -107,16 +111,15 @@ test('calendar removal archives and restores the event without deleting retained
 });
 
 test('salary band deactivation preserves historical placement and active selector identity', function () {
-    $worker = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $worker = User::factory()->create(['approved_at' => now()]);
     $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $worker->id,
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
         'annual_salary' => 60000,
         'is_active' => true,
     ]);
     $band = HrSalaryBand::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'position_role' => 'support_worker',
         'band_name' => 'Retained Band',
@@ -130,7 +133,7 @@ test('salary band deactivation preserves historical placement and active selecto
     ]);
     $service = app(CompensationService::class);
 
-    expect($service->getSalaryBandForRole(1, 'support_worker')?->id)->toBe($band->id)
+    expect($service->getSalaryBandForRole('support_worker')?->id)->toBe($band->id)
         ->and($service->bandPlacement($profile, $band)['position'])->toBe('in');
 
     $this->actingAs($this->hr)
@@ -142,7 +145,7 @@ test('salary band deactivation preserves historical placement and active selecto
         ->and($inactive->is_active)->toBeFalse()
         ->and($inactive->deactivated_at)->not->toBeNull()
         ->and((int) $inactive->deactivated_by)->toBe($this->hr->id)
-        ->and($service->getSalaryBandForRole(1, 'support_worker'))->toBeNull()
+        ->and($service->getSalaryBandForRole('support_worker'))->toBeNull()
         ->and($service->bandPlacement($profile, $inactive)['position'])->toBe('in');
 
     $this->actingAs($this->hr)
@@ -157,5 +160,5 @@ test('salary band deactivation preserves historical placement and active selecto
     expect($band->fresh()->is_active)->toBeTrue()
         ->and($band->fresh()->deactivated_at)->toBeNull()
         ->and($band->fresh()->deactivated_by)->toBeNull()
-        ->and($service->getSalaryBandForRole(1, 'support_worker')?->id)->toBe($band->id);
+        ->and($service->getSalaryBandForRole('support_worker')?->id)->toBe($band->id);
 });

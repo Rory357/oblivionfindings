@@ -51,7 +51,10 @@ export function ScoreDialog({
     const hasCriteria = interview.criteria.length > 0;
 
     const submit = () => {
-        const payload: Record<string, unknown> = { recommendation, notes: notes.trim() || null };
+        const payload: Record<string, unknown> = {
+            recommendation,
+            notes: notes.trim() || null,
+        };
         if (hasCriteria) {
             // Scores are 0–100; the 1–5 rating maps to 20/40/60/80/100.
             payload.criteria_scores = interview.criteria.map((c) => ({
@@ -69,7 +72,9 @@ export function ScoreDialog({
             onSuccess: (page) => {
                 const f = (page.props as { flash?: { error?: string } }).flash;
                 if (f?.error) {
-                    toast.error('Could not save scorecard', { description: f.error });
+                    toast.error('Could not save scorecard', {
+                        description: f.error,
+                    });
                     return;
                 }
                 toast.success(`Scorecard saved for ${interview.candidate}`);
@@ -82,9 +87,13 @@ export function ScoreDialog({
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Score interview — {interview.candidate}</DialogTitle>
+                    <DialogTitle>
+                        Score interview — {interview.candidate}
+                    </DialogTitle>
                     <DialogDescription>
-                        {interview.kit_name ? `${interview.kit_name} · rate each criterion` : 'Record an overall score and recommendation.'}
+                        {interview.kit_name
+                            ? `${interview.kit_name} · rate each criterion`
+                            : 'Record an overall score and recommendation.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -92,17 +101,33 @@ export function ScoreDialog({
                     {hasCriteria ? (
                         <div className="flex flex-col gap-3">
                             {interview.criteria.map((c) => (
-                                <div key={c.label} className="flex items-center gap-3">
-                                    <span className="flex-1 text-[13px] font-semibold">{c.label}<span className="ml-1 text-[11px] font-normal text-muted-foreground">{c.weight}%</span></span>
+                                <div
+                                    key={c.label}
+                                    className="flex items-center gap-3"
+                                >
+                                    <span className="flex-1 text-[13px] font-semibold">
+                                        {c.label}
+                                        <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                                            {c.weight}%
+                                        </span>
+                                    </span>
                                     <div className="flex gap-1.5">
                                         {[1, 2, 3, 4, 5].map((n) => (
                                             <button
                                                 key={n}
                                                 type="button"
-                                                onClick={() => setRatings((r) => ({ ...r, [c.label]: n }))}
+                                                onClick={() =>
+                                                    setRatings((r) => ({
+                                                        ...r,
+                                                        [c.label]: n,
+                                                    }))
+                                                }
                                                 className={cn(
                                                     'h-8 w-8 rounded-md border text-[13px] font-bold transition-colors',
-                                                    (ratings[c.label] ?? 3) === n ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card hover:border-primary/50',
+                                                    (ratings[c.label] ?? 3) ===
+                                                        n
+                                                        ? 'border-primary bg-primary text-primary-foreground'
+                                                        : 'border-border bg-card hover:border-primary/50',
                                                 )}
                                             >
                                                 {n}
@@ -114,7 +139,9 @@ export function ScoreDialog({
                         </div>
                     ) : (
                         <div>
-                            <Label className="mb-1.5 block text-sm font-semibold">Overall score (0–100)</Label>
+                            <Label className="mb-1.5 block text-sm font-semibold">
+                                Overall score (0–100)
+                            </Label>
                             <input
                                 value={overall}
                                 onChange={(e) => setOverall(e.target.value)}
@@ -125,7 +152,9 @@ export function ScoreDialog({
                     )}
 
                     <div>
-                        <Label className="mb-1.5 block text-sm font-semibold">Recommendation</Label>
+                        <Label className="mb-1.5 block text-sm font-semibold">
+                            Recommendation
+                        </Label>
                         <div className="flex flex-wrap gap-2">
                             {RECOMMENDATIONS.map((r) => (
                                 <button
@@ -134,7 +163,9 @@ export function ScoreDialog({
                                     onClick={() => setRecommendation(r.value)}
                                     className={cn(
                                         'rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
-                                        recommendation === r.value ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card hover:border-primary/50',
+                                        recommendation === r.value
+                                            ? 'border-primary bg-primary/10 text-primary'
+                                            : 'border-border bg-card hover:border-primary/50',
                                     )}
                                 >
                                     {r.label}
@@ -144,7 +175,12 @@ export function ScoreDialog({
                     </div>
 
                     <div>
-                        <Label className="mb-1.5 block text-sm font-semibold">Notes <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Label className="mb-1.5 block text-sm font-semibold">
+                            Notes{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
+                        </Label>
                         <textarea
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
@@ -156,7 +192,11 @@ export function ScoreDialog({
                 </div>
 
                 <DialogFooter>
-                    <button type="button" onClick={onClose} className="h-9 rounded-md border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="h-9 rounded-md border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted"
+                    >
                         Cancel
                     </button>
                     <button

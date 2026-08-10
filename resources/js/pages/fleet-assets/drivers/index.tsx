@@ -26,8 +26,8 @@ import { Head, router } from '@inertiajs/react';
 import {
     Car,
     ChevronDown,
-    ChevronUp,
     ChevronsUpDown,
+    ChevronUp,
     Download,
     Search,
     ShieldCheck,
@@ -37,6 +37,7 @@ import { useState } from 'react';
 
 type Driver = {
     id: number;
+    hr_profile_id: number;
     name: string;
     email: string | null;
     eligibility: {
@@ -65,7 +66,12 @@ type Props = {
         licence_expired: number;
         sessions_today: number;
     };
-    filters: { search?: string; status?: string };
+    filters: {
+        search?: string | null;
+        status?: string | null;
+        sort?: 'name' | 'email';
+        direction?: 'asc' | 'desc';
+    };
 };
 
 function statusVariant(
@@ -118,8 +124,16 @@ export default function DriversIndex({
     const links = rawDrivers?.links ?? [];
     const filters = rawFilters ?? {};
     const [search, setSearch] = useState(filters.search ?? '');
-    const [sortField, setSortField] = useState<string>('');
-    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+    const [sortField, setSortField] = useState<string>(filters.sort ?? 'name');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
+        filters.direction ?? 'asc',
+    );
+    const exportParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+        if (value) exportParams.set(key, value);
+    });
+    exportParams.set('export', 'csv');
+    const exportHref = `/fleet-assets/drivers?${exportParams.toString()}`;
 
     function handleSort(field: string) {
         const newDir =
@@ -197,18 +211,31 @@ export default function DriversIndex({
                 <HeroShell
                     footer={
                         <HeroSummaryStrip label="Licence compliance">
-                            <HeroSummaryMetric tone={heroStats.licence_expired > 0 ? 'critical' : 'success'}>
+                            <HeroSummaryMetric
+                                tone={
+                                    heroStats.licence_expired > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
+                            >
                                 {heroStats.licence_expired > 0
                                     ? `${heroStats.licence_expired} licence${heroStats.licence_expired !== 1 ? 's' : ''} expired`
                                     : 'No expired licences'}
                             </HeroSummaryMetric>
-                            <HeroSummaryMetric tone={heroStats.expiring_30 > 0 ? 'warning' : 'success'}>
+                            <HeroSummaryMetric
+                                tone={
+                                    heroStats.expiring_30 > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
+                            >
                                 {heroStats.expiring_30 > 0
                                     ? `${heroStats.expiring_30} expiring within 30 days`
                                     : 'None expiring within 30 days'}
                             </HeroSummaryMetric>
                             <HeroSummaryMetric tone="neutral">
-                                {heroStats.active} of {heroStats.total} drivers fully eligible
+                                {heroStats.active} of {heroStats.total} drivers
+                                fully eligible
                             </HeroSummaryMetric>
                         </HeroSummaryStrip>
                     }
@@ -216,8 +243,12 @@ export default function DriversIndex({
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={ShieldCheck} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Driver compliance · licence watch</HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Drivers</h1>
+                            <HeroStatusPill>
+                                Driver compliance · licence watch
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Drivers
+                            </h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
                                 Manage fleet drivers, licences, and assignments.
                             </p>
@@ -228,21 +259,31 @@ export default function DriversIndex({
                                 label="Active drivers"
                                 value={fmt(heroStats.active)}
                                 caption="eligible to drive"
-                                tone={heroStats.active > 0 ? 'success' : 'warning'}
+                                tone={
+                                    heroStats.active > 0 ? 'success' : 'warning'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/drivers?status=expiring_30"
                                 label="Expiring 30d"
                                 value={fmt(heroStats.expiring_30)}
                                 caption="licences due to renew"
-                                tone={heroStats.expiring_30 > 0 ? 'warning' : 'success'}
+                                tone={
+                                    heroStats.expiring_30 > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/drivers?status=at_risk"
                                 label="Expired / suspended"
                                 value={fmt(heroStats.at_risk)}
                                 caption="must not drive"
-                                tone={heroStats.at_risk > 0 ? 'critical' : 'success'}
+                                tone={
+                                    heroStats.at_risk > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="Sessions today"
@@ -253,7 +294,11 @@ export default function DriversIndex({
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction href="/fleet-assets/drivers?export=csv" icon={Download} external>
+                        <FleetHeroAction
+                            href={exportHref}
+                            icon={Download}
+                            external
+                        >
                             Export CSV
                         </FleetHeroAction>
                     </div>
@@ -302,7 +347,10 @@ export default function DriversIndex({
                 </div>
 
                 {/* Table */}
-                <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto rounded-lg border">
+                <div
+                    data-fleet-narrow-strategy="horizontal-scroll"
+                    className="overflow-x-auto rounded-lg border"
+                >
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">

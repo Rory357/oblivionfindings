@@ -78,7 +78,7 @@ function WeekStrip({ weekdays }: { weekdays: string[] }) {
                         key={day.code}
                         title={day.label}
                         className={cn(
-                            'flex h-8 flex-1 items-center justify-center rounded-md border text-[10px] font-semibold uppercase tracking-wide',
+                            'flex h-8 flex-1 items-center justify-center rounded-md border text-[10px] font-semibold tracking-wide uppercase',
                             on
                                 ? 'border-primary/30 bg-primary/10 text-primary'
                                 : 'border-border bg-muted/40 text-muted-foreground',
@@ -281,7 +281,7 @@ export function SeriesPane({
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -294,7 +294,8 @@ export function SeriesPane({
                             { key: false, label: 'All' },
                             { key: true, label: 'Active' },
                         ].map((opt) => (
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 key={String(opt.key)}
                                 type="button"
                                 aria-pressed={activeOnly === opt.key}

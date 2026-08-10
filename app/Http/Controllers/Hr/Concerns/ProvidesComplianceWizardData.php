@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Hr\Concerns;
 
-use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 
 /**
  * Shared payload for the Compliance hub wizards (people picker, requirement
@@ -14,23 +15,23 @@ use App\Models\Role;
  */
 trait ProvidesComplianceWizardData
 {
-    protected function complianceWizardData(?int $tenantId): array
+    protected function complianceWizardData(User $viewer): array
     {
-        $people = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->with('user:id,name,email')
-            ->orderBy('user_id')
-            ->get(['id', 'user_id', 'position_title'])
-            ->filter(fn ($p) => $p->user !== null)
-            ->map(fn ($p) => [
-                'value' => (string) $p->user_id,
-                'label' => $p->user->name,
-                'sub' => $p->position_title ?: $p->user->email,
+        $peopleQuery = User::query()
+            ->with('hrEmployeeProfile:id,user_id,position_title,work_email')
+            ->orderBy('name');
+        app(UserSiteAccessService::class)->applyStaffScope($peopleQuery, $viewer);
+        $people = $peopleQuery
+            ->get(['id', 'name'])
+            ->map(fn (User $person) => [
+                'value' => (string) $person->id,
+                'label' => $person->name,
+                'sub' => $person->hrEmployeeProfile?->position_title
+                    ?: $person->hrEmployeeProfile?->work_email,
             ])
             ->values();
 
-        $requirements = HrComplianceRequirement::where('tenant_id', $tenantId)
+        $requirements = HrComplianceRequirement::query()
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'category', 'check_type', 'validity_months', 'hard_stop'])
@@ -53,10 +54,18 @@ trait ProvidesComplianceWizardData
             ->map(fn ($r) => ['value' => $r->name, 'label' => $r->label ?: $r->name])
             ->values();
 
-        $siteTypes = HrComplianceMatrix::where('tenant_id', $tenantId)
-            ->whereNotNull('site_type')
+        // Site-type rules must come from the canonical Sites register, not from
+        // whatever rows already happen to exist in the matrix. Otherwise an
+        // all-Sites-only matrix can never create its first specific rule.
+        $siteTypes = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNotNull('type')
             ->distinct()
-            ->pluck('site_type')
+            ->orderBy('type')
+            ->pluck('type')
+            ->filter(fn ($type) => filled($type) && mb_strtolower(trim((string) $type)) !== 'all')
+            ->unique()
             ->values();
 
         return [

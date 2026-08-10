@@ -5,6 +5,7 @@ import {
     collectConsoleErrors,
     expectNoConsoleErrors,
     loginAsStaff,
+    resetRosteringReadinessFixtures,
 } from './helpers';
 import {
     rosteringFlagsEnabled,
@@ -54,6 +55,9 @@ async function openPublishDiff(page: Page) {
 
 test.describe('operations rostering a11y smoke', () => {
     test.skip(!rosteringFlagsEnabled, rosteringFlagSkipReason);
+    test.beforeEach(() => {
+        resetRosteringReadinessFixtures();
+    });
 
     test('dashboard has no serious or critical axe violations', async ({
         page,

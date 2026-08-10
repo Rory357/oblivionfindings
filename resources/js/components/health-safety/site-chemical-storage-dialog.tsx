@@ -1,7 +1,12 @@
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { Field, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { StorageLocationFields } from '@/components/health-safety/storage-location-fields';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Field, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { useForm } from '@inertiajs/react';
 import { MapPin } from 'lucide-react';
 import { type FormEvent } from 'react';
@@ -10,7 +15,9 @@ export type StorageSubstanceOption = { id: number; name: string };
 
 const todayStr = (): string => {
     const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 10);
 };
 
 /**
@@ -68,36 +75,64 @@ export function SiteAddStorageDialog({
             form.setError('location_description', 'Describe where it is held.');
             return;
         }
-        form.post(`/health-safety/substances/${form.data.substance_id}/storage-locations`, {
-            preserveScroll: true,
-            onSuccess: (page) => {
-                const flash = page.props.flash as { error?: string } | undefined;
-                if (!flash?.error) {
-                    form.reset();
-                    onClose();
-                }
+        form.post(
+            `/health-safety/substances/${form.data.substance_id}/storage-locations`,
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    const flash = page.props.flash as
+                        | { error?: string }
+                        | undefined;
+                    if (!flash?.error) {
+                        form.reset();
+                        onClose();
+                    }
+                },
             },
-        });
+        );
     };
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="max-w-lg">
-                <DialogTitle className="sr-only">Add storage at {siteName}</DialogTitle>
-                <DialogDescription className="sr-only">Record a hazardous substance stored at this site.</DialogDescription>
-                <StepHead icon={MapPin} title="Add storage here" blurb={`Record a hazardous substance stored at ${siteName}. It is added to that substance's record in the Chemical register.`} />
+                <DialogTitle className="sr-only">
+                    Add storage at {siteName}
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                    Record a hazardous substance stored at this site.
+                </DialogDescription>
+                <StepHead
+                    icon={MapPin}
+                    title="Add storage here"
+                    blurb={`Record a hazardous substance stored at ${siteName}. It is added to that substance's record in the Chemical register.`}
+                />
                 <form onSubmit={submit} className="flex flex-col gap-4">
-                    <Field label="Substance" required error={form.errors.substance_id}>
+                    <Field
+                        label="Substance"
+                        required
+                        error={form.errors.substance_id}
+                    >
                         <SelectInput
                             value={form.data.substance_id}
                             onChange={(v) => form.setData('substance_id', v)}
                             placeholder="Select substance"
-                            options={substances.map((s) => ({ value: String(s.id), label: s.name }))}
+                            options={substances.map((s) => ({
+                                value: String(s.id),
+                                label: s.name,
+                            }))}
                         />
                     </Field>
-                    <StorageLocationFields values={form.data} set={(k, v) => form.setData(k as never, v as never)} errors={form.errors} />
+                    <StorageLocationFields
+                        values={form.data}
+                        set={(k, v) => form.setData(k as never, v as never)}
+                        errors={form.errors}
+                    />
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={form.processing}>

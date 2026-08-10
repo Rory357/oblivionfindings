@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Models\Staff;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class StaffControllerTest extends TestCase
@@ -341,10 +344,34 @@ class StaffControllerTest extends TestCase
         $this->assertTrue($staff->roles->contains($coordinatorRole));
     }
 
-    public function test_staff_update_creates_staff_profile(): void
+    public function test_staff_update_updates_only_the_canonical_hr_profile(): void
     {
         $staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $staff->roles()->attach(Role::where('name', 'support_worker')->first());
+        $site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $staff->id,
+            'primary_site_id' => $site->id,
+            'position_title' => 'Support Worker',
+            'employment_type' => 'part_time',
+            'is_active' => true,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+        Staff::factory()->create([
+            'user_id' => $staff->id,
+            'job_title' => 'Compatibility title',
+            'work_phone' => '0800 OLD',
+        ]);
+        DB::table('staff_profiles')->insert([
+            'user_id' => $staff->id,
+            'phone' => '0900 OLD',
+            'job_title' => 'Earlier compatibility title',
+            'employment_type' => 'casual',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $this->actingAs($this->admin)
             ->put("/staff/{$staff->id}", [
@@ -359,10 +386,24 @@ class StaffControllerTest extends TestCase
             ])
             ->assertRedirect("/staff/{$staff->id}");
 
+        $this->assertDatabaseHas('hr_employee_profiles', [
+            'user_id' => $staff->id,
+            'work_phone' => '021 123 4567',
+            'position_title' => 'Senior Support Worker',
+            'employment_type' => 'full_time',
+            'is_active' => true,
+            'updated_by' => $this->admin->id,
+        ]);
+        $this->assertDatabaseHas('staff', [
+            'user_id' => $staff->id,
+            'job_title' => 'Compatibility title',
+            'work_phone' => '0800 OLD',
+        ]);
         $this->assertDatabaseHas('staff_profiles', [
             'user_id' => $staff->id,
-            'phone' => '021 123 4567',
-            'job_title' => 'Senior Support Worker',
+            'phone' => '0900 OLD',
+            'job_title' => 'Earlier compatibility title',
+            'employment_type' => 'casual',
         ]);
     }
 

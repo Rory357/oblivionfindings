@@ -15,7 +15,7 @@ class ClientStaffPreparationProjection
      *
      * @return array{summary: array<string, int>, workers: array<int, array<string, mixed>>}
      */
-    public function forClient(Client $client, int $tenantId): array
+    public function forClient(Client $client): array
     {
         $workers = $client->supportWorkers()
             ->select('users.id', 'users.name')
@@ -34,13 +34,27 @@ class ClientStaffPreparationProjection
             ];
         }
 
+        $today = now()->toDateString();
         $profiles = HrEmployeeProfile::query()
-            ->forTenant($tenantId)
+            ->active()
+            ->when(
+                $client->site_id !== null,
+                fn ($query) => $query->atSite((int) $client->site_id),
+                fn ($query) => $query->whereRaw('1 = 0'),
+            )
             ->whereIn('user_id', $workers->pluck('id'))
+            ->where(function ($query) use ($today): void {
+                $query->whereNull('start_date')
+                    ->orWhereDate('start_date', '<=', $today);
+            })
+            ->where(function ($query) use ($today): void {
+                $query->whereNull('end_date')
+                    ->orWhereDate('end_date', '>=', $today);
+            })
             ->get(['id', 'user_id', 'position_title', 'position_role'])
             ->keyBy('user_id');
 
-        $checklists = $this->latestChecklists($profiles, $tenantId);
+        $checklists = $this->latestChecklists($profiles);
         $today = now()->startOfDay();
 
         $rows = $workers->map(function ($worker) use ($profiles, $checklists, $today): array {
@@ -87,14 +101,13 @@ class ClientStaffPreparationProjection
     }
 
     /** @return Collection<int, HrOnboardingChecklist> */
-    private function latestChecklists(Collection $profiles, int $tenantId): Collection
+    private function latestChecklists(Collection $profiles): Collection
     {
         if ($profiles->isEmpty()) {
             return collect();
         }
 
         return HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
             ->whereIn('employee_profile_id', $profiles->pluck('id'))
             ->withCount([
                 'tasks',

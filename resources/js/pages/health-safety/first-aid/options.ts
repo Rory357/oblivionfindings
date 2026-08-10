@@ -2,7 +2,10 @@
  * canonical sets validated by StoreFirstAidRecordRequest (BE) so the wizard, the detail
  * Edit pane, the register table and the command-centre launcher can never drift.
  * Semantic tokens only. */
-import { type Tone, titleCase } from '@/pages/health-safety/components/register-row-kit';
+import {
+    type Tone,
+    titleCase,
+} from '@/pages/health-safety/components/register-row-kit';
 
 export type FirstAidOption = { value: string; label: string };
 
@@ -48,7 +51,8 @@ export const OUTCOMES: FirstAidOption[] = [
 const labelFrom = (opts: FirstAidOption[], value: string): string =>
     opts.find((o) => o.value === value)?.label ?? titleCase(value);
 
-export const personTypeLabel = (v: string): string => labelFrom(PERSON_TYPES, v);
+export const personTypeLabel = (v: string): string =>
+    labelFrom(PERSON_TYPES, v);
 export const injuryLabel = (v: string): string => labelFrom(INJURY_TYPES, v);
 export const outcomeLabel = (v: string): string => labelFrom(OUTCOMES, v);
 

@@ -16,24 +16,18 @@ const SHIFT_STATES = [
 ] as const;
 
 describe('<StaffStatus kind="shift">', () => {
-    it.each(SHIFT_STATES)(
-        'renders state %s without crashing',
-        (state) => {
-            const { container } = render(
-                <StaffStatus kind="shift" state={state} size="sm" />,
-            );
-            expect(container).toBeTruthy();
-            expect(container.firstChild).not.toBeNull();
-        },
-    );
+    it.each(SHIFT_STATES)('renders state %s without crashing', (state) => {
+        const { container } = render(
+            <StaffStatus kind="shift" state={state} size="sm" />,
+        );
+        expect(container).toBeTruthy();
+        expect(container.firstChild).not.toBeNull();
+    });
 
-    it.each(SHIFT_STATES)(
-        'matches snapshot for state %s',
-        (state) => {
-            const { container } = render(
-                <StaffStatus kind="shift" state={state} size="sm" />,
-            );
-            expect(container.firstChild).toMatchSnapshot();
-        },
-    );
+    it.each(SHIFT_STATES)('matches snapshot for state %s', (state) => {
+        const { container } = render(
+            <StaffStatus kind="shift" state={state} size="sm" />,
+        );
+        expect(container.firstChild).toMatchSnapshot();
+    });
 });

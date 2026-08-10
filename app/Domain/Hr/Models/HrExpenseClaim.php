@@ -4,18 +4,21 @@ namespace App\Domain\Hr\Models;
 
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Database\Factories\Hr\HrExpenseClaimFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+
 class HrExpenseClaim extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrExpenseClaimFactory::new();
+        return HrExpenseClaimFactory::new();
     }
 
     protected $fillable = [
@@ -46,7 +49,7 @@ class HrExpenseClaim extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -75,13 +78,8 @@ class HrExpenseClaim extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeSubmitted($query)
     {

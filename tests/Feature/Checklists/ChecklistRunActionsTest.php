@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Checklists;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
@@ -42,6 +43,14 @@ class ChecklistRunActionsTest extends TestCase
         $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
 
         $this->site = Site::factory()->create(['type' => 'house']);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->supportWorker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
     }
 
     public function test_admin_can_reschedule_a_run(): void
@@ -265,7 +274,6 @@ class ChecklistRunActionsTest extends TestCase
 
         $assignment = SiteChecklistAssignment::create([
             'site_id' => $this->site->id,
-            'tenant_id' => $this->site->tenant_id,
             'template_id' => $template->id,
             'frequency' => 'weekly',
             'start_date' => now()->toDateString(),
@@ -275,7 +283,6 @@ class ChecklistRunActionsTest extends TestCase
         return SiteChecklistRun::create([
             'assignment_id' => $assignment->id,
             'site_id' => $this->site->id,
-            'tenant_id' => $this->site->tenant_id,
             'template_id' => $template->id,
             'scheduled_date' => now()->toDateString(),
             'status' => 'scheduled',
@@ -311,7 +318,6 @@ class ChecklistRunActionsTest extends TestCase
 
         $assignment = SiteChecklistAssignment::create([
             'site_id' => $this->site->id,
-            'tenant_id' => $this->site->tenant_id,
             'template_id' => $template->id,
             'frequency' => 'weekly',
             'start_date' => now()->toDateString(),
@@ -321,7 +327,6 @@ class ChecklistRunActionsTest extends TestCase
         $run = SiteChecklistRun::create([
             'assignment_id' => $assignment->id,
             'site_id' => $this->site->id,
-            'tenant_id' => $this->site->tenant_id,
             'template_id' => $template->id,
             'scheduled_date' => now()->toDateString(),
             'status' => 'in_progress',

@@ -14,6 +14,8 @@ use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Operations\BillingService;
 use App\Services\Operations\TimesheetHrSyncService;
+use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Mockery;
@@ -39,7 +41,7 @@ class TimesheetApprovalWritePathTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         $this->travelTo(Carbon::parse('2026-04-12 09:00:00'));
 
         $this->site = Site::factory()->create([
@@ -153,7 +155,7 @@ class TimesheetApprovalWritePathTest extends TestCase
             $mock->shouldReceive('generateFromTimesheet')
                 ->times($times)
                 ->with(Mockery::type(Timesheet::class))
-                ->andReturn(new \Illuminate\Database\Eloquent\Collection());
+                ->andReturn(new Collection);
         });
     }
 
@@ -177,7 +179,6 @@ class TimesheetApprovalWritePathTest extends TestCase
         HrEmployeeProfile::query()->updateOrCreate(
             ['user_id' => $user->id],
             [
-                'tenant_id' => 1,
                 'employee_number' => 'EMP-TSA-'.$user->id,
                 'work_email' => $user->email,
                 'position_title' => 'Operations',
@@ -256,7 +257,6 @@ class TimesheetApprovalWritePathTest extends TestCase
         ]);
 
         $attendance = HrAttendanceSession::query()->create([
-            'tenant_id' => 1,
             'user_id' => $staff->id,
             'shift_id' => $shift->id,
             'site_id' => $shift->site_id,

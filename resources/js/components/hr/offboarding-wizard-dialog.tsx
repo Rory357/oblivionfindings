@@ -34,7 +34,11 @@ export interface OffboardingEmployee {
     email?: string | null;
     position_title?: string | null;
     end_date?: string | null;
-    active_assets: Array<{ id: number; name: string; asset_tag?: string | null }>;
+    active_assets: Array<{
+        id: number;
+        name: string;
+        asset_tag?: string | null;
+    }>;
 }
 
 export interface OffboardingTaskPreview {
@@ -56,12 +60,42 @@ export interface OffboardingInterviewer {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'person', label: 'Employee', blurb: 'Who is leaving', icon: UserMinus },
-    { key: 'date', label: 'Last day', blurb: 'Final working date', icon: CalendarX2 },
-    { key: 'tasks', label: 'Checklist', blurb: 'Tasks created', icon: ListChecks },
-    { key: 'reminders', label: 'Reminders', blurb: 'Access & pay', icon: ShieldAlert },
-    { key: 'exit', label: 'Exit interview', blurb: 'Optional', icon: MessageSquare },
-    { key: 'review', label: 'Review', blurb: 'Confirm & launch', icon: ClipboardCheck },
+    {
+        key: 'person',
+        label: 'Employee',
+        blurb: 'Who is leaving',
+        icon: UserMinus,
+    },
+    {
+        key: 'date',
+        label: 'Last day',
+        blurb: 'Final working date',
+        icon: CalendarX2,
+    },
+    {
+        key: 'tasks',
+        label: 'Checklist',
+        blurb: 'Tasks created',
+        icon: ListChecks,
+    },
+    {
+        key: 'reminders',
+        label: 'Reminders',
+        blurb: 'Access & pay',
+        icon: ShieldAlert,
+    },
+    {
+        key: 'exit',
+        label: 'Exit interview',
+        blurb: 'Optional',
+        icon: MessageSquare,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & launch',
+        icon: ClipboardCheck,
+    },
 ];
 
 /**
@@ -152,9 +186,8 @@ export function OffboardingWizardDialog({
         departureReasons.find((r) => r.value === form.data.departure_reason)
             ?.label ?? '—';
     const interviewerName =
-        interviewers.find(
-            (i) => String(i.id) === form.data.interviewer_user_id,
-        )?.name ?? '—';
+        interviewers.find((i) => String(i.id) === form.data.interviewer_user_id)
+            ?.name ?? '—';
 
     const canSubmit =
         form.data.employee_profile_id !== '' &&
@@ -225,7 +258,9 @@ export function OffboardingWizardDialog({
                                     'cursor-not-allowed opacity-50',
                             )}
                         >
-                            {form.processing ? 'Launching…' : 'Start offboarding'}
+                            {form.processing
+                                ? 'Launching…'
+                                : 'Start offboarding'}
                         </button>
                     ) : (
                         <button
@@ -255,7 +290,11 @@ export function OffboardingWizardDialog({
                         title="Who is leaving?"
                         blurb="Pick the departing employee. Only active people without an in-flight offboarding checklist are shown."
                     />
-                    <Field label="Employee" required error={form.errors.employee_profile_id}>
+                    <Field
+                        label="Employee"
+                        required
+                        error={form.errors.employee_profile_id}
+                    >
                         <PeoplePicker
                             value={form.data.employee_profile_id}
                             onChange={selectEmployee}
@@ -278,7 +317,11 @@ export function OffboardingWizardDialog({
                         title="Last working day"
                         blurb="Task due dates are calculated relative to this date."
                     />
-                    <Field label="Last working day" required error={form.errors.end_date}>
+                    <Field
+                        label="Last working day"
+                        required
+                        error={form.errors.end_date}
+                    >
                         <Input
                             type="date"
                             value={form.data.end_date}
@@ -381,9 +424,9 @@ export function OffboardingWizardDialog({
                             documents archived per retention policy.
                         </li>
                         <li className="rounded-lg border border-status-warning/40 bg-status-warning-bg/40 p-3">
-                            When every required task is completed, the profile is
-                            automatically deactivated and the end date stamped —
-                            no separate step needed.
+                            When every required task is completed, the profile
+                            is automatically deactivated and the end date
+                            stamped — no separate step needed.
                         </li>
                     </ul>
                 </WizardStepPane>
@@ -413,8 +456,8 @@ export function OffboardingWizardDialog({
                                 Schedule an exit interview
                             </span>
                             <span className="block text-xs text-muted-foreground">
-                                Creates an exit-interview record you can complete
-                                with feedback later.
+                                Creates an exit-interview record you can
+                                complete with feedback later.
                             </span>
                         </span>
                     </label>
@@ -509,7 +552,10 @@ export function OffboardingWizardDialog({
                                 label="Asset returns"
                                 value={String(assets.length)}
                             />
-                            <ReviewRow label="Total" value={String(taskCount)} />
+                            <ReviewRow
+                                label="Total"
+                                value={String(taskCount)}
+                            />
                         </ReviewCard>
                         <ReviewCard
                             icon={MessageSquare}
@@ -533,10 +579,7 @@ export function OffboardingWizardDialog({
                                     />
                                 </>
                             ) : (
-                                <ReviewRow
-                                    label="Scheduled"
-                                    value="Not now"
-                                />
+                                <ReviewRow label="Scheduled" value="Not now" />
                             )}
                         </ReviewCard>
                     </div>

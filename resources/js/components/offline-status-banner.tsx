@@ -40,7 +40,8 @@ export default function OfflineStatusBanner() {
 
     let message: string;
     if (offline && pendingCount === 0) {
-        message = 'You\u2019re offline. We\u2019ll send anything you save when you\u2019re back.';
+        message =
+            'You\u2019re offline. We\u2019ll send anything you save when you\u2019re back.';
     } else if (offline && pendingCount === 1) {
         message = 'Offline \u2014 1 item will send when you\u2019re back.';
     } else if (offline) {

@@ -59,7 +59,6 @@ class HsEventService
      *     worksafe_decided_by_user_id?: int|null,
      *     worksafe_decision_reason?: string|null,
      *     worksafe_decision_source?: string|null,
-     *     organization_id?: int|null,
      *     created_by?: int|null,
      *     control_room_alert_id?: int|null,
      *     handover_status?: string,
@@ -132,7 +131,6 @@ class HsEventService
                 $worksafeNotifiable,
             ): HsEvent {
                 $event = HsEvent::create([
-                    'organization_id' => $data['organization_id'] ?? null,
                     'reference_number' => HsEvent::generateReferenceNumber(),
                     'source_type' => get_class($source),
                     'source_id' => $source->getKey(),

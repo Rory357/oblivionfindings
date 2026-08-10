@@ -1,7 +1,5 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
 import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,6 +20,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
 import { ArrowLeft, FileText, Printer } from 'lucide-react';
 import { useRef } from 'react';
 
@@ -71,7 +71,9 @@ function ClientAddress({ client }: { client: Statement['client'] }) {
     const parts = [
         client.address_line_1,
         client.address_line_2,
-        [client.suburb, client.city, client.postcode].filter(Boolean).join(', '),
+        [client.suburb, client.city, client.postcode]
+            .filter(Boolean)
+            .join(', '),
     ].filter(Boolean);
 
     if (parts.length === 0) return null;
@@ -121,35 +123,55 @@ export default function Statements({ clients, statement, filters }: PageProps) {
             breadcrumbs={[
                 { title: 'Finance', href: '/finance' },
                 { title: 'Accounts Receivable', href: '/finance/receivables' },
-                { title: 'Statements', href: '/finance/receivables/statements' },
+                {
+                    title: 'Statements',
+                    href: '/finance/receivables/statements',
+                },
             ]}
         >
             <Head title="Client Statements" />
             <PageLayout
                 hero={
                     <div className="print:hidden">
-                        <PageHero category="finance"
+                        <PageHero
+                            category="finance"
                             icon={FileText}
                             title="Client Statements"
                             description="Generate and view outstanding invoice statements by client."
                             stats={
                                 statement
                                     ? [
-                                          { label: 'Client', value: statement.client.name },
-                                          { label: 'Invoices', value: statement.invoices.length },
-                                          { label: 'Outstanding', value: formatMoney(statement.total_outstanding) },
+                                          {
+                                              label: 'Client',
+                                              value: statement.client.name,
+                                          },
+                                          {
+                                              label: 'Invoices',
+                                              value: statement.invoices.length,
+                                          },
+                                          {
+                                              label: 'Outstanding',
+                                              value: formatMoney(
+                                                  statement.total_outstanding,
+                                              ),
+                                          },
                                       ]
                                     : undefined
                             }
                             actions={
                                 <Link href="/finance/receivables">
-                                    <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Button
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
                                         <ArrowLeft className="mr-2 h-4 w-4" />
                                         Back to Receivables
                                     </Button>
                                 </Link>
                             }
-                            footer={<ReceivablesTabsFooter active="statements" />}
+                            footer={
+                                <ReceivablesTabsFooter active="statements" />
+                            }
                         />
                     </div>
                 }
@@ -157,21 +179,29 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                 {/* Filters */}
                 <Card className="print:hidden">
                     <CardHeader>
-                        <CardTitle className="text-base">Select Client</CardTitle>
+                        <CardTitle className="text-base">
+                            Select Client
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div className="space-y-1">
                                 <Label>Client</Label>
                                 <Select
-                                    value={filters.client_id ? String(filters.client_id) : 'none'}
+                                    value={
+                                        filters.client_id
+                                            ? String(filters.client_id)
+                                            : 'none'
+                                    }
                                     onValueChange={handleClientChange}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a client" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">Select a client...</SelectItem>
+                                        <SelectItem value="none">
+                                            Select a client...
+                                        </SelectItem>
                                         {clients.map((client) => (
                                             <SelectItem
                                                 key={client.id}
@@ -188,12 +218,17 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                                 <Input
                                     type="date"
                                     value={filters.as_of_date}
-                                    onChange={(e) => handleDateChange(e.target.value)}
+                                    onChange={(e) =>
+                                        handleDateChange(e.target.value)
+                                    }
                                 />
                             </div>
                             <div className="flex items-end">
                                 {statement && (
-                                    <Button variant="outline" onClick={handlePrint}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handlePrint}
+                                    >
                                         <Printer className="mr-2 h-4 w-4" />
                                         Print / Download
                                     </Button>
@@ -208,7 +243,8 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                     <Card>
                         <CardContent className="py-12 text-center">
                             <p className="text-muted-foreground">
-                                Select a client above to generate their statement.
+                                Select a client above to generate their
+                                statement.
                             </p>
                         </CardContent>
                     </Card>
@@ -231,7 +267,9 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                                         <p className="text-lg font-bold">
                                             {statement.client.name}
                                         </p>
-                                        <ClientAddress client={statement.client} />
+                                        <ClientAddress
+                                            client={statement.client}
+                                        />
                                         {statement.client.email && (
                                             <p className="text-sm text-muted-foreground">
                                                 {statement.client.email}
@@ -243,14 +281,17 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                             <CardContent>
                                 {statement.invoices.length === 0 ? (
                                     <p className="py-8 text-center text-sm text-muted-foreground">
-                                        No outstanding invoices as at {statement.as_of_date}.
+                                        No outstanding invoices as at{' '}
+                                        {statement.as_of_date}.
                                     </p>
                                 ) : (
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Invoice #</TableHead>
-                                                <TableHead>Issue Date</TableHead>
+                                                <TableHead>
+                                                    Issue Date
+                                                </TableHead>
                                                 <TableHead>Due Date</TableHead>
                                                 <TableHead className="text-right">
                                                     Invoice Total
@@ -265,31 +306,46 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                                         </TableHeader>
                                         <TableBody>
                                             {statement.invoices.map((inv) => (
-                                                <TableRow key={inv.invoice_number}>
+                                                <TableRow
+                                                    key={inv.invoice_number}
+                                                >
                                                     <TableCell className="font-medium">
                                                         {inv.invoice_number}
                                                     </TableCell>
-                                                    <TableCell>{inv.issue_date}</TableCell>
-                                                    <TableCell>{inv.due_date}</TableCell>
+                                                    <TableCell>
+                                                        {inv.issue_date}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {inv.due_date}
+                                                    </TableCell>
                                                     <TableCell className="text-right">
                                                         {formatMoney(inv.total)}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        {formatMoney(inv.amount_paid)}
+                                                        {formatMoney(
+                                                            inv.amount_paid,
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-medium">
-                                                        {formatMoney(inv.amount_due)}
+                                                        {formatMoney(
+                                                            inv.amount_due,
+                                                        )}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
                                         <TableFooter>
                                             <TableRow className="font-bold">
-                                                <TableCell colSpan={5} className="text-right">
+                                                <TableCell
+                                                    colSpan={5}
+                                                    className="text-right"
+                                                >
                                                     Total Outstanding
                                                 </TableCell>
                                                 <TableCell className="text-right text-lg">
-                                                    {formatMoney(statement.total_outstanding)}
+                                                    {formatMoney(
+                                                        statement.total_outstanding,
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         </TableFooter>

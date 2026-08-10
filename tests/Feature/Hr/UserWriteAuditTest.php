@@ -7,6 +7,7 @@ use App\Domain\Hr\Services\EmployeeIntakeService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Models\AuditLog;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
@@ -28,9 +29,16 @@ beforeEach(function () {
     Notification::fake();
     $this->seed(RbacSeeder::class);
 
-    $this->actor = User::factory()->create(['role' => 'hr', 'approved_at' => now(), 'organization_id' => 1]);
+    $this->actor = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $hrRole = Role::query()->where('name', 'hr')->firstOrFail();
     $this->actor->roles()->syncWithoutDetaching([$hrRole->id]);
+    $this->site = Site::factory()->create(['name' => 'User Audit Allowed Site']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->actor->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => now()->subYear()->toDateString(),
+    ]);
 });
 
 test('C3: employee intake writes a user audit entry with the actor and role', function () {
@@ -45,7 +53,6 @@ test('C3: employee intake writes a user audit entry with the actor and role', fu
             'start_date' => now()->toDateString(),
         ],
         actorId: $this->actor->id,
-        tenantId: 1,
         startOnboarding: false,
         sendInvite: false,
     );
@@ -63,9 +70,8 @@ test('C3: employee intake writes a user audit entry with the actor and role', fu
 });
 
 test('C3: role-changing re-hire grants and audits the resolved role', function () {
-    $former = User::factory()->create(['role' => 'support_worker', 'approved_at' => null, 'organization_id' => 1]);
+    $former = User::factory()->create(['role' => 'support_worker', 'approved_at' => null]);
     $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $former->id,
         'position_role' => 'support_worker',
         'is_active' => false,
@@ -96,15 +102,13 @@ test('C3: role-changing re-hire grants and audits the resolved role', function (
 });
 
 test('C3: offboarding login revocation writes a user audit entry', function () {
-    $leaver = User::factory()->create(['role' => 'support_worker', 'approved_at' => now(), 'organization_id' => 1]);
+    $leaver = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $leaver->id,
         'is_active' => true,
     ]);
 
     $checklist = HrOffboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'c3-audit-test',
         'status' => 'pending',
@@ -143,11 +147,11 @@ test('C3: offboarding login revocation writes a user audit entry', function () {
 
 test('C3: lightweight reactivation audits restored login access', function () {
     $returnTo = '/hr/people?status=inactive';
-    $former = User::factory()->create(['role' => 'support_worker', 'approved_at' => null, 'organization_id' => 1]);
+    $former = User::factory()->create(['role' => 'support_worker', 'approved_at' => null]);
     $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $former->id,
         'is_active' => false,
+        'primary_site_id' => $this->site->id,
     ]);
 
     $this->actingAs($this->actor)

@@ -59,6 +59,7 @@ export const CLIENT_TAB_GROUPS: ClientTabGroup[] = [
         label: 'Health & safety',
         tabKeys: [
             'health_monitoring',
+            'healthcare_devices',
             'medical',
             'mar',
             'incidents_accidents',

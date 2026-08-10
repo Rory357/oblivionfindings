@@ -49,9 +49,13 @@ function parseHex(input: string): { r: number; g: number; b: number } | null {
 function normaliseHex(input: string): string {
     const match = input.trim().match(HEX_RE);
     if (!match) return '#7c3aed';
-    const hex = match[1].length === 3
-        ? match[1].split('').map((c) => c + c).join('')
-        : match[1];
+    const hex =
+        match[1].length === 3
+            ? match[1]
+                  .split('')
+                  .map((c) => c + c)
+                  .join('')
+            : match[1];
     return `#${hex.toLowerCase()}`;
 }
 
@@ -66,7 +70,11 @@ export function relativeLuminance(hex: string): number {
         const v = c / 255;
         return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
     };
-    return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b);
+    return (
+        0.2126 * channel(rgb.r) +
+        0.7152 * channel(rgb.g) +
+        0.0722 * channel(rgb.b)
+    );
 }
 
 /**
@@ -74,7 +82,9 @@ export function relativeLuminance(hex: string): number {
  * We output oklch strings to stay consistent with the rest of the token set.
  */
 export function pickForeground(hex: string): string {
-    return relativeLuminance(hex) > 0.5 ? 'oklch(0.15 0.015 277)' : 'oklch(1 0 0)';
+    return relativeLuminance(hex) > 0.5
+        ? 'oklch(0.15 0.015 277)'
+        : 'oklch(1 0 0)';
 }
 
 /**

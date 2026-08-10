@@ -43,7 +43,7 @@ class Signal extends Model
     {
         static::creating(function (self $signal): void {
             // Ensure required signal_type_code exists when only signal_type_id/code is provided.
-            if (empty($signal->signal_type_code) && !empty($signal->signal_type_id)) {
+            if (empty($signal->signal_type_code) && ! empty($signal->signal_type_id)) {
                 $signalType = SignalType::find($signal->signal_type_id);
                 if ($signalType) {
                     $signal->signal_type_code = $signalType->code;
@@ -148,7 +148,10 @@ class Signal extends Model
         $keyParts = [
             $data['signal_source_id'] ?? '',
             $data['signal_type_code'] ?? '',
-            $data['device_id'] ?? $data['asset_id'] ?? '',
+            $data['device_id']
+                ?? data_get($data, 'normalized_data.canonical_device_id')
+                ?? $data['asset_id']
+                ?? '',
             $data['external_ref'] ?? '',
             isset($data['occurred_at']) ? (is_string($data['occurred_at']) ? $data['occurred_at'] : $data['occurred_at']->format('Y-m-d H:i')) : '',
         ];

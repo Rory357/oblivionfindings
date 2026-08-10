@@ -37,6 +37,7 @@ import {
     type RequestReplacementShift,
     ResolveConflictDialog,
     type RosterSeriesRow,
+    type RosterTemplateRow,
     type SeriesDetail,
     SeriesDetailDialog,
     SeriesPane,
@@ -48,7 +49,6 @@ import {
     TemplateDetailDialog,
     TemplateWizardDialog,
     TemplatesPane,
-    type RosterTemplateRow,
     TimeOffPane,
     type TimeOffRequest,
     UnassignMakeOpenDialog,
@@ -60,12 +60,12 @@ import {
     startOfWeek,
     weekLabel,
 } from '@/components/rostering';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
 } from '@/components/timesheets/view-timesheet-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { index as rosteringIndex } from '@/routes/operations/rostering';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -2930,7 +2930,9 @@ export default function RosteringIndex(props: Props) {
                     staff={props.staff}
                     sites={props.sites}
                     serviceContexts={props.serviceContexts ?? []}
-                    defaultServiceContextId={props.defaultServiceContextId ?? null}
+                    defaultServiceContextId={
+                        props.defaultServiceContextId ?? null
+                    }
                     defaultStartsAt={createDefaults.starts_at ?? null}
                     defaultEndsAt={createDefaults.ends_at ?? null}
                     defaultUserId={createDefaults.user_id ?? null}
@@ -3137,13 +3139,13 @@ export default function RosteringIndex(props: Props) {
                                     {canRepublish ? 'Re-publish' : 'Publish'}
                                 </Button>
                                 {props.rosterPeriod && diffTotal > 0 ? (
-                                    <Link
-                                        href={`/operations/rostering/periods/${props.rosterPeriod.id}/diff`}
-                                    >
-                                        <Button size="sm" variant="outline">
+                                    <Button asChild size="sm" variant="outline">
+                                        <a
+                                            href={`/operations/rostering/periods/${props.rosterPeriod.id}/diff`}
+                                        >
                                             View diff
-                                        </Button>
-                                    </Link>
+                                        </a>
+                                    </Button>
                                 ) : null}
                                 {props.rosterPeriod?.status === 'published' ? (
                                     <Button

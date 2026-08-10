@@ -7,10 +7,12 @@ use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -32,10 +34,22 @@ beforeEach(function () {
         $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
     }
 
+    $this->site = Site::factory()->create(['name' => 'Offboarding Allowed Site']);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $this->hr->id,
+        'employee_number' => 'EMP-OFFBOARD-VIEWER',
+        'work_email' => $this->hr->email,
+        'position_title' => 'HR Manager',
+        'position_role' => 'hr',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
+    ]);
+
     $this->profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
-        'employee_number' => 'EMP-' . str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
+        'employee_number' => 'EMP-'.str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
         'work_email' => $this->staff->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
@@ -43,12 +57,12 @@ beforeEach(function () {
         'contract_type' => 'individual',
         'start_date' => now()->subYears(2)->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 });
 
 test('hr can create and complete offboarding workflow with dependency and sign-off checks', function () {
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'offboarding:support_worker',
         'site_type' => 'all',
         'tasks' => [
@@ -150,7 +164,6 @@ test('reactivating an employee restores a revoked login', function () {
 
 test('offboarding dashboard exposes overdue summary and supports status filter', function () {
     $overdueChecklist = HrOffboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $this->profile->id,
         'template_key' => 'offboarding:default',
         'status' => 'in_progress',

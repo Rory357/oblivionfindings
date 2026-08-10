@@ -3,18 +3,21 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
+use App\Models\StaffTimeOff;
 use App\Models\User;
+use Database\Factories\Hr\HrLeaveRequestFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrLeaveRequest extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrLeaveRequestFactory::new();
+        return HrLeaveRequestFactory::new();
     }
 
     protected $fillable = [
@@ -52,7 +55,7 @@ class HrLeaveRequest extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -75,16 +78,7 @@ class HrLeaveRequest extends Model
      */
     public function timeOff(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\StaffTimeOff::class, 'time_off_id');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
-    /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
+        return $this->belongsTo(StaffTimeOff::class, 'time_off_id');
     }
 
     public function scopePending($query)

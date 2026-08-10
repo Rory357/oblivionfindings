@@ -1,21 +1,32 @@
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import ClientSafetyRibbon, {
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
+import { useState } from 'react';
 
 type Props = {
-    client: { id: number; first_name: string; last_name: string; status: string };
+    client: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        status: string;
+    };
     risks: Array<any>;
     safety?: ClientSafety | null;
     can: { create: boolean; update: boolean };
@@ -45,9 +56,15 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
+                {
+                    title: labels?.['client.plural'] ?? 'Clients',
+                    href: '/clients',
+                },
                 { title: name, href: `/operations/clients/${client.id}` },
-                { title: 'Risks', href: `/operations/clients/${client.id}/risks` },
+                {
+                    title: 'Risks',
+                    href: `/operations/clients/${client.id}/risks`,
+                },
             ]}
         >
             <Head title={`Risks • ${name}`} />
@@ -61,7 +78,11 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                         description={name}
                         stats={[
                             { label: 'Risks', value: risks.length },
-                            { label: 'Active', value: risks.filter((r: any) => r.active).length },
+                            {
+                                label: 'Active',
+                                value: risks.filter((r: any) => r.active)
+                                    .length,
+                            },
                         ]}
                     />
                 }
@@ -71,39 +92,85 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                 {can.create && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Add risk</CardTitle>
+                            <CardTitle className="text-base">
+                                Add risk
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="space-y-1">
                                 <Label>Label</Label>
-                                <Input value={createForm.data.label} onChange={(e) => createForm.setData('label', e.target.value)} />
+                                <Input
+                                    value={createForm.data.label}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'label',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
                             </div>
 
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div className="space-y-1">
                                     <Label>Severity</Label>
-                                    <Select value={createForm.data.severity} onValueChange={(v) => createForm.setData('severity', v)}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <Select
+                                        value={createForm.data.severity}
+                                        onValueChange={(v) =>
+                                            createForm.setData('severity', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            {['low', 'medium', 'high', 'critical'].map((s) => (
-                                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                                            {[
+                                                'low',
+                                                'medium',
+                                                'high',
+                                                'critical',
+                                            ].map((s) => (
+                                                <SelectItem key={s} value={s}>
+                                                    {s}
+                                                </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-1">
                                     <Label>Review date</Label>
-                                    <Input type="date" value={createForm.data.review_date} onChange={(e) => createForm.setData('review_date', e.target.value)} />
+                                    <Input
+                                        type="date"
+                                        value={createForm.data.review_date}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'review_date',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                             </div>
 
                             <div className="space-y-1">
                                 <Label>Controls</Label>
-                                <Textarea value={createForm.data.controls} onChange={(e) => createForm.setData('controls', e.target.value)} />
+                                <Textarea
+                                    value={createForm.data.controls}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'controls',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
                             </div>
 
                             <div className="flex items-center gap-2">
-                                <Checkbox checked={createForm.data.active} onCheckedChange={(v) => createForm.setData('active', Boolean(v))} />
+                                <Checkbox
+                                    checked={createForm.data.active}
+                                    onCheckedChange={(v) =>
+                                        createForm.setData('active', Boolean(v))
+                                    }
+                                />
                                 <span className="text-sm">Active</span>
                             </div>
 
@@ -111,9 +178,13 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                                 <Button
                                     disabled={createForm.processing}
                                     onClick={() =>
-                                        createForm.post(`/operations/clients/${client.id}/risks`, {
-                                            onSuccess: () => createForm.reset(),
-                                        })
+                                        createForm.post(
+                                            `/operations/clients/${client.id}/risks`,
+                                            {
+                                                onSuccess: () =>
+                                                    createForm.reset(),
+                                            },
+                                        )
                                     }
                                 >
                                     Add
@@ -130,10 +201,20 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                                 <CardTitle className="text-base">
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
-                                            <div className="font-semibold">{r.label}</div>
+                                            <div className="font-semibold">
+                                                {r.label}
+                                            </div>
                                             <div className="mt-1 text-xs text-muted-foreground">
-                                                {r.severity} • {r.active ? 'active' : 'inactive'}
-                                                {r.review_date ? <span className="ml-2">• review: {r.review_date}</span> : null}
+                                                {r.severity} •{' '}
+                                                {r.active
+                                                    ? 'active'
+                                                    : 'inactive'}
+                                                {r.review_date ? (
+                                                    <span className="ml-2">
+                                                        • review:{' '}
+                                                        {r.review_date}
+                                                    </span>
+                                                ) : null}
                                             </div>
                                         </div>
                                         {can.update && (
@@ -144,10 +225,16 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                                                     setEditingId(r.id);
                                                     editForm.setData({
                                                         label: r.label || '',
-                                                        severity: r.severity || 'medium',
-                                                        controls: r.controls || '',
-                                                        review_date: r.review_date || '',
-                                                        active: Boolean(r.active),
+                                                        severity:
+                                                            r.severity ||
+                                                            'medium',
+                                                        controls:
+                                                            r.controls || '',
+                                                        review_date:
+                                                            r.review_date || '',
+                                                        active: Boolean(
+                                                            r.active,
+                                                        ),
                                                     });
                                                 }}
                                             >
@@ -160,41 +247,105 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                             <CardContent className="space-y-2 text-sm">
                                 {r.controls ? (
                                     <div>
-                                        <div className="text-xs text-muted-foreground">Controls</div>
-                                        <div className="whitespace-pre-wrap">{r.controls}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Controls
+                                        </div>
+                                        <div className="whitespace-pre-wrap">
+                                            {r.controls}
+                                        </div>
                                     </div>
                                 ) : null}
 
                                 {editingId === r.id && can.update && (
-                                    <div className="mt-3 rounded-md border p-3 space-y-3">
+                                    <div className="mt-3 space-y-3 rounded-md border p-3">
                                         <div className="space-y-1">
                                             <Label>Label</Label>
-                                            <Input value={editForm.data.label} onChange={(e) => editForm.setData('label', e.target.value)} />
+                                            <Input
+                                                value={editForm.data.label}
+                                                onChange={(e) =>
+                                                    editForm.setData(
+                                                        'label',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
                                         </div>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div className="space-y-1">
                                                 <Label>Severity</Label>
-                                                <Select value={editForm.data.severity} onValueChange={(v) => editForm.setData('severity', v)}>
-                                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <Select
+                                                    value={
+                                                        editForm.data.severity
+                                                    }
+                                                    onValueChange={(v) =>
+                                                        editForm.setData(
+                                                            'severity',
+                                                            v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
                                                     <SelectContent>
-                                                        {['low', 'medium', 'high', 'critical'].map((s) => (
-                                                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                                                        {[
+                                                            'low',
+                                                            'medium',
+                                                            'high',
+                                                            'critical',
+                                                        ].map((s) => (
+                                                            <SelectItem
+                                                                key={s}
+                                                                value={s}
+                                                            >
+                                                                {s}
+                                                            </SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
                                             </div>
                                             <div className="space-y-1">
                                                 <Label>Review date</Label>
-                                                <Input type="date" value={editForm.data.review_date} onChange={(e) => editForm.setData('review_date', e.target.value)} />
+                                                <Input
+                                                    type="date"
+                                                    value={
+                                                        editForm.data
+                                                            .review_date
+                                                    }
+                                                    onChange={(e) =>
+                                                        editForm.setData(
+                                                            'review_date',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
                                             </div>
                                         </div>
                                         <div className="space-y-1">
                                             <Label>Controls</Label>
-                                            <Textarea value={editForm.data.controls} onChange={(e) => editForm.setData('controls', e.target.value)} />
+                                            <Textarea
+                                                value={editForm.data.controls}
+                                                onChange={(e) =>
+                                                    editForm.setData(
+                                                        'controls',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Checkbox checked={editForm.data.active} onCheckedChange={(v) => editForm.setData('active', Boolean(v))} />
-                                            <span className="text-sm">Active</span>
+                                            <Checkbox
+                                                checked={editForm.data.active}
+                                                onCheckedChange={(v) =>
+                                                    editForm.setData(
+                                                        'active',
+                                                        Boolean(v),
+                                                    )
+                                                }
+                                            />
+                                            <span className="text-sm">
+                                                Active
+                                            </span>
                                         </div>
                                         <div className="flex items-center justify-end gap-2">
                                             <Button
@@ -211,9 +362,15 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                                                 size="sm"
                                                 disabled={editForm.processing}
                                                 onClick={() =>
-                                                    editForm.put(`/operations/clients/${client.id}/risks/${r.id}`, {
-                                                        onSuccess: () => setEditingId(null),
-                                                    })
+                                                    editForm.put(
+                                                        `/operations/clients/${client.id}/risks/${r.id}`,
+                                                        {
+                                                            onSuccess: () =>
+                                                                setEditingId(
+                                                                    null,
+                                                                ),
+                                                        },
+                                                    )
                                                 }
                                             >
                                                 Save
@@ -224,7 +381,11 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                             </CardContent>
                         </Card>
                     ))}
-                    {!risks.length && <div className="text-sm text-muted-foreground">No risks recorded.</div>}
+                    {!risks.length && (
+                        <div className="text-sm text-muted-foreground">
+                            No risks recorded.
+                        </div>
+                    )}
                 </div>
             </PageLayout>
         </AppLayout>

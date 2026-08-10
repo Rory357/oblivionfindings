@@ -22,16 +22,16 @@ import { useState, type ReactNode } from 'react';
 import { ConfirmAction } from '../_confirm-action';
 import {
     AddSiteNoteDialog,
-    EditLocationDialog,
     EditSafetyDialog,
     EditSiteLineDialog,
 } from '../_overview-dialogs';
 import SiteOverviewMapCard from '../_overview-map-card';
-import SiteGeofenceDialog from '../_site-geofence-dialog';
+import { AddContactDialog } from '../contacts/_dialogs';
 import type {
     SiteProfileAttentionData,
     SiteProfileHeroData,
     SiteProfileOverviewData,
+    SiteProfileRoleContact,
     SiteProfileSite,
 } from '../show';
 import { SiteAttentionPanel } from './attention-panel';
@@ -42,25 +42,29 @@ export function SiteProfileOverview({
     overview,
     attention,
     onNavigate,
+    onEditLocation,
+    onConfigureGeofence,
 }: {
     site: SiteProfileSite;
     hero: SiteProfileHeroData;
     overview: SiteProfileOverviewData;
     attention: SiteProfileAttentionData;
     onNavigate: (tab: string) => void;
+    onEditLocation: () => void;
+    onConfigureGeofence: () => void;
 }) {
     const [siteLineOpen, setSiteLineOpen] = useState(false);
-    const [locationOpen, setLocationOpen] = useState(false);
     const [safetyOpen, setSafetyOpen] = useState(false);
     const [noteOpen, setNoteOpen] = useState(false);
-    const [geofenceOpen, setGeofenceOpen] = useState(false);
+    const [managerContactOpen, setManagerContactOpen] = useState(false);
     const canManage = overview.can_manage;
 
     return (
         <div className="space-y-6">
             {hero.readiness.missing_critical > 0 ? (
-                <button
+                <Button
                     type="button"
+                    unstyled
                     onClick={() => onNavigate('readiness')}
                     className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
@@ -79,7 +83,7 @@ export function SiteProfileOverview({
                         </span>
                     </span>
                     <span className="text-sm font-medium">Review</span>
-                </button>
+                </Button>
             ) : null}
 
             <div className="grid gap-4 lg:grid-cols-4">
@@ -121,6 +125,7 @@ export function SiteProfileOverview({
                 <OverviewCard
                     title="Site line & key contacts"
                     icon={Phone}
+                    testId="site-contact-information-card"
                     action={
                         canManage ? (
                             <Button
@@ -129,8 +134,8 @@ export function SiteProfileOverview({
                                 className="min-h-11"
                                 onClick={() => setSiteLineOpen(true)}
                             >
-                                <Pencil className="mr-2 h-4 w-4" /> Edit Site
-                                line
+                                <Pencil className="mr-2 h-4 w-4" /> Edit phone
+                                &amp; email
                             </Button>
                         ) : null
                     }
@@ -141,6 +146,7 @@ export function SiteProfileOverview({
                             label="Phone"
                             value={site.phone}
                             href={site.phone ? `tel:${site.phone}` : undefined}
+                            testId="site-contact-row-phone"
                         />
                         <ContactLine
                             icon={Mail}
@@ -149,45 +155,40 @@ export function SiteProfileOverview({
                             href={
                                 site.email ? `mailto:${site.email}` : undefined
                             }
+                            testId="site-contact-row-email"
                         />
                     </div>
                     <div className="mt-4 space-y-3 border-t pt-4">
-                        {overview.contacts.slice(0, 5).map((contact) => (
-                            <div
-                                key={contact.id}
-                                className="flex min-h-11 items-center justify-between gap-3"
-                            >
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-semibold">
-                                        {contact.name}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {contact.role ||
-                                            contact.type.replaceAll('_', ' ')}
-                                    </p>
-                                </div>
-                                <div className="flex gap-2">
-                                    {contact.phone ? (
-                                        <a
-                                            className="rounded-md p-2 hover:bg-muted"
-                                            aria-label={`Call ${contact.name}`}
-                                            href={`tel:${contact.phone}`}
-                                        >
-                                            <Phone className="h-4 w-4" />
-                                        </a>
-                                    ) : null}
-                                    {contact.email ? (
-                                        <a
-                                            className="rounded-md p-2 hover:bg-muted"
-                                            aria-label={`Email ${contact.name}`}
-                                            href={`mailto:${contact.email}`}
-                                        >
-                                            <Mail className="h-4 w-4" />
-                                        </a>
-                                    ) : null}
-                                </div>
-                            </div>
-                        ))}
+                        <RoleContactLine
+                            label="Responsible staff"
+                            contact={site.primary_contact}
+                            testId="site-contact-row-responsible-staff"
+                        />
+                        <RoleContactLine
+                            label="Site lead"
+                            contact={site.site_lead_contact}
+                            testId="site-contact-row-site-lead"
+                        />
+                        <RoleContactLine
+                            label="Manager"
+                            contact={site.manager_contact}
+                            testId="site-contact-row-manager"
+                            action={
+                                canManage && !site.manager_contact ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="min-h-11"
+                                        onClick={() =>
+                                            setManagerContactOpen(true)
+                                        }
+                                    >
+                                        Add manager
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
                         <Button
                             type="button"
                             variant="ghost"
@@ -208,7 +209,8 @@ export function SiteProfileOverview({
                                 variant="outline"
                                 size="sm"
                                 className="min-h-11"
-                                onClick={() => setLocationOpen(true)}
+                                data-test="site-edit-location-button"
+                                onClick={onEditLocation}
                             >
                                 <Pencil className="mr-2 h-4 w-4" /> Edit
                             </Button>
@@ -240,7 +242,7 @@ export function SiteProfileOverview({
                             longitude={overview.location.longitude}
                             geofences={overview.geofences}
                             canManage={overview.can_manage_geofences}
-                            onEditGeofence={() => setGeofenceOpen(true)}
+                            onEditGeofence={onConfigureGeofence}
                         />
                     </div>
                 </OverviewCard>
@@ -435,32 +437,6 @@ export function SiteProfileOverview({
                 onClose={() => setSiteLineOpen(false)}
                 initial={{ phone: site.phone ?? '', email: site.email ?? '' }}
             />
-            <EditLocationDialog
-                siteId={site.id}
-                siteName={site.name}
-                isOpen={locationOpen}
-                onClose={() => setLocationOpen(false)}
-                initial={{
-                    address_line_1: site.address_line_1 ?? '',
-                    address_line_2: site.address_line_2 ?? '',
-                    suburb: site.suburb ?? '',
-                    city: site.city ?? '',
-                    postcode: site.postcode ?? '',
-                    country: site.country ?? '',
-                    region: site.region ?? '',
-                    latitude:
-                        site.latitude == null ? '' : String(site.latitude),
-                    longitude:
-                        site.longitude == null ? '' : String(site.longitude),
-                    access_instructions: site.access_instructions ?? '',
-                }}
-                geofences={overview.geofences}
-                onOpenGeofence={
-                    overview.can_manage_geofences
-                        ? () => setGeofenceOpen(true)
-                        : undefined
-                }
-            />
             <EditSafetyDialog
                 siteId={site.id}
                 isOpen={safetyOpen}
@@ -477,19 +453,19 @@ export function SiteProfileOverview({
                 isOpen={noteOpen}
                 onClose={() => setNoteOpen(false)}
             />
-            <SiteGeofenceDialog
-                isOpen={geofenceOpen}
-                onClose={() => setGeofenceOpen(false)}
-                onOpenLocation={() => {
-                    setGeofenceOpen(false);
-                    setLocationOpen(true);
-                }}
+            <AddContactDialog
                 siteId={site.id}
-                siteName={site.name}
-                siteLat={site.latitude}
-                siteLng={site.longitude}
-                existing={overview.geofences[0] ?? null}
-                assets={overview.geofence_assets}
+                isOpen={managerContactOpen}
+                onClose={() => setManagerContactOpen(false)}
+                type="manager"
+                lockType
+                onSaved={() =>
+                    router.reload({
+                        only: ['site', 'overview'],
+                        preserveState: true,
+                        preserveScroll: true,
+                    })
+                }
             />
         </div>
     );
@@ -500,14 +476,19 @@ function ContactLine({
     label,
     value,
     href,
+    testId,
 }: {
     icon: LucideIcon;
     label: string;
     value?: string | null;
     href?: string;
+    testId?: string;
 }) {
     return (
-        <div className="flex min-h-11 items-center gap-3 py-2">
+        <div
+            className="flex min-h-11 items-center gap-3 py-2"
+            data-test={testId}
+        >
             <Icon className="h-4 w-4 text-muted-foreground" />
             <span className="w-20 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {label}
@@ -524,6 +505,43 @@ function ContactLine({
                     {value || 'Not recorded'}
                 </span>
             )}
+        </div>
+    );
+}
+
+function RoleContactLine({
+    label,
+    contact,
+    testId,
+    action,
+}: {
+    label: string;
+    contact?: SiteProfileRoleContact | null;
+    testId: string;
+    action?: ReactNode;
+}) {
+    return (
+        <div
+            className="flex min-h-11 items-center justify-between gap-3"
+            data-test={testId}
+        >
+            <div className="min-w-0">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {label}
+                </p>
+                <p className="truncate text-sm font-semibold">
+                    {contact?.name || 'Not set'}
+                </p>
+                {contact?.phone ? (
+                    <a
+                        className="text-xs text-muted-foreground hover:underline"
+                        href={`tel:${contact.phone}`}
+                    >
+                        {contact.phone}
+                    </a>
+                ) : null}
+            </div>
+            {action}
         </div>
     );
 }
@@ -566,14 +584,16 @@ function OverviewCard({
     icon: Icon,
     action,
     children,
+    testId,
 }: {
     title: string;
     icon: LucideIcon;
     action?: ReactNode;
     children: ReactNode;
+    testId?: string;
 }) {
     return (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden" data-test={testId}>
             <CardHeader className="flex flex-row items-center justify-between gap-3 border-b bg-gradient-to-br from-primary/5 to-transparent">
                 <CardTitle className="flex items-center gap-2 text-base">
                     <span className="rounded-lg bg-primary/10 p-2 text-primary">

@@ -11,7 +11,7 @@ export function ResidentDot({ hue, initials, className }: ResidentDotProps) {
     return (
         <span
             className={cn(
-                'inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-[9px] font-bold leading-none',
+                'inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-[9px] leading-none font-bold',
                 className,
             )}
             style={{

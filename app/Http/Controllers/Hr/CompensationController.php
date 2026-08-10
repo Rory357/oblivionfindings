@@ -8,20 +8,20 @@ use App\Domain\Hr\Models\HrCompensationReviewItem;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Services\CompensationService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CompensationController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         protected CompensationService $compensationService,
+        private readonly HrPerformanceAccessService $access,
     ) {}
 
     /**
@@ -29,9 +29,7 @@ class CompensationController extends Controller
      */
     public function bands(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->viewer($request);
 
         // "Active as of" date: which bands are in effect on the chosen date
         // (defaults to today). Drives both the active filter and the labelled
@@ -44,7 +42,6 @@ class CompensationController extends Controller
         };
 
         $bands = HrSalaryBand::query()
-            ->forTenant($tenantId)
             ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$this->escapeLike($role).'%'))
             ->when($request->boolean('active_only'), $activeAsOf)
             ->orderBy('position_role')
@@ -55,9 +52,8 @@ class CompensationController extends Controller
         // Active employees grouped by role, used to plot people onto each band's
         // range and to compute true (non-page-limited) hero aggregates. Salary
         // fields are encrypted → placement is computed in PHP, not SQL.
-        $employees = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->active()
+        $employees = $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->with('user:id,name')
             ->get(['id', 'user_id', 'position_role', 'annual_salary', 'hourly_rate']);
 
@@ -105,8 +101,8 @@ class CompensationController extends Controller
             ],
             // Reuse the already-loaded $employees so the hero doesn't decrypt the
             // whole workforce a second time this request.
-            'stats' => $this->compensationService->heroStats($tenantId, $user, $employees),
-            'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            'stats' => $this->compensationService->heroStatsFor($user, $employees),
+            'tabCounts' => $this->compensationService->tabCountsFor($user),
             'can' => [
                 'manage' => $user->canDo('hr.compensation.manage'),
                 'benefits' => $user->canDo('hr.benefits.view'),
@@ -120,15 +116,12 @@ class CompensationController extends Controller
      */
     public function exportBands(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->viewer($request);
 
         // Mirror the list's "active as of" semantics so the CSV matches the screen.
         $asOf = $request->query('as_of') ? Carbon::parse($request->query('as_of')) : Carbon::today();
 
         $bands = HrSalaryBand::query()
-            ->forTenant($tenantId)
             ->when($request->query('role'), fn ($q, $role) => $q->where('position_role', 'like', '%'.$this->escapeLike($role).'%'))
             ->when($request->boolean('active_only'), fn ($q) => $q
                 ->where('is_active', true)
@@ -176,8 +169,7 @@ class CompensationController extends Controller
      */
     public function storeBand(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $user = $this->manager($request);
 
         $data = $request->validate([
             'position_role' => ['required', 'string', 'max:255'],
@@ -194,11 +186,14 @@ class CompensationController extends Controller
 
         $this->assertBandOrdering($data);
 
-        HrSalaryBand::create([
-            'tenant_id' => $this->resolveHrTenantIdForUser($user),
-            'created_by' => $user->id,
-            ...$data,
-        ]);
+        DB::transaction(function () use ($data, $user): void {
+            $this->assertBandIdentityAvailable($data);
+
+            HrSalaryBand::create([
+                'created_by' => $user->id,
+                ...$data,
+            ]);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Salary band created.');
     }
@@ -208,9 +203,7 @@ class CompensationController extends Controller
      */
     public function updateBand(Request $request, HrSalaryBand $band)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $band->tenant_id);
+        $this->manager($request);
 
         $data = $request->validate([
             'position_role' => ['sometimes', 'string', 'max:255'],
@@ -225,57 +218,70 @@ class CompensationController extends Controller
             'effective_to' => ['nullable', 'date'],
         ]);
 
-        // Validate min ≤ mid ≤ max against the merged (existing + incoming) values,
-        // since updates may patch only a subset of the range fields.
-        $this->assertBandOrdering([
-            'min_salary' => $data['min_salary'] ?? $band->min_salary,
-            'mid_salary' => $data['mid_salary'] ?? $band->mid_salary,
-            'max_salary' => $data['max_salary'] ?? $band->max_salary,
-            'min_hourly' => $data['min_hourly'] ?? $band->min_hourly,
-            'max_hourly' => $data['max_hourly'] ?? $band->max_hourly,
-        ]);
+        DB::transaction(function () use ($band, $data): void {
+            $locked = HrSalaryBand::query()->lockForUpdate()->findOrFail($band->getKey());
 
-        // Guard the effective window against the merged dates. The `after` rule
-        // can't see the stored effective_from on a partial PATCH, so check here.
-        $from = $data['effective_from'] ?? optional($band->effective_from)->toDateString();
-        $to = $data['effective_to'] ?? optional($band->effective_to)->toDateString();
-        if ($from && $to && strtotime((string) $to) <= strtotime((string) $from)) {
-            throw ValidationException::withMessages([
-                'effective_to' => 'Effective-to must be after effective-from.',
+            // Validate min ≤ mid ≤ max against the merged (existing + incoming)
+            // values because updates may patch only a subset of the range.
+            $this->assertBandOrdering([
+                'min_salary' => $data['min_salary'] ?? $locked->min_salary,
+                'mid_salary' => $data['mid_salary'] ?? $locked->mid_salary,
+                'max_salary' => $data['max_salary'] ?? $locked->max_salary,
+                'min_hourly' => $data['min_hourly'] ?? $locked->min_hourly,
+                'max_hourly' => $data['max_hourly'] ?? $locked->max_hourly,
             ]);
-        }
 
-        $band->update($data);
+            $this->assertBandIdentityAvailable([
+                'position_role' => $data['position_role'] ?? $locked->position_role,
+                'band_name' => $data['band_name'] ?? $locked->band_name,
+                'effective_from' => $data['effective_from']
+                    ?? optional($locked->effective_from)->toDateString(),
+            ], $locked->getKey());
+
+            $from = array_key_exists('effective_from', $data)
+                ? $data['effective_from']
+                : optional($locked->effective_from)->toDateString();
+            $to = array_key_exists('effective_to', $data)
+                ? $data['effective_to']
+                : optional($locked->effective_to)->toDateString();
+            if ($from && $to && strtotime((string) $to) <= strtotime((string) $from)) {
+                throw ValidationException::withMessages([
+                    'effective_to' => 'Effective-to must be after effective-from.',
+                ]);
+            }
+
+            $locked->update($data);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Salary band updated.');
     }
 
     public function deactivateBand(Request $request, HrSalaryBand $band)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $band->tenant_id);
+        $user = $this->manager($request);
 
-        $band->update([
-            'is_active' => false,
-            'deactivated_at' => now(),
-            'deactivated_by' => $user->id,
-        ]);
+        DB::transaction(function () use ($band, $user): void {
+            HrSalaryBand::query()->lockForUpdate()->findOrFail($band->getKey())->update([
+                'is_active' => false,
+                'deactivated_at' => now(),
+                'deactivated_by' => $user->id,
+            ]);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Salary band deactivated. Historical pay placement was retained.');
     }
 
     public function reactivateBand(Request $request, HrSalaryBand $band)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $band->tenant_id);
+        $this->manager($request);
 
-        $band->update([
-            'is_active' => true,
-            'deactivated_at' => null,
-            'deactivated_by' => null,
-        ]);
+        DB::transaction(function () use ($band): void {
+            HrSalaryBand::query()->lockForUpdate()->findOrFail($band->getKey())->update([
+                'is_active' => true,
+                'deactivated_at' => null,
+                'deactivated_by' => null,
+            ]);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Salary band reactivated.');
     }
@@ -316,16 +322,45 @@ class CompensationController extends Controller
     }
 
     /**
+     * Salary-band identity is application-wide: role + name + effective date.
+     * The database unique key remains the final concurrency guard; this check
+     * provides a useful validation response for ordinary duplicate requests.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertBandIdentityAvailable(array $data, ?int $ignoreId = null): void
+    {
+        $query = HrSalaryBand::query()
+            ->where('position_role', $data['position_role'])
+            ->where('band_name', $data['band_name'])
+            ->whereDate('effective_from', Carbon::parse($data['effective_from'])->toDateString());
+
+        if ($ignoreId !== null) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'band_name' => 'A salary band with this role, name and effective date already exists.',
+            ]);
+        }
+    }
+
+    /**
      * Compensation history for a specific employee.
      */
     public function history(Request $request, HrEmployeeProfile $profile)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+        $user = $this->viewer($request);
+        $profile = $this->access
+            ->applyHistoricalProfileScope(HrEmployeeProfile::query(), $user)
+            ->findOrFail($profile->getKey());
 
         $profile->load('user:id,name');
 
-        $history = HrCompensationHistory::where('employee_profile_id', $profile->id)
+        $history = $this->access
+            ->applyCompensationHistoryScope(HrCompensationHistory::query(), $user)
+            ->where('employee_profile_id', $profile->id)
             ->with(['approver:id,name', 'creator:id,name'])
             ->orderByDesc('effective_date')
             ->paginate(20)
@@ -345,12 +380,10 @@ class CompensationController extends Controller
      */
     public function historyIndex(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->viewer($request);
 
-        $history = HrCompensationHistory::query()
-            ->where('tenant_id', $tenantId)
+        $history = $this->access
+            ->applyCompensationHistoryScope(HrCompensationHistory::query(), $user)
             ->when($request->query('change_type'), fn ($q, $t) => $q->where('change_type', $t))
             ->with(['employeeProfile.user:id,name', 'approver:id,name'])
             ->orderByDesc('effective_date')
@@ -360,8 +393,8 @@ class CompensationController extends Controller
         return Inertia::render('hr/compensation/history-index', [
             'history' => $history,
             'filters' => ['change_type' => $request->query('change_type')],
-            'stats' => $this->compensationService->heroStats($tenantId, $user),
-            'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            'stats' => $this->compensationService->heroStatsFor($user),
+            'tabCounts' => $this->compensationService->tabCountsFor($user),
             'can' => ['manage' => $user->canDo('hr.compensation.manage')],
         ]);
     }
@@ -371,9 +404,7 @@ class CompensationController extends Controller
      */
     public function settings(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->viewer($request);
 
         return Inertia::render('hr/compensation/settings', [
             'settings' => [
@@ -387,8 +418,8 @@ class CompensationController extends Controller
                     ->values()
                     ->all(),
             ],
-            'stats' => $this->compensationService->heroStats($tenantId, $user),
-            'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            'stats' => $this->compensationService->heroStatsFor($user),
+            'tabCounts' => $this->compensationService->tabCountsFor($user),
             'can' => ['manage' => $user->canDo('hr.compensation.manage')],
         ]);
     }
@@ -398,13 +429,12 @@ class CompensationController extends Controller
      */
     public function reviews(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->viewer($request);
 
-        $reviews = HrCompensationReview::query()
-            ->where('tenant_id', $tenantId)
-            ->withCount('items')
+        $reviews = $this->access
+            ->applyCompensationReviewScope(HrCompensationReview::query(), $user)
+            ->withCount(['items' => fn ($items) => $this->access
+                ->applyCompensationReviewItemScope($items, $user)])
             ->with('creator:id,name')
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderByDesc('created_at')
@@ -416,14 +446,14 @@ class CompensationController extends Controller
             'filters' => [
                 'status' => $request->query('status'),
             ],
-            'stats' => $this->compensationService->heroStats($tenantId, $user),
-            'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            'stats' => $this->compensationService->heroStatsFor($user),
+            'tabCounts' => $this->compensationService->tabCountsFor($user),
             // Surfaced so the builder wizard can open in-place from the list
             // (no navigation to a separate create page).
             'employees' => $user->canDo('hr.compensation.manage')
-                ? HrEmployeeProfile::where('tenant_id', $tenantId)
+                ? $this->access
+                    ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
                     ->with('user:id,name')
-                    ->active()
                     ->get(['id', 'user_id', 'position_title', 'annual_salary', 'hourly_rate'])
                 : [],
             'reviewCycles' => [
@@ -431,7 +461,7 @@ class CompensationController extends Controller
                 ['value' => 'mid_year', 'label' => 'Mid-Year'],
                 ['value' => 'ad_hoc', 'label' => 'Ad Hoc'],
             ],
-            'bands' => HrSalaryBand::query()->forTenant($tenantId)->active()
+            'bands' => HrSalaryBand::query()->active()
                 ->orderByDesc('effective_from')
                 ->get(['id', 'position_role', 'min_salary', 'mid_salary', 'max_salary']),
             'can' => [
@@ -447,8 +477,7 @@ class CompensationController extends Controller
      */
     public function createReview(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $this->manager($request);
 
         return redirect()->route('hr.compensation.reviews');
     }
@@ -458,8 +487,7 @@ class CompensationController extends Controller
      */
     public function storeReview(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+        $user = $this->manager($request);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -468,18 +496,14 @@ class CompensationController extends Controller
             'budget_amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'items' => ['nullable', 'array'],
-            'items.*.employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
-            'items.*.current_salary' => ['required', 'numeric', 'min:0'],
+            'items.*.employee_profile_id' => ['required', 'integer', 'distinct'],
+            'items.*.current_salary' => ['sometimes', 'numeric', 'min:0'],
             'items.*.proposed_salary' => ['required', 'numeric', 'min:0'],
-            'items.*.change_percentage' => ['required', 'numeric'],
+            'items.*.change_percentage' => ['sometimes', 'numeric'],
             'items.*.justification' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        $this->compensationService->createCompensationReview([
-            'tenant_id' => $this->resolveHrTenantIdForUser($user),
-            'created_by' => $user->id,
-            ...$data,
-        ]);
+        $this->compensationService->createCompensationReview($data, $user);
 
         return redirect()->route('hr.compensation.reviews')->with('success', 'Compensation review created.');
     }
@@ -489,20 +513,19 @@ class CompensationController extends Controller
      */
     public function showReview(Request $request, HrCompensationReview $review)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
+        $user = $this->viewer($request);
+        $review = $this->access->compensationReview($user, $review);
 
         $review->load([
-            'items.employeeProfile.user:id,name',
-            'items.approver:id,name',
+            'items' => fn ($items) => $this->access
+                ->applyCompensationReviewItemScope($items, $user)
+                ->with(['employeeProfile.user:id,name', 'approver:id,name']),
             'creator:id,name',
         ]);
 
-        $employees = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $employees = $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->with('user:id,name')
-            ->active()
             ->get(['id', 'user_id', 'position_title', 'annual_salary', 'hourly_rate']);
 
         return Inertia::render('hr/compensation/review-detail', [
@@ -524,13 +547,10 @@ class CompensationController extends Controller
      */
     public function approveReview(Request $request, HrCompensationReview $review)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+        $user = $this->manager($request);
 
         try {
-            $this->compensationService->approveCompensationReview($review, $user->id);
+            $this->compensationService->approveCompensationReview($review, $user);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -543,13 +563,10 @@ class CompensationController extends Controller
      */
     public function applyReview(Request $request, HrCompensationReview $review)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
+        $user = $this->manager($request);
 
         try {
-            $this->compensationService->applyCompensationReview($review);
+            $this->compensationService->applyCompensationReview($review, $user);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -562,13 +579,10 @@ class CompensationController extends Controller
      */
     public function approveReviewItem(Request $request, HrCompensationReview $review, HrCompensationReviewItem $item)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
-        abort_unless((int) $item->compensation_review_id === (int) $review->id, 404);
+        $user = $this->manager($request);
 
         try {
-            $this->compensationService->approveReviewItem($item, $user->id);
+            $this->compensationService->approveReviewItem($review, $item, $user);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -581,21 +595,34 @@ class CompensationController extends Controller
      */
     public function rejectReviewItem(Request $request, HrCompensationReview $review, HrCompensationReviewItem $item)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $review->tenant_id);
-        abort_unless((int) $item->compensation_review_id === (int) $review->id, 404);
+        $user = $this->manager($request);
 
         $data = $request->validate([
             'reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
         try {
-            $this->compensationService->rejectReviewItem($item, $user->id, $data['reason'] ?? null);
+            $this->compensationService->rejectReviewItem($review, $item, $user, $data['reason'] ?? null);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Line rejected.');
+    }
+
+    private function viewer(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+
+        return $this->access->currentStaff($user, $user);
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+
+        return $this->access->currentStaff($user, $user);
     }
 }

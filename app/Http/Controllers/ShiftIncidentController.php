@@ -4,17 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Models\ClientIncident;
 use App\Models\Shift;
-use App\Models\TimelineEvent;
+use App\Services\Incidents\IncidentJourneyService;
 use App\Services\NotificationService;
+use App\Services\Timeline\TimelineEmitter;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ShiftIncidentController extends Controller
 {
     public function store(Request $request, Shift $shift)
     {
+        $shift->loadMissing('client:id,first_name,last_name,site_id');
+
         // Must be able to view the shift's client and create incidents
         $this->authorize('view', $shift->client);
-        abort_unless($request->user()?->canDo('incidents.create'), 403);
+        $actor = $request->user();
+        abort_unless($actor?->canDo('incidents.create'), 403);
 
         $data = $request->validate([
             'template_id' => ['nullable', 'integer', 'exists:incident_templates,id'],
@@ -23,33 +30,48 @@ class ShiftIncidentController extends Controller
             'occurred_at' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],
             'requires_followup' => ['sometimes', 'boolean'],
-            'immediate_action_taken' => ['nullable', 'string'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => $request->input('severity') === 'high'),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'witnesses' => ['nullable', 'string'],
         ]);
 
-        $incident = ClientIncident::create([
-            'client_id' => $shift->client_id,
-            'reported_by' => $request->user()?->id,
-            'shift_id' => $shift->id,
-            'template_id' => $data['template_id'] ?? null,
-            'type' => $data['type'],
-            'severity' => $data['severity'],
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'occurred_at' => $data['occurred_at'] ?? now(),
-            'description' => $data['description'] ?? null,
-            'requires_followup' => (bool)($data['requires_followup'] ?? false),
-            'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
-            'witnesses' => $data['witnesses'] ?? null,
-            // legacy compatibility
-            'title' => $data['type'] . ' incident',
-        ]);
+        $siteId = app(UserSiteAccessService::class)->shiftSiteId($shift);
+        $incident = DB::transaction(function () use ($actor, $data, $shift, $siteId): ClientIncident {
+            $incident = ClientIncident::create([
+                'client_id' => $shift->client_id,
+                'site_id' => $siteId,
+                'reported_by' => $actor->id,
+                'shift_id' => $shift->id,
+                'template_id' => $data['template_id'] ?? null,
+                'type' => $data['type'],
+                'severity' => $data['severity'],
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'occurred_at' => $data['occurred_at'] ?? now(),
+                'description' => $data['description'] ?? null,
+                'requires_followup' => (bool) ($data['requires_followup'] ?? false),
+                'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
+                    ? trim((string) $data['immediate_action_taken'])
+                    : null,
+                'witnesses' => $data['witnesses'] ?? null,
+                // legacy compatibility
+                'title' => $data['type'].' incident',
+            ]);
 
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+            return app(IncidentJourneyService::class)
+                ->ensureForSubmittedIncident($incident, $actor)
+                ->incident;
+        }, 3);
+
+        app(TimelineEmitter::class)->record([
             'client_id' => $shift->client_id,
             'shift_id' => $shift->id,
             'type' => 'incident',
-            'subject' => 'Incident: ' . ($incident->title ?? $incident->type),
+            'subject' => 'Incident: '.($incident->title ?? $incident->type),
             'body' => $incident->description,
             'visibility' => 'internal',
             'occurred_at' => $incident->occurred_at ?? now(),
@@ -60,7 +82,7 @@ class ShiftIncidentController extends Controller
         ]);
 
         app(NotificationService::class)->notifyCrud(
-            $request->user(),
+            $actor,
             'submitted',
             'incident',
             $incident,

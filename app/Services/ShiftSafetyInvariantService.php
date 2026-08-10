@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\Site;
 use App\Models\Timesheet;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
@@ -74,20 +75,80 @@ class ShiftSafetyInvariantService
 
     public function assertHandover(ShiftHandover $handover): void
     {
+        // A caller may change one of the foreign keys on a model whose old
+        // relation was already eager loaded. Always validate the current keys,
+        // never a stale in-memory relation snapshot.
+        foreach (['client', 'outgoingStaff', 'incomingStaff', 'outgoingShift', 'incomingShift'] as $relation) {
+            $handover->unsetRelation($relation);
+        }
+
         $handover->loadMissing([
-            'outgoingShift:id,status',
-            'incomingShift:id,status,user_id',
+            'client:id,site_id',
+            'outgoingStaff:id',
+            'incomingStaff:id',
+            'outgoingShift:id,status,user_id,client_id,site_id',
+            'outgoingShift.client:id,site_id',
+            'incomingShift:id,status,user_id,client_id,site_id',
+            'incomingShift.client:id,site_id',
         ]);
 
-        if ($handover->outgoing_shift_id && ! $handover->outgoingShift) {
+        if (! $handover->outgoing_shift_id || ! $handover->outgoingShift) {
             throw ValidationException::withMessages([
                 'handover' => 'This handover is no longer linked to a valid outgoing shift.',
+            ]);
+        }
+
+        if (! $handover->client_id || ! $handover->client || ! $handover->client->site_id) {
+            throw ValidationException::withMessages([
+                'handover' => 'Shift handovers require a Client with one canonical Site.',
+            ]);
+        }
+
+        if (! Site::query()->whereKey($handover->client->site_id)->exists()) {
+            throw ValidationException::withMessages([
+                'handover' => 'The handover Client Site is no longer available.',
+            ]);
+        }
+
+        if (! $handover->outgoing_staff_id || ! $handover->outgoingStaff) {
+            throw ValidationException::withMessages([
+                'handover' => 'Shift handovers require a valid outgoing staff member.',
+            ]);
+        }
+
+        $outgoingSiteId = $this->handoverShiftSiteId($handover->outgoingShift, 'outgoing');
+        if (
+            (int) $handover->outgoingShift->client_id !== (int) $handover->client_id
+            || (int) $handover->outgoingShift->user_id !== (int) $handover->outgoing_staff_id
+            || $outgoingSiteId !== (int) $handover->client->site_id
+        ) {
+            throw ValidationException::withMessages([
+                'handover' => 'The outgoing Shift, staff member, Client, and Site do not match.',
             ]);
         }
 
         if ($handover->incoming_shift_id && ! $handover->incomingShift) {
             throw ValidationException::withMessages([
                 'handover' => 'This handover is no longer linked to a valid incoming shift.',
+            ]);
+        }
+
+        if ($handover->incoming_shift_id) {
+            $incomingSiteId = $this->handoverShiftSiteId($handover->incomingShift, 'incoming');
+            if (
+                (int) $handover->incomingShift->client_id !== (int) $handover->client_id
+                || $incomingSiteId !== $outgoingSiteId
+                || ($handover->incomingShift->user_id === null) !== ($handover->incoming_staff_id === null)
+                || ($handover->incomingShift->user_id !== null
+                    && (int) $handover->incomingShift->user_id !== (int) $handover->incoming_staff_id)
+            ) {
+                throw ValidationException::withMessages([
+                    'handover' => 'The incoming Shift, staff member, Client, and Site do not match the outgoing handover.',
+                ]);
+            }
+        } elseif ($handover->incoming_staff_id && ! $handover->incomingStaff) {
+            throw ValidationException::withMessages([
+                'handover' => 'The selected incoming staff member is no longer available.',
             ]);
         }
 
@@ -123,6 +184,23 @@ class ShiftSafetyInvariantService
                 'handover' => 'Acknowledged handovers must match the current incoming shift assignee.',
             ]);
         }
+    }
+
+    private function handoverShiftSiteId(Shift $shift, string $direction): int
+    {
+        if (! $shift->client_id || ! $shift->client || ! $shift->client->site_id) {
+            throw ValidationException::withMessages([
+                'handover' => "The {$direction} Shift has no valid Client Site.",
+            ]);
+        }
+
+        if ($shift->site_id && (int) $shift->site_id !== (int) $shift->client->site_id) {
+            throw ValidationException::withMessages([
+                'handover' => "The {$direction} Shift Site does not match its Client Site.",
+            ]);
+        }
+
+        return (int) ($shift->site_id ?: $shift->client->site_id);
     }
 
     public function assertAttendanceSession(HrAttendanceSession $session): void

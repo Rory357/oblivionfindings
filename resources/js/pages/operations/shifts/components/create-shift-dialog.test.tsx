@@ -185,9 +185,7 @@ describe('CreateShiftDialog edit mode', () => {
             <CreateShiftDialog
                 open
                 onClose={vi.fn()}
-                clients={[
-                    { id: 10, first_name: 'Ari', last_name: 'Kauri' },
-                ]}
+                clients={[{ id: 10, first_name: 'Ari', last_name: 'Kauri' }]}
                 staff={[]}
                 initialShift={{
                     id: 44,
@@ -210,9 +208,7 @@ describe('CreateShiftDialog edit mode', () => {
             <CreateShiftDialog
                 open
                 onClose={vi.fn()}
-                clients={[
-                    { id: 10, first_name: 'Ari', last_name: 'Kauri' },
-                ]}
+                clients={[{ id: 10, first_name: 'Ari', last_name: 'Kauri' }]}
                 staff={[{ id: 7, name: 'Aroha King' }]}
                 initialShift={{
                     id: 44,
@@ -259,9 +255,7 @@ describe('CreateShiftDialog create mode wizard', () => {
             <CreateShiftDialog
                 open
                 onClose={vi.fn()}
-                clients={[
-                    { id: 10, first_name: 'Ari', last_name: 'Kauri' },
-                ]}
+                clients={[{ id: 10, first_name: 'Ari', last_name: 'Kauri' }]}
                 staff={[{ id: 7, name: 'Aroha King' }]}
             />,
         );
@@ -330,8 +324,18 @@ describe('CreateShiftDialog create mode wizard', () => {
                 open
                 onClose={vi.fn()}
                 clients={[
-                    { id: 10, first_name: 'Ari', last_name: 'Kauri', site_id: 2 },
-                    { id: 11, first_name: 'Mere', last_name: 'Pono', site_id: 3 },
+                    {
+                        id: 10,
+                        first_name: 'Ari',
+                        last_name: 'Kauri',
+                        site_id: 2,
+                    },
+                    {
+                        id: 11,
+                        first_name: 'Mere',
+                        last_name: 'Pono',
+                        site_id: 3,
+                    },
                 ]}
                 staff={[]}
                 sites={[

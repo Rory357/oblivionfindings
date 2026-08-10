@@ -3,10 +3,15 @@
  * (EmarController@storeReview). Completing a review stays on the /emar/reviews
  * deep page. */
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
-import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Field,
+    InfoCard,
+    SelectInput,
+    StepHead,
+} from '@/components/wizard/primitives';
 import { router } from '@inertiajs/react';
 import { CalendarCheck, ClipboardCheck, Info } from 'lucide-react';
 import { useState } from 'react';
@@ -15,8 +20,18 @@ import { toast } from 'sonner';
 import type { ClientOption } from './report-error-modal';
 
 const STEPS = [
-    { key: 'details', label: 'Review details', blurb: 'Client & type', icon: CalendarCheck },
-    { key: 'confirm', label: 'Confirm & schedule', blurb: 'Reason & save', icon: ClipboardCheck },
+    {
+        key: 'details',
+        label: 'Review details',
+        blurb: 'Client & type',
+        icon: CalendarCheck,
+    },
+    {
+        key: 'confirm',
+        label: 'Confirm & schedule',
+        blurb: 'Reason & save',
+        icon: ClipboardCheck,
+    },
 ];
 
 const REVIEW_TYPES = [
@@ -48,7 +63,9 @@ export function MedicationReviewModal({
 }) {
     const [step, setStep] = useState(0);
     const [saving, setSaving] = useState(false);
-    const [clientId, setClientId] = useState(initialClientId ? String(initialClientId) : '');
+    const [clientId, setClientId] = useState(
+        initialClientId ? String(initialClientId) : '',
+    );
     const [reviewType, setReviewType] = useState('');
     const [scheduledDate, setScheduledDate] = useState('');
     const [reviewerName, setReviewerName] = useState('');
@@ -96,11 +113,16 @@ export function MedicationReviewModal({
         );
     };
 
-    const clientName = clients.find((c) => String(c.id) === clientId)?.name ?? '—';
+    const clientName =
+        clients.find((c) => String(c.id) === clientId)?.name ?? '—';
 
     const footer = (
         <>
-            <Button variant="ghost" onClick={step === 0 ? close : () => setStep(0)} disabled={saving}>
+            <Button
+                variant="ghost"
+                onClick={step === 0 ? close : () => setStep(0)}
+                disabled={saving}
+            >
                 {step === 0 ? 'Cancel' : 'Back'}
             </Button>
             {step === 0 ? (
@@ -132,17 +154,31 @@ export function MedicationReviewModal({
         >
             {step === 0 ? (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={CalendarCheck} title="Review details" blurb="Who, what kind, and when." />
+                    <StepHead
+                        icon={CalendarCheck}
+                        title="Review details"
+                        blurb="Who, what kind, and when."
+                    />
                     <Field label="Client" required>
                         <SelectInput
                             value={clientId}
                             onChange={setClientId}
                             placeholder="Select client"
-                            options={clients.map((c) => ({ value: String(c.id), label: c.site ? `${c.name} · ${c.site}` : c.name }))}
+                            options={clients.map((c) => ({
+                                value: String(c.id),
+                                label: c.site
+                                    ? `${c.name} · ${c.site}`
+                                    : c.name,
+                            }))}
                         />
                     </Field>
                     <Field label="Review type" required>
-                        <SelectInput value={reviewType} onChange={setReviewType} placeholder="Select type" options={REVIEW_TYPES} />
+                        <SelectInput
+                            value={reviewType}
+                            onChange={setReviewType}
+                            placeholder="Select type"
+                            options={REVIEW_TYPES}
+                        />
                     </Field>
                     <Field label="Scheduled date" required>
                         {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
@@ -154,29 +190,60 @@ export function MedicationReviewModal({
                         />
                     </Field>
                     <Field label="Reviewer role">
-                        <SelectInput value={reviewerRole} onChange={setReviewerRole} placeholder="Select role" options={REVIEWER_ROLES} />
+                        <SelectInput
+                            value={reviewerRole}
+                            onChange={setReviewerRole}
+                            placeholder="Select role"
+                            options={REVIEWER_ROLES}
+                        />
                     </Field>
                     <Field label="Reviewer name" span>
-                        <Input value={reviewerName} onChange={(e) => setReviewerName(e.target.value)} placeholder="Optional — who will conduct it" />
+                        <Input
+                            value={reviewerName}
+                            onChange={(e) => setReviewerName(e.target.value)}
+                            placeholder="Optional — who will conduct it"
+                        />
                     </Field>
                 </div>
             ) : (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={ClipboardCheck} title="Confirm & schedule" blurb="Note why, then schedule." />
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Confirm & schedule"
+                        blurb="Note why, then schedule."
+                    />
                     <Field label="Trigger / reason" span>
-                        <Textarea value={triggerReason} onChange={(e) => setTriggerReason(e.target.value)} rows={3} placeholder="Why is this review needed? (optional)" />
+                        <Textarea
+                            value={triggerReason}
+                            onChange={(e) => setTriggerReason(e.target.value)}
+                            rows={3}
+                            placeholder="Why is this review needed? (optional)"
+                        />
                     </Field>
                     <div className="col-span-full rounded-lg border border-border">
                         <div className="px-4">
                             <SummaryRow label="Client" value={clientName} />
-                            <SummaryRow label="Type" value={reviewType || '—'} />
-                            <SummaryRow label="Scheduled" value={scheduledDate || '—'} />
-                            <SummaryRow label="Reviewer" value={[reviewerName, reviewerRole].filter(Boolean).join(' · ') || '—'} />
+                            <SummaryRow
+                                label="Type"
+                                value={reviewType || '—'}
+                            />
+                            <SummaryRow
+                                label="Scheduled"
+                                value={scheduledDate || '—'}
+                            />
+                            <SummaryRow
+                                label="Reviewer"
+                                value={
+                                    [reviewerName, reviewerRole]
+                                        .filter(Boolean)
+                                        .join(' · ') || '—'
+                                }
+                            />
                         </div>
                     </div>
                     <InfoCard icon={Info}>
-                        This schedules the review; complete it (findings & outcome) from the review schedule
-                        when it's done.
+                        This schedules the review; complete it (findings &
+                        outcome) from the review schedule when it's done.
                     </InfoCard>
                 </div>
             )}

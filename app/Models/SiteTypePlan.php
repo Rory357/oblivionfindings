@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,11 +11,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SiteTypePlan extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_PUBLISHED = 'published';
+
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [
@@ -22,6 +24,7 @@ class SiteTypePlan extends Model
         'site_id',
         'site_type',
         'status',
+        'current_slot',
         'version',
         'layout',
         'notes',
@@ -84,4 +87,3 @@ class SiteTypePlan extends Model
             ->first();
     }
 }
-

@@ -1,6 +1,14 @@
+import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { formatRelative } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import { Battery } from 'lucide-react';
 
@@ -19,9 +27,12 @@ export type DeviceListItem = {
     health_status: string;
     provider: string | null;
     last_seen_at: string | null;
+    last_changed_at?: string | null;
     battery_level: number | null;
     assigned_to: string | null;
     assignment_type: string | null;
+    monitor_count?: number | null;
+    monitoring_state?: string | null;
 };
 
 export type Paginated<T> = {
@@ -34,7 +45,9 @@ export type FilterOption = { value: string; label: string };
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-export function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+export function statusVariant(
+    status: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (status) {
         case 'active':
             return 'default';
@@ -50,7 +63,9 @@ export function statusVariant(status: string): 'default' | 'secondary' | 'destru
     }
 }
 
-export function healthVariant(health: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+export function healthVariant(
+    health: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (health) {
         case 'healthy':
             return 'default';
@@ -75,15 +90,7 @@ export function domainLabel(domain: string): string {
 }
 
 export function formatTimeSince(iso: string | null): string {
-    if (!iso) return 'Never';
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return formatRelative(iso, Date.now(), 'Never');
 }
 
 function allLabelForPlaceholder(placeholder: string): string {
@@ -108,7 +115,12 @@ function allLabelForPlaceholder(placeholder: string): string {
 
 // ── Components ────────────────────────────────────────────────────
 
-export function StatCard({ label, value, icon: Icon, variant = 'default' }: {
+export function StatCard({
+    label,
+    value,
+    icon: Icon,
+    variant = 'default',
+}: {
     label: string;
     value: number;
     icon: React.ComponentType<{ className?: string }>;
@@ -117,8 +129,12 @@ export function StatCard({ label, value, icon: Icon, variant = 'default' }: {
     return (
         <Card>
             <CardContent className="flex items-center gap-4 p-4">
-                <div className={`rounded-lg p-2 ${variant === 'warning' && value > 0 ? 'bg-status-warning-bg' : 'bg-muted'}`}>
-                    <Icon className={`h-5 w-5 ${variant === 'warning' && value > 0 ? 'text-status-warning dark:text-status-warning' : 'text-muted-foreground'}`} />
+                <div
+                    className={`rounded-lg p-2 ${variant === 'warning' && value > 0 ? 'bg-status-warning-bg' : 'bg-muted'}`}
+                >
+                    <Icon
+                        className={`h-5 w-5 ${variant === 'warning' && value > 0 ? 'text-status-warning dark:text-status-warning' : 'text-muted-foreground'}`}
+                    />
                 </div>
                 <div>
                     <p className="text-2xl font-semibold">{value}</p>
@@ -129,7 +145,12 @@ export function StatCard({ label, value, icon: Icon, variant = 'default' }: {
     );
 }
 
-export function FilterSelect({ value, onChange, placeholder, options }: {
+export function FilterSelect({
+    value,
+    onChange,
+    placeholder,
+    options,
+}: {
     value?: string;
     onChange: (v: string) => void;
     placeholder: string;
@@ -137,11 +158,13 @@ export function FilterSelect({ value, onChange, placeholder, options }: {
 }) {
     return (
         <Select value={value || 'all'} onValueChange={onChange}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger aria-label={placeholder} className="w-[150px]">
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>
-                <SelectItem value="all">{allLabelForPlaceholder(placeholder)}</SelectItem>
+                <SelectItem value="all">
+                    {allLabelForPlaceholder(placeholder)}
+                </SelectItem>
                 {options.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                         {opt.label}
@@ -156,29 +179,38 @@ export function DeviceCard({ device }: { device: DeviceListItem }) {
     return (
         <Link
             href={`/security-devices/devices/${device.id}`}
-            className="group flex flex-col rounded-lg border p-4 transition-all hover:bg-muted/50 hover:shadow-md"
+            className="frontline-focus group flex flex-col rounded-lg border p-4 transition-all hover:bg-muted/50 hover:shadow-md"
         >
             <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold truncate">{device.name}</span>
-                        <Badge variant="outline" className="font-mono text-[10px] shrink-0">
+                        <span className="truncate text-sm font-semibold">
+                            {device.name}
+                        </span>
+                        <Badge
+                            variant="outline"
+                            className="shrink-0 font-mono text-[10px]"
+                        >
                             {device.device_uid}
                         </Badge>
                     </div>
                     {(device.manufacturer || device.model) && (
-                        <p className="mt-0.5 text-xs text-muted-foreground truncate">
-                            {[device.manufacturer, device.model].filter(Boolean).join(' ')}
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {[device.manufacturer, device.model]
+                                .filter(Boolean)
+                                .join(' ')}
                         </p>
                     )}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
-                    <Badge variant={statusVariant(device.status)} className="text-[10px]">
-                        {device.status.replace(/_/g, ' ')}
-                    </Badge>
-                    <Badge variant={healthVariant(device.health_status)} className="text-[10px]">
-                        {device.health_status}
-                    </Badge>
+                    <OperationalStateBadge
+                        state={device.status}
+                        className="text-[10px]"
+                    />
+                    <OperationalStateBadge
+                        state={device.health_status}
+                        className="text-[10px]"
+                    />
                 </div>
             </div>
 
@@ -202,6 +234,12 @@ export function DeviceCard({ device }: { device: DeviceListItem }) {
 
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <span>Seen: {formatTimeSince(device.last_seen_at)}</span>
+                {device.monitoring_state ? (
+                    <OperationalStateBadge
+                        state={device.monitoring_state}
+                        className="text-[10px]"
+                    />
+                ) : null}
                 {device.battery_level !== null && (
                     <span className="flex items-center gap-1">
                         <Battery className="h-3 w-3" />

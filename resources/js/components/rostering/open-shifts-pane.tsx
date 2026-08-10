@@ -308,7 +308,8 @@ export function OpenShiftsPane({
                                             i === 0 && !isBlocked && !isWarning;
 
                                         return (
-                                            <Button unstyled
+                                            <Button
+                                                unstyled
                                                 key={nm.id}
                                                 type="button"
                                                 aria-label={

@@ -2,6 +2,7 @@
 
 namespace App\Services\Portal;
 
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\FamilyPortalSetting;
@@ -12,6 +13,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class PortalClientSectionAccess
 {
+    public function __construct(
+        private readonly PersonalTrackingPrivacyService $trackingPrivacy,
+    ) {}
+
     /** @var array<int, string> */
     private const CARE_TIMELINE_TYPES = [
         'note',
@@ -139,15 +144,7 @@ final class PortalClientSectionAccess
 
     public function activeLocationTrackingConsent(Client $client): ?ClientConsent
     {
-        return ClientConsent::query()
-            ->active()
-            ->where('client_id', $client->id)
-            ->whereHas(
-                'consentType',
-                fn ($query) => $query->where('name', 'Asset Location Tracking (Safety)'),
-            )
-            ->orderByDesc('given_at')
-            ->first();
+        return $this->trackingPrivacy->activeConsentForClientAssignment($client);
     }
 
     /** @param array<string, bool> $access */

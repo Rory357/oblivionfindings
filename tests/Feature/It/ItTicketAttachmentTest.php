@@ -1,8 +1,11 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Http\UploadedFile;
@@ -23,9 +26,23 @@ beforeEach(function () {
     Storage::fake(ItAttachment::DISK);
     $this->hr = itAttachmentUser('hr');
     $this->worker = itAttachmentUser('support_worker');
+    $this->site = Site::factory()->create();
+    foreach ([$this->hr, $this->worker] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 });
 
 test('raising a ticket stores evidence on the private disk', function () {
+    expect($this->worker->canDo('it.manage'))->toBeFalse();
+    expect(app(ItWorkAccessService::class)->approvedSiteIds($this->worker))
+        ->toContain($this->site->id);
+
     $this->actingAs($this->worker)
         ->post('/it/tickets', [
             'title' => 'Cracked tablet screen',
@@ -67,7 +84,10 @@ test('scriptable uploads are refused by the allowlist', function () {
 });
 
 test('downloads follow the thread audience, internal evidence stays agent-only', function () {
-    $ticket = ItTicket::factory()->create(['requester_user_id' => $this->worker->id]);
+    $ticket = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'requester_user_id' => $this->worker->id,
+    ]);
 
     // Requester attaches evidence to a public reply.
     $this->actingAs($this->worker)
@@ -89,17 +109,17 @@ test('downloads follow the thread audience, internal evidence stays agent-only',
     $publicFile = ItAttachment::query()->firstWhere('original_name', 'photo.png');
     $internalFile = ItAttachment::query()->firstWhere('original_name', 'quote.pdf');
 
-    // Owner: own public evidence streams; internal-note evidence never does.
+    // Owner: own public evidence streams; internal-note evidence is concealed.
     $this->actingAs($this->worker)->get("/it/attachments/{$publicFile->id}")->assertOk();
-    $this->actingAs($this->worker)->get("/it/attachments/{$internalFile->id}")->assertForbidden();
+    $this->actingAs($this->worker)->get("/it/attachments/{$internalFile->id}")->assertNotFound();
 
     // Agent: both.
     $this->actingAs($this->hr)->get("/it/attachments/{$publicFile->id}")->assertOk();
     $this->actingAs($this->hr)->get("/it/attachments/{$internalFile->id}")->assertOk();
 
-    // A different requester: nothing on someone else's ticket.
+    // A different requester cannot discover evidence on someone else's ticket.
     $stranger = itAttachmentUser('support_worker');
-    $this->actingAs($stranger)->get("/it/attachments/{$publicFile->id}")->assertForbidden();
+    $this->actingAs($stranger)->get("/it/attachments/{$publicFile->id}")->assertNotFound();
 
     // Requester payload: the internal note AND its attachment are absent.
     $this->actingAs($this->worker)

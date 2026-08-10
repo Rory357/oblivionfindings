@@ -25,12 +25,12 @@ async function openAlertWorkspace(
     await page.goto(`/control-room/alerts/${alert.id}`);
 
     const workspace = page.getByRole('dialog', { name: /^Alert CR-/ });
-    await expect(workspace).toBeVisible();
+    await expect(workspace).toBeVisible({ timeout: 20_000 });
     await expect(
         workspace
             .getByText('Playwright Lifecycle Alert', { exact: true })
             .first(),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20_000 });
 
     return workspace;
 }

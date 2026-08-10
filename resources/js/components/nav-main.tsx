@@ -41,7 +41,8 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     const normalizedItemPath = normalizePath(itemPath);
 
     if (itemQuery.length > 0) {
-        return normalizedCurrentPath === normalizedItemPath && currentQuery === itemQuery
+        return normalizedCurrentPath === normalizedItemPath &&
+            currentQuery === itemQuery
             ? 3000 + item.length
             : -1;
     }
@@ -72,13 +73,13 @@ function getActiveIndex(currentUrl: string, items: NavItem[]): number {
     return bestIndex;
 }
 
-function NavItemComponent({ 
-    item, 
+function NavItemComponent({
+    item,
     isActive,
     isNested = false,
     isLast = false,
-}: { 
-    item: NavItem; 
+}: {
+    item: NavItem;
     isActive: boolean;
     isNested?: boolean;
     isLast?: boolean;
@@ -89,10 +90,10 @@ function NavItemComponent({
             {isNested && (
                 <>
                     {/* Horizontal line connecting to parent */}
-                    <div className="absolute left-4 top-1/2 w-3 h-px bg-muted dark:bg-muted" />
+                    <div className="absolute top-1/2 left-4 h-px w-3 bg-muted dark:bg-muted" />
                     {/* Vertical line continuing down (if not last) */}
                     {!isLast && (
-                        <div className="absolute left-4 top-1/2 w-px h-[calc(100%+8px)] bg-muted dark:bg-muted" />
+                        <div className="absolute top-1/2 left-4 h-[calc(100%+8px)] w-px bg-muted dark:bg-muted" />
                     )}
                 </>
             )}
@@ -100,32 +101,33 @@ function NavItemComponent({
                 asChild
                 isActive={isActive}
                 tooltip={{ children: item.title }}
-                className={`
-                    relative transition-all duration-200
-                    ${isNested ? 'pl-8' : ''}
-                    ${isActive
-                        ? 'bg-primary/10 !text-foreground dark:!text-foreground font-medium'
+                className={`relative transition-all duration-200 ${isNested ? 'pl-8' : ''} ${
+                    isActive
+                        ? 'bg-primary/10 font-medium !text-foreground dark:!text-foreground'
                         : 'hover:bg-muted dark:hover:bg-muted'
-                    }
-                    rounded-lg my-0.5
-                `}
+                } my-0.5 rounded-lg`}
             >
-                <Link href={item.href} prefetch preserveScroll className="flex items-center gap-3">
+                <Link
+                    href={item.href}
+                    prefetch
+                    preserveScroll
+                    className="flex items-center gap-3"
+                >
                     {item.icon && (
-                        <span className={`
-                            flex items-center justify-center w-7 h-7 rounded-md transition-all duration-300
-                            ${isActive
-                                ? 'bg-primary text-white shadow-sm'
-                                : 'bg-muted text-muted-foreground group-hover:shadow-sm dark:bg-muted dark:text-muted-foreground icon-gradient-bg'
-                            }
-                        `}>
-                            <item.icon className="w-4 h-4" />
+                        <span
+                            className={`flex h-7 w-7 items-center justify-center rounded-md transition-all duration-300 ${
+                                isActive
+                                    ? 'bg-primary text-white shadow-sm'
+                                    : 'icon-gradient-bg bg-muted text-muted-foreground group-hover:shadow-sm dark:bg-muted dark:text-muted-foreground'
+                            } `}
+                        >
+                            <item.icon className="h-4 w-4" />
                         </span>
                     )}
                     <span className="flex-1">{item.title}</span>
                     {/* Active indicator - left border accent */}
                     {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full" />
+                        <span className="absolute top-1/2 left-0 h-6 w-1 -translate-y-1/2 rounded-r-full bg-primary" />
                     )}
                 </Link>
             </SidebarMenuButton>
@@ -142,7 +144,10 @@ function NavGroupComponent({
 }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     const page = usePage();
-    const activeIndex = useMemo(() => getActiveIndex(page.url, group.items), [page.url, group.items]);
+    const activeIndex = useMemo(
+        () => getActiveIndex(page.url, group.items),
+        [page.url, group.items],
+    );
 
     // Auto-expand group if it contains active item
     useEffect(() => {
@@ -153,7 +158,9 @@ function NavGroupComponent({
     }, [activeIndex]);
 
     // Check if any items have nested structure (indicated by title containing "/")
-    const hasNestedItems = group.items.some(item => item.title.includes(' > '));
+    const hasNestedItems = group.items.some((item) =>
+        item.title.includes(' > '),
+    );
 
     return (
         <SidebarGroup className="px-2 py-0">
@@ -161,44 +168,53 @@ function NavGroupComponent({
                 <CollapsibleTrigger asChild>
                     <SidebarGroupLabel className="group/label cursor-pointer">
                         {/* Group header accent - left border */}
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-gradient-to-b from-primary/60 to-primary/20 rounded-r-full opacity-0 group-hover/label:opacity-100 transition-opacity duration-200" />
-                        <span className="flex-1 flex items-center gap-2">
-                            <span className={`
-                                text-xs font-semibold uppercase tracking-wider
-                                ${isOpen ? 'text-foreground dark:text-muted-foreground' : 'text-muted-foreground dark:text-muted-foreground'}
-                            `}>
+                        <span className="absolute top-1/2 left-0 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-primary/60 to-primary/20 opacity-0 transition-opacity duration-200 group-hover/label:opacity-100" />
+                        <span className="flex flex-1 items-center gap-2">
+                            <span
+                                className={`text-xs font-semibold tracking-wider uppercase ${isOpen ? 'text-foreground dark:text-muted-foreground' : 'text-muted-foreground dark:text-muted-foreground'} `}
+                            >
                                 {group.label}
                             </span>
                         </span>
                         <ChevronDown
                             className={`ml-auto h-4 w-4 transition-all duration-200 ${
-                                isOpen 
-                                    ? 'rotate-180 text-muted-foreground dark:text-muted-foreground' 
-                                    : 'text-muted-foreground dark:text-muted-foreground group-hover/label:text-muted-foreground'
+                                isOpen
+                                    ? 'rotate-180 text-muted-foreground dark:text-muted-foreground'
+                                    : 'text-muted-foreground group-hover/label:text-muted-foreground dark:text-muted-foreground'
                             }`}
                         />
                     </SidebarGroupLabel>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                     {/* Subtle background tint for group content */}
-                    <div className={`
-                        relative ml-1 pl-2 py-1 rounded-lg
-                        ${hasNestedItems ? '' : 'border-l border-border dark:border-border'}
-                    `}>
+                    <div
+                        className={`relative ml-1 rounded-lg py-1 pl-2 ${hasNestedItems ? '' : 'border-l border-border dark:border-border'} `}
+                    >
                         <SidebarMenu className="gap-0.5">
                             {group.items.map((item, index) => {
                                 // Check if this item should be nested (contains " > " in title)
                                 const isNested = item.title.includes(' > ');
-                                const cleanTitle = isNested ? item.title.split(' > ').pop() : item.title;
-                                const cleanItem = { ...item, title: cleanTitle || item.title };
-                                
+                                const cleanTitle = isNested
+                                    ? item.title.split(' > ').pop()
+                                    : item.title;
+                                const cleanItem = {
+                                    ...item,
+                                    title: cleanTitle || item.title,
+                                };
+
                                 return (
                                     <NavItemComponent
                                         key={`${group.id}:${index}:${resolveUrl(item.href)}`}
                                         item={cleanItem}
                                         isActive={index === activeIndex}
                                         isNested={isNested}
-                                        isLast={index === group.items.length - 1 || (index < group.items.length - 1 && !group.items[index + 1]?.title.includes(' > '))}
+                                        isLast={
+                                            index === group.items.length - 1 ||
+                                            (index < group.items.length - 1 &&
+                                                !group.items[
+                                                    index + 1
+                                                ]?.title.includes(' > '))
+                                        }
                                     />
                                 );
                             })}

@@ -31,13 +31,10 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
 
     public function test_workspace_redacts_nested_asset_signal_and_device_when_they_conflict_with_the_alert_site(): void
     {
-        $localSite = Site::factory()->create(['tenant_id' => 1]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $localSite = Site::factory()->create();
+        $foreignSite = Site::factory()->create();
         $viewer = $this->siteViewer($localSite);
-        $localClient = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $localSite->id,
-        ]);
+        $localClient = Client::factory()->create(['site_id' => $localSite->id]);
         $foreignAsset = Asset::factory()->forSite($foreignSite)->create();
         $foreignSignal = FleetSignal::query()->create([
             'asset_id' => $foreignAsset->id,
@@ -78,12 +75,9 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
 
     public function test_workspace_keeps_nested_relations_that_match_the_authoritative_alert_tuple(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $viewer = $this->siteViewer($site);
-        $client = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $site->id,
-        ]);
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $asset = Asset::factory()->forSite($site)->create(['client_id' => $client->id]);
         $signal = FleetSignal::query()->create([
             'asset_id' => $asset->id,
@@ -120,26 +114,21 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
         $this->assertSame('Hallway', data_get($workspace, 'location.description'));
     }
 
-    public function test_workspace_redacts_same_tenant_cross_site_client_asset_assignee_and_context(): void
+    public function test_workspace_redacts_cross_site_client_asset_assignee_and_context(): void
     {
-        $localSite = Site::factory()->create(['tenant_id' => 1]);
-        $hiddenSite = Site::factory()->create(['tenant_id' => 1]);
+        $localSite = Site::factory()->create();
+        $hiddenSite = Site::factory()->create();
         $viewer = $this->siteViewer($localSite);
-        $hiddenClient = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $hiddenSite->id,
-        ]);
+        $hiddenClient = Client::factory()->create(['site_id' => $hiddenSite->id]);
         $hiddenAsset = Asset::factory()->forSite($hiddenSite)->create([
             'client_id' => $hiddenClient->id,
         ]);
         $hiddenAssignee = User::factory()->create([
-            'organization_id' => 1,
             'role' => 'admin',
             'approved_at' => now(),
         ]);
         $hiddenAssignee->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 1,
             'user_id' => $hiddenAssignee->id,
             'primary_site_id' => $hiddenSite->id,
             'secondary_site_ids' => [],
@@ -179,17 +168,11 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
 
     public function test_task7_final_gap_context_site_cannot_be_replaced_by_context_client_identity(): void
     {
-        $localSite = Site::factory()->create(['tenant_id' => 1]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $localSite = Site::factory()->create();
+        $foreignSite = Site::factory()->create();
         $viewer = $this->siteViewer($localSite);
-        $localClient = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $localSite->id,
-        ]);
-        $foreignClient = Client::factory()->create([
-            'organization_id' => 2,
-            'site_id' => $foreignSite->id,
-        ]);
+        $localClient = Client::factory()->create(['site_id' => $localSite->id]);
+        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
 
         $poisoned = ControlRoomAlert::factory()->open()->create([
             'site_id' => null,
@@ -260,17 +243,11 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
 
     public function test_task7_spec_followup_direct_client_does_not_trust_conflicting_context_identity(): void
     {
-        $localSite = Site::factory()->create(['tenant_id' => 1]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $localSite = Site::factory()->create();
+        $foreignSite = Site::factory()->create();
         $viewer = $this->siteViewer($localSite);
-        $localClient = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $localSite->id,
-        ]);
-        $foreignClient = Client::factory()->create([
-            'organization_id' => 2,
-            'site_id' => $foreignSite->id,
-        ]);
+        $localClient = Client::factory()->create(['site_id' => $localSite->id]);
+        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
 
         $poisoned = ControlRoomAlert::factory()->open()->create([
             'site_id' => $localSite->id,
@@ -337,13 +314,10 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
 
     public function test_incident_submission_rejects_an_alert_with_a_foreign_nested_asset(): void
     {
-        $localSite = Site::factory()->create(['tenant_id' => 1]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
-        $actor = User::factory()->create(['organization_id' => 1]);
-        $client = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $localSite->id,
-        ]);
+        $localSite = Site::factory()->create();
+        $foreignSite = Site::factory()->create();
+        $actor = User::factory()->create();
+        $client = Client::factory()->create(['site_id' => $localSite->id]);
         $foreignAsset = Asset::factory()->forSite($foreignSite)->create();
         $alert = ControlRoomAlert::factory()->open()->create([
             'source' => 'sensor',
@@ -366,17 +340,16 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
         ], $actor);
     }
 
-    public function test_tenant_admin_cannot_create_an_unattributed_site_less_alert(): void
+    public function test_application_admin_cannot_create_an_unattributed_site_less_alert(): void
     {
-        Site::factory()->create(['tenant_id' => 1]);
-        $tenantAdmin = User::factory()->create([
-            'organization_id' => 1,
+        Site::factory()->create();
+        $applicationAdmin = User::factory()->create([
             'role' => 'admin',
             'approved_at' => now(),
         ]);
-        $tenantAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $applicationAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
 
-        $this->actingAs($tenantAdmin)
+        $this->actingAs($applicationAdmin)
             ->postJson('/control-room/alerts', [
                 'source' => 'manual',
                 'alert_type' => 'Unattributed welfare concern',
@@ -389,26 +362,27 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
         ]);
     }
 
-    public function test_explicit_platform_admin_can_create_an_installation_level_alert(): void
+    public function test_application_admin_can_create_a_site_attributed_installation_alert(): void
     {
-        $platformAdmin = User::factory()->create([
-            'organization_id' => null,
+        $site = Site::factory()->create();
+        $applicationAdmin = User::factory()->create([
             'role' => 'admin',
             'approved_at' => now(),
         ]);
-        $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $applicationAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
 
-        $this->actingAs($platformAdmin)
+        $this->actingAs($applicationAdmin)
             ->postJson('/control-room/alerts', [
                 'source' => 'manual',
                 'alert_type' => 'Installation service interruption',
                 'severity' => 'high',
+                'site_id' => $site->id,
             ])
             ->assertCreated();
 
         $this->assertDatabaseHas('control_room_alerts', [
             'alert_type' => 'Installation service interruption',
-            'site_id' => null,
+            'site_id' => $site->id,
             'client_id' => null,
         ]);
     }
@@ -416,7 +390,6 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
     private function siteViewer(Site $site): User
     {
         $viewer = User::factory()->create([
-            'organization_id' => (int) $site->tenant_id,
             'approved_at' => now(),
         ]);
         $permissions = Permission::query()
@@ -430,7 +403,6 @@ class ControlRoomAlertNestedProvenanceTest extends TestCase
         $viewer->permissionOverrides()->sync($permissions);
 
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => (int) $site->tenant_id,
             'user_id' => $viewer->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],

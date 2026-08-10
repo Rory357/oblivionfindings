@@ -1,13 +1,19 @@
-import { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import RespiteSubnav from '@/components/respite-subnav';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 
 type Props = {
     stays: any[];
@@ -17,9 +23,17 @@ type Props = {
     planTypes: Record<string, string>;
 };
 
-export default function RiskPlanActivationCreate({ stays, stayId, clientId, clientRisks, planTypes }: Props) {
+export default function RiskPlanActivationCreate({
+    stays,
+    stayId,
+    clientId,
+    clientRisks,
+    planTypes,
+}: Props) {
     const resolveClientId = (selectedStayId: string): string => {
-        const selectedStay = stays.find((stay: any) => String(stay.id) === selectedStayId);
+        const selectedStay = stays.find(
+            (stay: any) => String(stay.id) === selectedStayId,
+        );
 
         if (selectedStay?.client?.id != null) {
             return String(selectedStay.client.id);
@@ -39,10 +53,18 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
         escalation_steps: [] as string[],
     });
 
-    const [planDetails, setPlanDetails] = useState<string[]>(data.plan_details.length ? data.plan_details : ['']);
-    const [triggers, setTriggers] = useState<string[]>(data.triggers.length ? data.triggers : ['']);
-    const [interventions, setInterventions] = useState<string[]>(data.interventions.length ? data.interventions : ['']);
-    const [escalationSteps, setEscalationSteps] = useState<string[]>(data.escalation_steps.length ? data.escalation_steps : ['']);
+    const [planDetails, setPlanDetails] = useState<string[]>(
+        data.plan_details.length ? data.plan_details : [''],
+    );
+    const [triggers, setTriggers] = useState<string[]>(
+        data.triggers.length ? data.triggers : [''],
+    );
+    const [interventions, setInterventions] = useState<string[]>(
+        data.interventions.length ? data.interventions : [''],
+    );
+    const [escalationSteps, setEscalationSteps] = useState<string[]>(
+        data.escalation_steps.length ? data.escalation_steps : [''],
+    );
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -57,7 +79,12 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
         post('/respite/risk-plan-activations');
     };
 
-    const updateArray = (arr: string[], setArr: (v: string[]) => void, idx: number, val: string) => {
+    const updateArray = (
+        arr: string[],
+        setArr: (v: string[]) => void,
+        idx: number,
+        val: string,
+    ) => {
         const next = [...arr];
         next[idx] = val;
         setArr(next);
@@ -67,30 +94,72 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
         setArr([...arr, '']);
     };
 
-    const removeFromArray = (arr: string[], setArr: (v: string[]) => void, idx: number) => {
+    const removeFromArray = (
+        arr: string[],
+        setArr: (v: string[]) => void,
+        idx: number,
+    ) => {
         const next = [...arr];
         next.splice(idx, 1);
         setArr(next);
     };
 
-    const renderDynamicList = (label: string, arr: string[], setArr: (v: string[]) => void, errorKey: string) => (
+    const renderDynamicList = (
+        label: string,
+        arr: string[],
+        setArr: (v: string[]) => void,
+        errorKey: string,
+    ) => (
         <div className="space-y-2">
             <Label>{label}</Label>
             {arr.map((item, idx) => (
                 <div key={idx} className="flex gap-2">
-                    <Input value={item} onChange={(e) => updateArray(arr, setArr, idx, e.target.value)} placeholder={`${label} item...`} />
+                    <Input
+                        value={item}
+                        onChange={(e) =>
+                            updateArray(arr, setArr, idx, e.target.value)
+                        }
+                        placeholder={`${label} item...`}
+                    />
                     {arr.length > 1 && (
-                        <Button type="button" variant="outline" size="sm" onClick={() => removeFromArray(arr, setArr, idx)}>Remove</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeFromArray(arr, setArr, idx)}
+                        >
+                            Remove
+                        </Button>
                     )}
                 </div>
             ))}
-            <Button type="button" variant="outline" size="sm" onClick={() => addToArray(arr, setArr)}>Add {label} Item</Button>
-            {(errors as any)[errorKey] && <div className="mt-1 text-xs text-status-critical">{(errors as any)[errorKey]}</div>}
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => addToArray(arr, setArr)}
+            >
+                Add {label} Item
+            </Button>
+            {(errors as any)[errorKey] && (
+                <div className="mt-1 text-xs text-status-critical">
+                    {(errors as any)[errorKey]}
+                </div>
+            )}
         </div>
     );
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Risk Plan Activations', href: '/respite/risk-plan-activations' }, { title: 'New', href: '/respite/risk-plan-activations/create' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                {
+                    title: 'Risk Plan Activations',
+                    href: '/respite/risk-plan-activations',
+                },
+                { title: 'New', href: '/respite/risk-plan-activations/create' },
+            ]}
+        >
             <Head title="New Risk Plan Activation" />
 
             <PageLayout
@@ -108,7 +177,9 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Plan Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Plan Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
@@ -118,57 +189,129 @@ export default function RiskPlanActivationCreate({ stays, stayId, clientId, clie
                                         value={data.stay_id}
                                         onValueChange={(value) => {
                                             setData('stay_id', value);
-                                            setData('client_id', resolveClientId(value));
+                                            setData(
+                                                'client_id',
+                                                resolveClientId(value),
+                                            );
                                         }}
                                     >
-                                        <SelectTrigger><SelectValue placeholder="Select stay" /></SelectTrigger>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select stay" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {stays.map((s: any) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.client?.first_name} {s.client?.last_name} — Stay #{s.id}
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
+                                                    {s.client?.first_name}{' '}
+                                                    {s.client?.last_name} — Stay
+                                                    #{s.id}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
+                                    {errors.stay_id && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.stay_id}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Plan Type *</Label>
-                                    <Select value={data.plan_type} onValueChange={(v) => setData('plan_type', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                                    <Select
+                                        value={data.plan_type}
+                                        onValueChange={(v) =>
+                                            setData('plan_type', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            {Object.entries(planTypes).map(([value, label]) => (
-                                                <SelectItem key={value} value={value}>{label}</SelectItem>
-                                            ))}
+                                            {Object.entries(planTypes).map(
+                                                ([value, label]) => (
+                                                    <SelectItem
+                                                        key={value}
+                                                        value={value}
+                                                    >
+                                                        {label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
                                         </SelectContent>
                                     </Select>
-                                    {errors.plan_type && <div className="mt-1 text-xs text-status-critical">{errors.plan_type}</div>}
+                                    {errors.plan_type && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.plan_type}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
                             <div>
                                 <Label>Plan Name *</Label>
-                                <Input value={data.plan_name} onChange={(e) => setData('plan_name', e.target.value)} placeholder="Enter plan name" />
-                                {errors.plan_name && <div className="mt-1 text-xs text-status-critical">{errors.plan_name}</div>}
+                                <Input
+                                    value={data.plan_name}
+                                    onChange={(e) =>
+                                        setData('plan_name', e.target.value)
+                                    }
+                                    placeholder="Enter plan name"
+                                />
+                                {errors.plan_name && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.plan_name}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Plan Content</CardTitle>
+                            <CardTitle className="text-base">
+                                Plan Content
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            {renderDynamicList('Plan Details', planDetails, setPlanDetails, 'plan_details')}
-                            {renderDynamicList('Triggers', triggers, setTriggers, 'triggers')}
-                            {renderDynamicList('Interventions', interventions, setInterventions, 'interventions')}
-                            {renderDynamicList('Escalation Steps', escalationSteps, setEscalationSteps, 'escalation_steps')}
+                            {renderDynamicList(
+                                'Plan Details',
+                                planDetails,
+                                setPlanDetails,
+                                'plan_details',
+                            )}
+                            {renderDynamicList(
+                                'Triggers',
+                                triggers,
+                                setTriggers,
+                                'triggers',
+                            )}
+                            {renderDynamicList(
+                                'Interventions',
+                                interventions,
+                                setInterventions,
+                                'interventions',
+                            )}
+                            {renderDynamicList(
+                                'Escalation Steps',
+                                escalationSteps,
+                                setEscalationSteps,
+                                'escalation_steps',
+                            )}
                         </CardContent>
                     </Card>
 
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => window.history.back()}>Cancel</Button>
-                        <Button type="submit" disabled={processing}>{processing ? 'Saving...' : 'Create Activation'}</Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => window.history.back()}
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={processing}>
+                            {processing ? 'Saving...' : 'Create Activation'}
+                        </Button>
                     </div>
                 </form>
             </PageLayout>

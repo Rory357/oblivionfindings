@@ -30,7 +30,6 @@ import {
     Building2,
     CalendarDays,
     Car,
-    Cctv,
     CheckCircle2,
     ChevronRight,
     Clipboard,
@@ -51,7 +50,6 @@ import {
     Landmark,
     LayoutDashboard,
     LayoutGrid,
-    Link2,
     ListChecks,
     Map,
     MapPin,
@@ -89,6 +87,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppLogoIcon from './app-logo-icon';
+import { buildSecurityDevicesNavigationGroups } from './security-devices/security-devices-navigation';
 const dashboard = () => '/dashboard';
 
 const SIDEBAR_OPCN_CLASS = 'size-5 shrink-0';
@@ -131,7 +130,6 @@ type PageProps = {
             email: string;
             avatar?: string;
             role?: string | null;
-            organization_id?: number | null;
         };
         can?: any;
         portalClients?: PortalClient[] | null;
@@ -574,14 +572,14 @@ function buildIconNavItems({
         }
     }
 
-    // IT & Provisioning — the account/access/equipment request queue fed by
+    // IT & Support — the account/access/equipment request queue fed by
     // onboarding IT tasks, plus the helpdesk. Requesters (everyone on staff)
     // see it too: they raise and track their own tickets there.
     if (can?.it?.view || can?.it?.request) {
         items.push({
             id: 'it-provisioning',
             icon: Server,
-            label: 'IT & Provisioning',
+            label: 'IT & Support',
             href: '/it',
         });
     }
@@ -1366,11 +1364,6 @@ function buildFleetAssetsSubPanelGroups({
                 href: '/fleet-assets/daily-check',
                 icon: CheckCircle2,
             },
-            {
-                title: 'Driver App',
-                href: '/fleet-assets/mobile/dashboard',
-                icon: Smartphone,
-            },
         ],
     };
     groups.push(overview);
@@ -2106,7 +2099,7 @@ function buildControlRoomSubPanelGroups({
     const ops: NavItem[] = [];
     if (can?.controlRoom?.viewAny)
         ops.push({
-            title: 'Devices',
+            title: 'Device signals',
             href: '/control-room/devices',
             icon: Smartphone,
         });
@@ -2156,94 +2149,7 @@ function buildSecurityDevicesSubPanelGroups({
 }: {
     can?: any;
 } = {}): SubPanelGroup[] {
-    const items: NavItem[] = [];
-
-    if (can?.securityDevices?.viewAny)
-        items.push({
-            title: 'Dashboard',
-            href: '/security-devices',
-            icon: LayoutDashboard,
-        });
-    if (can?.securityDevices?.eventsView)
-        items.push({
-            title: 'Alarms',
-            href: '/security-devices/alarms',
-            icon: Siren,
-        });
-    if (can?.securityDevices?.devicesView)
-        items.push({
-            title: 'CCTV',
-            href: '/security-devices/cctv',
-            icon: Cctv,
-        });
-    if (can?.securityDevices?.devicesView)
-        items.push({
-            title: 'Tracking Devices',
-            href: '/security-devices/tracking-devices',
-            icon: Smartphone,
-        });
-    if (can?.securityDevices?.devicesView)
-        items.push({
-            title: 'Smart IoT & Healthcare',
-            href: '/security-devices/smart-iot-healthcare',
-            icon: HeartPulse,
-        });
-    if (can?.securityDevices?.devicesView)
-        items.push({
-            title: 'Access Control',
-            href: '/security-devices/access-control',
-            icon: Key,
-        });
-    if (can?.securityDevices?.devicesView)
-        items.push({
-            title: 'IT Infrastructure',
-            href: '/security-devices/it-infrastructure',
-            icon: Server,
-        });
-    if (can?.securityDevices?.devicesView)
-        items.push({
-            title: 'Facilities',
-            href: '/security-devices/facilities',
-            icon: Building2,
-        });
-    if (can?.securityDevices?.groupsManage)
-        items.push({
-            title: 'Device Groups',
-            href: '/security-devices/device-groups',
-            icon: GitBranch,
-        });
-    if (can?.securityDevices?.eventsView)
-        items.push({
-            title: 'Alerts & Events',
-            href: '/security-devices/alerts-events',
-            icon: Bell,
-        });
-    if (
-        can?.securityDevices?.maintenanceView ||
-        can?.securityDevices?.maintenanceManage
-    )
-        items.push({
-            title: 'Maintenance & Health',
-            href: '/security-devices/maintenance-health',
-            icon: Wrench,
-        });
-    if (
-        can?.securityDevices?.integrationsView ||
-        can?.securityDevices?.integrationsManage
-    )
-        items.push({
-            title: 'APIs & Integrations',
-            href: '/security-devices/integrations',
-            icon: Link2,
-        });
-    if (can?.securityDevices?.reportsView)
-        items.push({
-            title: 'Reports',
-            href: '/security-devices/reports',
-            icon: FileText,
-        });
-
-    return items.length ? [{ label: 'Security & Devices', items }] : [];
+    return buildSecurityDevicesNavigationGroups(can?.securityDevices);
 }
 
 function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {

@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,7 +21,6 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
@@ -214,7 +214,6 @@ export default function ClientIncidents({
                     />
                 }
             >
-
                 {/* Inline create form */}
                 {showNew && can.create && (
                     <Card>

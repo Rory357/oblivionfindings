@@ -1,10 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import {
     HealthClinicalShell,
     type HealthClinicalKpis,
 } from '@/pages/health-clinical/components/health-clinical-shell';
-import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -67,10 +67,19 @@ type Props = {
 };
 
 const BAND_TONE: Record<string, { pill: string; bar: string }> = {
-    low: { pill: 'bg-status-success-bg text-status-success', bar: 'bg-status-success' },
+    low: {
+        pill: 'bg-status-success-bg text-status-success',
+        bar: 'bg-status-success',
+    },
     low_medium: { pill: 'bg-primary/10 text-primary', bar: 'bg-primary' },
-    medium: { pill: 'bg-status-warning-bg text-status-warning', bar: 'bg-status-warning' },
-    high: { pill: 'bg-status-critical-bg text-status-critical', bar: 'bg-status-critical' },
+    medium: {
+        pill: 'bg-status-warning-bg text-status-warning',
+        bar: 'bg-status-warning',
+    },
+    high: {
+        pill: 'bg-status-critical-bg text-status-critical',
+        bar: 'bg-status-critical',
+    },
 };
 
 function initials(name: string): string {
@@ -90,7 +99,10 @@ function DeteriorationWatchCard({ items }: { items: WatchItem[] }) {
                     <HeartPulse className="h-4 w-4 text-primary" />
                     Deterioration watch · NEWS2
                     {items.length > 0 ? (
-                        <Badge variant="outline" className="ml-auto text-xs text-status-warning">
+                        <Badge
+                            variant="outline"
+                            className="ml-auto text-xs text-status-warning"
+                        >
                             {items.length} on watch
                         </Badge>
                     ) : null}
@@ -99,12 +111,14 @@ function DeteriorationWatchCard({ items }: { items: WatchItem[] }) {
             <CardContent>
                 {items.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground">
-                        All clients stable — no NEWS2 escalations in the last 7 days.
+                        All clients stable — no NEWS2 escalations in the last 7
+                        days.
                     </p>
                 ) : (
                     <div className="divide-y">
                         {items.map((item) => {
-                            const tone = BAND_TONE[item.news2_band] ?? BAND_TONE.low;
+                            const tone =
+                                BAND_TONE[item.news2_band] ?? BAND_TONE.low;
                             const peak = Math.max(...item.sparkline, 6);
                             return (
                                 <Link
@@ -116,25 +130,42 @@ function DeteriorationWatchCard({ items }: { items: WatchItem[] }) {
                                         {initials(item.client_name)}
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium">{item.client_name}</p>
+                                        <p className="truncate text-sm font-medium">
+                                            {item.client_name}
+                                        </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {item.site ?? 'No site'}
                                         </p>
                                     </div>
-                                    <div className="flex h-7 items-end gap-0.5" aria-hidden="true">
+                                    <div
+                                        className="flex h-7 items-end gap-0.5"
+                                        aria-hidden="true"
+                                    >
                                         {item.sparkline.map((s, i) => (
                                             <div
                                                 key={i}
-                                                className={cn('w-1.5 rounded-sm', tone.bar)}
-                                                style={{ height: `${Math.max(12, (s / peak) * 100)}%` }}
+                                                className={cn(
+                                                    'w-1.5 rounded-sm',
+                                                    tone.bar,
+                                                )}
+                                                style={{
+                                                    height: `${Math.max(12, (s / peak) * 100)}%`,
+                                                }}
                                             />
                                         ))}
                                     </div>
                                     <div className="flex w-[120px] items-center justify-end gap-2">
-                                        <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-semibold', tone.pill)}>
+                                        <span
+                                            className={cn(
+                                                'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                                tone.pill,
+                                            )}
+                                        >
                                             {item.band_label}
                                         </span>
-                                        <span className="text-lg font-bold tabular-nums">{item.news2_score}</span>
+                                        <span className="text-lg font-bold tabular-nums">
+                                            {item.news2_score}
+                                        </span>
                                     </div>
                                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                                 </Link>
@@ -157,7 +188,8 @@ function formatTimeAgo(iso: string): string {
 }
 
 const severityColor: Record<string, string> = {
-    critical: 'bg-status-critical-bg text-status-critical border-status-critical/30',
+    critical:
+        'bg-status-critical-bg text-status-critical border-status-critical/30',
     high: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     medium: 'bg-status-warning-bg text-status-warning border-status-warning/30',
     low: 'bg-muted text-muted-foreground border-border',
@@ -172,7 +204,11 @@ export default function HealthClinicalOverview({
     recent_observations,
 }: Props) {
     return (
-        <HealthClinicalShell activeTab="overview" kpis={kpis} tabCounts={tab_counts}>
+        <HealthClinicalShell
+            activeTab="overview"
+            kpis={kpis}
+            tabCounts={tab_counts}
+        >
             <DeteriorationWatchCard items={deterioration_watch} />
 
             <div className="grid gap-6 lg:grid-cols-2">
@@ -183,7 +219,10 @@ export default function HealthClinicalOverview({
                             <AlertTriangle className="h-4 w-4 text-status-critical" />
                             Overdue Observations
                             {overdue_items.length > 0 && (
-                                <Badge variant="destructive" className="ml-auto text-xs">
+                                <Badge
+                                    variant="destructive"
+                                    className="ml-auto text-xs"
+                                >
                                     {overdue_items.length}
                                 </Badge>
                             )}
@@ -197,14 +236,23 @@ export default function HealthClinicalOverview({
                         ) : (
                             <div className="divide-y">
                                 {overdue_items.map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between py-2">
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center justify-between py-2"
+                                    >
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="text-[10px]">
-                                                    {item.observation_type_label}
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-[10px]"
+                                                >
+                                                    {
+                                                        item.observation_type_label
+                                                    }
                                                 </Badge>
                                                 <span className="text-xs font-medium text-status-critical">
-                                                    {item.hours_overdue}h overdue
+                                                    {item.hours_overdue}h
+                                                    overdue
                                                 </span>
                                             </div>
                                             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -241,17 +289,25 @@ export default function HealthClinicalOverview({
                         ) : (
                             <div className="divide-y">
                                 {recent_events.map((event) => (
-                                    <div key={event.id} className="flex items-center justify-between py-2">
+                                    <div
+                                        key={event.id}
+                                        className="flex items-center justify-between py-2"
+                                    >
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">{event.event_type_label}</span>
+                                                <span className="text-sm font-medium">
+                                                    {event.event_type_label}
+                                                </span>
                                                 <Badge
                                                     variant="outline"
                                                     className={`text-[10px] ${severityColor[event.severity] ?? ''}`}
                                                 >
                                                     {event.severity}
                                                 </Badge>
-                                                <Badge variant="outline" className="text-[10px]">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-[10px]"
+                                                >
                                                     {event.status}
                                                 </Badge>
                                             </div>
@@ -262,7 +318,9 @@ export default function HealthClinicalOverview({
                                                 >
                                                     {event.client_name}
                                                 </Link>
-                                                {event.reporter_name ? ` — ${event.reporter_name}` : ''}
+                                                {event.reporter_name
+                                                    ? ` — ${event.reporter_name}`
+                                                    : ''}
                                             </p>
                                         </div>
                                         <span className="ml-3 shrink-0 text-xs text-muted-foreground">
@@ -292,19 +350,29 @@ export default function HealthClinicalOverview({
                     ) : (
                         <div className="divide-y">
                             {recent_observations.map((obs) => (
-                                <div key={obs.id} className="flex items-center justify-between py-2">
+                                <div
+                                    key={obs.id}
+                                    className="flex items-center justify-between py-2"
+                                >
                                     <div className="flex items-center gap-3">
-                                        <Badge variant="outline" className="text-[10px]">
+                                        <Badge
+                                            variant="outline"
+                                            className="text-[10px]"
+                                        >
                                             {obs.observation_type_label}
                                         </Badge>
-                                        <span className="text-sm">{obs.client_name}</span>
+                                        <span className="text-sm">
+                                            {obs.client_name}
+                                        </span>
                                     </div>
                                     <div className="text-right">
                                         <span className="text-xs text-muted-foreground">
                                             {formatTimeAgo(obs.recorded_at)}
                                         </span>
                                         {obs.recorder_name && (
-                                            <p className="text-[10px] text-muted-foreground">{obs.recorder_name}</p>
+                                            <p className="text-[10px] text-muted-foreground">
+                                                {obs.recorder_name}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
@@ -315,7 +383,8 @@ export default function HealthClinicalOverview({
             </Card>
 
             <p className="text-xs text-muted-foreground">
-                {kpis.protocols_active} active protocol{kpis.protocols_active !== 1 ? 's' : ''} across all clients.
+                {kpis.protocols_active} active protocol
+                {kpis.protocols_active !== 1 ? 's' : ''} across all clients.
             </p>
         </HealthClinicalShell>
     );

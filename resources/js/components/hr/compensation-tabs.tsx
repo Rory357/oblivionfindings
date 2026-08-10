@@ -61,31 +61,71 @@ export function CompensationTabs({ active }: { active: CompensationTab }) {
 
     const all: Array<{ item: HrTabItem; show: boolean }> = [
         {
-            item: { id: 'bands', label: 'Salary bands', icon: Layers, tone: 'primary', badge: badge('bands') },
+            item: {
+                id: 'bands',
+                label: 'Salary bands',
+                icon: Layers,
+                tone: 'primary',
+                badge: badge('bands'),
+            },
             show: !!hr?.compensation?.view,
         },
         {
-            item: { id: 'reviews', label: 'Pay reviews', icon: ClipboardCheck, tone: 'info', badge: badge('reviews') },
+            item: {
+                id: 'reviews',
+                label: 'Pay reviews',
+                icon: ClipboardCheck,
+                tone: 'info',
+                badge: badge('reviews'),
+            },
             show: !!hr?.compensation?.view,
         },
         {
-            item: { id: 'bonuses', label: 'Bonuses', icon: Banknote, tone: 'success', badge: badge('bonuses') },
+            item: {
+                id: 'bonuses',
+                label: 'Bonuses',
+                icon: Banknote,
+                tone: 'success',
+                badge: badge('bonuses'),
+            },
             show: !!hr?.compensation?.view,
         },
         {
-            item: { id: 'benefits', label: 'Benefits', icon: Heart, tone: 'violet', badge: badge('benefits') },
+            item: {
+                id: 'benefits',
+                label: 'Benefits',
+                icon: Heart,
+                tone: 'violet',
+                badge: badge('benefits'),
+            },
             show: !!hr?.benefits?.view,
         },
         {
-            item: { id: 'expenses', label: 'Expenses', icon: Receipt, tone: 'warning', badge: badge('expenses') },
+            item: {
+                id: 'expenses',
+                label: 'Expenses',
+                icon: Receipt,
+                tone: 'warning',
+                badge: badge('expenses'),
+            },
             show: !!hr?.expenses?.view,
         },
         {
-            item: { id: 'history', label: 'History', icon: HistoryIcon, tone: 'info' },
+            item: {
+                id: 'history',
+                label: 'History',
+                icon: HistoryIcon,
+                tone: 'info',
+            },
             show: !!hr?.compensation?.view,
         },
         {
-            item: { id: 'settings', label: 'Settings', icon: SettingsIcon, tone: 'primary' },
+            item: {
+                id: 'settings',
+                label: 'Settings',
+                icon: SettingsIcon,
+                tone: 'primary',
+            },
             show: !!hr?.compensation?.view,
         },
     ];
@@ -98,7 +138,8 @@ export function CompensationTabs({ active }: { active: CompensationTab }) {
         <HrTabs
             value={active}
             onChange={(id) => {
-                if (id !== active) router.visit(TAB_URLS[id as CompensationTab]);
+                if (id !== active)
+                    router.visit(TAB_URLS[id as CompensationTab]);
             }}
             items={items}
             ariaLabel="Compensation views"

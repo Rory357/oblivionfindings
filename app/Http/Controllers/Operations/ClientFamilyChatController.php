@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\OpsConversation;
 use App\Models\OpsConversationParticipant;
 use App\Models\OpsMessage;
+use App\Models\User;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
 use Illuminate\Http\Request;
 
@@ -28,9 +29,12 @@ class ClientFamilyChatController extends Controller
         $user = $request->user();
         abort_unless($this->familyCommunicationAccess->canView($user, $client), 403);
 
-        $conversation = $this->resolveConversation($client, createIfMissing: false);
+        $conversation = $this->resolveConversation($client, $user, createIfMissing: false);
 
-        $portalUsers = $client->portalUsers()->get(['users.id', 'users.name']);
+        $portalUsers = $client->portalUsers()
+            ->get(['users.id', 'users.name', 'users.role', 'users.approved_at'])
+            ->filter(fn (User $portalUser) => $portalUser->canAccessClientPortal($client))
+            ->values();
 
         if (! $conversation) {
             return response()->json([
@@ -46,11 +50,7 @@ class ClientFamilyChatController extends Controller
         }
 
         $messagesBase = $conversation->messages()
-            ->where('client_id', $client->id)
-            ->where(function ($query) use ($client): void {
-                $query->where('organization_id', $client->organization_id)
-                    ->orWhereNull('organization_id');
-            });
+            ->where('client_id', $client->id);
         $messagesTotal = (clone $messagesBase)->count();
         $messages = (clone $messagesBase)
             ->with('sender:id,name')
@@ -74,8 +74,23 @@ class ClientFamilyChatController extends Controller
                 'id' => $conversation->id,
                 'title' => $conversation->title,
                 'participants' => $conversation->participants
-                    ->map(fn ($p) => ['id' => $p->user_id, 'name' => $p->user?->name])
-                    ->filter(fn ($p) => $p['name'])
+                    ->map(function ($participant) use ($client) {
+                        $participantUser = $participant->user;
+
+                        if (
+                            ! $participantUser
+                            || ! $this->familyCommunicationAccess
+                                ->canAppearAsParticipant($participantUser, $client)
+                        ) {
+                            return null;
+                        }
+
+                        return [
+                            'id' => $participantUser->id,
+                            'name' => $participantUser->name,
+                        ];
+                    })
+                    ->filter()
                     ->values(),
             ],
             'messages' => $messages,
@@ -98,7 +113,7 @@ class ClientFamilyChatController extends Controller
             'content' => ['required', 'string', 'max:5000'],
         ]);
 
-        $conversation = $this->resolveConversation($client, createIfMissing: true);
+        $conversation = $this->resolveConversation($client, $user, createIfMissing: true);
 
         OpsConversationParticipant::firstOrCreate([
             'conversation_id' => $conversation->id,
@@ -106,7 +121,6 @@ class ClientFamilyChatController extends Controller
         ]);
 
         OpsMessage::create([
-            'organization_id' => $client->organization_id,
             'conversation_id' => $conversation->id,
             'sender_id' => $user->id,
             'sender_type' => 'user',
@@ -124,16 +138,16 @@ class ClientFamilyChatController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function resolveConversation(Client $client, bool $createIfMissing): ?OpsConversation
-    {
+    private function resolveConversation(
+        Client $client,
+        User $user,
+        bool $createIfMissing,
+    ): ?OpsConversation {
         $conversation = OpsConversation::where('client_id', $client->id)
             ->where('conversation_type', 'family')
             ->where('is_archived', false)
-            ->where(function ($query) use ($client): void {
-                $query->where('organization_id', $client->organization_id)
-                    ->orWhereNull('organization_id');
-            })
-            ->with('participants.user:id,name')
+            ->whereHas('participants', fn ($query) => $query->where('user_id', $user->id))
+            ->with('participants.user:id,name,role,approved_at')
             ->orderByDesc('updated_at')
             ->first();
 
@@ -142,20 +156,24 @@ class ClientFamilyChatController extends Controller
         }
 
         $conversation = OpsConversation::create([
-            'organization_id' => $client->organization_id,
             'title' => trim("{$client->first_name} {$client->last_name}").' — whānau chat',
             'conversation_type' => 'family',
             'client_id' => $client->id,
         ]);
 
         // Seed whānau participants from the client's portal users.
-        foreach ($client->portalUsers()->pluck('users.id') as $portalUserId) {
+        $portalUserIds = $client->portalUsers()
+            ->get(['users.id', 'users.role', 'users.approved_at'])
+            ->filter(fn (User $portalUser) => $portalUser->canAccessClientPortal($client))
+            ->pluck('id');
+
+        foreach ($portalUserIds as $portalUserId) {
             OpsConversationParticipant::firstOrCreate([
                 'conversation_id' => $conversation->id,
                 'user_id' => $portalUserId,
             ]);
         }
 
-        return $conversation->load('participants.user:id,name');
+        return $conversation->load('participants.user:id,name,role,approved_at');
     }
 }

@@ -8,302 +8,484 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ControlRoomAlert;
 use App\Models\FleetShiftHandover;
-use App\Models\Role;
+use App\Models\Permission;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
-use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Tests\TestCase;
 
 class UserSiteAccessCanonicalIntegrityTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function setUp(): void
+    public function test_shift_query_and_direct_access_require_matching_site_client_and_current_worker_relationships(): void
     {
-        parent::setUp();
-
-        $this->seed(RbacSeeder::class);
-    }
-
-    public function test_shift_query_and_assert_reject_a_rostered_worker_from_another_tenant(): void
-    {
-        $site = Site::factory()->create(['tenant_id' => 501]);
-        $viewer = $this->siteUser(501, $site);
-        $foreignWorker = User::factory()->create(['organization_id' => 502]);
-        $client = Client::factory()->create([
-            'organization_id' => 501,
-            'site_id' => $site->id,
-        ]);
-        $shift = Shift::factory()->create([
-            'organization_id' => 501,
-            'site_id' => $site->id,
-            'client_id' => $client->id,
-            'user_id' => $foreignWorker->id,
-        ]);
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $viewer = $this->currentSiteUser($site, permissions: ['reports.viewAny']);
+        $worker = $this->currentSiteUser($site);
+        $otherSiteWorker = $this->currentSiteUser($otherSite);
+        $client = $this->clientAt($site);
+        $clientWithoutSite = $this->clientAt(null);
+        $validShift = $this->shiftAt($site, $client, $worker);
+        $clientFallbackShift = $this->shiftAt(null, $client, $worker);
+        $siteConflict = $this->shiftAt($site, $client, $worker);
+        $workerConflict = $this->shiftAt($site, $client, $otherSiteWorker);
+        $missingProvenance = $this->shiftAt(null, $clientWithoutSite, $worker);
+        Shift::query()->whereKey($siteConflict->id)->update(['site_id' => $otherSite->id]);
         $service = app(UserSiteAccessService::class);
+        $bypass = ['reports.viewAny'];
 
-        $query = Shift::query()->whereKey($shift->id);
-        $service->applyShiftScope($query, $viewer);
-        $this->assertFalse($query->exists());
-        $this->assertAccessDenied(fn () => $service->assertCanAccessShift($viewer, $shift));
+        $query = Shift::query()->whereIn('id', [
+            $validShift->id,
+            $clientFallbackShift->id,
+            $siteConflict->id,
+            $workerConflict->id,
+            $missingProvenance->id,
+        ])->orderBy('id');
+        $service->applyShiftScope($query, $viewer, $bypass);
+
+        $this->assertSame([$validShift->id, $clientFallbackShift->id], $query->pluck('id')->all());
+        $service->assertCanAccessShift($viewer, $validShift, $bypass);
+        $service->assertCanAccessShift($viewer, $clientFallbackShift, $bypass);
+        foreach ([$siteConflict, $workerConflict, $missingProvenance] as $shift) {
+            $this->assertAccessDenied(
+                fn () => $service->assertCanAccessShift($viewer, $shift->fresh(), $bypass),
+            );
+        }
     }
 
-    public function test_shift_query_and_assert_reject_a_direct_site_from_another_tenant_even_for_platform_admin(): void
+    public function test_timesheet_query_and_direct_access_require_one_agreed_site_and_matching_links(): void
     {
-        $poisonedSite = Site::factory()->create(['tenant_id' => 503]);
-        $worker = User::factory()->create(['organization_id' => 504]);
-        $client = Client::factory()->create([
-            'organization_id' => 504,
-            'site_id' => $poisonedSite->id,
-        ]);
-        $shift = Shift::factory()->create([
-            'organization_id' => 504,
-            'site_id' => $poisonedSite->id,
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $viewer = $this->currentSiteUser($site, permissions: ['reports.viewAny']);
+        $worker = $this->currentSiteUser($site);
+        $client = $this->clientAt($site);
+        $validShift = $this->shiftAt($site, $client, $worker);
+        $fallbackShift = $this->shiftAt($site, $client, $worker);
+        $conflictedShift = $this->shiftAt($site, $client, $worker);
+        $validTimesheet = $this->timesheetFor($validShift, $client, $worker, $site);
+        $linkedShiftFallback = Timesheet::factory()->create([
+            'shift_id' => $fallbackShift->id,
             'client_id' => $client->id,
             'user_id' => $worker->id,
+            'shift_site_id' => null,
+            'site_id' => null,
         ]);
-        $platformAdmin = User::factory()->create([
-            'organization_id' => null,
-            'approved_at' => now(),
-            'role' => 'admin',
+        $snapshotConflict = $this->timesheetFor($conflictedShift, $client, $worker, $site);
+        Timesheet::query()->whereKey($snapshotConflict->id)->update(['site_id' => $otherSite->id]);
+        $missingProvenance = Timesheet::factory()->create([
+            'shift_id' => null,
+            'client_id' => null,
+            'user_id' => $worker->id,
+            'shift_site_id' => null,
+            'site_id' => null,
         ]);
-        $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
+        $service = app(UserSiteAccessService::class);
+        $bypass = ['reports.viewAny'];
+
+        $query = Timesheet::query()->whereIn('id', [
+            $validTimesheet->id,
+            $linkedShiftFallback->id,
+            $snapshotConflict->id,
+            $missingProvenance->id,
+        ])->orderBy('id');
+        $service->applyTimesheetScope($query, $viewer, $bypass);
+
+        $this->assertSame(
+            [$validTimesheet->id, $linkedShiftFallback->id],
+            $query->pluck('id')->all(),
+        );
+        $service->assertCanAccessTimesheet($viewer, $validTimesheet, $bypass);
+        $service->assertCanAccessTimesheet($viewer, $linkedShiftFallback, $bypass);
+        foreach ([$snapshotConflict, $missingProvenance] as $timesheet) {
+            $this->assertAccessDenied(
+                fn () => $service->assertCanAccessTimesheet($viewer, $timesheet->fresh(), $bypass),
+            );
+        }
+    }
+
+    public function test_shift_handover_query_and_direct_access_require_all_sources_to_share_one_site(): void
+    {
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $viewer = $this->currentSiteUser($site, permissions: ['reports.viewAny']);
+        $outgoing = $this->currentSiteUser($site);
+        $incoming = $this->currentSiteUser($site);
+        $otherIncoming = $this->currentSiteUser($otherSite);
+        $client = $this->clientAt($site);
+        $outgoingShift = $this->shiftAt($site, $client, $outgoing);
+        $incomingShift = $this->shiftAt($site, $client, $incoming);
+        $otherIncomingShift = $this->shiftAt($otherSite, $this->clientAt($otherSite), $otherIncoming);
+        $validHandover = $this->shiftHandover(
+            $outgoingShift,
+            $incomingShift,
+            $client,
+            $outgoing,
+            $incoming,
+        );
+        $conflictedHandover = $this->shiftHandover(
+            $outgoingShift,
+            $incomingShift,
+            $client,
+            $outgoing,
+            $incoming,
+        );
+        ShiftHandover::query()->whereKey($conflictedHandover->id)->update([
+            'incoming_shift_id' => $otherIncomingShift->id,
+            'incoming_staff_id' => $otherIncoming->id,
+        ]);
+        $clientWithoutSite = $this->clientAt($site);
+        $shiftWithoutSite = $this->shiftAt($site, $clientWithoutSite, $outgoing);
+        $missingProvenance = $this->shiftHandover(
+            $shiftWithoutSite,
+            null,
+            $clientWithoutSite,
+            $outgoing,
+            null,
+        );
+        Client::query()->whereKey($clientWithoutSite->id)->update(['site_id' => null]);
+        Shift::query()->whereKey($shiftWithoutSite->id)->update(['site_id' => null]);
+        $service = app(UserSiteAccessService::class);
+        $bypass = ['reports.viewAny'];
+
+        $query = ShiftHandover::query()->whereIn('id', [
+            $validHandover->id,
+            $conflictedHandover->id,
+            $missingProvenance->id,
+        ])->orderBy('id');
+        $service->applyHandoverScope($query, $viewer, $bypass);
+
+        $this->assertSame([$validHandover->id], $query->pluck('id')->all());
+        $service->assertCanAccessHandover($viewer, $validHandover, $bypass);
+        foreach ([$conflictedHandover, $missingProvenance] as $handover) {
+            $this->assertAccessDenied(
+                fn () => $service->assertCanAccessHandover($viewer, $handover->fresh(), $bypass),
+            );
+        }
+    }
+
+    public function test_control_room_alert_query_and_direct_access_share_immutable_site_precedence(): void
+    {
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $viewer = $this->currentSiteUser($site);
+        $broadViewer = $this->currentSiteUser($otherSite, permissions: ['reports.viewAny']);
+        $siteClient = $this->clientAt($site);
+        $otherSiteClient = $this->clientAt($otherSite);
+        $directSiteAlert = ControlRoomAlert::factory()->create([
+            'site_id' => $site->id,
+            'client_id' => $otherSiteClient->id,
+            'context' => ['site_id' => $otherSite->id],
+        ]);
+        $clientSiteAlert = ControlRoomAlert::factory()->create([
+            'site_id' => null,
+            'client_id' => $siteClient->id,
+            'context' => ['site_id' => $otherSite->id],
+        ]);
+        $contextSiteAlert = ControlRoomAlert::factory()->create([
+            'site_id' => null,
+            'client_id' => null,
+            'context' => ['site_id' => $site->id],
+        ]);
+        $missingProvenance = ControlRoomAlert::factory()->create([
+            'site_id' => null,
+            'client_id' => null,
+            'context' => [],
+        ]);
         $service = app(UserSiteAccessService::class);
 
-        $query = Shift::query()->whereKey($shift->id);
-        $service->applyShiftScope($query, $platformAdmin, ['healthSafety.viewAllSites']);
+        $query = ControlRoomAlert::query()->whereIn('id', [
+            $directSiteAlert->id,
+            $clientSiteAlert->id,
+            $contextSiteAlert->id,
+            $missingProvenance->id,
+        ])->orderBy('id');
+        $service->applyAlertScope($query, $viewer);
 
-        $this->assertFalse($query->exists());
-        $this->assertAccessDenied(fn () => $service->assertCanAccessShift(
-            $platformAdmin,
-            $shift,
-            ['healthSafety.viewAllSites'],
+        $this->assertSame(
+            [$directSiteAlert->id, $clientSiteAlert->id, $contextSiteAlert->id],
+            $query->pluck('id')->all(),
+        );
+        foreach ([$directSiteAlert, $clientSiteAlert, $contextSiteAlert] as $alert) {
+            $service->assertCanAccessAlert($viewer, $alert);
+        }
+
+        $broadQuery = ControlRoomAlert::query()->whereKey($missingProvenance->id);
+        $service->applyAlertScope($broadQuery, $broadViewer, ['reports.viewAny']);
+        $this->assertFalse($broadQuery->exists());
+        $this->assertAccessDenied(fn () => $service->assertCanAccessAlert(
+            $broadViewer,
+            $missingProvenance,
+            ['reports.viewAny'],
         ));
     }
 
-    public function test_timesheet_query_and_assert_reject_snapshot_shift_and_client_contradictions(): void
+    public function test_fleet_recipient_eligibility_requires_current_staff_assigned_to_the_asset_site(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 511]);
-        $otherSite = Site::factory()->create(['tenant_id' => 511]);
-        $viewer = $this->siteUser(511, $site);
-        $worker = $this->siteUser(511, $site);
-        $client = Client::factory()->create([
-            'organization_id' => 511,
-            'site_id' => $site->id,
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $eligible = $this->currentSiteUser($site);
+        $otherSiteStaff = $this->currentSiteUser($otherSite);
+        $endedStaff = $this->currentSiteUser($site, profileOverrides: [
+            'end_date' => now()->subDay()->toDateString(),
         ]);
-        $shift = Shift::factory()->create([
-            'organization_id' => 511,
-            'site_id' => $site->id,
-            'client_id' => $client->id,
-            'user_id' => $worker->id,
-        ]);
-        $timesheet = Timesheet::factory()->create([
-            'user_id' => $worker->id,
-            'client_id' => $client->id,
-            'shift_id' => $shift->id,
-            'shift_site_id' => $site->id,
-        ]);
-        Shift::query()->whereKey($shift->id)->update(['site_id' => $otherSite->id]);
         $service = app(UserSiteAccessService::class);
 
-        $query = Timesheet::query()->whereKey($timesheet->id);
-        $service->applyTimesheetScope($query, $viewer);
-        $this->assertFalse($query->exists());
-        $this->assertAccessDenied(fn () => $service->assertCanAccessTimesheet($viewer, $timesheet->fresh()));
+        $query = User::query()->whereIn('id', [
+            $eligible->id,
+            $otherSiteStaff->id,
+            $endedStaff->id,
+        ])->orderBy('id');
+        $service->applyFleetRecipientEligibility($query, $site->id);
+
+        $this->assertSame([$eligible->id], $query->pluck('id')->all());
     }
 
-    public function test_timesheet_query_and_assert_both_reject_contradictory_direct_site_snapshots(): void
+    public function test_fleet_handover_query_and_direct_access_keep_asset_and_current_staff_integrity_under_bypass(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 512]);
-        $otherSite = Site::factory()->create(['tenant_id' => 512]);
-        $viewer = $this->siteUser(512, $site);
-        $worker = $this->siteUser(512, $site);
-        $timesheet = Timesheet::factory()->create([
-            'user_id' => $worker->id,
-            'client_id' => null,
+        $site = Site::factory()->create();
+        $homeSite = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $viewer = $this->currentSiteUser($site, permissions: ['fleet.manage']);
+        $outgoing = $this->currentSiteUser($site);
+        $incoming = $this->currentSiteUser($site);
+        $homeOutgoing = $this->currentSiteUser($homeSite);
+        $homeIncoming = $this->currentSiteUser($homeSite);
+        $otherSiteStaff = $this->currentSiteUser($otherSite);
+        $vehicle = Asset::factory()->vehicle()->create([
+            'site_id' => $site->id,
+            'home_site_id' => $homeSite->id,
+        ]);
+        $validHandover = $this->fleetHandover($vehicle, $outgoing, $incoming);
+        $homeOnlyVehicle = Asset::factory()->vehicle()->create([
+            'site_id' => null,
+            'home_site_id' => $homeSite->id,
+        ]);
+        $homeFallbackHandover = $this->fleetHandover($homeOnlyVehicle, $homeOutgoing, $homeIncoming);
+        $incomingConflict = $this->fleetHandover($vehicle, $outgoing, $otherSiteStaff);
+        $outgoingConflict = $this->fleetHandover($vehicle, $otherSiteStaff, $incoming);
+        $unattributedVehicle = Asset::factory()->vehicle()->create([
+            'site_id' => null,
+            'home_site_id' => null,
+        ]);
+        $missingProvenance = $this->fleetHandover($unattributedVehicle, $outgoing, $incoming);
+        $service = app(UserSiteAccessService::class);
+        $bypass = ['fleet.manage'];
+
+        $query = FleetShiftHandover::query()->whereIn('id', [
+            $validHandover->id,
+            $homeFallbackHandover->id,
+            $incomingConflict->id,
+            $outgoingConflict->id,
+            $missingProvenance->id,
+        ])->orderBy('id');
+        $service->applyFleetHandoverScope($query, $viewer, $bypass);
+
+        $this->assertSame(
+            [$validHandover->id, $homeFallbackHandover->id],
+            $query->pluck('id')->all(),
+        );
+        $service->assertCanAccessFleetHandover($viewer, $validHandover, $bypass);
+        $service->assertCanAccessFleetHandover($viewer, $homeFallbackHandover, $bypass);
+        foreach ([$incomingConflict, $outgoingConflict, $missingProvenance] as $handover) {
+            $this->assertAccessDenied(
+                fn () => $service->assertCanAccessFleetHandover($viewer, $handover, $bypass),
+            );
+        }
+    }
+
+    public function test_client_incident_query_and_direct_access_share_snapshot_shift_client_precedence(): void
+    {
+        $snapshotSite = Site::factory()->create();
+        $currentSite = Site::factory()->create();
+        $snapshotViewer = $this->currentSiteUser($snapshotSite);
+        $currentViewer = $this->currentSiteUser($currentSite);
+        $broadViewer = $this->currentSiteUser($snapshotSite, permissions: ['reports.viewAny']);
+        $worker = $this->currentSiteUser($snapshotSite);
+        $client = $this->clientAt($snapshotSite);
+        $capturedShift = $this->shiftAt($snapshotSite, $client, $worker);
+        $directSnapshot = ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'shift_id' => $capturedShift->id,
+            'site_id' => $snapshotSite->id,
+            'reported_by' => $worker->id,
+        ]);
+        $shiftSnapshot = ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'shift_id' => $capturedShift->id,
+            'site_id' => null,
+            'reported_by' => $worker->id,
+        ]);
+        $client->update(['site_id' => $currentSite->id]);
+        $clientFallback = ClientIncident::factory()->create([
+            'client_id' => $client->id,
             'shift_id' => null,
-            'shift_site_id' => $site->id,
-            'site_id' => $otherSite->id,
+            'site_id' => null,
+            'reported_by' => $worker->id,
+        ]);
+        $clientWithoutSite = $this->clientAt(null);
+        $missingProvenance = ClientIncident::factory()->create([
+            'client_id' => $clientWithoutSite->id,
+            'shift_id' => null,
+            'site_id' => null,
+            'reported_by' => $worker->id,
         ]);
         $service = app(UserSiteAccessService::class);
 
-        $query = Timesheet::query()->whereKey($timesheet->id);
-        $service->applyTimesheetScope($query, $viewer);
+        foreach ([$directSnapshot, $shiftSnapshot] as $incident) {
+            $query = ClientIncident::query()->whereKey($incident->id);
+            $service->applyClientIncidentScope($query, $snapshotViewer);
+            $this->assertTrue($query->exists());
+            $service->assertCanAccessClientIncident($snapshotViewer, $incident->fresh());
+        }
 
-        $this->assertFalse($query->exists());
-        $this->assertAccessDenied(fn () => $service->assertCanAccessTimesheet($viewer, $timesheet));
+        $clientQuery = ClientIncident::query()->whereKey($clientFallback->id);
+        $service->applyClientIncidentScope($clientQuery, $currentViewer);
+        $this->assertTrue($clientQuery->exists());
+        $service->assertCanAccessClientIncident($currentViewer, $clientFallback->fresh());
+
+        $missingQuery = ClientIncident::query()->whereKey($missingProvenance->id);
+        $service->applyClientIncidentScope($missingQuery, $broadViewer, ['reports.viewAny']);
+        $this->assertFalse($missingQuery->exists());
+        $this->assertAccessDenied(fn () => $service->assertCanAccessClientIncident(
+            $broadViewer,
+            $missingProvenance->fresh(),
+            ['reports.viewAny'],
+        ));
     }
 
-    public function test_shift_handover_query_and_assert_require_all_relations_to_share_one_authoritative_site_and_tenant(): void
+    /**
+     * @param  array<int, string>  $permissions
+     * @param  array<string, mixed>  $profileOverrides
+     */
+    private function currentSiteUser(
+        Site $site,
+        array $permissions = [],
+        array $profileOverrides = [],
+    ): User {
+        $user = User::factory()->create([
+            'approved_at' => now(),
+            'role' => 'support_worker',
+        ]);
+        HrEmployeeProfile::query()->create([
+            'user_id' => $user->id,
+            'employee_number' => 'EMP-USACI-'.$user->id,
+            'work_email' => $user->email,
+            'position_title' => 'Support Worker',
+            'position_role' => 'support_worker',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            ...$profileOverrides,
+        ]);
+
+        foreach ($permissions as $permission) {
+            $this->grantPermission($user, $permission);
+        }
+
+        return $user;
+    }
+
+    private function grantPermission(User $user, string $key): void
     {
-        $site = Site::factory()->create(['tenant_id' => 521]);
-        $otherSite = Site::factory()->create(['tenant_id' => 521]);
-        $viewer = $this->siteUser(521, $site);
-        $outgoing = $this->siteUser(521, $site);
-        $incoming = $this->siteUser(521, $site);
-        $client = Client::factory()->create([
-            'organization_id' => 521,
-            'site_id' => $site->id,
+        $permission = Permission::query()->firstOrCreate(
+            ['key' => $key],
+            [
+                'description' => $key,
+                'group' => 'test',
+                'module' => 'Test',
+            ],
+        );
+        $user->permissionOverrides()->syncWithoutDetaching([
+            $permission->id => ['allowed' => true],
         ]);
-        $outgoingShift = Shift::factory()->create([
-            'organization_id' => 521,
-            'site_id' => $site->id,
+    }
+
+    private function clientAt(?Site $site): Client
+    {
+        return Client::factory()->create([
+            'site_id' => $site?->id,
+            'status' => 'active',
+        ]);
+    }
+
+    private function shiftAt(?Site $site, Client $client, User $worker): Shift
+    {
+        return Shift::factory()->create([
+            'site_id' => $site?->id,
             'client_id' => $client->id,
-            'user_id' => $outgoing->id,
+            'user_id' => $worker->id,
         ]);
-        $incomingShift = Shift::factory()->create([
-            'organization_id' => 521,
-            'site_id' => $site->id,
+    }
+
+    private function timesheetFor(Shift $shift, Client $client, User $worker, Site $site): Timesheet
+    {
+        return Timesheet::factory()->create([
+            'shift_id' => $shift->id,
             'client_id' => $client->id,
-            'user_id' => $incoming->id,
+            'user_id' => $worker->id,
+            'shift_site_id' => $site->id,
+            'site_id' => $site->id,
         ]);
-        $handover = ShiftHandover::factory()->create([
-            'organization_id' => 521,
+    }
+
+    private function shiftHandover(
+        Shift $outgoingShift,
+        ?Shift $incomingShift,
+        Client $client,
+        User $outgoing,
+        ?User $incoming,
+    ): ShiftHandover {
+        return ShiftHandover::query()->create([
             'outgoing_shift_id' => $outgoingShift->id,
-            'incoming_shift_id' => $incomingShift->id,
+            'incoming_shift_id' => $incomingShift?->id,
             'client_id' => $client->id,
             'outgoing_staff_id' => $outgoing->id,
-            'incoming_staff_id' => $incoming->id,
+            'incoming_staff_id' => $incoming?->id,
+            'status' => 'submitted',
+            'handover_notes' => 'Canonical Site relationship handover.',
+            'tasks_pending' => [],
+            'medications_due' => [],
+            'incidents_to_note' => [],
+            'submitted_at' => now(),
+            'submitted_by' => $outgoing->id,
         ]);
-        Shift::query()->whereKey($incomingShift->id)->update(['site_id' => $otherSite->id]);
-        $service = app(UserSiteAccessService::class);
-
-        $query = ShiftHandover::query()->whereKey($handover->id);
-        $service->applyHandoverScope($query, $viewer);
-        $this->assertFalse($query->exists());
-        $this->assertAccessDenied(fn () => $service->assertCanAccessHandover($viewer, $handover->fresh()));
     }
 
-    public function test_fleet_query_and_assert_apply_recipient_tenant_and_current_site_integrity_even_to_broad_viewers(): void
-    {
-        $site = Site::factory()->create(['tenant_id' => 531]);
-        $otherSite = Site::factory()->create(['tenant_id' => 531]);
-        $vehicle = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
-        $outgoing = $this->siteUser(531, $site);
-        $wrongSiteIncoming = $this->siteUser(531, $otherSite);
-        $handover = FleetShiftHandover::query()->create([
-            'tenant_id' => 531,
-            'asset_id' => $vehicle->id,
+    private function fleetHandover(
+        Asset $asset,
+        User $outgoing,
+        User $incoming,
+    ): FleetShiftHandover {
+        return FleetShiftHandover::query()->create([
+            'asset_id' => $asset->id,
             'outgoing_user_id' => $outgoing->id,
-            'incoming_user_id' => $wrongSiteIncoming->id,
+            'incoming_user_id' => $incoming->id,
             'exterior_condition' => 'good',
             'interior_condition' => 'clean',
             'status' => 'pending_acceptance',
             'handed_over_at' => now(),
         ]);
-        $platformAdmin = User::factory()->create([
-            'organization_id' => null,
-            'approved_at' => now(),
-            'role' => 'admin',
-        ]);
-        $platformAdmin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        $service = app(UserSiteAccessService::class);
-
-        $query = FleetShiftHandover::query()->whereKey($handover->id);
-        $service->applyFleetHandoverScope($query, $platformAdmin, ['fleet.manage']);
-        $this->assertFalse($query->exists());
-        $this->assertAccessDenied(fn () => $service->assertCanAccessFleetHandover(
-            $wrongSiteIncoming,
-            $handover,
-            ['fleet.manage'],
-        ));
-        $this->assertAccessDenied(fn () => $service->assertCanAccessFleetHandover(
-            $platformAdmin,
-            $handover,
-            ['fleet.manage'],
-        ));
-    }
-
-    public function test_client_incident_snapshot_site_keeps_list_and_open_authorization_in_parity_after_a_client_moves(): void
-    {
-        $snapshotSite = Site::factory()->create(['tenant_id' => 541]);
-        $currentSite = Site::factory()->create(['tenant_id' => 541]);
-        $viewer = $this->siteUser(541, $snapshotSite);
-        $client = Client::factory()->create([
-            'organization_id' => 541,
-            'site_id' => $snapshotSite->id,
-        ]);
-        $incident = ClientIncident::factory()->create([
-            'client_id' => $client->id,
-            'site_id' => $snapshotSite->id,
-            'reported_by' => $viewer->id,
-        ]);
-        $legacyFallback = ClientIncident::factory()->create([
-            'client_id' => $client->id,
-            'site_id' => null,
-            'reported_by' => $viewer->id,
-        ]);
-        $client->update(['site_id' => $currentSite->id]);
-        $service = app(UserSiteAccessService::class);
-
-        $query = ClientIncident::query()->whereIn('id', [$incident->id, $legacyFallback->id]);
-        $service->applyClientIncidentScope($query, $viewer);
-
-        $this->assertSame([$incident->id], $query->pluck('id')->all());
-        $service->assertCanAccessClientIncident($viewer, $incident->fresh());
-        $this->assertAccessDenied(fn () => $service->assertCanAccessClientIncident(
-            $viewer,
-            $legacyFallback->fresh(),
-        ));
-    }
-
-    public function test_client_incident_snapshot_site_never_overrides_foreign_client_organization_ownership(): void
-    {
-        $localSite = Site::factory()->create(['tenant_id' => 542]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 543]);
-        $viewer = $this->siteUser(542, $localSite);
-        $foreignClient = Client::factory()->create([
-            'organization_id' => 543,
-            'site_id' => $foreignSite->id,
-        ]);
-        $incident = ClientIncident::factory()->create([
-            'client_id' => $foreignClient->id,
-            'site_id' => $localSite->id,
-            'reported_by' => $viewer->id,
-        ]);
-        $service = app(UserSiteAccessService::class);
-
-        $query = ClientIncident::query()->whereKey($incident->id);
-        $service->applyClientIncidentScope($query, $viewer);
-
-        $this->assertFalse($query->exists());
-        $this->assertAccessDenied(fn () => $service->assertCanAccessClientIncident(
-            $viewer,
-            $incident,
-        ));
-    }
-
-    private function siteUser(int $organizationId, Site $site): User
-    {
-        $user = User::factory()->create([
-            'organization_id' => $organizationId,
-            'approved_at' => now(),
-            'role' => 'support_worker',
-        ]);
-        HrEmployeeProfile::factory()->create([
-            'tenant_id' => $organizationId,
-            'user_id' => $user->id,
-            'primary_site_id' => $site->id,
-            'secondary_site_ids' => [],
-            'is_active' => true,
-        ]);
-
-        return $user;
     }
 
     private function assertAccessDenied(callable $assertion): void
     {
         try {
             $assertion();
-            $this->fail('A contradictory record tuple must not be authorized.');
-        } catch (HttpException $exception) {
+            $this->fail('A conflicting or missing canonical Site relationship must not be authorized.');
+        } catch (HttpExceptionInterface $exception) {
             $this->assertSame(403, $exception->getStatusCode());
         }
     }

@@ -1,4 +1,5 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,7 +23,6 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Download,
@@ -309,7 +309,8 @@ export default function ClientDocuments({
     };
 
     const visibleFolders = useMemo(
-        () => Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)),
+        () =>
+            Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)),
         [folderCounts],
     );
 
@@ -402,7 +403,6 @@ export default function ClientDocuments({
                     />
                 }
             >
-
                 {/* Stats Bar */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div className="rounded-xl border bg-primary/10 p-3 text-center">
@@ -681,7 +681,11 @@ export default function ClientDocuments({
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 aria-label="Delete document"
-                                                                onClick={() => setDocumentToDelete(d)}
+                                                                onClick={() =>
+                                                                    setDocumentToDelete(
+                                                                        d,
+                                                                    )
+                                                                }
                                                                 className="h-7 w-7 rounded-full bg-status-critical-bg text-status-critical hover:bg-status-critical-bg"
                                                             >
                                                                 <Trash2 className="h-3.5 w-3.5" />
@@ -892,7 +896,11 @@ export default function ClientDocuments({
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     aria-label="Delete document"
-                                                                    onClick={() => setDocumentToDelete(d)}
+                                                                    onClick={() =>
+                                                                        setDocumentToDelete(
+                                                                            d,
+                                                                        )
+                                                                    }
                                                                     className="h-7 w-7 rounded-lg hover:bg-status-critical-bg"
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5 text-status-critical" />
@@ -923,7 +931,7 @@ export default function ClientDocuments({
                     </DialogHeader>
                     <div className="space-y-4 py-2">
                         {/* Drop zone */}
-                        <label className="bg-primary/5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary p-8 transition-colors hover:bg-primary/10">
+                        <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary bg-primary/5 p-8 transition-colors hover:bg-primary/10">
                             <Upload className="mb-2 h-8 w-8 text-primary" />
                             <p className="text-sm font-medium text-primary">
                                 {uploadForm.data.file

@@ -381,8 +381,8 @@ class ControlRoomAlertLifecycleService
                 throw new InvalidArgumentException('The incident is not linked to this operational alert.');
             }
             $lockedIncident->loadMissing([
-                'client:id,site_id,organization_id',
-                'shift.client:id,site_id,organization_id',
+                'client:id,site_id',
+                'shift.client:id,site_id',
             ]);
             $incidentSiteId = $lockedIncident->site_id
                 ?: $lockedIncident->client?->site_id
@@ -395,7 +395,10 @@ class ControlRoomAlertLifecycleService
                     $incidentSiteId ? (int) $incidentSiteId : null,
                 );
             } catch (DomainException $exception) {
-                throw new InvalidArgumentException($exception->getMessage(), previous: $exception);
+                throw new InvalidArgumentException(
+                    'The linked incident is not available for this operational alert.',
+                    previous: $exception,
+                );
             }
             if ($lockedIncident->status !== 'reviewed'
                 || $lockedIncident->reopened_at === null

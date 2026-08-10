@@ -1,10 +1,12 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Settings\ItMailboxSettingsController;
 use App\Http\Requests\Settings\UpdateItMailboxRequest;
 use App\Jobs\PollItMailboxJob;
 use App\Models\ItMailboxConnection;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Queue;
@@ -13,7 +15,7 @@ use Laravel\Socialite\Facades\Socialite;
 
 /*
  * E6a — the support-mailbox connect/disconnect backend (mirrors the
- * calendar-sync OAuth flow; gated on integrations.manage_tenant_secrets).
+ * calendar-sync OAuth flow; gated on the existing connection-management permission).
  */
 
 function itMailboxSettingsUser(string $role): User
@@ -42,7 +44,6 @@ test('the delegated mailbox mutation uses its dedicated form request', function 
 function itSettingsConnection(array $overrides = []): ItMailboxConnection
 {
     return ItMailboxConnection::create(array_merge([
-        'tenant_id' => 1,
         'provider' => ItMailboxConnection::PROVIDER_MICROSOFT,
         'status' => ItMailboxConnection::STATUS_CONNECTED,
         'access_token' => 'access-123',
@@ -67,6 +68,34 @@ test('the mailbox settings surface is admin-gated', function () {
             ->has('connections.microsoft')
             ->has('connections.google')
             ->where('connections.microsoft.status', null));
+});
+
+test('the support mailbox connection is an application-wide setting', function () {
+    $otherSite = Site::factory()->create();
+    $otherAdmin = itMailboxSettingsUser('admin');
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $otherAdmin->id,
+        'primary_site_id' => $otherSite->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'created_by' => $otherAdmin->id,
+        'updated_by' => $otherAdmin->id,
+    ]);
+    itSettingsConnection();
+
+    $this->actingAs($otherAdmin)
+        ->get('/settings/it-mailbox')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('connections.microsoft.status', ItMailboxConnection::STATUS_CONNECTED)
+            ->where('connections.microsoft.account_email', 'admin@example.test'));
+
+    $this->actingAs($otherAdmin)
+        ->put('/settings/it-mailbox/mailbox/microsoft', ['mailbox_email' => 'helpdesk@example.test'])
+        ->assertRedirect(route('settings.it-mailbox'));
+
+    expect(ItMailboxConnection::query()->sole()->mailbox_email)->toBe('helpdesk@example.test');
 });
 
 test('the OAuth callback stores a connected mailbox row', function () {

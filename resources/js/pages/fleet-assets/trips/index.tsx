@@ -6,14 +6,6 @@ import {
 } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import LeafletMap from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -28,21 +20,29 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { toDateInput } from '@/lib/datetime';
 import {
     formatDateTime,
     formatDistance,
     formatDuration,
     formatTime,
 } from '@/lib/fleet-utils';
-import { toDateInput } from '@/lib/datetime';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     Car,
     ChevronDown,
     ChevronRight,
-    ChevronUp,
     ChevronsUpDown,
+    ChevronUp,
     Clock,
     Download,
     Gauge,
@@ -311,7 +311,9 @@ export default function TripsIndex({
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={Route} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Trip history · live feed</HeroStatusPill>
+                            <HeroStatusPill>
+                                Trip history · live feed
+                            </HeroStatusPill>
                             <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                                 Trip History
                             </h1>
@@ -339,19 +341,29 @@ export default function TripsIndex({
                                 label="Active now"
                                 value={fmt(hero.active_now)}
                                 caption="open or in progress"
-                                tone={hero.active_now > 0 ? 'success' : 'neutral'}
+                                tone={
+                                    hero.active_now > 0 ? 'success' : 'neutral'
+                                }
                             />
                             <HeroClusterTile
                                 href={weekHref}
                                 label="After-hours 7d"
                                 value={fmt(hero.after_hours_7d)}
                                 caption="before 8am / after 6pm"
-                                tone={hero.after_hours_7d > 0 ? 'warning' : 'success'}
+                                tone={
+                                    hero.after_hours_7d > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
                             />
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction href={csvHref()} icon={Download} external>
+                        <FleetHeroAction
+                            href={csvHref()}
+                            icon={Download}
+                            external
+                        >
                             Export CSV
                         </FleetHeroAction>
                     </div>
@@ -542,7 +554,10 @@ export default function TripsIndex({
 
                 {/* Trip Table */}
                 {tripsData.length > 0 ? (
-                    <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto rounded-lg border">
+                    <div
+                        data-fleet-narrow-strategy="horizontal-scroll"
+                        className="overflow-x-auto rounded-lg border"
+                    >
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
@@ -834,9 +849,13 @@ function TripRow({
                                                             {seg.seq ?? i + 1}
                                                         </div>
                                                         <div className="text-muted-foreground">
-                                                            {formatTime(seg.started_at)}
+                                                            {formatTime(
+                                                                seg.started_at,
+                                                            )}
                                                             {' - '}
-                                                            {formatTime(seg.ended_at)}
+                                                            {formatTime(
+                                                                seg.ended_at,
+                                                            )}
                                                         </div>
                                                         <div className="text-muted-foreground">
                                                             {formatDistance(

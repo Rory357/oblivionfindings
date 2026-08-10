@@ -36,8 +36,13 @@ export default function RespiteBookingShow({ booking }: Props) {
                     <PageHero
                         variant="compact"
                         backHref="/respite/bookings"
-                        title={`${booking.client?.first_name ?? ''} ${booking.client?.last_name ?? ''}`.trim() || 'Booking'}
-                        actions={<Badge variant="outline">{booking.status}</Badge>}
+                        title={
+                            `${booking.client?.first_name ?? ''} ${booking.client?.last_name ?? ''}`.trim() ||
+                            'Booking'
+                        }
+                        actions={
+                            <Badge variant="outline">{booking.status}</Badge>
+                        }
                     />
                 }
             >

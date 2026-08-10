@@ -41,7 +41,8 @@ const SAMPLE: Record<string, string> = {
 
 function renderPreview(template: string): string {
     let out = template;
-    for (const [k, v] of Object.entries(SAMPLE)) out = out.replaceAll(`{{${k}}}`, v);
+    for (const [k, v] of Object.entries(SAMPLE))
+        out = out.replaceAll(`{{${k}}}`, v);
     return out;
 }
 
@@ -99,19 +100,28 @@ export function EmailDialog({
         }
     };
 
-    const insertToken = (token: string) => form.setData('body', `${form.data.body}${token}`);
+    const insertToken = (token: string) =>
+        form.setData('body', `${form.data.body}${token}`);
 
     const sendTest = () => {
         if (!email) return;
-        router.post(`/hr/onboarding/emails/${email.id}/test`, {}, { preserveScroll: true });
+        router.post(
+            `/hr/onboarding/emails/${email.id}/test`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="max-h-[90vh] overflow-hidden p-0 sm:max-w-[760px]">
                 <DialogHeader className="border-b border-border px-6 py-4">
-                    <DialogTitle>{email ? 'Edit email template' : 'New email template'}</DialogTitle>
-                    <DialogDescription>Edit copy, merge tokens & schedule.</DialogDescription>
+                    <DialogTitle>
+                        {email ? 'Edit email template' : 'New email template'}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Edit copy, merge tokens & schedule.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid max-h-[64vh] gap-5 overflow-y-auto px-6 py-5 md:grid-cols-2">
@@ -120,22 +130,33 @@ export function EmailDialog({
                             <Label>Name</Label>
                             <Input
                                 value={form.data.template_name}
-                                onChange={(e) => form.setData('template_name', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'template_name',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Welcome to the team"
                             />
                             {form.errors.template_name && (
-                                <p className="text-xs text-status-critical">{form.errors.template_name}</p>
+                                <p className="text-xs text-status-critical">
+                                    {form.errors.template_name}
+                                </p>
                             )}
                         </div>
                         <div className="space-y-1.5">
                             <Label>Subject</Label>
                             <Input
                                 value={form.data.subject}
-                                onChange={(e) => form.setData('subject', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('subject', e.target.value)
+                                }
                                 placeholder="Welcome to {{company_name}}, {{employee_name}}!"
                             />
                             {form.errors.subject && (
-                                <p className="text-xs text-status-critical">{form.errors.subject}</p>
+                                <p className="text-xs text-status-critical">
+                                    {form.errors.subject}
+                                </p>
                             )}
                         </div>
                         <div className="space-y-1.5">
@@ -143,16 +164,25 @@ export function EmailDialog({
                             <Textarea
                                 rows={6}
                                 value={form.data.body}
-                                onChange={(e) => form.setData('body', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('body', e.target.value)
+                                }
                                 placeholder="Kia ora {{employee_name}}…"
                             />
-                            {form.errors.body && <p className="text-xs text-status-critical">{form.errors.body}</p>}
+                            {form.errors.body && (
+                                <p className="text-xs text-status-critical">
+                                    {form.errors.body}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">Insert merge token</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Insert merge token
+                            </Label>
                             <div className="flex flex-wrap gap-1.5">
                                 {TOKENS.map((t) => (
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         key={t}
                                         type="button"
                                         onClick={() => insertToken(t)}
@@ -170,34 +200,54 @@ export function EmailDialog({
                                     type="number"
                                     className="w-20"
                                     value={form.data.send_days_before_start}
-                                    onChange={(e) => form.setData('send_days_before_start', Number(e.target.value))}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'send_days_before_start',
+                                            Number(e.target.value),
+                                        )
+                                    }
                                 />
-                                <span className="text-muted-foreground">days before start date</span>
+                                <span className="text-muted-foreground">
+                                    days before start date
+                                </span>
                             </div>
                         </div>
                         <label className="flex items-center gap-2 text-sm">
                             <Checkbox
                                 checked={form.data.is_active}
-                                onCheckedChange={(c) => form.setData('is_active', Boolean(c))}
+                                onCheckedChange={(c) =>
+                                    form.setData('is_active', Boolean(c))
+                                }
                             />
                             Active
                         </label>
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Live preview</Label>
+                        <Label className="text-xs text-muted-foreground">
+                            Live preview
+                        </Label>
                         <div className="overflow-hidden rounded-xl border border-border">
                             <div className="h-1.5 bg-primary" />
                             <div className="space-y-2.5 p-4 text-[12.5px] leading-relaxed">
                                 <div className="text-[11px] text-muted-foreground">
-                                    <b>Subject:</b> {renderPreview(form.data.subject) || '—'}
+                                    <b>Subject:</b>{' '}
+                                    {renderPreview(form.data.subject) || '—'}
                                 </div>
-                                <p className="whitespace-pre-wrap">{renderPreview(form.data.body) || '…'}</p>
+                                <p className="whitespace-pre-wrap">
+                                    {renderPreview(form.data.body) || '…'}
+                                </p>
                             </div>
                         </div>
                         {email && (
-                            <Button type="button" variant="outline" className="w-full" onClick={sendTest}>
-                                <Send className="mr-2 h-4 w-4" /> Send test to me
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full"
+                                onClick={sendTest}
+                            >
+                                <Send className="mr-2 h-4 w-4" /> Send test to
+                                me
                             </Button>
                         )}
                     </div>
@@ -208,7 +258,11 @@ export function EmailDialog({
                         Cancel
                     </Button>
                     <Button onClick={submit} disabled={form.processing}>
-                        {form.processing ? 'Saving…' : email ? 'Save template' : 'Create template'}
+                        {form.processing
+                            ? 'Saving…'
+                            : email
+                              ? 'Save template'
+                              : 'Create template'}
                     </Button>
                 </div>
             </DialogContent>

@@ -1,9 +1,9 @@
+import { PresenceBadge } from '@/components/presence-dot';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
-import { PresenceBadge } from '@/components/presence-dot';
 import { ArrowLeft, Send } from 'lucide-react';
 import { FormEvent, useEffect, useRef } from 'react';
 
@@ -31,13 +31,24 @@ function formatTime(iso: string): string {
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
 
-    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = date.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
     if (isToday) return time;
 
-    return date.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' + time;
+    return (
+        date.toLocaleDateString([], { day: 'numeric', month: 'short' }) +
+        ' ' +
+        time
+    );
 }
 
-export default function ShowConversation({ client, conversation, messages }: Props) {
+export default function ShowConversation({
+    client,
+    conversation,
+    messages,
+}: Props) {
     const clientName = `${client.first_name} ${client.last_name}`;
     const conversationTitle = conversation.title || 'Conversation';
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -75,9 +86,18 @@ export default function ShowConversation({ client, conversation, messages }: Pro
         <AppLayout
             breadcrumbs={[
                 { title: 'Portal', href: '/portal' },
-                { title: clientName, href: `/portal/clients/${client.id}/dashboard` },
-                { title: 'Messages', href: `/portal/clients/${client.id}/messages` },
-                { title: conversationTitle, href: `/portal/clients/${client.id}/messages/${conversation.id}` },
+                {
+                    title: clientName,
+                    href: `/portal/clients/${client.id}/dashboard`,
+                },
+                {
+                    title: 'Messages',
+                    href: `/portal/clients/${client.id}/messages`,
+                },
+                {
+                    title: conversationTitle,
+                    href: `/portal/clients/${client.id}/messages/${conversation.id}`,
+                },
             ]}
         >
             <Head title={`${conversationTitle} - ${clientName}`} />
@@ -94,12 +114,24 @@ export default function ShowConversation({ client, conversation, messages }: Pro
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div>
-                        <h1 className="text-lg font-semibold">{conversationTitle}</h1>
+                        <h1 className="text-lg font-semibold">
+                            {conversationTitle}
+                        </h1>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span>{conversation.participants.map((p) => p.name).join(', ')}</span>
-                            {conversation.participants.length > 0 && conversation.participants[0]?.presence && (
-                                <PresenceBadge status={conversation.participants[0].presence} />
-                            )}
+                            <span>
+                                {conversation.participants
+                                    .map((p) => p.name)
+                                    .join(', ')}
+                            </span>
+                            {conversation.participants.length > 0 &&
+                                conversation.participants[0]?.presence && (
+                                    <PresenceBadge
+                                        status={
+                                            conversation.participants[0]
+                                                .presence
+                                        }
+                                    />
+                                )}
                         </div>
                     </div>
                 </div>
@@ -126,13 +158,19 @@ export default function ShowConversation({ client, conversation, messages }: Pro
                                             }`}
                                         >
                                             {!msg.is_own && (
-                                                <p className={`mb-0.5 text-xs font-medium ${
-                                                    msg.is_own ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                                                }`}>
+                                                <p
+                                                    className={`mb-0.5 text-xs font-medium ${
+                                                        msg.is_own
+                                                            ? 'text-primary-foreground/70'
+                                                            : 'text-muted-foreground'
+                                                    }`}
+                                                >
                                                     {msg.sender_name}
                                                 </p>
                                             )}
-                                            <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                                            <p className="text-sm whitespace-pre-wrap">
+                                                {msg.content}
+                                            </p>
                                             <p
                                                 className={`mt-1 text-xs ${
                                                     msg.is_own
@@ -152,11 +190,16 @@ export default function ShowConversation({ client, conversation, messages }: Pro
                 </Card>
 
                 {/* Input bar */}
-                <form onSubmit={handleSend} className="mt-3 flex items-end gap-2">
+                <form
+                    onSubmit={handleSend}
+                    className="mt-3 flex items-end gap-2"
+                >
                     <Textarea
                         ref={textareaRef}
                         value={form.data.content}
-                        onChange={(e) => form.setData('content', e.target.value)}
+                        onChange={(e) =>
+                            form.setData('content', e.target.value)
+                        }
                         onKeyDown={handleKeyDown}
                         placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
                         rows={2}
@@ -172,7 +215,9 @@ export default function ShowConversation({ client, conversation, messages }: Pro
                     </Button>
                 </form>
                 {form.errors.content && (
-                    <p className="mt-1 text-sm text-destructive">{form.errors.content}</p>
+                    <p className="mt-1 text-sm text-destructive">
+                        {form.errors.content}
+                    </p>
                 )}
             </div>
         </AppLayout>

@@ -54,9 +54,11 @@ class SitesModuleIntegrationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calendar/global')
+                ->where('scope', 'global')
                 ->has('sites')
-                ->has('events')
+                ->has('sources')
                 ->has('eventTypes')
+                ->missing('events')
             );
     }
 
@@ -186,7 +188,6 @@ class SitesModuleIntegrationTest extends TestCase
         $site = Site::factory()->create(['type' => 'house']);
 
         $template = SiteChecklistTemplate::create([
-            'tenant_id' => $site->tenant_id,
             'key' => 'house_quality_'.uniqid(),
             'name' => 'House Quality Checklist',
             'applicable_to_type' => 'house',
@@ -195,7 +196,6 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $passItem = SiteChecklistTemplateItem::create([
-            'tenant_id' => $site->tenant_id,
             'template_id' => $template->id,
             'sort_order' => 1,
             'question' => 'Entry locks working?',
@@ -205,7 +205,6 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $failItem = SiteChecklistTemplateItem::create([
-            'tenant_id' => $site->tenant_id,
             'template_id' => $template->id,
             'sort_order' => 2,
             'question' => 'Fire extinguishers tagged?',
@@ -215,7 +214,6 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $assignment = SiteChecklistAssignment::create([
-            'tenant_id' => $site->tenant_id,
             'site_id' => $site->id,
             'template_id' => $template->id,
             'frequency' => 'monthly',
@@ -224,7 +222,6 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $run = SiteChecklistRun::create([
-            'tenant_id' => $site->tenant_id,
             'assignment_id' => $assignment->id,
             'site_id' => $site->id,
             'template_id' => $template->id,
@@ -272,7 +269,6 @@ class SitesModuleIntegrationTest extends TestCase
         $site = Site::factory()->create(['type' => 'house']);
 
         $template = SiteChecklistTemplate::create([
-            'tenant_id' => $site->tenant_id,
             'key' => 'house_quality_'.uniqid(),
             'name' => 'House Quality Checklist',
             'applicable_to_type' => 'house',
@@ -281,7 +277,6 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $assignment = SiteChecklistAssignment::create([
-            'tenant_id' => $site->tenant_id,
             'site_id' => $site->id,
             'template_id' => $template->id,
             'frequency' => 'daily',
@@ -290,7 +285,6 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $run = SiteChecklistRun::create([
-            'tenant_id' => $site->tenant_id,
             'assignment_id' => $assignment->id,
             'site_id' => $site->id,
             'template_id' => $template->id,
@@ -313,7 +307,6 @@ class SitesModuleIntegrationTest extends TestCase
         $site = Site::factory()->create(['type' => 'house']);
 
         $template = SiteChecklistTemplate::create([
-            'tenant_id' => $site->tenant_id,
             'key' => 'house_quality_'.uniqid(),
             'name' => 'House Quality Checklist',
             'applicable_to_type' => 'house',
@@ -322,7 +315,6 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $assignment = SiteChecklistAssignment::create([
-            'tenant_id' => $site->tenant_id,
             'site_id' => $site->id,
             'template_id' => $template->id,
             'frequency' => 'daily',
@@ -331,7 +323,6 @@ class SitesModuleIntegrationTest extends TestCase
         ]);
 
         $run = SiteChecklistRun::create([
-            'tenant_id' => $site->tenant_id,
             'assignment_id' => $assignment->id,
             'site_id' => $site->id,
             'template_id' => $template->id,

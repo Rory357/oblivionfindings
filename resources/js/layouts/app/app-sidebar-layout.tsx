@@ -4,7 +4,12 @@ import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
-import { type PropsWithChildren, type ReactNode, useCallback, useState } from 'react';
+import {
+    type PropsWithChildren,
+    type ReactNode,
+    useCallback,
+    useState,
+} from 'react';
 
 interface AppSidebarLayoutProps {
     breadcrumbs?: BreadcrumbItem[];
@@ -62,7 +67,9 @@ export default function AppSidebarLayout({
                         breadcrumbs={breadcrumbs}
                         onMobileMenuToggle={() => setMobileOpen(true)}
                     />
-                ) : header}
+                ) : (
+                    header
+                )}
                 <div className={cn(contentClassName ?? DEFAULT_CONTENT_CLASS)}>
                     {children}
                 </div>

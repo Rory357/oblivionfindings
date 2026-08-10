@@ -1,17 +1,21 @@
 <?php
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrGoalCycle;
 use App\Domain\Hr\Models\HrGoalTemplate;
 use App\Domain\Hr\Models\HrKeyResult;
 use App\Domain\Hr\Notifications\GoalCheckinDueNotification;
 use App\Domain\Hr\Notifications\GoalOverdueNotification;
+use App\Domain\Hr\Notifications\GoalWeeklyDigestNotification;
 use App\Domain\Hr\Services\CycleService;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 beforeEach(function () {
@@ -24,11 +28,25 @@ beforeEach(function () {
     ]);
 
     $this->owner = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->site = Site::factory()->create(['name' => 'Goals and OKRs Site']);
+    goalsOkrProfile($this->hr, $this->site);
+    goalsOkrProfile($this->owner, $this->site);
 });
+
+function goalsOkrProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
 
 test('the hub ships objectives, cycles and confidence-aware analytics', function () {
     HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->owner->id,
         'created_by' => $this->hr->id,
         'title' => 'At-risk objective',
@@ -70,7 +88,6 @@ test('creating an objective with key results computes a weighted roll-up', funct
 
 test('a baseline-aware KR check-in recomputes progress and logs confidence', function () {
     $goal = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->owner->id,
         'created_by' => $this->hr->id,
         'title' => 'Reduce errors',
@@ -83,7 +100,6 @@ test('a baseline-aware KR check-in recomputes progress and logs confidence', fun
 
     // "Reduce 50 -> 10": a current of 30 is exactly halfway.
     $kr = HrKeyResult::query()->create([
-        'tenant_id' => 1,
         'goal_id' => $goal->id,
         'title' => 'Errors per month',
         'kr_type' => 'number',
@@ -113,7 +129,6 @@ test('a baseline-aware KR check-in recomputes progress and logs confidence', fun
 
 test('a manual objective rejects manual progress once it has key results', function () {
     $goal = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->owner->id,
         'created_by' => $this->hr->id,
         'title' => 'Derived objective',
@@ -124,7 +139,7 @@ test('a manual objective rejects manual progress once it has key results', funct
         'due_date' => '2026-09-30',
     ]);
     HrKeyResult::query()->create([
-        'tenant_id' => 1, 'goal_id' => $goal->id, 'title' => 'KR', 'start_value' => 0,
+        'goal_id' => $goal->id, 'title' => 'KR', 'start_value' => 0,
         'current_value' => 0, 'target_value' => 100, 'weight' => 1, 'status' => 'not_started',
     ]);
 
@@ -135,7 +150,6 @@ test('a manual objective rejects manual progress once it has key results', funct
 
 test('an objective can be duplicated with its key results reset to baseline', function () {
     $goal = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->owner->id,
         'created_by' => $this->hr->id,
         'title' => 'Clone me',
@@ -147,7 +161,7 @@ test('an objective can be duplicated with its key results reset to baseline', fu
         'due_date' => '2026-09-30',
     ]);
     HrKeyResult::query()->create([
-        'tenant_id' => 1, 'goal_id' => $goal->id, 'title' => 'KR', 'start_value' => 10,
+        'goal_id' => $goal->id, 'title' => 'KR', 'start_value' => 10,
         'current_value' => 50, 'target_value' => 100, 'weight' => 1, 'progress_percentage' => 44, 'status' => 'in_progress',
     ]);
 
@@ -164,12 +178,12 @@ test('an objective can be duplicated with its key results reset to baseline', fu
 
 test('an objective can be re-parented and roll-ups recompute', function () {
     $parent = HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'New parent', 'goal_type' => 'company', 'priority' => 'high', 'status' => 'active',
         'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
     $child = HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'Child', 'goal_type' => 'team', 'priority' => 'high', 'status' => 'active',
         'progress_percentage' => 80, 'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
@@ -186,12 +200,12 @@ test('an objective can be re-parented and roll-ups recompute', function () {
 
 test('re-parenting refuses to create a cycle', function () {
     $a = HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'A', 'goal_type' => 'company', 'priority' => 'high', 'status' => 'active',
         'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
     $b = HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'B', 'goal_type' => 'team', 'priority' => 'high', 'status' => 'active',
         'parent_goal_id' => $a->id, 'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
@@ -204,12 +218,12 @@ test('re-parenting refuses to create a cycle', function () {
 
 test('bulk archive cancels the selected objectives', function () {
     $g1 = HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'Bulk 1', 'goal_type' => 'team', 'priority' => 'low', 'status' => 'active',
         'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
     $g2 = HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'Bulk 2', 'goal_type' => 'team', 'priority' => 'low', 'status' => 'active',
         'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
@@ -225,12 +239,12 @@ test('bulk archive cancels the selected objectives', function () {
 
 test('the export endpoint streams a CSV of objectives and KRs', function () {
     $goal = HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'Exportable', 'goal_type' => 'team', 'priority' => 'medium', 'status' => 'active',
         'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
     HrKeyResult::query()->create([
-        'tenant_id' => 1, 'goal_id' => $goal->id, 'title' => 'Exported KR', 'start_value' => 0,
+        'goal_id' => $goal->id, 'title' => 'Exported KR', 'start_value' => 0,
         'current_value' => 0, 'target_value' => 100, 'weight' => 1, 'status' => 'not_started',
     ]);
 
@@ -241,16 +255,16 @@ test('the export endpoint streams a CSV of objectives and KRs', function () {
 
 test('cycles are seeded and the current cycle resolves to today\'s window', function () {
     $service = app(CycleService::class);
-    $service->seedDefaults(1);
+    $service->seedDefaults();
 
-    $cycles = HrGoalCycle::query()->where('tenant_id', 1)->get();
+    $cycles = HrGoalCycle::query()->get();
     expect($cycles->where('type', 'quarter'))->toHaveCount(4);
-    expect($service->currentCycle(1))->not->toBeNull();
+    expect($service->currentCycle())->not->toBeNull();
 });
 
 test('creating an objective persists confidence, cycle and tags', function () {
     $cycle = HrGoalCycle::query()->create([
-        'tenant_id' => 1, 'name' => 'FY26 Q3', 'type' => 'quarter',
+        'name' => 'FY26 Q3', 'type' => 'quarter',
         'starts_at' => '2026-07-01', 'ends_at' => '2026-09-30', 'status' => 'active',
     ]);
 
@@ -276,7 +290,7 @@ test('creating an objective persists confidence, cycle and tags', function () {
 
 test('an objective can be put on hold and blocked', function () {
     $goal = HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'Holdable', 'goal_type' => 'team', 'priority' => 'medium', 'status' => 'active',
         'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
@@ -290,7 +304,7 @@ test('an objective can be put on hold and blocked', function () {
 
 test('the hub exposes objective templates', function () {
     HrGoalTemplate::query()->create([
-        'tenant_id' => 1, 'name' => 'Sample template', 'title' => 'Sample objective',
+        'name' => 'Sample template', 'title' => 'Sample objective',
         'goal_type' => 'team', 'priority' => 'high',
         'key_results' => [['title' => 'KR', 'kr_type' => 'percent', 'start_value' => 0, 'target_value' => 100, 'unit' => '%', 'weight' => 1]],
         'is_active' => true,
@@ -306,7 +320,7 @@ test('the daily reminders command notifies owners of due check-ins and overdue o
 
     // No check-in ever + overdue.
     HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'Needs a check-in', 'goal_type' => 'team', 'priority' => 'high', 'status' => 'active',
         'checkin_frequency' => 'weekly', 'last_checkin_at' => null,
         'start_date' => now()->subMonths(2)->toDateString(), 'due_date' => now()->subWeek()->toDateString(),
@@ -322,7 +336,7 @@ test('the development reminders fire and bump next_review_at forward', function 
     Notification::fake();
 
     $plan = HrDevelopmentGoal::query()->create([
-        'tenant_id' => 1, 'employee_user_id' => $this->owner->id, 'manager_user_id' => $this->hr->id,
+        'employee_user_id' => $this->owner->id, 'manager_user_id' => $this->hr->id,
         'title' => 'Review me', 'category' => 'capability', 'status' => 'in_progress',
         'progress_percent' => 20, 'review_frequency' => 'monthly',
         'next_review_at' => now()->subDay()->toDateString(),
@@ -338,19 +352,19 @@ test('the weekly digest command runs and notifies owners', function () {
     Notification::fake();
 
     HrGoal::query()->create([
-        'tenant_id' => 1, 'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
+        'user_id' => $this->owner->id, 'created_by' => $this->hr->id,
         'title' => 'Digest goal', 'goal_type' => 'team', 'priority' => 'medium', 'status' => 'active',
         'confidence' => 'at_risk', 'start_date' => '2026-07-01', 'due_date' => '2026-09-30',
     ]);
 
     $this->artisan('hr:goal-weekly-digest')->assertExitCode(0);
 
-    Notification::assertSentTo($this->owner, \App\Domain\Hr\Notifications\GoalWeeklyDigestNotification::class);
+    Notification::assertSentTo($this->owner, GoalWeeklyDigestNotification::class);
 });
 
 test('a development plan can link a formal competency and seeds a review date', function () {
-    $competencyId = \Illuminate\Support\Facades\DB::table('hr_competencies')->insertGetId([
-        'tenant_id' => 1, 'name' => 'Medication administration', 'category' => 'clinical',
+    $competencyId = DB::table('hr_competencies')->insertGetId([
+        'name' => 'Medication administration', 'category' => 'clinical',
         'proficiency_levels' => json_encode(['Novice', 'Competent', 'Expert']),
         'created_at' => now(), 'updated_at' => now(),
     ]);

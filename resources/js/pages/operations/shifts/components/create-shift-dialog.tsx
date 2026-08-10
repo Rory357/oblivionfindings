@@ -29,6 +29,8 @@ import {
     OverrideConfirmationDialog,
     type OverrideableWarning,
 } from '@/components/eligibility/override-confirmation-dialog';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -48,8 +50,6 @@ import {
 } from '@/routes/operations/shifts';
 import { store as storeShiftSeries } from '@/routes/operations/shifts/series';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 type Client = {
     id: number;
@@ -78,7 +78,13 @@ type LockedContext = {
     }>;
 } | null;
 
-type WizStepKey = 'type' | 'people' | 'schedule' | 'repeat' | 'tasks' | 'review';
+type WizStepKey =
+    | 'type'
+    | 'people'
+    | 'schedule'
+    | 'repeat'
+    | 'tasks'
+    | 'review';
 
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 const WEEKDAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -317,8 +323,7 @@ export function CreateShiftDialog({
         coverage_roles: (initialShift?.coverage_roles ??
             defaultCoverageRoles ??
             []) as string[],
-        required_licence_class:
-            initialShift?.required_licence_class ?? '',
+        required_licence_class: initialShift?.required_licence_class ?? '',
         required_licence_endorsements:
             initialShift?.required_licence_endorsements ?? ([] as string[]),
         coverage_rule_id: (coverageRuleId ?? '') as number | string,
@@ -343,18 +348,50 @@ export function CreateShiftDialog({
         () =>
             (
                 [
-                    { key: 'type', label: 'Shift type', blurb: 'What kind of shift', icon: LayoutGrid },
-                    { key: 'people', label: 'Who & where', blurb: 'Client, location, staff', icon: Users },
-                    { key: 'schedule', label: 'Schedule', blurb: 'Times, break, publish', icon: Clock },
-                    { key: 'repeat', label: 'Repeat weekly', blurb: 'Optional recurring series', icon: Repeat },
-                    { key: 'tasks', label: 'Tasks & notes', blurb: 'Worker checklist', icon: Pencil },
+                    {
+                        key: 'type',
+                        label: 'Shift type',
+                        blurb: 'What kind of shift',
+                        icon: LayoutGrid,
+                    },
+                    {
+                        key: 'people',
+                        label: 'Who & where',
+                        blurb: 'Client, location, staff',
+                        icon: Users,
+                    },
+                    {
+                        key: 'schedule',
+                        label: 'Schedule',
+                        blurb: 'Times, break, publish',
+                        icon: Clock,
+                    },
+                    {
+                        key: 'repeat',
+                        label: 'Repeat weekly',
+                        blurb: 'Optional recurring series',
+                        icon: Repeat,
+                    },
+                    {
+                        key: 'tasks',
+                        label: 'Tasks & notes',
+                        blurb: 'Worker checklist',
+                        icon: Pencil,
+                    },
                     {
                         key: 'review',
                         label: 'Review',
-                        blurb: isEdit ? 'Confirm and save' : 'Confirm and create',
+                        blurb: isEdit
+                            ? 'Confirm and save'
+                            : 'Confirm and create',
                         icon: CheckCircle2,
                     },
-                ] as { key: WizStepKey; label: string; blurb: string; icon: LucideIcon }[]
+                ] as {
+                    key: WizStepKey;
+                    label: string;
+                    blurb: string;
+                    icon: LucideIcon;
+                }[]
             ).filter((s) => !(isEdit && s.key === 'repeat')),
         [isEdit],
     );
@@ -672,8 +709,7 @@ export function CreateShiftDialog({
                 ...data,
                 starts_at:
                     localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
-                ends_at:
-                    localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
+                ends_at: localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
                 return_to:
                     typeof window !== 'undefined'
                         ? window.location.pathname + window.location.search
@@ -905,7 +941,8 @@ export function CreateShiftDialog({
                                 const active = i === stepIndex;
                                 const done = i < stepIndex;
                                 return (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         key={s.key}
                                         type="button"
                                         onClick={() => {
@@ -947,7 +984,10 @@ export function CreateShiftDialog({
                                 );
                             })}
                         </div>
-                        <GuardrailCard unstyled className="mt-3 rounded-lg border border-border bg-card p-3">
+                        <GuardrailCard
+                            unstyled
+                            className="mt-3 rounded-lg border border-border bg-card p-3"
+                        >
                             <div className="flex items-center justify-between text-[11.5px] font-semibold">
                                 <span>Shift readiness</span>
                                 <span className="tabular-nums">
@@ -984,7 +1024,8 @@ export function CreateShiftDialog({
                                     </kbd>
                                     <span>to continue</span>
                                 </span>
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={onClose}
                                     aria-label="Close dialog"
@@ -1011,7 +1052,10 @@ export function CreateShiftDialog({
 
                             {(cur.key === 'people' || cur.key === 'review') &&
                             form.data.user_id ? (
-                                <GuardrailCard unstyled className="mb-4 space-y-2 rounded-xl border border-border bg-card p-3">
+                                <GuardrailCard
+                                    unstyled
+                                    className="mb-4 space-y-2 rounded-xl border border-border bg-card p-3"
+                                >
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div>
                                             <div className="text-sm font-semibold text-foreground">
@@ -1090,9 +1134,9 @@ export function CreateShiftDialog({
                                             </span>
                                             <span className="block text-xs text-muted-foreground">
                                                 Flag this shift for Lone Worker
-                                                Safety monitoring — it surfaces in
-                                                the watch-tower as a shift needing
-                                                a check-in session.
+                                                Safety monitoring — it surfaces
+                                                in the watch-tower as a shift
+                                                needing a check-in session.
                                             </span>
                                         </span>
                                     </label>
@@ -1100,273 +1144,293 @@ export function CreateShiftDialog({
                             ) : null}
 
                             {cur.key === 'people' ? (
-                            <Section first icon={Users} title="Who & where">
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label htmlFor="csd-client" required>
-                                            Client
-                                        </Label>
-                                        <select
-                                            id="csd-client"
-                                            className="select"
-                                            value={form.data.client_id}
-                                            onChange={(e) =>
-                                                selectClient(e.target.value)
-                                            }
-                                        >
-                                            {clients.map((c) => (
-                                                <option key={c.id} value={c.id}>
-                                                    {c.first_name} {c.last_name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {selectedClient ? (
-                                            <ServiceContextHint
-                                                client={selectedClient}
-                                                serviceContexts={
-                                                    serviceContexts
+                                <Section first icon={Users} title="Who & where">
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div>
+                                            <Label
+                                                htmlFor="csd-client"
+                                                required
+                                            >
+                                                Client
+                                            </Label>
+                                            <select
+                                                id="csd-client"
+                                                className="select"
+                                                value={form.data.client_id}
+                                                onChange={(e) =>
+                                                    selectClient(e.target.value)
                                                 }
-                                            />
-                                        ) : null}
-                                        <FieldError
-                                            message={form.errors.client_id}
-                                        />
-                                        <FieldError
-                                            message={stepErrors.client_id}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <Label htmlFor="csd-location">
-                                            Location{' '}
-                                            <span className="font-normal text-muted-foreground">
-                                                · follows the client's site
-                                            </span>
-                                        </Label>
-                                        <input
-                                            id="csd-location"
-                                            className="input"
-                                            value={form.data.location}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'location',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="e.g. Client's home or community venue"
-                                            list="csd-locations"
-                                        />
-                                        <datalist id="csd-locations">
-                                            {sites.map((s) => (
-                                                <option
-                                                    key={s.id}
-                                                    value={s.name}
-                                                />
-                                            ))}
-                                        </datalist>
-                                        <FieldError
-                                            message={form.errors.location}
-                                        />
-                                    </div>
-
-                                    <div className="sm:col-span-2">
-                                        <Label htmlFor="csd-staff">Staff</Label>
-                                        <select
-                                            id="csd-staff"
-                                            className="select"
-                                            value={form.data.user_id}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'user_id',
-                                                    e.target.value === ''
-                                                        ? ''
-                                                        : (Number(
-                                                              e.target.value,
-                                                          ) as number),
-                                                )
-                                            }
-                                        >
-                                            <option value="">
-                                                Unassigned (create an open
-                                                shift)
-                                            </option>
-                                            {staff.map((s) => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {!form.data.user_id ? (
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                Leave blank to publish as an
-                                                open shift — staff can be
-                                                assigned later from Rostering.
-                                            </p>
-                                        ) : null}
-                                        <FieldError
-                                            message={form.errors.user_id}
-                                        />
-                                    </div>
-
-                                    <div className="sm:col-span-2 rounded-xl border border-border bg-muted/25 p-3">
-                                        <div className="mb-3">
-                                            <div className="text-xs font-semibold text-foreground">
-                                                Driving requirement
-                                            </div>
-                                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                                Optional. Leave blank for an
-                                                ordinary shift.
-                                            </p>
-                                        </div>
-                                        <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
-                                            <div>
-                                                <Label htmlFor="csd-licence-class">
-                                                    Required licence class
-                                                </Label>
-                                                <select
-                                                    id="csd-licence-class"
-                                                    className="select"
-                                                    value={
-                                                        form.data
-                                                            .required_licence_class
-                                                    }
-                                                    onChange={(e) =>
-                                                        form.setData(
-                                                            'required_licence_class',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                >
-                                                    <option value="">
-                                                        No class requirement
+                                            >
+                                                {clients.map((c) => (
+                                                    <option
+                                                        key={c.id}
+                                                        value={c.id}
+                                                    >
+                                                        {c.first_name}{' '}
+                                                        {c.last_name}
                                                     </option>
-                                                    {LICENCE_CLASSES.map(
-                                                        (licenceClass) => (
-                                                            <option
-                                                                key={
-                                                                    licenceClass
-                                                                }
-                                                                value={
-                                                                    licenceClass
-                                                                }
-                                                            >
-                                                                Class{' '}
-                                                                {licenceClass}
-                                                            </option>
-                                                        ),
-                                                    )}
-                                                </select>
+                                                ))}
+                                            </select>
+                                            {selectedClient ? (
+                                                <ServiceContextHint
+                                                    client={selectedClient}
+                                                    serviceContexts={
+                                                        serviceContexts
+                                                    }
+                                                />
+                                            ) : null}
+                                            <FieldError
+                                                message={form.errors.client_id}
+                                            />
+                                            <FieldError
+                                                message={stepErrors.client_id}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label htmlFor="csd-location">
+                                                Location{' '}
+                                                <span className="font-normal text-muted-foreground">
+                                                    · follows the client's site
+                                                </span>
+                                            </Label>
+                                            <input
+                                                id="csd-location"
+                                                className="input"
+                                                value={form.data.location}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'location',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="e.g. Client's home or community venue"
+                                                list="csd-locations"
+                                            />
+                                            <datalist id="csd-locations">
+                                                {sites.map((s) => (
+                                                    <option
+                                                        key={s.id}
+                                                        value={s.name}
+                                                    />
+                                                ))}
+                                            </datalist>
+                                            <FieldError
+                                                message={form.errors.location}
+                                            />
+                                        </div>
+
+                                        <div className="sm:col-span-2">
+                                            <Label htmlFor="csd-staff">
+                                                Staff
+                                            </Label>
+                                            <select
+                                                id="csd-staff"
+                                                className="select"
+                                                value={form.data.user_id}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'user_id',
+                                                        e.target.value === ''
+                                                            ? ''
+                                                            : (Number(
+                                                                  e.target
+                                                                      .value,
+                                                              ) as number),
+                                                    )
+                                                }
+                                            >
+                                                <option value="">
+                                                    Unassigned (create an open
+                                                    shift)
+                                                </option>
+                                                {staff.map((s) => (
+                                                    <option
+                                                        key={s.id}
+                                                        value={s.id}
+                                                    >
+                                                        {s.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {!form.data.user_id ? (
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    Leave blank to publish as an
+                                                    open shift — staff can be
+                                                    assigned later from
+                                                    Rostering.
+                                                </p>
+                                            ) : null}
+                                            <FieldError
+                                                message={form.errors.user_id}
+                                            />
+                                        </div>
+
+                                        <div className="rounded-xl border border-border bg-muted/25 p-3 sm:col-span-2">
+                                            <div className="mb-3">
+                                                <div className="text-xs font-semibold text-foreground">
+                                                    Driving requirement
+                                                </div>
+                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                    Optional. Leave blank for an
+                                                    ordinary shift.
+                                                </p>
                                             </div>
-                                            <div>
-                                                <Label>
-                                                    Required endorsements
-                                                </Label>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {LICENCE_ENDORSEMENTS.map(
-                                                        (endorsement) => {
-                                                            const selected =
-                                                                form.data.required_licence_endorsements.includes(
-                                                                    endorsement.value,
-                                                                );
-                                                            return (
-                                                                <GuardrailButton
-                                                                    unstyled
+                                            <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
+                                                <div>
+                                                    <Label htmlFor="csd-licence-class">
+                                                        Required licence class
+                                                    </Label>
+                                                    <select
+                                                        id="csd-licence-class"
+                                                        className="select"
+                                                        value={
+                                                            form.data
+                                                                .required_licence_class
+                                                        }
+                                                        onChange={(e) =>
+                                                            form.setData(
+                                                                'required_licence_class',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    >
+                                                        <option value="">
+                                                            No class requirement
+                                                        </option>
+                                                        {LICENCE_CLASSES.map(
+                                                            (licenceClass) => (
+                                                                <option
                                                                     key={
-                                                                        endorsement.value
+                                                                        licenceClass
                                                                     }
-                                                                    type="button"
-                                                                    aria-label={`${endorsement.label} endorsement`}
-                                                                    aria-pressed={
-                                                                        selected
+                                                                    value={
+                                                                        licenceClass
                                                                     }
-                                                                    onClick={() =>
-                                                                        toggleLicenceEndorsement(
-                                                                            endorsement.value,
-                                                                        )
-                                                                    }
-                                                                    className={cn(
-                                                                        'min-h-9 rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                                                                        selected
-                                                                            ? 'border-primary bg-primary/10 text-primary'
-                                                                            : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground',
-                                                                    )}
                                                                 >
+                                                                    Class{' '}
                                                                     {
-                                                                        endorsement.value
-                                                                    }{' '}
-                                                                    ·{' '}
-                                                                    {
-                                                                        endorsement.label
+                                                                        licenceClass
                                                                     }
-                                                                </GuardrailButton>
-                                                            );
-                                                        },
-                                                    )}
+                                                                </option>
+                                                            ),
+                                                        )}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <Label>
+                                                        Required endorsements
+                                                    </Label>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {LICENCE_ENDORSEMENTS.map(
+                                                            (endorsement) => {
+                                                                const selected =
+                                                                    form.data.required_licence_endorsements.includes(
+                                                                        endorsement.value,
+                                                                    );
+                                                                return (
+                                                                    <GuardrailButton
+                                                                        unstyled
+                                                                        key={
+                                                                            endorsement.value
+                                                                        }
+                                                                        type="button"
+                                                                        aria-label={`${endorsement.label} endorsement`}
+                                                                        aria-pressed={
+                                                                            selected
+                                                                        }
+                                                                        onClick={() =>
+                                                                            toggleLicenceEndorsement(
+                                                                                endorsement.value,
+                                                                            )
+                                                                        }
+                                                                        className={cn(
+                                                                            'min-h-9 rounded-md border px-2.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                                                                            selected
+                                                                                ? 'border-primary bg-primary/10 text-primary'
+                                                                                : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                                                                        )}
+                                                                    >
+                                                                        {
+                                                                            endorsement.value
+                                                                        }{' '}
+                                                                        ·{' '}
+                                                                        {
+                                                                            endorsement.label
+                                                                        }
+                                                                    </GuardrailButton>
+                                                                );
+                                                            },
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <FieldError
+                                                message={
+                                                    form.errors
+                                                        .required_licence_class
+                                                }
+                                            />
+                                            <FieldError
+                                                message={
+                                                    form.errors
+                                                        .required_licence_endorsements
+                                                }
+                                            />
                                         </div>
-                                        <FieldError
-                                            message={
-                                                form.errors
-                                                    .required_licence_class
-                                            }
-                                        />
-                                        <FieldError
-                                            message={
-                                                form.errors
-                                                    .required_licence_endorsements
-                                            }
-                                        />
                                     </div>
-                                </div>
-                            </Section>
+                                </Section>
                             ) : null}
 
                             {cur.key === 'schedule' ? (
-                            <Section
-                                first
-                                icon={Clock}
-                                title="Schedule"
-                                hint={
-                                    durationLabel === '—'
-                                        ? undefined
-                                        : `${durationLabel} including any breaks`
-                                }
-                            >
-                                <ScheduleStrip
-                                    startsAt={form.data.starts_at}
-                                    endsAt={form.data.ends_at}
-                                    breakMinutes={
-                                        form.data.expected_break_minutes
+                                <Section
+                                    first
+                                    icon={Clock}
+                                    title="Schedule"
+                                    hint={
+                                        durationLabel === '—'
+                                            ? undefined
+                                            : `${durationLabel} including any breaks`
                                     }
-                                    onStartsAtChange={(v) =>
-                                        form.setData('starts_at', v)
-                                    }
-                                    onEndsAtChange={(v) =>
-                                        form.setData('ends_at', v)
-                                    }
-                                    onBreakChange={(v) =>
-                                        form.setData(
-                                            'expected_break_minutes',
-                                            v,
-                                        )
-                                    }
-                                    duration={durationLabel}
-                                />
-                                <div className="mt-3">
-                                    <Label required>Publish as</Label>
-                                    <StatusPicker
-                                        value={form.data.status}
-                                        onChange={(v) =>
-                                            form.setData('status', v)
+                                >
+                                    <ScheduleStrip
+                                        startsAt={form.data.starts_at}
+                                        endsAt={form.data.ends_at}
+                                        breakMinutes={
+                                            form.data.expected_break_minutes
                                         }
+                                        onStartsAtChange={(v) =>
+                                            form.setData('starts_at', v)
+                                        }
+                                        onEndsAtChange={(v) =>
+                                            form.setData('ends_at', v)
+                                        }
+                                        onBreakChange={(v) =>
+                                            form.setData(
+                                                'expected_break_minutes',
+                                                v,
+                                            )
+                                        }
+                                        duration={durationLabel}
                                     />
-                                </div>
-                                <FieldError message={form.errors.starts_at} />
-                                <FieldError message={form.errors.ends_at} />
-                                <FieldError message={stepErrors.starts_at} />
-                                <FieldError message={stepErrors.ends_at} />
-                            </Section>
+                                    <div className="mt-3">
+                                        <Label required>Publish as</Label>
+                                        <StatusPicker
+                                            value={form.data.status}
+                                            onChange={(v) =>
+                                                form.setData('status', v)
+                                            }
+                                        />
+                                    </div>
+                                    <FieldError
+                                        message={form.errors.starts_at}
+                                    />
+                                    <FieldError message={form.errors.ends_at} />
+                                    <FieldError
+                                        message={stepErrors.starts_at}
+                                    />
+                                    <FieldError message={stepErrors.ends_at} />
+                                </Section>
                             ) : null}
 
                             {cur.key === 'repeat' && !isEdit ? (
@@ -1400,7 +1464,8 @@ export function CreateShiftDialog({
                                                                 d,
                                                             );
                                                         return (
-                                                            <GuardrailButton unstyled
+                                                            <GuardrailButton
+                                                                unstyled
                                                                 key={d}
                                                                 type="button"
                                                                 onClick={() =>
@@ -1471,148 +1536,167 @@ export function CreateShiftDialog({
                             ) : null}
 
                             {cur.key === 'tasks' ? (
-                            <Section
-                                first
-                                icon={Pencil}
-                                title="Tasks & notes"
-                                hint="What the worker needs to know"
-                            >
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div>
-                                        <div className="mb-2 flex items-center justify-between">
-                                            <label className="text-xs font-semibold text-foreground">
-                                                Shift tasks{' '}
-                                                <span className="font-normal text-muted-foreground">
-                                                    ·{' '}
-                                                    {form.data.tasks.length
-                                                        ? `${form.data.tasks.length} task${form.data.tasks.length === 1 ? '' : 's'}`
-                                                        : 'checklist for the worker'}
-                                                </span>
-                                            </label>
-                                            {form.data.tasks.length > 0 ? (
-                                                <GuardrailButton unstyled
+                                <Section
+                                    first
+                                    icon={Pencil}
+                                    title="Tasks & notes"
+                                    hint="What the worker needs to know"
+                                >
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div>
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <label className="text-xs font-semibold text-foreground">
+                                                    Shift tasks{' '}
+                                                    <span className="font-normal text-muted-foreground">
+                                                        ·{' '}
+                                                        {form.data.tasks.length
+                                                            ? `${form.data.tasks.length} task${form.data.tasks.length === 1 ? '' : 's'}`
+                                                            : 'checklist for the worker'}
+                                                    </span>
+                                                </label>
+                                                {form.data.tasks.length > 0 ? (
+                                                    <GuardrailButton
+                                                        unstyled
+                                                        type="button"
+                                                        onClick={addTask}
+                                                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                                                    >
+                                                        <Plus className="h-3.5 w-3.5" />{' '}
+                                                        Add
+                                                    </GuardrailButton>
+                                                ) : null}
+                                            </div>
+                                            {form.data.tasks.length === 0 ? (
+                                                <GuardrailButton
+                                                    unstyled
                                                     type="button"
                                                     onClick={addTask}
-                                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                                                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                                                 >
-                                                    <Plus className="h-3.5 w-3.5" />{' '}
-                                                    Add
+                                                    <Plus className="h-3.5 w-3.5" />
+                                                    Add the first task — e.g.
+                                                    “Morning medication round”
                                                 </GuardrailButton>
-                                            ) : null}
+                                            ) : (
+                                                <ul className="space-y-1.5">
+                                                    {form.data.tasks.map(
+                                                        (t, i) => (
+                                                            <li
+                                                                key={i}
+                                                                className="grid gap-2 rounded-lg border border-border/70 bg-background p-2 sm:grid-cols-[auto,minmax(0,1fr),auto,auto] sm:items-center"
+                                                            >
+                                                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
+                                                                    {i + 1}
+                                                                </span>
+                                                                <input
+                                                                    className="input min-w-0"
+                                                                    placeholder={`Task ${i + 1}`}
+                                                                    value={
+                                                                        t.label
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) =>
+                                                                        setTask(
+                                                                            i,
+                                                                            e
+                                                                                .target
+                                                                                .value,
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <label className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-2 text-xs whitespace-nowrap text-muted-foreground">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        className="h-4 w-4 rounded border-border"
+                                                                        checked={
+                                                                            !!t.scheduled_time
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            setTaskScheduled(
+                                                                                i,
+                                                                                e
+                                                                                    .target
+                                                                                    .checked
+                                                                                    ? defaultTaskScheduledTime()
+                                                                                    : null,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <span>
+                                                                        Specific
+                                                                        time
+                                                                    </span>
+                                                                </label>
+                                                                {t.scheduled_time ? (
+                                                                    <input
+                                                                        type="time"
+                                                                        aria-label={`Task ${i + 1} scheduled time`}
+                                                                        className="input h-9 w-full sm:w-[7.5rem]"
+                                                                        value={
+                                                                            t.scheduled_time
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) =>
+                                                                            setTaskScheduled(
+                                                                                i,
+                                                                                e
+                                                                                    .target
+                                                                                    .value ||
+                                                                                    null,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                ) : null}
+                                                                <GuardrailButton
+                                                                    unstyled
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        removeTask(
+                                                                            i,
+                                                                        )
+                                                                    }
+                                                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                                    aria-label={`Remove task ${i + 1}`}
+                                                                >
+                                                                    <Trash className="h-4 w-4" />
+                                                                </GuardrailButton>
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            )}
                                         </div>
-                                        {form.data.tasks.length === 0 ? (
-                                            <GuardrailButton unstyled
-                                                type="button"
-                                                onClick={addTask}
-                                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                        <div>
+                                            <label
+                                                className="mb-2 block text-xs font-semibold text-foreground"
+                                                htmlFor="csd-notes"
                                             >
-                                                <Plus className="h-3.5 w-3.5" />
-                                                Add the first task — e.g.
-                                                “Morning medication round”
-                                            </GuardrailButton>
-                                        ) : (
-                                            <ul className="space-y-1.5">
-                                                {form.data.tasks.map((t, i) => (
-                                                    <li
-                                                        key={i}
-                                                        className="grid gap-2 rounded-lg border border-border/70 bg-background p-2 sm:grid-cols-[auto,minmax(0,1fr),auto,auto] sm:items-center"
-                                                    >
-                                                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
-                                                            {i + 1}
-                                                        </span>
-                                                        <input
-                                                            className="input min-w-0"
-                                                            placeholder={`Task ${i + 1}`}
-                                                            value={t.label}
-                                                            onChange={(e) =>
-                                                                setTask(
-                                                                    i,
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        />
-                                                        <label className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-2 text-xs whitespace-nowrap text-muted-foreground">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="h-4 w-4 rounded border-border"
-                                                                checked={
-                                                                    !!t.scheduled_time
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setTaskScheduled(
-                                                                        i,
-                                                                        e.target
-                                                                            .checked
-                                                                            ? defaultTaskScheduledTime()
-                                                                            : null,
-                                                                    )
-                                                                }
-                                                            />
-                                                            <span>
-                                                                Specific time
-                                                            </span>
-                                                        </label>
-                                                        {t.scheduled_time ? (
-                                                            <input
-                                                                type="time"
-                                                                aria-label={`Task ${i + 1} scheduled time`}
-                                                                className="input h-9 w-full sm:w-[7.5rem]"
-                                                                value={
-                                                                    t.scheduled_time
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setTaskScheduled(
-                                                                        i,
-                                                                        e.target
-                                                                            .value ||
-                                                                            null,
-                                                                    )
-                                                                }
-                                                            />
-                                                        ) : null}
-                                                        <GuardrailButton unstyled
-                                                            type="button"
-                                                            onClick={() =>
-                                                                removeTask(i)
-                                                            }
-                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                            aria-label={`Remove task ${i + 1}`}
-                                                        >
-                                                            <Trash className="h-4 w-4" />
-                                                        </GuardrailButton>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
+                                                Handover notes{' '}
+                                                <span className="font-normal text-muted-foreground">
+                                                    · anything the worker should
+                                                    know
+                                                </span>
+                                            </label>
+                                            <textarea
+                                                id="csd-notes"
+                                                rows={4}
+                                                className="textarea"
+                                                placeholder="e.g. Prefers a quieter handover; check fridge for new medication."
+                                                value={form.data.notes}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'notes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label
-                                            className="mb-2 block text-xs font-semibold text-foreground"
-                                            htmlFor="csd-notes"
-                                        >
-                                            Handover notes{' '}
-                                            <span className="font-normal text-muted-foreground">
-                                                · anything the worker should
-                                                know
-                                            </span>
-                                        </label>
-                                        <textarea
-                                            id="csd-notes"
-                                            rows={4}
-                                            className="textarea"
-                                            placeholder="e.g. Prefers a quieter handover; check fridge for new medication."
-                                            value={form.data.notes}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'notes',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                            </Section>
+                                </Section>
                             ) : null}
 
                             {cur.key === 'review' ? (
@@ -1687,7 +1771,8 @@ export function CreateShiftDialog({
                                                                   .required_licence_class
                                                                   ? `Class ${form.data.required_licence_class}`
                                                                   : null,
-                                                              form.data.required_licence_endorsements
+                                                              form.data
+                                                                  .required_licence_endorsements
                                                                   .length
                                                                   ? `${form.data.required_licence_endorsements.join(', ')} endorsement${form.data.required_licence_endorsements.length === 1 ? '' : 's'}`
                                                                   : null,
@@ -1745,8 +1830,7 @@ export function CreateShiftDialog({
                                             />
                                         </dl>
 
-                                        {Object.keys(form.errors).length >
-                                        0 ? (
+                                        {Object.keys(form.errors).length > 0 ? (
                                             <div className="rounded-lg border border-status-critical/35 bg-status-critical-bg p-3 text-xs">
                                                 <div className="mb-1 font-semibold text-status-critical">
                                                     Fix before saving:
@@ -1771,8 +1855,8 @@ export function CreateShiftDialog({
                                         eligibilityStatus?.status ===
                                             'blocked' ? (
                                             <p className="text-xs text-status-critical">
-                                                Resolve the eligibility
-                                                blockers above before saving.
+                                                Resolve the eligibility blockers
+                                                above before saving.
                                             </p>
                                         ) : null}
                                     </div>
@@ -1784,7 +1868,8 @@ export function CreateShiftDialog({
                         <footer className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
                             <div>
                                 {stepIndex > 0 ? (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         type="button"
                                         onClick={goBack}
                                         className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -1795,7 +1880,8 @@ export function CreateShiftDialog({
                                 ) : null}
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={onClose}
                                     className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
@@ -1931,7 +2017,8 @@ function ReviewRow({
                 </dt>
                 <dd className="mt-0.5 text-[13px] text-foreground">{value}</dd>
             </div>
-            <GuardrailButton unstyled
+            <GuardrailButton
+                unstyled
                 type="button"
                 onClick={onEdit}
                 className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/5"
@@ -1956,7 +2043,8 @@ function ShiftTypePicker({
                 const accent = SHIFT_TYPE_ACCENT_CLASSES[t.accent];
                 const Icon = t.icon;
                 return (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -2096,7 +2184,8 @@ function StatusPicker({
                 const active = value === o.key;
                 const Icon = o.icon;
                 return (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         key={o.key}
                         type="button"
                         onClick={() => onChange(o.key)}
@@ -2143,7 +2232,8 @@ function Toggle({
     ariaLabel?: string;
 }) {
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             type="button"
             role="switch"
             aria-checked={value}

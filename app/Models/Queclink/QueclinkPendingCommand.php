@@ -2,14 +2,22 @@
 
 namespace App\Models\Queclink;
 
+use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
+use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
+use App\Models\Concerns\WritesLegacyStorageContext;
+use App\Models\FleetTelemetryEvent;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 
 class QueclinkPendingCommand extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $table = 'queclink_pending_commands';
 
     public const STATUS_QUEUED = 'queued';
@@ -27,14 +35,23 @@ class QueclinkPendingCommand extends Model
     protected $fillable = [
         'queclink_device_id',
         'imei',
-        'tenant_id',
         'command_word',
         'raw_command',
+        'raw_command_encrypted',
         'serial_number',
         'status',
         'created_by_user_id',
+        'device_command_request_id',
+        'device_command_attempt_id',
+        'governed_sequence',
+        'governed_role',
+        'fulfilled_telemetry_event_id',
+        'fulfilled_raw_frame_id',
         'sent_at',
+        'sent_session_id',
         'acked_at',
+        'fulfilled_at',
+        'reconciliation_dispatched_at',
         'cancelled_at',
         'cancelled_by_user_id',
         'ack_response',
@@ -42,12 +59,48 @@ class QueclinkPendingCommand extends Model
         'expires_at',
     ];
 
+    protected $hidden = [
+        'raw_command',
+        'raw_command_encrypted',
+        'ack_response',
+        'sent_session_id',
+    ];
+
     protected $casts = [
+        'governed_sequence' => 'integer',
         'sent_at' => 'datetime',
         'acked_at' => 'datetime',
+        'fulfilled_at' => 'datetime',
+        'reconciliation_dispatched_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'expires_at' => 'datetime',
     ];
+
+    protected function rawCommand(): Attribute
+    {
+        return Attribute::make(
+            get: function (?string $value, array $attributes): ?string {
+                $encrypted = $attributes['raw_command_encrypted'] ?? null;
+
+                return is_string($encrypted) && $encrypted !== ''
+                    ? Crypt::decryptString($encrypted)
+                    : $value;
+            },
+            set: function (?string $value): array {
+                if ($value === null || $value === '') {
+                    return [
+                        'raw_command' => $value,
+                        'raw_command_encrypted' => null,
+                    ];
+                }
+
+                return [
+                    'raw_command' => '[encrypted command payload]',
+                    'raw_command_encrypted' => Crypt::encryptString($value),
+                ];
+            },
+        );
+    }
 
     public function device(): BelongsTo
     {
@@ -57,6 +110,26 @@ class QueclinkPendingCommand extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function governedRequest(): BelongsTo
+    {
+        return $this->belongsTo(DeviceCommandRequest::class, 'device_command_request_id');
+    }
+
+    public function governedAttempt(): BelongsTo
+    {
+        return $this->belongsTo(DeviceCommandAttempt::class, 'device_command_attempt_id');
+    }
+
+    public function fulfilledTelemetryEvent(): BelongsTo
+    {
+        return $this->belongsTo(FleetTelemetryEvent::class, 'fulfilled_telemetry_event_id');
+    }
+
+    public function fulfilledRawFrame(): BelongsTo
+    {
+        return $this->belongsTo(QueclinkRawFrame::class, 'fulfilled_raw_frame_id');
     }
 
     public function cancelledBy(): BelongsTo

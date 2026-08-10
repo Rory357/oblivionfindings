@@ -17,6 +17,7 @@ use App\Models\MedicationRound;
 use App\Models\PpeAllocation;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\ShiftOpenPosition;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
 use App\Models\Timesheet;
@@ -26,6 +27,7 @@ use App\Services\MarScheduleService;
 use App\Services\ShiftHandoverService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
+use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use App\Support\ResidentHue;
 use App\Support\RunDetailPresenter;
@@ -47,6 +49,10 @@ class MyTasksController extends Controller
         'medium' => 2,
         'low' => 3,
     ];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     public function __invoke(Request $request): Response
     {
@@ -89,6 +95,7 @@ class MyTasksController extends Controller
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
         $tasks = $this->getCrTasks($userId);
         $notifications = $this->getDigestNotifications($user);
+        $pendingClaimsCount = $this->getPendingClaimsCount($user);
 
         // 8. Stats
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
@@ -143,6 +150,7 @@ class MyTasksController extends Controller
             'incidents' => $incidents,
             'tasks' => $tasks,
             'notifications' => $notifications,
+            'pending_claims_count' => $pendingClaimsCount,
             'stats' => $stats,
             'clock' => $clock,
             'active_round' => $activeRound,
@@ -218,6 +226,32 @@ class MyTasksController extends Controller
             ->all();
     }
 
+    /**
+     * Keep the worker's claimed-cover next action on /my-day without leaking
+     * positions outside their canonical Site scope.
+     */
+    private function getPendingClaimsCount(User $user): int
+    {
+        if (! $user->canDo('job_board.viewAny')
+            && ! $user->canDo('job_board.claim')
+            && ! $user->canDo('shifts.viewAny')
+            && ! $user->canDo('shifts.viewAssigned')) {
+            return 0;
+        }
+
+        try {
+            return ShiftOpenPosition::query()
+                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $user, ['reports.viewAny']))
+                ->where('claimed_by', $user->id)
+                ->where('status', 'claimed')
+                ->count();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
     private function buildChecklistConfig(User $user, string $today): array
     {
         return [
@@ -258,7 +292,7 @@ class MyTasksController extends Controller
                 ->open()
                 ->whereHas('shift', fn ($query) => $query
                     ->where('user_id', $user->id)
-                    ->visibleToFrontline($user->organization_id))
+                    ->visibleToFrontline())
                 ->with(['shift' => fn ($query) => $query->with($relations)])
                 ->latest('clock_in_at')
                 ->first();
@@ -272,7 +306,8 @@ class MyTasksController extends Controller
             // do not disappear from the hero after the UTC date rolls over.
             $shift = Shift::query()
                 ->where('user_id', $user->id)
-                ->visibleToFrontline($user->organization_id)
+                ->visibleToFrontline()
+                ->whereIn('status', ['in_progress', 'scheduled', 'draft'])
                 ->where(function ($query) use ($nowUtc, $workerDayStart, $workerDayEnd) {
                     $query
                         ->where(function ($overlap) use ($nowUtc) {
@@ -282,7 +317,7 @@ class MyTasksController extends Controller
                         })
                         ->orWhereBetween('starts_at', [$workerDayStart, $workerDayEnd]);
                 })
-                ->orderByRaw("FIELD(status, 'in_progress', 'scheduled', 'draft')")
+                ->orderByRaw("CASE status WHEN 'in_progress' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'draft' THEN 2 ELSE 3 END")
                 ->orderBy('starts_at')
                 ->with($relations)
                 ->first();
@@ -434,7 +469,7 @@ class MyTasksController extends Controller
                         : '/control-room',
                 ],
                 'handover_submitted' => $openSession->shift_id
-                    ? $this->hasSubmittedHandoverForShift((int) $openSession->shift_id)
+                    ? $this->hasSubmittedHandoverForShift((int) $openSession->shift_id, $user)
                     : false,
                 'end_of_shift_blockers' => $endOfShiftBlockers,
                 'end_of_shift_ready' => $endOfShiftBlockers === [],
@@ -457,6 +492,7 @@ class MyTasksController extends Controller
     {
         try {
             $handover = ShiftHandover::query()
+                ->tap(fn ($query) => $this->siteAccess->applyHandoverScope($query, $user))
                 ->where('status', ShiftHandoverService::STATUS_SUBMITTED)
                 ->where(function ($q) use ($activeShift, $user) {
                     $q->where('incoming_shift_id', $activeShift->id)
@@ -584,10 +620,11 @@ class MyTasksController extends Controller
      * to their open attendance session. Used to suppress the clock-out write
      * prompt once a handover has been captured.
      */
-    private function hasSubmittedHandoverForShift(int $shiftId): bool
+    private function hasSubmittedHandoverForShift(int $shiftId, User $user): bool
     {
         try {
             return ShiftHandover::query()
+                ->tap(fn ($query) => $this->siteAccess->applyHandoverScope($query, $user))
                 ->where('outgoing_shift_id', $shiftId)
                 ->whereIn('status', [
                     ShiftHandoverService::STATUS_SUBMITTED,
@@ -605,7 +642,7 @@ class MyTasksController extends Controller
     {
         try {
             return Shift::where('user_id', $user->id)
-                ->visibleToFrontline($user->organization_id)
+                ->visibleToFrontline()
                 ->whereBetween('starts_at', [$today, $tomorrowEnd])
                 ->with(['client:id,first_name,last_name,profile_photo_path', 'serviceContext:id,name', 'tasks'])
                 ->orderBy('starts_at')
@@ -740,7 +777,7 @@ class MyTasksController extends Controller
             // doesn't bleed into the briefing card.
             $shift = Shift::query()
                 ->where('user_id', $user->id)
-                ->visibleToFrontline($user->organization_id)
+                ->visibleToFrontline()
                 ->whereIn('status', ['scheduled', 'draft'])
                 ->where('starts_at', '<=', $workerNow->copy()->addHours(36)->utc())
                 ->where('ends_at', '>=', $workerNow->copy()->utc())
@@ -778,7 +815,7 @@ class MyTasksController extends Controller
         try {
             $shift = Shift::query()
                 ->where('user_id', $user->id)
-                ->visibleToFrontline($user->organization_id)
+                ->visibleToFrontline()
                 ->where(function ($query) use ($workerNow) {
                     $query->where('actual_ends_at', '>=', $workerNow->copy()->subHours(12)->utc())
                         ->orWhere(function ($fallback) use ($workerNow) {
@@ -795,7 +832,11 @@ class MyTasksController extends Controller
                     'serviceContext:id,name',
                     'tasks',
                     'timesheets' => fn ($query) => $query->latest('updated_at'),
-                    'outgoingHandovers:id,outgoing_shift_id,status,submitted_at',
+                    'outgoingHandovers' => function ($relation) use ($user): void {
+                        $this->siteAccess
+                            ->applyHandoverScope($relation->getQuery(), $user)
+                            ->select(['id', 'outgoing_shift_id', 'status', 'submitted_at']);
+                    },
                 ])
                 ->orderByDesc('actual_ends_at')
                 ->orderByDesc('ends_at')

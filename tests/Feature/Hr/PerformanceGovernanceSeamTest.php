@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -9,6 +11,18 @@ use Illuminate\Support\Facades\DB;
 use Tests\Support\GovernanceTestHelpers;
 
 uses(GovernanceTestHelpers::class);
+
+function performanceGovernanceProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
 
 /**
  * Seam S13 — HR staff performance ↔ Governance board performance.
@@ -38,6 +52,9 @@ test('S13 seam: the HR staff-review workflow writes hr_performance_reviews and n
     $hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $hr->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
     $employee = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $site = Site::factory()->create(['name' => 'Performance Governance Site']);
+    performanceGovernanceProfile($hr, $site);
+    performanceGovernanceProfile($employee, $site);
 
     $this->actingAs($hr)
         ->post('/hr/performance/reviews', [

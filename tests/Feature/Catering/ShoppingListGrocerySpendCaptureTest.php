@@ -1,7 +1,6 @@
 <?php
 
 use App\Domain\Finance\Jobs\ProcessFinancialEventJob;
-use App\Models\HouseLedgerEntry;
 use App\Models\MealProduct;
 use App\Models\Permission;
 use App\Models\Role;
@@ -9,6 +8,8 @@ use App\Models\Site;
 use App\Models\SiteMealShoppingList;
 use App\Models\SiteMealShoppingListItem;
 use App\Models\User;
+use Database\Seeders\CateringPermissionsSeeder;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 
@@ -21,8 +22,8 @@ uses(RefreshDatabase::class);
  * Helpers prefixed `gcap_` to stay unique in the global Pest function space.
  */
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
-    $this->seed(\Database\Seeders\CateringPermissionsSeeder::class);
+    $this->seed(RbacSeeder::class);
+    $this->seed(CateringPermissionsSeeder::class);
 
     $adminRole = Role::where('name', 'admin')->first();
     $perm = Permission::where('key', 'sites.meals.shopping.manage')->first();
@@ -39,7 +40,7 @@ beforeEach(function () {
 function gcap_groceryList(int $siteId, ?int $costPerUnitCents = 500, ?int $estimatedCents = null): array
 {
     $product = MealProduct::create([
-        'name' => 'Milk ' . uniqid(),
+        'name' => 'Milk '.uniqid(),
         'default_unit' => 'each',
         'is_active' => true,
         'cost_per_unit_cents' => $costPerUnitCents,
@@ -72,7 +73,10 @@ it('posts received grocery spend to the house ledger and bridges it to the GL', 
         ])
         ->assertOk();
 
-    $entry = HouseLedgerEntry::where('reference', "shopping-list:{$list->id}")->first();
+    $entry = $this->site->houseLedger()->firstOrFail()
+        ->entries()
+        ->where('reference', "shopping-list:{$list->id}")
+        ->first();
     expect($entry)->not->toBeNull()
         ->and($entry->entry_type)->toBe('expense')
         ->and($entry->category)->toBe('groceries')
@@ -94,7 +98,10 @@ it('falls back to the line estimate when the product has no unit cost', function
         ])
         ->assertOk();
 
-    $entry = HouseLedgerEntry::where('reference', "shopping-list:{$list->id}")->first();
+    $entry = $this->site->houseLedger()->firstOrFail()
+        ->entries()
+        ->where('reference', "shopping-list:{$list->id}")
+        ->first();
     expect($entry)->not->toBeNull()
         ->and((float) $entry->amount)->toBe(12.0);
 });
@@ -108,7 +115,10 @@ it('does not double-post grocery spend when receive is submitted twice', functio
     $this->actingAs($this->admin)->post($url, $payload)->assertOk();
     $this->actingAs($this->admin)->post($url, $payload)->assertOk();
 
-    expect(HouseLedgerEntry::where('reference', "shopping-list:{$list->id}")->count())->toBe(1);
+    expect($this->site->houseLedger()->firstOrFail()
+        ->entries()
+        ->where('reference', "shopping-list:{$list->id}")
+        ->count())->toBe(1);
 });
 
 it('skips the ledger capture when there is no grocery cost', function () {
@@ -121,6 +131,8 @@ it('skips the ledger capture when there is no grocery cost', function () {
         ])
         ->assertOk();
 
-    expect(HouseLedgerEntry::where('reference', "shopping-list:{$list->id}")->count())->toBe(0);
+    expect($this->site->houseLedger()
+        ->whereHas('entries', fn ($query) => $query->where('reference', "shopping-list:{$list->id}"))
+        ->exists())->toBeFalse();
     Bus::assertNotDispatched(ProcessFinancialEventJob::class);
 });

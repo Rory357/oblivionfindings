@@ -1,9 +1,10 @@
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime, formatDistance } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link } from '@inertiajs/react';
 import {
     Car,
@@ -14,8 +15,6 @@ import {
     User,
     XCircle,
 } from 'lucide-react';
-import { formatDateTime, formatDistance } from '@/lib/fleet-utils';
-
 
 type ChecklistItem = {
     result: 'pass' | 'fail' | 'na';
@@ -25,7 +24,11 @@ type ChecklistItem = {
 type Inspection = {
     id: number;
     type: string;
-    asset: { id: number; name: string; registration_number?: string | null } | null;
+    asset: {
+        id: number;
+        name: string;
+        registration_number?: string | null;
+    } | null;
     user: { id: number; name: string } | null;
     passed: boolean;
     notes: string | null;
@@ -88,8 +91,10 @@ const SECTION_COLORS: Record<string, string> = {
 };
 
 function ResultIcon({ result }: { result: string }) {
-    if (result === 'pass') return <CheckCircle className="h-5 w-5 text-status-success" />;
-    if (result === 'fail') return <XCircle className="h-5 w-5 text-status-critical" />;
+    if (result === 'pass')
+        return <CheckCircle className="h-5 w-5 text-status-success" />;
+    if (result === 'fail')
+        return <XCircle className="h-5 w-5 text-status-critical" />;
     return <MinusCircle className="h-5 w-5 text-muted-foreground" />;
 }
 
@@ -98,7 +103,10 @@ export default function InspectionShow({ inspection }: Props) {
     const responses = insp.responses ?? {};
 
     // Group responses by section
-    const sections: Record<string, { key: string; label: string; item: ChecklistItem }[]> = {};
+    const sections: Record<
+        string,
+        { key: string; label: string; item: ChecklistItem }[]
+    > = {};
     for (const [key, item] of Object.entries(responses)) {
         const section = SECTION_MAP[key] ?? 'Other';
         if (!sections[section]) sections[section] = [];
@@ -117,7 +125,7 @@ export default function InspectionShow({ inspection }: Props) {
             else acc.na++;
             return acc;
         },
-        { pass: 0, fail: 0, na: 0 }
+        { pass: 0, fail: 0, na: 0 },
     );
 
     return (
@@ -138,12 +146,14 @@ export default function InspectionShow({ inspection }: Props) {
                 />
 
                 {/* Result Banner */}
-                <div className={cn(
-                    'rounded-lg border px-5 py-4',
-                    insp.passed
-                        ? 'bg-primary/10 border-primary text-primary dark:bg-primary/30 dark:border-primary/30 dark:text-primary/70'
-                        : 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical'
-                )}>
+                <div
+                    className={cn(
+                        'rounded-lg border px-5 py-4',
+                        insp.passed
+                            ? 'border-primary bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/30 dark:text-primary/70'
+                            : 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical',
+                    )}
+                >
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             {insp.passed ? (
@@ -152,12 +162,21 @@ export default function InspectionShow({ inspection }: Props) {
                                 <XCircle className="h-6 w-6 text-status-critical dark:text-status-critical" />
                             )}
                             <div>
-                                <span className="text-lg font-bold">{insp.passed ? 'Inspection Passed' : 'Inspection Failed'}</span>
+                                <span className="text-lg font-bold">
+                                    {insp.passed
+                                        ? 'Inspection Passed'
+                                        : 'Inspection Failed'}
+                                </span>
                                 <span className="mx-2 opacity-50">|</span>
-                                <span className="capitalize">{insp.type ?? '---'}</span>
+                                <span className="capitalize">
+                                    {insp.type ?? '---'}
+                                </span>
                             </div>
                         </div>
-                        <Badge variant={insp.passed ? 'default' : 'destructive'} className="text-sm">
+                        <Badge
+                            variant={insp.passed ? 'default' : 'destructive'}
+                            className="text-sm"
+                        >
                             {insp.passed ? 'Pass' : 'Fail'}
                         </Badge>
                     </div>
@@ -174,39 +193,63 @@ export default function InspectionShow({ inspection }: Props) {
                                 <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
                                     <Car className="h-4 w-4 text-muted-foreground" />
                                     <div>
-                                        <dt className="text-xs text-muted-foreground">Vehicle</dt>
+                                        <dt className="text-xs text-muted-foreground">
+                                            Vehicle
+                                        </dt>
                                         <dd className="font-medium">
                                             {insp.asset ? (
-                                                <Link href={`/fleet-assets/vehicles/${insp.asset.id}`} className="text-primary hover:underline">
+                                                <Link
+                                                    href={`/fleet-assets/vehicles/${insp.asset.id}`}
+                                                    className="text-primary hover:underline"
+                                                >
                                                     {insp.asset.name}
-                                                    {insp.asset.registration_number ? ` (${insp.asset.registration_number})` : ''}
+                                                    {insp.asset
+                                                        .registration_number
+                                                        ? ` (${insp.asset.registration_number})`
+                                                        : ''}
                                                 </Link>
-                                            ) : '---'}
+                                            ) : (
+                                                '---'
+                                            )}
                                         </dd>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
                                     <User className="h-4 w-4 text-muted-foreground" />
                                     <div>
-                                        <dt className="text-xs text-muted-foreground">Inspector</dt>
-                                        <dd className="font-medium">{insp.user?.name ?? '---'}</dd>
+                                        <dt className="text-xs text-muted-foreground">
+                                            Inspector
+                                        </dt>
+                                        <dd className="font-medium">
+                                            {insp.user?.name ?? '---'}
+                                        </dd>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
                                     <Clock className="h-4 w-4 text-muted-foreground" />
                                     <div>
-                                        <dt className="text-xs text-muted-foreground">Date</dt>
+                                        <dt className="text-xs text-muted-foreground">
+                                            Date
+                                        </dt>
                                         <dd className="font-medium">
-                                            {insp.completed_at ? formatDateTime(insp.completed_at) : '---'}
+                                            {insp.completed_at
+                                                ? formatDateTime(
+                                                      insp.completed_at,
+                                                  )
+                                                : '---'}
                                         </dd>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
                                     <Gauge className="h-4 w-4 text-muted-foreground" />
                                     <div>
-                                        <dt className="text-xs text-muted-foreground">Odometer</dt>
+                                        <dt className="text-xs text-muted-foreground">
+                                            Odometer
+                                        </dt>
                                         <dd className="font-medium">
-                                            {insp.odometer != null ? `${formatDistance(insp.odometer)}` : '---'}
+                                            {insp.odometer != null
+                                                ? `${formatDistance(insp.odometer)}`
+                                                : '---'}
                                         </dd>
                                     </div>
                                 </div>
@@ -222,21 +265,37 @@ export default function InspectionShow({ inspection }: Props) {
                         <CardContent>
                             <div className="grid grid-cols-3 gap-3">
                                 <div className="rounded-lg bg-status-success-bg p-3 text-center">
-                                    <div className="text-2xl font-bold text-status-success">{counts.pass}</div>
-                                    <div className="mt-1 text-xs text-muted-foreground">Passed</div>
+                                    <div className="text-2xl font-bold text-status-success">
+                                        {counts.pass}
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        Passed
+                                    </div>
                                 </div>
                                 <div className="rounded-lg bg-status-critical-bg p-3 text-center">
-                                    <div className="text-2xl font-bold text-status-critical">{counts.fail}</div>
-                                    <div className="mt-1 text-xs text-muted-foreground">Failed</div>
+                                    <div className="text-2xl font-bold text-status-critical">
+                                        {counts.fail}
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        Failed
+                                    </div>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3 text-center dark:bg-muted/20">
-                                    <div className="text-2xl font-bold text-muted-foreground">{counts.na}</div>
-                                    <div className="mt-1 text-xs text-muted-foreground">N/A</div>
+                                    <div className="text-2xl font-bold text-muted-foreground">
+                                        {counts.na}
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        N/A
+                                    </div>
                                 </div>
                             </div>
                             <div className="mt-4 rounded-md bg-muted/40 p-3">
-                                <div className="text-xs text-muted-foreground">Overall Condition</div>
-                                <div className="mt-1 text-lg font-bold capitalize">{insp.overall_condition ?? '---'}</div>
+                                <div className="text-xs text-muted-foreground">
+                                    Overall Condition
+                                </div>
+                                <div className="mt-1 text-lg font-bold capitalize">
+                                    {insp.overall_condition ?? '---'}
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -244,9 +303,17 @@ export default function InspectionShow({ inspection }: Props) {
 
                 {/* Checklist Results - Grouped by Section */}
                 {Object.entries(sections).map(([sectionName, items]) => (
-                    <Card key={sectionName} className={cn('border-l-4', SECTION_COLORS[sectionName] ?? SECTION_COLORS.Other)}>
+                    <Card
+                        key={sectionName}
+                        className={cn(
+                            'border-l-4',
+                            SECTION_COLORS[sectionName] ?? SECTION_COLORS.Other,
+                        )}
+                    >
                         <CardHeader>
-                            <CardTitle className="text-base">{sectionName}</CardTitle>
+                            <CardTitle className="text-base">
+                                {sectionName}
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
@@ -258,17 +325,27 @@ export default function InspectionShow({ inspection }: Props) {
                                             item.result === 'fail'
                                                 ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
                                                 : item.result === 'pass'
-                                                ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/50'
-                                                : ''
+                                                  ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/50'
+                                                  : '',
                                         )}
                                     >
                                         <ResultIcon result={item.result} />
-                                        <span className="flex-1 text-sm font-medium">{label}</span>
+                                        <span className="flex-1 text-sm font-medium">
+                                            {label}
+                                        </span>
                                         <Badge
-                                            variant={item.result === 'pass' ? 'default' : item.result === 'fail' ? 'destructive' : 'secondary'}
+                                            variant={
+                                                item.result === 'pass'
+                                                    ? 'default'
+                                                    : item.result === 'fail'
+                                                      ? 'destructive'
+                                                      : 'secondary'
+                                            }
                                             className="text-xs"
                                         >
-                                            {item.result === 'na' ? 'N/A' : item.result}
+                                            {item.result === 'na'
+                                                ? 'N/A'
+                                                : item.result}
                                         </Badge>
                                         {item.notes && (
                                             <span className="max-w-[200px] truncate text-xs text-muted-foreground italic">
@@ -289,7 +366,9 @@ export default function InspectionShow({ inspection }: Props) {
                             <CardTitle className="text-base">Notes</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm whitespace-pre-wrap">{insp.notes}</p>
+                            <p className="text-sm whitespace-pre-wrap">
+                                {insp.notes}
+                            </p>
                         </CardContent>
                     </Card>
                 )}

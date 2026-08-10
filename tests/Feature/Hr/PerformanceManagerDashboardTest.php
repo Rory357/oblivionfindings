@@ -1,37 +1,54 @@
 <?php
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
+
+    $this->site = Site::factory()->create(['name' => 'Performance Manager Site']);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
         'approved_at' => now(),
     ]);
-    $this->hr->setAttribute('tenant_id', 1);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
-    $this->staff->setAttribute('tenant_id', 1);
 
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $this->hr->roles()->syncWithoutDetaching([$hrRole->id]);
     }
+
+    performanceManagerProfile($this->hr, $this->site);
+    performanceManagerProfile($this->staff, $this->site);
 });
+
+function performanceManagerProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
 
 test('performance dashboard returns manager one to one and competency signals', function () {
     HrSupervisionNote::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->staff->id,
         'supervisor_user_id' => $this->hr->id,
         'session_date' => now()->subDays(10)->toDateString(),
@@ -42,7 +59,6 @@ test('performance dashboard returns manager one to one and competency signals', 
     ]);
 
     HrSupervisionNote::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->staff->id,
         'supervisor_user_id' => $this->hr->id,
         'session_date' => now()->subDays(3)->toDateString(),
@@ -53,7 +69,6 @@ test('performance dashboard returns manager one to one and competency signals', 
     ]);
 
     HrPerformanceReview::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->staff->id,
         'reviewer_user_id' => $this->hr->id,
         'review_type' => 'annual',
@@ -66,7 +81,6 @@ test('performance dashboard returns manager one to one and competency signals', 
     ]);
 
     $goal = HrDevelopmentGoal::query()->create([
-        'tenant_id' => 1,
         'employee_user_id' => $this->staff->id,
         'manager_user_id' => $this->hr->id,
         'title' => 'Improve de-escalation skills',
@@ -81,7 +95,6 @@ test('performance dashboard returns manager one to one and competency signals', 
     ]);
 
     $survey = HrEngagementSurvey::query()->create([
-        'tenant_id' => 1,
         'title' => 'Team pulse',
         'survey_type' => 'pulse',
         'status' => 'published',
@@ -92,7 +105,6 @@ test('performance dashboard returns manager one to one and competency signals', 
 
     HrEngagementActionPlan::query()->create([
         'survey_id' => $survey->id,
-        'tenant_id' => 1,
         'owner_user_id' => $this->staff->id,
         'title' => 'Reduce weekend overtime',
         'priority' => 'high',

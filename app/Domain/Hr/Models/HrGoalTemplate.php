@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class HrGoalTemplate extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $table = 'hr_goal_templates';
 
     protected $fillable = [
@@ -30,11 +33,6 @@ class HrGoalTemplate extends Model
         'key_results' => 'array',
         'is_active' => 'boolean',
     ];
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeActive(Builder $query): Builder
     {

@@ -56,7 +56,9 @@ export async function verifyMedicationScan(
     };
 }
 
-export function hasVerifiedMedicationScan(scan: MedicationScanCapture): boolean {
+export function hasVerifiedMedicationScan(
+    scan: MedicationScanCapture,
+): boolean {
     return scan.status === 'verified' && scan.code.trim().length > 0;
 }
 

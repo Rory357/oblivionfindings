@@ -18,7 +18,12 @@ describe('Fleet modal-first create workflows', () => {
             index: 'resources/js/pages/fleet-assets/outings/index.tsx',
             form: 'resources/js/pages/fleet-assets/outings/create.tsx',
             component: 'OutingWizard',
-            steps: ['People & purpose', 'Transport & timing', 'Safety checks', 'Review'],
+            steps: [
+                'People & purpose',
+                'Transport & timing',
+                'Safety checks',
+                'Review',
+            ],
         },
         {
             name: 'transport',
@@ -32,20 +37,23 @@ describe('Fleet modal-first create workflows', () => {
                 'Review',
             ],
         },
-    ])('opens the $name canonical WizardShell from its index', ({ index, form, component, steps }) => {
-        const indexSource = read(index);
-        const formSource = read(form);
+    ])(
+        'opens the $name canonical WizardShell from its index',
+        ({ index, form, component, steps }) => {
+            const indexSource = read(index);
+            const formSource = read(form);
 
-        expect(indexSource).toContain(component);
-        expect(indexSource).toContain("searchParams.get('new') === '1'");
-        expect(formSource).toContain(`export function ${component}`);
-        expect(formSource).toContain('<WizardShell');
-        expect(formSource).not.toContain('<AppLayout');
+            expect(indexSource).toContain(component);
+            expect(indexSource).toContain("searchParams.get('new') === '1'");
+            expect(formSource).toContain(`export function ${component}`);
+            expect(formSource).toContain('<WizardShell');
+            expect(formSource).not.toContain('<AppLayout');
 
-        for (const step of steps) {
-            expect(formSource).toContain(`label: '${step}'`);
-        }
-    });
+            for (const step of steps) {
+                expect(formSource).toContain(`label: '${step}'`);
+            }
+        },
+    );
 
     it('keeps incident detail in one modal experience', () => {
         const source = read(

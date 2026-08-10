@@ -94,14 +94,13 @@ covering ~1.5 focused weeks of work, almost entirely in existing files.
 [`AssetOwnershipController.php`](../app/Http/Controllers/AssetOwnershipController.php),
 [`AssetQrController.php`](../app/Http/Controllers/AssetQrController.php),
 [`AssetScanEventController.php`](../app/Http/Controllers/AssetScanEventController.php),
-[`AssetTrackerController.php`](../app/Http/Controllers/AssetTrackerController.php),
 [`AssetDocumentController.php`](../app/Http/Controllers/AssetDocumentController.php),
 [`AssetReportController.php`](../app/Http/Controllers/AssetReportController.php))
-— operational asset registry. The `AssetTrackerController` is explicitly
-deprecated and acts as a back-fill bridge; pair/unpair from this surface keeps
-the canonical `Device` + `DeviceAssetLink` view in sync via
-`FleetDeviceRuntimeService::ensureCanonicalDeviceForTracker` and a
-`DeviceAssetLink` insert ([`AssetTrackerController.php:65-85`](../app/Http/Controllers/AssetTrackerController.php#L65)).
+— operational asset registry. The public legacy Asset tracker mutation
+controller and routes are retired. Pairing now enters only through the canonical
+Security & Devices/Fleet Device workflow and `DeviceLinkService`; the
+`AssetTracker` model remains a private compatibility key for telemetry ingest
+and consent resolution.
 
 **Fleet (legacy split)** ([`app/Http/Controllers/Fleet/`](../app/Http/Controllers/Fleet))
 — eight controllers: `FleetDashboardController`, `FleetVehicleController`,

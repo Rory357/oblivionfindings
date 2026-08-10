@@ -44,7 +44,8 @@ const HERO_STYLE: CSSProperties = {
         'color-mix(in oklch, oklch(0.86 0.13 90) 25%, transparent)',
     background:
         'linear-gradient(120deg, color-mix(in oklch, var(--primary) 72%, black 22%), var(--primary) 60%, color-mix(in oklch, var(--primary) 92%, white 6%))',
-    boxShadow: '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
+    boxShadow:
+        '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
 };
 
 function greetingFor(hour: number): { greeting: string; wave: string } {
@@ -101,7 +102,8 @@ export function MyHrHero({
         return () => document.removeEventListener('keydown', onKey);
     }, [avatarOpen]);
 
-    const openActions = counts.docsToSign + counts.policiesDue + counts.onesToAck;
+    const openActions =
+        counts.docsToSign + counts.policiesDue + counts.onesToAck;
     const primaryNeed =
         counts.docsToSign > 0
             ? '/hr/my/documents'
@@ -159,7 +161,7 @@ export function MyHrHero({
         >
             {/* decorative orb */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
-                <div className="absolute right-[24%] -top-20 h-60 w-60 rounded-full bg-primary-foreground/[0.05]" />
+                <div className="absolute -top-20 right-[24%] h-60 w-60 rounded-full bg-primary-foreground/[0.05]" />
             </div>
 
             <div className="relative flex flex-wrap items-stretch">
@@ -197,9 +199,9 @@ export function MyHrHero({
                                     <div
                                         role="menu"
                                         aria-label="Account"
-                                        className="absolute left-0 top-[calc(100%+11px)] z-[56] min-w-[224px] rounded-[13px] border border-border bg-popover p-1.5 text-popover-foreground shadow-[0_26px_60px_-18px_rgba(20,10,40,0.5)] animate-in fade-in-0 slide-in-from-top-1 duration-150 motion-reduce:animate-none"
+                                        className="absolute top-[calc(100%+11px)] left-0 z-[56] min-w-[224px] animate-in rounded-[13px] border border-border bg-popover p-1.5 text-popover-foreground shadow-[0_26px_60px_-18px_rgba(20,10,40,0.5)] duration-150 fade-in-0 slide-in-from-top-1 motion-reduce:animate-none"
                                     >
-                                        <div className="flex items-center gap-3 px-2.5 pb-2.5 pt-2">
+                                        <div className="flex items-center gap-3 px-2.5 pt-2 pb-2.5">
                                             <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-primary text-[13px] font-bold text-primary-foreground">
                                                 {profile.initials}
                                             </div>
@@ -246,7 +248,7 @@ export function MyHrHero({
 
                         {/* greeting + meta */}
                         <div className="min-w-0">
-                            <h1 className="text-[28px] font-bold leading-[1.05] tracking-tight">
+                            <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">
                                 {greeting}, {profile.first_name}{' '}
                                 <span className="text-[22px]">{wave}</span>
                             </h1>
@@ -279,7 +281,7 @@ export function MyHrHero({
                     </div>
 
                     {/* stats */}
-                    <div className="-ml-3 mt-5 flex flex-wrap gap-0.5">
+                    <div className="mt-5 -ml-3 flex flex-wrap gap-0.5">
                         <HeroStat
                             label="This week"
                             value={`${weekly.total_hours.toFixed(1)}h`}
@@ -287,7 +289,9 @@ export function MyHrHero({
                         />
                         <HeroStat
                             label="Next shift"
-                            value={formatNextShift(nextShift?.starts_at ?? null)}
+                            value={formatNextShift(
+                                nextShift?.starts_at ?? null,
+                            )}
                             onClick={() => router.visit('/hr/my/time')}
                         />
                         <HeroStat
@@ -352,13 +356,13 @@ export function MyHrHero({
                         />
                     </button>
                     <span className="text-[11.5px] text-primary-foreground/65">
-                        {monthShiftCount} shift{monthShiftCount === 1 ? '' : 's'} this
-                        month
+                        {monthShiftCount} shift
+                        {monthShiftCount === 1 ? '' : 's'} this month
                     </span>
                 </div>
 
                 <div className="flex items-center gap-2.5">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/50">
+                    <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/50 uppercase">
                         Needs you
                     </span>
                     {openActions === 0 ? (
@@ -370,7 +374,7 @@ export function MyHrHero({
                         <button
                             type="button"
                             onClick={() => router.visit(primaryNeed)}
-                            className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/15 py-1.5 pl-2.5 pr-2.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
+                            className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/15 py-1.5 pr-2.5 pl-2.5 text-xs font-bold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
                         >
                             <NeedsDot />
                             {openActions} tasks need you
@@ -382,7 +386,7 @@ export function MyHrHero({
                                 key={n.label}
                                 type="button"
                                 onClick={() => router.visit(n.href)}
-                                className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/15 py-1.5 pl-2.5 pr-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
+                                className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/15 py-1.5 pr-3 pl-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
                             >
                                 <NeedsDot />
                                 <n.icon className="h-[13px] w-[13px]" />
@@ -419,7 +423,7 @@ function HeroStat({
             onClick={onClick}
             className="flex flex-col items-start gap-0.5 rounded-[10px] px-3 py-2 text-left transition-colors hover:bg-primary-foreground/10"
         >
-            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+            <span className="text-[10px] font-bold tracking-[0.09em] whitespace-nowrap text-primary-foreground/60 uppercase">
                 {label}
             </span>
             <span
@@ -447,7 +451,7 @@ function QuickAction({
         <button
             type="button"
             onClick={onClick}
-            className="inline-flex items-center gap-2 text-primary-foreground/90 transition-opacity hover:opacity-100 hover:text-primary-foreground"
+            className="inline-flex items-center gap-2 text-primary-foreground/90 transition-opacity hover:text-primary-foreground hover:opacity-100"
         >
             <Icon className="h-3.5 w-3.5" />
             {label}

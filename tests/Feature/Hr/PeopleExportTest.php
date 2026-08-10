@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -9,7 +10,18 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'People export Site']);
 });
+
+function peopleExportProfile(User $user, Site $site, array $overrides = []): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        ...$overrides,
+    ]);
+}
 
 test('people index export button submits to the existing exporter', function () {
     $source = file_get_contents(resource_path('js/pages/hr/employees/index.tsx'));
@@ -25,6 +37,9 @@ test('people index export button submits to the existing exporter', function () 
 test('employee export endpoint downloads a csv for people managers', function () {
     $manager = User::factory()->create(['approved_at' => now()]);
     $manager->roles()->sync([Role::where('name', 'hr')->firstOrFail()->id]);
+    peopleExportProfile($manager, $this->site, [
+        'employee_number' => 'EMP-EXPORT-MANAGER',
+    ]);
 
     $employee = User::factory()->create([
         'name' => 'Aroha Worker',
@@ -32,9 +47,7 @@ test('employee export endpoint downloads a csv for people managers', function ()
         'approved_at' => now(),
     ]);
 
-    HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $employee->id,
+    peopleExportProfile($employee, $this->site, [
         'employee_number' => 'EMP-100',
         'work_email' => 'aroha.worker@example.test',
         'position_title' => 'Support Worker',
@@ -68,15 +81,16 @@ test('the people table bulk bar wires an export-selected action', function () {
 test('export with selected ids returns only those people (incl. inactive)', function () {
     $manager = User::factory()->create(['approved_at' => now()]);
     $manager->roles()->sync([Role::where('name', 'hr')->firstOrFail()->id]);
+    peopleExportProfile($manager, $this->site, [
+        'employee_number' => 'EMP-SELECT-MANAGER',
+    ]);
 
     $selected = User::factory()->create([
         'name' => 'Selected One',
         'email' => 'sel.one@example.test',
         'approved_at' => now(),
     ]);
-    HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $selected->id,
+    peopleExportProfile($selected, $this->site, [
         'employee_number' => 'EMP-SEL',
         'work_email' => 'sel.one@example.test',
         'position_title' => 'Support Worker',
@@ -91,9 +105,7 @@ test('export with selected ids returns only those people (incl. inactive)', func
         'email' => 'other.two@example.test',
         'approved_at' => now(),
     ]);
-    HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
-        'user_id' => $other->id,
+    peopleExportProfile($other, $this->site, [
         'employee_number' => 'EMP-OTH',
         'work_email' => 'other.two@example.test',
         'position_title' => 'Support Worker',

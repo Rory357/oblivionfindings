@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Domain\SecurityDevices\Presenters\SiteProfileTechnologyProjectionPresenter;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Services\Sites\Profile\SiteProfileAdminPresenter;
@@ -23,6 +24,7 @@ class SiteProfileController extends Controller
         SiteProfileSafetyPresenter $safety,
         SiteProfileOperationsPresenter $operations,
         SiteProfileAdminPresenter $admin,
+        SiteProfileTechnologyProjectionPresenter $technology,
     ): Response {
         $user = $request->user();
         abort_unless($user, 403);
@@ -43,6 +45,10 @@ class SiteProfileController extends Controller
             'overview' => fn () => $resolveShell()['overview'],
             'readiness' => fn () => $resolveShell()['readiness'],
             'uiPreferences' => fn () => $resolveShell()['uiPreferences'],
+            'can' => [
+                'viewTechnology' => $technology->canView($user, $site),
+                'viewHardwarePlacement' => $technology->canView($user, $site),
+            ],
             'clientsData' => Inertia::optional(fn () => $people->clients($user, $site)),
             'contactsData' => Inertia::optional(fn () => $people->contacts($user, $site)),
             'staffRequirementsData' => Inertia::optional(fn () => $people->staffRequirements($user, $site)),
@@ -65,6 +71,9 @@ class SiteProfileController extends Controller
             'financialsData' => Inertia::optional(fn () => $admin->financials($user, $site)),
             'vendorsCredentialsData' => Inertia::optional(fn () => $admin->vendorsCredentials($user, $site)),
             'servicesData' => Inertia::optional(fn () => $admin->services($user, $site)),
+            'technology' => Inertia::optional(
+                fn () => $technology->present($user, $site),
+            ),
         ]);
     }
 }

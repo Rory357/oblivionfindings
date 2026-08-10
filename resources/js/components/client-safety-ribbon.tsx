@@ -75,12 +75,10 @@ const iconMap: Record<string, LucideIcon> = {
 };
 
 const toneClasses: Record<SafetyTone, string> = {
-    danger:
-        'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical',
+    danger: 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical',
     warning:
         'border-status-warning/30 bg-status-warning-bg text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning',
-    info:
-        'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info',
+    info: 'border-status-info/30 bg-status-info-bg text-status-info dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info',
 };
 
 function Pill({
@@ -97,7 +95,7 @@ function Pill({
     const pill = (
         <span
             className={cn(
-                'inline-flex min-w-0 max-w-full cursor-default items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+                'inline-flex max-w-full min-w-0 cursor-default items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
                 toneClasses[tone],
             )}
         >
@@ -113,7 +111,7 @@ function Pill({
             <TooltipTrigger asChild>{pill}</TooltipTrigger>
             <TooltipContent
                 side="top"
-                className="max-w-xs whitespace-normal break-words text-center"
+                className="max-w-xs text-center break-words whitespace-normal"
             >
                 {title}
             </TooltipContent>
@@ -220,19 +218,20 @@ export default function ClientSafetyRibbon({
                         {care_flags.map((f) => {
                             const Icon = iconMap[f.icon] ?? Info;
                             return (
-                                <Pill
-                                    key={f.key}
-                                    tone={f.tone}
-                                    icon={Icon}
-                                >
+                                <Pill key={f.key} tone={f.tone} icon={Icon}>
                                     {f.label}
                                 </Pill>
                             );
                         })}
 
                         {other_risks_count > 0 && (
-                            <Pill tone="info" icon={Info} title="Lower-severity active risks">
-                                +{other_risks_count} other risk{other_risks_count === 1 ? '' : 's'}
+                            <Pill
+                                tone="info"
+                                icon={Info}
+                                title="Lower-severity active risks"
+                            >
+                                +{other_risks_count} other risk
+                                {other_risks_count === 1 ? '' : 's'}
                             </Pill>
                         )}
                     </div>
@@ -276,9 +275,15 @@ export function ClientSafetyBadges({
 
             {summary.critical_risks_count > 0 && (
                 <Pill
-                    tone={summary.risk_level === 'critical' ? 'danger' : 'warning'}
+                    tone={
+                        summary.risk_level === 'critical' ? 'danger' : 'warning'
+                    }
                     icon={ShieldAlert}
-                    title={summary.top_risk ? `Risk: ${summary.top_risk}` : 'Critical risks'}
+                    title={
+                        summary.top_risk
+                            ? `Risk: ${summary.top_risk}`
+                            : 'Critical risks'
+                    }
                 >
                     {summary.critical_risks_count === 1 && summary.top_risk
                         ? `Risk: ${summary.top_risk}`

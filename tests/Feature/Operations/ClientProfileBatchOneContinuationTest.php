@@ -6,6 +6,7 @@ use App\Models\CarePlan;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -29,9 +30,31 @@ function grantClientProfileBatchOneContinuationPermissions(User $user, array $ke
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
+function clientProfileBatchOneContinuationUserAtSite(
+    Site $site,
+    array $permissionKeys,
+    string $role = 'manager',
+): User {
+    $user = User::factory()->create([
+        'approved_at' => now(),
+        'role' => $role,
+    ]);
+    grantClientProfileBatchOneContinuationPermissions($user, $permissionKeys);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    return $user;
+}
+
 it('emits independent Batch 1 action capabilities and canonical HR staff preparation', function () {
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileBatchOneContinuationPermissions($viewer, [
+    $site = Site::factory()->create();
+    $viewer = clientProfileBatchOneContinuationUserAtSite($site, [
         'clients.viewAny',
         'care_plans.viewAny',
         'care_plans.update',
@@ -45,14 +68,13 @@ it('emits independent Batch 1 action capabilities and canonical HR staff prepara
         'hr.onboarding.view',
     ]);
     $worker = User::factory()->create([
-        'organization_id' => 1,
         'name' => 'Prepared Worker',
         'role' => 'support_worker',
+        'approved_at' => now(),
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $client->supportWorkers()->attach($worker->id);
     CarePlan::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Working support plan',
         'status' => 'active',
@@ -62,12 +84,15 @@ it('emits independent Batch 1 action capabilities and canonical HR staff prepara
     ]);
 
     $employee = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $worker->id,
         'position_title' => 'Support Worker',
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
     ]);
     $checklist = HrOnboardingChecklist::factory()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $employee->id,
         'status' => 'in_progress',
         'due_date' => now()->addWeek(),
@@ -117,12 +142,12 @@ it('emits independent Batch 1 action capabilities and canonical HR staff prepara
 });
 
 it('keeps onboarding workflow creation distinct from workflow and checklist management', function () {
-    $creator = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileBatchOneContinuationPermissions($creator, [
+    $site = Site::factory()->create();
+    $creator = clientProfileBatchOneContinuationUserAtSite($site, [
         'clients.viewAny',
         'onboarding.create',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
 
     $this->actingAs($creator)
         ->post("/operations/clients/{$client->id}/onboarding-workflow")
@@ -130,7 +155,6 @@ it('keeps onboarding workflow creation distinct from workflow and checklist mana
 
     $this->assertDatabaseHas('client_onboarding_workflows', [
         'client_id' => $client->id,
-        'organization_id' => 1,
         'status' => 'in_progress',
         'created_by' => $creator->id,
     ]);

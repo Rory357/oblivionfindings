@@ -10,15 +10,19 @@ use App\Models\CalendarSyncMapping;
 use App\Models\Site;
 use App\Services\Sites\Calendar\CalendarSources;
 use App\Services\Sites\Calendar\CalendarSyncService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class CalendarSyncSettingsController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['integrations.manage_secrets'];
+
     private const SETTINGS_KEY = 'sites.calendar_sync.settings';
 
     private const DEFAULT_SETTINGS = [
@@ -31,16 +35,21 @@ class CalendarSyncSettingsController extends Controller
         CalendarSyncConnection::PROVIDER_MICROSOFT => 'Microsoft 365',
     ];
 
-    public function __construct(private CalendarSyncService $syncService) {}
+    public function __construct(
+        private CalendarSyncService $syncService,
+        private UserSiteAccessService $siteAccess,
+    ) {}
 
     public function index(Request $request): Response
     {
         $this->authorizeManage($request);
 
-        $tenantId = $this->tenantId($request);
+        $siteIds = $this->siteAccess->accessibleSiteIds(
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
 
         $connections = CalendarSyncConnection::query()
-            ->where('tenant_id', $tenantId)
             ->get()
             ->keyBy('provider');
 
@@ -59,13 +68,23 @@ class CalendarSyncSettingsController extends Controller
             ];
         })->values()->all();
 
-        $mappings = CalendarSyncMapping::query()
-            ->where('tenant_id', $tenantId)
+        $mappingGroups = CalendarSyncMapping::query()
+            ->active()
+            ->whereIn('site_id', $siteIds)
             ->get()
-            ->keyBy('site_id');
+            ->groupBy(fn (CalendarSyncMapping $mapping): int => (int) $mapping->site_id);
+        abort_if(
+            $mappingGroups->contains(fn ($siteMappings): bool => $siteMappings->count() > 1),
+            409,
+            'Calendar mapping configuration requires reconciliation before it can be managed.',
+        );
+        $mappings = $mappingGroups->map(fn ($siteMappings) => $siteMappings->first());
 
         $sites = Site::query()
-            ->where('is_active', true)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('id', $siteIds)
             ->orderBy('name')
             ->get(['id', 'name', 'type'])
             ->map(function (Site $site) use ($mappings) {
@@ -100,9 +119,10 @@ class CalendarSyncSettingsController extends Controller
     public function updateMapping(Request $request): RedirectResponse
     {
         $this->authorizeManage($request);
+        $this->assertCanManageSite($request, $request->integer('site_id'));
 
         $data = $request->validate([
-            'site_id' => ['required', 'integer', 'exists:sites,id'],
+            'site_id' => ['required', 'integer'],
             'provider' => ['nullable', 'in:google,microsoft'],
             'external_calendar_id' => ['nullable', 'string', 'max:255'],
             'external_calendar_name' => ['nullable', 'string', 'max:255'],
@@ -112,45 +132,51 @@ class CalendarSyncSettingsController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $tenantId = $this->tenantId($request);
+        return DB::transaction(function () use ($data): RedirectResponse {
+            $site = Site::query()
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at')
+                ->whereKey($data['site_id'])
+                ->lockForUpdate()
+                ->first();
+            abort_unless($site, 403);
 
-        if (empty($data['provider'])) {
+            if (empty($data['provider'])) {
+                CalendarSyncMapping::query()
+                    ->where('site_id', $site->id)
+                    ->update(['is_active' => false]);
+
+                return back()->with('success', 'House calendar sync disabled.');
+            }
+
+            $mapping = CalendarSyncMapping::firstOrNew([
+                'site_id' => $site->id,
+                'provider' => $data['provider'],
+            ]);
+
+            $mapping->fill([
+                'external_calendar_id' => $data['external_calendar_id'] ?? null,
+                'external_calendar_name' => $data['external_calendar_name'] ?? null,
+                'sync_direction' => $data['sync_direction'] ?? CalendarSyncMapping::DIRECTION_ONE_WAY,
+                'sources' => $data['sources'] ?? null,
+                'is_active' => $data['is_active'] ?? true,
+            ]);
+
+            if (! $mapping->ical_feed_token) {
+                $mapping->ical_feed_token = Str::random(48);
+            }
+
+            $mapping->save();
+
+            // Other providers for the same site become inactive (one live mapping per house).
             CalendarSyncMapping::query()
-                ->where('tenant_id', $tenantId)
-                ->where('site_id', $data['site_id'])
+                ->where('site_id', $site->id)
+                ->where('provider', '!=', $data['provider'])
                 ->update(['is_active' => false]);
 
-            return back()->with('success', 'House calendar sync disabled.');
-        }
-
-        $mapping = CalendarSyncMapping::firstOrNew([
-            'tenant_id' => $tenantId,
-            'site_id' => $data['site_id'],
-            'provider' => $data['provider'],
-        ]);
-
-        $mapping->fill([
-            'external_calendar_id' => $data['external_calendar_id'] ?? null,
-            'external_calendar_name' => $data['external_calendar_name'] ?? null,
-            'sync_direction' => $data['sync_direction'] ?? CalendarSyncMapping::DIRECTION_ONE_WAY,
-            'sources' => $data['sources'] ?? null,
-            'is_active' => $data['is_active'] ?? true,
-        ]);
-
-        if (! $mapping->ical_feed_token) {
-            $mapping->ical_feed_token = Str::random(48);
-        }
-
-        $mapping->save();
-
-        // Other providers for the same site become inactive (one live mapping per house).
-        CalendarSyncMapping::query()
-            ->where('tenant_id', $tenantId)
-            ->where('site_id', $data['site_id'])
-            ->where('provider', '!=', $data['provider'])
-            ->update(['is_active' => false]);
-
-        return back()->with('success', 'House calendar mapping saved.');
+            return back()->with('success', 'House calendar mapping saved.');
+        });
     }
 
     public function updateGlobal(Request $request): RedirectResponse
@@ -179,7 +205,6 @@ class CalendarSyncSettingsController extends Controller
         abort_unless(isset(self::PROVIDERS[$provider]), 404);
 
         $connection = CalendarSyncConnection::query()
-            ->where('tenant_id', $this->tenantId($request))
             ->where('provider', $provider)
             ->first();
 
@@ -199,23 +224,26 @@ class CalendarSyncSettingsController extends Controller
 
         $mappingId = $request->integer('mapping_id') ?: null;
         if ($mappingId !== null) {
-            abort_unless(
-                CalendarSyncMapping::query()
-                    ->whereKey($mappingId)
-                    ->where('tenant_id', $this->tenantId($request))
-                    ->exists(),
-                403,
-            );
+            $mapping = CalendarSyncMapping::query()->whereKey($mappingId)->first();
+            abort_unless($mapping, 403);
+            $this->assertCanManageSite($request, (int) $mapping->site_id);
         }
         SyncResourceCalendarsJob::dispatch($mappingId);
 
         return back()->with('success', 'Calendar sync queued.');
     }
 
-    public function resetFeed(Request $request, CalendarSyncMapping $mapping): RedirectResponse
+    public function resetFeed(Request $request, int $mapping): RedirectResponse
     {
         $this->authorizeManage($request);
-        abort_unless($mapping->tenant_id === $this->tenantId($request), 403);
+        $mapping = CalendarSyncMapping::query()
+            ->whereKey($mapping)
+            ->whereHas('site', fn ($site) => $site
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at'))
+            ->firstOrFail();
+        $this->assertCanManageSite($request, (int) $mapping->site_id);
 
         $mapping->update(['ical_feed_token' => Str::random(48)]);
 
@@ -263,13 +291,27 @@ class CalendarSyncSettingsController extends Controller
             && ! empty(config("services.{$provider}.client_secret"));
     }
 
-    private function tenantId(Request $request): int
+    private function assertCanManageSite(Request $request, int $siteId): void
     {
-        return (int) ($request->user()->tenant_id ?? 0);
+        $this->siteAccess->assertCanAccessSiteId(
+            $request->user(),
+            $siteId,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
+
+        abort_unless(
+            Site::query()
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at')
+                ->whereKey($siteId)
+                ->exists(),
+            403,
+        );
     }
 
     private function authorizeManage(Request $request): void
     {
-        abort_unless($request->user()?->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($request->user()?->canDo('integrations.manage_secrets'), 403);
     }
 }

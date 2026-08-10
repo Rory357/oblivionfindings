@@ -27,7 +27,6 @@ beforeEach(function () {
 function makeIncidentJourneyTasksUser(Site $site, array $permissionKeys): User
 {
     $user = User::factory()->create([
-        'organization_id' => $site->tenant_id,
         'role' => 'coordinator',
         'approved_at' => now(),
     ]);
@@ -40,7 +39,6 @@ function makeIncidentJourneyTasksUser(Site $site, array $permissionKeys): User
     }
 
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => $site->tenant_id,
         'user_id' => $user->id,
         'position_role' => 'coordinator',
         'primary_site_id' => $site->id,
@@ -70,7 +68,6 @@ function makeUniversalIncidentJourney(
         ]),
     );
     $event = HsEvent::factory()->forClientIncident($incident)->handoverAccepted($owner, $owner)->create([
-        'organization_id' => $site->tenant_id,
         'site_id' => $site->id,
         'client_id' => $client->id,
         'owner_user_id' => $owner->id,
@@ -112,14 +109,13 @@ function makeUniversalIncidentJourney(
 }
 
 it('groups the five incident entry paths under truthful journey references without collapsing separate work', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $user = makeIncidentJourneyTasksUser($site, [
         'incidents.viewAny',
         'controlRoom.viewAny',
         'hazards.view',
     ]);
     $client = Client::factory()->create([
-        'organization_id' => $site->tenant_id,
         'site_id' => $site->id,
     ]);
     $journeys = collect([
@@ -164,20 +160,18 @@ it('groups the five incident entry paths under truthful journey references witho
     }
 });
 
-it('uses the same tenant and incident-time site scope as the source modules', function () {
-    $visibleSite = Site::factory()->create(['tenant_id' => 1]);
-    $hiddenSite = Site::factory()->create(['tenant_id' => 1]);
+it('uses the same current and incident-time Site access as the source modules', function () {
+    $visibleSite = Site::factory()->create();
+    $hiddenSite = Site::factory()->create();
     $user = makeIncidentJourneyTasksUser($visibleSite, [
         'incidents.viewAny',
         'controlRoom.viewAny',
         'hazards.view',
     ]);
     $visibleClient = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $visibleSite->id,
     ]);
     $hiddenClient = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $hiddenSite->id,
     ]);
     $visible = makeUniversalIncidentJourney($visibleSite, $visibleClient, $user, 'manual');
@@ -196,13 +190,13 @@ it('uses the same tenant and incident-time site scope as the source modules', fu
 });
 
 it('finds every related responsibility by any official journey reference', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $user = makeIncidentJourneyTasksUser($site, [
         'incidents.viewAny',
         'controlRoom.viewAny',
         'hazards.view',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $journey = makeUniversalIncidentJourney($site, $client, $user, 'sensor');
     $expectedIds = collect((new TaskAggregator)->arrayFor($user))
         ->where('journey.key', 'incident-'.$journey['incident']->id)
@@ -227,10 +221,9 @@ it('finds every related responsibility by any official journey reference', funct
 });
 
 it('keeps private journey search relations out of the normal capped incident feed', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $user = makeIncidentJourneyTasksUser($site, ['incidents.viewAny']);
     $client = Client::factory()->create([
-        'organization_id' => $site->tenant_id,
         'site_id' => $site->id,
     ]);
     makeUniversalIncidentJourney($site, $client, $user, 'manual');
@@ -249,10 +242,9 @@ it('keeps private journey search relations out of the normal capped incident fee
 });
 
 it('keeps completed corrective actions active with truthful independent verification state', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $user = makeIncidentJourneyTasksUser($site, ['hazards.view']);
     $event = HsEvent::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
     $action = HsCorrectiveAction::factory()->completed()->create([
@@ -284,7 +276,6 @@ it('keeps completed corrective actions active with truthful independent verifica
 
 it('finds the incident journey by people place source work narrative references and display state', function () {
     $site = Site::factory()->create([
-        'tenant_id' => 1,
         'name' => 'Playwright Incident Handover House',
     ]);
     $viewer = makeIncidentJourneyTasksUser($site, [
@@ -294,32 +285,26 @@ it('finds the incident journey by people place source work narrative references 
     ]);
     $viewer->forceFill(['name' => 'Playwright Queue Viewer'])->save();
     $incidentOwner = User::factory()->create([
-        'organization_id' => $site->tenant_id,
         'name' => 'Playwright Incident Investigator',
         'approved_at' => now(),
     ]);
     $controlRoomOwner = User::factory()->create([
-        'organization_id' => $site->tenant_id,
         'name' => 'Playwright Control Room Operator',
         'approved_at' => now(),
     ]);
     $followupOwner = User::factory()->create([
-        'organization_id' => $site->tenant_id,
         'name' => 'Playwright Follow-up Owner',
         'approved_at' => now(),
     ]);
     $investigationOwner = User::factory()->create([
-        'organization_id' => $site->tenant_id,
         'name' => 'Playwright H&S Investigator',
         'approved_at' => now(),
     ]);
     $actionOwner = User::factory()->create([
-        'organization_id' => $site->tenant_id,
         'name' => 'Playwright Corrective Action Owner',
         'approved_at' => now(),
     ]);
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
         'first_name' => 'Playwright Aroha',
         'last_name' => 'Handover',
@@ -409,7 +394,7 @@ it('finds the incident journey by people place source work narrative references 
 });
 
 it('searches incident journey responsibilities beyond each providers normal 300 row dashboard cap', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $viewer = makeIncidentJourneyTasksUser($site, [
         'incidents.viewAny',
         'controlRoom.viewAny',
@@ -417,7 +402,6 @@ it('searches incident journey responsibilities beyond each providers normal 300 
         'fleet.viewAny',
     ]);
     $client = Client::factory()->create([
-        'organization_id' => $site->tenant_id,
         'site_id' => $site->id,
     ]);
     $journey = makeUniversalIncidentJourney($site, $client, $viewer, 'sensor');
@@ -435,7 +419,6 @@ it('searches incident journey responsibilities beyond each providers normal 300 
         collect(range(1, 301))
             ->map(fn (int $index) => [
                 'hs_event_id' => $journey['event']->id,
-                'organization_id' => $site->tenant_id,
                 'reference_number' => sprintf('CA-DECOY-%04d', $index),
                 'action_type' => HsCorrectiveAction::TYPE_CORRECTIVE,
                 'priority' => HsCorrectiveAction::PRIORITY_LOW,
@@ -470,10 +453,9 @@ it('searches incident journey responsibilities beyond each providers normal 300 
 });
 
 it('keeps completed journey work in explicit history only', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $user = makeIncidentJourneyTasksUser($site, ['hazards.view']);
     $event = HsEvent::factory()->closed()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
     $action = HsCorrectiveAction::factory()->closed()->create(['hs_event_id' => $event->id]);
@@ -488,13 +470,13 @@ it('keeps completed journey work in explicit history only', function () {
 });
 
 it('replaces transferred operational work with one retry-safe H&S responsibility', function () {
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    $site = Site::factory()->create();
     $user = makeIncidentJourneyTasksUser($site, [
         'controlRoom.viewAny',
         'hazards.view',
         'hazards.manage',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $journey = makeUniversalIncidentJourney($site, $client, $user, 'control_room');
     $task = AlertTask::query()->create([
         'alert_id' => $journey['alert']->id,

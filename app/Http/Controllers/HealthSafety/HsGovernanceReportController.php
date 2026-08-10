@@ -32,11 +32,12 @@ class HsGovernanceReportController extends Controller
      */
     public function boardSummary(Request $request): JsonResponse
     {
+        $siteId = $this->requestedSiteId($request);
         $from = $request->input('from') ? Carbon::parse($request->input('from')) : null;
         $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
 
         return response()->json(
-            $this->governanceService->getBoardSummary($from, $to)
+            $this->governanceService->getBoardSummary($from, $to, $request->user(), $siteId)
         );
     }
 
@@ -45,11 +46,12 @@ class HsGovernanceReportController extends Controller
      */
     public function worksafeRegister(Request $request): JsonResponse
     {
+        $siteId = $this->requestedSiteId($request);
         $from = $request->input('from') ? Carbon::parse($request->input('from')) : null;
         $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
 
         return response()->json(
-            $this->complianceService->worksafeRegister($from, $to)
+            $this->complianceService->worksafeRegister($from, $to, $request->user(), $siteId)
         );
     }
 
@@ -58,11 +60,12 @@ class HsGovernanceReportController extends Controller
      */
     public function investigationOutcomes(Request $request): JsonResponse
     {
+        $siteId = $this->requestedSiteId($request);
         $from = $request->input('from') ? Carbon::parse($request->input('from')) : null;
         $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
 
         return response()->json(
-            $this->complianceService->investigationOutcomes($from, $to)
+            $this->complianceService->investigationOutcomes($from, $to, $request->user(), $siteId)
         );
     }
 
@@ -71,6 +74,7 @@ class HsGovernanceReportController extends Controller
      */
     public function correctiveActionTraceability(Request $request): JsonResponse
     {
+        $siteId = $this->requestedSiteId($request);
         $from = $request->input('from') ? Carbon::parse($request->input('from')) : null;
         $to = $request->input('to') ? Carbon::parse($request->input('to')) : null;
 
@@ -79,6 +83,8 @@ class HsGovernanceReportController extends Controller
                 $request->input('status'),
                 $from,
                 $to,
+                $request->user(),
+                $siteId,
             )
         );
     }
@@ -86,10 +92,21 @@ class HsGovernanceReportController extends Controller
     /**
      * Risk assessment register.
      */
-    public function riskAssessmentRegister(): JsonResponse
+    public function riskAssessmentRegister(Request $request): JsonResponse
     {
+        $siteId = $this->requestedSiteId($request);
+
         return response()->json(
-            $this->complianceService->riskAssessmentRegister()
+            $this->complianceService->riskAssessmentRegister($request->user(), $siteId)
         );
+    }
+
+    private function requestedSiteId(Request $request): ?int
+    {
+        $validated = $request->validate([
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+        ]);
+
+        return isset($validated['site_id']) ? (int) $validated['site_id'] : null;
     }
 }

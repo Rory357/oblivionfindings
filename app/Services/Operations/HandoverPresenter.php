@@ -9,6 +9,7 @@ use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ShiftHandoverService;
+use App\Services\UserSiteAccessService;
 
 /**
  * Shared presentation for shift handovers, used by the Shift Handovers
@@ -20,8 +21,8 @@ class HandoverPresenter
 {
     public function __construct(
         protected ShiftHandoverService $handoverService,
-    ) {
-    }
+        protected UserSiteAccessService $siteAccess,
+    ) {}
 
     /**
      * Shape a single handover for index-style surfaces — full record plus the
@@ -150,10 +151,10 @@ class HandoverPresenter
      */
     public function catalogue(User $auth): array
     {
-        $organizationId = $auth->organization_id;
+        $siteIds = $this->siteAccess->accessibleSiteIds($auth, ['reports.viewAny']);
 
         $clients = Client::query()
-            ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+            ->whereIn('site_id', $siteIds)
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id'])
             ->map(fn (Client $c) => [
@@ -164,8 +165,8 @@ class HandoverPresenter
                 'site_id' => $c->site_id,
             ])->values();
 
-        $staff = User::staff()
-            ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+        $staff = User::query()
+            ->tap(fn ($query) => $this->siteAccess->applyStaffScope($query, $auth, ['reports.viewAny']))
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'role'])
             ->map(fn (User $u) => [
@@ -175,19 +176,18 @@ class HandoverPresenter
                 'role' => $u->role,
             ])->values();
 
-        // Sites carry tenant_id (not organization_id), so they are left unscoped
-        // here — matching the rostering filter dropdowns.
-        $sites = Site::query()->orderBy('name')->get(['id', 'name'])
+        $sites = Site::query()->whereIn('id', $siteIds)->orderBy('name')->get(['id', 'name'])
             ->map(fn (Site $s) => ['id' => $s->id, 'name' => $s->name])->values();
 
         $serviceContexts = ServiceContext::query()->orderBy('name')->get(['id', 'name', 'type'])
             ->map(fn (ServiceContext $s) => ['id' => $s->id, 'name' => $s->name, 'type' => $s->type])->values();
 
         // Shifts feed the wizard's outgoing/incoming selects + auto-next chain.
-        // The wizard is client-centric, so scope to this org's clients over a
+        // The wizard is client-centric, so scope to accessible Site clients over a
         // recent + upcoming window.
         $clientIds = $clients->pluck('id');
         $shifts = Shift::query()
+            ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
             ->whereIn('client_id', $clientIds)
             ->whereNotNull('starts_at')
             ->whereNotIn('status', ['cancelled'])

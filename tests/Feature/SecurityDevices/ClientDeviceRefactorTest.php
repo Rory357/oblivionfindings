@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -27,6 +28,10 @@ class ClientDeviceRefactorTest extends TestCase
 
     private Client $clientB;
 
+    private ClientConsent $trackingConsent;
+
+    private Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -34,16 +39,35 @@ class ClientDeviceRefactorTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
-        $this->admin = User::factory()->create();
-        $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+        $this->site = Site::factory()->create(['name' => 'Client device profile Site']);
 
-        $this->clientA = Client::factory()->create();
-        $this->clientB = Client::factory()->create();
+        $this->admin = User::factory()->create([
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
+        $this->admin->roles()->syncWithoutDetaching([
+            Role::query()->where('name', 'admin')->firstOrFail()->id,
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'employee_number' => 'SEC-CLIENT-ADMIN',
+            'position_role' => 'admin',
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
+
+        $this->clientA = Client::factory()->create(['site_id' => $this->site->id]);
+        $this->clientB = Client::factory()->create(['site_id' => $this->site->id]);
 
         $trackingConsentType = ConsentType::factory()->create([
             'name' => 'Asset Location Tracking (Safety)',
         ]);
-        ClientConsent::query()->create([
+        $this->trackingConsent = ClientConsent::query()->create([
             'client_id' => $this->clientA->id,
             'consent_type_id' => $trackingConsentType->id,
             'status' => 'given',
@@ -69,9 +93,11 @@ class ClientDeviceRefactorTest extends TestCase
 
         DeviceAssignment::create([
             'device_id' => $device->id,
-            'assignable_type' => 'client',
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
+            'consent_id' => $this->trackingConsent->id,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -100,10 +126,12 @@ class ClientDeviceRefactorTest extends TestCase
 
         DeviceAssignment::create([
             'device_id' => $device->id,
-            'assignable_type' => 'client',
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now()->subDays(30),
+            'assigned_by_user_id' => $this->admin->id,
             'released_at' => now()->subDays(5),
+            'released_by_user_id' => $this->admin->id,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -124,9 +152,10 @@ class ClientDeviceRefactorTest extends TestCase
 
         DeviceAssignment::create([
             'device_id' => $device->id,
-            'assignable_type' => 'client',
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
             'assignable_id' => $this->clientB->id,
             'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -162,9 +191,10 @@ class ClientDeviceRefactorTest extends TestCase
 
         DeviceAssignment::create([
             'device_id' => $camera->id,
-            'assignable_type' => 'client',
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -181,10 +211,8 @@ class ClientDeviceRefactorTest extends TestCase
 
     public function test_available_trackers_only_shows_unassigned_tracking_devices(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
         $availableHardware = LocationHardware::query()->create([
-            'tenant_id' => 1,
-            'site_id' => $site->id,
+            'site_id' => $this->site->id,
             'provider' => 'manual',
             'category' => LocationHardware::CATEGORY_TRACKER,
             'name' => 'Available Tracker Shadow',
@@ -199,8 +227,7 @@ class ClientDeviceRefactorTest extends TestCase
         ]);
 
         $assignedHardware = LocationHardware::query()->create([
-            'tenant_id' => 1,
-            'site_id' => $site->id,
+            'site_id' => $this->site->id,
             'provider' => 'manual',
             'category' => LocationHardware::CATEGORY_TRACKER,
             'name' => 'Assigned Tracker Shadow',
@@ -215,15 +242,15 @@ class ClientDeviceRefactorTest extends TestCase
         ]);
         DeviceAssignment::create([
             'device_id' => $assigned->id,
-            'assignable_type' => 'client',
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
             'assignable_id' => $this->clientB->id,
             'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
         ]);
 
         // Decommissioned tracker — should NOT appear.
         $retiredHardware = LocationHardware::query()->create([
-            'tenant_id' => 1,
-            'site_id' => $site->id,
+            'site_id' => $this->site->id,
             'provider' => 'manual',
             'category' => LocationHardware::CATEGORY_TRACKER,
             'name' => 'Retired Tracker Shadow',
@@ -261,9 +288,11 @@ class ClientDeviceRefactorTest extends TestCase
 
         DeviceAssignment::create([
             'device_id' => $device->id,
-            'assignable_type' => 'client',
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
             'assignable_id' => $this->clientA->id,
             'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
+            'consent_id' => $this->trackingConsent->id,
         ]);
 
         $response = $this->actingAs($this->admin)

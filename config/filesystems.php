@@ -46,6 +46,28 @@ return [
             'report' => false,
         ],
 
+        /*
+        | Isolated restore-rehearsal object storage. The fixed private
+        | visibility and disabled serving contract prevent a restored
+        | snapshot store from becoming a public download surface. Production
+        | credentials are never copied into this configuration; the rehearsal
+        | environment must inject its own bounded values.
+        */
+        'monitoring-restore' => [
+            'driver' => env('MONITORING_RESTORE_FILESYSTEM_DRIVER', 'local'),
+            'root' => env('MONITORING_RESTORE_FILESYSTEM_ROOT') ?: storage_path('app/monitoring-restore'),
+            'key' => env('MONITORING_RESTORE_OBJECT_ACCESS_KEY_ID'),
+            'secret' => env('MONITORING_RESTORE_OBJECT_SECRET_ACCESS_KEY'),
+            'region' => env('MONITORING_RESTORE_OBJECT_REGION'),
+            'bucket' => env('MONITORING_RESTORE_OBJECT_BUCKET'),
+            'endpoint' => env('MONITORING_RESTORE_OBJECT_ENDPOINT'),
+            'use_path_style_endpoint' => env('MONITORING_RESTORE_OBJECT_PATH_STYLE', false),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

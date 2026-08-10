@@ -14,12 +14,12 @@ import {
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     FileDropzone,
     formatFileSize,
     StagedFileCard,
 } from '@/components/ui/file-dropzone';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -287,7 +287,9 @@ export function ExpenseClaimDialog({
                 notes: notes || null,
                 currency,
                 on_behalf_user_id:
-                    canFileOnBehalf && onBehalfOf !== SELF ? Number(onBehalfOf) : null,
+                    canFileOnBehalf && onBehalfOf !== SELF
+                        ? Number(onBehalfOf)
+                        : null,
                 items: payloadItems,
             },
             {
@@ -414,7 +416,11 @@ export function ExpenseClaimDialog({
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
                         {canFileOnBehalf && employees.length > 0 ? (
-                            <Field label="File on behalf of" hint="defaults to you" span>
+                            <Field
+                                label="File on behalf of"
+                                hint="defaults to you"
+                                span
+                            >
                                 <SelectInput
                                     value={onBehalfOf}
                                     onChange={setOnBehalfOf}
@@ -614,7 +620,9 @@ export function ExpenseClaimDialog({
                             <label className="flex items-start gap-3">
                                 <Checkbox
                                     checked={mileageOn}
-                                    onCheckedChange={(v) => setMileageOn(v === true)}
+                                    onCheckedChange={(v) =>
+                                        setMileageOn(v === true)
+                                    }
                                     className="mt-0.5"
                                 />
                                 <span className="min-w-0">

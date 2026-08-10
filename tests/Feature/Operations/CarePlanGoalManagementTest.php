@@ -6,10 +6,12 @@ use App\Models\Client;
 use App\Models\ClientNote;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 
 function grantGoalPerms(User $user, array $keys = ['care_plans.update']): void
 {
+    $keys = array_values(array_unique([...$keys, 'clients.viewAny']));
     $role = Role::query()->firstOrCreate(
         ['name' => 'goal_test_'.$user->id],
         ['label' => 'Goal Test', 'level' => 50, 'type' => 'custom'],
@@ -30,9 +32,10 @@ function makeGoalPlan(): array
 {
     $user = User::factory()->create();
     grantGoalPerms($user);
-    $client = Client::factory()->create();
+    $client = Client::factory()->create([
+        'site_id' => Site::factory()->create()->id,
+    ]);
     $plan = CarePlan::query()->create([
-        'organization_id' => $user->organization_id,
         'client_id' => $client->id,
         'title' => 'Active plan',
         'status' => 'active',
@@ -178,7 +181,6 @@ it('forbids goal writes without the care plan permission', function () {
 it('rejects a goal that belongs to another care plan', function () {
     [$user, $client, $plan] = makeGoalPlan();
     $otherPlan = CarePlan::query()->create([
-        'organization_id' => $user->organization_id,
         'client_id' => $client->id,
         'title' => 'Other',
         'status' => 'active',

@@ -38,12 +38,26 @@ function makeTasksUser(array $permissionKeys): User
 function scopeAllTasksUserToSite(User $user, Site $site): HrEmployeeProfile
 {
     return HrEmployeeProfile::factory()->create([
-        'tenant_id' => $user->organization_id,
         'user_id' => $user->id,
         'position_role' => $user->role ?? 'coordinator',
         'primary_site_id' => $site->id,
         'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
     ]);
+}
+
+function makeControlRoomTasksStaff(Site $site, array $permissionKeys = []): User
+{
+    $user = makeTasksUser($permissionKeys);
+    $user->forceFill(['role' => 'coordinator'])->save();
+    $user->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'coordinator')->value('id'),
+    ]);
+    scopeAllTasksUserToSite($user, $site);
+
+    return $user;
 }
 
 function makeTasksIncident(User $user, array $attributes = []): ClientIncident
@@ -54,14 +68,13 @@ function makeTasksIncident(User $user, array $attributes = []): ClientIncident
 
     $site = $siteId
         ? Site::query()->findOrFail($siteId)
-        : Site::factory()->create(['tenant_id' => $user->organization_id]);
+        : Site::factory()->create();
 
     if (! $siteId) {
         scopeAllTasksUserToSite($user, $site);
     }
 
     $client = Client::factory()->create([
-        'organization_id' => $user->organization_id,
         'site_id' => $site->id,
     ]);
 
@@ -127,7 +140,7 @@ it('treats an explicit done bucket as a history request', function () {
 
 it('task7_final_gap uses the actionable allowlist for control room work items', function () {
     $user = makeTasksUser(['controlRoom.viewAny']);
-    $site = Site::factory()->create(['tenant_id' => $user->organization_id]);
+    $site = Site::factory()->create();
     scopeAllTasksUserToSite($user, $site);
     $active = ControlRoomAlert::factory()->open()->create(['site_id' => $site->id]);
     ControlRoomAlert::factory()->resolved()->create(['site_id' => $site->id]);
@@ -307,25 +320,12 @@ it('sorts overdue items first', function () {
 });
 
 it('assigns a control room alert under lock with history and audit in the same transaction', function () {
-    $actor = makeTasksUser([
+    $site = Site::factory()->create();
+    $actor = makeControlRoomTasksStaff($site, [
         'controlRoom.viewAny',
         'controlRoom.alerts.assign',
-        'reports.viewAny',
     ]);
-    $actor->roles()->syncWithoutDetaching([
-        Role::query()->where('name', 'admin')->value('id'),
-    ]);
-
-    $assignee = User::factory()->create([
-        'role' => 'coordinator',
-        'approved_at' => now(),
-        'organization_id' => $actor->organization_id,
-    ]);
-    $assignee->roles()->syncWithoutDetaching([
-        Role::query()->where('name', 'coordinator')->value('id'),
-    ]);
-
-    $site = Site::factory()->create(['tenant_id' => $actor->organization_id]);
+    $assignee = makeControlRoomTasksStaff($site);
     $alert = ControlRoomAlert::factory()->open()->create([
         'site_id' => $site->id,
         'context' => ['existing_key' => 'preserved'],
@@ -399,26 +399,13 @@ it('assigns a control room alert under lock with history and audit in the same t
 });
 
 it('rejects a control room task assignment when cached preflight site access was revoked before the transaction', function () {
-    $actor = makeTasksUser([
+    $authorizedSite = Site::factory()->create();
+    $revokedToSite = Site::factory()->create();
+    $actor = makeControlRoomTasksStaff($authorizedSite, [
         'controlRoom.viewAny',
         'controlRoom.alerts.assign',
     ]);
-    $actor->forceFill(['role' => 'coordinator'])->save();
-    $actor->roles()->syncWithoutDetaching([
-        Role::query()->where('name', 'coordinator')->value('id'),
-    ]);
-    $assignee = User::factory()->create([
-        'role' => 'coordinator',
-        'approved_at' => now(),
-        'organization_id' => $actor->organization_id,
-    ]);
-    $assignee->roles()->syncWithoutDetaching([
-        Role::query()->where('name', 'coordinator')->value('id'),
-    ]);
-    $authorizedSite = Site::factory()->create(['tenant_id' => $actor->organization_id]);
-    $revokedToSite = Site::factory()->create(['tenant_id' => $actor->organization_id]);
-    scopeAllTasksUserToSite($actor, $authorizedSite);
-    scopeAllTasksUserToSite($assignee, $authorizedSite);
+    $assignee = makeControlRoomTasksStaff($authorizedSite);
 
     $actor->load('hrEmployeeProfile');
     HrEmployeeProfile::query()
@@ -442,23 +429,12 @@ it('rejects a control room task assignment when cached preflight site access was
 });
 
 it('rolls back a control room task assignment when strict audit writing fails', function () {
-    $actor = makeTasksUser([
+    $site = Site::factory()->create();
+    $actor = makeControlRoomTasksStaff($site, [
         'controlRoom.viewAny',
         'controlRoom.alerts.assign',
-        'reports.viewAny',
     ]);
-    $actor->roles()->syncWithoutDetaching([
-        Role::query()->where('name', 'admin')->value('id'),
-    ]);
-    $assignee = User::factory()->create([
-        'role' => 'coordinator',
-        'approved_at' => now(),
-        'organization_id' => $actor->organization_id,
-    ]);
-    $assignee->roles()->syncWithoutDetaching([
-        Role::query()->where('name', 'coordinator')->value('id'),
-    ]);
-    $site = Site::factory()->create(['tenant_id' => $actor->organization_id]);
+    $assignee = makeControlRoomTasksStaff($site);
     $alert = ControlRoomAlert::factory()->open()->create(['site_id' => $site->id]);
     $eventName = 'eloquent.creating: '.AuditLog::class;
     Event::listen($eventName, static function (): never {

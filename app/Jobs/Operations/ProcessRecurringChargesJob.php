@@ -14,13 +14,9 @@ class ProcessRecurringChargesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public int $organizationId
-    ) {}
-
     public function handle(RecurringChargeService $service): void
     {
-        $count = $service->processDueCharges($this->organizationId);
-        Log::info("Processed {$count} recurring charges for org {$this->organizationId}.");
+        $count = $service->processDueCharges();
+        Log::info("Processed {$count} application recurring charges.");
     }
 }

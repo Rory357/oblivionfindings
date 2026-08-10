@@ -126,7 +126,11 @@ const fdate = (value?: string | null) => {
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
-        : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+        : d.toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 };
 
 const fdatetime = (value?: string | null) => {
@@ -145,7 +149,9 @@ const fdatetime = (value?: string | null) => {
 
 /** Flash error carried by an Inertia redirect — `back()->with('error')` fires
  *  onSuccess, not onError (see reference_inertia_flash_error). */
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
@@ -170,7 +176,9 @@ function StaffPickList({
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return staff;
-        return staff.filter((s) => `${s.name} ${s.email ?? ''}`.toLowerCase().includes(q));
+        return staff.filter((s) =>
+            `${s.name} ${s.email ?? ''}`.toLowerCase().includes(q),
+        );
     }, [search, staff]);
 
     return (
@@ -199,12 +207,18 @@ function StaffPickList({
                                 {initials(s.name)}
                             </span>
                             <div className="min-w-0 flex-1">
-                                <div className="text-[13.5px] font-bold">{s.name}</div>
+                                <div className="text-[13.5px] font-bold">
+                                    {s.name}
+                                </div>
                                 {withEmail && s.email ? (
-                                    <div className="truncate text-[11.5px] text-muted-foreground">{s.email}</div>
+                                    <div className="truncate text-[11.5px] text-muted-foreground">
+                                        {s.email}
+                                    </div>
                                 ) : null}
                             </div>
-                            {active ? <CheckCircle2 className="h-5 w-5 text-primary" /> : null}
+                            {active ? (
+                                <CheckCircle2 className="h-5 w-5 text-primary" />
+                            ) : null}
                         </button>
                     );
                 })}
@@ -243,10 +257,30 @@ const EVENT_TYPE_ICONS: Record<string, IconType> = {
 /* ================================================================== */
 
 const NEW_CASE_STEPS: readonly WizardStep[] = [
-    { key: 'subject', label: 'Subject', blurb: 'Who the case concerns', icon: User },
-    { key: 'details', label: 'Case details', blurb: 'Type, severity, summary', icon: FileText },
-    { key: 'assign', label: 'Assignment', blurb: 'Owner & confidentiality', icon: Shield },
-    { key: 'review', label: 'Review', blurb: 'Confirm & open', icon: CheckCircle2 },
+    {
+        key: 'subject',
+        label: 'Subject',
+        blurb: 'Who the case concerns',
+        icon: User,
+    },
+    {
+        key: 'details',
+        label: 'Case details',
+        blurb: 'Type, severity, summary',
+        icon: FileText,
+    },
+    {
+        key: 'assign',
+        label: 'Assignment',
+        blurb: 'Owner & confidentiality',
+        icon: Shield,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & open',
+        icon: CheckCircle2,
+    },
 ];
 
 export function NewCaseWizard({
@@ -283,8 +317,10 @@ export function NewCaseWizard({
         linked_incident_ids: [] as number[],
     });
 
-    const subject = staff.find((s) => String(s.id) === form.data.user_id) ?? null;
-    const assignee = staff.find((s) => String(s.id) === form.data.assigned_to) ?? null;
+    const subject =
+        staff.find((s) => String(s.id) === form.data.user_id) ?? null;
+    const assignee =
+        staff.find((s) => String(s.id) === form.data.assigned_to) ?? null;
     const linkedIncidents = incidents.filter((incident) =>
         form.data.linked_incident_ids.includes(incident.id),
     );
@@ -293,16 +329,21 @@ export function NewCaseWizard({
         form.setData(
             'linked_incident_ids',
             form.data.linked_incident_ids.includes(incidentId)
-                ? form.data.linked_incident_ids.filter((id) => id !== incidentId)
+                ? form.data.linked_incident_ids.filter(
+                      (id) => id !== incidentId,
+                  )
                 : [...form.data.linked_incident_ids, incidentId],
         );
     };
 
     const detailsValid =
-        form.data.case_type !== '' && form.data.severity !== '' && form.data.title.trim() !== '';
+        form.data.case_type !== '' &&
+        form.data.severity !== '' &&
+        form.data.title.trim() !== '';
 
     const stepInvalid =
-        (wizard.index === 0 && !subject) || (wizard.index === 1 && !detailsValid);
+        (wizard.index === 0 && !subject) ||
+        (wizard.index === 1 && !detailsValid);
 
     const submit = () => {
         form.post('/hr/cases', {
@@ -340,8 +381,8 @@ export function NewCaseWizard({
                         blurb={
                             <>
                                 “{form.data.title}” has been opened
-                                {subject ? <> for {subject.name}</> : null}. It now appears in the
-                                case register.
+                                {subject ? <> for {subject.name}</> : null}. It
+                                now appears in the case register.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -361,7 +402,12 @@ export function NewCaseWizard({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !subject || !detailsValid}>
+                        <Button
+                            onClick={submit}
+                            disabled={
+                                form.processing || !subject || !detailsValid
+                            }
+                        >
                             {form.processing ? 'Opening…' : 'Open case'}
                         </Button>
                     ) : (
@@ -396,7 +442,11 @@ export function NewCaseWizard({
                         title="Case details"
                         blurb="Classify the case and summarise the situation."
                     />
-                    <Field label="Case type" required error={form.errors.case_type}>
+                    <Field
+                        label="Case type"
+                        required
+                        error={form.errors.case_type}
+                    >
                         <TilePicker
                             value={form.data.case_type}
                             onChange={(v) => form.setData('case_type', v)}
@@ -409,29 +459,47 @@ export function NewCaseWizard({
                         />
                     </Field>
                     <div className="mt-4">
-                        <Field label="Severity" required error={form.errors.severity}>
+                        <Field
+                            label="Severity"
+                            required
+                            error={form.errors.severity}
+                        >
                             <Segmented
                                 value={form.data.severity}
                                 onChange={(v) => form.setData('severity', v)}
-                                options={severities.map((s) => ({ value: s.value, label: s.label }))}
+                                options={severities.map((s) => ({
+                                    value: s.value,
+                                    label: s.label,
+                                }))}
                             />
                         </Field>
                     </div>
                     <div className="mt-4">
-                        <Field label="Case title" required error={form.errors.title}>
+                        <Field
+                            label="Case title"
+                            required
+                            error={form.errors.title}
+                        >
                             <Input
                                 value={form.data.title}
-                                onChange={(e) => form.setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('title', e.target.value)
+                                }
                                 placeholder="Brief summary of the case"
                             />
                         </Field>
                     </div>
                     <div className="mt-3.5">
-                        <Field label="Description" error={form.errors.description}>
+                        <Field
+                            label="Description"
+                            error={form.errors.description}
+                        >
                             <Textarea
                                 rows={5}
                                 value={form.data.description}
-                                onChange={(e) => form.setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
                                 placeholder="Detailed description of the situation, including relevant dates, witnesses, and any initial actions taken…"
                             />
                         </Field>
@@ -446,28 +514,44 @@ export function NewCaseWizard({
                         title="Assignment & confidentiality"
                         blurb="Choose who runs the case and how widely it is visible."
                     />
-                    <Field label="Assigned to" hint="optional" error={form.errors.assigned_to}>
+                    <Field
+                        label="Assigned to"
+                        hint="optional"
+                        error={form.errors.assigned_to}
+                    >
                         <SelectInput
                             value={form.data.assigned_to || NONE}
-                            onChange={(v) => form.setData('assigned_to', v === NONE ? '' : v)}
+                            onChange={(v) =>
+                                form.setData('assigned_to', v === NONE ? '' : v)
+                            }
                             placeholder="Unassigned"
                             options={[
                                 { value: NONE, label: 'Unassigned' },
-                                ...staff.map((s) => ({ value: String(s.id), label: s.name })),
+                                ...staff.map((s) => ({
+                                    value: String(s.id),
+                                    label: s.name,
+                                })),
                             ]}
                         />
                     </Field>
                     <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-4">
                         <Checkbox
                             checked={form.data.is_confidential}
-                            onCheckedChange={(checked) => form.setData('is_confidential', Boolean(checked))}
+                            onCheckedChange={(checked) =>
+                                form.setData(
+                                    'is_confidential',
+                                    Boolean(checked),
+                                )
+                            }
                             className="mt-0.5"
                         />
                         <span>
-                            <span className="block text-[13px] font-semibold">Mark as confidential</span>
+                            <span className="block text-[13px] font-semibold">
+                                Mark as confidential
+                            </span>
                             <span className="block text-[12.5px] text-muted-foreground">
-                                Confidential cases are only visible to HR managers and assigned
-                                personnel.
+                                Confidential cases are only visible to HR
+                                managers and assigned personnel.
                             </span>
                         </span>
                     </label>
@@ -493,7 +577,9 @@ export function NewCaseWizard({
                                                 <Checkbox
                                                     checked={checked}
                                                     onCheckedChange={() =>
-                                                        toggleIncident(incident.id)
+                                                        toggleIncident(
+                                                            incident.id,
+                                                        )
                                                     }
                                                     className="mt-0.5"
                                                 />
@@ -535,22 +621,63 @@ export function NewCaseWizard({
                         blurb="Check the details, then open the case."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={User} title="Subject" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Staff member" value={subject?.name} />
-                            <ReviewRow label="Email" value={subject?.email ?? undefined} />
+                        <ReviewCard
+                            icon={User}
+                            title="Subject"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Staff member"
+                                value={subject?.name}
+                            />
+                            <ReviewRow
+                                label="Email"
+                                value={subject?.email ?? undefined}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={FileText} title="Case details" onEdit={() => wizard.goTo(1)}>
-                            <ReviewRow label="Type" value={optionLabel(caseTypes, form.data.case_type)} />
-                            <ReviewRow label="Severity" value={optionLabel(severities, form.data.severity)} />
+                        <ReviewCard
+                            icon={FileText}
+                            title="Case details"
+                            onEdit={() => wizard.goTo(1)}
+                        >
+                            <ReviewRow
+                                label="Type"
+                                value={optionLabel(
+                                    caseTypes,
+                                    form.data.case_type,
+                                )}
+                            />
+                            <ReviewRow
+                                label="Severity"
+                                value={optionLabel(
+                                    severities,
+                                    form.data.severity,
+                                )}
+                            />
                             <ReviewRow label="Title" value={form.data.title} />
                         </ReviewCard>
-                        <ReviewCard icon={Shield} title="Assignment" onEdit={() => wizard.goTo(2)} span>
-                            <ReviewRow label="Assigned to" value={assignee?.name ?? 'Unassigned'} />
+                        <ReviewCard
+                            icon={Shield}
+                            title="Assignment"
+                            onEdit={() => wizard.goTo(2)}
+                            span
+                        >
+                            <ReviewRow
+                                label="Assigned to"
+                                value={assignee?.name ?? 'Unassigned'}
+                            />
                             <ReviewRow
                                 label="Confidential"
-                                value={form.data.is_confidential ? 'Yes — restricted visibility' : 'No'}
+                                value={
+                                    form.data.is_confidential
+                                        ? 'Yes — restricted visibility'
+                                        : 'No'
+                                }
                             />
-                            <ReviewRow label="Description" value={form.data.description || undefined} />
+                            <ReviewRow
+                                label="Description"
+                                value={form.data.description || undefined}
+                            />
                             <ReviewRow
                                 label="Linked incidents"
                                 value={
@@ -578,8 +705,18 @@ export function NewCaseWizard({
 
 const EVENT_STEPS: readonly WizardStep[] = [
     { key: 'what', label: 'Event', blurb: 'Type & when', icon: Calendar },
-    { key: 'details', label: 'Details', blurb: 'Title & visibility', icon: FileText },
-    { key: 'review', label: 'Review', blurb: 'Confirm & add', icon: CheckCircle2 },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Title & visibility',
+        icon: FileText,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & add',
+        icon: CheckCircle2,
+    },
 ];
 
 const VISIBILITY_OPTIONS = [
@@ -619,7 +756,8 @@ export function CaseEventWizard({
     });
 
     const stepInvalid =
-        (wizard.index === 0 && (form.data.event_type === '' || form.data.occurred_at === '')) ||
+        (wizard.index === 0 &&
+            (form.data.event_type === '' || form.data.occurred_at === '')) ||
         (wizard.index === 1 && form.data.title.trim() === '');
 
     const submit = () => {
@@ -654,7 +792,12 @@ export function CaseEventWizard({
                 done ? (
                     <WizardSuccessPane
                         title="Event added"
-                        blurb={<>“{form.data.title}” is now on the {caseNumber} timeline.</>}
+                        blurb={
+                            <>
+                                “{form.data.title}” is now on the {caseNumber}{' '}
+                                timeline.
+                            </>
+                        }
                         actions={<Button onClick={onClose}>Done</Button>}
                     />
                 ) : undefined
@@ -697,7 +840,11 @@ export function CaseEventWizard({
                         title="What happened?"
                         blurb={`Record an event for ${subjectName ?? 'the case subject'} on ${caseNumber}.`}
                     />
-                    <Field label="Event type" required error={form.errors.event_type}>
+                    <Field
+                        label="Event type"
+                        required
+                        error={form.errors.event_type}
+                    >
                         <TilePicker
                             value={form.data.event_type}
                             onChange={(v) => form.setData('event_type', v)}
@@ -710,11 +857,17 @@ export function CaseEventWizard({
                         />
                     </Field>
                     <div className="mt-4 sm:max-w-xs">
-                        <Field label="Date & time" required error={form.errors.occurred_at}>
+                        <Field
+                            label="Date & time"
+                            required
+                            error={form.errors.occurred_at}
+                        >
                             <Input
                                 type="datetime-local"
                                 value={form.data.occurred_at}
-                                onChange={(e) => form.setData('occurred_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('occurred_at', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
@@ -731,16 +884,23 @@ export function CaseEventWizard({
                     <Field label="Title" required error={form.errors.title}>
                         <Input
                             value={form.data.title}
-                            onChange={(e) => form.setData('title', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('title', e.target.value)
+                            }
                             placeholder="Brief title for this event"
                         />
                     </Field>
                     <div className="mt-3.5">
-                        <Field label="Description" error={form.errors.description}>
+                        <Field
+                            label="Description"
+                            error={form.errors.description}
+                        >
                             <Textarea
                                 rows={5}
                                 value={form.data.description}
-                                onChange={(e) => form.setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
                                 placeholder="Detailed description of what occurred…"
                             />
                         </Field>
@@ -769,14 +929,37 @@ export function CaseEventWizard({
                         blurb="Check the event, then add it to the timeline."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={Calendar} title="Event" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Type" value={optionLabel(eventTypes, form.data.event_type)} />
-                            <ReviewRow label="When" value={fdatetime(form.data.occurred_at)} />
+                        <ReviewCard
+                            icon={Calendar}
+                            title="Event"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Type"
+                                value={optionLabel(
+                                    eventTypes,
+                                    form.data.event_type,
+                                )}
+                            />
+                            <ReviewRow
+                                label="When"
+                                value={fdatetime(form.data.occurred_at)}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={FileText} title="Details" onEdit={() => wizard.goTo(1)}>
+                        <ReviewCard
+                            icon={FileText}
+                            title="Details"
+                            onEdit={() => wizard.goTo(1)}
+                        >
                             <ReviewRow label="Title" value={form.data.title} />
-                            <ReviewRow label="Visibility" value={form.data.visibility} />
-                            <ReviewRow label="Description" value={form.data.description || undefined} />
+                            <ReviewRow
+                                label="Visibility"
+                                value={form.data.visibility}
+                            />
+                            <ReviewRow
+                                label="Description"
+                                value={form.data.description || undefined}
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>
@@ -790,10 +973,30 @@ export function CaseEventWizard({
 /* ================================================================== */
 
 const DISCIPLINARY_STEPS: readonly WizardStep[] = [
-    { key: 'action', label: 'Action', blurb: 'Employee & action type', icon: Gavel },
-    { key: 'allegation', label: 'Allegation', blurb: 'Summary & investigation', icon: FileText },
-    { key: 'meeting', label: 'Meeting', blurb: 'Schedule & support person', icon: Users },
-    { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: CheckCircle2 },
+    {
+        key: 'action',
+        label: 'Action',
+        blurb: 'Employee & action type',
+        icon: Gavel,
+    },
+    {
+        key: 'allegation',
+        label: 'Allegation',
+        blurb: 'Summary & investigation',
+        icon: FileText,
+    },
+    {
+        key: 'meeting',
+        label: 'Meeting',
+        blurb: 'Schedule & support person',
+        icon: Users,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & create',
+        icon: CheckCircle2,
+    },
 ];
 
 export function DisciplinaryCreateWizard({
@@ -828,8 +1031,11 @@ export function DisciplinaryCreateWizard({
         response_deadline: '',
     });
 
-    const employee = staff.find((s) => String(s.id) === form.data.employee_user_id) ?? null;
-    const investigator = staff.find((s) => String(s.id) === form.data.investigator_user_id) ?? null;
+    const employee =
+        staff.find((s) => String(s.id) === form.data.employee_user_id) ?? null;
+    const investigator =
+        staff.find((s) => String(s.id) === form.data.investigator_user_id) ??
+        null;
 
     const stepInvalid =
         (wizard.index === 0 && (!employee || form.data.action_type === '')) ||
@@ -869,9 +1075,10 @@ export function DisciplinaryCreateWizard({
                         title="Disciplinary action created"
                         blurb={
                             <>
-                                The action for {employee?.name ?? 'the employee'} starts at the
-                                “allegation raised” stage. Advance it from the case page as the
-                                process progresses.
+                                The action for{' '}
+                                {employee?.name ?? 'the employee'} starts at the
+                                “allegation raised” stage. Advance it from the
+                                case page as the process progresses.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -917,16 +1124,29 @@ export function DisciplinaryCreateWizard({
                         title="Who and what?"
                         blurb={`Pick the employee and the type of disciplinary action for ${caseNumber}${subjectName ? ` (subject: ${subjectName})` : ''}.`}
                     />
-                    <Field label="Employee" required error={form.errors.employee_user_id}>
+                    <Field
+                        label="Employee"
+                        required
+                        error={form.errors.employee_user_id}
+                    >
                         <SelectInput
                             value={form.data.employee_user_id}
-                            onChange={(v) => form.setData('employee_user_id', v)}
+                            onChange={(v) =>
+                                form.setData('employee_user_id', v)
+                            }
                             placeholder="Select employee"
-                            options={staff.map((s) => ({ value: String(s.id), label: s.name }))}
+                            options={staff.map((s) => ({
+                                value: String(s.id),
+                                label: s.name,
+                            }))}
                         />
                     </Field>
                     <div className="mt-4">
-                        <Field label="Action type" required error={form.errors.action_type}>
+                        <Field
+                            label="Action type"
+                            required
+                            error={form.errors.action_type}
+                        >
                             <TilePicker
                                 value={form.data.action_type}
                                 onChange={(v) => form.setData('action_type', v)}
@@ -949,41 +1169,79 @@ export function DisciplinaryCreateWizard({
                         title="Allegation & investigation"
                         blurb="Summarise the allegations and any investigation so far."
                     />
-                    <Field label="Allegation summary" required error={form.errors.allegation_summary}>
+                    <Field
+                        label="Allegation summary"
+                        required
+                        error={form.errors.allegation_summary}
+                    >
                         <Textarea
                             rows={5}
                             value={form.data.allegation_summary}
-                            onChange={(e) => form.setData('allegation_summary', e.target.value)}
+                            onChange={(e) =>
+                                form.setData(
+                                    'allegation_summary',
+                                    e.target.value,
+                                )
+                            }
                             placeholder="Detailed summary of the allegations or concerns…"
                         />
                     </Field>
                     <div className="mt-3.5">
-                        <Field label="Investigation notes" error={form.errors.investigation_notes}>
+                        <Field
+                            label="Investigation notes"
+                            error={form.errors.investigation_notes}
+                        >
                             <Textarea
                                 rows={4}
                                 value={form.data.investigation_notes}
-                                onChange={(e) => form.setData('investigation_notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'investigation_notes',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Notes from any investigation conducted…"
                             />
                         </Field>
                     </div>
                     <div className="mt-3.5 grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Investigator" hint="optional" error={form.errors.investigator_user_id}>
+                        <Field
+                            label="Investigator"
+                            hint="optional"
+                            error={form.errors.investigator_user_id}
+                        >
                             <SelectInput
                                 value={form.data.investigator_user_id || NONE}
-                                onChange={(v) => form.setData('investigator_user_id', v === NONE ? '' : v)}
+                                onChange={(v) =>
+                                    form.setData(
+                                        'investigator_user_id',
+                                        v === NONE ? '' : v,
+                                    )
+                                }
                                 placeholder="Not assigned"
                                 options={[
                                     { value: NONE, label: 'Not assigned' },
-                                    ...staff.map((s) => ({ value: String(s.id), label: s.name })),
+                                    ...staff.map((s) => ({
+                                        value: String(s.id),
+                                        label: s.name,
+                                    })),
                                 ]}
                             />
                         </Field>
-                        <Field label="Response deadline" hint="optional" error={form.errors.response_deadline}>
+                        <Field
+                            label="Response deadline"
+                            hint="optional"
+                            error={form.errors.response_deadline}
+                        >
                             <Input
                                 type="date"
                                 value={form.data.response_deadline}
-                                onChange={(e) => form.setData('response_deadline', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'response_deadline',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
@@ -998,17 +1256,35 @@ export function DisciplinaryCreateWizard({
                         blurb="Schedule the disciplinary meeting and record the support-person offer."
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Meeting scheduled" hint="optional" error={form.errors.meeting_scheduled_at}>
+                        <Field
+                            label="Meeting scheduled"
+                            hint="optional"
+                            error={form.errors.meeting_scheduled_at}
+                        >
                             <Input
                                 type="datetime-local"
                                 value={form.data.meeting_scheduled_at}
-                                onChange={(e) => form.setData('meeting_scheduled_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'meeting_scheduled_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
-                        <Field label="Meeting location" hint="optional" error={form.errors.meeting_location}>
+                        <Field
+                            label="Meeting location"
+                            hint="optional"
+                            error={form.errors.meeting_location}
+                        >
                             <Input
                                 value={form.data.meeting_location}
-                                onChange={(e) => form.setData('meeting_location', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'meeting_location',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="e.g. Conference Room A"
                             />
                         </Field>
@@ -1017,24 +1293,30 @@ export function DisciplinaryCreateWizard({
                         <Checkbox
                             checked={form.data.support_person_advised}
                             onCheckedChange={(checked) =>
-                                form.setData('support_person_advised', Boolean(checked))
+                                form.setData(
+                                    'support_person_advised',
+                                    Boolean(checked),
+                                )
                             }
                             className="mt-0.5"
                         />
                         <span>
-                            <span className="block text-[13px] font-semibold">Support person offered</span>
+                            <span className="block text-[13px] font-semibold">
+                                Support person offered
+                            </span>
                             <span className="block text-[12.5px] text-muted-foreground">
-                                The employee has been advised of their right to bring a support
-                                person.
+                                The employee has been advised of their right to
+                                bring a support person.
                             </span>
                         </span>
                     </label>
                     <div className="mt-4">
                         <InfoCard icon={AlertTriangle} tone="warn">
-                            Before proceeding, follow your disciplinary procedure and the
-                            principles of natural justice: clear communication of the allegations,
-                            a genuine opportunity to respond, the right to bring a support person,
-                            and time to prepare a response.
+                            Before proceeding, follow your disciplinary
+                            procedure and the principles of natural justice:
+                            clear communication of the allegations, a genuine
+                            opportunity to respond, the right to bring a support
+                            person, and time to prepare a response.
                         </InfoCard>
                     </div>
                 </WizardStepPane>
@@ -1048,27 +1330,72 @@ export function DisciplinaryCreateWizard({
                         blurb="Check the details, then create the disciplinary action."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={Gavel} title="Action" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Employee" value={employee?.name} />
-                            <ReviewRow label="Action type" value={optionLabel(actionTypes, form.data.action_type)} />
+                        <ReviewCard
+                            icon={Gavel}
+                            title="Action"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Employee"
+                                value={employee?.name}
+                            />
+                            <ReviewRow
+                                label="Action type"
+                                value={optionLabel(
+                                    actionTypes,
+                                    form.data.action_type,
+                                )}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={FileText} title="Allegation" onEdit={() => wizard.goTo(1)}>
-                            <ReviewRow label="Investigator" value={investigator?.name ?? 'Not assigned'} />
+                        <ReviewCard
+                            icon={FileText}
+                            title="Allegation"
+                            onEdit={() => wizard.goTo(1)}
+                        >
+                            <ReviewRow
+                                label="Investigator"
+                                value={investigator?.name ?? 'Not assigned'}
+                            />
                             <ReviewRow
                                 label="Response deadline"
-                                value={form.data.response_deadline ? fdate(form.data.response_deadline) : undefined}
+                                value={
+                                    form.data.response_deadline
+                                        ? fdate(form.data.response_deadline)
+                                        : undefined
+                                }
                             />
-                            <ReviewRow label="Summary" value={form.data.allegation_summary} />
+                            <ReviewRow
+                                label="Summary"
+                                value={form.data.allegation_summary}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Users} title="Meeting" onEdit={() => wizard.goTo(2)} span>
+                        <ReviewCard
+                            icon={Users}
+                            title="Meeting"
+                            onEdit={() => wizard.goTo(2)}
+                            span
+                        >
                             <ReviewRow
                                 label="Scheduled"
-                                value={form.data.meeting_scheduled_at ? fdatetime(form.data.meeting_scheduled_at) : undefined}
+                                value={
+                                    form.data.meeting_scheduled_at
+                                        ? fdatetime(
+                                              form.data.meeting_scheduled_at,
+                                          )
+                                        : undefined
+                                }
                             />
-                            <ReviewRow label="Location" value={form.data.meeting_location || undefined} />
+                            <ReviewRow
+                                label="Location"
+                                value={form.data.meeting_location || undefined}
+                            />
                             <ReviewRow
                                 label="Support person"
-                                value={form.data.support_person_advised ? 'Offered' : 'Not yet offered'}
+                                value={
+                                    form.data.support_person_advised
+                                        ? 'Offered'
+                                        : 'Not yet offered'
+                                }
                             />
                         </ReviewCard>
                     </div>
@@ -1083,11 +1410,36 @@ export function DisciplinaryCreateWizard({
 /* ================================================================== */
 
 const EDIT_DISCIPLINARY_STEPS: readonly WizardStep[] = [
-    { key: 'action', label: 'Action details', blurb: 'Employee & allegation', icon: Gavel },
-    { key: 'meeting', label: 'Meeting & response', blurb: 'Dates, notes, response', icon: Users },
-    { key: 'goodfaith', label: 'Good faith', blurb: 'NZ natural-justice checks', icon: Scale },
-    { key: 'outcome', label: 'Outcome & appeal', blurb: 'Decision & any appeal', icon: FileText },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+    {
+        key: 'action',
+        label: 'Action details',
+        blurb: 'Employee & allegation',
+        icon: Gavel,
+    },
+    {
+        key: 'meeting',
+        label: 'Meeting & response',
+        blurb: 'Dates, notes, response',
+        icon: Users,
+    },
+    {
+        key: 'goodfaith',
+        label: 'Good faith',
+        blurb: 'NZ natural-justice checks',
+        icon: Scale,
+    },
+    {
+        key: 'outcome',
+        label: 'Outcome & appeal',
+        blurb: 'Decision & any appeal',
+        icon: FileText,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: CheckCircle2,
+    },
 ];
 
 export function DisciplinaryEditWizard({
@@ -1137,8 +1489,11 @@ export function DisciplinaryEditWizard({
 
     const errors = form.errors as Record<string, string>;
 
-    const employee = staff.find((s) => String(s.id) === form.data.employee_user_id) ?? null;
-    const investigator = staff.find((s) => String(s.id) === form.data.investigator_user_id) ?? null;
+    const employee =
+        staff.find((s) => String(s.id) === form.data.employee_user_id) ?? null;
+    const investigator =
+        staff.find((s) => String(s.id) === form.data.investigator_user_id) ??
+        null;
 
     const completedGoodFaithCount = goodFaithRequiredChecks.filter(
         (option) => form.data.good_faith_checklist?.[option.key],
@@ -1200,7 +1555,9 @@ export function DisciplinaryEditWizard({
                 if (errs.good_faith) {
                     wizard.goTo(2);
                     toast.error(
-                        Array.isArray(errs.good_faith) ? errs.good_faith.join(' ') : errs.good_faith,
+                        Array.isArray(errs.good_faith)
+                            ? errs.good_faith.join(' ')
+                            : errs.good_faith,
                     );
                     return;
                 }
@@ -1229,8 +1586,9 @@ export function DisciplinaryEditWizard({
                         title="Disciplinary action updated"
                         blurb={
                             <>
-                                Changes to the action for {employee?.name ?? 'the employee'} have
-                                been saved to {caseNumber}.
+                                Changes to the action for{' '}
+                                {employee?.name ?? 'the employee'} have been
+                                saved to {caseNumber}.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -1252,7 +1610,10 @@ export function DisciplinaryEditWizard({
                     {wizard.isLast ? (
                         <Button
                             onClick={submit}
-                            disabled={form.processing || form.data.allegation_summary.trim() === ''}
+                            disabled={
+                                form.processing ||
+                                form.data.allegation_summary.trim() === ''
+                            }
                         >
                             {form.processing ? 'Saving…' : 'Save changes'}
                         </Button>
@@ -1273,9 +1634,14 @@ export function DisciplinaryEditWizard({
                         <Field label="Employee" error={errors.employee_user_id}>
                             <SelectInput
                                 value={form.data.employee_user_id}
-                                onChange={(v) => form.setData('employee_user_id', v)}
+                                onChange={(v) =>
+                                    form.setData('employee_user_id', v)
+                                }
                                 placeholder="Select employee"
-                                options={staff.map((s) => ({ value: String(s.id), label: s.name }))}
+                                options={staff.map((s) => ({
+                                    value: String(s.id),
+                                    label: s.name,
+                                }))}
                             />
                         </Field>
                         <Field label="Action type" error={errors.action_type}>
@@ -1283,25 +1649,45 @@ export function DisciplinaryEditWizard({
                                 value={form.data.action_type}
                                 onChange={(v) => form.setData('action_type', v)}
                                 placeholder="Select action type"
-                                options={actionTypes.map((t) => ({ value: t.value, label: t.label }))}
+                                options={actionTypes.map((t) => ({
+                                    value: t.value,
+                                    label: t.label,
+                                }))}
                             />
                         </Field>
                     </div>
                     <div className="mt-3.5">
-                        <Field label="Allegation summary" required error={errors.allegation_summary}>
+                        <Field
+                            label="Allegation summary"
+                            required
+                            error={errors.allegation_summary}
+                        >
                             <Textarea
                                 rows={4}
                                 value={form.data.allegation_summary}
-                                onChange={(e) => form.setData('allegation_summary', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'allegation_summary',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
                     <div className="mt-3.5">
-                        <Field label="Investigation notes" error={errors.investigation_notes}>
+                        <Field
+                            label="Investigation notes"
+                            error={errors.investigation_notes}
+                        >
                             <Textarea
                                 rows={4}
                                 value={form.data.investigation_notes}
-                                onChange={(e) => form.setData('investigation_notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'investigation_notes',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
@@ -1316,76 +1702,152 @@ export function DisciplinaryEditWizard({
                         blurb="Track the meeting, attendees, and the employee's response."
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Investigator" error={errors.investigator_user_id}>
+                        <Field
+                            label="Investigator"
+                            error={errors.investigator_user_id}
+                        >
                             <SelectInput
                                 value={form.data.investigator_user_id || NONE}
-                                onChange={(v) => form.setData('investigator_user_id', v === NONE ? '' : v)}
+                                onChange={(v) =>
+                                    form.setData(
+                                        'investigator_user_id',
+                                        v === NONE ? '' : v,
+                                    )
+                                }
                                 placeholder="Not assigned"
                                 options={[
                                     { value: NONE, label: 'Not assigned' },
-                                    ...staff.map((s) => ({ value: String(s.id), label: s.name })),
+                                    ...staff.map((s) => ({
+                                        value: String(s.id),
+                                        label: s.name,
+                                    })),
                                 ]}
                             />
                         </Field>
-                        <Field label="Response deadline" error={errors.response_deadline}>
+                        <Field
+                            label="Response deadline"
+                            error={errors.response_deadline}
+                        >
                             <Input
                                 type="date"
                                 value={form.data.response_deadline}
-                                onChange={(e) => form.setData('response_deadline', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'response_deadline',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
-                        <Field label="Meeting scheduled" error={errors.meeting_scheduled_at}>
+                        <Field
+                            label="Meeting scheduled"
+                            error={errors.meeting_scheduled_at}
+                        >
                             <Input
                                 type="datetime-local"
                                 value={form.data.meeting_scheduled_at}
-                                onChange={(e) => form.setData('meeting_scheduled_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'meeting_scheduled_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
-                        <Field label="Meeting held" error={errors.meeting_held_at}>
+                        <Field
+                            label="Meeting held"
+                            error={errors.meeting_held_at}
+                        >
                             <Input
                                 type="datetime-local"
                                 value={form.data.meeting_held_at}
-                                onChange={(e) => form.setData('meeting_held_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'meeting_held_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
-                        <Field label="Meeting location" error={errors.meeting_location}>
+                        <Field
+                            label="Meeting location"
+                            error={errors.meeting_location}
+                        >
                             <Input
                                 value={form.data.meeting_location}
-                                onChange={(e) => form.setData('meeting_location', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'meeting_location',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
-                        <Field label="Notice issued" error={errors.notice_issued_at}>
+                        <Field
+                            label="Notice issued"
+                            error={errors.notice_issued_at}
+                        >
                             <Input
                                 type="datetime-local"
                                 value={form.data.notice_issued_at}
-                                onChange={(e) => form.setData('notice_issued_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'notice_issued_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
                     <div className="mt-3.5">
-                        <Field label="Meeting attendees" hint="one per line" error={errors.meeting_attendees}>
+                        <Field
+                            label="Meeting attendees"
+                            hint="one per line"
+                            error={errors.meeting_attendees}
+                        >
                             <Textarea
                                 rows={3}
                                 value={form.data.meeting_attendees_text}
-                                onChange={(e) => form.setData('meeting_attendees_text', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'meeting_attendees_text',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
                     <div className="mt-3.5">
-                        <Field label="Meeting notes" error={errors.meeting_notes}>
+                        <Field
+                            label="Meeting notes"
+                            error={errors.meeting_notes}
+                        >
                             <Textarea
                                 rows={4}
                                 value={form.data.meeting_notes}
-                                onChange={(e) => form.setData('meeting_notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'meeting_notes',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
                     <div className="mt-3.5">
-                        <Field label="Employee response" error={errors.employee_response}>
+                        <Field
+                            label="Employee response"
+                            error={errors.employee_response}
+                        >
                             <Textarea
                                 rows={4}
                                 value={form.data.employee_response}
-                                onChange={(e) => form.setData('employee_response', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'employee_response',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
@@ -1393,7 +1855,10 @@ export function DisciplinaryEditWizard({
                         <Checkbox
                             checked={Boolean(form.data.support_person_advised)}
                             onCheckedChange={(checked) =>
-                                form.setData('support_person_advised', Boolean(checked))
+                                form.setData(
+                                    'support_person_advised',
+                                    Boolean(checked),
+                                )
                             }
                             className="mt-0.5"
                         />
@@ -1418,13 +1883,22 @@ export function DisciplinaryEditWizard({
                                 className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-3.5 text-sm"
                             >
                                 <Checkbox
-                                    checked={Boolean(form.data.good_faith_checklist?.[option.key])}
+                                    checked={Boolean(
+                                        form.data.good_faith_checklist?.[
+                                            option.key
+                                        ],
+                                    )}
                                     onCheckedChange={(checked) =>
-                                        toggleGoodFaith(option.key, Boolean(checked))
+                                        toggleGoodFaith(
+                                            option.key,
+                                            Boolean(checked),
+                                        )
                                     }
                                     className="mt-0.5"
                                 />
-                                <span className="text-[13px] font-medium">{option.label}</span>
+                                <span className="text-[13px] font-medium">
+                                    {option.label}
+                                </span>
                             </label>
                         ))}
                     </div>
@@ -1444,56 +1918,99 @@ export function DisciplinaryEditWizard({
                         <Textarea
                             rows={3}
                             value={form.data.outcome}
-                            onChange={(e) => form.setData('outcome', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('outcome', e.target.value)
+                            }
                         />
                     </Field>
                     <div className="mt-3.5">
-                        <Field label="Outcome rationale" error={errors.outcome_rationale}>
+                        <Field
+                            label="Outcome rationale"
+                            error={errors.outcome_rationale}
+                        >
                             <Textarea
                                 rows={3}
                                 value={form.data.outcome_rationale}
-                                onChange={(e) => form.setData('outcome_rationale', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'outcome_rationale',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
                     <div className="mt-3.5">
-                        <Field label="Outcome document path" error={errors.outcome_document_path}>
+                        <Field
+                            label="Outcome document path"
+                            error={errors.outcome_document_path}
+                        >
                             <Input
                                 value={form.data.outcome_document_path}
-                                onChange={(e) => form.setData('outcome_document_path', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'outcome_document_path',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                     </div>
                     {completedGoodFaithCount < goodFaithRequiredChecks.length &&
-                    (form.data.outcome.trim() !== '' || form.data.outcome_rationale.trim() !== '') ? (
+                    (form.data.outcome.trim() !== '' ||
+                        form.data.outcome_rationale.trim() !== '') ? (
                         <div className="mt-4">
                             <InfoCard icon={AlertTriangle} tone="warn">
-                                The good-faith checklist is incomplete — recording an outcome will
-                                be rejected until all four checks are done.
+                                The good-faith checklist is incomplete —
+                                recording an outcome will be rejected until all
+                                four checks are done.
                             </InfoCard>
                         </div>
                     ) : null}
                     <label className="mt-4 flex cursor-pointer items-center gap-3 rounded-xl border border-border bg-card p-3.5">
                         <Checkbox
                             checked={Boolean(form.data.appeal_received)}
-                            onCheckedChange={(checked) => form.setData('appeal_received', Boolean(checked))}
+                            onCheckedChange={(checked) =>
+                                form.setData(
+                                    'appeal_received',
+                                    Boolean(checked),
+                                )
+                            }
                         />
-                        <span className="text-[13px] font-semibold">Appeal received</span>
+                        <span className="text-[13px] font-semibold">
+                            Appeal received
+                        </span>
                     </label>
                     {form.data.appeal_received ? (
                         <div className="mt-3.5 grid gap-3.5 sm:grid-cols-2">
-                            <Field label="Appeal notes" error={errors.appeal_notes}>
+                            <Field
+                                label="Appeal notes"
+                                error={errors.appeal_notes}
+                            >
                                 <Textarea
                                     rows={3}
                                     value={form.data.appeal_notes}
-                                    onChange={(e) => form.setData('appeal_notes', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'appeal_notes',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </Field>
-                            <Field label="Appeal outcome" error={errors.appeal_outcome}>
+                            <Field
+                                label="Appeal outcome"
+                                error={errors.appeal_outcome}
+                            >
                                 <Textarea
                                     rows={3}
                                     value={form.data.appeal_outcome}
-                                    onChange={(e) => form.setData('appeal_outcome', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'appeal_outcome',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </Field>
                         </div>
@@ -1509,41 +2026,97 @@ export function DisciplinaryEditWizard({
                         blurb="Check the changes, then save the disciplinary action."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={Gavel} title="Action" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Employee" value={employee?.name} />
-                            <ReviewRow label="Action type" value={optionLabel(actionTypes, form.data.action_type)} />
-                            <ReviewRow label="Stage" value={currentStageLabel} />
+                        <ReviewCard
+                            icon={Gavel}
+                            title="Action"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Employee"
+                                value={employee?.name}
+                            />
+                            <ReviewRow
+                                label="Action type"
+                                value={optionLabel(
+                                    actionTypes,
+                                    form.data.action_type,
+                                )}
+                            />
+                            <ReviewRow
+                                label="Stage"
+                                value={currentStageLabel}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Users} title="Meeting & response" onEdit={() => wizard.goTo(1)}>
-                            <ReviewRow label="Investigator" value={investigator?.name ?? 'Not assigned'} />
+                        <ReviewCard
+                            icon={Users}
+                            title="Meeting & response"
+                            onEdit={() => wizard.goTo(1)}
+                        >
+                            <ReviewRow
+                                label="Investigator"
+                                value={investigator?.name ?? 'Not assigned'}
+                            />
                             <ReviewRow
                                 label="Scheduled"
-                                value={form.data.meeting_scheduled_at ? fdatetime(form.data.meeting_scheduled_at) : undefined}
+                                value={
+                                    form.data.meeting_scheduled_at
+                                        ? fdatetime(
+                                              form.data.meeting_scheduled_at,
+                                          )
+                                        : undefined
+                                }
                             />
                             <ReviewRow
                                 label="Held"
-                                value={form.data.meeting_held_at ? fdatetime(form.data.meeting_held_at) : undefined}
+                                value={
+                                    form.data.meeting_held_at
+                                        ? fdatetime(form.data.meeting_held_at)
+                                        : undefined
+                                }
                             />
                             <ReviewRow
                                 label="Response deadline"
-                                value={form.data.response_deadline ? fdate(form.data.response_deadline) : undefined}
+                                value={
+                                    form.data.response_deadline
+                                        ? fdate(form.data.response_deadline)
+                                        : undefined
+                                }
                             />
                         </ReviewCard>
-                        <ReviewCard icon={Scale} title="Good faith" onEdit={() => wizard.goTo(2)}>
+                        <ReviewCard
+                            icon={Scale}
+                            title="Good faith"
+                            onEdit={() => wizard.goTo(2)}
+                        >
                             <ReviewRow
                                 label="Checks complete"
                                 value={`${completedGoodFaithCount} of ${goodFaithRequiredChecks.length}`}
                             />
                             <ReviewRow
                                 label="Support person"
-                                value={form.data.support_person_advised ? 'Offered' : 'Not yet offered'}
+                                value={
+                                    form.data.support_person_advised
+                                        ? 'Offered'
+                                        : 'Not yet offered'
+                                }
                             />
                         </ReviewCard>
-                        <ReviewCard icon={FileText} title="Outcome & appeal" onEdit={() => wizard.goTo(3)}>
-                            <ReviewRow label="Outcome" value={form.data.outcome || undefined} />
+                        <ReviewCard
+                            icon={FileText}
+                            title="Outcome & appeal"
+                            onEdit={() => wizard.goTo(3)}
+                        >
+                            <ReviewRow
+                                label="Outcome"
+                                value={form.data.outcome || undefined}
+                            />
                             <ReviewRow
                                 label="Appeal"
-                                value={form.data.appeal_received ? 'Received' : 'None'}
+                                value={
+                                    form.data.appeal_received
+                                        ? 'Received'
+                                        : 'None'
+                                }
                             />
                         </ReviewCard>
                     </div>

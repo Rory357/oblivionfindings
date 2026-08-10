@@ -3,7 +3,7 @@
 namespace App\Models\Queclink;
 
 use App\Domain\SecurityDevices\Models\Device;
-use App\Models\User;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,23 +11,30 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class QueclinkDevice extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $table = 'queclink_devices';
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_PAIRED = 'paired';
+
     public const STATUS_REJECTED = 'rejected';
 
     public const PAIRING_VEHICLE = 'vehicle';
+
     public const PAIRING_STAFF = 'staff';
+
     public const PAIRING_CLIENT = 'client';
 
     public const CONN_CONNECTED = 'connected';
+
     public const CONN_DISCONNECTED = 'disconnected';
 
     protected $fillable = [
         'imei',
         'device_id',
-        'tenant_id',
+        'binding_uuid',
         'model_hint',
         'protocol_version',
         'firmware_version',
@@ -41,6 +48,10 @@ class QueclinkDevice extends Model
         'last_frame_at',
         'last_count_number',
         'notes',
+    ];
+
+    protected $hidden = [
+        'binding_uuid',
     ];
 
     protected $casts = [

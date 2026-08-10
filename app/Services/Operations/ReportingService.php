@@ -13,22 +13,27 @@ use App\Models\ShiftTask;
 use App\Models\StaffCredential;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\Schema;
 
 class ReportingService
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function shiftAnalytics(int $orgId, string $dateFrom, string $dateTo, array $filters): array
     {
         $query = Shift::query()
             ->whereHas('client', fn ($q) => $q->where('organization_id', $orgId))
-            ->whereBetween('starts_at', [$dateFrom, $dateTo . ' 23:59:59'])
-            ->when(!empty($filters['allowed_site_ids']), fn ($q) => $q->where(function ($siteQuery) use ($filters) {
+            ->whereBetween('starts_at', [$dateFrom, $dateTo.' 23:59:59'])
+            ->when(! empty($filters['allowed_site_ids']), fn ($q) => $q->where(function ($siteQuery) use ($filters) {
                 $siteIds = $filters['allowed_site_ids'];
                 $siteQuery->whereIn('shifts.site_id', $siteIds)
                     ->orWhereHas('client', fn ($clientQuery) => $clientQuery->whereIn('clients.site_id', $siteIds));
             }))
-            ->when(!empty($filters['client_id']), fn ($q) => $q->where('shifts.client_id', $filters['client_id']))
-            ->when(!empty($filters['staff_id']), fn ($q) => $q->where('shifts.user_id', $filters['staff_id']));
+            ->when(! empty($filters['client_id']), fn ($q) => $q->where('shifts.client_id', $filters['client_id']))
+            ->when(! empty($filters['staff_id']), fn ($q) => $q->where('shifts.user_id', $filters['staff_id']));
 
         $total = (clone $query)->count();
         $completed = (clone $query)->where('status', 'completed')->count();
@@ -47,6 +52,7 @@ class ReportingService
         $formSubmissionCount = CustomFormSubmission::query()->whereIn('shift_id', $shiftIds)->count();
         $medicationRecordCount = ClientMedicationAdministration::query()->whereIn('shift_id', $shiftIds)->count();
         $handoverCount = ShiftHandover::query()
+            ->tap(fn ($handoverQuery) => $this->siteAccess->applyHandoverIntegrityScope($handoverQuery))
             ->where(function ($query) use ($shiftIds) {
                 $query->whereIn('outgoing_shift_id', $shiftIds)
                     ->orWhereIn('incoming_shift_id', $shiftIds);
@@ -162,7 +168,7 @@ class ReportingService
     {
         $staffQuery = User::where('organization_id', $orgId)->staff();
 
-        if (!empty($filters['allowed_site_ids'])) {
+        if (! empty($filters['allowed_site_ids'])) {
             $siteIds = array_values(array_map('intval', $filters['allowed_site_ids']));
 
             $staffQuery->where(function ($query) use ($siteIds) {
@@ -178,15 +184,15 @@ class ReportingService
             });
         }
 
-        if (!empty($filters['client_id'])) {
+        if (! empty($filters['client_id'])) {
             $staffQuery->whereHas('shifts', function ($shiftQuery) use ($filters) {
                 $shiftQuery->where('shifts.client_id', $filters['client_id'])
-                    ->when(!empty($filters['date_from']), fn ($query) => $query->where('starts_at', '>=', $filters['date_from']))
-                    ->when(!empty($filters['date_to']), fn ($query) => $query->where('starts_at', '<=', $filters['date_to'] . ' 23:59:59'));
+                    ->when(! empty($filters['date_from']), fn ($query) => $query->where('starts_at', '>=', $filters['date_from']))
+                    ->when(! empty($filters['date_to']), fn ($query) => $query->where('starts_at', '<=', $filters['date_to'].' 23:59:59'));
             });
         }
 
-        if (!empty($filters['staff_id'])) {
+        if (! empty($filters['staff_id'])) {
             $staffQuery->whereKey((int) $filters['staff_id']);
         }
 
@@ -197,14 +203,14 @@ class ReportingService
 
         $expired = $credentials->filter(fn ($c) => $c->expires_at && $c->expires_at->isPast());
         $expiringSoon = $credentials->filter(fn ($c) => $c->expires_at && $c->expires_at->isBetween(now(), now()->addDays(30)));
-        $valid = $credentials->filter(fn ($c) => !$c->expires_at || $c->expires_at->isFuture());
+        $valid = $credentials->filter(fn ($c) => ! $c->expires_at || $c->expires_at->isFuture());
 
         $byType = $credentials->groupBy('type')->map(function ($group) {
             return [
                 'total' => $group->count(),
                 'expired' => $group->filter(fn ($c) => $c->expires_at && $c->expires_at->isPast())->count(),
                 'expiring_soon' => $group->filter(fn ($c) => $c->expires_at && $c->expires_at->isBetween(now(), now()->addDays(30)))->count(),
-                'valid' => $group->filter(fn ($c) => !$c->expires_at || $c->expires_at->isFuture())->count(),
+                'valid' => $group->filter(fn ($c) => ! $c->expires_at || $c->expires_at->isFuture())->count(),
             ];
         });
 

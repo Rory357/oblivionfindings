@@ -4,16 +4,16 @@ namespace App\Models;
 
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FundingClaim extends Model
 {
-    use AuditableChanges;
-    use HasFactory;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'service_agreement_id',
         'client_id',
         'claim_reference',

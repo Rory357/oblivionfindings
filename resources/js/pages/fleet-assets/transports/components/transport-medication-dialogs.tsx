@@ -211,8 +211,9 @@ export function PackMedicationWizard({
     onCompleted: MutationCompleted;
 }) {
     const [stepIndex, setStepIndex] = useState(0);
-    const [scanCapture, setScanCapture] =
-        useState<MedicationScanCapture>(emptyMedicationScanCapture());
+    const [scanCapture, setScanCapture] = useState<MedicationScanCapture>(
+        emptyMedicationScanCapture(),
+    );
     const [submitting, setSubmitting] = useState(false);
     const form = useForm({
         medication_id: '',
@@ -280,9 +281,10 @@ export function PackMedicationWizard({
             applyFormRequestErrors(
                 error,
                 (field, value) =>
-                    (
-                        form.setError as (field: string, value: string) => void
-                    )(field, value),
+                    (form.setError as (field: string, value: string) => void)(
+                        field,
+                        value,
+                    ),
                 'Failed to pack medication for this transport.',
             );
         } finally {
@@ -301,7 +303,9 @@ export function PackMedicationWizard({
             railSub={client?.name ?? residentName}
             steps={packSteps}
             stepIndex={stepIndex}
-            onStepClick={(index) => index === 0 || canContinue ? setStepIndex(index) : undefined}
+            onStepClick={(index) =>
+                index === 0 || canContinue ? setStepIndex(index) : undefined
+            }
             pct={stepIndex === 0 ? (canContinue ? 50 : 20) : 100}
             footerStart={
                 <Button type="button" variant="ghost" onClick={close}>
@@ -351,12 +355,15 @@ export function PackMedicationWizard({
                                 {client?.name ?? residentName}
                             </div>
                             <div className="mt-1 text-muted-foreground">
-                                Select an active medication and complete any custody checks.
+                                Select an active medication and complete any
+                                custody checks.
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="pack-medication-id">Medication</Label>
+                            <Label htmlFor="pack-medication-id">
+                                Medication
+                            </Label>
                             <Select
                                 value={form.data.medication_id || 'none'}
                                 onValueChange={(value) => {
@@ -366,7 +373,9 @@ export function PackMedicationWizard({
                                         'medication_id',
                                         value === 'none' ? '' : value,
                                     );
-                                    setScanCapture(emptyMedicationScanCapture());
+                                    setScanCapture(
+                                        emptyMedicationScanCapture(),
+                                    );
                                 }}
                             >
                                 <SelectTrigger id="pack-medication-id">
@@ -407,11 +416,21 @@ export function PackMedicationWizard({
                                             {selectedMedication.dosage}
                                         </span>
                                     ) : null}
-                                    <Badge variant={selectedMedication.is_prn ? 'secondary' : 'outline'}>
-                                        {selectedMedication.is_prn ? 'PRN' : 'Scheduled'}
+                                    <Badge
+                                        variant={
+                                            selectedMedication.is_prn
+                                                ? 'secondary'
+                                                : 'outline'
+                                        }
+                                    >
+                                        {selectedMedication.is_prn
+                                            ? 'PRN'
+                                            : 'Scheduled'}
                                     </Badge>
                                     {selectedMedication.controlled_drug ? (
-                                        <Badge variant="destructive">Controlled</Badge>
+                                        <Badge variant="destructive">
+                                            Controlled
+                                        </Badge>
                                     ) : null}
                                 </div>
                                 {selectedMedication.route ? (
@@ -437,7 +456,10 @@ export function PackMedicationWizard({
                                     value={form.data.witness_name}
                                     onChange={(event) => {
                                         form.clearErrors('witness_name');
-                                        form.setData('witness_name', event.target.value);
+                                        form.setData(
+                                            'witness_name',
+                                            event.target.value,
+                                        );
                                     }}
                                     placeholder="Required for controlled drugs"
                                 />
@@ -453,7 +475,9 @@ export function PackMedicationWizard({
                             <MedicationScanVerificationPanel
                                 clientId={client?.id ?? null}
                                 medicationId={selectedMedication.id}
-                                scanVerification={selectedMedication.scan_verification}
+                                scanVerification={
+                                    selectedMedication.scan_verification
+                                }
                                 requirementText="Verification is required before packing this medication for transit."
                                 resetKey={`pack-${selectedMedication.id}-${open}`}
                                 onChange={(capture) => {
@@ -473,7 +497,9 @@ export function PackMedicationWizard({
                             <Textarea
                                 id="pack-notes"
                                 value={form.data.notes}
-                                onChange={(event) => form.setData('notes', event.target.value)}
+                                onChange={(event) =>
+                                    form.setData('notes', event.target.value)
+                                }
                                 placeholder="Add any chain-of-custody or handling notes..."
                             />
                             {form.errors.notes ? (
@@ -485,23 +511,40 @@ export function PackMedicationWizard({
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Review medication pack</h3>
+                        <h3 className="text-lg font-semibold">
+                            Review medication pack
+                        </h3>
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <ReviewItem label="Resident" value={client?.name ?? residentName} />
+                            <ReviewItem
+                                label="Resident"
+                                value={client?.name ?? residentName}
+                            />
                             <ReviewItem
                                 label="Medication"
-                                value={selectedMedication?.name ?? 'Not selected'}
+                                value={
+                                    selectedMedication?.name ?? 'Not selected'
+                                }
                             />
                             <ReviewItem
                                 label="Controlled drug"
-                                value={selectedMedication?.controlled_drug ? 'Yes' : 'No'}
+                                value={
+                                    selectedMedication?.controlled_drug
+                                        ? 'Yes'
+                                        : 'No'
+                                }
                             />
                             <ReviewItem
                                 label="Witness"
-                                value={form.data.witness_name.trim() || 'Not required'}
+                                value={
+                                    form.data.witness_name.trim() ||
+                                    'Not required'
+                                }
                             />
                         </div>
-                        <ReviewItem label="Notes" value={form.data.notes.trim() || 'No notes added'} />
+                        <ReviewItem
+                            label="Notes"
+                            value={form.data.notes.trim() || 'No notes added'}
+                        />
                     </div>
                 )}
             </WizardStepPane>
@@ -521,8 +564,9 @@ export function AdministerTransportMedicationWizard({
     onCompleted: MutationCompleted;
 }) {
     const [stepIndex, setStepIndex] = useState(0);
-    const [scanCapture, setScanCapture] =
-        useState<MedicationScanCapture>(emptyMedicationScanCapture());
+    const [scanCapture, setScanCapture] = useState<MedicationScanCapture>(
+        emptyMedicationScanCapture(),
+    );
     const [submitting, setSubmitting] = useState(false);
     const form = useForm({
         witnessed_by_user_id: '',
@@ -595,7 +639,9 @@ export function AdministerTransportMedicationWizard({
             railSub={log?.client?.name ?? 'Medication transit'}
             steps={administerSteps}
             stepIndex={stepIndex}
-            onStepClick={(index) => index === 0 || canContinue ? setStepIndex(index) : undefined}
+            onStepClick={(index) =>
+                index === 0 || canContinue ? setStepIndex(index) : undefined
+            }
             pct={stepIndex === 0 ? (canContinue ? 50 : 25) : 100}
             footerStart={
                 <Button type="button" variant="ghost" onClick={close}>
@@ -604,16 +650,28 @@ export function AdministerTransportMedicationWizard({
             }
             footerEnd={
                 stepIndex === 0 ? (
-                    <Button type="button" onClick={() => setStepIndex(1)} disabled={!canContinue}>
+                    <Button
+                        type="button"
+                        onClick={() => setStepIndex(1)}
+                        disabled={!canContinue}
+                    >
                         Continue
                     </Button>
                 ) : (
                     <>
-                        <Button type="button" variant="outline" onClick={() => setStepIndex(0)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setStepIndex(0)}
+                        >
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back
                         </Button>
-                        <Button type="button" onClick={submit} disabled={submitting || !canContinue}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={submitting || !canContinue}
+                        >
                             {submitting ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
@@ -631,11 +689,17 @@ export function AdministerTransportMedicationWizard({
                         <MedicationSummary log={log} />
                         {requiresWitness ? (
                             <div className="space-y-2">
-                                <Label htmlFor="administer-witness">Witness</Label>
+                                <Label htmlFor="administer-witness">
+                                    Witness
+                                </Label>
                                 <Select
-                                    value={form.data.witnessed_by_user_id || 'none'}
+                                    value={
+                                        form.data.witnessed_by_user_id || 'none'
+                                    }
                                     onValueChange={(value) => {
-                                        form.clearErrors('witnessed_by_user_id');
+                                        form.clearErrors(
+                                            'witnessed_by_user_id',
+                                        );
                                         form.setData(
                                             'witnessed_by_user_id',
                                             value === 'none' ? '' : value,
@@ -646,9 +710,14 @@ export function AdministerTransportMedicationWizard({
                                         <SelectValue placeholder="Select witness" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="none">Select witness</SelectItem>
+                                        <SelectItem value="none">
+                                            Select witness
+                                        </SelectItem>
                                         {witnesses.map((witness) => (
-                                            <SelectItem key={witness.id} value={String(witness.id)}>
+                                            <SelectItem
+                                                key={witness.id}
+                                                value={String(witness.id)}
+                                            >
                                                 {witness.name}
                                             </SelectItem>
                                         ))}
@@ -675,39 +744,62 @@ export function AdministerTransportMedicationWizard({
                             />
                         ) : null}
                         {form.errors.scan_code ? (
-                            <p className="text-sm text-destructive">{form.errors.scan_code}</p>
+                            <p className="text-sm text-destructive">
+                                {form.errors.scan_code}
+                            </p>
                         ) : null}
                         <div className="space-y-2">
                             <Label htmlFor="administer-notes">Notes</Label>
                             <Textarea
                                 id="administer-notes"
                                 value={form.data.notes}
-                                onChange={(event) => form.setData('notes', event.target.value)}
+                                onChange={(event) =>
+                                    form.setData('notes', event.target.value)
+                                }
                                 placeholder="Add any transport administration notes..."
                             />
                             {form.errors.notes ? (
-                                <p className="text-sm text-destructive">{form.errors.notes}</p>
+                                <p className="text-sm text-destructive">
+                                    {form.errors.notes}
+                                </p>
                             ) : null}
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Review administration</h3>
+                        <h3 className="text-lg font-semibold">
+                            Review administration
+                        </h3>
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <ReviewItem label="Medication" value={log?.medication_name ?? '---'} />
-                            <ReviewItem label="Resident" value={log?.client?.name ?? '---'} />
+                            <ReviewItem
+                                label="Medication"
+                                value={log?.medication_name ?? '---'}
+                            />
+                            <ReviewItem
+                                label="Resident"
+                                value={log?.client?.name ?? '---'}
+                            />
                             <ReviewItem
                                 label="Witness"
                                 value={
                                     witnesses.find(
                                         (witness) =>
-                                            String(witness.id) === form.data.witnessed_by_user_id,
+                                            String(witness.id) ===
+                                            form.data.witnessed_by_user_id,
                                     )?.name ?? 'Not required'
                                 }
                             />
-                            <ReviewItem label="Verification" value={requiresScan ? 'Verified' : 'Not required'} />
+                            <ReviewItem
+                                label="Verification"
+                                value={
+                                    requiresScan ? 'Verified' : 'Not required'
+                                }
+                            />
                         </div>
-                        <ReviewItem label="Notes" value={form.data.notes.trim() || 'No notes added'} />
+                        <ReviewItem
+                            label="Notes"
+                            value={form.data.notes.trim() || 'No notes added'}
+                        />
                     </div>
                 )}
             </WizardStepPane>
@@ -725,8 +817,9 @@ export function ReturnTransportMedicationWizard({
     onCompleted: MutationCompleted;
 }) {
     const [stepIndex, setStepIndex] = useState(0);
-    const [scanCapture, setScanCapture] =
-        useState<MedicationScanCapture>(emptyMedicationScanCapture());
+    const [scanCapture, setScanCapture] = useState<MedicationScanCapture>(
+        emptyMedicationScanCapture(),
+    );
     const [submitting, setSubmitting] = useState(false);
     const form = useForm({ notes: '', scan_code: '' });
     const requiresScan = !!log?.scan_verification;
@@ -791,7 +884,9 @@ export function ReturnTransportMedicationWizard({
             railSub={log?.client?.name ?? 'Medication transit'}
             steps={returnSteps}
             stepIndex={stepIndex}
-            onStepClick={(index) => index === 0 || canContinue ? setStepIndex(index) : undefined}
+            onStepClick={(index) =>
+                index === 0 || canContinue ? setStepIndex(index) : undefined
+            }
             pct={stepIndex === 0 ? (canContinue ? 50 : 25) : 100}
             footerStart={
                 <Button type="button" variant="ghost" onClick={close}>
@@ -800,16 +895,28 @@ export function ReturnTransportMedicationWizard({
             }
             footerEnd={
                 stepIndex === 0 ? (
-                    <Button type="button" onClick={() => setStepIndex(1)} disabled={!canContinue}>
+                    <Button
+                        type="button"
+                        onClick={() => setStepIndex(1)}
+                        disabled={!canContinue}
+                    >
                         Continue
                     </Button>
                 ) : (
                     <>
-                        <Button type="button" variant="outline" onClick={() => setStepIndex(0)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setStepIndex(0)}
+                        >
                             <ArrowLeft className="mr-2 h-4 w-4" />
                             Back
                         </Button>
-                        <Button type="button" onClick={submit} disabled={submitting || !canContinue}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={submitting || !canContinue}
+                        >
                             {submitting ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
@@ -839,31 +946,56 @@ export function ReturnTransportMedicationWizard({
                             />
                         ) : null}
                         {form.errors.scan_code ? (
-                            <p className="text-sm text-destructive">{form.errors.scan_code}</p>
+                            <p className="text-sm text-destructive">
+                                {form.errors.scan_code}
+                            </p>
                         ) : null}
                         <div className="space-y-2">
                             <Label htmlFor="return-notes">Return notes</Label>
                             <Textarea
                                 id="return-notes"
                                 value={form.data.notes}
-                                onChange={(event) => form.setData('notes', event.target.value)}
+                                onChange={(event) =>
+                                    form.setData('notes', event.target.value)
+                                }
                                 placeholder="Add any hand-back or chain-of-custody notes..."
                             />
                             {form.errors.notes ? (
-                                <p className="text-sm text-destructive">{form.errors.notes}</p>
+                                <p className="text-sm text-destructive">
+                                    {form.errors.notes}
+                                </p>
                             ) : null}
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Review medication return</h3>
+                        <h3 className="text-lg font-semibold">
+                            Review medication return
+                        </h3>
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <ReviewItem label="Medication" value={log?.medication_name ?? '---'} />
-                            <ReviewItem label="Resident" value={log?.client?.name ?? '---'} />
-                            <ReviewItem label="Destination" value="House stock" />
-                            <ReviewItem label="Verification" value={requiresScan ? 'Verified' : 'Not required'} />
+                            <ReviewItem
+                                label="Medication"
+                                value={log?.medication_name ?? '---'}
+                            />
+                            <ReviewItem
+                                label="Resident"
+                                value={log?.client?.name ?? '---'}
+                            />
+                            <ReviewItem
+                                label="Destination"
+                                value="House stock"
+                            />
+                            <ReviewItem
+                                label="Verification"
+                                value={
+                                    requiresScan ? 'Verified' : 'Not required'
+                                }
+                            />
                         </div>
-                        <ReviewItem label="Return notes" value={form.data.notes.trim() || 'No notes added'} />
+                        <ReviewItem
+                            label="Return notes"
+                            value={form.data.notes.trim() || 'No notes added'}
+                        />
                     </div>
                 )}
             </WizardStepPane>

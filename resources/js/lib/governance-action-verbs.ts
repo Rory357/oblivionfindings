@@ -106,7 +106,11 @@ export function resolveActionVerb(
     status: WorkflowStatus,
     override?: string | null,
 ): string {
-    if (override && override.trim().length > 0 && !/^open$/i.test(override.trim())) {
+    if (
+        override &&
+        override.trim().length > 0 &&
+        !/^open$/i.test(override.trim())
+    ) {
         return override;
     }
     const areaKey = normaliseArea(area);
@@ -117,24 +121,33 @@ export function resolveActionVerb(
 }
 
 function normaliseArea(area: WorkflowArea): string {
-    const lower = String(area ?? '').toLowerCase().trim();
+    const lower = String(area ?? '')
+        .toLowerCase()
+        .trim();
     if (lower.startsWith('meeting')) return 'meeting';
-    if (lower.startsWith('resolution') || lower.startsWith('vote')) return 'resolution';
+    if (lower.startsWith('resolution') || lower.startsWith('vote'))
+        return 'resolution';
     if (lower.startsWith('risk')) return 'risk';
-    if (lower.startsWith('compliance') || lower.startsWith('obligation')) return 'compliance';
+    if (lower.startsWith('compliance') || lower.startsWith('obligation'))
+        return 'compliance';
     if (lower.startsWith('budget')) return 'budget';
     if (lower.startsWith('spend')) return 'spend';
     if (lower.startsWith('action')) return 'action';
-    if (lower.startsWith('policy') || lower.startsWith('policies')) return 'policy';
-    if (lower.startsWith('conflict') || lower.startsWith('interest')) return 'conflict';
+    if (lower.startsWith('policy') || lower.startsWith('policies'))
+        return 'policy';
+    if (lower.startsWith('conflict') || lower.startsWith('interest'))
+        return 'conflict';
     if (lower.startsWith('ceo')) return 'ceo_report';
     if (lower.startsWith('pack')) return 'pack';
     return lower;
 }
 
 function normaliseStatus(status: WorkflowStatus): string {
-    const lower = String(status ?? '').toLowerCase().trim();
+    const lower = String(status ?? '')
+        .toLowerCase()
+        .trim();
     if (lower === 'overdue' || lower === 'late') return 'overdue';
-    if (lower === 'due_soon' || lower === 'due-soon' || lower === 'soon') return 'due_soon';
+    if (lower === 'due_soon' || lower === 'due-soon' || lower === 'soon')
+        return 'due_soon';
     return 'pending';
 }

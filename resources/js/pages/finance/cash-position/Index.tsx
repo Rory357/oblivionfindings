@@ -1,5 +1,5 @@
-import { OverviewTabsFooter } from '@/components/finance/overview-hub';
 import { formatMoney } from '@/components/finance/money';
+import { OverviewTabsFooter } from '@/components/finance/overview-hub';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -62,9 +62,18 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const dateLabel = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(iso).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 
-export default function CashPosition({ accounts, pettyCash, totals, obligations }: Props) {
+export default function CashPosition({
+    accounts,
+    pettyCash,
+    totals,
+    obligations,
+}: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Cash Position" />
@@ -78,10 +87,22 @@ export default function CashPosition({ accounts, pettyCash, totals, obligations 
                         title="Cash Position"
                         description={`Live balances across ${accounts.length} bank ${accounts.length === 1 ? 'account' : 'accounts'} and ${pettyCash.length} petty-cash ${pettyCash.length === 1 ? 'fund' : 'funds'}, with dated obligations for the next 30 days.`}
                         stats={[
-                            { label: 'Cash on hand', value: formatMoney(totals.cash_on_hand) },
-                            { label: 'Expected in · 30d', value: formatMoney(totals.expected_in_30d) },
-                            { label: 'Expected out · 30d', value: formatMoney(totals.expected_out_30d) },
-                            { label: 'Projected · 30d', value: formatMoney(totals.projected_30d) },
+                            {
+                                label: 'Cash on hand',
+                                value: formatMoney(totals.cash_on_hand),
+                            },
+                            {
+                                label: 'Expected in · 30d',
+                                value: formatMoney(totals.expected_in_30d),
+                            },
+                            {
+                                label: 'Expected out · 30d',
+                                value: formatMoney(totals.expected_out_30d),
+                            },
+                            {
+                                label: 'Projected · 30d',
+                                value: formatMoney(totals.projected_30d),
+                            },
                         ]}
                         footer={<OverviewTabsFooter active="cash-position" />}
                     />
@@ -93,7 +114,9 @@ export default function CashPosition({ accounts, pettyCash, totals, obligations 
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Landmark className="h-4 w-4 text-muted-foreground" />
                                 Bank accounts
-                                <span className="ml-auto text-sm font-semibold tabular-nums">{formatMoney(totals.bank)}</span>
+                                <span className="ml-auto text-sm font-semibold tabular-nums">
+                                    {formatMoney(totals.bank)}
+                                </span>
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -110,27 +133,44 @@ export default function CashPosition({ accounts, pettyCash, totals, obligations 
                                         <TableRow>
                                             <TableHead>Account</TableHead>
                                             <TableHead>Type</TableHead>
-                                            <TableHead className="text-right">Balance</TableHead>
+                                            <TableHead className="text-right">
+                                                Balance
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {accounts.map((account) => (
                                             <TableRow key={account.id}>
                                                 <TableCell>
-                                                    <Link href={`/finance/bank-accounts/${account.id}`} className="font-medium text-primary hover:underline">
+                                                    <Link
+                                                        href={`/finance/bank-accounts/${account.id}`}
+                                                        className="font-medium text-primary hover:underline"
+                                                    >
                                                         {account.name}
                                                     </Link>
                                                     <div className="text-xs text-muted-foreground">
-                                                        {account.bank_name ?? '—'}
+                                                        {account.bank_name ??
+                                                            '—'}
                                                         {account.is_primary && (
-                                                            <StatusBadge variant="info" size="sm" className="ml-2">
+                                                            <StatusBadge
+                                                                variant="info"
+                                                                size="sm"
+                                                                className="ml-2"
+                                                            >
                                                                 Primary
                                                             </StatusBadge>
                                                         )}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-sm text-muted-foreground">{account.account_type ?? '—'}</TableCell>
-                                                <TableCell className="text-right font-medium tabular-nums">{formatMoney(account.current_balance)}</TableCell>
+                                                <TableCell className="text-sm text-muted-foreground">
+                                                    {account.account_type ??
+                                                        '—'}
+                                                </TableCell>
+                                                <TableCell className="text-right font-medium tabular-nums">
+                                                    {formatMoney(
+                                                        account.current_balance,
+                                                    )}
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -144,7 +184,9 @@ export default function CashPosition({ accounts, pettyCash, totals, obligations 
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Coins className="h-4 w-4 text-muted-foreground" />
                                 Petty cash
-                                <span className="ml-auto text-sm font-semibold tabular-nums">{formatMoney(totals.petty_cash)}</span>
+                                <span className="ml-auto text-sm font-semibold tabular-nums">
+                                    {formatMoney(totals.petty_cash)}
+                                </span>
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -160,18 +202,27 @@ export default function CashPosition({ accounts, pettyCash, totals, obligations 
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>Fund</TableHead>
-                                            <TableHead className="text-right">Float balance</TableHead>
+                                            <TableHead className="text-right">
+                                                Float balance
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {pettyCash.map((fund) => (
                                             <TableRow key={fund.id}>
                                                 <TableCell>
-                                                    <Link href={`/finance/petty-cash/${fund.id}`} className="font-medium text-primary hover:underline">
+                                                    <Link
+                                                        href={`/finance/petty-cash/${fund.id}`}
+                                                        className="font-medium text-primary hover:underline"
+                                                    >
                                                         {fund.name}
                                                     </Link>
                                                 </TableCell>
-                                                <TableCell className="text-right font-medium tabular-nums">{formatMoney(fund.current_balance)}</TableCell>
+                                                <TableCell className="text-right font-medium tabular-nums">
+                                                    {formatMoney(
+                                                        fund.current_balance,
+                                                    )}
+                                                </TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -203,37 +254,68 @@ export default function CashPosition({ accounts, pettyCash, totals, obligations 
                                         <TableHead>Obligation</TableHead>
                                         <TableHead>Counterparty</TableHead>
                                         <TableHead>Direction</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-right">
+                                            Amount
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {obligations.map((item) => (
                                         <TableRow key={item.id}>
-                                            <TableCell className="whitespace-nowrap text-sm">{dateLabel(item.start)}</TableCell>
+                                            <TableCell className="text-sm whitespace-nowrap">
+                                                {dateLabel(item.start)}
+                                            </TableCell>
                                             <TableCell>
                                                 {item.link ? (
-                                                    <Link href={item.link} className="font-medium text-primary hover:underline">
+                                                    <Link
+                                                        href={item.link}
+                                                        className="font-medium text-primary hover:underline"
+                                                    >
                                                         {item.title}
                                                     </Link>
                                                 ) : (
-                                                    <span className="font-medium">{item.title}</span>
+                                                    <span className="font-medium">
+                                                        {item.title}
+                                                    </span>
                                                 )}
-                                                {item.ref && <div className="text-xs text-muted-foreground">{item.ref}</div>}
+                                                {item.ref && (
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {item.ref}
+                                                    </div>
+                                                )}
                                             </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">{item.counterparty ?? '—'}</TableCell>
+                                            <TableCell className="text-sm text-muted-foreground">
+                                                {item.counterparty ?? '—'}
+                                            </TableCell>
                                             <TableCell>
                                                 {item.direction ? (
                                                     <StatusBadge
-                                                        variant={item.direction === 'inflow' ? 'success' : 'warning'}
+                                                        variant={
+                                                            item.direction ===
+                                                            'inflow'
+                                                                ? 'success'
+                                                                : 'warning'
+                                                        }
                                                         size="sm"
-                                                        label={item.direction === 'inflow' ? 'Money in' : 'Money out'}
+                                                        label={
+                                                            item.direction ===
+                                                            'inflow'
+                                                                ? 'Money in'
+                                                                : 'Money out'
+                                                        }
                                                     />
                                                 ) : (
-                                                    <StatusBadge variant="neutral" size="sm" label={item.status} />
+                                                    <StatusBadge
+                                                        variant="neutral"
+                                                        size="sm"
+                                                        label={item.status}
+                                                    />
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right font-medium tabular-nums">
-                                                {item.amount != null ? formatMoney(item.amount) : '—'}
+                                                {item.amount != null
+                                                    ? formatMoney(item.amount)
+                                                    : '—'}
                                             </TableCell>
                                         </TableRow>
                                     ))}

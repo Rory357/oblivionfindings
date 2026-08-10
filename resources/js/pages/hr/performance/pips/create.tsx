@@ -88,7 +88,8 @@ export default function PipCreate({ staff }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/performance/pips"
                         title="Create Performance Improvement Plan"

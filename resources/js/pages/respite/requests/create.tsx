@@ -1,12 +1,18 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import RespiteSubnav from '@/components/respite-subnav';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 
 type Props = {
@@ -15,7 +21,11 @@ type Props = {
     defaultClientId?: number | string | null;
 };
 
-export default function RespiteRequestCreate({ clients, serviceContexts, defaultClientId }: Props) {
+export default function RespiteRequestCreate({
+    clients,
+    serviceContexts,
+    defaultClientId,
+}: Props) {
     const form = useForm({
         client_id: defaultClientId ? String(defaultClientId) : '',
         service_context_id: '',
@@ -28,10 +38,15 @@ export default function RespiteRequestCreate({ clients, serviceContexts, default
     const { data, setData, post, processing, errors } = form;
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'New Booking Request', href: '/respite/requests/create' },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                {
+                    title: 'New Booking Request',
+                    href: '/respite/requests/create',
+                },
+            ]}
+        >
             <Head title="New Respite Booking Request" />
 
             <PageLayout
@@ -55,31 +70,57 @@ export default function RespiteRequestCreate({ clients, serviceContexts, default
                 >
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Request Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Request Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label>Client *</Label>
-                                    <Select value={data.client_id} onValueChange={(v) => setData('client_id', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                                    <Select
+                                        value={data.client_id}
+                                        onValueChange={(v) =>
+                                            setData('client_id', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select client" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {clients.map((c) => (
-                                                <SelectItem key={c.id} value={String(c.id)}>
+                                                <SelectItem
+                                                    key={c.id}
+                                                    value={String(c.id)}
+                                                >
                                                     {c.first_name} {c.last_name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.client_id && <div className="mt-1 text-xs text-status-critical">{errors.client_id}</div>}
+                                    {errors.client_id && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.client_id}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Service Context</Label>
-                                    <Select value={data.service_context_id} onValueChange={(v) => setData('service_context_id', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select context" /></SelectTrigger>
+                                    <Select
+                                        value={data.service_context_id}
+                                        onValueChange={(v) =>
+                                            setData('service_context_id', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select context" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {serviceContexts.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
                                                     {s.name}
                                                 </SelectItem>
                                             ))}
@@ -91,13 +132,39 @@ export default function RespiteRequestCreate({ clients, serviceContexts, default
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label>Requested Start *</Label>
-                                    <Input type="datetime-local" value={data.requested_start} onChange={(e) => setData('requested_start', e.target.value)} />
-                                    {errors.requested_start && <div className="mt-1 text-xs text-status-critical">{errors.requested_start}</div>}
+                                    <Input
+                                        type="datetime-local"
+                                        value={data.requested_start}
+                                        onChange={(e) =>
+                                            setData(
+                                                'requested_start',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    {errors.requested_start && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.requested_start}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Requested End *</Label>
-                                    <Input type="datetime-local" value={data.requested_end} onChange={(e) => setData('requested_end', e.target.value)} />
-                                    {errors.requested_end && <div className="mt-1 text-xs text-status-critical">{errors.requested_end}</div>}
+                                    <Input
+                                        type="datetime-local"
+                                        value={data.requested_end}
+                                        onChange={(e) =>
+                                            setData(
+                                                'requested_end',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    {errors.requested_end && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.requested_end}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -105,20 +172,38 @@ export default function RespiteRequestCreate({ clients, serviceContexts, default
                                 <Label>Funding Reference</Label>
                                 <Input
                                     value={data.funding_reference}
-                                    onChange={(e) => setData('funding_reference', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'funding_reference',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="e.g. Funder + reference number"
                                 />
                             </div>
 
                             <div>
                                 <Label>Preference Notes</Label>
-                                <Textarea value={data.preference_notes} onChange={(e) => setData('preference_notes', e.target.value)} rows={4} />
+                                <Textarea
+                                    value={data.preference_notes}
+                                    onChange={(e) =>
+                                        setData(
+                                            'preference_notes',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={4}
+                                />
                             </div>
                         </CardContent>
                     </Card>
 
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => window.history.back()}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => window.history.back()}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>

@@ -6,12 +6,14 @@ use App\Models\CarePlanSignOff;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function grantCarePlanReviewIntegrityPermissions(User $user, array $keys): void
 {
+    $keys = array_values(array_unique([...$keys, 'clients.viewAny']));
     $role = Role::query()->firstOrCreate(
         ['name' => 'care_plan_review_integrity_'.$user->id],
         ['label' => 'Care Plan Review Integrity', 'level' => 50, 'type' => 'custom'],
@@ -30,13 +32,19 @@ function grantCarePlanReviewIntegrityPermissions(User $user, array $keys): void
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
+function makeCarePlanReviewIntegrityClient(): Client
+{
+    return Client::factory()->create([
+        'site_id' => Site::factory()->create()->id,
+    ]);
+}
+
 function makeCarePlanReviewIntegrityPlan(
     User $user,
     Client $client,
     array $attributes = [],
 ): CarePlan {
     return CarePlan::query()->create(array_merge([
-        'organization_id' => $user->organization_id,
         'client_id' => $client->id,
         'title' => 'Published support plan',
         'status' => 'active',
@@ -59,7 +67,6 @@ function addCarePlanReviewIntegrityGoal(
     string $title,
 ): CarePlanGoal {
     return $plan->goals()->create([
-        'organization_id' => $plan->organization_id,
         'client_id' => $plan->client_id,
         'title' => $title,
         'category' => 'daily_living',
@@ -71,16 +78,15 @@ function addCarePlanReviewIntegrityGoal(
 }
 
 it('hydrates the in-progress review as the complete working care plan', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, [
         'clients.viewAny',
         'care_plans.viewAny',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
     $active = makeCarePlanReviewIntegrityPlan($manager, $client);
     addCarePlanReviewIntegrityGoal($active, $manager, 'Published goal');
     $active->signOffs()->create([
-        'organization_id' => 1,
         'party_role' => 'client',
         'party_name' => 'Published signatory',
         'agreed_on' => today()->subMonth(),
@@ -95,7 +101,6 @@ it('hydrates the in-progress review as the complete working care plan', function
     ]);
     $reviewGoal = addCarePlanReviewIntegrityGoal($review, $manager, 'Review-only goal');
     $reviewSignOff = $review->signOffs()->create([
-        'organization_id' => 1,
         'party_role' => 'whanau',
         'party_name' => 'Fresh review signatory',
         'agreed_on' => today(),
@@ -114,9 +119,9 @@ it('hydrates the in-progress review as the complete working care plan', function
 });
 
 it('rejects lifecycle-only statuses during care plan creation', function (string $status) {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, ['care_plans.create']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
 
     $this->actingAs($manager)
         ->from("/operations/clients/{$client->id}?tab=care_plans")
@@ -135,9 +140,9 @@ it('rejects lifecycle-only statuses during care plan creation', function (string
 })->with(['review', 'archived']);
 
 it('rejects arbitrary status transitions through the generic update endpoint', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
     $active = makeCarePlanReviewIntegrityPlan($manager, $client);
     $draft = makeCarePlanReviewIntegrityPlan($manager, $client, [
         'title' => 'Draft plan',
@@ -160,9 +165,9 @@ it('rejects arbitrary status transitions through the generic update endpoint', f
 });
 
 it('keeps archived care plan versions immutable', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
     $archived = makeCarePlanReviewIntegrityPlan($manager, $client, [
         'title' => 'Archived plan',
         'status' => 'archived',
@@ -197,9 +202,9 @@ it('keeps archived care plan versions immutable', function () {
 });
 
 it('freezes the published source version while its review copy is in progress', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
     $active = makeCarePlanReviewIntegrityPlan($manager, $client);
     $review = makeCarePlanReviewIntegrityPlan($manager, $client, [
         'title' => 'Review working copy',
@@ -238,12 +243,11 @@ it('freezes the published source version while its review copy is in progress', 
 });
 
 it('requires a fresh review-version sign-off before review completion', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
     $active = makeCarePlanReviewIntegrityPlan($manager, $client);
     $active->signOffs()->create([
-        'organization_id' => 1,
         'party_role' => 'client',
         'party_name' => 'Prior-version signatory',
         'agreed_on' => today()->subMonth(),
@@ -286,9 +290,9 @@ it('requires a fresh review-version sign-off before review completion', function
 });
 
 it('retracts the canonical timeline projection when a sign-off is removed', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
     $plan = makeCarePlanReviewIntegrityPlan($manager, $client);
 
     $this->actingAs($manager)
@@ -318,9 +322,9 @@ it('retracts the canonical timeline projection when a sign-off is removed', func
 });
 
 it('uses the dedicated delete capability for current care plans', function () {
-    $deleteManager = User::factory()->create(['organization_id' => 1]);
+    $deleteManager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($deleteManager, ['care_plans.delete']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
     $draft = makeCarePlanReviewIntegrityPlan($deleteManager, $client, [
         'title' => 'Disposable draft',
         'status' => 'draft',
@@ -332,7 +336,7 @@ it('uses the dedicated delete capability for current care plans', function () {
 
     expect(CarePlan::withTrashed()->findOrFail($draft->id)->trashed())->toBeTrue();
 
-    $updateManager = User::factory()->create(['organization_id' => 1]);
+    $updateManager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($updateManager, ['care_plans.update']);
     $otherDraft = makeCarePlanReviewIntegrityPlan($updateManager, $client, [
         'title' => 'Protected draft',
@@ -347,9 +351,9 @@ it('uses the dedicated delete capability for current care plans', function () {
 });
 
 it('does not delete archived care plan history', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, ['care_plans.delete']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeCarePlanReviewIntegrityClient();
     $archived = makeCarePlanReviewIntegrityPlan($manager, $client, [
         'title' => 'Historical plan',
         'status' => 'archived',

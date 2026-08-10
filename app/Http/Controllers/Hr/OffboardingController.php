@@ -6,22 +6,22 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Services\ExitInterviewService;
+use App\Domain\Hr\Services\HrLifecycleAccessService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\AssetAssignment;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class OffboardingController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly OnboardingService $onboardingService,
         private readonly ExitInterviewService $exitInterviewService,
+        private readonly HrLifecycleAccessService $lifecycleAccess,
     ) {}
 
     public function index(Request $request)
@@ -29,15 +29,23 @@ class OffboardingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $status = $request->query('status');
         $search = trim((string) $request->query('q', ''));
 
-        $checklists = HrOffboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $checklists = $this->lifecycleAccess->visibleOffboardingChecklists($user)
+            ->select([
+                'id',
+                'employee_profile_id',
+                'template_key',
+                'status',
+                'started_at',
+                'completed_at',
+                'due_date',
+                'created_at',
+            ])
             ->with([
-                'employeeProfile.user:id,name,email',
-                'creator:id,name',
+                'employeeProfile:id,user_id',
+                'employeeProfile.user:id,name',
             ])
             ->withCount([
                 'tasks',
@@ -50,8 +58,7 @@ class OffboardingController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $baseQuery = HrOffboardingChecklist::query()
-            ->where('tenant_id', $tenantId);
+        $baseQuery = $this->lifecycleAccess->visibleOffboardingChecklists($user);
 
         $today = now()->toDateString();
         $nextWeek = now()->addDays(7)->toDateString();
@@ -74,8 +81,8 @@ class OffboardingController extends Controller
         return Inertia::render('hr/offboarding/index', [
             'checklists' => $checklists,
             'summary' => $summary,
-            'employees' => $this->eligibleEmployees($tenantId),
-            'interviewers' => $this->interviewerOptions($tenantId, $user),
+            'employees' => $this->eligibleEmployees($user),
+            'interviewers' => $this->interviewerOptions($user),
             'departureReasons' => self::DEPARTURE_REASONS,
             'defaultTasks' => $this->onboardingService->defaultOffboardingTasks(),
             'defaultEndDate' => now()->addWeeks(2)->toDateString(),
@@ -111,24 +118,23 @@ class OffboardingController extends Controller
      * active-asset-return preview for the wizard. Assets are batch-loaded to
      * avoid an N+1 across the candidate list.
      */
-    private function eligibleEmployees(int $tenantId): Collection
+    private function eligibleEmployees(User $viewer): Collection
     {
-        $existingProfileIds = HrOffboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $existingProfileIds = $this->lifecycleAccess->visibleOffboardingChecklists($viewer)
             ->whereIn('status', ['pending', 'in_progress'])
             ->pluck('employee_profile_id');
 
-        $profiles = HrEmployeeProfile::query()
+        $profiles = $this->lifecycleAccess->currentProfiles($viewer)
             ->with('user:id,name,email')
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
             ->whereNotIn('id', $existingProfileIds)
-            ->get();
+            ->get(['id', 'user_id', 'position_title', 'end_date']);
 
         $userIds = $profiles->pluck('user_id')->filter()->values();
+        $assetIds = $this->lifecycleAccess->authorizedAssetIds($viewer);
 
         $assetsByUser = AssetAssignment::query()
             ->with('asset:id,name,asset_tag')
+            ->whereIn('asset_id', $assetIds)
             ->whereIn('assignee_type', ['staff', 'user', User::class])
             ->whereIn('assignee_id', $userIds)
             ->whereNull('released_at')
@@ -154,19 +160,9 @@ class OffboardingController extends Controller
     /**
      * Users who can be recorded as exit-interview interviewers.
      */
-    private function interviewerOptions(int $tenantId, User $user): Collection
+    private function interviewerOptions(User $viewer): Collection
     {
-        $ids = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->pluck('user_id')
-            ->push($user->id)
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values();
-
-        return User::query()
-            ->whereIn('id', $ids)
+        return $this->lifecycleAccess->currentUsers($viewer)
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
@@ -177,22 +173,36 @@ class OffboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOffboardingChecklist($user, $checklist);
 
         $checklist->load([
-            'employeeProfile.user:id,name,email',
-            'employeeProfile.primarySite:id,name',
-            'tasks' => fn ($query) => $query->orderBy('sort_order'),
+            'employeeProfile:id,user_id',
+            'employeeProfile.user:id,name',
+            'tasks' => fn ($query) => $query
+                ->select([
+                    'id',
+                    'offboarding_checklist_id',
+                    'exit_interview_id',
+                    'category',
+                    'title',
+                    'description',
+                    'is_required',
+                    'sort_order',
+                    'assigned_to_user_id',
+                    'status',
+                    'due_date',
+                    'completed_at',
+                    'sign_off_required',
+                    'notes',
+                ])
+                ->orderBy('sort_order'),
             'tasks.assignedTo:id,name',
-            'tasks.completedBy:id,name',
-            'creator:id,name',
         ]);
 
         return Inertia::render('hr/offboarding/show', [
             'checklist' => $checklist,
             'progress' => $this->onboardingService->getProgress($checklist),
-            'interviewers' => $this->interviewerOptions($tenantId, $user),
+            'interviewers' => $this->interviewerOptions($user),
             'departureReasons' => self::DEPARTURE_REASONS,
             'can' => [
                 'manage' => $user->canDo('hr.onboarding.manage'),
@@ -216,51 +226,67 @@ class OffboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
+            'employee_profile_id' => ['required', 'integer'],
             'end_date' => ['nullable', 'date'],
             'schedule_exit_interview' => ['sometimes', 'boolean'],
             'departure_reason' => ['nullable', 'string', 'max:255', 'required_if:schedule_exit_interview,true'],
-            'interviewer_user_id' => ['nullable', 'integer', 'exists:users,id', 'required_if:schedule_exit_interview,true'],
+            'interviewer_user_id' => ['nullable', 'integer', 'required_if:schedule_exit_interview,true'],
             'interview_date' => ['nullable', 'date', 'required_if:schedule_exit_interview,true'],
         ]);
 
-        $profile = HrEmployeeProfile::query()->findOrFail((int) $validated['employee_profile_id']);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
+        try {
+            $checklist = DB::transaction(function () use ($user, $validated): HrOffboardingChecklist {
+                $profile = $this->lifecycleAccess->currentProfile(
+                    $user,
+                    (int) $validated['employee_profile_id'],
+                    true,
+                );
 
-        $existing = HrOffboardingChecklist::query()
-            ->where('employee_profile_id', $profile->id)
-            ->whereIn('status', ['pending', 'in_progress'])
-            ->first();
+                if ($validated['schedule_exit_interview'] ?? false) {
+                    $this->lifecycleAccess->currentUser(
+                        $user,
+                        (int) $validated['interviewer_user_id'],
+                        true,
+                    );
+                }
 
-        if ($existing) {
-            return redirect()->back()->with('error', 'An active offboarding checklist already exists for this employee.');
-        }
+                $existing = HrOffboardingChecklist::query()
+                    ->where('employee_profile_id', $profile->id)
+                    ->whereIn('status', ['pending', 'in_progress'])
+                    ->lockForUpdate()
+                    ->first();
 
-        $checklist = $this->onboardingService->generateOffboardingChecklist(
-            $profile,
-            $user->id,
-            ['end_date' => $validated['end_date'] ?? null]
-        );
+                if ($existing) {
+                    throw new \LogicException('An active offboarding checklist already exists for this employee.');
+                }
 
-        // Optionally schedule the exit interview as part of the same flow, so the
-        // checklist's "Exit interview" task is backed by a real HrExitInterview.
-        if (($validated['schedule_exit_interview'] ?? false)) {
-            $exitInterviewTaskId = $checklist->tasks()
-                ->where('notes', 'like', '%workflow_key=exit_interview%')
-                ->value('id');
+                $checklist = $this->onboardingService->generateOffboardingChecklist(
+                    $profile,
+                    $user->id,
+                    ['end_date' => $validated['end_date'] ?? null],
+                );
 
-            $this->exitInterviewService->createExitInterview([
-                'tenant_id' => $tenantId,
-                'created_by' => $user->id,
-                'employee_profile_id' => $profile->id,
-                'interviewer_user_id' => (int) $validated['interviewer_user_id'],
-                'interview_date' => $validated['interview_date'],
-                'departure_reason' => $validated['departure_reason'],
-                'offboarding_task_id' => $exitInterviewTaskId,
-            ]);
+                if ($validated['schedule_exit_interview'] ?? false) {
+                    $exitInterviewTaskId = $checklist->tasks()
+                        ->where('notes', 'like', '%workflow_key=exit_interview%')
+                        ->value('id');
+
+                    $this->exitInterviewService->createExitInterview([
+                        'created_by' => $user->id,
+                        'employee_profile_id' => $profile->id,
+                        'interviewer_user_id' => (int) $validated['interviewer_user_id'],
+                        'interview_date' => $validated['interview_date'],
+                        'departure_reason' => $validated['departure_reason'],
+                        'offboarding_task_id' => $exitInterviewTaskId,
+                    ]);
+                }
+
+                return $checklist;
+            });
+        } catch (\LogicException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
 
         return redirect()->route('hr.offboarding.show', $checklist)
@@ -271,24 +297,28 @@ class OffboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $checklist = $task->checklist;
-        abort_unless($checklist, 404);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
 
         $validated = $request->validate([
             'evidence_path' => ['nullable', 'string', 'max:500'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'signed_off_by' => ['nullable', 'integer', 'exists:users,id'],
+            'signed_off_by' => ['nullable', 'integer'],
         ]);
 
-        if ($task->sign_off_required && empty($validated['signed_off_by'])) {
-            return redirect()->back()->with('error', 'This task requires sign-off. Please specify the sign-off user.');
-        }
-
         try {
-            $this->onboardingService->completeOffboardingTask($task, $user->id, $validated);
+            DB::transaction(function () use ($user, $task, $validated): void {
+                $lockedTask = $this->lifecycleAccess->visibleOffboardingTask($user, $task, true);
+                if ($lockedTask->sign_off_required && empty($validated['signed_off_by'])) {
+                    throw new \LogicException('This task requires sign-off. Please specify the sign-off user.');
+                }
+                if (! empty($validated['signed_off_by'])) {
+                    $this->lifecycleAccess->currentUser(
+                        $user,
+                        (int) $validated['signed_off_by'],
+                        true,
+                    );
+                }
+                $this->onboardingService->completeOffboardingTask($lockedTask, $user->id, $validated);
+            });
         } catch (\LogicException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -304,13 +334,10 @@ class OffboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $checklist = $task->checklist;
-        abort_unless($checklist, 404);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
-
-        $this->onboardingService->uncompleteOffboardingTask($task);
+        DB::transaction(function () use ($user, $task): void {
+            $lockedTask = $this->lifecycleAccess->visibleOffboardingTask($user, $task, true);
+            $this->onboardingService->uncompleteOffboardingTask($lockedTask);
+        });
 
         return redirect()->back()->with('success', 'Task reopened.');
     }
@@ -323,14 +350,16 @@ class OffboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOffboardingChecklist($user, $checklist);
 
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:in_progress,cancelled,archived'],
         ]);
 
-        $this->onboardingService->setOffboardingChecklistStatus($checklist, $validated['status']);
+        DB::transaction(function () use ($user, $checklist, $validated): void {
+            $lockedChecklist = $this->lifecycleAccess->visibleOffboardingChecklist($user, $checklist, true);
+            $this->onboardingService->setOffboardingChecklistStatus($lockedChecklist, $validated['status']);
+        });
 
         return redirect()->back()->with('success', 'Offboarding updated.');
     }

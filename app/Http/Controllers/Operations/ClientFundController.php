@@ -6,15 +6,18 @@ use App\Domain\Finance\Services\ClientFundTransactionService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientFund;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class ClientFundController extends Controller
 {
     public function __construct(
         private readonly ClientFundTransactionService $fundTransactions,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     public function index(Request $request)
@@ -28,11 +31,12 @@ class ClientFundController extends Controller
         ]);
         $search = trim((string) ($filters['q'] ?? ''));
 
-        $funds = ClientFund::query()
-            ->where('organization_id', $auth->organization_id)
+        $baseQuery = $this->accessibleFunds($auth);
+
+        $funds = (clone $baseQuery)
             ->with(['client:id,first_name,last_name'])
             ->withCount('transactions')
-            ->when($search !== '', fn ($q) => $q->where('name', 'like', '%'.$search.'%'))
+            ->when($search !== '', fn ($q) => $q->where('fund_name', 'like', '%'.$search.'%'))
             ->when($filters['fund_type'] ?? null, fn ($q, $fundType) => $q->where('fund_type', $fundType))
             ->orderByDesc('updated_at')
             ->paginate(20)
@@ -58,14 +62,10 @@ class ClientFundController extends Controller
                 'fund_type' => $filters['fund_type'] ?? null,
             ],
             'stats' => [
-                'total' => ClientFund::query()
-                    ->where('organization_id', $auth->organization_id)
-                    ->count(),
-                'total_balance' => (float) ClientFund::query()
-                    ->where('organization_id', $auth->organization_id)
+                'total' => (clone $baseQuery)->count(),
+                'total_balance' => (float) (clone $baseQuery)
                     ->sum('balance'),
-                'low_balance_alerts' => ClientFund::query()
-                    ->where('organization_id', $auth->organization_id)
+                'low_balance_alerts' => (clone $baseQuery)
                     ->whereNotNull('low_balance_threshold')
                     ->whereColumn('balance', '<=', 'low_balance_threshold')
                     ->count(),
@@ -78,8 +78,7 @@ class ClientFundController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canViewFunds($auth), 403);
 
-        $fund = ClientFund::query()
-            ->where('organization_id', $auth->organization_id)
+        $fund = $this->accessibleFunds($auth)
             ->with(['client:id,first_name,last_name', 'transactions' => fn ($q) => $q->orderByDesc('created_at')])
             ->findOrFail($fund);
 
@@ -93,8 +92,11 @@ class ClientFundController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canManageFunds($auth), 403);
 
-        $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+        $clients = $this->siteAccess->applyClientScope(
+            Client::query(),
+            $auth,
+            ['reports.viewAny'],
+        )
             ->select('id', 'first_name', 'last_name')
             ->orderBy('last_name')
             ->get();
@@ -110,12 +112,7 @@ class ClientFundController extends Controller
         abort_unless($auth && $this->canManageFunds($auth), 403);
 
         $data = $request->validate([
-            'client_id' => [
-                'required',
-                'integer',
-                Rule::exists('clients', 'id')
-                    ->where(fn ($query) => $query->where('organization_id', $auth->organization_id)),
-            ],
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
             'name' => ['required', 'string', 'max:255'],
             'funding_source' => ['nullable', 'string', 'max:255'],
             'fund_type' => ['nullable', 'string', 'max:100'],
@@ -125,6 +122,12 @@ class ClientFundController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        $this->siteAccess->assertCanAccessClientId(
+            $auth,
+            (int) $data['client_id'],
+            ['reports.viewAny'],
+        );
+
         DB::transaction(function () use ($auth, $data): void {
             $openingBalance = bcadd(
                 (string) ($data['balance'] ?? $data['total_budget']),
@@ -132,7 +135,6 @@ class ClientFundController extends Controller
                 2,
             );
             $fund = ClientFund::query()->create([
-                'organization_id' => $auth->organization_id,
                 'client_id' => $data['client_id'],
                 'fund_name' => $data['name'],
                 'fund_type' => $data['fund_type'] ?? 'general',
@@ -160,9 +162,7 @@ class ClientFundController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canManageFunds($auth), 403);
 
-        $fund = ClientFund::query()
-            ->where('organization_id', $auth->organization_id)
-            ->findOrFail($fund);
+        $fund = $this->accessibleFunds($auth)->findOrFail($fund);
 
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -187,9 +187,7 @@ class ClientFundController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canManageFunds($auth), 403);
 
-        $fund = ClientFund::query()
-            ->where('organization_id', $auth->organization_id)
-            ->findOrFail($fund);
+        $fund = $this->accessibleFunds($auth)->findOrFail($fund);
 
         $data = $request->validate([
             'type' => ['required', 'string', 'in:credit,debit'],
@@ -212,5 +210,15 @@ class ClientFundController extends Controller
     private function canManageFunds($auth): bool
     {
         return $auth->canDo('client_funds.manage');
+    }
+
+    private function accessibleFunds(User $user): Builder
+    {
+        return ClientFund::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ));
     }
 }

@@ -1,14 +1,14 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
 import { toDatetimeLocal } from '@/lib/datetime';
+import { formatDateTime, formatDuration } from '@/lib/fleet-utils';
 import { cn } from '@/lib/utils';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -128,11 +128,19 @@ function statusVariant(
 function transitStatusBadge(status: string) {
     switch (status) {
         case 'packed':
-            return <Badge className="bg-status-warning text-white">Packed</Badge>;
+            return (
+                <Badge className="bg-status-warning text-white">Packed</Badge>
+            );
         case 'administered':
-            return <Badge className="bg-status-info text-white">Administered</Badge>;
+            return (
+                <Badge className="bg-status-info text-white">
+                    Administered
+                </Badge>
+            );
         case 'returned':
-            return <Badge className="bg-status-success text-white">Returned</Badge>;
+            return (
+                <Badge className="bg-status-success text-white">Returned</Badge>
+            );
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
@@ -190,7 +198,11 @@ export default function TransportShow({
         if (t.status === 'in_progress') {
             refreshTimerRef.current = setInterval(() => {
                 router.reload({
-                    only: ['vehicle_position', 'medication_context', 'completion_blockers'],
+                    only: [
+                        'vehicle_position',
+                        'medication_context',
+                        'completion_blockers',
+                    ],
                 });
             }, 15000);
         }
@@ -223,8 +235,7 @@ export default function TransportShow({
     }, [vehicle_position]);
 
     const unresolvedMedicationCount = useMemo(
-        () =>
-            safeTransitLogs.filter((log) => log.status !== 'returned').length,
+        () => safeTransitLogs.filter((log) => log.status !== 'returned').length,
         [safeTransitLogs],
     );
 
@@ -572,7 +583,9 @@ export default function TransportShow({
                                                 Medication Transit
                                             </CardTitle>
                                             <p className="text-sm text-muted-foreground">
-                                                Track medications packed, administered, and returned for this trip.
+                                                Track medications packed,
+                                                administered, and returned for
+                                                this trip.
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
@@ -590,7 +603,8 @@ export default function TransportShow({
                                             {canManageMedicationTransit &&
                                                 t.status === 'in_progress' &&
                                                 medicationContext.client &&
-                                                safeMedicationOptions.length > 0 && (
+                                                safeMedicationOptions.length >
+                                                    0 && (
                                                     <Button
                                                         size="sm"
                                                         onClick={openPackDialog}
@@ -610,7 +624,10 @@ export default function TransportShow({
                                                     Resident
                                                 </div>
                                                 <div className="mt-1 text-sm font-medium">
-                                                    {medicationContext.client.name}
+                                                    {
+                                                        medicationContext.client
+                                                            .name
+                                                    }
                                                 </div>
                                             </div>
                                             <div className="rounded-md bg-muted/40 p-3">
@@ -618,7 +635,9 @@ export default function TransportShow({
                                                     Packable Medications
                                                 </div>
                                                 <div className="mt-1 text-sm font-medium">
-                                                    {safeMedicationOptions.length}
+                                                    {
+                                                        safeMedicationOptions.length
+                                                    }
                                                 </div>
                                             </div>
                                             <div className="rounded-md bg-muted/40 p-3">
@@ -632,13 +651,17 @@ export default function TransportShow({
                                         </div>
                                     ) : (
                                         <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                                            This transport is not linked to a resident record, so medication packing is not available on this page.
+                                            This transport is not linked to a
+                                            resident record, so medication
+                                            packing is not available on this
+                                            page.
                                         </div>
                                     )}
 
                                     {safeTransitLogs.length === 0 ? (
                                         <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                                            No medications are currently logged against this transport.
+                                            No medications are currently logged
+                                            against this transport.
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
@@ -651,7 +674,9 @@ export default function TransportShow({
                                                         <div className="space-y-3">
                                                             <div className="flex flex-wrap items-center gap-2">
                                                                 <span className="text-sm font-semibold">
-                                                                    {log.medication_name}
+                                                                    {
+                                                                        log.medication_name
+                                                                    }
                                                                 </span>
                                                                 {transitStatusBadge(
                                                                     log.status,
@@ -661,7 +686,8 @@ export default function TransportShow({
                                                                         variant="destructive"
                                                                         className="text-[10px]"
                                                                     >
-                                                                        Controlled drug
+                                                                        Controlled
+                                                                        drug
                                                                     </Badge>
                                                                 )}
                                                                 {log.scan_verification && (
@@ -669,13 +695,17 @@ export default function TransportShow({
                                                                         variant="outline"
                                                                         className="text-[10px]"
                                                                     >
-                                                                        Scan required
+                                                                        Scan
+                                                                        required
                                                                     </Badge>
                                                                 )}
                                                             </div>
                                                             <div className="text-xs text-muted-foreground">
-                                                                {log.client?.name ??
-                                                                    medicationContext.client?.name ??
+                                                                {log.client
+                                                                    ?.name ??
+                                                                    medicationContext
+                                                                        .client
+                                                                        ?.name ??
                                                                     t.resident_name}
                                                             </div>
                                                             <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
@@ -693,7 +723,9 @@ export default function TransportShow({
                                                                 </div>
                                                                 <div>
                                                                     Witness:{' '}
-                                                                    {log.witnessed_by?.name ??
+                                                                    {log
+                                                                        .witnessed_by
+                                                                        ?.name ??
                                                                         log.packed_witness_name ??
                                                                         '---'}
                                                                 </div>
@@ -781,7 +813,9 @@ export default function TransportShow({
                                                         'controlled_drug_witness' && (
                                                         <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
                                                     )}
-                                                    <span>{blocker.message}</span>
+                                                    <span>
+                                                        {blocker.message}
+                                                    </span>
                                                     <Badge
                                                         variant="outline"
                                                         className="ml-auto border-status-warning/30 text-[9px] text-status-warning"
@@ -813,7 +847,9 @@ export default function TransportShow({
                                             </label>
                                             <Input
                                                 type="datetime-local"
-                                                value={completeForm.data.arrived_at}
+                                                value={
+                                                    completeForm.data.arrived_at
+                                                }
                                                 onChange={(event) =>
                                                     completeForm.setData(
                                                         'arrived_at',
@@ -841,7 +877,9 @@ export default function TransportShow({
                                             <Button
                                                 type="submit"
                                                 size="lg"
-                                                disabled={completeForm.processing}
+                                                disabled={
+                                                    completeForm.processing
+                                                }
                                                 className="w-full"
                                             >
                                                 {completeForm.processing ? (
@@ -882,7 +920,7 @@ export default function TransportShow({
                                             />
                                         </div>
                                         <div className="pb-6">
-                                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                            <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                 Departed
                                             </p>
                                             <p className="mt-1 text-sm font-medium">
@@ -916,7 +954,7 @@ export default function TransportShow({
                                                 />
                                             </div>
                                             <div className="pb-6">
-                                                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                     Duration
                                                 </p>
                                                 <p className="mt-1 text-lg font-bold">
@@ -946,7 +984,7 @@ export default function TransportShow({
                                             </div>
                                         </div>
                                         <div>
-                                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                            <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                 Arrived
                                             </p>
                                             <p className="mt-1 text-sm font-medium">

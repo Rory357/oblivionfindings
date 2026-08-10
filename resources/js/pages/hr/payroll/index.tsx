@@ -1,11 +1,11 @@
 import { PayrollTabs } from '@/components/hr';
+import { PayrollHero } from '@/components/hr/payroll-hero';
 import {
     CreateRunWizard,
     ExportProfileWizard,
     type ExportFieldOption,
     type PayrollExportProfile,
 } from '@/components/hr/payroll-wizards';
-import { PayrollHero } from '@/components/hr/payroll-hero';
 import {
     useRowContextMenu,
     type RowCtxItem,
@@ -25,7 +25,13 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { CircleDollarSign, Download, LockKeyhole, Plus, RefreshCw } from 'lucide-react';
+import {
+    CircleDollarSign,
+    Download,
+    LockKeyhole,
+    Plus,
+    RefreshCw,
+} from 'lucide-react';
 import { useState } from 'react';
 
 interface PayrollRun {
@@ -163,30 +169,113 @@ export default function PayrollIndex({
         return (
             <div className="flex flex-wrap items-center gap-2">
                 {run.status === 'draft' && can.manage ? (
-                    <Button variant="outline" size="sm" onClick={() => router.post(`/hr/payroll/runs/${run.id}/lock`, {}, { preserveScroll: true })}>Lock</Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                            router.post(
+                                `/hr/payroll/runs/${run.id}/lock`,
+                                {},
+                                { preserveScroll: true },
+                            )
+                        }
+                    >
+                        Lock
+                    </Button>
                 ) : null}
                 {can.manage && run.gl_posted_at && !run.net_paid_at ? (
-                    <Button variant="outline" size="sm" onClick={() => router.post(`/hr/payroll/runs/${run.id}/pay`, {}, { preserveScroll: true })}>Pay net</Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                            router.post(
+                                `/hr/payroll/runs/${run.id}/pay`,
+                                {},
+                                { preserveScroll: true },
+                            )
+                        }
+                    >
+                        Pay net
+                    </Button>
                 ) : null}
-                {run.net_paid_at ? <span className="rounded-md bg-status-success-bg px-2 py-1 text-xs font-semibold text-status-success">Paid</span> : null}
+                {run.net_paid_at ? (
+                    <span className="rounded-md bg-status-success-bg px-2 py-1 text-xs font-semibold text-status-success">
+                        Paid
+                    </span>
+                ) : null}
                 {run.gl_error && !run.gl_posted_at ? (
                     <>
-                        <span className="rounded-md bg-status-critical-bg px-2 py-1 text-xs font-semibold text-status-critical" title={run.gl_error}>GL failed</span>
-                        {can.manage ? <Button variant="outline" size="sm" onClick={() => router.post(`/hr/payroll/runs/${run.id}/retry-gl`, {}, { preserveScroll: true })}>Retry GL</Button> : null}
+                        <span
+                            className="rounded-md bg-status-critical-bg px-2 py-1 text-xs font-semibold text-status-critical"
+                            title={run.gl_error}
+                        >
+                            GL failed
+                        </span>
+                        {can.manage ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    router.post(
+                                        `/hr/payroll/runs/${run.id}/retry-gl`,
+                                        {},
+                                        { preserveScroll: true },
+                                    )
+                                }
+                            >
+                                Retry GL
+                            </Button>
+                        ) : null}
                     </>
                 ) : null}
                 {can.export_data && run.net_paid_at ? (
-                    <Button variant="outline" size="sm" asChild><a href={`/hr/payroll/runs/${run.id}/net-pay-file`}><Download className="mr-1 h-3 w-3" />Bank file</a></Button>
+                    <Button variant="outline" size="sm" asChild>
+                        <a href={`/hr/payroll/runs/${run.id}/net-pay-file`}>
+                            <Download className="mr-1 h-3 w-3" />
+                            Bank file
+                        </a>
+                    </Button>
                 ) : null}
                 {can.export_data && run.status === 'locked' ? (
                     <>
                         {profiles.length > 0 ? (
-                            <Select value={selectedProfileByRun[run.id] || (defaultProfile ? String(defaultProfile.id) : undefined)} onValueChange={(value) => setSelectedProfileByRun((previous) => ({ ...previous, [run.id]: value }))}>
-                                <SelectTrigger className="h-8 min-w-[160px] flex-1"><SelectValue placeholder="Default mapping" /></SelectTrigger>
-                                <SelectContent>{profiles.map((profile) => <SelectItem key={profile.id} value={String(profile.id)}>{profile.name}</SelectItem>)}</SelectContent>
+                            <Select
+                                value={
+                                    selectedProfileByRun[run.id] ||
+                                    (defaultProfile
+                                        ? String(defaultProfile.id)
+                                        : undefined)
+                                }
+                                onValueChange={(value) =>
+                                    setSelectedProfileByRun((previous) => ({
+                                        ...previous,
+                                        [run.id]: value,
+                                    }))
+                                }
+                            >
+                                <SelectTrigger className="h-8 min-w-[160px] flex-1">
+                                    <SelectValue placeholder="Default mapping" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {profiles.map((profile) => (
+                                        <SelectItem
+                                            key={profile.id}
+                                            value={String(profile.id)}
+                                        >
+                                            {profile.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
                             </Select>
                         ) : null}
-                        <Button variant="outline" size="sm" onClick={() => handleExport(run.id)}><Download className="mr-1 h-3 w-3" />Export</Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExport(run.id)}
+                        >
+                            <Download className="mr-1 h-3 w-3" />
+                            Export
+                        </Button>
                     </>
                 ) : null}
             </div>
@@ -195,11 +284,58 @@ export default function PayrollIndex({
 
     function runContextItems(run: PayrollRun): RowCtxItem[] {
         const items: RowCtxItem[] = [];
-        if (run.status === 'draft' && can.manage) items.push({ kind: 'item', label: 'Lock run', icon: LockKeyhole, onSelect: () => router.post(`/hr/payroll/runs/${run.id}/lock`, {}, { preserveScroll: true }) });
-        if (can.manage && run.gl_posted_at && !run.net_paid_at) items.push({ kind: 'item', label: 'Pay net', icon: CircleDollarSign, onSelect: () => router.post(`/hr/payroll/runs/${run.id}/pay`, {}, { preserveScroll: true }) });
-        if (can.manage && run.gl_error && !run.gl_posted_at) items.push({ kind: 'item', label: 'Retry GL', icon: RefreshCw, onSelect: () => router.post(`/hr/payroll/runs/${run.id}/retry-gl`, {}, { preserveScroll: true }) });
-        if (can.export_data && run.status === 'locked') items.push({ kind: 'item', label: 'Export run', icon: Download, onSelect: () => handleExport(run.id) });
-        if (can.export_data && run.net_paid_at) items.push({ kind: 'item', label: 'Download bank file', icon: Download, onSelect: () => { window.location.href = `/hr/payroll/runs/${run.id}/net-pay-file`; } });
+        if (run.status === 'draft' && can.manage)
+            items.push({
+                kind: 'item',
+                label: 'Lock run',
+                icon: LockKeyhole,
+                onSelect: () =>
+                    router.post(
+                        `/hr/payroll/runs/${run.id}/lock`,
+                        {},
+                        { preserveScroll: true },
+                    ),
+            });
+        if (can.manage && run.gl_posted_at && !run.net_paid_at)
+            items.push({
+                kind: 'item',
+                label: 'Pay net',
+                icon: CircleDollarSign,
+                onSelect: () =>
+                    router.post(
+                        `/hr/payroll/runs/${run.id}/pay`,
+                        {},
+                        { preserveScroll: true },
+                    ),
+            });
+        if (can.manage && run.gl_error && !run.gl_posted_at)
+            items.push({
+                kind: 'item',
+                label: 'Retry GL',
+                icon: RefreshCw,
+                onSelect: () =>
+                    router.post(
+                        `/hr/payroll/runs/${run.id}/retry-gl`,
+                        {},
+                        { preserveScroll: true },
+                    ),
+            });
+        if (can.export_data && run.status === 'locked')
+            items.push({
+                kind: 'item',
+                label: 'Export run',
+                icon: Download,
+                onSelect: () => handleExport(run.id),
+            });
+        if (can.export_data && run.net_paid_at)
+            items.push({
+                kind: 'item',
+                label: 'Download bank file',
+                icon: Download,
+                onSelect: () => {
+                    window.location.href = `/hr/payroll/runs/${run.id}/net-pay-file`;
+                },
+            });
         return items;
     }
 
@@ -352,282 +488,330 @@ export default function PayrollIndex({
                 <Card>
                     <CardContent className="p-0">
                         <div data-payroll-desktop className="hidden md:block">
-                        <table className="w-full text-sm">
-                            <thead className="border-b bg-muted/50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Period
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Status
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Total Hours
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Total Gross
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Items
-                                    </th>
-                                    <th className="px-4 py-3 text-left font-medium">
-                                        Created
-                                    </th>
-                                    <th className="px-4 py-3 text-right font-medium">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {runs.data.map((run) => {
-                                    const config =
-                                        statusConfig[run.status] ||
-                                        statusConfig.draft;
-                                    return (
-                                        <tr
-                                            key={run.id}
-                                            className="hover:bg-muted/30"
-                                            onContextMenu={openRunContext(runContextItems(run))}
-                                        >
-                                            <td className="px-4 py-3">
-                                                <span className="font-medium">
+                            <table className="w-full text-sm">
+                                <thead className="border-b bg-muted/50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Period
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Status
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Total Hours
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Total Gross
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Items
+                                        </th>
+                                        <th className="px-4 py-3 text-left font-medium">
+                                            Created
+                                        </th>
+                                        <th className="px-4 py-3 text-right font-medium">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {runs.data.map((run) => {
+                                        const config =
+                                            statusConfig[run.status] ||
+                                            statusConfig.draft;
+                                        return (
+                                            <tr
+                                                key={run.id}
+                                                className="hover:bg-muted/30"
+                                                onContextMenu={openRunContext(
+                                                    runContextItems(run),
+                                                )}
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <span className="font-medium">
+                                                        {formatDate(
+                                                            run.period_start,
+                                                        )}{' '}
+                                                        -{' '}
+                                                        {formatDate(
+                                                            run.period_end,
+                                                        )}
+                                                    </span>
+                                                    {run.validation_errors
+                                                        ?.length > 0 ? (
+                                                        <div className="mt-1 text-xs text-status-critical">
+                                                            {
+                                                                run
+                                                                    .validation_errors[0]
+                                                            }
+                                                            {run
+                                                                .validation_errors
+                                                                .length > 1
+                                                                ? ` (+${run.validation_errors.length - 1} more)`
+                                                                : ''}
+                                                        </div>
+                                                    ) : null}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={
+                                                            config.className
+                                                        }
+                                                    >
+                                                        {config.label}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-muted-foreground">
+                                                    {run.total_hours.toFixed(1)}
+                                                    h
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-medium">
+                                                    {formatCurrency(
+                                                        run.total_gross,
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-muted-foreground">
+                                                    {run.items_count}
+                                                </td>
+                                                <td className="px-4 py-3 text-muted-foreground">
+                                                    {formatDate(run.created_at)}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {run.status ===
+                                                            'draft' &&
+                                                            can.manage && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.post(
+                                                                            `/hr/payroll/runs/${run.id}/lock`,
+                                                                            {},
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Lock
+                                                                </Button>
+                                                            )}
+                                                        {can.manage &&
+                                                            run.gl_posted_at &&
+                                                            !run.net_paid_at && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        router.post(
+                                                                            `/hr/payroll/runs/${run.id}/pay`,
+                                                                            {},
+                                                                            {
+                                                                                preserveScroll: true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Pay net
+                                                                </Button>
+                                                            )}
+                                                        {run.net_paid_at && (
+                                                            <span className="inline-flex items-center rounded-md bg-status-success-bg px-2 py-1 text-xs font-semibold text-status-success">
+                                                                Paid
+                                                            </span>
+                                                        )}
+                                                        {run.gl_error &&
+                                                            !run.gl_posted_at && (
+                                                                <>
+                                                                    <span
+                                                                        className="inline-flex items-center rounded-md bg-status-critical-bg px-2 py-1 text-xs font-semibold text-status-critical"
+                                                                        title={
+                                                                            run.gl_error
+                                                                        }
+                                                                    >
+                                                                        GL
+                                                                        failed
+                                                                    </span>
+                                                                    {can.manage && (
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() =>
+                                                                                router.post(
+                                                                                    `/hr/payroll/runs/${run.id}/retry-gl`,
+                                                                                    {},
+                                                                                    {
+                                                                                        preserveScroll: true,
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            Retry
+                                                                            GL
+                                                                        </Button>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        {can.export_data &&
+                                                            run.net_paid_at && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    asChild
+                                                                >
+                                                                    <a
+                                                                        href={`/hr/payroll/runs/${run.id}/net-pay-file`}
+                                                                    >
+                                                                        <Download className="mr-1 h-3 w-3" />
+                                                                        Bank
+                                                                        file
+                                                                    </a>
+                                                                </Button>
+                                                            )}
+                                                        {can.export_data &&
+                                                            run.status ===
+                                                                'locked' && (
+                                                                <div className="flex items-center gap-2">
+                                                                    {profiles.length >
+                                                                        0 && (
+                                                                        <Select
+                                                                            value={
+                                                                                selectedProfileByRun[
+                                                                                    run
+                                                                                        .id
+                                                                                ] ||
+                                                                                (defaultProfile
+                                                                                    ? String(
+                                                                                          defaultProfile.id,
+                                                                                      )
+                                                                                    : undefined)
+                                                                            }
+                                                                            onValueChange={(
+                                                                                value,
+                                                                            ) =>
+                                                                                setSelectedProfileByRun(
+                                                                                    (
+                                                                                        previous,
+                                                                                    ) => ({
+                                                                                        ...previous,
+                                                                                        [run.id]:
+                                                                                            value,
+                                                                                    }),
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <SelectTrigger className="h-8 w-[180px]">
+                                                                                <SelectValue placeholder="Default mapping" />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                {profiles.map(
+                                                                                    (
+                                                                                        profile,
+                                                                                    ) => (
+                                                                                        <SelectItem
+                                                                                            key={
+                                                                                                profile.id
+                                                                                            }
+                                                                                            value={String(
+                                                                                                profile.id,
+                                                                                            )}
+                                                                                        >
+                                                                                            {
+                                                                                                profile.name
+                                                                                            }
+                                                                                        </SelectItem>
+                                                                                    ),
+                                                                                )}
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                    )}
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            handleExport(
+                                                                                run.id,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Download className="mr-1 h-3 w-3" />
+                                                                        Export
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {runs.data.length === 0 && (
+                                        <tr>
+                                            <td
+                                                colSpan={7}
+                                                className="px-4 py-8 text-center text-muted-foreground"
+                                            >
+                                                No payroll runs found.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div data-payroll-mobile className="divide-y md:hidden">
+                            {runs.data.map((run) => {
+                                const config =
+                                    statusConfig[run.status] ||
+                                    statusConfig.draft;
+                                return (
+                                    <article
+                                        key={run.id}
+                                        className="space-y-3 p-4"
+                                        onContextMenu={openRunContext(
+                                            runContextItems(run),
+                                        )}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="font-semibold">
                                                     {formatDate(
                                                         run.period_start,
                                                     )}{' '}
                                                     -{' '}
                                                     {formatDate(run.period_end)}
-                                                </span>
-                                                {run.validation_errors?.length >
-                                                0 ? (
-                                                    <div className="mt-1 text-xs text-status-critical">
-                                                        {
-                                                            run
-                                                                .validation_errors[0]
-                                                        }
-                                                        {run.validation_errors
-                                                            .length > 1
-                                                            ? ` (+${run.validation_errors.length - 1} more)`
-                                                            : ''}
-                                                    </div>
-                                                ) : null}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={config.className}
-                                                >
-                                                    {config.label}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-muted-foreground">
-                                                {run.total_hours.toFixed(1)}h
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-medium">
-                                                {formatCurrency(
-                                                    run.total_gross,
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-muted-foreground">
-                                                {run.items_count}
-                                            </td>
-                                            <td className="px-4 py-3 text-muted-foreground">
-                                                {formatDate(run.created_at)}
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {run.status === 'draft' &&
-                                                        can.manage && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    router.post(
-                                                                        `/hr/payroll/runs/${run.id}/lock`,
-                                                                        {},
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                Lock
-                                                            </Button>
-                                                        )}
-                                                    {can.manage &&
-                                                        run.gl_posted_at &&
-                                                        !run.net_paid_at && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    router.post(
-                                                                        `/hr/payroll/runs/${run.id}/pay`,
-                                                                        {},
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                Pay net
-                                                            </Button>
-                                                        )}
-                                                    {run.net_paid_at && (
-                                                        <span className="inline-flex items-center rounded-md bg-status-success-bg px-2 py-1 text-xs font-semibold text-status-success">
-                                                            Paid
-                                                        </span>
-                                                    )}
-                                                    {run.gl_error &&
-                                                        !run.gl_posted_at && (
-                                                            <>
-                                                                <span
-                                                                    className="inline-flex items-center rounded-md bg-status-critical-bg px-2 py-1 text-xs font-semibold text-status-critical"
-                                                                    title={run.gl_error}
-                                                                >
-                                                                    GL failed
-                                                                </span>
-                                                                {can.manage && (
-                                                                    <Button
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() =>
-                                                                            router.post(
-                                                                                `/hr/payroll/runs/${run.id}/retry-gl`,
-                                                                                {},
-                                                                                {
-                                                                                    preserveScroll: true,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Retry GL
-                                                                    </Button>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    {can.export_data &&
-                                                        run.net_paid_at && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                asChild
-                                                            >
-                                                                <a
-                                                                    href={`/hr/payroll/runs/${run.id}/net-pay-file`}
-                                                                >
-                                                                    <Download className="mr-1 h-3 w-3" />
-                                                                    Bank file
-                                                                </a>
-                                                            </Button>
-                                                        )}
-                                                    {can.export_data &&
-                                                        run.status ===
-                                                            'locked' && (
-                                                            <div className="flex items-center gap-2">
-                                                                {profiles.length >
-                                                                    0 && (
-                                                                    <Select
-                                                                        value={
-                                                                            selectedProfileByRun[
-                                                                                run
-                                                                                    .id
-                                                                            ] ||
-                                                                            (defaultProfile
-                                                                                ? String(
-                                                                                      defaultProfile.id,
-                                                                                  )
-                                                                                : undefined)
-                                                                        }
-                                                                        onValueChange={(
-                                                                            value,
-                                                                        ) =>
-                                                                            setSelectedProfileByRun(
-                                                                                (
-                                                                                    previous,
-                                                                                ) => ({
-                                                                                    ...previous,
-                                                                                    [run.id]:
-                                                                                        value,
-                                                                                }),
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <SelectTrigger className="h-8 w-[180px]">
-                                                                            <SelectValue placeholder="Default mapping" />
-                                                                        </SelectTrigger>
-                                                                        <SelectContent>
-                                                                            {profiles.map(
-                                                                                (
-                                                                                    profile,
-                                                                                ) => (
-                                                                                    <SelectItem
-                                                                                        key={
-                                                                                            profile.id
-                                                                                        }
-                                                                                        value={String(
-                                                                                            profile.id,
-                                                                                        )}
-                                                                                    >
-                                                                                        {
-                                                                                            profile.name
-                                                                                        }
-                                                                                    </SelectItem>
-                                                                                ),
-                                                                            )}
-                                                                        </SelectContent>
-                                                                    </Select>
-                                                                )}
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        handleExport(
-                                                                            run.id,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Download className="mr-1 h-3 w-3" />
-                                                                    Export
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {runs.data.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={7}
-                                            className="px-4 py-8 text-center text-muted-foreground"
-                                        >
-                                            No payroll runs found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                        </div>
-                        <div data-payroll-mobile className="divide-y md:hidden">
-                            {runs.data.map((run) => {
-                                const config = statusConfig[run.status] || statusConfig.draft;
-                                return (
-                                    <article key={run.id} className="space-y-3 p-4" onContextMenu={openRunContext(runContextItems(run))}>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="font-semibold">{formatDate(run.period_start)} - {formatDate(run.period_end)}</p>
-                                                <p className="text-xs text-muted-foreground">{run.total_hours.toFixed(1)}h · {run.items_count} items · {formatDate(run.created_at)}</p>
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {run.total_hours.toFixed(1)}
+                                                    h · {run.items_count} items
+                                                    ·{' '}
+                                                    {formatDate(run.created_at)}
+                                                </p>
                                             </div>
-                                            <Badge variant="outline" className={config.className}>{config.label}</Badge>
+                                            <Badge
+                                                variant="outline"
+                                                className={config.className}
+                                            >
+                                                {config.label}
+                                            </Badge>
                                         </div>
-                                        <p className="text-lg font-semibold">{formatCurrency(run.total_gross)}</p>
-                                        {run.validation_errors?.length ? <p className="text-xs text-status-critical">{run.validation_errors[0]}</p> : null}
+                                        <p className="text-lg font-semibold">
+                                            {formatCurrency(run.total_gross)}
+                                        </p>
+                                        {run.validation_errors?.length ? (
+                                            <p className="text-xs text-status-critical">
+                                                {run.validation_errors[0]}
+                                            </p>
+                                        ) : null}
                                         {renderMobileRunActions(run)}
                                     </article>
                                 );
                             })}
-                            {runs.data.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">No payroll runs found.</p> : null}
+                            {runs.data.length === 0 ? (
+                                <p className="p-8 text-center text-sm text-muted-foreground">
+                                    No payroll runs found.
+                                </p>
+                            ) : null}
                         </div>
                     </CardContent>
                 </Card>

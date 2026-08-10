@@ -1,6 +1,9 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\AttendanceService;
+use App\Domain\Hr\Services\TimeTrackingService;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -45,7 +48,6 @@ function grantHrTimePermission(User $user, string $permissionKey): void
 function hrTimeProfile(User $user, ?User $manager = null): void
 {
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-HRT-'.$user->id,
         'work_email' => $user->email,
@@ -98,10 +100,57 @@ test('users without hr time permission cannot clock in via hr time routes', func
 
 test('hr users can access the hr time dashboard', function () {
     $user = hrRoleUser('hr');
+    hrTimeProfile($user);
 
     $this->actingAs($user)
         ->get('/hr/time')
         ->assertOk();
+});
+
+test('former staff cannot retain hr time access through an old permission', function () {
+    $user = hrRoleUser('hr');
+    hrTimeProfile($user);
+    HrEmployeeProfile::query()->where('user_id', $user->id)->update([
+        'end_date' => today()->subDay(),
+    ]);
+
+    $this->actingAs($user)
+        ->get('/hr/time')
+        ->assertForbidden();
+});
+
+test('approve-only managers cannot widen dashboard or export scope beyond their team', function () {
+    $lead = hrRoleUser('team_lead');
+    $report = hrRoleUser('support_worker');
+    $stranger = hrRoleUser('support_worker');
+    hrTimeProfile($lead);
+    hrTimeProfile($report, $lead);
+    hrTimeProfile($stranger);
+    grantHrTimePermission($lead, 'timesheets.viewAny');
+    grantHrTimePermission($lead, 'timesheets.approve');
+
+    $visible = HrTimeEntry::factory()->create([
+        'user_id' => $report->id,
+        'status' => 'submitted',
+        'notes' => 'Visible team entry',
+    ]);
+    HrTimeEntry::factory()->create([
+        'user_id' => $stranger->id,
+        'status' => 'submitted',
+        'notes' => 'Private stranger entry',
+    ]);
+
+    $this->actingAs($lead)
+        ->get('/hr/time?scope=all')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.scope', 'team')
+            ->has('entries.data', 1)
+            ->where('entries.data.0.id', $visible->id));
+
+    $csv = $this->actingAs($lead)->get('/hr/time/export?scope=all')->assertOk()->streamedContent();
+    expect($csv)->toContain($report->name)
+        ->not->toContain($stranger->name);
 });
 
 test('hr time timesheets tab lists the shared operations timesheet rows', function () {
@@ -198,7 +247,7 @@ test('clock on behalf requires and persists a reason', function () {
         ])
         ->assertSessionHasNoErrors();
 
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::query()
+    $entry = HrTimeEntry::query()
         ->where('user_id', $staff->id)
         ->where('entry_type', 'admin_clock')
         ->firstOrFail();
@@ -214,7 +263,7 @@ test('voiding an entry soft-deletes it with a required reason', function () {
     grantHrTimePermission($manager, 'timesheets.viewAny');
     grantHrTimePermission($manager, 'timesheets.manageAny');
 
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+    $entry = HrTimeEntry::factory()->create([
         'user_id' => $staff->id,
         'status' => 'submitted',
     ]);
@@ -230,7 +279,7 @@ test('voiding an entry soft-deletes it with a required reason', function () {
         ])
         ->assertSessionHasNoErrors();
 
-    expect(\App\Domain\Hr\Models\HrTimeEntry::withTrashed()->find($entry->id)->trashed())->toBeTrue();
+    expect(HrTimeEntry::withTrashed()->find($entry->id)->trashed())->toBeTrue();
     expect($entry->amendments()->where('field_name', 'voided')->exists())->toBeTrue();
 });
 
@@ -241,7 +290,7 @@ test('approved entries cannot be voided', function () {
     grantHrTimePermission($manager, 'timesheets.viewAny');
     grantHrTimePermission($manager, 'timesheets.manageAny');
 
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+    $entry = HrTimeEntry::factory()->create([
         'user_id' => $staff->id,
         'status' => 'approved',
     ]);
@@ -252,7 +301,7 @@ test('approved entries cannot be voided', function () {
         ])
         ->assertSessionHas('error');
 
-    expect(\App\Domain\Hr\Models\HrTimeEntry::find($entry->id))->not->toBeNull();
+    expect(HrTimeEntry::find($entry->id))->not->toBeNull();
 });
 
 test('an approve-only manager cannot amend an entry outside their team', function () {
@@ -265,7 +314,7 @@ test('an approve-only manager cannot amend an entry outside their team', functio
     grantHrTimePermission($lead, 'timesheets.viewAny');
     grantHrTimePermission($lead, 'timesheets.approve');
 
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+    $entry = HrTimeEntry::factory()->create([
         'user_id' => $stranger->id,
         'status' => 'submitted',
     ]);
@@ -295,7 +344,7 @@ test('an approve-only manager can amend their direct report\'s entry', function 
     grantHrTimePermission($lead, 'timesheets.viewAny');
     grantHrTimePermission($lead, 'timesheets.approve');
 
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+    $entry = HrTimeEntry::factory()->create([
         'user_id' => $report->id,
         'status' => 'submitted',
     ]);
@@ -318,7 +367,7 @@ test('correcting a missed clock-out closes the entry and records the reason', fu
     grantHrTimePermission($manager, 'timesheets.manageAny');
 
     $clockIn = CarbonImmutable::parse('2026-04-20 09:00:00', config('app.worker_timezone'))->utc();
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+    $entry = HrTimeEntry::factory()->create([
         'user_id' => $staff->id,
         'entry_date' => '2026-04-20',
         'clock_in' => $clockIn,
@@ -350,7 +399,7 @@ test('a manager can add a team-visible note recorded on the amendment trail', fu
     grantHrTimePermission($manager, 'timesheets.viewAny');
     grantHrTimePermission($manager, 'timesheets.manageAny');
 
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::factory()->create([
+    $entry = HrTimeEntry::factory()->create([
         'user_id' => $staff->id,
         'status' => 'submitted',
     ]);
@@ -392,7 +441,7 @@ test('a manual sleepover entry persists the disturbance log', function () {
         ])
         ->assertSessionHasNoErrors();
 
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::query()
+    $entry = HrTimeEntry::query()
         ->where('user_id', $staff->id)
         ->where('is_sleepover', true)
         ->firstOrFail();
@@ -408,23 +457,23 @@ test('syncEntryFromSession backfills a closed session that has no time entry', f
     $staff = hrRoleUser('support_worker');
     hrTimeProfile($staff);
 
-    $attendance = app(\App\Domain\Hr\Services\AttendanceService::class);
-    $session = $attendance->clockIn($staff, ['tenant_id' => 1]);
+    $attendance = app(AttendanceService::class);
+    $session = $attendance->clockIn($staff);
     $this->travel(3)->hours();
     $session = $attendance->clockOut($staff, $session, ['break_minutes' => 30]);
 
     // Simulate a legacy session by removing the auto-created entry.
-    \App\Domain\Hr\Models\HrTimeEntry::query()
+    HrTimeEntry::query()
         ->where('attendance_session_id', $session->id)
         ->forceDelete();
     expect(
-        \App\Domain\Hr\Models\HrTimeEntry::query()->where('attendance_session_id', $session->id)->exists()
+        HrTimeEntry::query()->where('attendance_session_id', $session->id)->exists()
     )->toBeFalse();
 
-    app(\App\Domain\Hr\Services\TimeTrackingService::class)
+    app(TimeTrackingService::class)
         ->syncEntryFromSession($session->fresh(), $staff);
 
-    $entry = \App\Domain\Hr\Models\HrTimeEntry::query()
+    $entry = HrTimeEntry::query()
         ->where('attendance_session_id', $session->id)
         ->firstOrFail();
 
@@ -437,6 +486,7 @@ test('hr clock out rejects break_minutes above the shared 240 cap', function () 
     // D4 — break cap unified to 240 across the HR module too, matching the
     // frontline /attendance + /timesheets surfaces (this path was 480 before).
     $user = hrRoleUser('support_worker');
+    hrTimeProfile($user);
     grantHrTimePermission($user, 'timesheets.viewAny');
 
     $this->actingAs($user)

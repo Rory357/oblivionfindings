@@ -31,7 +31,7 @@ const Footer: React.FC = () => {
                 {/* Brand */}
                 <div className="lg:col-span-1">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-sm font-semibold shadow-lg shadow-primary/20">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20">
                             OF
                         </div>
                         <span className="text-sm font-semibold tracking-tight">
@@ -39,11 +39,15 @@ const Footer: React.FC = () => {
                         </span>
                     </div>
                     <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                        Modern operations platform for supported living providers. 
-                        Manage residents, staff, compliance and care delivery in one place.
+                        Modern operations platform for supported living
+                        providers. Manage residents, staff, compliance and care
+                        delivery in one place.
                     </p>
                     <div className="mt-6 space-y-3 text-sm text-muted-foreground">
-                        <a href="mailto:hello@oblivionfindings.co.nz" className="flex items-center gap-2 hover:text-primary transition-colors">
+                        <a
+                            href="mailto:hello@oblivionfindings.co.nz"
+                            className="flex items-center gap-2 transition-colors hover:text-primary"
+                        >
                             <Mail size={16} />
                             <span>hello@oblivionfindings.co.nz</span>
                         </a>
@@ -56,13 +60,15 @@ const Footer: React.FC = () => {
 
                 {/* Product */}
                 <div>
-                    <h3 className="text-sm font-semibold text-foreground">Product</h3>
+                    <h3 className="text-sm font-semibold text-foreground">
+                        Product
+                    </h3>
                     <ul className="mt-4 space-y-3">
                         {footerLinks.product.map((link) => (
                             <li key={link.label}>
                                 <Link
                                     href={link.href}
-                                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                                    className="text-sm text-muted-foreground transition-colors hover:text-primary"
                                 >
                                     {link.label}
                                 </Link>
@@ -73,13 +79,15 @@ const Footer: React.FC = () => {
 
                 {/* Company */}
                 <div>
-                    <h3 className="text-sm font-semibold text-foreground">Company</h3>
+                    <h3 className="text-sm font-semibold text-foreground">
+                        Company
+                    </h3>
                     <ul className="mt-4 space-y-3">
                         {footerLinks.company.map((link) => (
                             <li key={link.label}>
                                 <Link
                                     href={link.href}
-                                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                                    className="text-sm text-muted-foreground transition-colors hover:text-primary"
                                 >
                                     {link.label}
                                 </Link>
@@ -90,13 +98,15 @@ const Footer: React.FC = () => {
 
                 {/* Legal */}
                 <div>
-                    <h3 className="text-sm font-semibold text-foreground">Legal</h3>
+                    <h3 className="text-sm font-semibold text-foreground">
+                        Legal
+                    </h3>
                     <ul className="mt-4 space-y-3">
                         {footerLinks.legal.map((link) => (
                             <li key={link.label}>
                                 <Link
                                     href={link.href}
-                                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                                    className="text-sm text-muted-foreground transition-colors hover:text-primary"
                                 >
                                     {link.label}
                                 </Link>
@@ -112,7 +122,9 @@ const Footer: React.FC = () => {
                     © {year} Oblivion Findings. All rights reserved.
                 </p>
                 <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                    Made with <Heart size={12} className="text-status-critical" /> in New Zealand
+                    Made with{' '}
+                    <Heart size={12} className="text-status-critical" /> in New
+                    Zealand
                 </p>
             </div>
         </footer>

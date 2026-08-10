@@ -36,11 +36,11 @@ class PublishDueAnnouncementsJob implements ShouldQueue
                 // Header-bell bridge (high/urgent default on; otherwise still
                 // bridge — managers opt notices into the bell via the wizard,
                 // which sets requires_acknowledgement/priority on the row).
-                $bridge->publish($announcement->fresh('targets'), $announcement->tenant_id);
+                $bridge->publish($announcement->fresh('targets'));
 
                 // Notify the resolved audience (the creator is excluded).
                 $notification = new AnnouncementPublishedNotification($announcement->fresh());
-                $resolver->resolveForAnnouncement($announcement, $announcement->tenant_id, $announcement->created_by)
+                $resolver->resolveForAnnouncement($announcement, $announcement->created_by)
                     ->each(fn ($recipient) => $recipient->notify($notification));
 
                 $this->cloneNextOccurrence($announcement);

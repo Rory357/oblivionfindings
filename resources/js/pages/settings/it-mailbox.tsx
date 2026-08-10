@@ -1,6 +1,12 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
@@ -40,7 +46,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 function fmtDate(iso: string | null): string {
     if (!iso) return 'never';
     try {
-        return new Date(iso).toLocaleString('en-NZ', { dateStyle: 'medium', timeStyle: 'short' });
+        return new Date(iso).toLocaleString('en-NZ', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+        });
     } catch {
         return iso;
     }
@@ -48,7 +57,10 @@ function fmtDate(iso: string | null): string {
 
 export default function ItMailboxSettings() {
     const { connections } = usePage<PageProps>().props;
-    const page = usePage<{ flash?: { success?: string; error?: string }; errors?: Record<string, string> }>().props;
+    const page = usePage<{
+        flash?: { success?: string; error?: string };
+        errors?: Record<string, string>;
+    }>().props;
     const flash = page.flash;
     const errorList = Object.values(page.errors ?? {});
     const anyConnected = (['microsoft', 'google'] as ProviderKey[]).some(
@@ -65,10 +77,12 @@ export default function ItMailboxSettings() {
                             <Inbox className="h-6 w-6 text-primary" />
                             Support Mailbox
                         </h1>
-                        <p className="text-muted-foreground max-w-3xl text-sm">
-                            Connect the mailbox staff email for IT help. Unread messages are polled hourly and
-                            become helpdesk tickets (or thread onto an existing ticket when the subject carries
-                            its IT-… reference). Only mail from staff accounts is ticketed.
+                        <p className="max-w-3xl text-sm text-muted-foreground">
+                            Connect the mailbox staff email for IT help. Unread
+                            messages are polled hourly and become helpdesk
+                            tickets (or thread onto an existing ticket when the
+                            subject carries its IT-… reference). Only mail from
+                            staff accounts is ticketed.
                         </p>
                     </header>
 
@@ -92,7 +106,7 @@ export default function ItMailboxSettings() {
 
                     <section className="space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                            <h2 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">
                                 Providers
                             </h2>
                             {anyConnected && (
@@ -100,16 +114,29 @@ export default function ItMailboxSettings() {
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => router.post('/settings/it-mailbox/poll-now', {}, { preserveScroll: true })}
+                                    onClick={() =>
+                                        router.post(
+                                            '/settings/it-mailbox/poll-now',
+                                            {},
+                                            { preserveScroll: true },
+                                        )
+                                    }
                                 >
-                                    <RefreshCw className="mr-1.5 h-4 w-4" /> Poll now
+                                    <RefreshCw className="mr-1.5 h-4 w-4" />{' '}
+                                    Poll now
                                 </Button>
                             )}
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            {(['microsoft', 'google'] as ProviderKey[]).map((key) => (
-                                <MailboxProviderCard key={key} providerKey={key} connection={connections[key]} />
-                            ))}
+                            {(['microsoft', 'google'] as ProviderKey[]).map(
+                                (key) => (
+                                    <MailboxProviderCard
+                                        key={key}
+                                        providerKey={key}
+                                        connection={connections[key]}
+                                    />
+                                ),
+                            )}
                         </div>
                     </section>
                 </div>
@@ -118,15 +145,26 @@ export default function ItMailboxSettings() {
     );
 }
 
-function MailboxProviderCard({ providerKey, connection }: { providerKey: ProviderKey; connection: Connection }) {
+function MailboxProviderCard({
+    providerKey,
+    connection,
+}: {
+    providerKey: ProviderKey;
+    connection: Connection;
+}) {
     const connected = connection.status === 'connected';
     const errored = connection.status === 'error';
-    const [mailboxDraft, setMailboxDraft] = useState(connection.mailbox_email ?? '');
+    const [mailboxDraft, setMailboxDraft] = useState(
+        connection.mailbox_email ?? '',
+    );
 
     const saveMailbox = () =>
         router.put(
             `/settings/it-mailbox/mailbox/${providerKey}`,
-            { mailbox_email: mailboxDraft.trim() === '' ? null : mailboxDraft.trim() },
+            {
+                mailbox_email:
+                    mailboxDraft.trim() === '' ? null : mailboxDraft.trim(),
+            },
             { preserveScroll: true },
         );
 
@@ -134,7 +172,9 @@ function MailboxProviderCard({ providerKey, connection }: { providerKey: Provide
         <Card>
             <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{PROVIDER_LABELS[providerKey]}</CardTitle>
+                    <CardTitle className="text-base">
+                        {PROVIDER_LABELS[providerKey]}
+                    </CardTitle>
                     {connected ? (
                         <Badge className="bg-status-success/15 text-status-success hover:bg-status-success/15">
                             Connected
@@ -152,8 +192,8 @@ function MailboxProviderCard({ providerKey, connection }: { providerKey: Provide
                         ? `${connection.account_name ?? connection.account_email ?? 'Connected account'} · reads ${connection.effective_mailbox ?? 'its own inbox'} · last poll ${fmtDate(connection.last_polled_at)}`
                         : connection.configured
                           ? providerKey === 'microsoft'
-                            ? 'Authorise an account with delegated access to the support mailbox.'
-                            : 'Authorise the support account itself — Gmail reads its own inbox.'
+                              ? 'Authorise an account with delegated access to the support mailbox.'
+                              : 'Authorise the support account itself — Gmail reads its own inbox.'
                           : 'OAuth client credentials are not configured for this provider yet.'}
                 </CardDescription>
             </CardHeader>
@@ -166,24 +206,38 @@ function MailboxProviderCard({ providerKey, connection }: { providerKey: Provide
 
                 {connected && providerKey === 'microsoft' ? (
                     <div className="space-y-1.5">
-                        <Label htmlFor="it-mailbox-delegated" className="text-xs">
+                        <Label
+                            htmlFor="it-mailbox-delegated"
+                            className="text-xs"
+                        >
                             Support mailbox (optional)
                         </Label>
                         <div className="flex items-center gap-2">
                             <Input
                                 id="it-mailbox-delegated"
                                 type="email"
-                                placeholder={connection.account_email ?? 'support@yourorg.co.nz'}
+                                placeholder={
+                                    connection.account_email ??
+                                    'support@yourorg.co.nz'
+                                }
                                 value={mailboxDraft}
-                                onChange={(e) => setMailboxDraft(e.target.value)}
+                                onChange={(e) =>
+                                    setMailboxDraft(e.target.value)
+                                }
                             />
-                            <Button type="button" variant="outline" size="sm" onClick={saveMailbox}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={saveMailbox}
+                            >
                                 Save
                             </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Leave blank to read the connected account’s own inbox. A shared support@ mailbox
-                            needs delegated access for the connected account.
+                            Leave blank to read the connected account’s own
+                            inbox. A shared support@ mailbox needs delegated
+                            access for the connected account.
                         </p>
                     </div>
                 ) : null}
@@ -193,7 +247,12 @@ function MailboxProviderCard({ providerKey, connection }: { providerKey: Provide
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => router.delete(`/settings/it-mailbox/connect/${providerKey}`, { preserveScroll: true })}
+                        onClick={() =>
+                            router.delete(
+                                `/settings/it-mailbox/connect/${providerKey}`,
+                                { preserveScroll: true },
+                            )
+                        }
                     >
                         Disconnect
                     </Button>
@@ -204,7 +263,12 @@ function MailboxProviderCard({ providerKey, connection }: { providerKey: Provide
                         </a>
                     </Button>
                 ) : (
-                    <Button type="button" size="sm" disabled title="Set OAuth client credentials in the environment first">
+                    <Button
+                        type="button"
+                        size="sm"
+                        disabled
+                        title="Set OAuth client credentials in the environment first"
+                    >
                         Not configured
                     </Button>
                 )}

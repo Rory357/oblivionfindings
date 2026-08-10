@@ -25,9 +25,11 @@ class AlternativeHolidayService
 
         $profile = HrEmployeeProfile::query()
             ->where('user_id', $timesheet->user_id)
-            ->first(['id', 'tenant_id', 'employment_type', 'hours_per_week']);
+            ->first(['id', 'employment_type', 'hours_per_week']);
 
-        if (! $profile || in_array((string) $profile->employment_type, ['casual', 'contractor'], true)) {
+        if (! $profile
+            || ! app(HrCurrentStaffService::class)->isCurrent((int) $timesheet->user_id)
+            || in_array((string) $profile->employment_type, ['casual', 'contractor'], true)) {
             return;
         }
 
@@ -53,7 +55,6 @@ class AlternativeHolidayService
 
         $balance = HrLeaveBalance::query()->firstOrCreate(
             [
-                'tenant_id' => $profile->tenant_id,
                 'user_id' => $timesheet->user_id,
                 'leave_type' => 'alternative',
                 'year' => $year,
@@ -75,7 +76,6 @@ class AlternativeHolidayService
         $balance->save();
 
         HrLeaveBalanceLedger::create([
-            'tenant_id' => $profile->tenant_id,
             'user_id' => $timesheet->user_id,
             'leave_type' => 'alternative',
             'year' => $year,

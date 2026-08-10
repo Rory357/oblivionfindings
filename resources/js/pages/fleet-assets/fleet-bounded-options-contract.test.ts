@@ -24,16 +24,27 @@ describe('Fleet bounded option selectors', () => {
     });
 
     it.each([
-        ['maintenance/work-orders/create-wizard.tsx', 'visibleAssetOptions', 'visibleUserOptions'],
-        ['../../components/fleet/fleet-incident-report-dialog.tsx', 'visibleAssetOptions', 'visibleDriverOptions'],
+        [
+            'maintenance/work-orders/create-wizard.tsx',
+            'visibleAssetOptions',
+            'visibleUserOptions',
+        ],
+        [
+            '../../components/fleet/fleet-incident-report-dialog.tsx',
+            'visibleAssetOptions',
+            'visibleDriverOptions',
+        ],
         ['devices/index.tsx', 'visibleDeviceOptions', 'visibleAssetOptions'],
-    ])('%s retains selected values outside the latest result page', (relativePath, firstOptions, secondOptions) => {
-        const source = readFileSync(
-            `resources/js/pages/fleet-assets/${relativePath}`,
-            'utf8',
-        );
+    ])(
+        '%s retains selected values outside the latest result page',
+        (relativePath, firstOptions, secondOptions) => {
+            const source = readFileSync(
+                `resources/js/pages/fleet-assets/${relativePath}`,
+                'utf8',
+            );
 
-        expect(source).toContain(firstOptions);
-        expect(source).toContain(secondOptions);
-    });
+            expect(source).toContain(firstOptions);
+            expect(source).toContain(secondOptions);
+        },
+    );
 });

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CalendarSyncEventLink extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $fillable = [
         'tenant_id',
         'site_id',

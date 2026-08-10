@@ -41,12 +41,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import {
-    minutesBetween,
-    timeOnDate,
-    toHHMM,
-    type OpenSession,
-} from './shared';
+import { minutesBetween, timeOnDate, toHHMM, type OpenSession } from './shared';
 
 const STEPS: readonly WizardStep[] = [
     {
@@ -184,7 +179,8 @@ export function ClockOutWizard({
         (acc, b) =>
             acc +
             (b.ended_at
-                ? (b.minutes ?? minutesBetween(b.started_at ?? b.ended_at, b.ended_at))
+                ? (b.minutes ??
+                  minutesBetween(b.started_at ?? b.ended_at, b.ended_at))
                 : b.started_at
                   ? minutesBetween(b.started_at, now)
                   : 0),
@@ -447,8 +443,8 @@ export function ClockOutWizard({
                                             No handover needed
                                         </div>
                                         <div className="text-xs text-muted-foreground">
-                                            e.g. end of day, no incoming shift at
-                                            this site
+                                            e.g. end of day, no incoming shift
+                                            at this site
                                         </div>
                                     </div>
                                     <Switch
@@ -509,7 +505,9 @@ export function ClockOutWizard({
                                             </div>
                                             <Switch
                                                 checked={medsCompleted}
-                                                onCheckedChange={setMedsCompleted}
+                                                onCheckedChange={
+                                                    setMedsCompleted
+                                                }
                                                 aria-label="All medications given and signed"
                                             />
                                         </div>
@@ -522,10 +520,12 @@ export function ClockOutWizard({
                                         </Field>
                                         <InfoCard icon={ArrowLeftRight}>
                                             This files the same record as the{' '}
-                                            <strong>Shift Handover wizard</strong>{' '}
+                                            <strong>
+                                                Shift Handover wizard
+                                            </strong>{' '}
                                             — the incoming staff member
-                                            acknowledges it from their attendance
-                                            page.
+                                            acknowledges it from their
+                                            attendance page.
                                         </InfoCard>
                                     </>
                                 ) : null}

@@ -56,7 +56,9 @@ export default function CreateClient({
                     className="max-w-xl space-y-4 rounded-xl border p-4"
                 >
                     <div>
-                        <label className="text-sm font-medium">{siteSingular}</label>
+                        <label className="text-sm font-medium">
+                            {siteSingular}
+                        </label>
                         <select
                             className="mt-1 w-full rounded-md border bg-transparent p-2"
                             value={data.site_id ?? ''}
@@ -84,7 +86,9 @@ export default function CreateClient({
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium">Service context</label>
+                        <label className="text-sm font-medium">
+                            Service context
+                        </label>
                         <select
                             className="mt-1 w-full rounded-md border bg-transparent p-2"
                             value={data.service_context_id ?? ''}
@@ -110,7 +114,8 @@ export default function CreateClient({
                             </div>
                         )}
                         <div className="mt-1 text-xs text-muted-foreground">
-                            Residential / home support / respite classification (used for audit and reporting).
+                            Residential / home support / respite classification
+                            (used for audit and reporting).
                         </div>
                     </div>
 
@@ -149,40 +154,58 @@ export default function CreateClient({
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium">Preferred name</label>
+                        <label className="text-sm font-medium">
+                            Preferred name
+                        </label>
                         <input
                             className="mt-1 w-full rounded-md border bg-transparent p-2"
                             value={data.preferred_name}
-                            onChange={(e) => setData('preferred_name', e.target.value)}
+                            onChange={(e) =>
+                                setData('preferred_name', e.target.value)
+                            }
                         />
                         {errors.preferred_name && (
-                            <div className="mt-1 text-xs text-status-critical">{errors.preferred_name}</div>
+                            <div className="mt-1 text-xs text-status-critical">
+                                {errors.preferred_name}
+                            </div>
                         )}
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="text-sm font-medium">Date of birth</label>
+                            <label className="text-sm font-medium">
+                                Date of birth
+                            </label>
                             <input
                                 type="date"
                                 className="mt-1 w-full rounded-md border bg-transparent p-2"
                                 value={data.date_of_birth}
-                                onChange={(e) => setData('date_of_birth', e.target.value)}
+                                onChange={(e) =>
+                                    setData('date_of_birth', e.target.value)
+                                }
                             />
                             {errors.date_of_birth && (
-                                <div className="mt-1 text-xs text-status-critical">{errors.date_of_birth}</div>
+                                <div className="mt-1 text-xs text-status-critical">
+                                    {errors.date_of_birth}
+                                </div>
                             )}
                         </div>
 
                         <div>
-                            <label className="text-sm font-medium">Gender</label>
+                            <label className="text-sm font-medium">
+                                Gender
+                            </label>
                             <input
                                 className="mt-1 w-full rounded-md border bg-transparent p-2"
                                 value={data.gender}
-                                onChange={(e) => setData('gender', e.target.value)}
+                                onChange={(e) =>
+                                    setData('gender', e.target.value)
+                                }
                             />
                             {errors.gender && (
-                                <div className="mt-1 text-xs text-status-critical">{errors.gender}</div>
+                                <div className="mt-1 text-xs text-status-critical">
+                                    {errors.gender}
+                                </div>
                             )}
                         </div>
                     </div>
@@ -208,42 +231,63 @@ export default function CreateClient({
                         <div className="text-sm font-medium">Contact</div>
                         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div>
-                                <label className="text-sm font-medium">Phone</label>
+                                <label className="text-sm font-medium">
+                                    Phone
+                                </label>
                                 <input
                                     className="mt-1 w-full rounded-md border bg-transparent p-2"
                                     value={data.phone}
-                                    onChange={(e) => setData('phone', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('phone', e.target.value)
+                                    }
                                 />
                                 {errors.phone && (
-                                    <div className="mt-1 text-xs text-status-critical">{errors.phone}</div>
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.phone}
+                                    </div>
                                 )}
                             </div>
                             <div>
-                                <label className="text-sm font-medium">Email</label>
+                                <label className="text-sm font-medium">
+                                    Email
+                                </label>
                                 <input
                                     className="mt-1 w-full rounded-md border bg-transparent p-2"
                                     value={data.email}
-                                    onChange={(e) => setData('email', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('email', e.target.value)
+                                    }
                                 />
                                 {errors.email && (
-                                    <div className="mt-1 text-xs text-status-critical">{errors.email}</div>
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.email}
+                                    </div>
                                 )}
                             </div>
                         </div>
                     </div>
 
                     <div className="rounded-lg border p-3">
-                        <div className="text-sm font-medium">Portal Access (Client)</div>
+                        <div className="text-sm font-medium">
+                            Portal Access (Client)
+                        </div>
                         <label className="mt-3 flex items-center gap-2 text-sm">
                             <input
                                 type="checkbox"
                                 checked={data.create_client_portal_user}
-                                onChange={(e) => setData('create_client_portal_user', e.target.checked)}
+                                onChange={(e) =>
+                                    setData(
+                                        'create_client_portal_user',
+                                        e.target.checked,
+                                    )
+                                }
                             />
-                            Create login account for this {clientSingular.toLowerCase()}
+                            Create login account for this{' '}
+                            {clientSingular.toLowerCase()}
                         </label>
                         <div className="mt-2 text-xs text-muted-foreground">
-                            Uses the Contact email above. Contact email is required when this is checked.
+                            Uses the Contact email above. Contact email is
+                            required when this is checked.
                         </div>
                     </div>
 
@@ -251,59 +295,95 @@ export default function CreateClient({
                         <div className="text-sm font-medium">Address</div>
                         <div className="mt-3 space-y-3">
                             <div>
-                                <label className="text-sm font-medium">Address line 1</label>
+                                <label className="text-sm font-medium">
+                                    Address line 1
+                                </label>
                                 <input
                                     className="mt-1 w-full rounded-md border bg-transparent p-2"
                                     value={data.address_line_1}
-                                    onChange={(e) => setData('address_line_1', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'address_line_1',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                                 {errors.address_line_1 && (
-                                    <div className="mt-1 text-xs text-status-critical">{errors.address_line_1}</div>
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.address_line_1}
+                                    </div>
                                 )}
                             </div>
                             <div>
-                                <label className="text-sm font-medium">Address line 2</label>
+                                <label className="text-sm font-medium">
+                                    Address line 2
+                                </label>
                                 <input
                                     className="mt-1 w-full rounded-md border bg-transparent p-2"
                                     value={data.address_line_2}
-                                    onChange={(e) => setData('address_line_2', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'address_line_2',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                                 {errors.address_line_2 && (
-                                    <div className="mt-1 text-xs text-status-critical">{errors.address_line_2}</div>
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.address_line_2}
+                                    </div>
                                 )}
                             </div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <div>
-                                    <label className="text-sm font-medium">Suburb</label>
+                                    <label className="text-sm font-medium">
+                                        Suburb
+                                    </label>
                                     <input
                                         className="mt-1 w-full rounded-md border bg-transparent p-2"
                                         value={data.suburb}
-                                        onChange={(e) => setData('suburb', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('suburb', e.target.value)
+                                        }
                                     />
                                     {errors.suburb && (
-                                        <div className="mt-1 text-xs text-status-critical">{errors.suburb}</div>
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.suburb}
+                                        </div>
                                     )}
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium">City</label>
+                                    <label className="text-sm font-medium">
+                                        City
+                                    </label>
                                     <input
                                         className="mt-1 w-full rounded-md border bg-transparent p-2"
                                         value={data.city}
-                                        onChange={(e) => setData('city', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('city', e.target.value)
+                                        }
                                     />
                                     {errors.city && (
-                                        <div className="mt-1 text-xs text-status-critical">{errors.city}</div>
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.city}
+                                        </div>
                                     )}
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium">Postcode</label>
+                                    <label className="text-sm font-medium">
+                                        Postcode
+                                    </label>
                                     <input
                                         className="mt-1 w-full rounded-md border bg-transparent p-2"
                                         value={data.postcode}
-                                        onChange={(e) => setData('postcode', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('postcode', e.target.value)
+                                        }
                                     />
                                     {errors.postcode && (
-                                        <div className="mt-1 text-xs text-status-critical">{errors.postcode}</div>
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.postcode}
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -314,26 +394,38 @@ export default function CreateClient({
                         <div className="text-sm font-medium">Funding</div>
                         <div className="mt-3 space-y-3">
                             <div>
-                                <label className="text-sm font-medium">Funding type</label>
+                                <label className="text-sm font-medium">
+                                    Funding type
+                                </label>
                                 <input
                                     className="mt-1 w-full rounded-md border bg-transparent p-2"
                                     value={data.funding_type}
-                                    onChange={(e) => setData('funding_type', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('funding_type', e.target.value)
+                                    }
                                 />
                                 {errors.funding_type && (
-                                    <div className="mt-1 text-xs text-status-critical">{errors.funding_type}</div>
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.funding_type}
+                                    </div>
                                 )}
                             </div>
                             <div>
-                                <label className="text-sm font-medium">Funding notes</label>
+                                <label className="text-sm font-medium">
+                                    Funding notes
+                                </label>
                                 <textarea
                                     className="mt-1 w-full rounded-md border bg-transparent p-2"
                                     rows={4}
                                     value={data.funding_notes}
-                                    onChange={(e) => setData('funding_notes', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('funding_notes', e.target.value)
+                                    }
                                 />
                                 {errors.funding_notes && (
-                                    <div className="mt-1 text-xs text-status-critical">{errors.funding_notes}</div>
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.funding_notes}
+                                    </div>
                                 )}
                             </div>
                         </div>

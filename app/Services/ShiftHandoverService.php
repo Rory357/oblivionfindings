@@ -32,8 +32,8 @@ class ShiftHandoverService
 
     public function __construct(
         protected ShiftTimelineService $timelineService,
-    ) {
-    }
+        protected UserSiteAccessService $siteAccess,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -74,6 +74,7 @@ class ShiftHandoverService
             if ($existing && $existing->status === self::STATUS_DRAFT) {
                 $existing = ShiftHandover::query()
                     ->with('outgoingStaff:id,name')
+                    ->tap(fn (Builder $query) => $this->siteAccess->applyHandoverIntegrityScope($query))
                     ->lockForUpdate()
                     ->findOrFail($existing->id);
 
@@ -90,7 +91,7 @@ class ShiftHandoverService
 
             $handover = $existing && $existing->status === self::STATUS_DRAFT
                 ? $existing
-                : new ShiftHandover();
+                : new ShiftHandover;
 
             $clientId = $data['client_id'] ?? $outgoingShift->client_id;
 
@@ -102,7 +103,6 @@ class ShiftHandoverService
                 : false;
 
             $handover->fill([
-                'organization_id' => $actor->organization_id,
                 'outgoing_shift_id' => $outgoingShift->id,
                 'incoming_shift_id' => $incomingShift?->id,
                 'client_id' => $clientId,
@@ -184,6 +184,7 @@ class ShiftHandoverService
 
         return DB::transaction(function () use ($handover, $actor) {
             $handover = ShiftHandover::query()
+                ->tap(fn (Builder $query) => $this->siteAccess->applyHandoverIntegrityScope($query))
                 ->lockForUpdate()
                 ->findOrFail($handover->id);
 
@@ -259,6 +260,7 @@ class ShiftHandoverService
 
         return DB::transaction(function () use ($handover, $actor) {
             $handover = ShiftHandover::query()
+                ->tap(fn (Builder $query) => $this->siteAccess->applyHandoverIntegrityScope($query))
                 ->lockForUpdate()
                 ->findOrFail($handover->id);
 
@@ -309,7 +311,10 @@ class ShiftHandoverService
     public function acquireEditLock(ShiftHandover $handover, User $actor): ?string
     {
         return DB::transaction(function () use ($handover, $actor) {
-            $handover = ShiftHandover::query()->lockForUpdate()->findOrFail($handover->id);
+            $handover = ShiftHandover::query()
+                ->tap(fn (Builder $query) => $this->siteAccess->applyHandoverIntegrityScope($query))
+                ->lockForUpdate()
+                ->findOrFail($handover->id);
             $holder = $this->activeLockHolder($handover, $actor->id);
 
             if ($holder !== null) {
@@ -325,6 +330,8 @@ class ShiftHandoverService
     /** Release the presence edit-lock if this actor holds it (or is a manager). */
     public function releaseEditLock(ShiftHandover $handover, User $actor): void
     {
+        $this->siteAccess->handoverSiteIds($handover);
+
         if ((int) $handover->locked_by === (int) $actor->id || $this->canViewAny($actor)) {
             $handover->forceFill(['locked_by' => null, 'locked_at' => null])->save();
         }
@@ -369,6 +376,7 @@ class ShiftHandoverService
         $matchedHandover = null;
         if ($matchedShift) {
             $matchedHandover = ShiftHandover::query()
+                ->tap(fn (Builder $query) => $this->siteAccess->applyHandoverIntegrityScope($query))
                 ->where('outgoing_shift_id', $shift->id)
                 ->whereIn('status', [self::STATUS_SUBMITTED, self::STATUS_ACKNOWLEDGED])
                 ->where(function (Builder $query) use ($matchedShift) {
@@ -622,7 +630,10 @@ class ShiftHandoverService
     public function applyEdit(ShiftHandover $handover, User $actor, array $data): ShiftHandover
     {
         return DB::transaction(function () use ($handover, $actor, $data) {
-            $handover = ShiftHandover::query()->lockForUpdate()->findOrFail($handover->id);
+            $handover = ShiftHandover::query()
+                ->tap(fn (Builder $query) => $this->siteAccess->applyHandoverIntegrityScope($query))
+                ->lockForUpdate()
+                ->findOrFail($handover->id);
             $handover->loadMissing(['outgoingShift:id,user_id,client_id,site_id,service_context_id,starts_at,ends_at,status']);
 
             $attributes = [
@@ -749,6 +760,7 @@ class ShiftHandoverService
     protected function activeHandoverForShift(Shift $shift): ?ShiftHandover
     {
         return ShiftHandover::query()
+            ->tap(fn (Builder $query) => $this->siteAccess->applyHandoverIntegrityScope($query))
             ->where('outgoing_shift_id', $shift->id)
             ->whereIn('status', [self::STATUS_DRAFT, self::STATUS_SUBMITTED, self::STATUS_ACKNOWLEDGED])
             ->latest('id')
@@ -863,7 +875,7 @@ class ShiftHandoverService
             ])),
             'weight' => isset($d['weight_kg']) ? "{$d['weight_kg']} kg" : '',
             'bowel' => isset($d['bristol_type']) ? "Bristol type {$d['bristol_type']}" : '',
-            'sleep' => isset($d['quality']) ? ucfirst($d['quality']) . ' sleep' : '',
+            'sleep' => isset($d['quality']) ? ucfirst($d['quality']).' sleep' : '',
             'fluid_intake' => isset($d['amount_ml']) ? "{$d['amount_ml']}ml" : '',
             'pain' => isset($d['score']) ? "Pain {$d['score']}/10" : '',
             default => $obs->notes ?? '',

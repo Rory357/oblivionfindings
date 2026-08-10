@@ -20,7 +20,7 @@ two names from the exclusion lists in those files and drop the
 
 ## 2. Business-hours SLA calendar (built — 24/7 remains the fallback)
 
-The stretch loop added per-tenant `business_hours` and `holiday_dates` to
+The stretch loop added installation-wide `business_hours` and `holiday_dates` to
 `it_sla_policies`, wired working-time arithmetic into SLA stamping and at-risk
 detection, and added the calendar controls to the SLA editor. A null or empty
 calendar deliberately preserves the original continuous 24/7 behaviour.
@@ -102,8 +102,8 @@ build I need to know what we'd integrate with — e.g. a procurement / asset-ven
 portal, an MSP/RMM (NinjaOne, Atera, etc.), or nothing external at all.
 
 **Recommendation (default if you want it generic):** a signed **outbound webhook** on
-provisioning/ticket status change (POST the reference + status + minimal payload to a
-per-tenant configured URL, HMAC-signed) plus an inbound **status callback** to close
+provisioning/ticket status change (POST the reference + status + minimal payload to an
+installation-wide configured URL, HMAC-signed) plus an inbound **status callback** to close
 the loop — no vendor lock-in. If that's acceptable I'll seed a §P-S5 and build it;
 otherwise it stays ⛔ blocked pending the target system. **No silent schema** either way.
 

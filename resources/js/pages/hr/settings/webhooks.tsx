@@ -1,14 +1,14 @@
+import { SettingsTabs } from '@/components/hr';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
-import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Webhook } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -36,6 +36,8 @@ interface Endpoint {
 interface Delivery {
     id: number;
     endpoint_id: number;
+    retry_of_id: number | null;
+    has_retry: boolean;
     endpoint_name: string | null;
     event_type: string;
     status: 'pending' | 'retrying' | 'success' | 'failed';
@@ -63,8 +65,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusClass: Record<string, string> = {
     pending: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
-    retrying: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
-    success: 'border-status-success/30 text-status-success bg-status-success-bg',
+    retrying:
+        'border-status-warning/30 text-status-warning bg-status-warning-bg',
+    success:
+        'border-status-success/30 text-status-success bg-status-success-bg',
     failed: 'border-status-critical/30 text-status-critical bg-status-critical-bg',
 };
 
@@ -166,7 +170,8 @@ export default function HrWebhookIndex({
             <Head title="HR Webhooks" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={Webhook}
                         title="HR Webhooks"
                         description="Manage webhook endpoints for HR event notifications."
@@ -538,9 +543,17 @@ export default function HrWebhookIndex({
                                             {delivery.endpoint_name || '-'}
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground">
-                                            {eventTypeLabelByValue.get(
-                                                delivery.event_type,
-                                            ) || delivery.event_type}
+                                            <span className="block">
+                                                {eventTypeLabelByValue.get(
+                                                    delivery.event_type,
+                                                ) || delivery.event_type}
+                                            </span>
+                                            {delivery.retry_of_id !== null && (
+                                                <span className="block text-xs">
+                                                    Retry of delivery #
+                                                    {delivery.retry_of_id}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3">
                                             <Badge
@@ -566,8 +579,8 @@ export default function HrWebhookIndex({
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             {can.manage &&
-                                                delivery.status ===
-                                                    'failed' && (
+                                                delivery.status === 'failed' &&
+                                                !delivery.has_retry && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
@@ -579,6 +592,12 @@ export default function HrWebhookIndex({
                                                     >
                                                         Retry
                                                     </Button>
+                                                )}
+                                            {delivery.status === 'failed' &&
+                                                delivery.has_retry && (
+                                                    <span className="text-xs font-medium text-muted-foreground">
+                                                        Retry queued
+                                                    </span>
                                                 )}
                                         </td>
                                     </tr>

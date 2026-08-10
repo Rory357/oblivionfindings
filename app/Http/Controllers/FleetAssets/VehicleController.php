@@ -2,35 +2,47 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\SecurityDevices\Presenters\FleetVehicleTechnologyProjectionPresenter;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetDriverSession;
 use App\Models\FleetFuelLog;
+use App\Models\FleetIncident;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetSignal;
 use App\Models\FleetTrip;
-use App\Models\FleetIncident;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Assets\AssetMutationIntegrityService;
 use App\Services\AuditLogger;
+use App\Services\Fleet\FleetTimelineService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class VehicleController extends Controller
 {
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly FleetVehicleTechnologyProjectionPresenter $vehicleTechnology,
+        private readonly AssetMutationIntegrityService $mutationIntegrity,
+    ) {}
 
-    private function canManageFleet(?\App\Models\User $user): bool
+    private function canManageFleet(?User $user): bool
     {
         return (bool) $user?->canDo('fleet.manage');
     }
 
-    private function canManageMaintenance(?\App\Models\User $user): bool
+    private function canManageMaintenance(?User $user): bool
     {
         return $this->canManageFleet($user) || (bool) $user?->canDo('fleet.maintenance.manage');
     }
@@ -50,10 +62,7 @@ class VehicleController extends Controller
         $user = $request->user();
         $hasFleetFields = $this->hasFleetFields();
 
-        $eagerLoads = [
-            'fleetState',
-            'trackers' => fn ($q) => $q->where('status', 'paired'),
-        ];
+        $eagerLoads = ['fleetState'];
         if ($hasFleetFields) {
             $eagerLoads[] = 'homeSite';
         }
@@ -64,6 +73,7 @@ class VehicleController extends Controller
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = (clone $query)->orderBy('name');
+
             return response()->streamDownload(function () use ($exportQuery, $hasFleetFields) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Name', 'Asset Tag', 'Status', 'Home Site', 'Online Status', 'Last Seen']);
@@ -109,8 +119,12 @@ class VehicleController extends Controller
         $allowedSorts = ['name', 'status', 'asset_tag'];
         $sort = $request->input('sort', 'name');
         $direction = $request->input('direction', 'asc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'name';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'asc';
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'name';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'asc';
+        }
         $query->orderBy($sort, $direction);
 
         $vehicles = $query->paginate(25)->withQueryString();
@@ -214,7 +228,6 @@ class VehicleController extends Controller
                         'speed_kph' => $v->fleetState->speed_kph,
                         'battery_pct' => $v->fleetState->battery_pct,
                     ] : null,
-                    'tracker_count' => $v->trackers->count(),
                 ])->values(),
                 'links' => $vehicles->linkCollection()->toArray(),
                 'meta' => [
@@ -234,11 +247,12 @@ class VehicleController extends Controller
     public function show(Request $request, Asset $asset)
     {
         $user = $request->user();
+        abort_unless($user, 403);
+        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);
         $hasFleetFields = $this->hasFleetFields();
 
         $eagerLoads = [
             'fleetState',
-            'trackers',
             'geofences',
             'workOrders' => fn ($q) => $q->latest()->limit(10),
             'bookings' => fn ($q) => $q->latest()->limit(10),
@@ -348,13 +362,6 @@ class VehicleController extends Controller
                     'name' => $asset->primaryDriver->name,
                     'email' => $asset->primaryDriver->email,
                 ] : null,
-                'trackers' => $asset->trackers->map(fn ($t) => [
-                    'id' => $t->id,
-                    'vendor' => $t->vendor,
-                    'device_uid' => $t->device_uid,
-                    'status' => $t->status,
-                    'last_seen_at' => optional($t->last_seen_at)->toISOString(),
-                ])->values(),
                 'has_wheelchair_ramp' => (bool) $asset->has_wheelchair_ramp,
                 'has_hoist' => (bool) $asset->has_hoist,
                 'has_child_seat_anchors' => (bool) $asset->has_child_seat_anchors,
@@ -406,18 +413,21 @@ class VehicleController extends Controller
             'can' => [
                 'manage' => $this->canManageFleet($user),
                 'inspect' => $this->canManageMaintenance($user),
+                'view_vehicle_technology' => $this->vehicleTechnology->canView($user, $asset),
             ],
-            'timeline' => \Inertia\Inertia::optional(fn () =>
-                app(\App\Services\Fleet\FleetTimelineService::class)
-                    ->forVehicle($asset->id, now()->subDays(14), 40)
-                    ->toArray()
+            'vehicle_technology' => Inertia::optional(
+                fn () => $this->vehicleTechnology->present($user, $asset),
+            ),
+            'timeline' => Inertia::optional(fn () => app(FleetTimelineService::class)
+                ->forVehicle($asset->id, now()->subDays(14), 40)
+                ->toArray()
             ),
         ]);
     }
 
     private function buildServicePrediction(Asset $asset): ?array
     {
-        if (!Schema::hasTable('fleet_service_schedules') || !Schema::hasTable('fleet_trips')) {
+        if (! Schema::hasTable('fleet_service_schedules') || ! Schema::hasTable('fleet_trips')) {
             return null;
         }
 
@@ -426,7 +436,9 @@ class VehicleController extends Controller
             ->whereNotNull('next_due_km')
             ->first();
 
-        if (!$schedule) return null;
+        if (! $schedule) {
+            return null;
+        }
 
         $currentOdometer = (float) ($asset->odometer_km ?? 0);
         $nextDueKm = (float) $schedule->next_due_km;
@@ -462,6 +474,8 @@ class VehicleController extends Controller
 
     public function update(Request $request, Asset $asset)
     {
+        $user = $request->user() ?? abort(403);
+        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);
         $data = $request->validate([
             'home_site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'primary_driver_user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -480,7 +494,7 @@ class VehicleController extends Controller
             'seating_capacity' => ['nullable', 'integer', 'min:1', 'max:50'],
             'accessibility_notes' => ['nullable', 'string', 'max:5000'],
             'name' => ['sometimes', 'string', 'max:255'],
-            'status' => ['sometimes', 'string', 'max:50'],
+            'status' => ['sometimes', 'string', 'in:active,maintenance,out_of_service,retired'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
@@ -490,24 +504,57 @@ class VehicleController extends Controller
         } else {
             $safeData = collect($data)->except($fleetFields)->toArray();
         }
-        $safeData['updated_by_user_id'] = $request->user()->id;
+        $safeData['updated_by_user_id'] = $user->id;
 
-        $asset->update($safeData);
+        $asset = DB::transaction(function () use ($user, $asset, $safeData): Asset {
+            $locked = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey(), true) ?? abort(404);
+            if (! empty($safeData['home_site_id'])) {
+                $siteId = (int) $safeData['home_site_id'];
+                $this->accessibleSite($user, $siteId, true);
+                $this->assertClientPlacementMatchesSite($locked, $siteId);
+                $safeData['site_id'] = $siteId;
+            }
+            if (! empty($safeData['primary_driver_user_id'])) {
+                abort_unless(
+                    $this->deviceAccess->assignableStaffMember($user, (int) $safeData['primary_driver_user_id'], true) !== null,
+                    404,
+                );
+            }
+            $this->mutationIntegrity->assertOrdinaryStatusUpdate($locked, $safeData['status'] ?? null);
+            $this->mutationIntegrity->assertPlacementChangeAllowed($locked, $safeData);
+            $before = $locked->only(['site_id', 'home_site_id', 'primary_driver_user_id', 'status']);
+            $locked->update($safeData);
+            AuditLogger::logOrFail('fleet.vehicle.update', $locked, [
+                'asset_id' => $locked->id,
+                'before' => $before,
+                'after' => $locked->only(['site_id', 'home_site_id', 'primary_driver_user_id', 'status']),
+            ]);
 
-        AuditLogger::log('fleet.vehicle.update', $asset, [
-            'asset_id' => $asset->id,
-        ]);
+            return $locked->fresh();
+        }, 3);
 
         return back()->with('success', 'Vehicle updated successfully.');
     }
 
     public function markPersonal(Request $request, FleetTrip $trip)
     {
-        $trip->update([
-            'is_personal' => !$trip->is_personal,
-            'marked_personal_by' => $request->user()->id,
-            'marked_personal_at' => now(),
-        ]);
+        $user = $request->user() ?? abort(403);
+        $trip = DB::transaction(function () use ($user, $trip): FleetTrip {
+            $asset = $this->deviceAccess->assignableVehicle($user, (int) $trip->asset_id, true) ?? abort(404);
+            $locked = FleetTrip::query()->whereKey($trip->getKey())->lockForUpdate()->firstOrFail();
+            abort_unless((int) $locked->asset_id === (int) $asset->id, 409, 'Trip provenance changed. Reload and try again.');
+            $locked->update([
+                'is_personal' => ! $locked->is_personal,
+                'marked_personal_by' => $user->id,
+                'marked_personal_at' => now(),
+            ]);
+            AuditLogger::logOrFail('fleet.trip.personal_state_changed', $asset, [
+                'trip_id' => $locked->id,
+                'is_personal' => (bool) $locked->is_personal,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
 
         return back()->with('success', $trip->is_personal ? 'Trip marked as personal.' : 'Trip marked as business.');
     }
@@ -528,7 +575,7 @@ class VehicleController extends Controller
         }
 
         // Legacy support
-        if ($request->filled('asset_id') && !$request->filled('vehicle_id')) {
+        if ($request->filled('asset_id') && ! $request->filled('vehicle_id')) {
             $query->where('asset_id', (int) $request->input('asset_id'));
         }
 
@@ -556,6 +603,7 @@ class VehicleController extends Controller
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = clone $query;
+
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Vehicle', 'Driver', 'Start Time', 'End Time', 'Distance (km)', 'Duration (min)', 'Max Speed (km/h)', 'Start Address', 'End Address', 'Status']);
@@ -686,8 +734,12 @@ class VehicleController extends Controller
         $allowedSorts = ['started_at', 'distance_km', 'duration_s', 'status'];
         $sort = $request->input('sort', 'started_at');
         $direction = $request->input('direction', 'desc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'started_at';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'desc';
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'started_at';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'desc';
+        }
         $query->reorder()->orderBy($sort, $direction);
 
         $trips = $query->paginate(25)->withQueryString();
@@ -774,6 +826,7 @@ class VehicleController extends Controller
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = clone $query;
+
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Date', 'Vehicle', 'Odometer (km)', 'Litres', 'Cost ($)', 'Cost/Litre', 'Fuel Type', 'Station', 'Notes', 'Logged By']);
@@ -827,6 +880,7 @@ class VehicleController extends Controller
             ->map(function ($row) use ($distanceByAsset) {
                 $totalDistance = (float) ($distanceByAsset[$row->asset_id] ?? 0);
                 $kmPerLitre = $row->total_litres > 0 ? round($totalDistance / (float) $row->total_litres, 2) : 0;
+
                 return [
                     'vehicle' => $row->asset?->name ?? 'Unknown',
                     'asset_id' => $row->asset_id,
@@ -845,8 +899,12 @@ class VehicleController extends Controller
         $allowedFuelSorts = ['logged_at', 'quantity_litres', 'total_cost'];
         $fuelSort = $request->input('sort', 'logged_at');
         $fuelDirection = $request->input('direction', 'desc');
-        if (!in_array($fuelSort, $allowedFuelSorts)) $fuelSort = 'logged_at';
-        if (!in_array($fuelDirection, ['asc', 'desc'])) $fuelDirection = 'desc';
+        if (! in_array($fuelSort, $allowedFuelSorts)) {
+            $fuelSort = 'logged_at';
+        }
+        if (! in_array($fuelDirection, ['asc', 'desc'])) {
+            $fuelDirection = 'desc';
+        }
         $query->reorder()->orderBy($fuelSort, $fuelDirection);
 
         $fuelLogs = $query->paginate(25)->withQueryString();
@@ -909,6 +967,7 @@ class VehicleController extends Controller
 
     public function storeFuel(Request $request)
     {
+        $user = $request->user() ?? abort(403);
         $data = $request->validate([
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
             'logged_at' => ['required', 'date'],
@@ -921,12 +980,21 @@ class VehicleController extends Controller
             'full_tank' => ['nullable', 'boolean'],
         ]);
 
-        $data['user_id'] = $request->user()->id;
+        $asset = $this->deviceAccess->assignableVehicle($user, (int) $data['asset_id']) ?? abort(404);
+        $data['asset_id'] = $asset->id;
+        $data['user_id'] = $user->id;
         $data['cost_per_litre'] = $data['quantity_litres'] > 0
             ? round($data['total_cost'] / $data['quantity_litres'], 3)
             : 0;
 
-        FleetFuelLog::create($data);
+        DB::transaction(function () use ($user, $asset, $data): void {
+            $locked = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey(), true) ?? abort(404);
+            $fuelLog = FleetFuelLog::query()->create($data);
+            AuditLogger::logOrFail('fleet.vehicle.fuel_logged', $locked, [
+                'fuel_log_id' => $fuelLog->id,
+                'logged_at' => $fuelLog->logged_at?->toIso8601String(),
+            ]);
+        }, 3);
 
         return back()->with('success', 'Fuel log recorded successfully.');
     }
@@ -935,36 +1003,65 @@ class VehicleController extends Controller
     {
         $data = $request->validate([
             'action' => ['required', 'string', 'in:assign_site,mark_offline'],
-            'ids' => ['required', 'array'],
-            'ids.*' => ['integer'],
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'distinct'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
         ]);
 
-        $assets = Asset::whereIn('id', $data['ids'])->get();
-
-        switch ($data['action']) {
-            case 'assign_site':
-                if (!empty($data['site_id']) && $this->hasFleetFields()) {
-                    Asset::whereIn('id', $data['ids'])->update(['home_site_id' => $data['site_id']]);
-                } elseif (!empty($data['site_id'])) {
-                    Asset::whereIn('id', $data['ids'])->update(['site_id' => $data['site_id']]);
-                }
-                break;
-            case 'mark_offline':
-                FleetVehicleStateSnapshot::whereIn('asset_id', $data['ids'])->update(['status' => 'offline']);
-                break;
+        $user = $request->user() ?? abort(403);
+        $ids = collect($data['ids'])->map(fn ($id): int => (int) $id)->unique()->sort()->values();
+        if ($data['action'] === 'assign_site') {
+            abort_unless(! empty($data['site_id']), 422, 'Select a Site.');
         }
 
-        AuditLogger::log('fleet.vehicles.bulk_action', null, [
-            'action' => $data['action'],
-            'count' => count($data['ids']),
-        ]);
+        DB::transaction(function () use ($user, $ids, $data): void {
+            $assets = $ids->map(fn (int $id): Asset => $this->deviceAccess->assignableVehicle($user, $id, true) ?? abort(404));
 
-        return back()->with('success', 'Bulk action applied to ' . count($data['ids']) . ' vehicle(s).');
+            if ($data['action'] === 'assign_site') {
+                $siteId = (int) $data['site_id'];
+                $this->accessibleSite($user, $siteId, true);
+                foreach ($assets as $asset) {
+                    $this->assertClientPlacementMatchesSite($asset, $siteId);
+                    $placement = ['site_id' => $siteId];
+                    if ($this->hasFleetFields()) {
+                        $placement['home_site_id'] = $siteId;
+                    }
+                    $this->mutationIntegrity->assertPlacementChangeAllowed($asset, $placement);
+                    $before = $asset->only(['site_id', 'home_site_id']);
+                    $asset->update($placement + ['updated_by_user_id' => $user->id]);
+                    AuditLogger::logOrFail('fleet.vehicle.site_assigned', $asset, [
+                        'before' => $before,
+                        'after' => $asset->only(['site_id', 'home_site_id']),
+                    ]);
+                }
+            } else {
+                foreach ($assets as $asset) {
+                    $state = FleetVehicleStateSnapshot::query()
+                        ->whereKey($asset->id)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($state) {
+                        $state->update(['status' => 'offline']);
+                    } else {
+                        FleetVehicleStateSnapshot::query()->create([
+                            'asset_id' => $asset->id,
+                            'status' => 'offline',
+                        ]);
+                    }
+                    AuditLogger::logOrFail('fleet.vehicle.marked_offline', $asset, [
+                        'asset_id' => $asset->id,
+                    ]);
+                }
+            }
+        }, 3);
+
+        return back()->with('success', 'Bulk action applied to '.count($data['ids']).' vehicle(s).');
     }
 
     public function alertsConfig(Request $request, Asset $asset)
     {
+        $user = $request->user() ?? abort(403);
+        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);
         $config = [];
         if ($this->hasVehicleAlertConfigField() && $asset->alert_config) {
             $config = is_string($asset->alert_config) ? json_decode($asset->alert_config, true) : (array) $asset->alert_config;
@@ -992,20 +1089,50 @@ class VehicleController extends Controller
 
     public function saveAlertsConfig(Request $request, Asset $asset)
     {
+        $user = $request->user() ?? abort(403);
+        $asset = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey()) ?? abort(404);
         $data = $request->validate([
             'config' => ['required', 'array'],
         ]);
 
         if ($this->hasVehicleAlertConfigField()) {
-            $asset->update(['alert_config' => json_encode($data['config'])]);
+            $asset = DB::transaction(function () use ($user, $asset, $data): Asset {
+                $locked = $this->deviceAccess->assignableVehicle($user, (int) $asset->getKey(), true) ?? abort(404);
+                $locked->update(['alert_config' => $data['config']]);
+                AuditLogger::logOrFail('fleet.vehicle.alerts_config', $locked, [
+                    'asset_id' => $locked->id,
+                ]);
+
+                return $locked->fresh();
+            }, 3);
         } else {
             return back()->with('error', 'Vehicle alert configuration is not available until the fleet schema is updated.');
         }
 
-        AuditLogger::log('fleet.vehicle.alerts_config', $asset, [
-            'asset_id' => $asset->id,
-        ]);
-
         return back()->with('success', 'Alert configuration saved.');
+    }
+
+    private function accessibleSite(User $user, int $siteId, bool $lockForUpdate): Site
+    {
+        $query = $this->deviceAccess->accessibleSites($user)->whereKey($siteId);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first() ?? abort(404);
+    }
+
+    private function assertClientPlacementMatchesSite(Asset $asset, int $siteId): void
+    {
+        if (! is_numeric($asset->client_id)) {
+            return;
+        }
+
+        $client = Client::query()->whereKey($asset->client_id)->lockForUpdate()->first(['id', 'site_id']);
+        if (! $client || (int) $client->site_id !== $siteId) {
+            throw ValidationException::withMessages([
+                'site_id' => 'Remove or update the client placement before assigning this vehicle to another Site.',
+            ]);
+        }
     }
 }

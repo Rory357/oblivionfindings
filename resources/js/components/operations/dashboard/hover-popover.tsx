@@ -10,20 +10,20 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import {
-    type ReactNode,
-    type RefObject,
     useCallback,
     useEffect,
     useLayoutEffect,
     useRef,
     useState,
+    type ReactNode,
+    type RefObject,
 } from 'react';
 import { createPortal } from 'react-dom';
 
 import { cn } from '@/lib/utils';
 
-import type { HoverPopoverContent } from './types';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import type { HoverPopoverContent } from './types';
 
 const ICON_MAP: Record<string, LucideIcon> = {
     'alert-triangle': AlertTriangle,
@@ -106,7 +106,8 @@ export function HoverPopover({
     const headerTone = TONE[content.tone] ?? TONE.info;
 
     return createPortal(
-        <GuardrailCard unstyled
+        <GuardrailCard
+            unstyled
             ref={popRef}
             role="dialog"
             onMouseEnter={onMouseEnter}
@@ -121,7 +122,10 @@ export function HoverPopover({
                     '0 12px 32px -8px rgba(76, 29, 149, 0.18), 0 4px 12px -4px rgba(0,0,0,0.08)',
             }}
         >
-            <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: 'var(--border)' }}>
+            <div
+                className="flex items-center gap-2 border-b px-3 py-2.5"
+                style={{ borderColor: 'var(--border)' }}
+            >
                 <div
                     className="flex h-7 w-7 items-center justify-center rounded-md"
                     style={{ background: headerTone.bg, color: headerTone.fg }}
@@ -129,11 +133,15 @@ export function HoverPopover({
                     <Icon className="h-3.5 w-3.5" />
                 </div>
                 <div className="text-[12px] font-semibold">{content.title}</div>
-                <div className="ml-auto text-[10.5px] text-muted-foreground">{content.sub}</div>
+                <div className="ml-auto text-[10.5px] text-muted-foreground">
+                    {content.sub}
+                </div>
             </div>
             <div className="max-h-[280px] overflow-y-auto py-1.5">
                 {content.rows.length === 0 ? (
-                    <div className="px-3 py-4 text-center text-[11px] text-muted-foreground">No items</div>
+                    <div className="px-3 py-4 text-center text-[11px] text-muted-foreground">
+                        No items
+                    </div>
                 ) : (
                     content.rows.map((row, idx) => (
                         <div
@@ -147,14 +155,20 @@ export function HoverPopover({
                                 borderColor: 'var(--border)',
                             }}
                         >
-                            <div className="text-right text-[10.5px] tabular-nums text-muted-foreground">{row.time}</div>
+                            <div className="text-right text-[10.5px] text-muted-foreground tabular-nums">
+                                {row.time}
+                            </div>
                             <div className="min-w-0">
-                                <div className="text-[11.5px] font-semibold leading-tight">{row.site}</div>
-                                <div className="truncate text-[10.5px] text-muted-foreground">{row.detail}</div>
+                                <div className="text-[11.5px] leading-tight font-semibold">
+                                    {row.site}
+                                </div>
+                                <div className="truncate text-[10.5px] text-muted-foreground">
+                                    {row.detail}
+                                </div>
                             </div>
                             {row.tag ? (
                                 <span
-                                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide"
+                                    className="inline-flex items-center rounded px-1.5 py-0.5 text-[9.5px] font-semibold tracking-wide uppercase"
                                     style={{
                                         background: TONE[row.tag.cls].bg,
                                         color: TONE[row.tag.cls].fg,
@@ -173,8 +187,13 @@ export function HoverPopover({
                 className="flex items-center justify-between border-t bg-muted px-3 py-2 text-[11px]"
                 style={{ borderColor: 'var(--border)' }}
             >
-                <span className="text-muted-foreground">Click card to open</span>
-                <Link href={content.href} className="inline-flex items-center gap-1 font-semibold text-primary">
+                <span className="text-muted-foreground">
+                    Click card to open
+                </span>
+                <Link
+                    href={content.href}
+                    className="inline-flex items-center gap-1 font-semibold text-primary"
+                >
                     {content.cta}
                     <ArrowRight className="h-3 w-3" />
                 </Link>
@@ -229,9 +248,12 @@ export function useHoverPopover() {
 
 export function PulseDot({ className }: { className?: string }): ReactNode {
     return (
-        <span aria-hidden="true" className={cn('relative inline-flex h-2 w-2', className)}>
-                            <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                            <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
+        <span
+            aria-hidden="true"
+            className={cn('relative inline-flex h-2 w-2', className)}
+        >
+            <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
         </span>
     );
 }

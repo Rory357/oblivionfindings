@@ -11,7 +11,8 @@ class PrepareTestingSchema extends Command
 {
     protected $signature = 'testing:prepare-schema
         {--database=mysql : The database connection to prepare}
-        {--seed= : Optional seeder class to run after migrate:fresh before dumping the schema}';
+        {--seed= : Optional seeder class to run after migrate:fresh before dumping the schema}
+        {--output= : Optional repository-relative output path for a disposable schema cache}';
 
     protected $description = 'Prepare a reusable testing schema dump for faster PHPUnit bootstrapping';
 
@@ -19,7 +20,7 @@ class PrepareTestingSchema extends Command
     {
         $database = (string) $this->option('database');
         $seeder = $this->option('seed');
-        $schemaPath = $this->schemaPath($database);
+        $schemaPath = $this->schemaPath($database, $this->option('output'));
         $backupPath = is_file($schemaPath) ? $schemaPath.'.bak' : null;
 
         $this->configureMysqlClientPath();
@@ -52,7 +53,7 @@ class PrepareTestingSchema extends Command
                 return self::FAILURE;
             }
 
-            if (! $this->dumpSchema(DB::connection($database))) {
+            if (! $this->dumpSchema(DB::connection($database), $schemaPath)) {
                 return self::FAILURE;
             }
         } finally {
@@ -63,7 +64,7 @@ class PrepareTestingSchema extends Command
             }
         }
 
-        $this->components->info('Testing schema dump is ready at database/schema/mysql-schema.sql');
+        $this->components->info(sprintf('Testing schema dump is ready at %s', $schemaPath));
 
         return self::SUCCESS;
     }
@@ -78,14 +79,27 @@ class PrepareTestingSchema extends Command
             }
 
             if (str_contains(strtolower($currentPath), strtolower($directory))) {
+                $this->setPathEnvironment($currentPath);
+
                 return;
             }
 
-            putenv(sprintf('PATH=%s%s%s', $directory, PATH_SEPARATOR, $currentPath));
-            $_ENV['PATH'] = sprintf('%s%s%s', $directory, PATH_SEPARATOR, $currentPath);
-            $_SERVER['PATH'] = sprintf('%s%s%s', $directory, PATH_SEPARATOR, $currentPath);
+            $this->setPathEnvironment(sprintf('%s%s%s', $directory, PATH_SEPARATOR, $currentPath));
 
             return;
+        }
+    }
+
+    protected function setPathEnvironment(string $path): void
+    {
+        putenv('PATH='.$path);
+        $_ENV['PATH'] = $path;
+        $_SERVER['PATH'] = $path;
+
+        if (DIRECTORY_SEPARATOR === '\\') {
+            putenv('Path='.$path);
+            $_ENV['Path'] = $path;
+            $_SERVER['Path'] = $path;
         }
     }
 
@@ -122,7 +136,7 @@ class PrepareTestingSchema extends Command
         ]))));
     }
 
-    protected function dumpSchema(Connection $connection): bool
+    protected function dumpSchema(Connection $connection, string $schemaPath): bool
     {
         $dumpBinary = $this->resolveMysqlDumpBinary();
         if ($dumpBinary === null) {
@@ -131,7 +145,6 @@ class PrepareTestingSchema extends Command
             return false;
         }
 
-        $schemaPath = database_path(sprintf('schema/%s-schema.sql', $connection->getName()));
         $this->ensureSchemaDirectoryExists($schemaPath);
 
         if (! $this->dumpStructure($dumpBinary, $connection, $schemaPath)) {
@@ -147,8 +160,13 @@ class PrepareTestingSchema extends Command
         return true;
     }
 
-    protected function schemaPath(string $database): string
+    protected function schemaPath(string $database, mixed $output): string
     {
+        $output = trim((string) $output);
+        if ($output !== '') {
+            return base_path($output);
+        }
+
         return database_path(sprintf('schema/%s-schema.sql', $database));
     }
 

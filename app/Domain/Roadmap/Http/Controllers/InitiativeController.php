@@ -3,10 +3,10 @@
 namespace App\Domain\Roadmap\Http\Controllers;
 
 use App\Domain\Roadmap\Http\Controllers\Concerns\ProvidesRoadmapInertiaProps;
-use App\Domain\Roadmap\Models\Initiative;
-use App\Domain\Roadmap\Models\InitiativeCategory;
 use App\Domain\Roadmap\Http\Requests\StoreInitiativeRequest;
 use App\Domain\Roadmap\Http\Requests\UpdateInitiativeRequest;
+use App\Domain\Roadmap\Models\Initiative;
+use App\Domain\Roadmap\Models\InitiativeCategory;
 use App\Domain\Roadmap\Services\RoadmapChangeLogService;
 use App\Domain\Roadmap\Services\RoadmapDecisionService;
 use App\Domain\Roadmap\Services\RoadmapScoringService;
@@ -28,10 +28,7 @@ class InitiativeController extends Controller
 
     public function index(Request $request): JsonResponse|Response
     {
-        $tenantId = $this->tenantId($request);
-
         $query = Initiative::query()
-            ->forTenant($tenantId)
             ->with(['category', 'owner', 'sponsor', 'budgets', 'riskLinks']);
 
         if ($request->filled('status')) {
@@ -71,21 +68,16 @@ class InitiativeController extends Controller
     public function store(StoreInitiativeRequest $request)
     {
         $user = $request->user();
-        $tenantId = $this->tenantId($request);
-
         $data = $request->validated();
 
         $categoryId = $data['category_id'] ?? null;
         if (! $categoryId && ! empty($data['category_key'])) {
             $category = InitiativeCategory::query()
-                ->forTenant($tenantId)
                 ->where('key', $data['category_key'])
-                ->orderByRaw('tenant_id IS NULL')
                 ->first();
 
             if (! $category) {
                 $category = InitiativeCategory::create([
-                    'tenant_id' => $tenantId,
                     'key' => $data['category_key'],
                     'name' => ucfirst(str_replace('_', ' ', $data['category_key'])),
                     'sort_order' => 500,
@@ -97,7 +89,6 @@ class InitiativeController extends Controller
         }
 
         $initiative = Initiative::create([
-            'tenant_id' => $tenantId,
             'title' => $data['title'],
             'summary' => $data['summary'] ?? null,
             'category_id' => $categoryId,
@@ -123,7 +114,6 @@ class InitiativeController extends Controller
         $this->decisionService->ensureDecisionRequestForInitiative($initiative, $user?->id);
 
         $this->changeLogService->log(
-            $tenantId,
             Initiative::class,
             $initiative->id,
             'initiative.created',
@@ -139,8 +129,6 @@ class InitiativeController extends Controller
 
     public function show(Request $request, Initiative $initiative)
     {
-        $this->assertTenant($request, $initiative->tenant_id);
-
         return response()->json([
             'item' => $initiative->load([
                 'category',
@@ -161,8 +149,6 @@ class InitiativeController extends Controller
 
     public function update(UpdateInitiativeRequest $request, Initiative $initiative)
     {
-        $this->assertTenant($request, $initiative->tenant_id);
-
         $data = $request->validated();
 
         $before = $initiative->only(array_keys($data));
@@ -186,7 +172,6 @@ class InitiativeController extends Controller
         $this->decisionService->ensureDecisionRequestForInitiative($initiative, $request->user()?->id);
 
         $this->changeLogService->log(
-            $initiative->tenant_id,
             Initiative::class,
             $initiative->id,
             'initiative.updated',
@@ -205,8 +190,6 @@ class InitiativeController extends Controller
 
     public function score(Request $request, Initiative $initiative)
     {
-        $this->assertTenant($request, $initiative->tenant_id);
-
         $preset = $request->validate([
             'preset' => ['nullable', 'string', 'max:32'],
         ])['preset'] ?? 'board_ceo';
@@ -214,7 +197,6 @@ class InitiativeController extends Controller
         $breakdown = $this->scoringService->score($initiative, $preset, true);
 
         $this->changeLogService->log(
-            $initiative->tenant_id,
             Initiative::class,
             $initiative->id,
             'initiative.scored',
@@ -231,8 +213,6 @@ class InitiativeController extends Controller
 
     public function transition(Request $request, Initiative $initiative)
     {
-        $this->assertTenant($request, $initiative->tenant_id);
-
         $status = $request->validate([
             'status' => ['required', 'string', 'max:32'],
         ])['status'];
@@ -242,7 +222,6 @@ class InitiativeController extends Controller
         }
 
         $this->changeLogService->log(
-            $initiative->tenant_id,
             Initiative::class,
             $initiative->id,
             'initiative.transitioned',
@@ -252,24 +231,6 @@ class InitiativeController extends Controller
         );
 
         return response()->json(['item' => $initiative->fresh()]);
-    }
-
-    protected function tenantId(Request $request): ?int
-    {
-        if ($request->filled('tenant_id')) {
-            return (int) $request->integer('tenant_id');
-        }
-
-        return $request->user()?->tenant_id ?? null;
-    }
-
-    protected function assertTenant(Request $request, ?int $resourceTenantId): void
-    {
-        $tenantId = $this->tenantId($request);
-
-        if ($tenantId !== null && $resourceTenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(403, 'Tenant scope mismatch.');
-        }
     }
 
     protected function shouldReturnJson(Request $request): bool

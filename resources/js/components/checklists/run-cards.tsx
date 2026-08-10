@@ -1,19 +1,31 @@
-import { Building2, Camera, Eye, Play, PlayCircle, TriangleAlert } from 'lucide-react';
+import {
+    Building2,
+    Camera,
+    Eye,
+    Play,
+    PlayCircle,
+    TriangleAlert,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { catColorVar, initials, relDay, runStatusMeta } from './category';
 import { freqLabel, useChecklistConfig } from './context';
 import { useRunContextMenu } from './context-menu';
 import { CategoryIcon, Progress, StatusBadge } from './primitives';
 import type { ChecklistRun } from './types';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 function actionFor(run: ChecklistRun, canRun: boolean) {
-    if (run.status === 'completed') return { label: 'View', Icon: Eye, variant: 'ghost' as const };
+    if (run.status === 'completed')
+        return { label: 'View', Icon: Eye, variant: 'ghost' as const };
     if (!canRun) return { label: 'View', Icon: Eye, variant: 'ghost' as const };
-    if (run.status === 'in_progress') return { label: 'Continue', Icon: PlayCircle, variant: 'default' as const };
+    if (run.status === 'in_progress')
+        return {
+            label: 'Continue',
+            Icon: PlayCircle,
+            variant: 'default' as const,
+        };
     return { label: 'Start', Icon: Play, variant: 'outline' as const };
 }
 
@@ -35,18 +47,34 @@ export function RunListRow({ run }: { run: ChecklistRun }) {
             className="group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-accent/40"
             onContextMenu={menu.open(run)}
         >
-            <span className="h-9 w-1 shrink-0 rounded-full" style={{ background: catColorVar(tone) }} />
-            <CategoryIcon category={cat} box={36} size={18} className="hidden sm:flex" />
+            <span
+                className="h-9 w-1 shrink-0 rounded-full"
+                style={{ background: catColorVar(tone) }}
+            />
+            <CategoryIcon
+                category={cat}
+                box={36}
+                size={18}
+                className="hidden sm:flex"
+            />
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-semibold">{run.template?.name}</span>
+                    <span className="truncate text-sm font-semibold">
+                        {run.template?.name}
+                    </span>
                     {flags?.hazard ? (
-                        <span title="Failures raise a hazard" className="shrink-0 text-status-critical">
+                        <span
+                            title="Failures raise a hazard"
+                            className="shrink-0 text-status-critical"
+                        >
                             <TriangleAlert className="h-3 w-3" />
                         </span>
                     ) : null}
                     {flags?.photo ? (
-                        <span title="Photo evidence" className="shrink-0 text-muted-foreground">
+                        <span
+                            title="Photo evidence"
+                            className="shrink-0 text-muted-foreground"
+                        >
                             <Camera className="h-3 w-3" />
                         </span>
                     ) : null}
@@ -71,7 +99,9 @@ export function RunListRow({ run }: { run: ChecklistRun }) {
             {started ? (
                 <div className="hidden items-center gap-2 md:flex">
                     <Progress value={run.pct} className="w-16" />
-                    <span className="w-8 text-xs tabular-nums text-muted-foreground">{run.pct}%</span>
+                    <span className="w-8 text-xs text-muted-foreground tabular-nums">
+                        {run.pct}%
+                    </span>
                 </div>
             ) : null}
             <div className="hidden shrink-0 sm:block">
@@ -79,7 +109,12 @@ export function RunListRow({ run }: { run: ChecklistRun }) {
                     {meta.label}
                 </StatusBadge>
             </div>
-            <Button size="sm" variant={action.variant} className="shrink-0" onClick={() => openRun(run.id)}>
+            <Button
+                size="sm"
+                variant={action.variant}
+                className="shrink-0"
+                onClick={() => openRun(run.id)}
+            >
                 <ActionIcon className="h-3.5 w-3.5" />
                 {action.label}
             </Button>
@@ -100,15 +135,22 @@ export function WorklistCard({ run }: { run: ChecklistRun }) {
     const ActionIcon = action.Icon;
 
     return (
-        <GuardrailCard unstyled
+        <GuardrailCard
+            unstyled
             className="flex flex-col rounded-xl border border-border bg-card p-3.5 shadow-sm transition hover:border-primary/40 hover:shadow-sm"
             onContextMenu={menu.open(run)}
         >
             <div className="flex items-start gap-3">
-                <CategoryIcon category={run.template?.category ?? null} box={38} size={19} />
+                <CategoryIcon
+                    category={run.template?.category ?? null}
+                    box={38}
+                    size={19}
+                />
                 <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                        <h4 className="min-w-0 text-sm font-semibold leading-snug">{run.template?.name}</h4>
+                        <h4 className="min-w-0 text-sm leading-snug font-semibold">
+                            {run.template?.name}
+                        </h4>
                         <StatusBadge tone={meta.tone} Icon={StatusIcon}>
                             {meta.label}
                         </StatusBadge>
@@ -128,7 +170,9 @@ export function WorklistCard({ run }: { run: ChecklistRun }) {
             {started ? (
                 <div className="mt-3 flex items-center gap-2">
                     <Progress value={run.pct} className="flex-1" />
-                    <span className="text-xs tabular-nums text-muted-foreground">{run.pct}%</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                        {run.pct}%
+                    </span>
                 </div>
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-2">
@@ -155,7 +199,11 @@ export function WorklistCard({ run }: { run: ChecklistRun }) {
                             <Camera className="h-3 w-3" />
                         </span>
                     ) : null}
-                    <Button size="sm" variant={action.variant} onClick={() => openRun(run.id)}>
+                    <Button
+                        size="sm"
+                        variant={action.variant}
+                        onClick={() => openRun(run.id)}
+                    >
                         <ActionIcon className="h-3.5 w-3.5" />
                         {action.label}
                     </Button>

@@ -3,6 +3,8 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
+use Database\Factories\Hr\HrPolicyFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,11 +13,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrPolicy extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrPolicyFactory::new();
+        return HrPolicyFactory::new();
     }
 
     protected $fillable = [
@@ -37,7 +39,7 @@ class HrPolicy extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function versions(): HasMany
@@ -57,13 +59,8 @@ class HrPolicy extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeActive(Builder $query): Builder
     {

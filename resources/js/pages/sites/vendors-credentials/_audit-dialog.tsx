@@ -37,7 +37,10 @@ import { FilterSelect, type FilterOption } from '../_dialog-shared';
 
 type AuditTone = 'info' | 'neutral' | 'success' | 'warning' | 'critical';
 
-const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: AuditTone }> = {
+const ACTION_META: Record<
+    string,
+    { label: string; icon: LucideIcon; tone: AuditTone }
+> = {
     view_list: { label: 'Viewed list', icon: Eye, tone: 'neutral' },
     reveal: { label: 'Revealed', icon: Eye, tone: 'info' },
     copy: { label: 'Copied', icon: Copy, tone: 'neutral' },
@@ -45,17 +48,28 @@ const ACTION_META: Record<string, { label: string; icon: LucideIcon; tone: Audit
     create: { label: 'Created', icon: Plus, tone: 'success' },
     edit: { label: 'Updated', icon: Pencil, tone: 'warning' },
     rotate: { label: 'Rotated', icon: RefreshCcw, tone: 'info' },
-    totp_setup: { label: 'Authenticator set', icon: ShieldCheck, tone: 'success' },
-    totp_remove: { label: 'Authenticator removed', icon: ShieldCheck, tone: 'warning' },
+    totp_setup: {
+        label: 'Authenticator set',
+        icon: ShieldCheck,
+        tone: 'success',
+    },
+    totp_remove: {
+        label: 'Authenticator removed',
+        icon: ShieldCheck,
+        tone: 'warning',
+    },
     delete: { label: 'Deleted', icon: Trash2, tone: 'critical' },
 };
 
 const TONE_BADGE: Record<AuditTone, string> = {
     info: 'border-status-info/30 bg-status-info-bg text-status-info',
     neutral: 'border-border bg-muted text-muted-foreground',
-    success: 'border-status-success/30 bg-status-success-bg text-status-success',
-    warning: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    critical: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    success:
+        'border-status-success/30 bg-status-success-bg text-status-success',
+    warning:
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    critical:
+        'border-status-critical/30 bg-status-critical-bg text-status-critical',
 };
 
 type AuditRow = {
@@ -71,7 +85,13 @@ type AuditRow = {
 };
 
 function actionMeta(action: string) {
-    return ACTION_META[action] ?? { label: action, icon: History, tone: 'neutral' as AuditTone };
+    return (
+        ACTION_META[action] ?? {
+            label: action,
+            icon: History,
+            tone: 'neutral' as AuditTone,
+        }
+    );
 }
 
 function formatDateTime(iso: string) {
@@ -117,19 +137,30 @@ export function AuditLogDialog({
         if (siteId) url.searchParams.set('site_id', String(siteId));
         fetch(url.toString(), {
             credentials: 'include',
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
         })
             .then(async (res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = (await res.json()) as { logs: AuditRow[] };
                 setRows(data.logs ?? []);
             })
-            .catch((e) => setError(e instanceof Error ? e.message : 'Could not load the audit log.'))
+            .catch((e) =>
+                setError(
+                    e instanceof Error
+                        ? e.message
+                        : 'Could not load the audit log.',
+                ),
+            )
             .finally(() => setLoading(false));
     }, [isOpen, focusLabel, siteId]);
 
     const rangeHours = useMemo(
-        () => ({ '24h': 24, '7d': 168, '30d': 720, all: Infinity })[range] ?? Infinity,
+        () =>
+            ({ '24h': 24, '7d': 168, '30d': 720, all: Infinity })[range] ??
+            Infinity,
         [range],
     );
 
@@ -143,7 +174,12 @@ export function AuditLogDialog({
                 if (age > rangeHours) return false;
             }
             if (s) {
-                const hay = [row.target, row.site_name, row.actor.name, actionMeta(row.action).label]
+                const hay = [
+                    row.target,
+                    row.site_name,
+                    row.actor.name,
+                    actionMeta(row.action).label,
+                ]
                     .join(' ')
                     .toLowerCase();
                 if (!hay.includes(s)) return false;
@@ -154,16 +190,35 @@ export function AuditLogDialog({
 
     const count = (a: string) => filtered.filter((r) => r.action === a).length;
     const deniedCount = filtered.filter((r) => r.result === 'denied').length;
-    const summary: { label: string; value: number; icon: LucideIcon; tone: AuditTone }[] = [
+    const summary: {
+        label: string;
+        value: number;
+        icon: LucideIcon;
+        tone: AuditTone;
+    }[] = [
         { label: 'Reveals', value: count('reveal'), icon: Eye, tone: 'info' },
         { label: 'Copies', value: count('copy'), icon: Copy, tone: 'neutral' },
-        { label: 'Rotations', value: count('rotate'), icon: RefreshCcw, tone: 'success' },
-        { label: 'Denied', value: deniedCount, icon: AlertTriangle, tone: deniedCount ? 'critical' : 'success' },
+        {
+            label: 'Rotations',
+            value: count('rotate'),
+            icon: RefreshCcw,
+            tone: 'success',
+        },
+        {
+            label: 'Denied',
+            value: deniedCount,
+            icon: AlertTriangle,
+            tone: deniedCount ? 'critical' : 'success',
+        },
     ];
 
     const actionOptions: FilterOption[] = [
         { value: 'all', label: 'All actions' },
-        ...Object.keys(ACTION_META).map((k) => ({ value: k, label: ACTION_META[k].label, icon: ACTION_META[k].icon })),
+        ...Object.keys(ACTION_META).map((k) => ({
+            value: k,
+            label: ACTION_META[k].label,
+            icon: ACTION_META[k].icon,
+        })),
     ];
     const rangeOptions: FilterOption[] = [
         { value: '24h', label: 'Last 24 hours' },
@@ -174,7 +229,16 @@ export function AuditLogDialog({
 
     const exportCsv = () => {
         setExporting(true);
-        const head = ['Timestamp', 'Actor', 'Action', 'Target', 'Type', 'Site', 'Source IP', 'Result'];
+        const head = [
+            'Timestamp',
+            'Actor',
+            'Action',
+            'Target',
+            'Type',
+            'Site',
+            'Source IP',
+            'Result',
+        ];
         const lines = filtered.map((r) =>
             [
                 new Date(r.at).toISOString(),
@@ -210,7 +274,10 @@ export function AuditLogDialog({
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className="max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 1080px)', width: 'min(92vw, 1080px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 1080px)',
+                    width: 'min(92vw, 1080px)',
+                }}
             >
                 <DialogHeader className="flex-row items-start justify-between gap-4 space-y-0">
                     <div>
@@ -219,8 +286,8 @@ export function AuditLogDialog({
                             Reveal &amp; audit log
                         </DialogTitle>
                         <DialogDescription>
-                            Every reveal, copy, rotation and change — immutable, time-stamped, and
-                            exportable.
+                            Every reveal, copy, rotation and change — immutable,
+                            time-stamped, and exportable.
                         </DialogDescription>
                     </div>
                     <Button
@@ -256,8 +323,10 @@ export function AuditLogDialog({
                                     <Icon className="h-4 w-4" />
                                 </span>
                                 <div>
-                                    <div className="text-lg font-bold tabular-nums">{tile.value}</div>
-                                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                                    <div className="text-lg font-bold tabular-nums">
+                                        {tile.value}
+                                    </div>
+                                    <div className="text-[11px] tracking-wider text-muted-foreground uppercase">
                                         {tile.label}
                                     </div>
                                 </div>
@@ -268,7 +337,7 @@ export function AuditLogDialog({
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <div className="relative min-w-[200px] flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -298,10 +367,18 @@ export function AuditLogDialog({
                         <table className="w-full text-sm">
                             <thead className="sticky top-0 z-10 border-b bg-muted">
                                 <tr>
-                                    {['When', 'Who', 'Action', 'Target', 'Site', 'Source', 'Result'].map((h) => (
+                                    {[
+                                        'When',
+                                        'Who',
+                                        'Action',
+                                        'Target',
+                                        'Site',
+                                        'Source',
+                                        'Result',
+                                    ].map((h) => (
                                         <th
                                             key={h}
-                                            className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                                            className="px-3 py-2.5 text-left text-xs font-semibold tracking-wider text-muted-foreground uppercase"
                                         >
                                             {h}
                                         </th>
@@ -311,20 +388,29 @@ export function AuditLogDialog({
                             <tbody className="divide-y">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={7} className="px-3 py-12 text-center text-muted-foreground">
+                                        <td
+                                            colSpan={7}
+                                            className="px-3 py-12 text-center text-muted-foreground"
+                                        >
                                             <Loader2 className="mx-auto mb-2 h-6 w-6 animate-spin" />
                                             Loading audit trail…
                                         </td>
                                     </tr>
                                 ) : error ? (
                                     <tr>
-                                        <td colSpan={7} className="px-3 py-12 text-center text-status-critical">
+                                        <td
+                                            colSpan={7}
+                                            className="px-3 py-12 text-center text-status-critical"
+                                        >
                                             {error}
                                         </td>
                                     </tr>
                                 ) : filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-3 py-12 text-center text-muted-foreground">
+                                        <td
+                                            colSpan={7}
+                                            className="px-3 py-12 text-center text-muted-foreground"
+                                        >
                                             <History className="mx-auto mb-2 h-7 w-7 opacity-40" />
                                             No matching events
                                         </td>
@@ -334,8 +420,11 @@ export function AuditLogDialog({
                                         const meta = actionMeta(row.action);
                                         const Icon = meta.icon;
                                         return (
-                                            <tr key={row.id} className="hover:bg-muted/40">
-                                                <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
+                                            <tr
+                                                key={row.id}
+                                                className="hover:bg-muted/40"
+                                            >
+                                                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                                                     {formatDateTime(row.at)}
                                                 </td>
                                                 <td className="px-3 py-2">
@@ -343,33 +432,57 @@ export function AuditLogDialog({
                                                         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
                                                             {row.actor.initials}
                                                         </span>
-                                                        <span className="font-medium">{row.actor.name}</span>
+                                                        <span className="font-medium">
+                                                            {row.actor.name}
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <Badge variant="outline" className={cn('gap-1', TONE_BADGE[meta.tone])}>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={cn(
+                                                            'gap-1',
+                                                            TONE_BADGE[
+                                                                meta.tone
+                                                            ],
+                                                        )}
+                                                    >
                                                         <Icon className="h-3 w-3" />
                                                         {meta.label}
                                                     </Badge>
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <div className="font-medium">{row.target}</div>
-                                                    <div className="text-xs capitalize text-muted-foreground">
+                                                    <div className="font-medium">
+                                                        {row.target}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground capitalize">
                                                         {row.target_type}
                                                     </div>
                                                 </td>
-                                                <td className="px-3 py-2 text-muted-foreground">{row.site_name}</td>
+                                                <td className="px-3 py-2 text-muted-foreground">
+                                                    {row.site_name}
+                                                </td>
                                                 <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
                                                     {row.ip}
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     {row.result === 'ok' ? (
                                                         <span className="inline-flex items-center text-status-success">
-                                                            <Check className="h-4 w-4" aria-hidden="true" />
-                                                            <span className="sr-only">Allowed</span>
+                                                            <Check
+                                                                className="h-4 w-4"
+                                                                aria-hidden="true"
+                                                            />
+                                                            <span className="sr-only">
+                                                                Allowed
+                                                            </span>
                                                         </span>
                                                     ) : (
-                                                        <Badge variant="outline" className={TONE_BADGE.critical}>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                TONE_BADGE.critical
+                                                            }
+                                                        >
                                                             Denied
                                                         </Badge>
                                                     )}

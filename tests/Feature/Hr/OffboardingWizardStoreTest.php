@@ -4,16 +4,19 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExitInterview;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 
 function makeOffProfile(): HrEmployeeProfile
 {
-    $user = User::factory()->create();
+    $user = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
 
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
@@ -22,6 +25,7 @@ function makeOffProfile(): HrEmployeeProfile
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => Site::query()->firstOrFail()->id,
     ]);
 }
 
@@ -31,6 +35,13 @@ beforeEach(function () {
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    $this->site = Site::factory()->create(['name' => 'Offboarding Wizard Site']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => today()->subYear(),
     ]);
 });
 
@@ -109,7 +120,7 @@ test('recording an exit interview from offboarding redirects back', function () 
     $profile = makeOffProfile();
 
     $this->actingAs($this->hr)
-        ->from("/hr/offboarding")
+        ->from('/hr/offboarding')
         ->post('/hr/exit-interviews', [
             'employee_profile_id' => $profile->id,
             'interviewer_user_id' => $this->hr->id,

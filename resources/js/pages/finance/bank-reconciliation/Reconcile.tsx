@@ -1,23 +1,28 @@
-import { Head, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
+import { formatMoney } from '@/components/finance/money';
 import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import {
+    ArrowRight,
     Banknote,
     CheckCircle,
-    XCircle,
     Link2,
-    Unlink,
-    AlertTriangle,
-    ArrowRight,
     Sparkles,
+    Unlink,
 } from 'lucide-react';
-import { type BreadcrumbItem } from '@/types';
-import { useState, useMemo } from 'react';
-import { formatMoney } from '@/components/finance/money';
+import { useMemo, useState } from 'react';
 
 interface BankTransaction {
     id: number;
@@ -92,8 +97,12 @@ export default function Reconcile({
     suggestedMatches,
     adjustmentAccounts,
 }: Props) {
-    const [selectedTransaction, setSelectedTransaction] = useState<number | null>(null);
-    const [selectedJournalLine, setSelectedJournalLine] = useState<number | null>(null);
+    const [selectedTransaction, setSelectedTransaction] = useState<
+        number | null
+    >(null);
+    const [selectedJournalLine, setSelectedJournalLine] = useState<
+        number | null
+    >(null);
     const [adjustmentAccountId, setAdjustmentAccountId] = useState<string>('');
     const [processing, setProcessing] = useState(false);
 
@@ -191,7 +200,9 @@ export default function Reconcile({
             {
                 bank_transaction_id: selectedTransaction,
                 journal_line_id: null,
-                adjustment_account_id: adjustmentAccountId ? Number(adjustmentAccountId) : null,
+                adjustment_account_id: adjustmentAccountId
+                    ? Number(adjustmentAccountId)
+                    : null,
             },
             {
                 preserveScroll: true,
@@ -208,7 +219,10 @@ export default function Reconcile({
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Reconciliation', href: '/finance/bank-reconciliation' },
-        { title: `${reconciliation.bank_account_name} - ${reconciliation.statement_date}`, href: `/finance/bank-reconciliation/${reconciliation.id}` },
+        {
+            title: `${reconciliation.bank_account_name} - ${reconciliation.statement_date}`,
+            href: `/finance/bank-reconciliation/${reconciliation.id}`,
+        },
     ];
 
     return (
@@ -217,7 +231,8 @@ export default function Reconcile({
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Banknote}
                         backHref="/finance/bank-reconciliation"
                         title="Bank Reconciliation"
@@ -225,55 +240,74 @@ export default function Reconcile({
                         actions={
                             isCompleted ? (
                                 <Badge className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">
-                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    <CheckCircle className="mr-1 h-4 w-4" />
                                     Completed {reconciliation.completed_at}
-                                    {reconciliation.completed_by_name && ` by ${reconciliation.completed_by_name}`}
+                                    {reconciliation.completed_by_name &&
+                                        ` by ${reconciliation.completed_by_name}`}
                                 </Badge>
                             ) : null
                         }
                     />
                 }
             >
-
                 {/* Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
                     <Card>
                         <CardContent className="pt-4 pb-4">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Starting Balance</p>
-                            <p className="text-lg font-semibold font-mono tabular-nums mt-1">
+                            <p className="text-xs tracking-wider text-muted-foreground uppercase">
+                                Starting Balance
+                            </p>
+                            <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
                                 {formatMoney(reconciliation.starting_balance)}
                             </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-4 pb-4">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Statement Balance</p>
-                            <p className="text-lg font-semibold font-mono tabular-nums mt-1">
+                            <p className="text-xs tracking-wider text-muted-foreground uppercase">
+                                Statement Balance
+                            </p>
+                            <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
                                 {formatMoney(reconciliation.statement_balance)}
                             </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-4 pb-4">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Calculated Balance</p>
-                            <p className="text-lg font-semibold font-mono tabular-nums mt-1">
+                            <p className="text-xs tracking-wider text-muted-foreground uppercase">
+                                Calculated Balance
+                            </p>
+                            <p className="mt-1 font-mono text-lg font-semibold tabular-nums">
                                 {formatMoney(calculatedBalance)}
                             </p>
                         </CardContent>
                     </Card>
-                    <Card className={isBalanced ? 'border-status-success/30 bg-status-success' : 'border-status-warning/30 bg-status-warning'}>
+                    <Card
+                        className={
+                            isBalanced
+                                ? 'border-status-success/30 bg-status-success'
+                                : 'border-status-warning/30 bg-status-warning'
+                        }
+                    >
                         <CardContent className="pt-4 pb-4">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Difference</p>
-                            <p className={`text-lg font-semibold font-mono tabular-nums mt-1 ${isBalanced ? 'text-status-success' : 'text-status-warning'}`}>
+                            <p className="text-xs tracking-wider text-muted-foreground uppercase">
+                                Difference
+                            </p>
+                            <p
+                                className={`mt-1 font-mono text-lg font-semibold tabular-nums ${isBalanced ? 'text-status-success' : 'text-status-warning'}`}
+                            >
                                 {formatMoney(difference)}
                             </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-4 pb-4">
-                            <p className="text-xs text-muted-foreground uppercase tracking-wider">Matched</p>
-                            <p className="text-lg font-semibold mt-1">
-                                {matchedLines.length} item{matchedLines.length !== 1 ? 's' : ''}
+                            <p className="text-xs tracking-wider text-muted-foreground uppercase">
+                                Matched
+                            </p>
+                            <p className="mt-1 text-lg font-semibold">
+                                {matchedLines.length} item
+                                {matchedLines.length !== 1 ? 's' : ''}
                             </p>
                             <p className="text-xs text-muted-foreground">
                                 {unreconciledTransactions.length} unmatched
@@ -289,12 +323,14 @@ export default function Reconcile({
                             onClick={handleMatch}
                             disabled={!selectedTransaction || processing}
                         >
-                            <Link2 className="h-4 w-4 mr-2" />
+                            <Link2 className="mr-2 h-4 w-4" />
                             Match Selected
                         </Button>
                         <select
                             value={adjustmentAccountId}
-                            onChange={(e) => setAdjustmentAccountId(e.target.value)}
+                            onChange={(e) =>
+                                setAdjustmentAccountId(e.target.value)
+                            }
                             disabled={!selectedTransaction || processing}
                             aria-label="Adjustment account"
                             className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground disabled:opacity-50"
@@ -310,17 +346,27 @@ export default function Reconcile({
                             variant="outline"
                             onClick={handleMatchWithoutJournal}
                             disabled={!selectedTransaction || processing}
-                            title={adjustmentAccountId ? 'Posts a balanced adjustment journal against the chosen account' : 'Marks reconciled without a journal'}
+                            title={
+                                adjustmentAccountId
+                                    ? 'Posts a balanced adjustment journal against the chosen account'
+                                    : 'Marks reconciled without a journal'
+                            }
                         >
-                            {adjustmentAccountId ? 'Match as Adjustment' : 'Match Without Journal Entry'}
+                            {adjustmentAccountId
+                                ? 'Match as Adjustment'
+                                : 'Match Without Journal Entry'}
                         </Button>
                         <div className="flex-1" />
                         <Button
                             onClick={handleComplete}
                             disabled={!isBalanced || processing}
-                            className={isBalanced ? 'bg-status-success hover:bg-status-success text-white' : ''}
+                            className={
+                                isBalanced
+                                    ? 'bg-status-success text-white hover:bg-status-success'
+                                    : ''
+                            }
                         >
-                            <CheckCircle className="h-4 w-4 mr-2" />
+                            <CheckCircle className="mr-2 h-4 w-4" />
                             Complete Reconciliation
                         </Button>
                     </div>
@@ -330,7 +376,7 @@ export default function Reconcile({
                 {!isCompleted && suggestedMatches.length > 0 && (
                     <Card className="border-status-info/30 bg-status-info">
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
                                 <Sparkles className="h-4 w-4 text-status-info" />
                                 Suggested Matches ({suggestedMatches.length})
                             </CardTitle>
@@ -339,7 +385,8 @@ export default function Reconcile({
                             <div className="space-y-2">
                                 {suggestedMatches.map((match) => {
                                     const txn = unreconciledTransactions.find(
-                                        (t) => t.id === match.bank_transaction_id,
+                                        (t) =>
+                                            t.id === match.bank_transaction_id,
                                     );
                                     const jl = unmatchedJournalLines.find(
                                         (l) => l.id === match.journal_line_id,
@@ -347,40 +394,64 @@ export default function Reconcile({
                                     if (!txn || !jl) return null;
 
                                     return (
-                                        <div
+                                        <Card
                                             key={`${match.bank_transaction_id}-${match.journal_line_id}`}
-                                            className="flex items-center gap-4 p-3 bg-background rounded-lg border"
+                                            className="flex-row items-center gap-4 rounded-lg bg-background p-3 shadow-none"
                                         >
-                                            <div className="flex-1 min-w-0">
+                                            <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium truncate">{txn.description}</span>
-                                                    <span className={`font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                        {formatMoney(txn.amount)}
+                                                    <span className="truncate text-sm font-medium">
+                                                        {txn.description}
                                                     </span>
-                                                    <span className="text-xs text-muted-foreground">{txn.transaction_date}</span>
+                                                    <span
+                                                        className={`font-mono text-sm tabular-nums ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                                    >
+                                                        {formatMoney(
+                                                            txn.amount,
+                                                        )}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {txn.transaction_date}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                                            <div className="flex-1 min-w-0">
+                                            <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium truncate">{jl.description || jl.journal_description}</span>
-                                                    <span className="font-mono tabular-nums text-sm">
-                                                        {jl.debit > 0 ? formatMoney(jl.debit) : formatMoney(-jl.credit)}
+                                                    <span className="truncate text-sm font-medium">
+                                                        {jl.description ||
+                                                            jl.journal_description}
                                                     </span>
-                                                    <span className="text-xs text-muted-foreground">#{jl.journal_number}</span>
+                                                    <span className="font-mono text-sm tabular-nums">
+                                                        {jl.debit > 0
+                                                            ? formatMoney(
+                                                                  jl.debit,
+                                                              )
+                                                            : formatMoney(
+                                                                  -jl.credit,
+                                                              )}
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        #{jl.journal_number}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <Badge variant="outline" className={`shrink-0 ${confidenceColors[match.confidence]}`}>
+                                            <Badge
+                                                variant="outline"
+                                                className={`shrink-0 ${confidenceColors[match.confidence]}`}
+                                            >
                                                 {match.confidence}
                                             </Badge>
                                             <Button
                                                 size="sm"
-                                                onClick={() => handleSuggestedMatch(match)}
+                                                onClick={() =>
+                                                    handleSuggestedMatch(match)
+                                                }
                                                 disabled={processing}
                                             >
                                                 Accept
                                             </Button>
-                                        </div>
+                                        </Card>
                                     );
                                 })}
                             </div>
@@ -389,12 +460,13 @@ export default function Reconcile({
                 )}
 
                 {/* Two-Column Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     {/* LEFT: Unreconciled Bank Transactions */}
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base">
-                                Unreconciled Bank Transactions ({unreconciledTransactions.length})
+                                Unreconciled Bank Transactions (
+                                {unreconciledTransactions.length})
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -406,16 +478,24 @@ export default function Reconcile({
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[100px]">Date</TableHead>
-                                            <TableHead className="text-right w-[110px]">Amount</TableHead>
+                                            <TableHead className="w-[100px]">
+                                                Date
+                                            </TableHead>
+                                            <TableHead className="w-[110px] text-right">
+                                                Amount
+                                            </TableHead>
                                             <TableHead>Description</TableHead>
-                                            <TableHead className="w-[100px]">Reference</TableHead>
+                                            <TableHead className="w-[100px]">
+                                                Reference
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {unreconciledTransactions.map((txn) => {
-                                            const isSelected = selectedTransaction === txn.id;
-                                            const hasSuggestion = suggestedMatchMap.has(txn.id);
+                                            const isSelected =
+                                                selectedTransaction === txn.id;
+                                            const hasSuggestion =
+                                                suggestedMatchMap.has(txn.id);
 
                                             return (
                                                 <TableRow
@@ -429,26 +509,44 @@ export default function Reconcile({
                                                     } ${isCompleted ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
                                                         if (isCompleted) return;
-                                                        setSelectedTransaction(isSelected ? null : txn.id);
+                                                        setSelectedTransaction(
+                                                            isSelected
+                                                                ? null
+                                                                : txn.id,
+                                                        );
                                                         // Auto-select suggested journal line
-                                                        const suggestion = suggestedMatchMap.get(txn.id);
-                                                        if (suggestion && !isSelected) {
-                                                            setSelectedJournalLine(suggestion.journal_line_id);
+                                                        const suggestion =
+                                                            suggestedMatchMap.get(
+                                                                txn.id,
+                                                            );
+                                                        if (
+                                                            suggestion &&
+                                                            !isSelected
+                                                        ) {
+                                                            setSelectedJournalLine(
+                                                                suggestion.journal_line_id,
+                                                            );
                                                         } else if (isSelected) {
-                                                            setSelectedJournalLine(null);
+                                                            setSelectedJournalLine(
+                                                                null,
+                                                            );
                                                         }
                                                     }}
                                                 >
-                                                    <TableCell className="whitespace-nowrap text-sm">
+                                                    <TableCell className="text-sm whitespace-nowrap">
                                                         {txn.transaction_date}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                        {formatMoney(txn.amount)}
+                                                    <TableCell
+                                                        className={`text-right font-mono text-sm tabular-nums ${txn.amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                                    >
+                                                        {formatMoney(
+                                                            txn.amount,
+                                                        )}
                                                     </TableCell>
-                                                    <TableCell className="text-sm truncate max-w-[200px]">
+                                                    <TableCell className="max-w-[200px] truncate text-sm">
                                                         {txn.description}
                                                     </TableCell>
-                                                    <TableCell className="text-sm text-muted-foreground truncate max-w-[100px]">
+                                                    <TableCell className="max-w-[100px] truncate text-sm text-muted-foreground">
                                                         {txn.reference || '-'}
                                                     </TableCell>
                                                 </TableRow>
@@ -464,7 +562,8 @@ export default function Reconcile({
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base">
-                                Unmatched GL Journal Lines ({unmatchedJournalLines.length})
+                                Unmatched GL Journal Lines (
+                                {unmatchedJournalLines.length})
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -476,16 +575,26 @@ export default function Reconcile({
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="w-[100px]">Date</TableHead>
-                                            <TableHead className="text-right w-[110px]">Amount</TableHead>
+                                            <TableHead className="w-[100px]">
+                                                Date
+                                            </TableHead>
+                                            <TableHead className="w-[110px] text-right">
+                                                Amount
+                                            </TableHead>
                                             <TableHead>Description</TableHead>
-                                            <TableHead className="w-[90px]">Journal #</TableHead>
+                                            <TableHead className="w-[90px]">
+                                                Journal #
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {unmatchedJournalLines.map((line) => {
-                                            const isSelected = selectedJournalLine === line.id;
-                                            const amount = line.debit > 0 ? line.debit : -line.credit;
+                                            const isSelected =
+                                                selectedJournalLine === line.id;
+                                            const amount =
+                                                line.debit > 0
+                                                    ? line.debit
+                                                    : -line.credit;
 
                                             return (
                                                 <TableRow
@@ -497,19 +606,27 @@ export default function Reconcile({
                                                     } ${isCompleted ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
                                                         if (isCompleted) return;
-                                                        setSelectedJournalLine(isSelected ? null : line.id);
+                                                        setSelectedJournalLine(
+                                                            isSelected
+                                                                ? null
+                                                                : line.id,
+                                                        );
                                                     }}
                                                 >
-                                                    <TableCell className="whitespace-nowrap text-sm">
+                                                    <TableCell className="text-sm whitespace-nowrap">
                                                         {line.journal_date}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
+                                                    <TableCell
+                                                        className={`text-right font-mono text-sm tabular-nums ${amount >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                                    >
                                                         {formatMoney(amount)}
                                                     </TableCell>
-                                                    <TableCell className="text-sm truncate max-w-[200px]">
-                                                        {line.description || line.journal_description || '-'}
+                                                    <TableCell className="max-w-[200px] truncate text-sm">
+                                                        {line.description ||
+                                                            line.journal_description ||
+                                                            '-'}
                                                     </TableCell>
-                                                    <TableCell className="text-sm font-mono text-muted-foreground">
+                                                    <TableCell className="font-mono text-sm text-muted-foreground">
                                                         {line.journal_number}
                                                     </TableCell>
                                                 </TableRow>
@@ -526,7 +643,7 @@ export default function Reconcile({
                 {matchedLines.length > 0 && (
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
                                 <CheckCircle className="h-4 w-4 text-status-success" />
                                 Matched Items ({matchedLines.length})
                             </CardTitle>
@@ -536,10 +653,16 @@ export default function Reconcile({
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Bank Transaction</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-right">
+                                            Amount
+                                        </TableHead>
                                         <TableHead>Journal Entry</TableHead>
-                                        <TableHead className="text-right">Journal Amount</TableHead>
-                                        {!isCompleted && <TableHead className="w-[80px]"></TableHead>}
+                                        <TableHead className="text-right">
+                                            Journal Amount
+                                        </TableHead>
+                                        {!isCompleted && (
+                                            <TableHead className="w-[80px]"></TableHead>
+                                        )}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -548,34 +671,77 @@ export default function Reconcile({
                                             <TableCell>
                                                 <div>
                                                     <span className="text-sm font-medium">
-                                                        {line.bank_transaction?.description}
+                                                        {
+                                                            line
+                                                                .bank_transaction
+                                                                ?.description
+                                                        }
                                                     </span>
                                                     <div className="text-xs text-muted-foreground">
-                                                        {line.bank_transaction?.transaction_date}
-                                                        {line.bank_transaction?.reference && ` | ${line.bank_transaction.reference}`}
+                                                        {
+                                                            line
+                                                                .bank_transaction
+                                                                ?.transaction_date
+                                                        }
+                                                        {line.bank_transaction
+                                                            ?.reference &&
+                                                            ` | ${line.bank_transaction.reference}`}
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${(line.bank_transaction?.amount ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                {line.bank_transaction ? formatMoney(line.bank_transaction.amount) : '-'}
+                                            <TableCell
+                                                className={`text-right font-mono tabular-nums ${(line.bank_transaction?.amount ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                            >
+                                                {line.bank_transaction
+                                                    ? formatMoney(
+                                                          line.bank_transaction
+                                                              .amount,
+                                                      )
+                                                    : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 {line.journal_line ? (
                                                     <div>
                                                         <span className="text-sm font-medium">
-                                                            {line.journal_line.description}
+                                                            {
+                                                                line
+                                                                    .journal_line
+                                                                    .description
+                                                            }
                                                         </span>
                                                         <div className="text-xs text-muted-foreground">
-                                                            #{line.journal_line.journal_number} | {line.journal_line.journal_date}
+                                                            #
+                                                            {
+                                                                line
+                                                                    .journal_line
+                                                                    .journal_number
+                                                            }{' '}
+                                                            |{' '}
+                                                            {
+                                                                line
+                                                                    .journal_line
+                                                                    .journal_date
+                                                            }
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-sm text-muted-foreground italic">No journal entry</span>
+                                                    <span className="text-sm text-muted-foreground italic">
+                                                        No journal entry
+                                                    </span>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
                                                 {line.journal_line
-                                                    ? formatMoney(line.journal_line.debit > 0 ? line.journal_line.debit : -line.journal_line.credit)
+                                                    ? formatMoney(
+                                                          line.journal_line
+                                                              .debit > 0
+                                                              ? line
+                                                                    .journal_line
+                                                                    .debit
+                                                              : -line
+                                                                    .journal_line
+                                                                    .credit,
+                                                      )
                                                     : '-'}
                                             </TableCell>
                                             {!isCompleted && (
@@ -583,8 +749,12 @@ export default function Reconcile({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                        onClick={() => handleUnmatch(line.id)}
+                                                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                        onClick={() =>
+                                                            handleUnmatch(
+                                                                line.id,
+                                                            )
+                                                        }
                                                         disabled={processing}
                                                     >
                                                         <Unlink className="h-4 w-4" />

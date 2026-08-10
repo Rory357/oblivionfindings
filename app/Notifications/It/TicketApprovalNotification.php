@@ -2,6 +2,7 @@
 
 namespace App\Notifications\It;
 
+use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Models\ItTicket;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,7 +14,7 @@ use Illuminate\Notifications\Notification;
  * or a request was decided (approved/rejected → the agent who asked).
  * Reference + title only — never ticket body or client detail (§8).
  */
-class TicketApprovalNotification extends Notification implements ShouldQueue
+class TicketApprovalNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
     use Queueable;
 
@@ -22,6 +23,22 @@ class TicketApprovalNotification extends Notification implements ShouldQueue
         private ItTicket $ticket,
         private string $event,
     ) {}
+
+    public function itEmailDeliveryContext(): array
+    {
+        $subject = match ($this->event) {
+            'approved' => "Approved — {$this->ticket->reference} {$this->ticket->title}",
+            'rejected' => "Rejected — {$this->ticket->reference} {$this->ticket->title}",
+            default => "Approval needed — {$this->ticket->reference} {$this->ticket->title}",
+        };
+
+        return [
+            'ticket_id' => (int) $this->ticket->id,
+            'type' => 'ticket_approval',
+            'subject' => $subject,
+            'retry_context' => ['event' => $this->event],
+        ];
+    }
 
     public function via(object $notifiable): array
     {

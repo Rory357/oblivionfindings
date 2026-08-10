@@ -29,8 +29,9 @@ use Illuminate\Support\Facades\Schema;
  *   - compliance  → the cert/vetting/licence/training expiry derivation
  *   - milestones  → HrEmployeeProfile (birthdays / anniversaries / probation…)
  *
- * Everything is tenant-scoped. Colours are emitted as design-token *names*
- * (never raw hex); the React page resolves them to hsl(var(--token)).
+ * Everything is bounded by canonical Site and audience access. Colours are
+ * emitted as design-token *names* (never raw hex); the React page resolves
+ * them to hsl(var(--token)).
  */
 class HrCalendarAggregator
 {
@@ -46,9 +47,12 @@ class HrCalendarAggregator
     /** The current viewer's id, set per feed() call so eventRow can surface "my RSVP". */
     private ?int $viewerId = null;
 
+    private ?User $viewer = null;
+
     public function __construct(
         private readonly LeaveService $leaveService,
         private readonly ShiftCoverageService $shiftCoverageService,
+        private readonly HrCalendarAccessService $access,
     ) {}
 
     /**
@@ -57,7 +61,6 @@ class HrCalendarAggregator
      * @return list<array<string, mixed>>
      */
     public function feed(
-        ?int $tenantId,
         string $from,
         string $to,
         array $layers,
@@ -66,15 +69,16 @@ class HrCalendarAggregator
     ): array {
         $start = Carbon::parse($from)->startOfDay();
         $end = Carbon::parse($to)->endOfDay();
+        $this->viewer = $viewer;
         $want = fn (string $layer): bool => in_array($layer, $layers, true);
 
         $out = collect();
 
         if ($want('event')) {
-            $out = $out->concat($this->events($tenantId, $start, $end, $filters, $viewer));
+            $out = $out->concat($this->events($start, $end, $filters, $viewer));
         }
         if ($want('leave') || $want('holiday')) {
-            [$leave, $holidays] = $this->leaveAndHolidays($tenantId, $start, $end, $filters, $viewer);
+            [$leave, $holidays] = $this->leaveAndHolidays($start, $end, $filters, $viewer);
             if ($want('leave')) {
                 $out = $out->concat($leave);
             }
@@ -86,10 +90,10 @@ class HrCalendarAggregator
             $out = $out->concat($this->shifts($start, $end, $filters, $viewer));
         }
         if ($want('compliance')) {
-            $out = $out->concat($this->compliance($tenantId, $start, $end, $filters));
+            $out = $out->concat($this->compliance($start, $end, $filters, $viewer));
         }
         if ($want('milestone')) {
-            $out = $out->concat($this->milestones($tenantId, $start, $end, $filters));
+            $out = $out->concat($this->milestones($start, $end, $filters, $viewer));
         }
 
         return $out->values()->all();
@@ -97,7 +101,7 @@ class HrCalendarAggregator
 
     /* ── Events (editable) ───────────────────────────────────────────────── */
 
-    private function events(?int $tenantId, Carbon $start, Carbon $end, array $filters, ?User $viewer = null): Collection
+    private function events(Carbon $start, Carbon $end, array $filters, ?User $viewer = null): Collection
     {
         if (! Schema::hasTable('hr_calendar_events')) {
             return collect();
@@ -109,8 +113,7 @@ class HrCalendarAggregator
         // Top-level events only (exception/override children are folded into
         // their parent's expansion below). Pull non-recurring events overlapping
         // the range plus any recurring base whose window touches the range.
-        $base = HrCalendarEvent::query()
-            ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
+        $baseQuery = HrCalendarEvent::query()
             ->active()
             ->whereNull('recurrence_parent_id')
             ->when(! empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
@@ -126,9 +129,16 @@ class HrCalendarAggregator
                 });
             })
             ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name', 'reminders', 'attachments'])
-            ->orderBy('starts_at')
-            ->get()
-            ->filter(fn (HrCalendarEvent $event) => $this->teamAudienceIsVisible($event, $viewer))
+            ->orderBy('starts_at');
+
+        if ($viewer) {
+            $this->access->applySiteScope($baseQuery, $viewer);
+        } else {
+            $baseQuery->whereRaw('1 = 0');
+        }
+
+        $base = $baseQuery->get()
+            ->filter(fn (HrCalendarEvent $event) => $viewer && $this->access->canViewEvent($viewer, $event))
             ->filter(fn (HrCalendarEvent $event) => $this->eventMatchesTeamFilter($event, $teamFilter));
 
         // Override children for the recurring bases in scope.
@@ -139,7 +149,17 @@ class HrCalendarAggregator
                 ->whereIn('recurrence_parent_id', $recurringIds->all())
                 ->active()
                 ->where('is_exception', true)
-                ->with(['creator:id,name', 'site:id,name', 'departmentRef:id,name', 'attendees.user:id,name', 'reminders', 'attachments'])
+                ->with([
+                    'creator:id,name',
+                    'site:id,name',
+                    'departmentRef:id,name',
+                    'attendees.user:id,name',
+                    'reminders',
+                    'attachments',
+                    'recurrenceParent.attendees.user:id,name',
+                    'recurrenceParent.reminders',
+                    'recurrenceParent.attachments',
+                ])
                 ->get()
                 ->groupBy('recurrence_parent_id');
 
@@ -178,7 +198,8 @@ class HrCalendarAggregator
     private function eventRow(HrCalendarEvent $e, ?Carbon $start, ?Carbon $end, ?string $occurrenceDate = null, bool $isException = false): array
     {
         $recurring = (bool) $e->rrule || $isException || $occurrenceDate !== null;
-        $audience = $this->attendeeSummary($e);
+        $presentationEvent = $isException && $e->recurrenceParent ? $e->recurrenceParent : $e;
+        $audience = $this->attendeeSummary($presentationEvent);
 
         return [
             'layer' => 'event',
@@ -188,7 +209,7 @@ class HrCalendarAggregator
             'end' => optional($end)->toIso8601String(),
             'allDay' => (bool) $e->is_all_day,
             'color' => self::EVENT_CATEGORY_TOKENS[$e->event_type] ?? 'category-hr',
-            'editable' => true,
+            'editable' => $this->viewer !== null && $this->access->canManageEvent($this->viewer, $e),
             'extendedProps' => [
                 'eventId' => $e->id,
                 'category' => $e->event_type,
@@ -215,14 +236,14 @@ class HrCalendarAggregator
                 'attendeeUserIds' => $audience['userIds'],
                 'rsvp' => $audience['rsvp'],
                 'myRsvp' => $audience['myRsvp'],
-                'reminders' => $e->relationLoaded('reminders')
-                    ? $e->reminders->map(fn ($r) => [
+                'reminders' => $presentationEvent->relationLoaded('reminders')
+                    ? $presentationEvent->reminders->map(fn ($r) => [
                         'offset_minutes' => (int) $r->offset_minutes,
                         'channel' => $r->channel,
                     ])->values()->all()
                     : [],
-                'attachments' => $e->relationLoaded('attachments')
-                    ? $e->attachments->map(fn ($a) => [
+                'attachments' => $presentationEvent->relationLoaded('attachments')
+                    ? $presentationEvent->attachments->map(fn ($a) => [
                         'id' => $a->id,
                         'name' => $a->original_name,
                         'mime' => $a->mime,
@@ -265,36 +286,6 @@ class HrCalendarAggregator
                 ? $people->firstWhere('user_id', $this->viewerId)?->rsvp_status
                 : null,
         ];
-    }
-
-    private function teamAudienceIsVisible(HrCalendarEvent $event, ?User $viewer): bool
-    {
-        $teamAudience = $event->attendees->firstWhere('audience_type', 'team');
-
-        if (! $teamAudience) {
-            return true;
-        }
-
-        if (! $viewer) {
-            return false;
-        }
-
-        if ((int) $event->created_by === (int) $viewer->id) {
-            return true;
-        }
-
-        $viewerTeam = HrEmployeeProfile::query()
-            ->where('tenant_id', $event->tenant_id)
-            ->where('user_id', $viewer->id)
-            ->where('is_active', true)
-            ->value('team');
-
-        $normalisedViewerTeam = HrEmployeeProfile::normalizeTeam($viewerTeam);
-        $normalisedAudienceTeam = HrEmployeeProfile::normalizeTeam($teamAudience->audience_ref);
-
-        return $normalisedViewerTeam !== null
-            && $normalisedAudienceTeam !== null
-            && mb_strtolower($normalisedViewerTeam) === mb_strtolower($normalisedAudienceTeam);
     }
 
     private function eventMatchesTeamFilter(HrCalendarEvent $event, ?string $teamFilter): bool
@@ -393,7 +384,7 @@ class HrCalendarAggregator
     /**
      * @return array{0: Collection, 1: Collection}
      */
-    private function leaveAndHolidays(?int $tenantId, Carbon $start, Carbon $end, array $filters, ?User $viewer): array
+    private function leaveAndHolidays(Carbon $start, Carbon $end, array $filters, ?User $viewer): array
     {
         if (! Schema::hasTable('hr_leave_requests')) {
             return [collect(), collect()];
@@ -401,6 +392,9 @@ class HrCalendarAggregator
 
         $canSeeSensitive = (bool) $viewer?->canDo('hr.leave.manage');
         $leaveFilters = ! empty($filters['site_id']) ? ['site_id' => $filters['site_id']] : [];
+        $visibleUserIds = $viewer
+            ? $this->access->visibleCurrentStaffQuery($viewer)->pluck('id')->map(fn ($id) => (int) $id)->all()
+            : [];
 
         $leave = collect();
         $holidays = collect();
@@ -412,15 +406,21 @@ class HrCalendarAggregator
         $cursor = $start->copy()->startOfMonth();
         $guard = 0;
         while ($cursor->lte($end) && $guard++ < 6) {
+            if (! $viewer) {
+                break;
+            }
             $feed = $this->leaveService->calendarFeed(
-                $tenantId,
+                $viewer,
                 $cursor->format('Y-m'),
                 $leaveFilters,
-                $viewer?->id,
+                $viewer->canDo('hr.leave.approve') || $viewer->canDo('hr.leave.manage'),
                 $canSeeSensitive,
             );
 
             foreach ($feed['entries'] as $entry) {
+                if (! in_array((int) ($entry['user_id'] ?? 0), $visibleUserIds, true)) {
+                    continue;
+                }
                 if (isset($seenLeave[$entry['id']])) {
                     continue;
                 }
@@ -487,14 +487,18 @@ class HrCalendarAggregator
 
         $siteId = ! empty($filters['site_id']) ? (int) $filters['site_id'] : null;
 
-        $shifts = Shift::query()
+        $shiftQuery = Shift::query()
             ->with(['client:id,first_name,last_name,site_id', 'site:id,name', 'staff:id,name'])
             ->where('starts_at', '<', $end)
             ->where('ends_at', '>', $start)
-            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->get();
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId));
+        $this->access->applyShiftScope($shiftQuery, $viewer);
+        $shifts = $shiftQuery->get();
 
-        $coverageWindows = collect($this->shiftCoverageService->buildRangeCoverage($start, $end, $siteId));
+        $coverageSiteIds = $siteId ? [$siteId] : $this->access->accessibleSiteIds($viewer);
+        $coverageWindows = collect($coverageSiteIds)
+            ->flatMap(fn (int $visibleSiteId) => $this->shiftCoverageService
+                ->buildRangeCoverage($start, $end, $visibleSiteId));
 
         $shiftEvents = $shifts->map(function (Shift $shift) {
             $clientName = $shift->client
@@ -550,7 +554,7 @@ class HrCalendarAggregator
 
     /* ── Compliance renewals (read-only; deep-link to Compliance) ────────── */
 
-    private function compliance(?int $tenantId, Carbon $start, Carbon $end, array $filters): Collection
+    private function compliance(Carbon $start, Carbon $end, array $filters, ?User $viewer): Collection
     {
         $now = now();
         $out = collect();
@@ -558,11 +562,13 @@ class HrCalendarAggregator
             return $expires->lt($now) || $expires->diffInDays($now) <= 30 ? 'critical' : 'warning';
         };
 
-        // Tenant-scoped like every other layer (audit fix round 2 — this layer
-        // previously queried all three tables unscoped).
+        $visibleUserIds = $viewer
+            ? $this->access->visibleCurrentStaffQuery($viewer)->select('users.id')
+            : User::query()->select('users.id')->whereRaw('1 = 0');
+
         if (Schema::hasTable('hr_staff_compliance_statuses')) {
             HrStaffComplianceStatus::query()
-                ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+                ->whereIn('user_id', clone $visibleUserIds)
                 ->whereNotNull('expires_at')
                 ->whereBetween('expires_at', [$start, $end])
                 ->with(['user:id,name', 'requirement:id,name,code'])
@@ -578,14 +584,9 @@ class HrCalendarAggregator
                 });
         }
 
-        // staff_background_checks has no tenant_id column — scope through the
-        // owner's employee profile instead.
         if (Schema::hasTable('staff_background_checks')) {
             StaffBackgroundCheck::query()
-                ->when($tenantId !== null, fn ($q) => $q->whereHas(
-                    'user.hrEmployeeProfile',
-                    fn ($p) => $p->where('tenant_id', $tenantId),
-                ))
+                ->whereIn('user_id', clone $visibleUserIds)
                 ->whereNotNull('expires_at')
                 ->whereBetween('expires_at', [$start, $end])
                 ->with('user:id,name')
@@ -603,7 +604,7 @@ class HrCalendarAggregator
 
         if (Schema::hasTable('hr_driver_eligibility')) {
             HrDriverEligibility::query()
-                ->when($tenantId !== null, fn ($q) => $q->forTenant($tenantId))
+                ->whereIn('user_id', clone $visibleUserIds)
                 ->whereNotNull('licence_expires_at')
                 ->whereBetween('licence_expires_at', [$start, $end])
                 ->with('user:id,name')
@@ -640,7 +641,7 @@ class HrCalendarAggregator
 
     /* ── People milestones (read-only, privacy-aware) ────────────────────── */
 
-    private function milestones(?int $tenantId, Carbon $start, Carbon $end, array $filters): Collection
+    private function milestones(Carbon $start, Carbon $end, array $filters, ?User $viewer): Collection
     {
         $out = collect();
 
@@ -648,9 +649,11 @@ class HrCalendarAggregator
             return $out;
         }
 
-        HrEmployeeProfile::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->where('is_active', true)
+        $profiles = $viewer
+            ? $this->access->visibleCurrentProfilesQuery($viewer)
+            : HrEmployeeProfile::query()->whereRaw('1 = 0');
+
+        $profiles
             ->when(! empty($filters['site_id']), fn ($q) => $q->where('primary_site_id', $filters['site_id']))
             ->when(! empty($filters['department_id']), fn ($q) => $q->where('department_id', $filters['department_id']))
             ->with('user:id,name')

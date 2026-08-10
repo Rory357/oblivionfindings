@@ -22,8 +22,18 @@ export type UserOption = { id: number; name: string };
 const NO_CUSTODIAN = 'none';
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Name, float & GL account', icon: Coins },
-    { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: ListChecks },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Name, float & GL account',
+        icon: Coins,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & create',
+        icon: ListChecks,
+    },
 ];
 
 /**
@@ -61,23 +71,29 @@ export function PettyCashFundDialog({
     });
     const { data, setData, processing, errors } = form;
 
-    const accountOptions = accounts.map((a) => ({ value: String(a.id), label: `${a.code} · ${a.name}` }));
+    const accountOptions = accounts.map((a) => ({
+        value: String(a.id),
+        label: `${a.code} · ${a.name}`,
+    }));
     const custodianOptions = [
         { value: NO_CUSTODIAN, label: 'No custodian' },
         ...users.map((u) => ({ value: String(u.id), label: u.name })),
     ];
 
-    const accountLabel = accountOptions.find((a) => a.value === data.gl_account_id)?.label ?? '—';
+    const accountLabel =
+        accountOptions.find((a) => a.value === data.gl_account_id)?.label ??
+        '—';
     const custodianLabel =
         data.custodian_user_id && data.custodian_user_id !== NO_CUSTODIAN
-            ? users.find((u) => String(u.id) === data.custodian_user_id)?.name ?? '—'
+            ? (users.find((u) => String(u.id) === data.custodian_user_id)
+                  ?.name ?? '—')
             : 'None';
 
     const detailsValid =
-        !!data.name.trim()
-        && data.float_amount !== ''
-        && Number(data.float_amount) > 0
-        && !!data.gl_account_id;
+        !!data.name.trim() &&
+        data.float_amount !== '' &&
+        Number(data.float_amount) > 0 &&
+        !!data.gl_account_id;
 
     const close = () => {
         reset();
@@ -90,7 +106,10 @@ export function PettyCashFundDialog({
         form.transform((d) => ({
             ...d,
             // sentinel/blank custodian → null (optional field)
-            custodian_user_id: d.custodian_user_id && d.custodian_user_id !== NO_CUSTODIAN ? d.custodian_user_id : null,
+            custodian_user_id:
+                d.custodian_user_id && d.custodian_user_id !== NO_CUSTODIAN
+                    ? d.custodian_user_id
+                    : null,
         }));
         form.post('/finance/petty-cash', {
             preserveScroll: true,
@@ -117,17 +136,30 @@ export function PettyCashFundDialog({
             footerEnd={
                 <>
                     {!isFirst && (
-                        <Button type="button" variant="outline" onClick={back} disabled={processing}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={back}
+                            disabled={processing}
+                        >
                             Back
                         </Button>
                     )}
                     {!isLast && (
-                        <Button type="button" onClick={next} disabled={!detailsValid}>
+                        <Button
+                            type="button"
+                            onClick={next}
+                            disabled={!detailsValid}
+                        >
                             Continue
                         </Button>
                     )}
                     {isLast && (
-                        <Button type="button" onClick={submit} disabled={processing || !detailsValid}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing || !detailsValid}
+                        >
                             Create fund
                         </Button>
                     )}
@@ -136,24 +168,45 @@ export function PettyCashFundDialog({
         >
             {index === 0 && (
                 <div>
-                    <StepHead icon={Coins} title="Fund details" blurb="Name the float, set its amount and where it posts." />
+                    <StepHead
+                        icon={Coins}
+                        title="Fund details"
+                        blurb="Name the float, set its amount and where it posts."
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Fund name" span required error={errors.name}>
+                        <Field
+                            label="Fund name"
+                            span
+                            required
+                            error={errors.name}
+                        >
                             <Input
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="e.g. Office Petty Cash"
                             />
                         </Field>
-                        <Field label="Float amount (NZD)" required error={errors.float_amount}>
+                        <Field
+                            label="Float amount (NZD)"
+                            required
+                            error={errors.float_amount}
+                        >
                             <AmountField
                                 value={data.float_amount}
-                                onValueChange={(v) => setData('float_amount', v)}
+                                onValueChange={(v) =>
+                                    setData('float_amount', v)
+                                }
                                 placeholder="200.00"
                                 aria-label="Float amount"
                             />
                         </Field>
-                        <Field label="GL account" required error={errors.gl_account_id}>
+                        <Field
+                            label="GL account"
+                            required
+                            error={errors.gl_account_id}
+                        >
                             <SelectInput
                                 value={data.gl_account_id}
                                 onChange={(v) => setData('gl_account_id', v)}
@@ -161,10 +214,17 @@ export function PettyCashFundDialog({
                                 options={accountOptions}
                             />
                         </Field>
-                        <Field label="Custodian" span hint="optional" error={errors.custodian_user_id}>
+                        <Field
+                            label="Custodian"
+                            span
+                            hint="optional"
+                            error={errors.custodian_user_id}
+                        >
                             <SelectInput
                                 value={data.custodian_user_id}
-                                onChange={(v) => setData('custodian_user_id', v)}
+                                onChange={(v) =>
+                                    setData('custodian_user_id', v)
+                                }
                                 placeholder="Select custodian"
                                 options={custodianOptions}
                             />
@@ -175,14 +235,25 @@ export function PettyCashFundDialog({
 
             {index === 1 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Review & create" blurb="Creates the fund and opens it so you can record transactions." />
+                    <StepHead
+                        icon={ListChecks}
+                        title="Review & create"
+                        blurb="Creates the fund and opens it so you can record transactions."
+                    />
                     <ReviewCard icon={Coins} title="Petty cash fund">
                         <ReviewRow label="Name" value={data.name || '—'} />
-                        <ReviewRow label="Float" value={formatMoney(data.float_amount)} />
+                        <ReviewRow
+                            label="Float"
+                            value={formatMoney(data.float_amount)}
+                        />
                         <ReviewRow label="GL account" value={accountLabel} />
                         <ReviewRow label="Custodian" value={custodianLabel} />
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">Creating…</p>}
+                    {processing && (
+                        <p className="mt-3 text-[13px] text-muted-foreground">
+                            Creating…
+                        </p>
+                    )}
                 </div>
             )}
         </WizardShell>

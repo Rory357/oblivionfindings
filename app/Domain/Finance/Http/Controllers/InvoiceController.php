@@ -17,18 +17,22 @@ use App\Domain\Finance\Services\InvoicePdfService;
 use App\Http\Controllers\Controller;
 use App\Models\BillingEntry;
 use App\Models\Client;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class InvoiceController extends Controller
 {
+    private const APPLICATION_STORAGE_CONTEXT_ID = 1;
+
     public function index(Request $request)
     {
-        $orgId = $request->user()->organization_id;
+        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
 
         $query = FinInvoice::forOrganization($orgId)
             // Lines power the in-place Edit modal's prefill for draft invoices.
@@ -106,7 +110,7 @@ class InvoiceController extends Controller
             // Reference data for the New Invoice modal — only for managers (the
             // create route is finance.ar.manage), so view-only users skip the queries.
             'clients' => $canManage
-                ? $this->clientOptions($orgId)
+                ? $this->clientOptions($request->user())
                     ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)])
                     ->values()
                 : [],
@@ -122,7 +126,7 @@ class InvoiceController extends Controller
      */
     public function export(Request $request)
     {
-        $orgId = $request->user()->organization_id;
+        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
 
         $query = FinInvoice::forOrganization($orgId)->orderBy('invoice_date', 'desc');
 
@@ -162,7 +166,7 @@ class InvoiceController extends Controller
 
     public function create(Request $request)
     {
-        $orgId = $request->user()->organization_id;
+        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
 
         $accounts = FinAccount::forOrganization($orgId)
             ->active()
@@ -181,10 +185,9 @@ class InvoiceController extends Controller
             ->limit(50)
             ->get(['id', 'bill_number', 'vendor_id', 'total_amount']);
 
-        $clients = $this->clientOptions($orgId);
+        $clients = $this->clientOptions($request->user());
 
-        $billingEntries = BillingEntry::query()
-            ->where('organization_id', $orgId)
+        $billingEntries = $this->accessibleBillingEntries($request->user())
             ->whereIn('status', ['pending', 'approved'])
             ->with(['client:id,first_name,last_name'])
             ->orderByDesc('service_date')
@@ -204,18 +207,13 @@ class InvoiceController extends Controller
     {
         $validated = $request->validated();
 
-        $orgId = $request->user()->organization_id;
+        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
         $isOperationsPayload = $request->has('line_items')
             || $request->has('items')
             || $request->has('issue_date')
             || $request->has('payment_terms');
         $client = ! empty($validated['client_id'])
-            ? Client::query()
-                ->when(
-                    $orgId && Schema::hasColumn('clients', 'organization_id'),
-                    fn ($query) => $query->where('organization_id', $orgId),
-                )
-                ->findOrFail($validated['client_id'])
+            ? $this->accessibleClients($request->user())->findOrFail($validated['client_id'])
             : null;
 
         $billingEntryIds = collect($validated['lines'])
@@ -225,14 +223,24 @@ class InvoiceController extends Controller
             ->values();
 
         if ($billingEntryIds->isNotEmpty()) {
-            $scopedCount = BillingEntry::query()
-                ->where('organization_id', $orgId)
+            $accessibleBillingEntries = $this->accessibleBillingEntries($request->user())
                 ->whereIn('id', $billingEntryIds)
-                ->count();
+                ->get(['id', 'client_id']);
 
-            if ($scopedCount !== $billingEntryIds->count()) {
+            if ($accessibleBillingEntries->count() !== $billingEntryIds->count()) {
                 throw ValidationException::withMessages([
-                    'lines' => 'One or more billing entries are not available for this organisation.',
+                    'lines' => 'One or more billing entries are not available for an accessible Client Site.',
+                ]);
+            }
+
+            $billingClientIds = $accessibleBillingEntries
+                ->pluck('client_id')
+                ->unique()
+                ->values();
+
+            if (! $client || $billingClientIds->count() !== 1 || (int) $billingClientIds->first() !== (int) $client->id) {
+                throw ValidationException::withMessages([
+                    'lines' => 'Every billing entry must belong to the selected Client.',
                 ]);
             }
         }
@@ -313,8 +321,7 @@ class InvoiceController extends Controller
             }
 
             if ($billingEntryIds->isNotEmpty()) {
-                BillingEntry::query()
-                    ->where('organization_id', $orgId)
+                $this->accessibleBillingEntries($request->user())
                     ->whereIn('id', $billingEntryIds)
                     ->update(['status' => 'invoiced']);
             }
@@ -348,7 +355,7 @@ class InvoiceController extends Controller
                 ->with('error', 'Only draft invoices can be edited.');
         }
 
-        $orgId = $request->user()->organization_id;
+        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
 
         $invoice->load('lines');
 
@@ -386,17 +393,12 @@ class InvoiceController extends Controller
 
         $validated = $request->validated();
 
-        $orgId = $request->user()->organization_id;
+        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
         // Resolve the client (when client-billed) exactly as store() does, so the
         // edit modal can switch between client- and funder-billed and the
         // denormalised name/email/address stay consistent.
         $client = ! empty($validated['client_id'])
-            ? Client::query()
-                ->when(
-                    $orgId && Schema::hasColumn('clients', 'organization_id'),
-                    fn ($query) => $query->where('organization_id', $orgId),
-                )
-                ->findOrFail($validated['client_id'])
+            ? $this->accessibleClients($request->user())->findOrFail($validated['client_id'])
             : null;
 
         DB::transaction(function () use ($invoice, $validated, $client) {
@@ -527,7 +529,7 @@ class InvoiceController extends Controller
 
     public function markPaid(Request $request, int $invoiceId, AccountsReceivableService $arService)
     {
-        $orgId = $request->user()->organization_id;
+        $orgId = self::APPLICATION_STORAGE_CONTEXT_ID;
         $invoice = FinInvoice::forOrganization($orgId)->findOrFail($invoiceId);
 
         $this->authorize('update', $invoice);
@@ -604,16 +606,36 @@ class InvoiceController extends Controller
         return FinInvoice::nextNumber($orgId);
     }
 
-    private function clientOptions(?int $orgId)
+    private function clientOptions(User $user)
     {
-        return Client::query()
-            ->when(
-                $orgId && Schema::hasColumn('clients', 'organization_id'),
-                fn ($query) => $query->where('organization_id', $orgId),
-            )
+        return $this->accessibleClients($user)
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name']);
+    }
+
+    private function accessibleClients(User $user): Builder
+    {
+        return app(UserSiteAccessService::class)->applyClientScope(
+            Client::query(),
+            $user,
+            ['reports.viewAny'],
+        );
+    }
+
+    private function accessibleBillingEntries(User $user): Builder
+    {
+        return BillingEntry::query()
+            ->whereHas('client', fn (Builder $clientQuery) => app(UserSiteAccessService::class)->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ))
+            ->where(function (Builder $query): void {
+                $query->whereNull('service_agreement_id')
+                    ->orWhereHas('serviceAgreement', fn (Builder $agreementQuery) => $agreementQuery
+                        ->whereColumn('service_agreements.client_id', 'billing_entries.client_id'));
+            });
     }
 
     private function formatClientAddress(?Client $client): ?string

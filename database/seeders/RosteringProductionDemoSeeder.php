@@ -134,6 +134,7 @@ class RosteringProductionDemoSeeder extends Seeder
     {
         $weekStart = Carbon::parse('2026-05-04', 'Pacific/Auckland')->startOfDay();
         $this->period($site, $weekStart, $manager);
+        $this->ensureSuggestionCandidateEligible($worker, $site);
 
         $this->shift(9101, $site, $client, $weekStart->copy()->setTime(9, 0), $worker, false);
     }
@@ -234,10 +235,14 @@ class RosteringProductionDemoSeeder extends Seeder
 
     private function frontlineVisibilityFixture(Site $site, Client $client, User $worker, User $manager): void
     {
-        $weekStart = Carbon::parse('2026-05-04', 'Pacific/Auckland')->startOfDay();
+        $weekStart = Carbon::now('Pacific/Auckland')
+            ->startOfWeek()
+            ->addWeek()
+            ->startOfDay();
         $this->period($site, $weekStart, $manager);
+        $this->ensureSuggestionCandidateEligible($worker, $site);
 
-        $this->shift(9301, $site, $client, $weekStart->copy()->addDays(3)->setTime(9, 0), $worker, false);
+        $this->shift(9301, $site, $client, $weekStart->copy()->addDays(2)->setTime(9, 0), $worker, false);
     }
 
     private function templateConflictFixture(Client $client, User $worker, User $manager): void

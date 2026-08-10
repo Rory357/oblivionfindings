@@ -16,7 +16,6 @@ function seedSiteGeofenceFixture(): { siteId: number } {
 $site = \\App\\Models\\Site::query()->updateOrCreate(
     ['name' => 'Playwright Geofence House'],
     [
-        'tenant_id' => 1,
         'type' => 'house',
         'address_line_1' => '1 Queen Street',
         'suburb' => 'Auckland Central',
@@ -37,7 +36,6 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
 \\App\\Models\\SiteContact::query()->updateOrCreate(
     ['site_id' => $site->id, 'type' => 'site_lead', 'name' => 'Geofence Site Lead'],
     [
-        'tenant_id' => $site->tenant_id,
         'role' => 'Site Lead',
         'phone' => '021 555 010',
         'is_primary' => true,
@@ -47,7 +45,6 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
 \\App\\Models\\SiteContact::query()->updateOrCreate(
     ['site_id' => $site->id, 'type' => 'emergency', 'name' => 'Geofence After Hours'],
     [
-        'tenant_id' => $site->tenant_id,
         'role' => 'After hours',
         'phone' => '0800 555 010',
     ],
@@ -85,7 +82,7 @@ test('site readiness geofence flow saves a boundary and reuses the same dialog e
     await loginAsStaff(page);
     await page.goto(`/sites/${siteId}`, { waitUntil: 'domcontentloaded' });
 
-    await page.getByTestId('site-readiness-tab').click();
+    await page.getByTestId('site-profile-tab-readiness').click();
     await expect(page.getByTestId('readiness-item-geofence')).toContainText(
         'Geofence configured',
     );
@@ -101,7 +98,7 @@ test('site readiness geofence flow saves a boundary and reuses the same dialog e
     await page.getByTestId('site-geofence-save').click();
 
     await expect(page.getByTestId('site-geofence-dialog')).toHaveCount(0);
-    await page.getByTestId('site-readiness-tab').click();
+    await page.getByTestId('site-profile-tab-readiness').click();
     await expect(page.getByTestId('readiness-fix-geofence')).toHaveCount(0);
 
     await page.getByRole('tab', { name: /^Overview/ }).click();

@@ -22,7 +22,6 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -33,12 +32,11 @@ beforeEach(function () {
     }
 
     $this->site = Site::factory()->create([
-        'tenant_id' => 1,
         'type' => 'house',
     ]);
+    auditFixPerformanceProfile($this->hr, $this->site);
 
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'support_worker',
         'site_type' => 'all',
         'tasks' => [],
@@ -48,16 +46,20 @@ beforeEach(function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  Fixtures                                                           */
+/*  Fixtures */
 /* ------------------------------------------------------------------ */
 
 function auditFixRequisition(User $hiringManager, User $creator, int $openings = 1, string $status = 'published'): HrJobRequisition
 {
+    if (! $hiringManager->hrEmployeeProfile()->exists()) {
+        auditFixPerformanceProfile($hiringManager, test()->site);
+    }
+
     return HrJobRequisition::query()->create([
-        'tenant_id' => 1,
         'title' => 'Support Worker — Audit Fixture',
         'slug' => 'support-worker-audit-fixture-'.uniqid(),
         'position_role' => 'support_worker',
+        'site_id' => test()->site->id,
         'employment_type' => 'full_time',
         'openings' => $openings,
         'status' => $status,
@@ -70,7 +72,6 @@ function auditFixRequisition(User $hiringManager, User $creator, int $openings =
 function auditFixSentOffer(User $hr, Site $site, HrJobRequisition $requisition, string $email): array
 {
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'first_name' => 'Aroha',
         'last_name' => 'Candidate',
         'personal_email' => $email,
@@ -80,7 +81,6 @@ function auditFixSentOffer(User $hr, Site $site, HrJobRequisition $requisition, 
     ]);
 
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'requisition_id' => $requisition->id,
         'position_title' => 'Support Worker',
@@ -109,7 +109,7 @@ function auditFixSentOffer(User $hr, Site $site, HrJobRequisition $requisition, 
 }
 
 /* ------------------------------------------------------------------ */
-/*  1. Offer declined → hiring manager notified                        */
+/*  1. Offer declined → hiring manager notified */
 /* ------------------------------------------------------------------ */
 
 test('declining an offer notifies the hiring manager', function () {
@@ -163,7 +163,7 @@ test('a withdrawn offer also notifies the hiring manager with reason withdrawn',
 });
 
 /* ------------------------------------------------------------------ */
-/*  2. Requisition auto-closes when every opening is filled            */
+/*  2. Requisition auto-closes when every opening is filled */
 /* ------------------------------------------------------------------ */
 
 test('requisition closes automatically when the hired count reaches openings', function () {
@@ -197,7 +197,7 @@ test('requisition stays open while openings remain unfilled', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  3. Bulk reject → optional decline emails                           */
+/*  3. Bulk reject → optional decline emails */
 /* ------------------------------------------------------------------ */
 
 test('bulk reject sends a decline email per candidate when opted in', function () {
@@ -205,13 +205,11 @@ test('bulk reject sends a decline email per candidate when opted in', function (
 
     $candidates = collect(['bulk.one@example.test', 'bulk.two@example.test'])->map(function ($email) {
         $candidate = HrCandidate::factory()->create([
-            'tenant_id' => 1,
             'personal_email' => $email,
             'status' => 'screening',
             'created_by' => $this->hr->id,
         ]);
         HrApplication::factory()->create([
-            'tenant_id' => 1,
             'candidate_id' => $candidate->id,
             'position_title' => 'Support Worker',
             'position_role' => 'support_worker',
@@ -243,13 +241,11 @@ test('bulk reject sends no decline email by default', function () {
     Notification::fake();
 
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'personal_email' => 'bulk.silent@example.test',
         'status' => 'screening',
         'created_by' => $this->hr->id,
     ]);
     HrApplication::factory()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
@@ -269,7 +265,7 @@ test('bulk reject sends no decline email by default', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  4. PIP creation → employee + manager notified                      */
+/*  4. PIP creation → employee + manager notified */
 /* ------------------------------------------------------------------ */
 
 function auditFixPipPayload(User $employee): array
@@ -288,10 +284,23 @@ function auditFixPipPayload(User $employee): array
     ];
 }
 
+function auditFixPerformanceProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
+
 test('creating a PIP notifies the subject employee and the manager', function () {
     Notification::fake();
 
     $employee = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    auditFixPerformanceProfile($employee, $this->site);
 
     $this->actingAs($this->hr)
         ->post('/hr/performance/pips', auditFixPipPayload($employee))
@@ -313,14 +322,16 @@ test('creating a PIP notifies the subject employee and the manager', function ()
 });
 
 /* ------------------------------------------------------------------ */
-/*  5. Subject can view own PIP; strangers cannot                      */
+/*  5. Subject can view own PIP; strangers cannot */
 /* ------------------------------------------------------------------ */
 
-test('the subject employee can view their own PIP read-only and a stranger gets 403', function () {
+test('the subject employee can view their own PIP read-only and a stranger gets 404', function () {
     Notification::fake();
 
     $employee = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $stranger = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    auditFixPerformanceProfile($employee, $this->site);
+    auditFixPerformanceProfile($stranger, $this->site);
 
     $this->actingAs($this->hr)
         ->post('/hr/performance/pips', auditFixPipPayload($employee))
@@ -338,13 +349,14 @@ test('the subject employee can view their own PIP read-only and a stranger gets 
 
     $this->actingAs($stranger)
         ->get("/hr/performance/pips/{$pip->id}")
-        ->assertForbidden();
+        ->assertNotFound();
 });
 
 test('the subject employee can acknowledge their own PIP', function () {
     Notification::fake();
 
     $employee = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    auditFixPerformanceProfile($employee, $this->site);
 
     $this->actingAs($this->hr)
         ->post('/hr/performance/pips', auditFixPipPayload($employee))
@@ -360,19 +372,17 @@ test('the subject employee can acknowledge their own PIP', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  6. My-HR attention item for an unacknowledged PIP                  */
+/*  6. My-HR attention item for an unacknowledged PIP */
 /* ------------------------------------------------------------------ */
 
 test('an active unacknowledged PIP appears as a critical attention item on My HR', function () {
     Notification::fake();
 
     $employee = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $employee->id,
         'employee_number' => 'EMP-PIP-'.$employee->id,
         'work_email' => 'pip'.$employee->id.'@example.test',
@@ -381,6 +391,8 @@ test('an active unacknowledged PIP appears as a critical attention item on My HR
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
     ]);
 
     $this->actingAs($this->hr)

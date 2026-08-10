@@ -267,10 +267,7 @@ export function TierTwoTabs({
     pinnedTabs?: string[];
     onPinnedTabsChange?: (tabs: string[]) => void;
 }) {
-    const moveTab = (
-        event: ReactKeyboardEvent<HTMLElement>,
-        index: number,
-    ) => {
+    const moveTab = (event: ReactKeyboardEvent<HTMLElement>, index: number) => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
             return;
         }
@@ -293,9 +290,7 @@ export function TierTwoTabs({
                     ];
         if (!target) return;
 
-        document
-            .getElementById(`${testIdPrefix}-tab-${target.key}`)
-            ?.focus();
+        document.getElementById(`${testIdPrefix}-tab-${target.key}`)?.focus();
         onTab(target.key);
     };
 
@@ -338,12 +333,7 @@ export function TierTwoTabs({
                         'data-test': `${testIdPrefix}-tab-${tab.key}`,
                     };
                     const tabControl = tab.href ? (
-                        renderLink(
-                            tab,
-                            className,
-                            inner,
-                            accessibilityProps,
-                        )
+                        renderLink(tab, className, inner, accessibilityProps)
                     ) : (
                         <button
                             type="button"

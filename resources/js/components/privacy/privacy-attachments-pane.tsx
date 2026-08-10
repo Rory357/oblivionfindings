@@ -8,10 +8,20 @@
  * of existing documents with download + delete. Sensitive files the viewer
  * isn't cleared for arrive as a locked shell (need-to-know).
  */
-import { AttachmentUploader, formatFileSize } from '@/components/ui/file-dropzone';
+import {
+    AttachmentUploader,
+    formatFileSize,
+} from '@/components/ui/file-dropzone';
 import { fmtDate } from '@/pages/privacy/privacy-shared';
 import { router } from '@inertiajs/react';
-import { Download, FileText, ImageIcon, Lock, ShieldAlert, Trash2 } from 'lucide-react';
+import {
+    Download,
+    FileText,
+    ImageIcon,
+    Lock,
+    ShieldAlert,
+    Trash2,
+} from 'lucide-react';
 
 export type PrivacyAttachmentItem =
     | { id: number; locked: true; is_sensitive: true }
@@ -29,7 +39,12 @@ export type PrivacyAttachmentItem =
           download_url: string;
       };
 
-export type PrivacyAttachableType = 'request' | 'breach' | 'hold' | 'dpia' | 'retention';
+export type PrivacyAttachableType =
+    | 'request'
+    | 'breach'
+    | 'hold'
+    | 'dpia'
+    | 'retention';
 
 export function PrivacyAttachmentsPane({
     attachableType,
@@ -43,7 +58,10 @@ export function PrivacyAttachmentsPane({
     canManage: boolean;
 }) {
     const remove = (id: number) =>
-        router.delete(`/privacy/attachments/${id}`, { preserveScroll: true, preserveState: true });
+        router.delete(`/privacy/attachments/${id}`, {
+            preserveScroll: true,
+            preserveState: true,
+        });
 
     return (
         <div className="flex flex-col gap-3">
@@ -59,8 +77,13 @@ export function PrivacyAttachmentsPane({
                                     <Lock className="h-5 w-5" />
                                 </span>
                                 <div className="text-[13px]">
-                                    <div className="font-semibold text-foreground">Restricted document</div>
-                                    <div className="text-xs">Sensitive — need-to-know (privacy write access required)</div>
+                                    <div className="font-semibold text-foreground">
+                                        Restricted document
+                                    </div>
+                                    <div className="text-xs">
+                                        Sensitive — need-to-know (privacy write
+                                        access required)
+                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -69,23 +92,40 @@ export function PrivacyAttachmentsPane({
                                 className="flex items-center gap-3 rounded-xl border border-border bg-card/70 p-3 transition-colors hover:border-primary/40"
                             >
                                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-                                    {a.is_image ? <ImageIcon className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                                    {a.is_image ? (
+                                        <ImageIcon className="h-5 w-5" />
+                                    ) : (
+                                        <FileText className="h-5 w-5" />
+                                    )}
                                 </span>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
-                                        <span className="truncate text-[13px] font-semibold">{a.name}</span>
+                                        <span className="truncate text-[13px] font-semibold">
+                                            {a.name}
+                                        </span>
                                         {a.is_sensitive ? (
                                             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-warning">
-                                                <ShieldAlert className="h-2.5 w-2.5" /> Sensitive
+                                                <ShieldAlert className="h-2.5 w-2.5" />{' '}
+                                                Sensitive
                                             </span>
                                         ) : null}
                                     </div>
                                     <div className="truncate text-[11px] text-muted-foreground">
-                                        {[a.size ? formatFileSize(a.size) : null, a.uploaded_by, fmtDate(a.created_at)]
+                                        {[
+                                            a.size
+                                                ? formatFileSize(a.size)
+                                                : null,
+                                            a.uploaded_by,
+                                            fmtDate(a.created_at),
+                                        ]
                                             .filter(Boolean)
                                             .join(' · ')}
                                     </div>
-                                    {a.notes ? <div className="mt-0.5 text-xs text-muted-foreground">{a.notes}</div> : null}
+                                    {a.notes ? (
+                                        <div className="mt-0.5 text-xs text-muted-foreground">
+                                            {a.notes}
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <a
                                     href={a.download_url}
@@ -118,7 +158,10 @@ export function PrivacyAttachmentsPane({
                 <AttachmentUploader
                     endpoint={`/privacy/attachments?attachable_type=${attachableType}&attachable_id=${attachableId}`}
                     noteField="notes"
-                    sensitive={{ field: 'is_sensitive', label: 'Sensitive — restrict to staff with privacy write access' }}
+                    sensitive={{
+                        field: 'is_sensitive',
+                        label: 'Sensitive — restrict to staff with privacy write access',
+                    }}
                     hint="PDF, Word, Excel, images — up to 10 MB each"
                 />
             ) : null}

@@ -250,7 +250,7 @@ class HsRecommendationDispositionTest extends TestCase
 
     public function test_event_detail_exposes_only_eligible_owners_and_unresolved_tasks_for_handover(): void
     {
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $officer = $this->hsOfficer();
         $owner = $this->hsOfficer();
         $owner->update(['name' => 'Zed Eligible H&S Owner']);
@@ -262,11 +262,9 @@ class HsRecommendationDispositionTest extends TestCase
                 'name' => sprintf('A non-H&S staff %03d', $sequence->index),
             ])
             ->create([
-                'organization_id' => 1,
                 'approved_at' => now(),
             ])
             ->each(fn (User $user) => HrEmployeeProfile::factory()->create([
-                'tenant_id' => 1,
                 'user_id' => $user->id,
                 'primary_site_id' => $site->id,
                 'secondary_site_ids' => [],
@@ -275,7 +273,6 @@ class HsRecommendationDispositionTest extends TestCase
         $event = HsEvent::factory()
             ->handoverAccepted($owner, $officer)
             ->create([
-                'organization_id' => 1,
                 'site_id' => $site->id,
                 'control_room_alert_id' => $alert->id,
             ]);
@@ -415,7 +412,6 @@ class HsRecommendationDispositionTest extends TestCase
         $role = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
         $user->roles()->attach($role);
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => $user->organization_id,
             'user_id' => $user->id,
             'secondary_site_ids' => [],
         ]);

@@ -1,3 +1,11 @@
+import { LifecycleTabs } from '@/components/hr/lifecycle-tabs';
+import {
+    OffboardingWizardDialog,
+    type DepartureReason,
+    type OffboardingEmployee,
+    type OffboardingInterviewer,
+    type OffboardingTaskPreview,
+} from '@/components/hr/offboarding-wizard-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,14 +20,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { LifecycleTabs } from '@/components/hr/lifecycle-tabs';
-import {
-    OffboardingWizardDialog,
-    type DepartureReason,
-    type OffboardingEmployee,
-    type OffboardingInterviewer,
-    type OffboardingTaskPreview,
-} from '@/components/hr/offboarding-wizard-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
@@ -139,13 +139,17 @@ export default function OffboardingIndex({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={UserMinus}
                         title="Offboarding Checklists"
                         description="Manage employee exits with structured checklists and progress tracking."
                         stats={[
                             { label: 'Pending', value: summary.pending },
-                            { label: 'In progress', value: summary.in_progress },
+                            {
+                                label: 'In progress',
+                                value: summary.in_progress,
+                            },
                             { label: 'Overdue', value: summary.overdue },
                             { label: 'Completed', value: summary.completed },
                         ]}

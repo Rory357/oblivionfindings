@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 
 import { cn } from '@/lib/utils';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import {
     type HandoverCtxHandlers,
     useHandoverContextMenu,
@@ -17,7 +18,6 @@ import {
     relTime,
     ymd,
 } from './shared';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 type RailCounts = {
     draft: number;
@@ -89,7 +89,8 @@ export function HandoverRail({
                 </p>
                 <div className="mt-3 space-y-1">
                     {awaiting.map((h) => (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             key={h.id}
                             type="button"
                             onClick={() => onOpen(h)}

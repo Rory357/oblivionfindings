@@ -16,9 +16,13 @@ vi.mock('@inertiajs/react', async () => {
 
     return {
         Head: () => null,
-        Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
-            <a href={href}>{children}</a>
-        ),
+        Link: ({
+            href,
+            children,
+        }: {
+            href: string;
+            children: React.ReactNode;
+        }) => <a href={href}>{children}</a>,
         router: { get: vi.fn() },
         useForm: (initial: Record<string, unknown>) => {
             const [data, setDataState] = ReactActual.useState({
@@ -81,9 +85,13 @@ describe('Log fuel workflow', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         expect(screen.getByText('Community van')).toBeVisible();
         expect(screen.getByText('42.5 L')).toBeVisible();
-        expect(screen.getByRole('button', { name: 'Save fuel log' })).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: 'Save fuel log' }),
+        ).toBeVisible();
 
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-        expect(screen.queryByRole('dialog', { name: 'Log fuel purchase' })).toBeNull();
+        expect(
+            screen.queryByRole('dialog', { name: 'Log fuel purchase' }),
+        ).toBeNull();
     });
 });

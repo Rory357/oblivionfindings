@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\FleetShiftHandover;
@@ -10,6 +9,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
+use App\Support\LegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -232,18 +232,10 @@ class HandoverController extends Controller
 
             $siteId = $asset->site_id ?: $asset->home_site_id;
             $site = $siteId
-                ? Site::query()->whereKey($siteId)->lockForUpdate()->first()
+                ? Site::query()->active()->notArchived()->whereKey($siteId)->lockForUpdate()->first()
                 : null;
             abort_unless(
                 $site,
-                403,
-                'You are not authorized to create handovers for vehicles at this site.',
-            );
-            $tenantId = is_numeric($site->tenant_id) ? (int) $site->tenant_id : null;
-            abort_unless(
-                $tenantId !== null
-                    && $tenantId > 0
-                    && (int) $actor->organization_id === $tenantId,
                 403,
                 'You are not authorized to create handovers for vehicles at this site.',
             );
@@ -253,12 +245,18 @@ class HandoverController extends Controller
                 self::BYPASS_PERMISSIONS,
                 'You are not authorized to create handovers for vehicles at this site.',
             );
+            $outgoingQuery = User::query()->whereKey($actor->id);
+            $siteAccess->applyFleetRecipientEligibility($outgoingQuery, (int) $site->id);
+            abort_unless(
+                $outgoingQuery->lockForUpdate()->exists(),
+                403,
+                'You must be current staff assigned to this Site to hand over its vehicle.',
+            );
 
             $incomingUserId = (int) $data['incoming_user_id'];
             $incomingQuery = User::query()->whereKey($incomingUserId);
             $siteAccess->applyFleetRecipientEligibility(
                 $incomingQuery,
-                $tenantId,
                 (int) $site->id,
             );
             $incoming = $incomingQuery->lockForUpdate()->first();
@@ -267,24 +265,9 @@ class HandoverController extends Controller
                 403,
                 'You are not authorized to hand this vehicle over to that user.',
             );
-            $incomingProfile = HrEmployeeProfile::query()
-                ->where('user_id', $incoming->id)
-                ->where('tenant_id', $tenantId)
-                ->where('is_active', true)
-                ->where(function (Builder $profileSite) use ($site) {
-                    $profileSite->where('primary_site_id', $site->id)
-                        ->orWhereJsonContains('secondary_site_ids', (int) $site->id);
-                })
-                ->lockForUpdate()
-                ->first();
-            abort_unless(
-                $incomingProfile,
-                403,
-                'You are not authorized to hand this vehicle over to that user.',
-            );
 
             $handover = FleetShiftHandover::query()->create([
-                'tenant_id' => $tenantId,
+                ...LegacyStorageContext::attributes(),
                 'asset_id' => $asset->id,
                 'outgoing_user_id' => $actor->id,
                 'incoming_user_id' => $incomingUserId,
@@ -460,7 +443,7 @@ class HandoverController extends Controller
             ->first();
         $siteId = $asset?->site_id ?: $asset?->home_site_id;
         $site = $siteId
-            ? Site::query()->whereKey($siteId)->lockForUpdate()->first()
+            ? Site::query()->active()->notArchived()->whereKey($siteId)->lockForUpdate()->first()
             : null;
         $outgoing = User::query()
             ->whereKey($lockedHandover->outgoing_user_id)
@@ -470,38 +453,21 @@ class HandoverController extends Controller
             ->whereKey($lockedHandover->incoming_user_id)
             ->lockForUpdate()
             ->first();
-        $tenantId = is_numeric($lockedHandover->tenant_id)
-            ? (int) $lockedHandover->tenant_id
-            : null;
-        $incomingProfile = $incoming
-            ? HrEmployeeProfile::query()
-                ->where('user_id', $incoming->id)
-                ->lockForUpdate()
-                ->first()
-            : null;
-
         abort_unless(
             $asset
                 && $site
-                && $tenantId !== null
-                && $tenantId > 0
-                && (int) $site->tenant_id === $tenantId
                 && $outgoing
-                && (int) $outgoing->organization_id === $tenantId
-                && $incoming
-                && (int) $incoming->organization_id === $tenantId
-                && $incomingProfile,
+                && $incoming,
             403,
             $message,
         );
 
-        $incomingEligibility = User::query()->whereKey($incoming->id);
-        app(UserSiteAccessService::class)->applyFleetRecipientEligibility(
-            $incomingEligibility,
-            $tenantId,
-            (int) $site->id,
-        );
-        abort_unless($incomingEligibility->exists(), 403, $message);
+        $siteAccess = app(UserSiteAccessService::class);
+        foreach ([$outgoing->id, $incoming->id] as $participantId) {
+            $eligibility = User::query()->whereKey($participantId);
+            $siteAccess->applyFleetRecipientEligibility($eligibility, (int) $site->id);
+            abort_unless($eligibility->exists(), 403, $message);
+        }
 
         $lockedHandover->setRelation('asset', $asset);
         $lockedHandover->setRelation('outgoingUser', $outgoing);
@@ -521,13 +487,6 @@ class HandoverController extends Controller
         User $user,
         UserSiteAccessService $siteAccess,
     ): void {
-        if (
-            $siteAccess->canBypass($user, self::BYPASS_PERMISSIONS)
-            && $siteAccess->isUnrestrictedPlatformUser($user)
-        ) {
-            return;
-        }
-
         $siteIds = $siteAccess->accessibleSiteIds($user, self::BYPASS_PERMISSIONS);
         if ($siteIds === []) {
             $query->whereRaw('1 = 0');

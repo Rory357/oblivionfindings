@@ -515,6 +515,7 @@ class ControlRoomIncidentController extends Controller
             $incident = ClientIncident::withoutEvents(
                 fn () => ClientIncident::create([
                     'client_id' => $client->id,
+                    'site_id' => $client->site_id,
                     'reported_by' => $user->id,
                     'type' => $data['type'],
                     'source' => 'control_room',
@@ -616,14 +617,12 @@ class ControlRoomIncidentController extends Controller
         $siteAccess = $this->siteAccess();
         $bypassPermissions = $this->alertBypassPermissions();
 
-        if (! $siteAccess->isUnrestrictedPlatformUser($user)) {
-            $siteIds = $siteAccess->accessibleSiteIds($user, $bypassPermissions);
+        $siteIds = $siteAccess->accessibleSiteIds($user, $bypassPermissions);
 
-            if ($siteIds === []) {
-                $query->whereRaw('1 = 0');
-            } else {
-                $query->whereIn('site_id', $siteIds);
-            }
+        if ($siteIds === []) {
+            $query->whereRaw('1 = 0');
+        } else {
+            $query->whereIn('site_id', $siteIds);
         }
 
         if (! $user->can('viewAny', SafeguardingConcern::class)) {

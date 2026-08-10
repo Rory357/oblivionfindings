@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrComplianceRenewalSnooze;
+use App\Domain\Hr\Models\HrDriverEligibility;
+use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\BuildsComplianceHero;
 use App\Http\Controllers\Hr\Concerns\ProvidesComplianceWizardData;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
-use App\Domain\Hr\Models\HrStaffComplianceStatus;
-use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Models\StaffBackgroundCheck;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -16,7 +20,10 @@ class ComplianceCalendarController extends Controller
 {
     use BuildsComplianceHero;
     use ProvidesComplianceWizardData;
-    use ResolvesHrTenant;
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     /**
      * Renders compliance calendar showing all compliance deadlines,
@@ -26,7 +33,6 @@ class ComplianceCalendarController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $now = now();
         // Capture overdue (back 9 months) through the next 4 months of renewals.
@@ -37,7 +43,8 @@ class ComplianceCalendarController extends Controller
 
         // 1. Compliance status expiries.
         HrStaffComplianceStatus::query()
-            ->where('tenant_id', $tenantId)
+            ->whereIn('user_id', $this->visibleCurrentStaffIds($user))
+            ->whereNotIn('id', $this->activeSnoozedIds('compliance'))
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$rangeStart, $rangeEnd])
             ->with(['user:id,name', 'requirement:id,name,code'])
@@ -53,6 +60,8 @@ class ComplianceCalendarController extends Controller
 
         // 2. Vetting expiries.
         StaffBackgroundCheck::query()
+            ->whereIn('user_id', $this->visibleCurrentStaffIds($user))
+            ->whereNotIn('id', $this->activeSnoozedIds('vetting'))
             ->whereNotNull('expires_at')
             ->whereBetween('expires_at', [$rangeStart, $rangeEnd])
             ->with('user:id,name')
@@ -68,7 +77,8 @@ class ComplianceCalendarController extends Controller
 
         // 3. Driver licence expiries.
         HrDriverEligibility::query()
-            ->where('tenant_id', $tenantId)
+            ->whereIn('user_id', $this->visibleCurrentStaffIds($user))
+            ->whereNotIn('id', $this->activeSnoozedIds('driver'))
             ->whereNotNull('licence_expires_at')
             ->whereBetween('licence_expires_at', [$rangeStart, $rangeEnd])
             ->with('user:id,name')
@@ -76,23 +86,26 @@ class ComplianceCalendarController extends Controller
             ->each(function ($record) use ($events, $now) {
                 $events->push($this->event(
                     'driver', $record->id, $record->licence_expires_at, $now,
-                    'Driver Licence (Class ' . ($record->licence_class ?: '—') . ')',
+                    'Driver Licence (Class '.($record->licence_class ?: '—').')',
                     $record->user?->name ?? 'Unknown',
                     $record->user_id,
                 ));
             });
 
-        $filterType = $request->query('type');
-        if ($filterType && $filterType !== 'all') {
+        $filterType = (string) $request->query('type', 'all');
+        if (! in_array($filterType, ['all', 'compliance', 'vetting', 'driver'], true)) {
+            $filterType = 'all';
+        }
+        if ($filterType !== 'all') {
             $events = $events->where('type', $filterType);
         }
 
         return Inertia::render('hr/compliance/calendar', [
-            'hero' => $this->complianceHero($user, $tenantId),
+            'hero' => $this->complianceHero($user),
             'events' => $events->sortBy('start')->values(),
-            'wizard' => $this->complianceWizardData($tenantId),
+            'wizard' => $this->complianceWizardData($user),
             'filters' => [
-                'type' => $filterType ?: 'all',
+                'type' => $filterType,
             ],
             'can' => [
                 'manage' => $user->canDo('hr.compliance.manage'),
@@ -103,24 +116,42 @@ class ComplianceCalendarController extends Controller
         ]);
     }
 
+    /** @return Builder<User> */
+    private function visibleCurrentStaffIds(User $viewer): Builder
+    {
+        $query = User::query()->select('id');
+        $this->siteAccess->applyStaffScope($query, $viewer);
+
+        return $query;
+    }
+
+    /** @return Builder<HrComplianceRenewalSnooze> */
+    private function activeSnoozedIds(string $entityType): Builder
+    {
+        return HrComplianceRenewalSnooze::query()
+            ->select('entity_id')
+            ->where('entity_type', $entityType)
+            ->where('snoozed_until', '>', now());
+    }
+
     /** Build a renewal event row with urgency + human "days" label. */
     private function event(string $type, int $id, $date, $now, string $requirement, string $person, ?int $userId = null): array
     {
-        $date = $date instanceof \Carbon\Carbon ? $date : \Carbon\Carbon::parse($date);
+        $date = $date instanceof Carbon ? $date : Carbon::parse($date);
         $diff = (int) round($now->diffInDays($date, false));
         if ($diff < 0) {
             $urgency = 'over';
-            $days = abs($diff) . ' days overdue';
+            $days = abs($diff).' days overdue';
         } elseif ($diff <= 30) {
             $urgency = 'soon';
-            $days = 'in ' . $diff . ' days';
+            $days = 'in '.$diff.' days';
         } else {
             $urgency = 'far';
-            $days = 'in ' . $diff . ' days';
+            $days = 'in '.$diff.' days';
         }
 
         return [
-            'id' => $type . '-' . $id,
+            'id' => $type.'-'.$id,
             'entity_type' => $type,
             'entity_id' => $id,
             'user_id' => $userId,

@@ -1,6 +1,7 @@
 import { Check, ChevronDown, MapPin, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import {
     Command,
     CommandEmpty,
@@ -17,7 +18,6 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type SiteOption = {
     id: number;
@@ -75,7 +75,8 @@ export function SiteFilter({
           )
         : cn(
               'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent',
-              !allSelected && 'border-primary bg-primary text-primary-foreground',
+              !allSelected &&
+                  'border-primary bg-primary text-primary-foreground',
           );
 
     return (
@@ -92,7 +93,10 @@ export function SiteFilter({
                             aria-expanded={open}
                             className="inline-flex items-center gap-1.5 rounded-full"
                         >
-                            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                            <MapPin
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                            />
                             <span className="max-w-[200px] truncate">
                                 {triggerLabel}
                             </span>
@@ -102,7 +106,8 @@ export function SiteFilter({
                         </button>
                     </PopoverTrigger>
                     {!allSelected ? (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             type="button"
                             aria-label="Clear site filter"
                             className={cn(
@@ -151,7 +156,7 @@ export function SiteFilter({
                                 <span className="flex-1 font-medium">
                                     All sites
                                 </span>
-                                <span className="text-[10px] tabular-nums text-muted-foreground">
+                                <span className="text-[10px] text-muted-foreground tabular-nums">
                                     {sites.length}
                                 </span>
                             </CommandItem>
@@ -210,7 +215,8 @@ export function SiteFilter({
                             <span className="text-muted-foreground tabular-nums">
                                 {selectedCount} of {sites.length} selected
                             </span>
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 type="button"
                                 onClick={clearAll}
                                 className="font-semibold text-primary hover:underline"

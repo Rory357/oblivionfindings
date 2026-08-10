@@ -15,7 +15,11 @@ import {
  * `finance.admin`. The tabs SPA-navigate under the shared finance hero; `requires`
  * mirrors each route's gate so a tab the user can't open is never shown.
  */
-export type TaxTabId = 'gst-returns' | 'ird-filings' | 'audit-exports' | 'consolidation';
+export type TaxTabId =
+    | 'gst-returns'
+    | 'ird-filings'
+    | 'audit-exports'
+    | 'consolidation';
 
 // `can` is the same loosely-typed permission tree the sidebar consumes (auth.can).
 type CanTree = Record<string, any> | undefined;
@@ -26,10 +30,38 @@ type TaxTabDef = FinanceTabItem & {
 };
 
 export const TAX_TABS: TaxTabDef[] = [
-    { id: 'gst-returns', label: 'GST returns', icon: Receipt, tone: 'primary', href: '/finance/gst-returns', requires: (c) => !!c?.finance?.tax?.view },
-    { id: 'ird-filings', label: 'IRD filing', icon: Landmark, tone: 'info', href: '/finance/ird-filings', requires: (c) => !!c?.finance?.tax?.manage },
-    { id: 'audit-exports', label: 'Audit exports', icon: Download, tone: 'success', href: '/finance/audit-exports', requires: (c) => !!c?.finance?.reports?.view },
-    { id: 'consolidation', label: 'Consolidation', icon: Building2, tone: 'violet', href: '/finance/consolidation', requires: (c) => !!c?.finance?.admin },
+    {
+        id: 'gst-returns',
+        label: 'GST returns',
+        icon: Receipt,
+        tone: 'primary',
+        href: '/finance/gst-returns',
+        requires: (c) => !!c?.finance?.tax?.view,
+    },
+    {
+        id: 'ird-filings',
+        label: 'IRD filing',
+        icon: Landmark,
+        tone: 'info',
+        href: '/finance/ird-filings',
+        requires: (c) => !!c?.finance?.tax?.manage,
+    },
+    {
+        id: 'audit-exports',
+        label: 'Audit exports',
+        icon: Download,
+        tone: 'success',
+        href: '/finance/audit-exports',
+        requires: (c) => !!c?.finance?.reports?.view,
+    },
+    {
+        id: 'consolidation',
+        label: 'Consolidation',
+        icon: Building2,
+        tone: 'violet',
+        href: '/finance/consolidation',
+        requires: (c) => !!c?.finance?.admin,
+    },
 ];
 
 /**

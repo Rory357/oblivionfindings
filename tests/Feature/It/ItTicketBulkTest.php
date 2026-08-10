@@ -1,7 +1,10 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\It\TicketAssignedNotification;
 use Database\Seeders\RbacSeeder;
@@ -19,14 +22,25 @@ function itBulkUser(string $role): User
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = itBulkUser('hr');
     $this->manager = itBulkUser('provider_manager');
     $this->worker = itBulkUser('support_worker');
+
+    foreach ([$this->hr, $this->manager, $this->worker] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+    }
 });
 
 test('bulk assign hands a selection to one agent and notifies them once per ticket', function () {
     Notification::fake();
-    $tickets = ItTicket::factory()->count(3)->create();
+    $tickets = ItTicket::factory()->count(3)->create(['site_id' => $this->site->id]);
 
     $this->actingAs($this->hr)
         ->post('/it/tickets/bulk', [
@@ -54,7 +68,7 @@ test('bulk assign hands a selection to one agent and notifies them once per tick
 
 test('bulk assign to yourself never self-notifies', function () {
     Notification::fake();
-    $ticket = ItTicket::factory()->create();
+    $ticket = ItTicket::factory()->create(['site_id' => $this->site->id]);
 
     $this->actingAs($this->hr)->post('/it/tickets/bulk', [
         'ids' => [$ticket->id],
@@ -89,18 +103,32 @@ test('bulk priority restamps the SLA clock from the new target', function () {
 });
 
 test('bulk status moves working tickets and starts the waiting pause', function () {
-    $open = ItTicket::factory()->create();
-    $resolved = ItTicket::factory()->resolved()->create();
+    $open = ItTicket::factory()->create(['site_id' => $this->site->id]);
+    $resolved = ItTicket::factory()->resolved()->create(['site_id' => $this->site->id]);
 
     $this->actingAs($this->hr)->post('/it/tickets/bulk', [
         'ids' => [$open->id, $resolved->id],
         'action' => 'status',
         'status' => 'waiting',
+        'waiting_party' => 'vendor',
+        'waiting_reason' => 'The supplier is confirming stock availability.',
+        'next_action' => 'Review the supplier response tomorrow.',
     ])->assertSessionHas('success', '1 ticket(s) updated · 1 unchanged.');
 
     expect($open->refresh()->status)->toBe('waiting');
     expect($open->waiting_since)->not->toBeNull();
+    expect($open->waiting_party)->toBe('vendor');
+    expect($open->waiting_reason)->toBe('The supplier is confirming stock availability.');
+    expect($open->next_action)->toBe('Review the supplier response tomorrow.');
     expect($resolved->refresh()->status)->toBe('resolved'); // bulk never un-resolves
+
+    $another = ItTicket::factory()->create(['site_id' => $this->site->id]);
+    $this->actingAs($this->hr)->post('/it/tickets/bulk', [
+        'ids' => [$another->id],
+        'action' => 'status',
+        'status' => 'waiting',
+    ])->assertSessionHasErrors(['waiting_party', 'waiting_reason']);
+    expect($another->fresh()->status)->toBe('open');
 
     // Settling by bare status is refused at validation — resolve needs a note.
     $this->actingAs($this->hr)->post('/it/tickets/bulk', [
@@ -110,14 +138,52 @@ test('bulk status moves working tickets and starts the waiting pause', function 
     ])->assertSessionHasErrors('status');
 });
 
+test('bulk close requires and preserves one operational reason per ticket', function () {
+    $ticket = ItTicket::factory()->create(['site_id' => $this->site->id]);
+
+    $this->actingAs($this->hr)
+        ->from('/it?tab=tickets')
+        ->post('/it/tickets/bulk', [
+            'ids' => [$ticket->id],
+            'action' => 'close',
+        ])
+        ->assertRedirect('/it?tab=tickets')
+        ->assertSessionHasErrors('reason');
+
+    expect($ticket->refresh()->status)->toBe('open');
+
+    $this->actingAs($this->hr)->post('/it/tickets/bulk', [
+        'ids' => [$ticket->id],
+        'action' => 'close',
+        'reason' => 'Duplicate request confirmed against the surviving ticket.',
+    ])->assertSessionHas('success', '1 ticket(s) closed.');
+
+    expect($ticket->refresh()->status)->toBe('closed')
+        ->and($ticket->events()->where('type', 'closed')->first()->payload['reason'])
+        ->toBe('Duplicate request confirmed against the surviving ticket.')
+        ->and(AuditLog::query()
+            ->where('action', 'it.ticket.closed')
+            ->where('auditable_id', $ticket->id)
+            ->count())->toBe(1);
+});
+
 test('bulk close settles everything still open and skips the already-closed', function () {
-    $open = ItTicket::factory()->create();
-    $waiting = ItTicket::factory()->create(['status' => 'waiting', 'waiting_since' => now()->subMinutes(30)]);
-    $closed = ItTicket::factory()->create(['status' => 'closed', 'closed_at' => now()]);
+    $open = ItTicket::factory()->create(['site_id' => $this->site->id]);
+    $waiting = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'status' => 'waiting',
+        'waiting_since' => now()->subMinutes(30),
+    ]);
+    $closed = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'status' => 'closed',
+        'closed_at' => now(),
+    ]);
 
     $this->actingAs($this->hr)->post('/it/tickets/bulk', [
         'ids' => [$open->id, $waiting->id, $closed->id],
         'action' => 'close',
+        'reason' => 'These selected records are no longer actionable.',
     ])->assertSessionHas('success', '2 ticket(s) closed · 1 unchanged.');
 
     expect($open->refresh()->status)->toBe('closed');
@@ -127,20 +193,23 @@ test('bulk close settles everything still open and skips the already-closed', fu
     expect($open->events()->where('type', 'closed')->count())->toBe(1);
 });
 
-test('bulk is agent-only and tenant-scoped', function () {
-    $foreign = ItTicket::factory()->create(['tenant_id' => 2]);
-    $mine = ItTicket::factory()->create();
+test('bulk is agent-only and constrained to canonical Site access', function () {
+    $inaccessibleSite = Site::factory()->create();
+    $inaccessible = ItTicket::factory()->create(['site_id' => $inaccessibleSite->id]);
+    $mine = ItTicket::factory()->create(['site_id' => $this->site->id]);
 
     $this->actingAs($this->worker)->post('/it/tickets/bulk', [
         'ids' => [$mine->id],
         'action' => 'close',
+        'reason' => 'A requester must not be able to close queue work.',
     ])->assertForbidden();
 
     $this->actingAs($this->hr)->post('/it/tickets/bulk', [
-        'ids' => [$foreign->id, $mine->id],
+        'ids' => [$inaccessible->id, $mine->id],
         'action' => 'close',
+        'reason' => 'Close only the authorised Site work item.',
     ])->assertSessionHas('success', '1 ticket(s) closed · 1 unchanged.');
 
-    expect($foreign->refresh()->status)->toBe('open'); // other tenant untouched
-    expect($mine->refresh()->status)->toBe('closed');
+    expect($inaccessible->refresh()->status)->toBe('open')
+        ->and($mine->refresh()->status)->toBe('closed');
 });

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import type { LucideIcon } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 export type ContextMenuItem =
     | { type: 'header'; label: string }
@@ -71,17 +71,14 @@ export function ShiftContextMenu({ x, y, items, onClose }: Props) {
             {items.map((it, i) => {
                 if (it.type === 'separator') {
                     return (
-                        <div
-                            key={`sep-${i}`}
-                            className="my-1 h-px bg-border"
-                        />
+                        <div key={`sep-${i}`} className="my-1 h-px bg-border" />
                     );
                 }
                 if (it.type === 'header') {
                     return (
                         <div
                             key={`hdr-${i}`}
-                            className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                            className="px-3 py-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase"
                         >
                             {it.label}
                         </div>
@@ -90,7 +87,8 @@ export function ShiftContextMenu({ x, y, items, onClose }: Props) {
                 const action = it;
                 const Icon = action.icon;
                 return (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         key={`${action.label}-${i}`}
                         type="button"
                         role="menuitem"
@@ -104,7 +102,9 @@ export function ShiftContextMenu({ x, y, items, onClose }: Props) {
                             action.destructive
                                 ? 'text-status-critical hover:bg-status-critical-bg'
                                 : 'text-foreground hover:bg-muted',
-                            action.disabled ? 'cursor-not-allowed opacity-50' : '',
+                            action.disabled
+                                ? 'cursor-not-allowed opacity-50'
+                                : '',
                         ].join(' ')}
                     >
                         {Icon ? (

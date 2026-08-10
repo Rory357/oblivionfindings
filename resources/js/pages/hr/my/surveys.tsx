@@ -1,3 +1,4 @@
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,7 +21,6 @@ import {
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { useForm } from '@inertiajs/react';
 import { CheckCircle2, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
@@ -324,42 +324,32 @@ export default function MySurveys({ myHr, surveys }: Props) {
     return (
         <MyHrShell active="surveys" myHr={myHr} title="Surveys · My HR">
             {surveys.length === 0 ? (
-                    <Card>
-                        <CardContent className="py-8 text-center text-muted-foreground">
-                            No surveys available at this time.
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <>
-                        {pending.length > 0 && (
-                            <div className="space-y-4">
-                                <h2 className="text-lg font-semibold">
-                                    Pending
-                                </h2>
-                                {pending.map((survey) => (
-                                    <SurveyCard
-                                        key={survey.id}
-                                        survey={survey}
-                                    />
-                                ))}
-                            </div>
-                        )}
+                <Card>
+                    <CardContent className="py-8 text-center text-muted-foreground">
+                        No surveys available at this time.
+                    </CardContent>
+                </Card>
+            ) : (
+                <>
+                    {pending.length > 0 && (
+                        <div className="space-y-4">
+                            <h2 className="text-lg font-semibold">Pending</h2>
+                            {pending.map((survey) => (
+                                <SurveyCard key={survey.id} survey={survey} />
+                            ))}
+                        </div>
+                    )}
 
-                        {completed.length > 0 && (
-                            <div className="space-y-4">
-                                <h2 className="text-lg font-semibold">
-                                    Completed
-                                </h2>
-                                {completed.map((survey) => (
-                                    <SurveyCard
-                                        key={survey.id}
-                                        survey={survey}
-                                    />
-                                ))}
-                            </div>
-                        )}
-                    </>
-                )}
+                    {completed.length > 0 && (
+                        <div className="space-y-4">
+                            <h2 className="text-lg font-semibold">Completed</h2>
+                            {completed.map((survey) => (
+                                <SurveyCard key={survey.id} survey={survey} />
+                            ))}
+                        </div>
+                    )}
+                </>
+            )}
         </MyHrShell>
     );
 }

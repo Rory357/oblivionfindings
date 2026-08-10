@@ -56,7 +56,10 @@ export function AssignChecklistButton({
     const siteType = cfg.scope.site.type;
 
     const available = templates.filter(
-        (t) => t.is_active && (t.applicable_to_type === 'all' || t.applicable_to_type === siteType),
+        (t) =>
+            t.is_active &&
+            (t.applicable_to_type === 'all' ||
+                t.applicable_to_type === siteType),
     );
 
     const submit = (e: React.FormEvent) => {
@@ -70,7 +73,14 @@ export function AssignChecklistButton({
         });
     };
 
-    const frequencies = ['once', 'daily', 'weekly', 'fortnightly', 'monthly', 'quarterly'];
+    const frequencies = [
+        'once',
+        'daily',
+        'weekly',
+        'fortnightly',
+        'monthly',
+        'quarterly',
+    ];
 
     return (
         <>
@@ -79,7 +89,8 @@ export function AssignChecklistButton({
                 size={size}
                 className={className}
                 onClick={() => {
-                    if (templateId) form.setData('template_id', String(templateId));
+                    if (templateId)
+                        form.setData('template_id', String(templateId));
                     setOpen(true);
                 }}
             >
@@ -89,21 +100,31 @@ export function AssignChecklistButton({
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Assign checklist to {cfg.scope.mode === 'site' ? cfg.scope.site.name : ''}</DialogTitle>
+                        <DialogTitle>
+                            Assign checklist to{' '}
+                            {cfg.scope.mode === 'site'
+                                ? cfg.scope.site.name
+                                : ''}
+                        </DialogTitle>
                     </DialogHeader>
                     <form onSubmit={submit} className="space-y-4">
                         <div className="space-y-1.5">
                             <Label>Template</Label>
                             <Select
                                 value={form.data.template_id || undefined}
-                                onValueChange={(v) => form.setData('template_id', v)}
+                                onValueChange={(v) =>
+                                    form.setData('template_id', v)
+                                }
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a template…" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {available.map((t) => (
-                                        <SelectItem key={t.id} value={String(t.id)}>
+                                        <SelectItem
+                                            key={t.id}
+                                            value={String(t.id)}
+                                        >
                                             {t.name} ({t.items_count} items)
                                         </SelectItem>
                                     ))}
@@ -112,7 +133,12 @@ export function AssignChecklistButton({
                         </div>
                         <div className="space-y-1.5">
                             <Label>Frequency</Label>
-                            <Select value={form.data.frequency} onValueChange={(v) => form.setData('frequency', v)}>
+                            <Select
+                                value={form.data.frequency}
+                                onValueChange={(v) =>
+                                    form.setData('frequency', v)
+                                }
+                            >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
@@ -126,13 +152,24 @@ export function AssignChecklistButton({
                             </Select>
                         </div>
                         {form.errors.template_id ? (
-                            <p className="text-sm text-status-critical">{form.errors.template_id}</p>
+                            <p className="text-sm text-status-critical">
+                                {form.errors.template_id}
+                            </p>
                         ) : null}
                         <div className="flex gap-2 pt-1">
-                            <Button type="submit" disabled={form.processing || !form.data.template_id}>
+                            <Button
+                                type="submit"
+                                disabled={
+                                    form.processing || !form.data.template_id
+                                }
+                            >
                                 Assign
                             </Button>
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                            >
                                 Cancel
                             </Button>
                         </div>

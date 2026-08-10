@@ -1,4 +1,11 @@
 import {
+    CompensationHero,
+    CompensationTabs,
+    type CompensationHeroStats,
+} from '@/components/hr';
+import { StatusBadge } from '@/components/hr/status-badge';
+import { PageLayout } from '@/components/page';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -19,6 +26,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Table,
     TableBody,
     TableCell,
@@ -26,16 +40,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { CompensationHero, CompensationTabs, type CompensationHeroStats } from '@/components/hr';
-import { StatusBadge } from '@/components/hr/status-badge';
-import { PageLayout } from '@/components/page';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -111,9 +115,13 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
         const target = cancelTarget;
         if (!target) return;
         setCancelTarget(null);
-        router.post(`/hr/compensation/bonuses/${target.id}/cancel`, {}, {
-            preserveScroll: true,
-        });
+        router.post(
+            `/hr/compensation/bonuses/${target.id}/cancel`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
     }
 
     const set = (key: string, value: string) =>
@@ -180,11 +188,19 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                                     <TableRow>
                                         <TableHead>Employee</TableHead>
                                         <TableHead>Type</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-right">
+                                            Amount
+                                        </TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead>Reason</TableHead>
-                                        <TableHead className="text-center">Status</TableHead>
-                                        {can.manage && <TableHead className="text-right">Actions</TableHead>}
+                                        <TableHead className="text-center">
+                                            Status
+                                        </TableHead>
+                                        {can.manage && (
+                                            <TableHead className="text-right">
+                                                Actions
+                                            </TableHead>
+                                        )}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -193,7 +209,7 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                                             <TableCell className="font-medium">
                                                 {b.employee_name}
                                             </TableCell>
-                                            <TableCell className="capitalize text-muted-foreground">
+                                            <TableCell className="text-muted-foreground capitalize">
                                                 {BONUS_TYPES.find(
                                                     (t) =>
                                                         t.value ===
@@ -205,7 +221,10 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                                                     )}
                                             </TableCell>
                                             <TableCell className="text-right font-medium tabular-nums">
-                                                {formatMoney(b.amount, b.currency)}
+                                                {formatMoney(
+                                                    b.amount,
+                                                    b.currency,
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-muted-foreground">
                                                 {b.payment_date}
@@ -214,7 +233,9 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                                                 {b.reason || '—'}
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                <StatusBadge status={b.status} />
+                                                <StatusBadge
+                                                    status={b.status}
+                                                />
                                             </TableCell>
                                             {can.manage && (
                                                 <TableCell className="text-right">
@@ -271,9 +292,7 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Cancel this bonus?
-                        </AlertDialogTitle>
+                        <AlertDialogTitle>Cancel this bonus?</AlertDialogTitle>
                         <AlertDialogDescription>
                             {cancelTarget
                                 ? `${cancelTarget.employee_name} · ${formatMoney(cancelTarget.amount, cancelTarget.currency)}. `
@@ -299,7 +318,9 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                     </DialogHeader>
                     <form onSubmit={submit} className="space-y-4">
                         <div>
-                            <Label htmlFor="employee_profile_id">Employee</Label>
+                            <Label htmlFor="employee_profile_id">
+                                Employee
+                            </Label>
                             <Select
                                 value={form.employee_profile_id}
                                 onValueChange={(val) =>
@@ -315,7 +336,8 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                                             key={emp.id}
                                             value={String(emp.id)}
                                         >
-                                            {emp.user?.name ?? `Profile #${emp.id}`}
+                                            {emp.user?.name ??
+                                                `Profile #${emp.id}`}
                                             {emp.position_title
                                                 ? ` — ${emp.position_title}`
                                                 : ''}
@@ -397,7 +419,10 @@ export default function BonusIndex({ bonuses, employees, stats, can }: Props) {
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={!form.employee_profile_id}>
+                            <Button
+                                type="submit"
+                                disabled={!form.employee_profile_id}
+                            >
                                 Record Bonus
                             </Button>
                         </div>

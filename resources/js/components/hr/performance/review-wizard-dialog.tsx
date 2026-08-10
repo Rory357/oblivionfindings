@@ -48,9 +48,24 @@ export interface ExistingReview {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Who & when', icon: ClipboardList },
-    { key: 'assessment', label: 'Assessment', blurb: 'Strengths & goals', icon: Target },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Who & when',
+        icon: ClipboardList,
+    },
+    {
+        key: 'assessment',
+        label: 'Assessment',
+        blurb: 'Strengths & goals',
+        icon: Target,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: ClipboardCheck,
+    },
 ];
 
 const RATING_OPTIONS = [
@@ -110,7 +125,9 @@ export function ReviewWizardDialog({
         review_period_start: review?.review_period_start ?? '',
         review_period_end: review?.review_period_end ?? '',
         next_review_date: review?.next_review_date ?? '',
-        overall_rating: review?.overall_rating ? String(review.overall_rating) : '',
+        overall_rating: review?.overall_rating
+            ? String(review.overall_rating)
+            : '',
         strengths: review?.strengths ?? '',
         development_areas: review?.development_areas ?? '',
         goals_text: toLines(review?.goals),
@@ -139,7 +156,8 @@ export function ReviewWizardDialog({
         staff.find((s) => String(s.id) === form.data.employee_user_id)?.name ??
         '—';
     const typeLabel =
-        reviewTypes.find((t) => t.value === form.data.review_type)?.label ?? '—';
+        reviewTypes.find((t) => t.value === form.data.review_type)?.label ??
+        '—';
 
     const canSubmit =
         form.data.employee_user_id !== '' &&
@@ -182,7 +200,9 @@ export function ReviewWizardDialog({
         <WizardShell
             open={open}
             onClose={close}
-            title={isEdit ? 'Edit performance review' : 'New performance review'}
+            title={
+                isEdit ? 'Edit performance review' : 'New performance review'
+            }
             description="Schedule and record a staff performance review."
             railIcon={Target}
             railTitle={isEdit ? 'Edit review' : 'New review'}
@@ -353,7 +373,11 @@ export function ReviewWizardDialog({
                         blurb="Strengths, development areas, goals and training (one per line)."
                     />
                     <div className="space-y-4">
-                        <Field label="Strengths" hint="optional" error={form.errors.strengths}>
+                        <Field
+                            label="Strengths"
+                            hint="optional"
+                            error={form.errors.strengths}
+                        >
                             <Textarea
                                 rows={3}
                                 value={form.data.strengths}
@@ -387,17 +411,27 @@ export function ReviewWizardDialog({
                                 onChange={(e) =>
                                     form.setData('goals_text', e.target.value)
                                 }
-                                placeholder={'Lead the new intake roster\nComplete medication competency'}
+                                placeholder={
+                                    'Lead the new intake roster\nComplete medication competency'
+                                }
                             />
                         </Field>
-                        <Field label="Training recommendations" hint="one per line">
+                        <Field
+                            label="Training recommendations"
+                            hint="one per line"
+                        >
                             <Textarea
                                 rows={3}
                                 value={form.data.training_text}
                                 onChange={(e) =>
-                                    form.setData('training_text', e.target.value)
+                                    form.setData(
+                                        'training_text',
+                                        e.target.value,
+                                    )
                                 }
-                                placeholder={'First aid refresher\nDe-escalation workshop'}
+                                placeholder={
+                                    'First aid refresher\nDe-escalation workshop'
+                                }
                             />
                         </Field>
                     </div>

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class HrKudosReply extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'tenant_id',

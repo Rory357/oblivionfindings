@@ -1,7 +1,7 @@
 import { Head } from '@inertiajs/react';
 
-import { ChecklistsWorkspace } from '@/components/checklists/workspace';
 import type { ChecklistsData } from '@/components/checklists/types';
+import { ChecklistsWorkspace } from '@/components/checklists/workspace';
 import AppLayout from '@/layouts/app-layout';
 
 export default function ChecklistsIndex(props: ChecklistsData) {

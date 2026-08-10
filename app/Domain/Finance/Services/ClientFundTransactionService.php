@@ -5,11 +5,17 @@ namespace App\Domain\Finance\Services;
 use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ClientFundTransactionService
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /**
      * Record one balance movement. The affected fund is locked so concurrent
      * requests cannot derive their running balance from the same stale value.
@@ -34,6 +40,13 @@ class ClientFundTransactionService
             : null;
         $idempotencyKey = strtolower(trim($data['idempotency_key']));
 
+        $fund->loadMissing('client:id,site_id');
+        $this->siteAccess->assertCanAccessClientId(
+            $actor,
+            $fund->client_id ? (int) $fund->client_id : null,
+            ['reports.viewAny'],
+        );
+
         return DB::transaction(function () use (
             $fund,
             $actor,
@@ -45,7 +58,11 @@ class ClientFundTransactionService
         ): ClientFundTransaction {
             $lockedFund = ClientFund::query()
                 ->whereKey($fund->getKey())
-                ->where('organization_id', $actor->organization_id)
+                ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                    $clientQuery,
+                    $actor,
+                    ['reports.viewAny'],
+                ))
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -76,7 +93,6 @@ class ClientFundTransactionService
                 : bcsub((string) $lockedFund->balance, $amount, 2);
 
             $transaction = $lockedFund->transactions()->create([
-                'organization_id' => $lockedFund->organization_id,
                 'idempotency_key' => $idempotencyKey,
                 'transaction_type' => $data['type'],
                 'amount' => $amount,

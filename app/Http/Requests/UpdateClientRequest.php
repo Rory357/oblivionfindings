@@ -5,9 +5,9 @@ namespace App\Http\Requests;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ServiceContext;
-use App\Models\Site;
 use App\Models\SiteHouseRoom;
 use App\Services\Clients\ClientWorkerEligibility;
+use App\Services\UserSiteAccessService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -184,73 +184,134 @@ class UpdateClientRequest extends FormRequest
         });
 
         $validator->after(function (Validator $validator) {
-            $workerId = $this->input('key_worker_id');
             $client = $this->route('client');
+            if (! $client instanceof Client) {
+                return;
+            }
+
+            $currentSiteId = $this->nullableId($client->site_id);
+            $effectiveSiteId = $this->exists('site_id')
+                ? $this->nullableId($this->input('site_id'))
+                : $currentSiteId;
+            $siteChanged = $this->exists('site_id') && $effectiveSiteId !== $currentSiteId;
+            $workerWasSubmitted = $this->exists('key_worker_id');
+            $effectiveWorkerId = $workerWasSubmitted
+                ? $this->nullableId($this->input('key_worker_id'))
+                : $this->nullableId($client->key_worker_id);
+
             if (
-                blank($workerId)
-                || ! $client instanceof Client
+                (! $workerWasSubmitted && ! $siteChanged)
+                || $effectiveWorkerId === null
+                || $validator->errors()->has('site_id')
                 || $validator->errors()->has('key_worker_id')
             ) {
                 return;
             }
 
-            if (! app(ClientWorkerEligibility::class)->contains($client, (int) $workerId)) {
+            if (! app(ClientWorkerEligibility::class)
+                ->containsForSite($effectiveSiteId, $effectiveWorkerId)
+            ) {
                 $validator->errors()->add(
                     'key_worker_id',
-                    'Choose an eligible key worker from this organisation.',
+                    'Choose a current key worker assigned to the selected Site.',
                 );
             }
         });
 
         $validator->after(function (Validator $validator) {
             $client = $this->route('client');
-            if (! $client instanceof Client || $client->organization_id === null) {
+            if (! $client instanceof Client) {
                 return;
             }
 
-            $organizationId = (int) $client->organization_id;
+            $currentSiteId = $this->nullableId($client->site_id);
+            $effectiveSiteId = $this->exists('site_id')
+                ? $this->nullableId($this->input('site_id'))
+                : $currentSiteId;
+            $siteChanged = $this->exists('site_id') && $effectiveSiteId !== $currentSiteId;
 
             if (
-                filled($this->input('site_id'))
+                $this->exists('site_id')
+                && $effectiveSiteId !== null
+                && $effectiveSiteId !== $currentSiteId
                 && ! $validator->errors()->has('site_id')
-                && ! Site::query()
-                    ->forTenant($organizationId)
-                    ->whereKey((int) $this->input('site_id'))
-                    ->exists()
+                && ! in_array(
+                    $effectiveSiteId,
+                    app(UserSiteAccessService::class)->accessibleSiteIds(
+                        $this->user(),
+                        ['clients.update'],
+                    ),
+                    true,
+                )
             ) {
                 $validator->errors()->add(
                     'site_id',
-                    'Choose a site from this organisation.',
+                    'Choose an accessible Site.',
                 );
             }
 
+            $serviceContextWasSubmitted = $this->exists('service_context_id');
+            $effectiveServiceContextId = $serviceContextWasSubmitted
+                ? $this->nullableId($this->input('service_context_id'))
+                : $this->nullableId($client->service_context_id);
+
             if (
-                filled($this->input('service_context_id'))
+                ($serviceContextWasSubmitted || $siteChanged)
+                && $effectiveServiceContextId !== null
+                && ! $validator->errors()->has('site_id')
                 && ! $validator->errors()->has('service_context_id')
                 && ! ServiceContext::query()
-                    ->forOrganization($organizationId)
-                    ->whereKey((int) $this->input('service_context_id'))
+                    ->availableToSite($effectiveSiteId)
+                    ->whereKey($effectiveServiceContextId)
                     ->exists()
             ) {
                 $validator->errors()->add(
                     'service_context_id',
-                    'Choose a service context from this organisation.',
-                );
-            }
-
-            if (
-                filled($this->input('house_geofence_id'))
-                && ! $validator->errors()->has('house_geofence_id')
-                && ! AssetGeofence::query()
-                    ->forOrganization($organizationId)
-                    ->whereKey((int) $this->input('house_geofence_id'))
-                    ->exists()
-            ) {
-                $validator->errors()->add(
-                    'house_geofence_id',
-                    'Choose a geofence from this organisation.',
+                    'Choose a service context available to the selected Site.',
                 );
             }
         });
+
+        $validator->after(function (Validator $validator) {
+            $client = $this->route('client');
+            if (! $client instanceof Client) {
+                return;
+            }
+
+            $currentSiteId = $this->nullableId($client->site_id);
+            $effectiveSiteId = $this->exists('site_id')
+                ? $this->nullableId($this->input('site_id'))
+                : $currentSiteId;
+            $siteChanged = $this->exists('site_id') && $effectiveSiteId !== $currentSiteId;
+            $geofenceWasSubmitted = $this->exists('house_geofence_id');
+            $effectiveGeofenceId = $geofenceWasSubmitted
+                ? $this->nullableId($this->input('house_geofence_id'))
+                : $this->nullableId($client->house_geofence_id);
+
+            if (
+                (! $geofenceWasSubmitted && ! $siteChanged)
+                || $effectiveGeofenceId === null
+                || $validator->errors()->has('site_id')
+                || $validator->errors()->has('house_geofence_id')
+            ) {
+                return;
+            }
+
+            if (! AssetGeofence::query()
+                ->eligibleForClientSite($effectiveSiteId)
+                ->whereKey($effectiveGeofenceId)
+                ->exists()
+            ) {
+                $validator->errors()->add(
+                    'house_geofence_id',
+                    'Choose an active house or resident geofence for the selected Site.',
+                );
+            }
+        });
+    }
+
+    private function nullableId(mixed $value): ?int
+    {
+        return filled($value) && is_numeric($value) ? (int) $value : null;
     }
 }

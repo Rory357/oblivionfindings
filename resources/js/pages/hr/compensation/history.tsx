@@ -1,11 +1,10 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -94,7 +93,8 @@ export default function CompensationHistory({ profile, history, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref={`/hr/people/${profile.id}`}
                         title="Compensation History"

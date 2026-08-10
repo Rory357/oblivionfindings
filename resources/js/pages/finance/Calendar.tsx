@@ -1,4 +1,8 @@
-import type { DatesSetArg, EventClickArg, EventInput } from '@fullcalendar/core';
+import type {
+    DatesSetArg,
+    EventClickArg,
+    EventInput,
+} from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
@@ -50,13 +54,35 @@ interface Props extends PageProps {
  * they track the theme — never hex. Overdue items override to the critical token
  * regardless of source, so a missed deadline always reads red.
  */
-const SOURCE_META: Record<string, { label: string; color: string; text: string }> = {
-    invoice_due: { label: 'Invoice due', color: 'var(--status-success)', text: 'var(--status-success-foreground)' },
-    bill_due: { label: 'Bill due', color: 'var(--status-warning)', text: 'var(--status-warning-foreground)' },
-    payment_run: { label: 'Payment run', color: 'var(--category-finance)', text: 'var(--primary-foreground)' },
-    gst_due: { label: 'GST return', color: 'var(--status-info)', text: 'var(--status-info-foreground)' },
+const SOURCE_META: Record<
+    string,
+    { label: string; color: string; text: string }
+> = {
+    invoice_due: {
+        label: 'Invoice due',
+        color: 'var(--status-success)',
+        text: 'var(--status-success-foreground)',
+    },
+    bill_due: {
+        label: 'Bill due',
+        color: 'var(--status-warning)',
+        text: 'var(--status-warning-foreground)',
+    },
+    payment_run: {
+        label: 'Payment run',
+        color: 'var(--category-finance)',
+        text: 'var(--primary-foreground)',
+    },
+    gst_due: {
+        label: 'GST return',
+        color: 'var(--status-info)',
+        text: 'var(--status-info-foreground)',
+    },
 };
-const OVERDUE = { color: 'var(--status-critical)', text: 'var(--status-critical-foreground)' };
+const OVERDUE = {
+    color: 'var(--status-critical)',
+    text: 'var(--status-critical-foreground)',
+};
 
 function sourceLabel(key: string): string {
     return SOURCE_META[key]?.label ?? key;
@@ -89,8 +115,13 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
         async (arg: DatesSetArg) => {
             setLoading(true);
             try {
-                const { data } = await axios.get<{ events: FinanceObligation[] }>(eventsUrl, {
-                    params: { start: arg.startStr.slice(0, 10), end: arg.endStr.slice(0, 10) },
+                const { data } = await axios.get<{
+                    events: FinanceObligation[];
+                }>(eventsUrl, {
+                    params: {
+                        start: arg.startStr.slice(0, 10),
+                        end: arg.endStr.slice(0, 10),
+                    },
                 });
                 setObligations(data.events ?? []);
             } finally {
@@ -107,11 +138,18 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
                 .map((o) => {
                     const meta = SOURCE_META[o.source];
                     const overdue = o.status === 'overdue';
-                    const color = overdue ? OVERDUE.color : (meta?.color ?? 'var(--primary)');
-                    const text = overdue ? OVERDUE.text : (meta?.text ?? 'var(--primary-foreground)');
+                    const color = overdue
+                        ? OVERDUE.color
+                        : (meta?.color ?? 'var(--primary)');
+                    const text = overdue
+                        ? OVERDUE.text
+                        : (meta?.text ?? 'var(--primary-foreground)');
                     return {
                         id: o.id,
-                        title: o.amount != null ? `${o.title} · ${formatMoney(o.amount)}` : o.title,
+                        title:
+                            o.amount != null
+                                ? `${o.title} · ${formatMoney(o.amount)}`
+                                : o.title,
                         start: o.start,
                         allDay: true,
                         backgroundColor: color,
@@ -125,7 +163,9 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
 
     // Hero stats for the loaded range.
     const stats = useMemo(() => {
-        const visible = obligations.filter((o) => activeSources.includes(o.source));
+        const visible = obligations.filter((o) =>
+            activeSources.includes(o.source),
+        );
         const overdue = visible.filter((o) => o.status === 'overdue').length;
         const inflow = visible
             .filter((o) => o.direction === 'inflow')
@@ -142,7 +182,9 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
     }, [obligations, activeSources]);
 
     function handleEventClick(info: EventClickArg) {
-        const obligation = info.event.extendedProps.obligation as FinanceObligation | undefined;
+        const obligation = info.event.extendedProps.obligation as
+            | FinanceObligation
+            | undefined;
         if (obligation) {
             setSelected(obligation);
             setDetailOpen(true);
@@ -191,16 +233,26 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
                             >
                                 <span
                                     className="h-2.5 w-2.5 rounded-full"
-                                    style={{ backgroundColor: meta?.color ?? 'var(--primary)' }}
+                                    style={{
+                                        backgroundColor:
+                                            meta?.color ?? 'var(--primary)',
+                                    }}
                                 />
                                 {sourceLabel(key)}
                             </button>
                         );
                     })}
                     <span className="ml-auto inline-flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: OVERDUE.color }} />
+                        <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: OVERDUE.color }}
+                        />
                         Overdue
-                        {loading ? <span className="ml-2 animate-pulse">· loading…</span> : null}
+                        {loading ? (
+                            <span className="ml-2 animate-pulse">
+                                · loading…
+                            </span>
+                        ) : null}
                     </span>
                 </div>
 
@@ -217,7 +269,11 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
                             center: 'title',
                             right: 'dayGridMonth,listMonth',
                         }}
-                        buttonText={{ today: 'Today', month: 'Month', list: 'List' }}
+                        buttonText={{
+                            today: 'Today',
+                            month: 'Month',
+                            list: 'List',
+                        }}
                         noEventsContent="No obligations in this period"
                     />
                 </div>
@@ -232,35 +288,55 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
                     {selected && (
                         <div className="space-y-4">
                             <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant="outline">{sourceLabel(selected.source)}</Badge>
+                                <Badge variant="outline">
+                                    {sourceLabel(selected.source)}
+                                </Badge>
                                 <span
                                     className={cn(
                                         'rounded-full px-2.5 py-0.5 text-xs font-medium capitalize',
-                                        STATUS_TONE[selected.status] ?? 'bg-muted text-muted-foreground',
+                                        STATUS_TONE[selected.status] ??
+                                            'bg-muted text-muted-foreground',
                                     )}
                                 >
                                     {selected.status}
                                 </span>
                                 {selected.direction && (
                                     <span className="text-xs text-muted-foreground">
-                                        {selected.direction === 'inflow' ? 'Money in' : 'Money out'}
+                                        {selected.direction === 'inflow'
+                                            ? 'Money in'
+                                            : 'Money out'}
                                     </span>
                                 )}
                             </div>
 
                             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                                {selected.ref && <Field label="Reference" value={selected.ref} />}
-                                {selected.counterparty && <Field label="Counterparty" value={selected.counterparty} />}
-                                {selected.amount != null && (
-                                    <Field label="Amount" value={formatMoney(selected.amount)} strong />
-                                )}
-                                <Field label="Date" value={selected.start} />
-                                {selected.meta?.period_start && selected.meta?.period_end && (
+                                {selected.ref && (
                                     <Field
-                                        label="Period"
-                                        value={`${selected.meta.period_start} – ${selected.meta.period_end}`}
+                                        label="Reference"
+                                        value={selected.ref}
                                     />
                                 )}
+                                {selected.counterparty && (
+                                    <Field
+                                        label="Counterparty"
+                                        value={selected.counterparty}
+                                    />
+                                )}
+                                {selected.amount != null && (
+                                    <Field
+                                        label="Amount"
+                                        value={formatMoney(selected.amount)}
+                                        strong
+                                    />
+                                )}
+                                <Field label="Date" value={selected.start} />
+                                {selected.meta?.period_start &&
+                                    selected.meta?.period_end && (
+                                        <Field
+                                            label="Period"
+                                            value={`${selected.meta.period_start} – ${selected.meta.period_end}`}
+                                        />
+                                    )}
                             </dl>
                         </div>
                     )}
@@ -276,7 +352,11 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
                         ) : (
                             <span />
                         )}
-                        <Button variant="outline" size="sm" onClick={() => setDetailOpen(false)}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDetailOpen(false)}
+                        >
                             Close
                         </Button>
                     </DialogFooter>
@@ -286,11 +366,28 @@ export default function FinanceCalendar({ eventsUrl, sources }: Props) {
     );
 }
 
-function Field({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+function Field({
+    label,
+    value,
+    strong = false,
+}: {
+    label: string;
+    value: string;
+    strong?: boolean;
+}) {
     return (
         <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
-            <dd className={cn('mt-0.5', strong ? 'font-semibold' : 'text-foreground')}>{value}</dd>
+            <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                {label}
+            </dt>
+            <dd
+                className={cn(
+                    'mt-0.5',
+                    strong ? 'font-semibold' : 'text-foreground',
+                )}
+            >
+                {value}
+            </dd>
         </div>
     );
 }

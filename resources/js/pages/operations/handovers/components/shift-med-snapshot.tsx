@@ -24,7 +24,15 @@ export type ShiftMedSnapshot = {
     generated_at: string;
 };
 
-function ShiftMedStat({ label, value, tone }: { label: string; value: number; tone?: 'critical' | 'warning' }) {
+function ShiftMedStat({
+    label,
+    value,
+    tone,
+}: {
+    label: string;
+    value: number;
+    tone?: 'critical' | 'warning';
+}) {
     const toneClass =
         tone === 'critical' && value > 0
             ? 'text-status-critical'
@@ -34,8 +42,14 @@ function ShiftMedStat({ label, value, tone }: { label: string; value: number; to
     return (
         // eslint-disable-next-line no-restricted-syntax -- compact stat tile (number + label), not a Card surface
         <div className="rounded-lg border border-border bg-background px-2.5 py-2 text-center">
-            <div className={cn('text-[17px] font-bold tabular-nums', toneClass)}>{value}</div>
-            <div className="text-[10.5px] font-medium text-muted-foreground">{label}</div>
+            <div
+                className={cn('text-[17px] font-bold tabular-nums', toneClass)}
+            >
+                {value}
+            </div>
+            <div className="text-[10.5px] font-medium text-muted-foreground">
+                {label}
+            </div>
         </div>
     );
 }
@@ -63,30 +77,66 @@ export function ShiftMedSummary({
                     <Pill className="h-3.5 w-3.5" />
                 </span>
                 Medications this shift
-                <span className="ml-auto text-[11px] font-normal text-muted-foreground">auto-surfaced from the MAR</span>
+                <span className="ml-auto text-[11px] font-normal text-muted-foreground">
+                    auto-surfaced from the MAR
+                </span>
             </div>
             {!hasShift ? (
-                <div className="text-[12.5px] text-muted-foreground">{noShiftHint}</div>
+                <div className="text-[12.5px] text-muted-foreground">
+                    {noShiftHint}
+                </div>
             ) : loading ? (
                 <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Loading the shift's medication state…
                 </div>
             ) : !snapshot ? (
-                <div className="text-[12.5px] text-muted-foreground">No medication data for this shift's window.</div>
+                <div className="text-[12.5px] text-muted-foreground">
+                    No medication data for this shift's window.
+                </div>
             ) : (
                 <div className="space-y-2.5">
                     <div className="grid grid-cols-4 gap-1.5">
                         <ShiftMedStat label="Due" value={snapshot.counts.due} />
-                        <ShiftMedStat label="Given" value={snapshot.counts.given} />
-                        <ShiftMedStat label="Missed" value={snapshot.counts.missed} tone="critical" />
-                        <ShiftMedStat label="Refused" value={snapshot.counts.refused} tone="warning" />
-                        <ShiftMedStat label="PRN given" value={snapshot.counts.prn_given} />
-                        <ShiftMedStat label="Reviews due" value={snapshot.counts.reviews_outstanding} tone="warning" />
-                        <ShiftMedStat label="Omissions" value={snapshot.counts.omissions} tone="critical" />
-                        <ShiftMedStat label="CD due" value={snapshot.counts.cd_due} tone="warning" />
+                        <ShiftMedStat
+                            label="Given"
+                            value={snapshot.counts.given}
+                        />
+                        <ShiftMedStat
+                            label="Missed"
+                            value={snapshot.counts.missed}
+                            tone="critical"
+                        />
+                        <ShiftMedStat
+                            label="Refused"
+                            value={snapshot.counts.refused}
+                            tone="warning"
+                        />
+                        <ShiftMedStat
+                            label="PRN given"
+                            value={snapshot.counts.prn_given}
+                        />
+                        <ShiftMedStat
+                            label="Reviews due"
+                            value={snapshot.counts.reviews_outstanding}
+                            tone="warning"
+                        />
+                        <ShiftMedStat
+                            label="Omissions"
+                            value={snapshot.counts.omissions}
+                            tone="critical"
+                        />
+                        <ShiftMedStat
+                            label="CD due"
+                            value={snapshot.counts.cd_due}
+                            tone="warning"
+                        />
                     </div>
-                    {note ? <div className="text-[11.5px] text-muted-foreground">{note}</div> : null}
+                    {note ? (
+                        <div className="text-[11.5px] text-muted-foreground">
+                            {note}
+                        </div>
+                    ) : null}
                     {snapshot.alerts.length > 0 ? (
                         <div className="space-y-1">
                             {snapshot.alerts.map((a, i) => (
@@ -94,7 +144,9 @@ export function ShiftMedSummary({
                                     key={i}
                                     className={cn(
                                         'flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px]',
-                                        a.tone === 'critical' ? 'bg-status-critical-bg text-status-critical' : 'bg-status-warning-bg text-status-warning',
+                                        a.tone === 'critical'
+                                            ? 'bg-status-critical-bg text-status-critical'
+                                            : 'bg-status-warning-bg text-status-warning',
                                     )}
                                 >
                                     <AlertTriangle className="h-3 w-3 shrink-0" />

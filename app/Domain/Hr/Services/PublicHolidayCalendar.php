@@ -17,16 +17,16 @@ class PublicHolidayCalendar
      *
      * National holidays always match; regional anniversary days match only
      * when the workplace region is known and equal (case-insensitive).
-     * Holidays are seeded globally (tenant_id null); tenant-specific rows
-     * additionally apply to that tenant.
+     * Holidays are one application catalogue. National holidays always match;
+     * regional anniversary days match the supplied workplace region.
      */
-    public function holidayFor(CarbonInterface|string $date, ?int $tenantId = null, ?string $region = null): ?HrPublicHoliday
+    public function holidayFor(CarbonInterface|string $date, ?string $region = null): ?HrPublicHoliday
     {
         $dateString = $date instanceof CarbonInterface
             ? $date->toDateString()
             : Carbon::parse($date)->toDateString();
 
-        $holidays = $this->holidaysOn($dateString, $tenantId);
+        $holidays = $this->holidaysOn($dateString);
 
         $normalisedRegion = $region !== null ? mb_strtolower(trim($region)) : null;
 
@@ -40,26 +40,20 @@ class PublicHolidayCalendar
         });
     }
 
-    public function isPublicHoliday(CarbonInterface|string $date, ?int $tenantId = null, ?string $region = null): bool
+    public function isPublicHoliday(CarbonInterface|string $date, ?string $region = null): bool
     {
-        return $this->holidayFor($date, $tenantId, $region) !== null;
+        return $this->holidayFor($date, $region) !== null;
     }
 
     /**
      * @return Collection<int, HrPublicHoliday>
      */
-    private function holidaysOn(string $dateString, ?int $tenantId): Collection
+    private function holidaysOn(string $dateString): Collection
     {
-        $key = $dateString.'|'.($tenantId ?? 'global');
+        $key = $dateString;
 
         return $this->cache[$key] ??= HrPublicHoliday::query()
             ->whereDate('date', $dateString)
-            ->where(function ($query) use ($tenantId) {
-                $query->whereNull('tenant_id');
-                if ($tenantId !== null) {
-                    $query->orWhere('tenant_id', $tenantId);
-                }
-            })
             ->get();
     }
 }

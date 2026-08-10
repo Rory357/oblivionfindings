@@ -6,6 +6,7 @@ import {
     formatRegisterDate,
     registerLabel,
 } from './safety-register';
+import { SiteProfileLockedState } from './site-profile-states';
 
 type InspectionSchedule = {
     id: number;
@@ -30,19 +31,30 @@ type InspectionRecord = {
     linked_hazard_id?: number | null;
 };
 
-export type SiteInspectionsData = {
-    locked?: boolean;
-    schedules: InspectionSchedule[];
-    records: InspectionRecord[];
-    can_manage: boolean;
-    href: string;
-};
+export type SiteInspectionsData =
+    | {
+          locked: true;
+          items: never[];
+          summary: null;
+          href: null;
+      }
+    | {
+          locked?: false;
+          schedules: InspectionSchedule[];
+          records: InspectionRecord[];
+          can_manage: boolean;
+          href: string;
+      };
 
 export function SiteProfileInspections({
     data,
 }: {
     data: SiteInspectionsData;
 }) {
+    if (data.locked) {
+        return <SiteProfileLockedState label="Site inspections" />;
+    }
+
     return (
         <div className="space-y-5">
             <SafetyRegisterHeader

@@ -96,13 +96,13 @@ export function CoveragePane({
                         gridTemplateColumns: `200px repeat(${windowLabels.length}, minmax(0, 1fr))`,
                     }}
                 >
-                    <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                         Site
                     </div>
                     {windowLabels.map((w) => (
                         <div
                             key={w}
-                            className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                            className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
                         >
                             {w}
                         </div>

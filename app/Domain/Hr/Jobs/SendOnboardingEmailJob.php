@@ -27,10 +27,20 @@ class SendOnboardingEmailJob implements ShouldQueue
 
     public function handle(OnboardingEmailService $service): void
     {
-        $email = HrOnboardingEmail::find($this->emailId);
-        $profile = HrEmployeeProfile::find($this->employeeProfileId);
+        $email = HrOnboardingEmail::query()->where('is_active', true)->find($this->emailId);
+        $profile = HrEmployeeProfile::query()
+            ->where('is_active', true)
+            ->find($this->employeeProfileId);
 
         if (! $email || ! $profile) {
+            return;
+        }
+
+        $siteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0);
+        if ($siteIds->isEmpty() || ($profile->end_date && $profile->end_date->isBefore(today()))) {
             return;
         }
 

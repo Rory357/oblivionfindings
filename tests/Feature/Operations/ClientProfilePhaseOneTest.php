@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
 use App\Models\Client;
 use App\Models\ClientAppointment;
@@ -14,6 +15,7 @@ use App\Models\ClientRoutine;
 use App\Models\ClientSeizureEntry;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Client\ActionsAggregator;
@@ -36,6 +38,19 @@ function grantClientProfilePhaseOnePermissions(User $user, array $permissionKeys
         Permission::query()->whereIn('key', $permissionKeys)->pluck('id')->all(),
     );
     $user->roles()->syncWithoutDetaching([$role->id]);
+}
+
+function scopeClientProfilePhaseOneUserToSite(User $user, Site $site, string $positionRole = 'support_worker'): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'position_role' => $positionRole,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 }
 
 it('projects client notes through the canonical timeline emitter and retracts deleted notes', function () {
@@ -99,14 +114,17 @@ it('projects client notes through the canonical timeline emitter and retracts de
 });
 
 it('stores quick notes and daily-note drafts through the client daily note endpoint', function () {
-    $user = User::factory()->create();
-    $client = Client::factory()->create();
+    $site = Site::factory()->create(['is_active' => true]);
+    $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     grantClientProfilePhaseOnePermissions($user, [
-        'clients.viewAny',
+        'clients.viewAssigned',
         'progress_notes.viewAny',
         'progress_notes.create',
         'timeline.create',
     ]);
+    scopeClientProfilePhaseOneUserToSite($user, $site);
+    $client->supportWorkers()->attach($user->id);
 
     $this->actingAs($user)
         ->post("/operations/clients/{$client->id}/daily-notes", [
@@ -155,9 +173,13 @@ it('stores quick notes and daily-note drafts through the client daily note endpo
 });
 
 it('limits flagged note review to users with the review permission', function () {
-    $worker = User::factory()->create();
-    $manager = User::factory()->create();
-    $client = Client::factory()->create();
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $manager = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    scopeClientProfilePhaseOneUserToSite($worker, $site);
+    scopeClientProfilePhaseOneUserToSite($manager, $site, 'coordinator');
+    $client->supportWorkers()->attach([$worker->id, $manager->id]);
     $note = ClientNote::query()->create([
         'client_id' => $client->id,
         'user_id' => $worker->id,
@@ -168,9 +190,9 @@ it('limits flagged note review to users with the review permission', function ()
         'is_flagged' => true,
     ]);
 
-    grantClientProfilePhaseOnePermissions($worker, ['clients.viewAny', 'progress_notes.viewAny']);
+    grantClientProfilePhaseOnePermissions($worker, ['clients.viewAssigned', 'progress_notes.viewAny']);
     grantClientProfilePhaseOnePermissions($manager, [
-        'clients.viewAny',
+        'clients.viewAssigned',
         'progress_notes.viewAny',
         'progress_notes.review',
     ]);
@@ -188,13 +210,16 @@ it('limits flagged note review to users with the review permission', function ()
 });
 
 it('stores health chart entries and projects them into the client timeline', function () {
-    $user = User::factory()->create();
-    $client = Client::factory()->create();
+    $site = Site::factory()->create(['is_active' => true]);
+    $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     grantClientProfilePhaseOnePermissions($user, [
-        'clients.viewAny',
+        'clients.viewAssigned',
         'medications.view',
         'medications.administer.record',
     ]);
+    scopeClientProfilePhaseOneUserToSite($user, $site);
+    $client->supportWorkers()->attach($user->id);
 
     $this->actingAs($user)
         ->post("/operations/clients/{$client->id}/health/bowel", [
@@ -234,14 +259,17 @@ it('stores health chart entries and projects them into the client timeline', fun
 });
 
 it('updates and deletes health chart entries while keeping timeline projections in sync', function () {
-    $user = User::factory()->create();
-    $client = Client::factory()->create();
+    $site = Site::factory()->create(['is_active' => true]);
+    $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     grantClientProfilePhaseOnePermissions($user, [
-        'clients.viewAny',
+        'clients.viewAssigned',
         'clients.update',
         'medications.view',
         'medications.administer.record',
     ]);
+    scopeClientProfilePhaseOneUserToSite($user, $site);
+    $client->supportWorkers()->attach($user->id);
 
     $bowel = ClientBowelEntry::query()->create([
         'client_id' => $client->id,
@@ -359,10 +387,11 @@ it('projects the remaining phase-one timeline sources through observers', functi
 });
 
 it('upserts routines and returns a schema-aware actions and reviews list', function () {
-    $user = User::factory()->create();
-    $client = Client::factory()->create();
+    $site = Site::factory()->create(['is_active' => true]);
+    $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     grantClientProfilePhaseOnePermissions($user, [
-        'clients.viewAny',
+        'clients.viewAssigned',
         'clients.update',
         'progress_notes.viewAny',
         'progress_notes.review',
@@ -372,6 +401,8 @@ it('upserts routines and returns a schema-aware actions and reviews list', funct
         'consents.viewAny',
         'clinical.assessments.viewAny',
     ]);
+    scopeClientProfilePhaseOneUserToSite($user, $site);
+    $client->supportWorkers()->attach($user->id);
 
     $this->actingAs($user)
         ->post("/operations/clients/{$client->id}/routines/morning", [

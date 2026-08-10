@@ -9,8 +9,8 @@ import type { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
-import { avatarHueStyle } from './avatar-hue';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import { avatarHueStyle } from './avatar-hue';
 
 export type SignalTone = 'critical' | 'warning' | 'info' | 'success';
 
@@ -106,7 +106,7 @@ export function SignalRail({
                                         <Icon className="h-3 w-3" />
                                     </span>
                                     <span className="min-w-0 flex-1">
-                                        <span className="block text-xs font-semibold leading-tight text-foreground">
+                                        <span className="block text-xs leading-tight font-semibold text-foreground">
                                             {s.title}
                                         </span>
                                         <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
@@ -124,7 +124,8 @@ export function SignalRail({
                                     {s.href ? (
                                         <Link href={s.href}>{inner}</Link>
                                     ) : s.onClick ? (
-                                        <GuardrailButton unstyled
+                                        <GuardrailButton
+                                            unstyled
                                             type="button"
                                             onClick={s.onClick}
                                             className="block w-full"
@@ -180,7 +181,7 @@ export function SignalRail({
                                             }}
                                         />
                                     </span>
-                                    <span className="w-8 text-right text-[11px] font-semibold tabular-nums text-muted-foreground">
+                                    <span className="w-8 text-right text-[11px] font-semibold text-muted-foreground tabular-nums">
                                         {row.hours}h
                                     </span>
                                 </li>

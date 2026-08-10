@@ -17,9 +17,7 @@ class ShiftSeriesPresenter
     public function __construct(private ShiftCoverageService $coverage) {}
 
     /**
-     * List payload for the Recurring tab cards. Not organization-scoped — the
-     * shift_series table has no organization_id; tenancy flows through the
-     * linked client/site, matching the historical standalone index page.
+     * List payload for the Recurring tab cards.
      *
      * @return array<int, array<string, mixed>>
      */

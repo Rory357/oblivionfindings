@@ -11,10 +11,12 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftTask;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
@@ -29,9 +31,11 @@ beforeEach(function () {
 
 function openShiftSessionFor(User $staff): HrAttendanceSession
 {
-    $client = Client::factory()->create();
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $serviceContext = ServiceContext::factory()->create();
     $shift = Shift::query()->create([
+        'site_id' => $site->id,
         'client_id' => $client->id,
         'service_context_id' => $serviceContext->id,
         'user_id' => $staff->id,

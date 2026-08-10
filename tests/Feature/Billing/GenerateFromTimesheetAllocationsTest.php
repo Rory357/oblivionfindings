@@ -252,7 +252,6 @@ class GenerateFromTimesheetAllocationsTest extends TestCase
     private function makeActiveAgreement(Client $client, float $hourlyRate): ServiceAgreement
     {
         return ServiceAgreement::factory()->create([
-            'organization_id' => 1,
             'client_id' => $client->id,
             'status' => 'active',
             'starts_at' => '2026-01-01',

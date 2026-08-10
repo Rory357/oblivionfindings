@@ -17,6 +17,7 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { PeoplePicker, type PersonOption } from '@/components/hr/people-picker';
 import {
     Field,
     ReviewCard,
@@ -30,7 +31,6 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/hr/wizard';
-import { PeoplePicker, type PersonOption } from '@/components/hr/people-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -53,10 +53,30 @@ export interface DepartureReasonOption {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Interview', blurb: 'Who, when & why', icon: User },
-    { key: 'ratings', label: 'Ratings', blurb: 'Satisfaction & recommend', icon: Star },
-    { key: 'feedback', label: 'Feedback', blurb: 'What they told us', icon: MessagesSquare },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+    {
+        key: 'details',
+        label: 'Interview',
+        blurb: 'Who, when & why',
+        icon: User,
+    },
+    {
+        key: 'ratings',
+        label: 'Ratings',
+        blurb: 'Satisfaction & recommend',
+        icon: Star,
+    },
+    {
+        key: 'feedback',
+        label: 'Feedback',
+        blurb: 'What they told us',
+        icon: MessagesSquare,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: CheckCircle2,
+    },
 ];
 
 const RECOMMEND_OPTS = [
@@ -65,7 +85,9 @@ const RECOMMEND_OPTS = [
     { value: 'no', label: 'No' },
 ];
 
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
@@ -106,11 +128,15 @@ export function ExitInterviewWizard({
         sub: e.position_title ?? undefined,
     }));
 
-    const picked = employees.find((e) => String(e.id) === form.data.employee_profile_id) ?? null;
+    const picked =
+        employees.find((e) => String(e.id) === form.data.employee_profile_id) ??
+        null;
     const interviewerName =
-        interviewers.find((i) => String(i.id) === form.data.interviewer_user_id)?.name ?? null;
+        interviewers.find((i) => String(i.id) === form.data.interviewer_user_id)
+            ?.name ?? null;
     const reasonLabel =
-        departureReasons.find((r) => r.value === form.data.departure_reason)?.label ?? null;
+        departureReasons.find((r) => r.value === form.data.departure_reason)
+            ?.label ?? null;
 
     const detailsValid =
         form.data.employee_profile_id !== '' &&
@@ -122,9 +148,13 @@ export function ExitInterviewWizard({
         form.transform((data) => ({
             ...data,
             would_recommend:
-                data.would_recommend === 'unspecified' ? null : data.would_recommend === 'yes',
+                data.would_recommend === 'unspecified'
+                    ? null
+                    : data.would_recommend === 'yes',
             overall_satisfaction:
-                data.overall_satisfaction === 0 ? null : data.overall_satisfaction,
+                data.overall_satisfaction === 0
+                    ? null
+                    : data.overall_satisfaction,
         }));
         form.post('/hr/exit-interviews', {
             preserveScroll: true,
@@ -159,8 +189,12 @@ export function ExitInterviewWizard({
                         title="Exit interview recorded"
                         blurb={
                             <>
-                                {picked?.user?.name ?? 'The employee'}&rsquo;s departure feedback is
-                                saved{picked ? ' — any open offboarding exit-interview task was ticked off automatically' : ''}.
+                                {picked?.user?.name ?? 'The employee'}&rsquo;s
+                                departure feedback is saved
+                                {picked
+                                    ? ' — any open offboarding exit-interview task was ticked off automatically'
+                                    : ''}
+                                .
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -180,8 +214,13 @@ export function ExitInterviewWizard({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !detailsValid}>
-                            {form.processing ? 'Saving…' : 'Save exit interview'}
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !detailsValid}
+                        >
+                            {form.processing
+                                ? 'Saving…'
+                                : 'Save exit interview'}
                         </Button>
                     ) : (
                         <Button
@@ -202,18 +241,31 @@ export function ExitInterviewWizard({
                         blurb="Who is leaving, who conducted the interview, and the primary reason."
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Departing employee" required span error={form.errors.employee_profile_id}>
+                        <Field
+                            label="Departing employee"
+                            required
+                            span
+                            error={form.errors.employee_profile_id}
+                        >
                             <PeoplePicker
                                 value={form.data.employee_profile_id}
-                                onChange={(v) => form.setData('employee_profile_id', v)}
+                                onChange={(v) =>
+                                    form.setData('employee_profile_id', v)
+                                }
                                 people={people}
                                 placeholder="Select employee…"
                             />
                         </Field>
-                        <Field label="Interviewer" required error={form.errors.interviewer_user_id}>
+                        <Field
+                            label="Interviewer"
+                            required
+                            error={form.errors.interviewer_user_id}
+                        >
                             <SelectInput
                                 value={form.data.interviewer_user_id}
-                                onChange={(v) => form.setData('interviewer_user_id', v)}
+                                onChange={(v) =>
+                                    form.setData('interviewer_user_id', v)
+                                }
                                 placeholder="Select interviewer"
                                 options={interviewers.map((i) => ({
                                     value: String(i.id),
@@ -221,11 +273,20 @@ export function ExitInterviewWizard({
                                 }))}
                             />
                         </Field>
-                        <Field label="Interview date" required error={form.errors.interview_date}>
+                        <Field
+                            label="Interview date"
+                            required
+                            error={form.errors.interview_date}
+                        >
                             <Input
                                 type="date"
                                 value={form.data.interview_date}
-                                onChange={(e) => form.setData('interview_date', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'interview_date',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                         <Field
@@ -236,7 +297,9 @@ export function ExitInterviewWizard({
                         >
                             <SelectInput
                                 value={form.data.departure_reason}
-                                onChange={(v) => form.setData('departure_reason', v)}
+                                onChange={(v) =>
+                                    form.setData('departure_reason', v)
+                                }
                                 placeholder="Select reason"
                                 options={departureReasons}
                             />
@@ -261,12 +324,18 @@ export function ExitInterviewWizard({
                                     variant="ghost"
                                     size="icon"
                                     aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
-                                    onClick={() => form.setData('overall_satisfaction', star)}
+                                    onClick={() =>
+                                        form.setData(
+                                            'overall_satisfaction',
+                                            star,
+                                        )
+                                    }
                                     className="h-8 w-8"
                                 >
                                     <Star
                                         className={`h-6 w-6 ${
-                                            star <= form.data.overall_satisfaction
+                                            star <=
+                                            form.data.overall_satisfaction
                                                 ? 'fill-status-warning text-status-warning'
                                                 : 'text-muted-foreground'
                                         }`}
@@ -279,7 +348,9 @@ export function ExitInterviewWizard({
                                     variant="ghost"
                                     size="sm"
                                     className="ml-2 text-xs text-muted-foreground"
-                                    onClick={() => form.setData('overall_satisfaction', 0)}
+                                    onClick={() =>
+                                        form.setData('overall_satisfaction', 0)
+                                    }
                                 >
                                     Clear
                                 </Button>
@@ -290,7 +361,9 @@ export function ExitInterviewWizard({
                         <Field label="Would recommend as an employer">
                             <Segmented
                                 value={form.data.would_recommend}
-                                onChange={(v) => form.setData('would_recommend', v)}
+                                onChange={(v) =>
+                                    form.setData('would_recommend', v)
+                                }
                                 options={RECOMMEND_OPTS}
                             />
                         </Field>
@@ -310,7 +383,12 @@ export function ExitInterviewWizard({
                             <Textarea
                                 rows={3}
                                 value={form.data.what_went_well}
-                                onChange={(e) => form.setData('what_went_well', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'what_went_well',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Positive experiences during their time here…"
                             />
                         </Field>
@@ -318,7 +396,12 @@ export function ExitInterviewWizard({
                             <Textarea
                                 rows={3}
                                 value={form.data.what_could_improve}
-                                onChange={(e) => form.setData('what_could_improve', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'what_could_improve',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Areas for improvement…"
                             />
                         </Field>
@@ -326,7 +409,12 @@ export function ExitInterviewWizard({
                             <Textarea
                                 rows={3}
                                 value={form.data.management_feedback}
-                                onChange={(e) => form.setData('management_feedback', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'management_feedback',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Feedback on management and leadership…"
                             />
                         </Field>
@@ -334,7 +422,12 @@ export function ExitInterviewWizard({
                             <Textarea
                                 rows={3}
                                 value={form.data.culture_feedback}
-                                onChange={(e) => form.setData('culture_feedback', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'culture_feedback',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Feedback on company culture…"
                             />
                         </Field>
@@ -342,7 +435,12 @@ export function ExitInterviewWizard({
                             <Textarea
                                 rows={3}
                                 value={form.data.additional_comments}
-                                onChange={(e) => form.setData('additional_comments', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'additional_comments',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Any other feedback…"
                             />
                         </Field>
@@ -351,12 +449,18 @@ export function ExitInterviewWizard({
                         <input
                             type="checkbox"
                             checked={form.data.is_confidential}
-                            onChange={(e) => form.setData('is_confidential', e.target.checked)}
+                            onChange={(e) =>
+                                form.setData(
+                                    'is_confidential',
+                                    e.target.checked,
+                                )
+                            }
                             className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
                         />
                         <span>
                             <span className="flex items-center gap-1.5 text-[13px] font-semibold">
-                                <Lock className="h-3.5 w-3.5" /> Mark as confidential
+                                <Lock className="h-3.5 w-3.5" /> Mark as
+                                confidential
                             </span>
                             <span className="block text-[12.5px] text-muted-foreground">
                                 Restricts detailed feedback to HR managers.
@@ -374,13 +478,33 @@ export function ExitInterviewWizard({
                         blurb="Check the details, then record the interview."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={User} title="Interview" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Employee" value={picked?.user?.name} />
-                            <ReviewRow label="Interviewer" value={interviewerName ?? undefined} />
-                            <ReviewRow label="Date" value={form.data.interview_date} />
-                            <ReviewRow label="Reason" value={reasonLabel ?? undefined} />
+                        <ReviewCard
+                            icon={User}
+                            title="Interview"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Employee"
+                                value={picked?.user?.name}
+                            />
+                            <ReviewRow
+                                label="Interviewer"
+                                value={interviewerName ?? undefined}
+                            />
+                            <ReviewRow
+                                label="Date"
+                                value={form.data.interview_date}
+                            />
+                            <ReviewRow
+                                label="Reason"
+                                value={reasonLabel ?? undefined}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Star} title="Ratings" onEdit={() => wizard.goTo(1)}>
+                        <ReviewCard
+                            icon={Star}
+                            title="Ratings"
+                            onEdit={() => wizard.goTo(1)}
+                        >
                             <ReviewRow
                                 label="Satisfaction"
                                 value={
@@ -393,7 +517,9 @@ export function ExitInterviewWizard({
                                 label="Would recommend"
                                 value={
                                     RECOMMEND_OPTS.find(
-                                        (o) => o.value === form.data.would_recommend,
+                                        (o) =>
+                                            o.value ===
+                                            form.data.would_recommend,
                                     )?.label
                                 }
                             />

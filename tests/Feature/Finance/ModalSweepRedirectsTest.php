@@ -1,6 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -15,7 +18,7 @@ use Inertia\Testing\AssertableInertia as Assert;
  */
 function modalSweepUser(): User
 {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
 
     // The view permission each index route's middleware requires.
     foreach ([
@@ -75,10 +78,22 @@ it('persists a recurring charge from the modal payload (starts_at regression)', 
     // Regression: recurring_charges.starts_at is NOT NULL with no default, so the
     // store 500'd on every create — the modal AND the retired full-page form both
     // hit it. The store now derives starts_at from the first charge date.
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
     $manage = Permission::firstOrCreate(['key' => 'finance.ar.manage'], ['description' => 'finance.ar.manage']);
     $user->permissionOverrides()->syncWithoutDetaching([$manage->id => ['allowed' => true]]);
-    $client = \App\Models\Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => today()->subDay(),
+        'end_date' => null,
+    ]);
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'status' => 'active',
+    ]);
 
     $this->actingAs($user)
         ->post('/finance/recurring-charges', [
@@ -92,7 +107,6 @@ it('persists a recurring charge from the modal payload (starts_at regression)', 
         ->assertRedirect(route('finance.recurring_charges.index'));
 
     $this->assertDatabaseHas('recurring_charges', [
-        'organization_id' => 1,
         'client_id' => $client->id,
         'name' => 'Weekly transport levy',
         'frequency' => 'weekly',

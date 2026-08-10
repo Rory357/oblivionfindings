@@ -133,7 +133,10 @@ export function MyHrClockCard({
           })
         : null;
     const nextShiftSite =
-        nextShift?.location ?? nextShift?.service_context_name ?? siteName ?? null;
+        nextShift?.location ??
+        nextShift?.service_context_name ??
+        siteName ??
+        null;
 
     function handleClockIn() {
         setProcessing(true);
@@ -144,7 +147,8 @@ export function MyHrClockCard({
                 preserveScroll: true,
                 onSuccess: () =>
                     toast.success('Clocked in 🌿', {
-                        description: 'Have a good shift. Your timer is running.',
+                        description:
+                            'Have a good shift. Your timer is running.',
                     }),
                 onError: () => toast.error('Could not clock in'),
                 onFinish: () => setProcessing(false),
@@ -184,14 +188,20 @@ export function MyHrClockCard({
     function toggleBreak() {
         if (!isClockedIn) return;
         if (onBreak && breakStart) {
-            setBreakAccum((a) => a + Math.floor((Date.now() - breakStart) / 1000));
+            setBreakAccum(
+                (a) => a + Math.floor((Date.now() - breakStart) / 1000),
+            );
             setOnBreak(false);
             setBreakStart(null);
-            toast.info('Back from break ☕', { description: 'Timer running again.' });
+            toast.info('Back from break ☕', {
+                description: 'Timer running again.',
+            });
         } else {
             setOnBreak(true);
             setBreakStart(Date.now());
-            toast.info('On break ☕', { description: 'Take five — timer paused.' });
+            toast.info('On break ☕', {
+                description: 'Take five — timer paused.',
+            });
         }
     }
 
@@ -223,7 +233,7 @@ export function MyHrClockCard({
                     ) : (
                         <span className="h-2.5 w-2.5 rounded-full border-2 border-primary-foreground/50" />
                     )}
-                    <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-primary-foreground/85">
+                    <span className="text-[11px] font-bold tracking-[0.1em] text-primary-foreground/85 uppercase">
                         {statusLabel}
                     </span>
                 </div>
@@ -237,10 +247,10 @@ export function MyHrClockCard({
             {/* clocked-in: live timer + shift-window track */}
             {isClockedIn ? (
                 <>
-                    <div className="mt-3 text-[52px] font-bold leading-none tracking-tight tabular-nums">
+                    <div className="mt-3 text-[52px] leading-none font-bold tracking-tight tabular-nums">
                         {fmtTimer(elapsed)}
                     </div>
-                    <div className="relative mb-[7px] mt-[22px] h-1.5 rounded-full bg-primary-foreground/20">
+                    <div className="relative mt-[22px] mb-[7px] h-1.5 rounded-full bg-primary-foreground/20">
                         <div
                             className="absolute inset-y-0 left-0 rounded-full bg-primary-foreground"
                             style={{ width: `${progPct}%` }}
@@ -257,11 +267,11 @@ export function MyHrClockCard({
                 </>
             ) : (
                 /* clocked-out: calm "Next shift" block */
-                <div className="pb-0.5 pt-1">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/55">
+                <div className="pt-1 pb-0.5">
+                    <div className="text-[10px] font-bold tracking-[0.09em] text-primary-foreground/55 uppercase">
                         Next shift
                     </div>
-                    <div className="mt-[7px] text-4xl font-bold leading-none tracking-tight tabular-nums">
+                    <div className="mt-[7px] text-4xl leading-none font-bold tracking-tight tabular-nums">
                         {nextShiftTime}
                     </div>
                     <div className="mt-2 text-[12.5px] text-primary-foreground/75">

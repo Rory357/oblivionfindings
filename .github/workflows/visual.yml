@@ -10,10 +10,22 @@ on:
       - develop
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   visual:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 70
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - chromium-desktop
+          - chromium-desktop-visual
+          - it-security-desktop-1440
+          - it-security-desktop-1280
 
     services:
       mysql:
@@ -84,7 +96,8 @@ jobs:
           SESSION_DRIVER: file
         run: php artisan migrate:fresh --seed --force
 
-      - name: Visual Regression
+      - name: Visual Regression (${{ matrix.project }})
+        timeout-minutes: 50
         env:
           APP_URL: http://127.0.0.1:4173
           DB_CONNECTION: mysql
@@ -103,13 +116,13 @@ jobs:
           FEATURE_ROSTERING_AUTO_SCHEDULE: true
           VISUAL_EMAIL: admin@demo.test
           VISUAL_PASSWORD: password
-        run: npm run visual:test
+        run: npx playwright test --project=${{ matrix.project }}
 
       - name: Upload Playwright Artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts
+          name: playwright-artifacts-${{ matrix.project }}
           path: |
             playwright-report
             test-results

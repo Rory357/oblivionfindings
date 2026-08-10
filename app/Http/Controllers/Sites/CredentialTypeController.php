@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\CredentialType;
 use App\Models\SiteCredential;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
- * Manage the tenant's credential-type registry (powers the type tile picker).
+ * Manage the application credential-type catalogue (powers the type picker).
  * Gated on credentials.manage — the same right needed to create credentials.
  */
 class CredentialTypeController extends Controller
@@ -21,10 +23,9 @@ class CredentialTypeController extends Controller
         $user = $request->user();
         abort_unless((bool) ($user?->canDo('credentials.manage') ?? false), 403);
 
-        $tenantId = $user?->organization_id;
-        $counts = $this->usageCounts($tenantId);
+        $counts = $this->usageCounts();
 
-        $types = CredentialType::effectiveForTenant($tenantId)
+        $types = CredentialType::applicationCatalogue()
             ->map(fn (array $type) => [
                 ...$type,
                 'count' => (int) ($counts[$type['key']] ?? 0),
@@ -42,12 +43,9 @@ class CredentialTypeController extends Controller
         $user = $request->user();
         abort_unless((bool) ($user?->canDo('credentials.manage') ?? false), 403);
 
-        $tenantId = $user?->organization_id;
-        abort_unless($tenantId, 422, 'No organization context is available for saving credential types.');
-
         $validated = $request->validate([
             'types' => 'required|array|min:1',
-            'types.*.key' => 'required|string|max:50',
+            'types.*.key' => 'required|string|max:30',
             'types.*.label' => 'required|string|max:100',
             'types.*.icon' => ['required', 'string', Rule::in(CredentialType::ICONS)],
             'types.*.description' => 'nullable|string|max:255',
@@ -55,13 +53,18 @@ class CredentialTypeController extends Controller
         ]);
 
         $defaultKeys = CredentialType::defaultKeys();
-        $usage = $this->usageCounts($tenantId);
 
         // Normalise + de-dupe the incoming keys (custom keys become snake_case).
         $rows = [];
         foreach ($validated['types'] as $type) {
             $isDefault = in_array($type['key'], $defaultKeys, true);
-            $key = $isDefault ? $type['key'] : (Str::slug($type['key'], '_') ?: $type['key']);
+            $key = $isDefault ? $type['key'] : Str::slug($type['key'], '_');
+            if ($key === '' || array_key_exists($key, $rows)) {
+                throw ValidationException::withMessages([
+                    'types' => 'Credential type keys must be non-empty and unique after normalisation.',
+                ]);
+            }
+
             $rows[$key] = [
                 'key' => $key,
                 'label' => $type['label'],
@@ -75,11 +78,16 @@ class CredentialTypeController extends Controller
 
         $incomingKeys = array_keys($rows);
 
-        DB::transaction(function () use ($rows, $tenantId, $incomingKeys, $defaultKeys, $usage) {
+        DB::transaction(function () use ($rows, $incomingKeys, $defaultKeys): void {
+            CredentialType::query()
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
             $order = 0;
             foreach ($rows as $row) {
                 CredentialType::updateOrCreate(
-                    ['tenant_id' => $tenantId, 'key' => $row['key']],
+                    ['key' => $row['key']],
                     [
                         'label' => $row['label'],
                         'icon' => $row['icon'],
@@ -95,12 +103,11 @@ class CredentialTypeController extends Controller
             // that were removed in the dialog AND are not referenced by any
             // credential. Defaults and in-use types are never deleted.
             CredentialType::query()
-                ->where('tenant_id', $tenantId)
                 ->where('is_system', false)
                 ->whereNotIn('key', array_merge($incomingKeys, $defaultKeys))
                 ->get()
-                ->each(function (CredentialType $row) use ($usage) {
-                    if ((int) ($usage[$row->key] ?? 0) === 0) {
+                ->each(function (CredentialType $row): void {
+                    if (! SiteCredential::query()->where('credential_type', $row->key)->exists()) {
                         $row->delete();
                     }
                 });
@@ -110,12 +117,11 @@ class CredentialTypeController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection<string, int>
+     * @return Collection<string, int>
      */
-    private function usageCounts(?int $tenantId)
+    private function usageCounts()
     {
         return SiteCredential::query()
-            ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))
             ->selectRaw('credential_type, COUNT(*) as c')
             ->groupBy('credential_type')
             ->pluck('c', 'credential_type');

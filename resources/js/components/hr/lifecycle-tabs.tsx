@@ -1,9 +1,18 @@
 import { router, usePage } from '@inertiajs/react';
-import { DoorOpen, FolderKanban, MessageSquareQuote, UserPlus } from 'lucide-react';
+import {
+    DoorOpen,
+    FolderKanban,
+    MessageSquareQuote,
+    UserPlus,
+} from 'lucide-react';
 
 import { HrTabs, type HrTabItem } from './hr-tabs';
 
-export type LifecycleTab = 'onboarding' | 'offboarding' | 'cases' | 'exit-interviews';
+export type LifecycleTab =
+    | 'onboarding'
+    | 'offboarding'
+    | 'cases'
+    | 'exit-interviews';
 
 const TAB_URLS: Record<LifecycleTab, string> = {
     onboarding: '/hr/onboarding',
@@ -42,15 +51,33 @@ export function LifecycleTabs({ active }: { active: LifecycleTab }) {
 
     const all: Array<{ item: HrTabItem; show: boolean }> = [
         {
-            item: { id: 'onboarding', label: 'Onboarding', icon: UserPlus, tone: 'primary', badge: badge('onboarding') },
+            item: {
+                id: 'onboarding',
+                label: 'Onboarding',
+                icon: UserPlus,
+                tone: 'primary',
+                badge: badge('onboarding'),
+            },
             show: !!hr?.onboarding?.view,
         },
         {
-            item: { id: 'offboarding', label: 'Offboarding', icon: DoorOpen, tone: 'warning', badge: badge('offboarding') },
+            item: {
+                id: 'offboarding',
+                label: 'Offboarding',
+                icon: DoorOpen,
+                tone: 'warning',
+                badge: badge('offboarding'),
+            },
             show: !!hr?.onboarding?.view,
         },
         {
-            item: { id: 'cases', label: 'Cases & disciplinary', icon: FolderKanban, tone: 'critical', badge: badge('cases') },
+            item: {
+                id: 'cases',
+                label: 'Cases & disciplinary',
+                icon: FolderKanban,
+                tone: 'critical',
+                badge: badge('cases'),
+            },
             show: !!hr?.cases?.view,
         },
         {
@@ -61,7 +88,9 @@ export function LifecycleTabs({ active }: { active: LifecycleTab }) {
                 tone: 'violet',
                 badge: badge('exit-interviews'),
             },
-            show: !!hr?.['exit-interviews']?.view || !!hr?.['exit-interviews']?.manage,
+            show:
+                !!hr?.['exit-interviews']?.view ||
+                !!hr?.['exit-interviews']?.manage,
         },
     ];
 

@@ -7,11 +7,21 @@ use App\Models\Client;
 use App\Models\FundingClaim;
 use App\Models\FundingClaimItem;
 use App\Models\ServiceAgreement;
+use App\Models\Shift;
+use App\Models\Timesheet;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class FundingClaimController extends Controller
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $this->authorizeAny($request, ['funding.viewAny', 'funding_claims.viewAny']);
@@ -21,22 +31,32 @@ class FundingClaimController extends Controller
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
         ]);
 
-        $claims = FundingClaim::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        if (! empty($data['client_id'])) {
+            $this->siteAccess->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                ['reports.viewAny'],
+            );
+        }
+
+        $claims = $this->accessibleClaims($auth)
             ->with([
                 'client:id,first_name,last_name',
                 'serviceAgreement:id,title,reference_number',
                 'submitter:id,name',
             ])
             ->withCount('items')
-            ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
-            ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
+            ->when(! empty($data['status']), fn ($q) => $q->where('status', $data['status']))
+            ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
 
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $clients = $this->siteAccess->applyClientScope(
+            Client::query(),
+            $auth,
+            ['reports.viewAny'],
+        )
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -51,8 +71,7 @@ class FundingClaimController extends Controller
     {
         $auth = $this->authorizeAny($request, ['funding.claims.create', 'funding_claims.create']);
 
-        $agreements = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $agreements = $this->accessibleAgreements($auth)
             ->active()
             ->with(['client:id,first_name,last_name', 'lineItems'])
             ->orderBy('title')
@@ -84,13 +103,30 @@ class FundingClaimController extends Controller
             'items.*.funding_contract_reference' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $claim = DB::transaction(function () use ($data, $auth) {
+        $this->siteAccess->assertCanAccessClientId(
+            $auth,
+            (int) $data['client_id'],
+            ['reports.viewAny'],
+        );
+
+        $agreement = $this->accessibleAgreements($auth)
+            ->with('lineItems:id,service_agreement_id')
+            ->findOrFail($data['service_agreement_id']);
+
+        if ((int) $agreement->client_id !== (int) $data['client_id']) {
+            throw ValidationException::withMessages([
+                'client_id' => 'The Funding Claim Client must match its Service Agreement.',
+            ]);
+        }
+
+        $this->assertItemOwnership($agreement, $data['items']);
+
+        $claim = DB::transaction(function () use ($data, $agreement) {
             $totalAmount = collect($data['items'])->sum(fn ($item) => $item['quantity'] * $item['unit_price']);
 
             $claim = FundingClaim::create([
-                'organization_id' => $auth->organization_id,
-                'service_agreement_id' => $data['service_agreement_id'],
-                'client_id' => $data['client_id'],
+                'service_agreement_id' => $agreement->id,
+                'client_id' => $agreement->client_id,
                 'claim_reference' => $data['claim_reference'] ?? null,
                 'status' => 'draft',
                 'period_start' => $data['period_start'],
@@ -100,7 +136,6 @@ class FundingClaimController extends Controller
 
             foreach ($data['items'] as $itemData) {
                 FundingClaimItem::create([
-                    'organization_id' => $auth->organization_id,
                     'funding_claim_id' => $claim->id,
                     'service_agreement_line_item_id' => $itemData['service_agreement_line_item_id'] ?? null,
                     'shift_id' => $itemData['shift_id'] ?? null,
@@ -125,8 +160,7 @@ class FundingClaimController extends Controller
     {
         $auth = $this->authorizeAny($request, ['funding.viewAny', 'funding_claims.view']);
 
-        $claim = FundingClaim::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $claim = $this->accessibleClaims($auth)
             ->with([
                 'client:id,first_name,last_name',
                 'serviceAgreement:id,title,reference_number,total_budget,budget_used',
@@ -146,8 +180,7 @@ class FundingClaimController extends Controller
     {
         $auth = $this->authorizeAny($request, ['funding.claims.submit', 'funding_claims.submit']);
 
-        $claim = FundingClaim::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $claim = $this->accessibleClaims($auth)
             ->where('status', 'draft')
             ->findOrFail($claim);
 
@@ -164,8 +197,7 @@ class FundingClaimController extends Controller
     {
         $auth = $this->authorizeAny($request, ['funding.claims.approve', 'funding_claims.approve']);
 
-        $claim = FundingClaim::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $claim = $this->accessibleClaims($auth)
             ->where('status', 'submitted')
             ->findOrFail($claim);
 
@@ -187,5 +219,56 @@ class FundingClaimController extends Controller
         );
 
         return $user;
+    }
+
+    private function accessibleClaims(User $user): Builder
+    {
+        return FundingClaim::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ))
+            ->whereHas('serviceAgreement', fn (Builder $agreementQuery) => $agreementQuery
+                ->whereColumn('service_agreements.client_id', 'funding_claims.client_id'));
+    }
+
+    private function accessibleAgreements(User $user): Builder
+    {
+        return ServiceAgreement::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ));
+    }
+
+    /** @param array<int, array<string, mixed>> $items */
+    private function assertItemOwnership(ServiceAgreement $agreement, array $items): void
+    {
+        $lineItemIds = collect($items)
+            ->pluck('service_agreement_line_item_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+        if ($agreement->lineItems->whereIn('id', $lineItemIds)->count() !== $lineItemIds->count()) {
+            throw ValidationException::withMessages([
+                'items' => 'Every Funding Claim line item must belong to the selected Service Agreement.',
+            ]);
+        }
+
+        $shiftIds = collect($items)->pluck('shift_id')->filter()->map(fn ($id) => (int) $id)->unique();
+        if (Shift::query()->whereIn('id', $shiftIds)->where('client_id', $agreement->client_id)->count() !== $shiftIds->count()) {
+            throw ValidationException::withMessages([
+                'items' => 'Every linked Shift must belong to the Funding Claim Client.',
+            ]);
+        }
+
+        $timesheetIds = collect($items)->pluck('timesheet_id')->filter()->map(fn ($id) => (int) $id)->unique();
+        if (Timesheet::query()->whereIn('id', $timesheetIds)->where('client_id', $agreement->client_id)->count() !== $timesheetIds->count()) {
+            throw ValidationException::withMessages([
+                'items' => 'Every linked Timesheet must belong to the Funding Claim Client.',
+            ]);
+        }
     }
 }

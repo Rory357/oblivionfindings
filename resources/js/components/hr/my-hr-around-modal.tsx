@@ -57,7 +57,10 @@ const CELEB_TYPE: Record<string, { label: string; variant: StatusVariant }> = {
     new_starter: { label: 'New starter', variant: 'success' },
 };
 
-export function leaveBadge(type: string): { label: string; variant: StatusVariant } {
+export function leaveBadge(type: string): {
+    label: string;
+    variant: StatusVariant;
+} {
     const map: Record<string, { label: string; variant: StatusVariant }> = {
         annual: { label: 'Annual', variant: 'success' },
         sick: { label: 'Sick', variant: 'warning' },
@@ -68,7 +71,9 @@ export function leaveBadge(type: string): { label: string; variant: StatusVarian
     };
     return (
         map[type] ?? {
-            label: type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+            label: type
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase()),
             variant: 'neutral',
         }
     );
@@ -157,7 +162,13 @@ export function MyHrAroundModal({
 
     const meta: Record<
         AroundView,
-        { railTitle: string; railSub: string; blurb: string; header: string; legendTitle: string }
+        {
+            railTitle: string;
+            railSub: string;
+            blurb: string;
+            header: string;
+            legendTitle: string;
+        }
     > = {
         celebrations: {
             railTitle: 'Celebrations',
@@ -189,22 +200,34 @@ export function MyHrAroundModal({
                 counts.set(c.type, (counts.get(c.type) ?? 0) + 1),
             );
             return [...counts.entries()].map(([type, count]) => {
-                const t = CELEB_TYPE[type] ?? { label: type, variant: 'neutral' as StatusVariant };
+                const t = CELEB_TYPE[type] ?? {
+                    label: type,
+                    variant: 'neutral' as StatusVariant,
+                };
                 return legendRow(t.label, count, VARIANT_TOKEN[t.variant]);
             });
         }
         if (v === 'whosOut') {
-            const counts = new Map<string, { count: number; variant: StatusVariant }>();
+            const counts = new Map<
+                string,
+                { count: number; variant: StatusVariant }
+            >();
             whosOut.forEach((w) => {
                 const b = leaveBadge(w.leave_type);
-                const e = counts.get(b.label) ?? { count: 0, variant: b.variant };
+                const e = counts.get(b.label) ?? {
+                    count: 0,
+                    variant: b.variant,
+                };
                 counts.set(b.label, { count: e.count + 1, variant: b.variant });
             });
             return [...counts.entries()].map(([label, { count, variant }]) =>
                 legendRow(label, count, VARIANT_TOKEN[variant]),
             );
         }
-        const counts = new Map<string, { count: number; variant: StatusVariant }>();
+        const counts = new Map<
+            string,
+            { count: number; variant: StatusVariant }
+        >();
         announcements.forEach((a) => {
             const b = announcementBadge(a.priority);
             const e = counts.get(b.label) ?? { count: 0, variant: b.variant };
@@ -264,14 +287,16 @@ export function MyHrAroundModal({
                     <p className="mb-2.5 text-[12px] leading-relaxed text-muted-foreground">
                         {meta[v].blurb}
                     </p>
-                    <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
+                    <div className="mb-2 text-[10px] font-bold tracking-[0.06em] text-muted-foreground uppercase">
                         {meta[v].legendTitle}
                     </div>
                     <div className="flex flex-col gap-2">{legend}</div>
                 </div>
             }
             footerStart={
-                <span className="text-[12px] text-muted-foreground">{footerNote}</span>
+                <span className="text-[12px] text-muted-foreground">
+                    {footerNote}
+                </span>
             }
             footerEnd={
                 <>
@@ -288,7 +313,9 @@ export function MyHrAroundModal({
                             onClick={primary.onClick}
                             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-bold text-primary-foreground"
                         >
-                            {v === 'celebrations' ? <Send className="h-3.5 w-3.5" /> : null}
+                            {v === 'celebrations' ? (
+                                <Send className="h-3.5 w-3.5" />
+                            ) : null}
                             {primary.label}
                         </button>
                     ) : null}
@@ -310,14 +337,22 @@ export function MyHrAroundModal({
                             >
                                 {avatar(c.user_id, c.initials)}
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-[13px] font-semibold">{c.name}</div>
+                                    <div className="text-[13px] font-semibold">
+                                        {c.name}
+                                    </div>
                                     <div className="text-[11.5px] text-muted-foreground">
                                         {c.occasion}
                                     </div>
                                 </div>
                                 <div className="shrink-0 text-right">
-                                    <div className="text-[12px] font-semibold">{c.date}</div>
-                                    <StatusBadge variant={t.variant} size="sm" className="mt-1">
+                                    <div className="text-[12px] font-semibold">
+                                        {c.date}
+                                    </div>
+                                    <StatusBadge
+                                        variant={t.variant}
+                                        size="sm"
+                                        className="mt-1"
+                                    >
                                         {t.label}
                                     </StatusBadge>
                                 </div>
@@ -351,13 +386,17 @@ export function MyHrAroundModal({
                             >
                                 {avatar(w.user_id, w.initials)}
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-[13px] font-semibold">{w.name}</div>
+                                    <div className="text-[13px] font-semibold">
+                                        {w.name}
+                                    </div>
                                     <div className="text-[11.5px] text-muted-foreground">
                                         {w.role}
                                     </div>
                                 </div>
-                                <div className="shrink-0 text-right min-w-[92px]">
-                                    <div className="text-[12px] font-semibold">{w.range}</div>
+                                <div className="min-w-[92px] shrink-0 text-right">
+                                    <div className="text-[12px] font-semibold">
+                                        {w.range}
+                                    </div>
                                     <div className="text-[11px] text-muted-foreground">
                                         {w.days_label}
                                     </div>
@@ -383,12 +422,19 @@ export function MyHrAroundModal({
                             >
                                 <span
                                     className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
-                                    style={{ background: `var(${VARIANT_TOKEN[b.variant]})` }}
+                                    style={{
+                                        background: `var(${VARIANT_TOKEN[b.variant]})`,
+                                    }}
                                 />
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-[13px] font-bold">{a.title}</span>
-                                        <StatusBadge variant={b.variant} size="sm">
+                                        <span className="text-[13px] font-bold">
+                                            {a.title}
+                                        </span>
+                                        <StatusBadge
+                                            variant={b.variant}
+                                            size="sm"
+                                        >
                                             {b.label}
                                         </StatusBadge>
                                     </div>

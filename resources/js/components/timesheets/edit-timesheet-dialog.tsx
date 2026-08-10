@@ -26,8 +26,8 @@ import {
     submit as submitTimesheet,
     update as updateTimesheet,
 } from '@/routes/operations/timesheets';
-import { router, useForm } from '@inertiajs/react';
 import type { Page, PageProps } from '@inertiajs/core';
+import { router, useForm } from '@inertiajs/react';
 import { AlertTriangle, CalendarDays, Loader2, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -147,7 +147,8 @@ export default function EditTimesheetDialog({
                 </DialogHeader>
 
                 <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-                    {timesheet.status === 'returned' && timesheet.returned_notes ? (
+                    {timesheet.status === 'returned' &&
+                    timesheet.returned_notes ? (
                         <div className="flex items-start gap-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                             <div>
@@ -345,7 +346,10 @@ export default function EditTimesheetDialog({
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
                         {editable ? 'Cancel' : 'Close'}
                     </Button>
                     {editable ? (

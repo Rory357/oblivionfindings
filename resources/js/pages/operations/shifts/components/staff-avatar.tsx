@@ -7,8 +7,7 @@ type Props = {
 };
 
 export function StaffAvatar({ name, size = 'sm', className = '' }: Props) {
-    const sizeClass =
-        size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-9 w-9 text-xs';
+    const sizeClass = size === 'sm' ? 'h-7 w-7 text-[10px]' : 'h-9 w-9 text-xs';
 
     if (!name) {
         return (

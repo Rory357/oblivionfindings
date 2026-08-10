@@ -3,13 +3,14 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrTalentPool extends Model
 {
-    use AuditableChanges;
+    use AuditableChanges, WritesLegacyStorageContext;
 
     protected $table = 'hr_talent_pool';
 

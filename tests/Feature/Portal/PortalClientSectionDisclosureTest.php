@@ -12,6 +12,7 @@ use App\Models\Permission;
 use App\Models\RespiteBooking;
 use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
@@ -50,11 +51,9 @@ function makePortalSectionDisclosureIdentity(
     string $relation = 'next_of_kin',
     array $flags = [],
     array $permissionKeys = ['clients.viewPortal', 'incidents.view.portal'],
-    ?int $organizationId = null,
     bool $createNok = true,
 ): User {
     $user = User::factory()->create([
-        'organization_id' => $organizationId ?? $client->organization_id,
         'role' => $roleName,
         'approved_at' => now(),
     ]);
@@ -78,7 +77,6 @@ function makePortalSectionDisclosureIdentity(
 function enablePortalSectionDisclosureSettings(Client $client, array $overrides = []): FamilyPortalSetting
 {
     return FamilyPortalSetting::query()->create([
-        'organization_id' => $client->organization_id,
         'client_id' => $client->id,
         'show_shift_schedule' => true,
         'show_respite' => true,
@@ -198,7 +196,7 @@ function portalSectionCalendarTypes(TestResponse $response): array
 }
 
 it('fails closed across portal readers for a NOK without active family information consent', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     $nok = makePortalSectionDisclosureIdentity($client, flags: [
         'can_view_medical' => true,
         'can_view_medications' => true,
@@ -268,7 +266,7 @@ it('fails closed across portal readers for a NOK without active family informati
 });
 
 it('combines active consent portal settings and NOK flags for positive family disclosure', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     $nok = makePortalSectionDisclosureIdentity($client, flags: [
         'can_view_medical' => true,
         'can_view_medications' => true,
@@ -341,7 +339,7 @@ it('combines active consent portal settings and NOK flags for positive family di
 });
 
 it('keeps each disabled family portal setting effective even with active consent and permissive NOK flags', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     $nok = makePortalSectionDisclosureIdentity($client, flags: [
         'can_view_medical' => true,
         'can_view_medications' => true,
@@ -406,7 +404,7 @@ it('keeps each disabled family portal setting effective even with active consent
 });
 
 it('does not apply family disclosure controls to the person viewing their own portal record', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create();
     $portalClient = makePortalSectionDisclosureIdentity(
         $client,
         roleName: 'client',
@@ -464,8 +462,10 @@ it('does not apply family disclosure controls to the person viewing their own po
         ->assertInertia(fn (Assert $page) => $page->has('notes', 1));
 });
 
-it('fails closed for ambiguous self links and denies unlinked or cross-organization portal readers', function () {
-    $client = Client::factory()->create(['organization_id' => 2]);
+it('fails closed for ambiguous self links and denies readers without the requested Client link', function () {
+    $site = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $ambiguous = makePortalSectionDisclosureIdentity(
         $client,
         roleName: 'next_of_kin',
@@ -489,7 +489,6 @@ it('fails closed for ambiguous self links and denies unlinked or cross-organizat
             ->has('incidents', 0));
 
     $unlinked = User::factory()->create([
-        'organization_id' => 2,
         'role' => 'next_of_kin',
         'approved_at' => now(),
     ]);
@@ -501,12 +500,14 @@ it('fails closed for ambiguous self links and denies unlinked or cross-organizat
             ->assertForbidden();
     }
 
-    $crossOrganization = makePortalSectionDisclosureIdentity(
-        $client,
-        organizationId: 1,
-    );
+    $otherLinkedClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $linkedElsewhere = makePortalSectionDisclosureIdentity($otherLinkedClient);
+    $this->actingAs($linkedElsewhere)
+        ->get(route('portal.clients.dashboard', $otherLinkedClient, false))
+        ->assertOk();
+
     foreach (['dashboard', 'timeline', 'health'] as $surface) {
-        $this->actingAs($crossOrganization)
+        $this->actingAs($linkedElsewhere)
             ->get(route("portal.clients.{$surface}", $client, false))
             ->assertForbidden();
     }

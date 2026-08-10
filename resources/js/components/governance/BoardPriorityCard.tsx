@@ -1,10 +1,18 @@
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { CalendarClock, Info } from 'lucide-react';
-import { PriorityBadge, type Priority, type WorkflowStatus } from './PriorityBadge';
 import { NextActionButton } from './NextActionButton';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    PriorityBadge,
+    type Priority,
+    type WorkflowStatus,
+} from './PriorityBadge';
 
 export interface WorkflowAction {
     id: string;
@@ -31,12 +39,14 @@ interface BoardPriorityCardProps {
  */
 function ownerInitials(name: string | null): string {
     if (!name) return '?';
-    return name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase() ?? '')
-        .join('') || '?';
+    return (
+        name
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((part) => part[0]?.toUpperCase() ?? '')
+            .join('') || '?'
+    );
 }
 
 const AREA_LABELS: Record<string, string> = {
@@ -75,14 +85,18 @@ export function BoardPriorityCard({
         <div
             className={cn(
                 'group flex flex-col gap-3 rounded-lg border border-border bg-card p-4 transition hover:border-primary/40 hover:shadow-sm lg:flex-row lg:items-center lg:justify-between',
-                action.status === 'overdue' && 'border-status-critical/30 bg-status-critical-bg/10',
+                action.status === 'overdue' &&
+                    'border-status-critical/30 bg-status-critical-bg/10',
                 className,
             )}
             data-dusk={`cockpit-priority-${action.id}`}
         >
             <div className="flex min-w-0 flex-1 items-start gap-3">
                 {!dense && (
-                    <Avatar className="hidden h-9 w-9 shrink-0 md:flex" title={action.owner ?? 'Unassigned'}>
+                    <Avatar
+                        className="hidden h-9 w-9 shrink-0 md:flex"
+                        title={action.owner ?? 'Unassigned'}
+                    >
                         <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
                             {ownerInitials(action.owner)}
                         </AvatarFallback>
@@ -91,28 +105,44 @@ export function BoardPriorityCard({
 
                 <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                        <Badge
+                            variant="outline"
+                            className="text-[10px] tracking-wide uppercase"
+                        >
                             {areaLabel}
                         </Badge>
-                        <PriorityBadge priority={action.priority} status={action.status} />
+                        <PriorityBadge
+                            priority={action.priority}
+                            status={action.status}
+                        />
                         {action.due_date ? (
                             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                <CalendarClock className="h-3 w-3" aria-hidden="true" />
+                                <CalendarClock
+                                    className="h-3 w-3"
+                                    aria-hidden="true"
+                                />
                                 Due {action.due_date}
                             </span>
                         ) : null}
                     </div>
 
-                    <p className="font-medium leading-snug text-foreground">{action.title}</p>
+                    <p className="leading-snug font-medium text-foreground">
+                        {action.title}
+                    </p>
 
                     {action.detail ? (
-                        <p className="text-sm leading-snug text-muted-foreground">{action.detail}</p>
+                        <p className="text-sm leading-snug text-muted-foreground">
+                            {action.detail}
+                        </p>
                     ) : null}
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         {action.owner ? (
                             <span>
-                                <span className="text-muted-foreground/70">Owner:</span> {action.owner}
+                                <span className="text-muted-foreground/70">
+                                    Owner:
+                                </span>{' '}
+                                {action.owner}
                             </span>
                         ) : (
                             <span className="italic">Unassigned</span>
@@ -120,11 +150,16 @@ export function BoardPriorityCard({
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <span className="inline-flex cursor-help items-center gap-1 text-muted-foreground hover:text-foreground">
-                                    <Info className="h-3 w-3" aria-hidden="true" />
+                                    <Info
+                                        className="h-3 w-3"
+                                        aria-hidden="true"
+                                    />
                                     Why this matters
                                 </span>
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs">{why}</TooltipContent>
+                            <TooltipContent className="max-w-xs text-xs">
+                                {why}
+                            </TooltipContent>
                         </Tooltip>
                     </div>
                 </div>

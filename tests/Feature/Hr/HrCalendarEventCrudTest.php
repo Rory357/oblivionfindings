@@ -38,13 +38,11 @@ test('an HR calendar event can be created via the events endpoint', function () 
     $this->assertDatabaseHas('hr_calendar_events', [
         'title' => 'All-staff hui',
         'event_type' => 'company',
-        'tenant_id' => 1,
     ]);
 });
 
 test('an HR calendar event can be updated and archived', function () {
     $event = HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'title' => 'Draft',
         'event_type' => 'team',

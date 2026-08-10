@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingEmail;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Bus;
@@ -15,13 +16,14 @@ function makeWizardProfile(): HrEmployeeProfile
     $user = User::factory()->create();
 
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
+        'primary_site_id' => test()->site->id,
+        'secondary_site_ids' => [],
         'start_date' => now()->addDays(10)->toDateString(),
         'is_active' => true,
     ]);
@@ -30,7 +32,6 @@ function makeWizardProfile(): HrEmployeeProfile
 function makeOnboardingTemplate(string $role = 'support_worker', string $site = 'all'): HrOnboardingTemplate
 {
     return HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => $role,
         'site_type' => $site,
         'is_active' => true,
@@ -43,9 +44,19 @@ function makeOnboardingTemplate(string $role = 'support_worker', string $site = 
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
     ]);
 });
 
@@ -94,7 +105,6 @@ test('send_welcome_email dispatches the send job for the chosen email', function
     makeOnboardingTemplate();
     $profile = makeWizardProfile();
     $email = HrOnboardingEmail::query()->create([
-        'tenant_id' => 1,
         'template_name' => 'Welcome',
         'subject' => 'Welcome',
         'body' => 'body',
@@ -131,7 +141,6 @@ test('the onboarding index ships the wizard employees and email templates', func
     makeOnboardingTemplate();
     $profile = makeWizardProfile();
     HrOnboardingEmail::query()->create([
-        'tenant_id' => 1,
         'template_name' => 'Welcome',
         'subject' => 'Welcome',
         'body' => 'body',

@@ -3,6 +3,7 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetIncident;
@@ -73,9 +74,10 @@ class HsEventBackboneTest extends TestCase
 
     public function test_client_incident_creates_hs_event(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $this->assertDatabaseHas('hs_events', [
@@ -89,7 +91,7 @@ class HsEventBackboneTest extends TestCase
 
     public function test_low_severity_incident_still_creates_hs_event(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'low',
             'status' => 'submitted',
         ]);
@@ -106,7 +108,7 @@ class HsEventBackboneTest extends TestCase
 
     public function test_near_miss_incident_uses_near_miss_category(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'type' => 'near_miss',
             'severity' => 'medium',
             'status' => 'submitted',
@@ -121,9 +123,10 @@ class HsEventBackboneTest extends TestCase
 
     public function test_duplicate_hs_event_not_created_for_same_incident(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $this->assertDatabaseCount('hs_events', 1);
@@ -142,7 +145,7 @@ class HsEventBackboneTest extends TestCase
 
     public function test_incident_severity_change_syncs_to_hs_event(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'low',
             'status' => 'submitted',
         ]);
@@ -152,7 +155,10 @@ class HsEventBackboneTest extends TestCase
             'severity' => 'low',
         ]);
 
-        $incident->update(['severity' => 'high']);
+        $incident->update([
+            'severity' => 'high',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
+        ]);
 
         $this->assertDatabaseHas('hs_events', [
             'source_id' => $incident->id,
@@ -163,9 +169,10 @@ class HsEventBackboneTest extends TestCase
 
     public function test_high_incident_sets_investigation_required(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $this->assertDatabaseHas('hs_events', [
@@ -328,7 +335,6 @@ class HsEventBackboneTest extends TestCase
         $inspector = User::factory()->create();
         $schedule = SiteInspectionSchedule::create([
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'inspection_type' => 'house_safety',
             'title' => 'House safety inspection',
             'frequency' => 'monthly',
@@ -340,7 +346,6 @@ class HsEventBackboneTest extends TestCase
         $record = SiteInspectionRecord::create([
             'schedule_id' => $schedule->id,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'due_date' => now()->subDay()->toDateString(),
             'completed_at' => now(),
             'completed_by_user_id' => $inspector->id,
@@ -366,7 +371,6 @@ class HsEventBackboneTest extends TestCase
         $site = Site::factory()->create();
         $schedule = SiteInspectionSchedule::create([
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'inspection_type' => 'house_safety',
             'title' => 'House safety inspection',
             'frequency' => 'monthly',
@@ -378,7 +382,6 @@ class HsEventBackboneTest extends TestCase
         SiteInspectionRecord::create([
             'schedule_id' => $schedule->id,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'due_date' => now()->subDay()->toDateString(),
             'completed_at' => now(),
             'result' => 'pass',
@@ -398,7 +401,6 @@ class HsEventBackboneTest extends TestCase
         $workOrder = FleetWorkOrder::factory()->create([
             'asset_id' => $asset->id,
             'reported_by_user_id' => $reporter->id,
-            'tenant_id' => $site->tenant_id,
             'title' => 'Wheelchair ramp hydraulic fault',
             'priority' => 'high',
             'status' => 'open',
@@ -422,9 +424,10 @@ class HsEventBackboneTest extends TestCase
 
     public function test_high_incident_still_creates_control_room_alert(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         // HsEvent created
@@ -454,9 +457,10 @@ class HsEventBackboneTest extends TestCase
 
     public function test_hs_event_links_to_control_room_alert(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'high',
             'status' => 'submitted',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
         ]);
 
         $hsEvent = HsEvent::where('source_type', ClientIncident::class)
@@ -479,7 +483,7 @@ class HsEventBackboneTest extends TestCase
 
     public function test_severity_escalation_on_incident_promotes_the_canonical_journey_once(): void
     {
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'type' => 'fall',
             'severity' => 'low',
             'status' => 'submitted',
@@ -487,7 +491,10 @@ class HsEventBackboneTest extends TestCase
 
         $this->assertDatabaseCount('control_room_alerts', 0);
 
-        $incident->update(['severity' => 'high']);
+        $incident->update([
+            'severity' => 'high',
+            'immediate_action_taken' => 'The reporter isolated the immediate risk and requested assistance.',
+        ]);
 
         $incident->refresh();
         $hsEvent = HsEvent::query()->whereKey($incident->hs_event_id)->firstOrFail();
@@ -512,13 +519,12 @@ class HsEventBackboneTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────
-    // Record creation safety — observer must not break source
+    // Complete medium-severity journey
     // ──────────────────────────────────────────────────────
 
-    public function test_source_record_persists_even_if_hs_event_service_errors(): void
+    public function test_medium_incident_persists_with_its_complete_hs_journey(): void
     {
-        // The observer wraps all HsEvent operations in try/catch
-        $incident = ClientIncident::factory()->create([
+        $incident = $this->createSiteBoundIncident([
             'severity' => 'medium',
             'status' => 'submitted',
         ]);
@@ -526,5 +532,25 @@ class HsEventBackboneTest extends TestCase
         $this->assertDatabaseHas('client_incidents', [
             'id' => $incident->id,
         ]);
+        $this->assertDatabaseHas('hs_events', [
+            'source_type' => ClientIncident::class,
+            'source_id' => $incident->id,
+            'severity' => 'medium',
+        ]);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function createSiteBoundIncident(array $attributes): ClientIncident
+    {
+        $site = Site::factory()->create();
+        $client = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
+
+        return ClientIncident::factory()->create(array_merge([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ], $attributes));
     }
 }

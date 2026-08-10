@@ -1,10 +1,14 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\InboundEmailIngestor;
 use App\Jobs\PollItMailboxJob;
 use App\Models\ItInboundEmail;
 use App\Models\ItMailboxConnection;
 use App\Models\ItTicket;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
@@ -13,10 +17,36 @@ use Illuminate\Support\Facades\Http;
  * mark-read, retry-safe dedupe. All HTTP faked.
  */
 
+function itPollRequestSender(string $email): User
+{
+    $site = Site::factory()->create();
+    $sender = User::factory()->create(['email' => $email]);
+    $permission = Permission::query()->firstOrCreate(
+        ['key' => 'it.request'],
+        ['description' => 'Create IT requests', 'group' => 'it', 'module' => 'Operations'],
+    );
+    $role = Role::query()->create([
+        'name' => 'mailbox-requester-'.str()->uuid(),
+        'label' => 'Mailbox requester',
+        'level' => 10,
+        'type' => 'custom',
+    ]);
+    $role->permissions()->attach($permission);
+    $sender->roles()->attach($role);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $sender->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'created_by' => $sender->id,
+        'updated_by' => $sender->id,
+    ]);
+
+    return $sender;
+}
+
 function itPollConnection(array $overrides = []): ItMailboxConnection
 {
     return ItMailboxConnection::create(array_merge([
-        'tenant_id' => 1,
         'provider' => ItMailboxConnection::PROVIDER_MICROSOFT,
         'status' => ItMailboxConnection::STATUS_CONNECTED,
         'access_token' => 'access-123',
@@ -40,7 +70,7 @@ function itPollGraphMessage(array $overrides = []): array
 }
 
 test('polling a connected mailbox turns unread mail into tickets and marks it read', function () {
-    User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+    itPollRequestSender('worker@example.test');
     $connection = itPollConnection();
 
     Http::fake([
@@ -50,7 +80,7 @@ test('polling a connected mailbox turns unread mail into tickets and marks it re
         'graph.microsoft.com/v1.0/users/*/messages/*' => Http::response([], 200),
     ]);
 
-    (new PollItMailboxJob)->handle(new InboundEmailIngestor);
+    (new PollItMailboxJob)->handle(app(InboundEmailIngestor::class));
 
     $ticket = ItTicket::query()->firstWhere('title', 'Printer jammed');
     expect($ticket)->not->toBeNull();
@@ -62,10 +92,9 @@ test('polling a connected mailbox turns unread mail into tickets and marks it re
 });
 
 test('an already-ingested message is not ticketed twice but is still marked read', function () {
-    User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+    User::factory()->create(['email' => 'worker@example.test']);
     itPollConnection();
     ItInboundEmail::create([
-        'tenant_id' => 1,
         'from_email' => 'worker@example.test',
         'message_id' => '<msg1@mail.example.test>',
         'status' => 'processed',
@@ -79,7 +108,7 @@ test('an already-ingested message is not ticketed twice but is still marked read
         'graph.microsoft.com/v1.0/users/*/messages/*' => Http::response([], 200),
     ]);
 
-    (new PollItMailboxJob)->handle(new InboundEmailIngestor);
+    (new PollItMailboxJob)->handle(app(InboundEmailIngestor::class));
 
     expect(ItTicket::query()->count())->toBe(0);
     expect(ItInboundEmail::query()->count())->toBe(1); // no duplicate log row
@@ -91,14 +120,14 @@ test('disconnected connections are skipped without any HTTP', function () {
 
     Http::fake();
 
-    (new PollItMailboxJob)->handle(new InboundEmailIngestor);
+    (new PollItMailboxJob)->handle(app(InboundEmailIngestor::class));
 
     Http::assertNothingSent();
     expect(ItMailboxConnection::query()->where('status', ItMailboxConnection::STATUS_ERROR)->count())->toBe(0);
 });
 
 test('polling a connected gmail mailbox turns unread mail into tickets and clears UNREAD', function () {
-    User::factory()->create(['email' => 'worker@example.test', 'organization_id' => 1]);
+    itPollRequestSender('worker@example.test');
     $connection = itPollConnection([
         'provider' => ItMailboxConnection::PROVIDER_GOOGLE,
         'account_email' => 'support@example.test',
@@ -127,7 +156,7 @@ test('polling a connected gmail mailbox turns unread mail into tickets and clear
         ], 200),
     ]);
 
-    (new PollItMailboxJob)->handle(new InboundEmailIngestor);
+    (new PollItMailboxJob)->handle(app(InboundEmailIngestor::class));
 
     $ticket = ItTicket::query()->firstWhere('title', 'Laptop battery dead');
     expect($ticket)->not->toBeNull();

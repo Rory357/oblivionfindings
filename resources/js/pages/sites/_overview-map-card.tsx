@@ -38,7 +38,12 @@ export default function SiteOverviewMapCard({
     const lng = longitude != null ? Number(longitude) : null;
 
     const markers = useMemo<MapMarker[]>(() => {
-        if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
+        if (
+            lat == null ||
+            lng == null ||
+            Number.isNaN(lat) ||
+            Number.isNaN(lng)
+        ) {
             return [];
         }
         return [
@@ -62,7 +67,10 @@ export default function SiteOverviewMapCard({
                         id: g.id,
                         name: g.name,
                         type: 'circle',
-                        center: { lat: Number(shape.center.lat), lng: Number(shape.center.lng) },
+                        center: {
+                            lat: Number(shape.center.lat),
+                            lng: Number(shape.center.lng),
+                        },
                         radius_m: Number(shape.radius_m),
                     };
                 }
@@ -85,8 +93,9 @@ export default function SiteOverviewMapCard({
     if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) {
         return (
             <div className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-                Pick an address from the search box in <strong>Edit Location</strong> to
-                drop a pin and enable geofencing.
+                Pick an address from the search box in{' '}
+                <strong>Edit Location</strong> to drop a pin and enable
+                geofencing.
             </div>
         );
     }

@@ -3,29 +3,20 @@
 namespace App\Models;
 
 use App\Domain\Hr\Models\HrAsset;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Models\Concerns\AuditableChanges;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
-use App\Models\FleetChecklistRun;
-use App\Models\FleetKeyLog;
-use App\Models\FleetServiceSchedule;
-use App\Models\FleetSignal;
-use App\Models\FleetTrip;
-use App\Models\FleetVehicleBooking;
-use App\Models\FleetVehicleStateSnapshot;
-use App\Models\FleetWorkOrder;
-use App\Models\FleetIncident;
-use App\Models\FleetShiftHandover;
 
 class Asset extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected static function boot()
     {
@@ -41,6 +32,7 @@ class Asset extends Model
     protected $fillable = [
         'site_id',
         'room_id',
+        'site_room_id',
         'home_site_id',
         'primary_driver_user_id',
         'client_id',
@@ -109,6 +101,12 @@ class Asset extends Model
         return $this->belongsTo(SiteHouseRoom::class, 'room_id');
     }
 
+    /** Canonical physical-space identity used by Devices and monitoring. */
+    public function canonicalRoom(): BelongsTo
+    {
+        return $this->belongsTo(SiteRoom::class, 'site_room_id');
+    }
+
     public function categoryRef(): BelongsTo
     {
         return $this->belongsTo(AssetCategory::class, 'asset_category_id');
@@ -160,10 +158,25 @@ class Asset extends Model
     }
 
     /**
+     * Canonical Security & Devices link history for this operational asset.
+     */
+    public function deviceLinks(): HasMany
+    {
+        return $this->hasMany(DeviceAssetLink::class);
+    }
+
+    /**
+     * Devices currently installed in or otherwise linked to this asset.
+     */
+    public function activeDeviceLinks(): HasMany
+    {
+        return $this->deviceLinks()->whereNull('unlinked_at');
+    }
+
+    /**
      * @deprecated Use DeviceAssetLink::active()->forAsset($this->id) instead.
      * Legacy relationship — AssetTracker is retired as active source of truth.
-     * Kept for telemetry ingestion bridge, consent compatibility, and the
-     * legacy asset detail tracker pair/unpair UI.
+     * Kept only for telemetry ingestion and consent compatibility.
      */
     public function trackers(): HasMany
     {

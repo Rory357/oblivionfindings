@@ -1,8 +1,7 @@
-import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FLEET_COLORS, HalfMoonGauge } from '@/components/fleet-charts';
+import { FleetEmptyState } from '@/components/fleet-empty-state';
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import ResidentMap from '@/components/resident-tracking/resident-map';
 import ResidentSidebar from '@/components/resident-tracking/resident-sidebar';
 import type { Geofence, Resident } from '@/components/resident-tracking/types';
@@ -43,6 +42,7 @@ import {
     HeroShell,
     HeroStatusPill,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -136,9 +136,24 @@ type AssignPayload = {
 };
 
 const assignTrackerSteps = [
-    { key: 'records', label: 'Resident & device', blurb: 'Choose the records to link', icon: UserPlus },
-    { key: 'consent', label: 'Consent check', blurb: 'Confirm tracking authority', icon: Shield },
-    { key: 'review', label: 'Review', blurb: 'Confirm before assigning', icon: CheckCircle },
+    {
+        key: 'records',
+        label: 'Resident & device',
+        blurb: 'Choose the records to link',
+        icon: UserPlus,
+    },
+    {
+        key: 'consent',
+        label: 'Consent check',
+        blurb: 'Confirm tracking authority',
+        icon: Shield,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm before assigning',
+        icon: CheckCircle,
+    },
 ] as const;
 
 type Props = {
@@ -188,7 +203,9 @@ type Props = {
 };
 
 function formatAlertType(alertType: string): string {
-    return alertType.replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return alertType
+        .replace(/[._]/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function alertTypeLabel(type: string): string {
@@ -229,7 +246,9 @@ function WanderingAlertsTab({
     // When Echo is not available, the tab relies on manual refresh.
     useEffect(() => {
         if (typeof window !== 'undefined' && (window as any).Echo) {
-            const channel = (window as any).Echo.channel('fleet.wandering-alerts');
+            const channel = (window as any).Echo.channel(
+                'fleet.wandering-alerts',
+            );
             channel.listen('.alert.triggered', (data: any) => {
                 router.reload({ only: ['wandering', 'stats'] });
                 if (data.severity === 'critical' || data.severity === 'high') {
@@ -263,19 +282,29 @@ function WanderingAlertsTab({
 
     const mapCenter = useMemo(() => {
         if (mapMarkers.length > 0) {
-            const avgLat = mapMarkers.reduce((s, m) => s + m.lat, 0) / mapMarkers.length;
-            const avgLng = mapMarkers.reduce((s, m) => s + m.lng, 0) / mapMarkers.length;
+            const avgLat =
+                mapMarkers.reduce((s, m) => s + m.lat, 0) / mapMarkers.length;
+            const avgLng =
+                mapMarkers.reduce((s, m) => s + m.lng, 0) / mapMarkers.length;
             return { lat: avgLat, lng: avgLng };
         }
         return { lat: -41.2865, lng: 174.7762 };
     }, [mapMarkers]);
 
     const handleAcknowledge = (alertId: number) => {
-        router.post(`/fleet-assets/alerts/${alertId}/acknowledge`, {}, { preserveScroll: true });
+        router.post(
+            `/fleet-assets/alerts/${alertId}/acknowledge`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     const handleResolve = (alertId: number) => {
-        router.post(`/fleet-assets/alerts/${alertId}/resolve`, {}, { preserveScroll: true });
+        router.post(
+            `/fleet-assets/alerts/${alertId}/resolve`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     const handleStatusFilter = (value: string) => {
@@ -342,8 +371,12 @@ function WanderingAlertsTab({
                             <SelectContent>
                                 <SelectItem value="all">All Active</SelectItem>
                                 <SelectItem value="new">New</SelectItem>
-                                <SelectItem value="acknowledged">Acknowledged</SelectItem>
-                                <SelectItem value="resolved">Resolved</SelectItem>
+                                <SelectItem value="acknowledged">
+                                    Acknowledged
+                                </SelectItem>
+                                <SelectItem value="resolved">
+                                    Resolved
+                                </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -351,112 +384,149 @@ function WanderingAlertsTab({
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <FleetResponsiveTable>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Resident</TableHead>
-                                    <TableHead>Alert Type</TableHead>
-                                    <TableHead>Geofence</TableHead>
-                                    <TableHead>Time</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {alertData.length === 0 ? (
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell
-                                            colSpan={6}
-                                            className="py-8 text-center text-muted-foreground"
-                                        >
-                                            No wandering alerts found.
-                                        </TableCell>
+                                        <TableHead>Resident</TableHead>
+                                        <TableHead>Alert Type</TableHead>
+                                        <TableHead>Geofence</TableHead>
+                                        <TableHead>Time</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
-                                ) : (
-                                    alertData.map((alert) => (
-                                        <TableRow key={alert.id}>
-                                            <TableCell data-fleet-row-identity>
-                                                <div className="flex items-center gap-3">
-                                                    <img
-                                                        src={
-                                                            alert.client?.photo ??
-                                                            '/images/avatar-placeholder.svg'
-                                                        }
-                                                        alt={alert.client?.name ?? ''}
-                                                        className="h-8 w-8 rounded-full border object-cover"
-                                                    />
-                                                    <div>
-                                                        <p className="text-sm font-medium">
-                                                            {alert.client?.name ?? 'Unknown'}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {alert.client?.house ?? ''}
-                                                        </p>
+                                </TableHeader>
+                                <TableBody>
+                                    {alertData.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={6}
+                                                className="py-8 text-center text-muted-foreground"
+                                            >
+                                                No wandering alerts found.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        alertData.map((alert) => (
+                                            <TableRow key={alert.id}>
+                                                <TableCell
+                                                    data-fleet-row-identity
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <img
+                                                            src={
+                                                                alert.client
+                                                                    ?.photo ??
+                                                                '/images/avatar-placeholder.svg'
+                                                            }
+                                                            alt={
+                                                                alert.client
+                                                                    ?.name ?? ''
+                                                            }
+                                                            className="h-8 w-8 rounded-full border object-cover"
+                                                        />
+                                                        <div>
+                                                            <p className="text-sm font-medium">
+                                                                {alert.client
+                                                                    ?.name ??
+                                                                    'Unknown'}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {alert.client
+                                                                    ?.house ??
+                                                                    ''}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant={severityVariant(alert.severity)}
-                                                    className="text-xs"
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant={severityVariant(
+                                                            alert.severity,
+                                                        )}
+                                                        className="text-xs"
+                                                    >
+                                                        {alertTypeLabel(
+                                                            alert.alert_type,
+                                                        )}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-sm">
+                                                    {alert.geofence_name ??
+                                                        '---'}
+                                                </TableCell>
+                                                <TableCell
+                                                    data-fleet-row-time
+                                                    className="text-sm"
                                                 >
-                                                    {alertTypeLabel(alert.alert_type)}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {alert.geofence_name ?? '---'}
-                                            </TableCell>
-                                            <TableCell data-fleet-row-time className="text-sm">
-                                                {formatRelativeTime(alert.triggered_at)}
-                                            </TableCell>
-                                            <TableCell data-fleet-row-status>
-                                                <Badge
-                                                    className={`text-[10px] ${statusColor(alert.status)}`}
+                                                    {formatRelativeTime(
+                                                        alert.triggered_at,
+                                                    )}
+                                                </TableCell>
+                                                <TableCell
+                                                    data-fleet-row-status
                                                 >
-                                                    {alert.status?.replace(/_/g, ' ')}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell data-fleet-row-action className="text-right">
-                                                {canManage ? (
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {alert.status !== 'acknowledged' &&
-                                                            alert.status !== 'resolved' && (
+                                                    <Badge
+                                                        className={`text-[10px] ${statusColor(alert.status)}`}
+                                                    >
+                                                        {alert.status?.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell
+                                                    data-fleet-row-action
+                                                    className="text-right"
+                                                >
+                                                    {canManage ? (
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            {alert.status !==
+                                                                'acknowledged' &&
+                                                                alert.status !==
+                                                                    'resolved' && (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            handleAcknowledge(
+                                                                                alert.id,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Eye className="mr-1 h-3.5 w-3.5" />
+                                                                        Ack
+                                                                    </Button>
+                                                                )}
+                                                            {alert.status !==
+                                                                'resolved' && (
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
                                                                     onClick={() =>
-                                                                        handleAcknowledge(alert.id)
+                                                                        handleResolve(
+                                                                            alert.id,
+                                                                        )
                                                                     }
+                                                                    className="text-status-success"
                                                                 >
-                                                                    <Eye className="mr-1 h-3.5 w-3.5" />
-                                                                    Ack
+                                                                    <CheckCircle className="mr-1 h-3.5 w-3.5" />
+                                                                    Resolve
                                                                 </Button>
                                                             )}
-                                                        {alert.status !== 'resolved' && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    handleResolve(alert.id)
-                                                                }
-                                                                className="text-status-success"
-                                                            >
-                                                                <CheckCircle className="mr-1 h-3.5 w-3.5" />
-                                                                Resolve
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        View only
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            View only
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
                         </FleetResponsiveTable>
                     </div>
                 </CardContent>
@@ -503,7 +573,9 @@ export function AssignTrackerDialog({
         tracker_id: '',
     });
 
-    const unassignableClients = (payload.clients ?? []).filter((c) => !c.is_tracked);
+    const unassignableClients = (payload.clients ?? []).filter(
+        (c) => !c.is_tracked,
+    );
     const availableTrackers = payload.available_trackers ?? [];
     const assignedTrackers = payload.assigned_trackers ?? [];
     const selectedTracker = availableTrackers.find(
@@ -552,7 +624,11 @@ export function AssignTrackerDialog({
             steps={assignTrackerSteps}
             stepIndex={stepIndex}
             onStepClick={(index) => {
-                if (index === 0 || (index === 1 && hasSelection) || (hasSelection && consentConfirmed)) {
+                if (
+                    index === 0 ||
+                    (index === 1 && hasSelection) ||
+                    (hasSelection && consentConfirmed)
+                ) {
                     setStepIndex(index);
                 }
             }}
@@ -566,18 +642,34 @@ export function AssignTrackerDialog({
                     stepIndex < 2 ? (
                         <Button
                             type="button"
-                            disabled={stepIndex === 0 ? !hasSelection : !consentConfirmed}
+                            disabled={
+                                stepIndex === 0
+                                    ? !hasSelection
+                                    : !consentConfirmed
+                            }
                             onClick={() => setStepIndex((step) => step + 1)}
                         >
                             Continue
                         </Button>
                     ) : (
                         <>
-                            <Button type="button" variant="outline" onClick={() => setStepIndex(1)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setStepIndex(1)}
+                            >
                                 Back
                             </Button>
-                            <Button type="button" onClick={handleAssign} disabled={form.processing}>
-                                {form.processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
+                            <Button
+                                type="button"
+                                onClick={handleAssign}
+                                disabled={form.processing}
+                            >
+                                {form.processing ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Link2 className="mr-2 h-4 w-4" />
+                                )}
                                 Assign tracker
                             </Button>
                         </>
@@ -587,27 +679,36 @@ export function AssignTrackerDialog({
         >
             {!canManage ? (
                 <p className="text-sm text-muted-foreground">
-                    Assigning or unassigning trackers requires fleet manager access.
+                    Assigning or unassigning trackers requires fleet manager
+                    access.
                 </p>
             ) : stepIndex === 0 ? (
                 <WizardStepPane>
                     <div className="grid gap-6 lg:grid-cols-2">
                         <div className="space-y-4">
                             <p className="flex items-center gap-2 text-sm font-semibold">
-                                <UserPlus className="h-4 w-4" /> Assign new tracker
+                                <UserPlus className="h-4 w-4" /> Assign new
+                                tracker
                             </p>
                             <div className="space-y-2">
-                                <Label htmlFor="assign-tracker-resident">Resident</Label>
+                                <Label htmlFor="assign-tracker-resident">
+                                    Resident
+                                </Label>
                                 <Select
                                     value={form.data.client_id}
-                                    onValueChange={(v) => form.setData('client_id', v)}
+                                    onValueChange={(v) =>
+                                        form.setData('client_id', v)
+                                    }
                                 >
                                     <SelectTrigger id="assign-tracker-resident">
                                         <SelectValue placeholder="Select a resident..." />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {unassignableClients.map((c) => (
-                                            <SelectItem key={c.id} value={String(c.id)}>
+                                            <SelectItem
+                                                key={c.id}
+                                                value={String(c.id)}
+                                            >
                                                 {c.name} ({c.house})
                                             </SelectItem>
                                         ))}
@@ -621,19 +722,28 @@ export function AssignTrackerDialog({
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="assign-tracker-device">Tracker Device</Label>
+                                <Label htmlFor="assign-tracker-device">
+                                    Tracker Device
+                                </Label>
                                 <Select
                                     value={form.data.tracker_id}
-                                    onValueChange={(v) => form.setData('tracker_id', v)}
+                                    onValueChange={(v) =>
+                                        form.setData('tracker_id', v)
+                                    }
                                 >
                                     <SelectTrigger id="assign-tracker-device">
                                         <SelectValue placeholder="Select an available tracker..." />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {availableTrackers.map((t) => (
-                                            <SelectItem key={t.id} value={String(t.id)}>
+                                            <SelectItem
+                                                key={t.id}
+                                                value={String(t.id)}
+                                            >
                                                 {t.name ?? t.device_uid}{' '}
-                                                {t.serial ? `(${t.serial})` : ''}
+                                                {t.serial
+                                                    ? `(${t.serial})`
+                                                    : ''}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -648,10 +758,14 @@ export function AssignTrackerDialog({
                             {/* Selected device details */}
                             {selectedTracker && (
                                 <div className="space-y-2 rounded-lg border bg-muted/30 p-4">
-                                    <p className="text-sm font-medium">Device Details</p>
+                                    <p className="text-sm font-medium">
+                                        Device Details
+                                    </p>
                                     <dl className="grid grid-cols-2 gap-2 text-sm">
                                         <div>
-                                            <dt className="text-xs text-muted-foreground">Name</dt>
+                                            <dt className="text-xs text-muted-foreground">
+                                                Name
+                                            </dt>
                                             <dd className="font-medium">
                                                 {selectedTracker.name ??
                                                     selectedTracker.device_uid}
@@ -678,7 +792,9 @@ export function AssignTrackerDialog({
                                             </div>
                                         )}
                                         <div>
-                                            <dt className="text-xs text-muted-foreground">Status</dt>
+                                            <dt className="text-xs text-muted-foreground">
+                                                Status
+                                            </dt>
                                             <dd>
                                                 <Badge
                                                     variant="secondary"
@@ -701,7 +817,6 @@ export function AssignTrackerDialog({
                                     </dl>
                                 </div>
                             )}
-
                         </div>
 
                         {/* Currently assigned */}
@@ -711,7 +826,9 @@ export function AssignTrackerDialog({
                                     <Radio className="h-4 w-4" />
                                     Currently Assigned
                                 </span>
-                                <Badge variant="secondary">{assignedTrackers.length}</Badge>
+                                <Badge variant="secondary">
+                                    {assignedTrackers.length}
+                                </Badge>
                             </p>
                             <div
                                 className="divide-y overflow-y-auto rounded-lg border"
@@ -732,8 +849,8 @@ export function AssignTrackerDialog({
                                                     {tracker.client_name}
                                                 </p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    {tracker.client_house} &middot;{' '}
-                                                    {tracker.name}
+                                                    {tracker.client_house}{' '}
+                                                    &middot; {tracker.name}
                                                     {tracker.serial
                                                         ? ` (${tracker.serial})`
                                                         : ''}
@@ -742,17 +859,21 @@ export function AssignTrackerDialog({
                                                     <Badge
                                                         variant="secondary"
                                                         className={`text-[10px] ${
-                                                            tracker.status === 'online' ||
-                                                            tracker.status === 'active'
+                                                            tracker.status ===
+                                                                'online' ||
+                                                            tracker.status ===
+                                                                'active'
                                                                 ? 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success'
                                                                 : ''
                                                         }`}
                                                     >
                                                         {tracker.status}
                                                     </Badge>
-                                                    {tracker.battery != null && (
+                                                    {tracker.battery !=
+                                                        null && (
                                                         <span className="text-[10px] text-muted-foreground">
-                                                            {tracker.battery}% battery
+                                                            {tracker.battery}%
+                                                            battery
                                                         </span>
                                                     )}
                                                 </div>
@@ -760,7 +881,9 @@ export function AssignTrackerDialog({
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => handleUnassign(tracker.id)}
+                                                onClick={() =>
+                                                    handleUnassign(tracker.id)
+                                                }
                                                 className="text-destructive hover:bg-destructive/10"
                                             >
                                                 <Link2Off className="mr-1 h-3.5 w-3.5" />
@@ -775,34 +898,64 @@ export function AssignTrackerDialog({
                 </WizardStepPane>
             ) : stepIndex === 1 ? (
                 <WizardStepPane>
+                    {/* eslint-disable-next-line no-restricted-syntax -- Custom wizard consent surface, not a standalone content card. */}
                     <div className="space-y-4 rounded-xl border border-border bg-card/70 p-5">
                         <div className="flex items-start gap-3">
                             <Shield className="mt-0.5 h-5 w-5 text-primary" />
                             <div>
-                                <h3 className="font-semibold">Confirm tracking consent</h3>
+                                <h3 className="font-semibold">
+                                    Confirm tracking consent
+                                </h3>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    Confirm the resident has active Fleet Tracking consent before linking this personal tracker.
+                                    Confirm the resident has active Fleet
+                                    Tracking consent before linking this
+                                    personal tracker.
                                 </p>
                             </div>
                         </div>
-                        <label htmlFor="assign-tracker-consent" className="flex items-start gap-3 text-sm">
+                        <label
+                            htmlFor="assign-tracker-consent"
+                            className="flex items-start gap-3 text-sm"
+                        >
                             <input
                                 id="assign-tracker-consent"
                                 type="checkbox"
                                 checked={consentConfirmed}
-                                onChange={(event) => setConsentConfirmed(event.target.checked)}
+                                onChange={(event) =>
+                                    setConsentConfirmed(event.target.checked)
+                                }
                                 className="mt-0.5 h-4 w-4 rounded border-border"
                             />
-                            I have confirmed active consent for this tracking assignment.
+                            I have confirmed active consent for this tracking
+                            assignment.
                         </label>
                     </div>
                 </WizardStepPane>
             ) : (
                 <WizardStepPane>
                     <dl className="space-y-4 rounded-xl border border-border bg-card/70 p-4 text-sm">
-                        <div><dt className="text-muted-foreground">Resident</dt><dd className="font-medium">{selectedClient ? `${selectedClient.name} (${selectedClient.house})` : 'Selected resident'}</dd></div>
-                        <div><dt className="text-muted-foreground">Tracker</dt><dd className="font-medium">{selectedTracker?.name ?? selectedTracker?.device_uid ?? 'Selected tracker'}</dd></div>
-                        <div><dt className="text-muted-foreground">Consent</dt><dd className="font-medium text-status-success">Confirmed</dd></div>
+                        <div>
+                            <dt className="text-muted-foreground">Resident</dt>
+                            <dd className="font-medium">
+                                {selectedClient
+                                    ? `${selectedClient.name} (${selectedClient.house})`
+                                    : 'Selected resident'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground">Tracker</dt>
+                            <dd className="font-medium">
+                                {selectedTracker?.name ??
+                                    selectedTracker?.device_uid ??
+                                    'Selected tracker'}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground">Consent</dt>
+                            <dd className="font-medium text-status-success">
+                                Confirmed
+                            </dd>
+                        </div>
                     </dl>
                 </WizardStepPane>
             )}
@@ -827,11 +980,15 @@ export default function ResidentTrackingIndex({
     can,
 }: Props) {
     const [search, setSearch] = useState('');
-    const [activeSideTab, setActiveSideTab] = useState<'all' | 'outside' | 'panic' | 'alerts'>('all');
+    const [activeSideTab, setActiveSideTab] = useState<
+        'all' | 'outside' | 'panic' | 'alerts'
+    >('all');
     const [activeResidentId, setActiveResidentId] = useState<number | null>(
         focus_client_id ?? null,
     );
-    const [lastUpdatedAt, setLastUpdatedAt] = useState<string>(new Date().toISOString());
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<string>(
+        new Date().toISOString(),
+    );
     const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const sidebarRef = useRef<HTMLDivElement | null>(null);
 
@@ -848,7 +1005,13 @@ export default function ResidentTrackingIndex({
         if (activeTab !== 'tracking') return;
         refreshTimerRef.current = setInterval(() => {
             router.reload({
-                only: ['residents', 'stats', 'recent_alerts', 'active_outings', 'geofences'],
+                only: [
+                    'residents',
+                    'stats',
+                    'recent_alerts',
+                    'active_outings',
+                    'geofences',
+                ],
                 preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => setLastUpdatedAt(new Date().toISOString()),
@@ -872,7 +1035,9 @@ export default function ResidentTrackingIndex({
     }, [focus_client_id]);
 
     const outsideCount = useMemo(
-        () => safeResidents.filter((r) => r.geofence_status === 'outside_zone').length,
+        () =>
+            safeResidents.filter((r) => r.geofence_status === 'outside_zone')
+                .length,
         [safeResidents],
     );
     const panicCount = useMemo(
@@ -923,8 +1088,10 @@ export default function ResidentTrackingIndex({
 
     const mapCenter = useMemo(() => {
         if (mapMarkers.length > 0) {
-            const avgLat = mapMarkers.reduce((s, m) => s + m.lat, 0) / mapMarkers.length;
-            const avgLng = mapMarkers.reduce((s, m) => s + m.lng, 0) / mapMarkers.length;
+            const avgLat =
+                mapMarkers.reduce((s, m) => s + m.lat, 0) / mapMarkers.length;
+            const avgLng =
+                mapMarkers.reduce((s, m) => s + m.lng, 0) / mapMarkers.length;
             return { lat: avgLat, lng: avgLng };
         }
         return { lat: -41.2865, lng: 174.7762 };
@@ -933,7 +1100,9 @@ export default function ResidentTrackingIndex({
     const handleMarkerClick = useCallback((id: string | number) => {
         const clientId = typeof id === 'number' ? id : parseInt(String(id), 10);
         setActiveResidentId(clientId);
-        const el = sidebarRef.current?.querySelector(`[data-resident-id="${clientId}"]`);
+        const el = sidebarRef.current?.querySelector(
+            `[data-resident-id="${clientId}"]`,
+        );
         if (el && el instanceof HTMLElement) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
@@ -946,11 +1115,18 @@ export default function ResidentTrackingIndex({
 
     const handleAcknowledgePanic = useCallback((resident: Resident) => {
         if (!resident.acknowledge_panic_url) return;
-        router.post(resident.acknowledge_panic_url, {}, { preserveScroll: true });
+        router.post(
+            resident.acknowledge_panic_url,
+            {},
+            { preserveScroll: true },
+        );
     }, []);
 
     const handleOpenProfile = useCallback((resident: Resident) => {
-        router.visit(resident.profile_url ?? `/operations/clients/${resident.client_id}?tab=location&from=fleet`);
+        router.visit(
+            resident.profile_url ??
+                `/operations/clients/${resident.client_id}?tab=location&from=fleet`,
+        );
     }, []);
 
     const safetyScoreColor = useMemo(() => {
@@ -963,7 +1139,11 @@ export default function ResidentTrackingIndex({
     const panicAlerts = useMemo(() => {
         return safeAlerts.filter((a) => {
             const t = (a.title || '').toLowerCase();
-            return t.includes('sos') || t.includes('panic') || t.includes('man_down');
+            return (
+                t.includes('sos') ||
+                t.includes('panic') ||
+                t.includes('man_down')
+            );
         });
     }, [safeAlerts]);
 
@@ -1008,12 +1188,15 @@ export default function ResidentTrackingIndex({
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={Shield} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Safety command centre · live</HeroStatusPill>
+                            <HeroStatusPill>
+                                Safety command centre · live
+                            </HeroStatusPill>
                             <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                                 Resident Tracking
                             </h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Monitor tracked residents, wandering alerts and panic events in real time.
+                                Monitor tracked residents, wandering alerts and
+                                panic events in real time.
                             </p>
                         </div>
                         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
@@ -1027,19 +1210,31 @@ export default function ResidentTrackingIndex({
                                 label="Active alerts"
                                 value={fmt(activeAlertCount)}
                                 caption="open right now"
-                                tone={activeAlertCount > 0 ? 'critical' : 'success'}
+                                tone={
+                                    activeAlertCount > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="Wandering 7d"
                                 value={fmt(safeStats.wandering_7d ?? 0)}
                                 caption="zone breaches"
-                                tone={(safeStats.wandering_7d ?? 0) > 0 ? 'warning' : 'success'}
+                                tone={
+                                    (safeStats.wandering_7d ?? 0) > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="Panic 7d"
                                 value={fmt(safeStats.panic_7d ?? 0)}
                                 caption="SOS events"
-                                tone={(safeStats.panic_7d ?? 0) > 0 ? 'critical' : 'success'}
+                                tone={
+                                    (safeStats.panic_7d ?? 0) > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
                             />
                         </div>
                     </div>
@@ -1053,7 +1248,10 @@ export default function ResidentTrackingIndex({
                                 Assign tracker
                             </FleetHeroAction>
                         )}
-                        <FleetHeroAction href="/fleet-assets/devices" icon={Radio}>
+                        <FleetHeroAction
+                            href="/fleet-assets/devices"
+                            icon={Radio}
+                        >
                             Tracking devices
                         </FleetHeroAction>
                     </div>
@@ -1070,7 +1268,8 @@ export default function ResidentTrackingIndex({
                             },
                         ] as const
                     ).map((t) => (
-                        <Button unstyled
+                        <Button
+                            unstyled
                             key={t.key}
                             type="button"
                             onClick={() => switchTab(t.key)}
@@ -1100,14 +1299,17 @@ export default function ResidentTrackingIndex({
                                     <div className="flex items-center gap-2 text-status-critical">
                                         <AlertTriangle className="h-4 w-4" />
                                         <span className="text-sm font-medium">
-                                            {panicCount} active panic{panicCount > 1 ? 's' : ''} —
+                                            {panicCount} active panic
+                                            {panicCount > 1 ? 's' : ''} —
                                             immediate attention needed
                                         </span>
                                     </div>
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => setActiveSideTab('panic')}
+                                        onClick={() =>
+                                            setActiveSideTab('panic')
+                                        }
                                         className="border-status-critical/30 text-status-critical"
                                     >
                                         View
@@ -1135,13 +1337,17 @@ export default function ResidentTrackingIndex({
 
                             <Card className="flex flex-col">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-base">Residents</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Residents
+                                    </CardTitle>
                                     <div className="mt-2 flex flex-wrap gap-1">
                                         <Button
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setActiveSideTab('all')}
+                                            onClick={() =>
+                                                setActiveSideTab('all')
+                                            }
                                             className={`h-auto rounded-md px-3 py-1.5 text-xs ${
                                                 activeSideTab === 'all'
                                                     ? 'bg-primary/10 text-primary'
@@ -1154,7 +1360,9 @@ export default function ResidentTrackingIndex({
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setActiveSideTab('outside')}
+                                            onClick={() =>
+                                                setActiveSideTab('outside')
+                                            }
                                             className={`h-auto rounded-md px-3 py-1.5 text-xs ${
                                                 activeSideTab === 'outside'
                                                     ? 'bg-status-critical-bg text-status-critical'
@@ -1167,7 +1375,9 @@ export default function ResidentTrackingIndex({
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setActiveSideTab('panic')}
+                                            onClick={() =>
+                                                setActiveSideTab('panic')
+                                            }
                                             className={`h-auto rounded-md px-3 py-1.5 text-xs ${
                                                 activeSideTab === 'panic'
                                                     ? 'bg-status-critical-bg text-status-critical'
@@ -1180,7 +1390,9 @@ export default function ResidentTrackingIndex({
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            onClick={() => setActiveSideTab('alerts')}
+                                            onClick={() =>
+                                                setActiveSideTab('alerts')
+                                            }
                                             className={`h-auto rounded-md px-3 py-1.5 text-xs ${
                                                 activeSideTab === 'alerts'
                                                     ? 'bg-status-warning-bg text-status-warning'
@@ -1196,7 +1408,9 @@ export default function ResidentTrackingIndex({
                                             <Input
                                                 placeholder="Search by name or house..."
                                                 value={search}
-                                                onChange={(e) => setSearch(e.target.value)}
+                                                onChange={(e) =>
+                                                    setSearch(e.target.value)
+                                                }
                                                 className="pl-9"
                                             />
                                         </div>
@@ -1206,7 +1420,10 @@ export default function ResidentTrackingIndex({
                                     className="flex-1 overflow-y-auto p-0"
                                     style={{ maxHeight: '460px' }}
                                 >
-                                    <div ref={sidebarRef} data-fleet-mobile-list>
+                                    <div
+                                        ref={sidebarRef}
+                                        data-fleet-mobile-list
+                                    >
                                         {activeSideTab === 'alerts' ? (
                                             safeAlerts.length === 0 ? (
                                                 <div className="flex flex-col items-center gap-2 py-10 text-center">
@@ -1230,17 +1447,26 @@ export default function ResidentTrackingIndex({
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="truncate text-sm font-medium">
                                                                         {alert.resident_name ??
-                                                                            formatAlertType(alert.title)}
+                                                                            formatAlertType(
+                                                                                alert.title,
+                                                                            )}
                                                                     </span>
                                                                     <Badge
                                                                         className={`text-[10px] text-white ${severityColor(alert.severity)}`}
                                                                     >
-                                                                        {alert.severity}
+                                                                        {
+                                                                            alert.severity
+                                                                        }
                                                                     </Badge>
                                                                 </div>
                                                                 <p className="text-xs text-muted-foreground">
-                                                                    {formatAlertType(alert.title)} ·{' '}
-                                                                    {formatRelativeTime(alert.created_at)}
+                                                                    {formatAlertType(
+                                                                        alert.title,
+                                                                    )}{' '}
+                                                                    ·{' '}
+                                                                    {formatRelativeTime(
+                                                                        alert.created_at,
+                                                                    )}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -1252,20 +1478,35 @@ export default function ResidentTrackingIndex({
                                                 No residents found.
                                             </div>
                                         ) : (
-                                            filteredResidents.map((resident) => (
-                                                <ResidentSidebar
-                                                    key={resident.id}
-                                                    resident={resident}
-                                                    variant="fleet-row"
-                                                    canManage={can.manage}
-                                                    onLocateNow={() => handleLocateNow(resident)}
-                                                    onAcknowledgePanic={() =>
-                                                        handleAcknowledgePanic(resident)
-                                                    }
-                                                    onOpenProfile={() => handleOpenProfile(resident)}
-                                                    isActive={activeResidentId === resident.client_id}
-                                                />
-                                            ))
+                                            filteredResidents.map(
+                                                (resident) => (
+                                                    <ResidentSidebar
+                                                        key={resident.id}
+                                                        resident={resident}
+                                                        variant="fleet-row"
+                                                        canManage={can.manage}
+                                                        onLocateNow={() =>
+                                                            handleLocateNow(
+                                                                resident,
+                                                            )
+                                                        }
+                                                        onAcknowledgePanic={() =>
+                                                            handleAcknowledgePanic(
+                                                                resident,
+                                                            )
+                                                        }
+                                                        onOpenProfile={() =>
+                                                            handleOpenProfile(
+                                                                resident,
+                                                            )
+                                                        }
+                                                        isActive={
+                                                            activeResidentId ===
+                                                            resident.client_id
+                                                        }
+                                                    />
+                                                ),
+                                            )
                                         )}
                                     </div>
                                 </CardContent>
@@ -1294,11 +1535,15 @@ export default function ResidentTrackingIndex({
                                                         <AlertTriangle className="h-3.5 w-3.5" />
                                                         <span className="truncate text-xs font-semibold">
                                                             {alert.resident_name ??
-                                                                formatAlertType(alert.title)}
+                                                                formatAlertType(
+                                                                    alert.title,
+                                                                )}
                                                         </span>
                                                     </div>
                                                     <p className="mt-0.5 text-[11px] text-status-critical/80">
-                                                        {formatRelativeTime(alert.created_at)}
+                                                        {formatRelativeTime(
+                                                            alert.created_at,
+                                                        )}
                                                     </p>
                                                 </div>
                                             ))}
@@ -1307,34 +1552,47 @@ export default function ResidentTrackingIndex({
                                     {safeAlerts.length === 0 ? (
                                         <div className="flex flex-col items-center gap-2 py-6 text-center">
                                             <CheckCircle2 className="h-8 w-8 text-primary" />
-                                            <p className="text-sm font-medium">All residents safe</p>
+                                            <p className="text-sm font-medium">
+                                                All residents safe
+                                            </p>
                                             <p className="text-xs text-muted-foreground">
                                                 No recent alerts to display
                                             </p>
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            {safeAlerts.slice(0, 5).map((alert) => (
-                                                <div key={alert.id} className="flex items-start gap-2">
-                                                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="truncate text-sm">
-                                                                {alert.resident_name ??
-                                                                    formatAlertType(alert.title)}
-                                                            </span>
-                                                            <Badge
-                                                                className={`text-[10px] text-white ${severityColor(alert.severity)}`}
-                                                            >
-                                                                {alert.severity}
-                                                            </Badge>
+                                            {safeAlerts
+                                                .slice(0, 5)
+                                                .map((alert) => (
+                                                    <div
+                                                        key={alert.id}
+                                                        className="flex items-start gap-2"
+                                                    >
+                                                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" />
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="truncate text-sm">
+                                                                    {alert.resident_name ??
+                                                                        formatAlertType(
+                                                                            alert.title,
+                                                                        )}
+                                                                </span>
+                                                                <Badge
+                                                                    className={`text-[10px] text-white ${severityColor(alert.severity)}`}
+                                                                >
+                                                                    {
+                                                                        alert.severity
+                                                                    }
+                                                                </Badge>
+                                                            </div>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {formatRelativeTime(
+                                                                    alert.created_at,
+                                                                )}
+                                                            </p>
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {formatRelativeTime(alert.created_at)}
-                                                        </p>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                ))}
                                         </div>
                                     )}
                                     <div className="mt-4 border-t pt-3">
@@ -1342,7 +1600,9 @@ export default function ResidentTrackingIndex({
                                             variant="outline"
                                             size="sm"
                                             className="w-full"
-                                            onClick={() => switchTab('wandering')}
+                                            onClick={() =>
+                                                switchTab('wandering')
+                                            }
                                         >
                                             View All Alerts
                                         </Button>
@@ -1369,7 +1629,10 @@ export default function ResidentTrackingIndex({
                                     ) : (
                                         <div className="space-y-3">
                                             {safeOutings.map((outing) => (
-                                                <div key={outing.id} className="flex items-start gap-2">
+                                                <div
+                                                    key={outing.id}
+                                                    className="flex items-start gap-2"
+                                                >
                                                     <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-info" />
                                                     <div className="min-w-0 flex-1">
                                                         <p className="truncate text-sm font-medium">
@@ -1377,22 +1640,34 @@ export default function ResidentTrackingIndex({
                                                         </p>
                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                             <span>
-                                                                {outing.resident_count} resident
-                                                                {outing.resident_count !== 1 ? 's' : ''}
+                                                                {
+                                                                    outing.resident_count
+                                                                }{' '}
+                                                                resident
+                                                                {outing.resident_count !==
+                                                                1
+                                                                    ? 's'
+                                                                    : ''}
                                                             </span>
                                                             {outing.departed_at && (
                                                                 <>
-                                                                    <span>·</span>
+                                                                    <span>
+                                                                        ·
+                                                                    </span>
                                                                     <span>
                                                                         Departed{' '}
-                                                                        {formatRelativeTime(outing.departed_at)}
+                                                                        {formatRelativeTime(
+                                                                            outing.departed_at,
+                                                                        )}
                                                                     </span>
                                                                 </>
                                                             )}
                                                         </div>
                                                         {outing.vehicle_name && (
                                                             <p className="text-xs text-muted-foreground">
-                                                                {outing.vehicle_name}
+                                                                {
+                                                                    outing.vehicle_name
+                                                                }
                                                             </p>
                                                         )}
                                                     </div>
@@ -1401,8 +1676,15 @@ export default function ResidentTrackingIndex({
                                         </div>
                                     )}
                                     <div className="mt-4 border-t pt-3">
-                                        <Button variant="outline" size="sm" className="w-full" asChild>
-                                            <Link href="/fleet-assets/outings">View All Outings</Link>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full"
+                                            asChild
+                                        >
+                                            <Link href="/fleet-assets/outings">
+                                                View All Outings
+                                            </Link>
                                         </Button>
                                     </div>
                                 </CardContent>

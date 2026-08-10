@@ -3,21 +3,23 @@
 namespace App\Models\Integration;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Site;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class IntegrationSiteSecret extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'integration_site_secrets';
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'provider',
         'capability',
@@ -35,6 +37,13 @@ class IntegrationSiteSecret extends Model
 
     protected $hidden = [
         'secret_encrypted',
+        'secretReferences',
+    ];
+
+    protected array $auditExcludedAttributes = [
+        'secret_encrypted',
+        'base_url',
+        'last_error',
     ];
 
     /* ---------------------------------------------------------------
@@ -46,14 +55,14 @@ class IntegrationSiteSecret extends Model
         return $this->belongsTo(Site::class);
     }
 
+    public function secretReferences(): HasMany
+    {
+        return $this->hasMany(IntegrationSecretReference::class, 'site_secret_id');
+    }
+
     /* ---------------------------------------------------------------
      * Scopes
      * ------------------------------------------------------------- */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeEnabled(Builder $query): Builder
     {

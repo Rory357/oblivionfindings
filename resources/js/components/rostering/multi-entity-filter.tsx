@@ -1,6 +1,7 @@
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import {
     Command,
     CommandEmpty,
@@ -17,7 +18,6 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 export type MultiEntityItem = {
     id: number;
@@ -93,7 +93,8 @@ export function MultiEntityFilter({
           )
         : cn(
               'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent',
-              !allSelected && 'border-primary bg-primary text-primary-foreground',
+              !allSelected &&
+                  'border-primary bg-primary text-primary-foreground',
           );
 
     return (
@@ -111,7 +112,10 @@ export function MultiEntityFilter({
                             aria-label={`${label} filter: ${triggerLabel}`}
                             className="inline-flex items-center gap-1.5 rounded-full"
                         >
-                            <Search className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Search
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                            />
                             <span className="max-w-[200px] truncate">
                                 {triggerLabel}
                             </span>
@@ -121,7 +125,8 @@ export function MultiEntityFilter({
                         </button>
                     </PopoverTrigger>
                     {!allSelected ? (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             type="button"
                             aria-label={`Clear ${label} filter`}
                             className={cn(
@@ -170,7 +175,7 @@ export function MultiEntityFilter({
                                 <span className="flex-1 font-medium">
                                     {allLabel}
                                 </span>
-                                <span className="text-[10px] tabular-nums text-muted-foreground">
+                                <span className="text-[10px] text-muted-foreground tabular-nums">
                                     {items.length}
                                 </span>
                             </CommandItem>
@@ -186,7 +191,9 @@ export function MultiEntityFilter({
                                     }
                                 >
                                     {items.map((item) => {
-                                        const checked = selectedSet.has(item.id);
+                                        const checked = selectedSet.has(
+                                            item.id,
+                                        );
                                         return (
                                             <CommandItem
                                                 key={item.id}

@@ -1,6 +1,12 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 const injectionSites = [
     { value: 'left_arm', label: 'Left arm' },
@@ -20,21 +26,29 @@ interface Props {
 export default function InsulinAdminFields({ form, errors, onChange }: Props) {
     return (
         <div className="space-y-3 rounded-md border border-status-info/30 bg-status-info-bg p-3">
-            <div className="text-sm font-medium text-status-info">Insulin Administration</div>
+            <div className="text-sm font-medium text-status-info">
+                Insulin Administration
+            </div>
 
             <div>
-                <Label htmlFor="blood_glucose_level">Pre-administration BGL (mmol/L)</Label>
+                <Label htmlFor="blood_glucose_level">
+                    Pre-administration BGL (mmol/L)
+                </Label>
                 <Input
                     id="blood_glucose_level"
                     type="number"
                     step="0.1"
                     min="0"
                     value={(form.blood_glucose_level as string | number) ?? ''}
-                    onChange={(e) => onChange('blood_glucose_level', e.target.value || null)}
+                    onChange={(e) =>
+                        onChange('blood_glucose_level', e.target.value || null)
+                    }
                     placeholder="e.g., 8.5"
                 />
                 {errors.blood_glucose_level && (
-                    <p className="mt-1 text-xs text-status-critical">{errors.blood_glucose_level}</p>
+                    <p className="mt-1 text-xs text-status-critical">
+                        {errors.blood_glucose_level}
+                    </p>
                 )}
             </div>
 
@@ -46,11 +60,15 @@ export default function InsulinAdminFields({ form, errors, onChange }: Props) {
                     step="0.5"
                     min="0"
                     value={(form.insulin_units_given as string | number) ?? ''}
-                    onChange={(e) => onChange('insulin_units_given', e.target.value || null)}
+                    onChange={(e) =>
+                        onChange('insulin_units_given', e.target.value || null)
+                    }
                     placeholder="e.g., 10"
                 />
                 {errors.insulin_units_given && (
-                    <p className="mt-1 text-xs text-status-critical">{errors.insulin_units_given}</p>
+                    <p className="mt-1 text-xs text-status-critical">
+                        {errors.insulin_units_given}
+                    </p>
                 )}
             </div>
 
@@ -58,7 +76,9 @@ export default function InsulinAdminFields({ form, errors, onChange }: Props) {
                 <Label htmlFor="injection_site">Injection Site</Label>
                 <Select
                     value={(form.injection_site as string) ?? ''}
-                    onValueChange={(value) => onChange('injection_site', value || null)}
+                    onValueChange={(value) =>
+                        onChange('injection_site', value || null)
+                    }
                 >
                     <SelectTrigger>
                         <SelectValue placeholder="Select injection site..." />
@@ -72,7 +92,9 @@ export default function InsulinAdminFields({ form, errors, onChange }: Props) {
                     </SelectContent>
                 </Select>
                 {errors.injection_site && (
-                    <p className="mt-1 text-xs text-status-critical">{errors.injection_site}</p>
+                    <p className="mt-1 text-xs text-status-critical">
+                        {errors.injection_site}
+                    </p>
                 )}
             </div>
 

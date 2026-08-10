@@ -520,7 +520,7 @@ export default function RecordAdministrationDialog({
                                                         type="button"
                                                         variant="secondary"
                                                         size="sm"
-                                                        className="h-auto max-w-full justify-start whitespace-normal break-all px-2 py-1 text-left font-mono text-xs"
+                                                        className="h-auto max-w-full justify-start px-2 py-1 text-left font-mono text-xs break-all whitespace-normal"
                                                         data-test="record-administration-scan-code"
                                                         onClick={() => {
                                                             setScanCode(
@@ -621,7 +621,7 @@ export default function RecordAdministrationDialog({
                                                     ? 'default'
                                                     : 'outline'
                                             }
-                                            className="h-auto min-h-10 justify-start whitespace-normal text-left"
+                                            className="h-auto min-h-10 justify-start text-left whitespace-normal"
                                             onClick={() =>
                                                 setReasonCode(option.value)
                                             }

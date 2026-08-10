@@ -16,7 +16,12 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
-export type EmailTemplate = { id: number; name: string; subject: string; body: string };
+export type EmailTemplate = {
+    id: number;
+    name: string;
+    subject: string;
+    body: string;
+};
 
 export function BulkEmailDialog({
     open,
@@ -50,7 +55,9 @@ export function BulkEmailDialog({
     };
 
     const saveTemplate = () => {
-        const name = window.prompt('Save this message as a template. Template name:');
+        const name = window.prompt(
+            'Save this message as a template. Template name:',
+        );
         if (!name || name.trim() === '') return;
         router.post(
             '/hr/recruitment/email-templates',
@@ -58,8 +65,12 @@ export function BulkEmailDialog({
             {
                 preserveScroll: true,
                 onSuccess: (page) => {
-                    const f = (page.props as { flash?: { error?: string } }).flash;
-                    if (f?.error) toast.error('Could not save template', { description: f.error });
+                    const f = (page.props as { flash?: { error?: string } })
+                        .flash;
+                    if (f?.error)
+                        toast.error('Could not save template', {
+                            description: f.error,
+                        });
                     else toast.success('Template saved');
                 },
             },
@@ -77,16 +88,26 @@ export function BulkEmailDialog({
     };
 
     const submit = () => {
-        form.transform(() => ({ candidate_ids: candidateIds, subject: subject.trim(), body: body.trim() }));
+        form.transform(() => ({
+            candidate_ids: candidateIds,
+            subject: subject.trim(),
+            body: body.trim(),
+        }));
         form.post('/hr/recruitment/candidates/bulk-email', {
             preserveScroll: true,
             onSuccess: (page) => {
-                const f = (page.props as { flash?: { error?: string; success?: string } }).flash;
+                const f = (
+                    page.props as {
+                        flash?: { error?: string; success?: string };
+                    }
+                ).flash;
                 if (f?.error) {
                     toast.error('Could not send', { description: f.error });
                     return;
                 }
-                toast.success(f?.success ?? `Message sent to ${count} candidate(s)`);
+                toast.success(
+                    f?.success ?? `Message sent to ${count} candidate(s)`,
+                );
                 setSubject('');
                 setBody('');
                 setTemplateId('');
@@ -99,31 +120,46 @@ export function BulkEmailDialog({
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>Email {count} candidate{count === 1 ? '' : 's'}</DialogTitle>
+                    <DialogTitle>
+                        Email {count} candidate{count === 1 ? '' : 's'}
+                    </DialogTitle>
                     <DialogDescription>
-                        Sends the same message to each selected candidate's personal email. Candidates without an email on file are skipped.
+                        Sends the same message to each selected candidate's
+                        personal email. Candidates without an email on file are
+                        skipped.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     {templates.length > 0 ? (
                         <div>
-                            <Label className="mb-1.5 block text-sm font-semibold">Start from a template <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                            <Label className="mb-1.5 block text-sm font-semibold">
+                                Start from a template{' '}
+                                <span className="font-normal text-muted-foreground">
+                                    (optional)
+                                </span>
+                            </Label>
                             <div className="flex items-center gap-2">
                                 <select
                                     value={templateId}
-                                    onChange={(e) => applyTemplate(e.target.value)}
+                                    onChange={(e) =>
+                                        applyTemplate(e.target.value)
+                                    }
                                     className="h-9 flex-1 rounded-md border border-border bg-card px-2.5 text-[13px] outline-none focus:border-primary"
                                 >
                                     <option value="">No template</option>
                                     {templates.map((t) => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                        <option key={t.id} value={t.id}>
+                                            {t.name}
+                                        </option>
                                     ))}
                                 </select>
                                 {canManage && templateId !== '' ? (
                                     <button
                                         type="button"
-                                        onClick={() => deleteTemplate(templateId)}
+                                        onClick={() =>
+                                            deleteTemplate(templateId)
+                                        }
                                         aria-label="Delete template"
                                         className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-border text-muted-foreground hover:bg-muted"
                                     >
@@ -135,7 +171,9 @@ export function BulkEmailDialog({
                     ) : null}
 
                     <div>
-                        <Label className="mb-1.5 block text-sm font-semibold">Subject</Label>
+                        <Label className="mb-1.5 block text-sm font-semibold">
+                            Subject
+                        </Label>
                         <input
                             value={subject}
                             onChange={(e) => setSubject(e.target.value)}
@@ -144,7 +182,9 @@ export function BulkEmailDialog({
                         />
                     </div>
                     <div>
-                        <Label className="mb-1.5 block text-sm font-semibold">Message</Label>
+                        <Label className="mb-1.5 block text-sm font-semibold">
+                            Message
+                        </Label>
                         <textarea
                             value={body}
                             onChange={(e) => setBody(e.target.value)}
@@ -165,9 +205,15 @@ export function BulkEmailDialog({
                         >
                             Save as template
                         </button>
-                    ) : <span />}
+                    ) : (
+                        <span />
+                    )}
                     <div className="flex gap-2">
-                        <button type="button" onClick={onClose} className="h-9 rounded-md border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="h-9 rounded-md border border-border bg-card px-4 text-[13px] font-semibold hover:bg-muted"
+                        >
                             Cancel
                         </button>
                         <button

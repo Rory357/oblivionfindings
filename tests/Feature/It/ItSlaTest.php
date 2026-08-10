@@ -1,8 +1,10 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ItSlaPolicy;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Support\It\BusinessHours;
 use Carbon\CarbonImmutable;
@@ -21,8 +23,20 @@ function itSlaUser(string $role): User
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = itSlaUser('hr');
     $this->worker = itSlaUser('support_worker');
+    foreach ([$this->hr, $this->worker] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+    }
 });
 
 test('creating a ticket stamps SLA due dates from the default policy', function () {
@@ -55,9 +69,8 @@ test('urgent tickets get the tight default targets', function () {
     expect($ticket->resolution_due_at->equalTo($ticket->created_at->copy()->addMinutes(240)))->toBeTrue();
 });
 
-test('a tenant policy row overrides the code defaults', function () {
+test('an application policy row overrides the code defaults', function () {
     ItSlaPolicy::query()->create([
-        'tenant_id' => 1,
         'priority' => 'high',
         'first_response_minutes' => 30,
         'resolution_minutes' => 90,
@@ -101,8 +114,8 @@ test('a priority change re-targets the clock without restarting it', function ()
 
 test('the seeder materialises editable default rows and factories stay unstamped', function () {
     $this->seed(ItSlaPolicySeeder::class);
-    expect(ItSlaPolicy::query()->where('tenant_id', 1)->count())->toBe(4);
-    expect(ItSlaPolicy::minutesFor(1, 'urgent'))->toBe([60, 240]);
+    expect(ItSlaPolicy::query()->count())->toBe(4);
+    expect(ItSlaPolicy::minutesFor('urgent'))->toBe([60, 240]);
 
     // Factory tickets (test fixtures) never auto-stamp — stamping is the
     // controller write-path's job.
@@ -111,7 +124,7 @@ test('the seeder materialises editable default rows and factories stay unstamped
 });
 
 /* ------------------------------------------------------------------ */
-/*  §N7 — the admin SLA target editor (PUT it.sla.update)             */
+/*  §N7 — the admin SLA target editor (PUT it.sla.update) */
 /* ------------------------------------------------------------------ */
 
 /** A full valid editor payload (the §G defaults), with per-priority overrides. */
@@ -137,9 +150,9 @@ test('an admin can retune the grid and new tickets stamp from it', function () {
         ]))
         ->assertRedirect();
 
-    // The whole grid materialises as tenant rows (editable from here on).
-    expect(ItSlaPolicy::query()->where('tenant_id', 1)->count())->toBe(4);
-    expect(ItSlaPolicy::minutesFor(1, 'urgent'))->toBe([30, 120]);
+    // The whole grid materialises as application rows (editable from here on).
+    expect(ItSlaPolicy::query()->count())->toBe(4);
+    expect(ItSlaPolicy::minutesFor('urgent'))->toBe([30, 120]);
 
     $this->actingAs($this->worker)
         ->post('/it/tickets', [
@@ -176,12 +189,11 @@ test('the grid refuses a resolution target tighter than first response', functio
 });
 
 /* ------------------------------------------------------------------ */
-/*  §P-S2 — a business-hours calendar rolls targets onto working time  */
+/*  §P-S2 — a business-hours calendar rolls targets onto working time */
 /* ------------------------------------------------------------------ */
 
 test('a business-hours policy rolls SLA targets onto working time', function () {
     ItSlaPolicy::query()->create([
-        'tenant_id' => 1,
         'priority' => 'normal',
         'first_response_minutes' => 60,
         'resolution_minutes' => 480, // 8 working hours
@@ -211,9 +223,14 @@ test('a business-hours policy rolls SLA targets onto working time', function () 
 test('SLA targets skip a public holiday', function () {
     $monday = CarbonImmutable::parse('2026-07-06 00:00', 'Pacific/Auckland')->startOfWeek();
     $tuesday = $monday->addDay();
+    $accessStart = $monday->subMonth();
+
+    $this->worker->forceFill(['approved_at' => $accessStart])->save();
+    $this->worker->hrEmployeeProfile()->update([
+        'start_date' => $accessStart->toDateString(),
+    ]);
 
     ItSlaPolicy::query()->create([
-        'tenant_id' => 1,
         'priority' => 'high',
         'first_response_minutes' => 60,
         'resolution_minutes' => 540, // 9 working hours
@@ -235,7 +252,7 @@ test('SLA targets skip a public holiday', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  §P-S4a — the editor sets/clears a tenant business-hours calendar   */
+/*  §P-S4a — the editor sets/clears the application business-hours calendar */
 /* ------------------------------------------------------------------ */
 
 test('the SLA editor writes a business-hours calendar across the whole grid', function () {
@@ -251,7 +268,7 @@ test('the SLA editor writes a business-hours calendar across the whole grid', fu
         ]))
         ->assertRedirect();
 
-    $rows = ItSlaPolicy::query()->where('tenant_id', 1)->get();
+    $rows = ItSlaPolicy::query()->get();
     expect($rows)->toHaveCount(4);
     $rows->each(function (ItSlaPolicy $row) {
         expect($row->business_hours['mon'])->toBe([['08:00', '17:00']]);
@@ -260,7 +277,7 @@ test('the SLA editor writes a business-hours calendar across the whole grid', fu
     });
 
     // The calendar is now live for stamping.
-    expect(ItSlaPolicy::calendarFor(1, 'urgent'))->not->toBeNull();
+    expect(ItSlaPolicy::calendarFor('urgent'))->not->toBeNull();
 });
 
 test('the SLA editor clears the calendar back to 24/7 when disabled', function () {
@@ -272,14 +289,14 @@ test('the SLA editor clears the calendar back to 24/7 when disabled', function (
         'close_time' => '17:30',
         'working_days' => ['mon', 'tue', 'wed', 'thu', 'fri'],
     ]))->assertRedirect();
-    expect(ItSlaPolicy::calendarFor(1, 'urgent'))->not->toBeNull();
+    expect(ItSlaPolicy::calendarFor('urgent'))->not->toBeNull();
 
     $this->actingAs($admin)->put('/it/sla-policies', array_merge(itSlaGrid(), [
         'business_hours_enabled' => false,
     ]))->assertRedirect();
 
-    expect(ItSlaPolicy::calendarFor(1, 'urgent'))->toBeNull();
-    ItSlaPolicy::query()->where('tenant_id', 1)->get()->each(
+    expect(ItSlaPolicy::calendarFor('urgent'))->toBeNull();
+    ItSlaPolicy::query()->get()->each(
         fn (ItSlaPolicy $row) => expect($row->business_hours)->toBeNull(),
     );
 });

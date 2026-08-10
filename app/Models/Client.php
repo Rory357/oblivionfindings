@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\Finance\Models\FinInvoice;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -14,10 +15,10 @@ class Client extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+    use WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
         'user_id',
-        'organization_id',
         'nhi_number',
         'nhi_hash',
         'site_id',

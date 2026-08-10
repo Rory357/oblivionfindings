@@ -2,19 +2,19 @@
 
 namespace App\Http\Controllers\Portal;
 
-use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Http\Controllers\Controller;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Services\Integration\IntegrationEventHistoryService;
-use App\Services\Portal\PortalClientSectionAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
 class PortalLocationController extends Controller
 {
     public function __construct(
-        private readonly PortalClientSectionAccess $sectionAccess,
+        private readonly PersonalTrackingPrivacyService $trackingPrivacy,
+        private readonly IntegrationEventHistoryService $history,
     ) {}
 
     public function index(Request $request, Client $client)
@@ -23,16 +23,10 @@ class PortalLocationController extends Controller
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
 
-        $trackingConsent = $this->sectionAccess->activeLocationTrackingConsent($client);
-        abort_unless($trackingConsent, 403);
-
-        $tenantId = (int) ($client->organization_id ?? $client->site?->tenant_id ?? 1);
-
-        // Canonical device lookup — active tracking device assigned to this client.
-        $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
-            ->where('domain', 'tracking')
-            ->first();
+        $assignment = $this->trackingPrivacy->authorisedClientAssignment($client);
+        abort_unless($assignment, 403);
+        $trackingConsent = $assignment->consent;
+        $device = $assignment->device;
 
         $currentLocation = null;
         $trackerInfo = null;
@@ -70,7 +64,6 @@ class PortalLocationController extends Controller
             if ($client->site_id && Schema::hasTable('asset_geofences')) {
                 $siteId = $client->site_id;
                 $geofences = AssetGeofence::query()
-                    ->forOrganization($tenantId)
                     ->where('is_active', true)
                     ->where('site_id', $siteId)
                     ->whereIn('scope', ['house', 'resident'])
@@ -125,7 +118,13 @@ class PortalLocationController extends Controller
                 'expires_at' => optional($trackingConsent->expires_at)->toISOString(),
             ] : null,
             'geofences' => $geofences,
-        ]);
+            'privacyStatusUrl' => route(
+                'portal.clients.location.privacy-status',
+                ['client' => $client->id],
+                false,
+            ),
+            'retentionDays' => (int) $assignment->retention_days,
+        ])->toResponse($request)->withHeaders($this->privateLocationHeaders());
     }
 
     public function history(Request $request, Client $client)
@@ -133,21 +132,41 @@ class PortalLocationController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($user->canAccessClientPortal($client), 403);
-        abort_unless($this->sectionAccess->activeLocationTrackingConsent($client), 403);
-
-        $tenantId = (int) ($client->organization_id ?? $client->site?->tenant_id ?? 1);
-
-        // Canonical device lookup.
-        $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
-            ->where('domain', 'tracking')
-            ->first();
-
-        $locations = app(IntegrationEventHistoryService::class)
-            ->forDevice($device, $request->only(['date_from', 'date_to']));
+        $assignment = $this->trackingPrivacy->authorisedClientAssignment($client);
+        abort_unless($assignment, 403);
+        $locations = $this->history->forDevice(
+            $assignment->device,
+            $request->only(['date_from', 'date_to']),
+            false,
+            $assignment->retention_days,
+        );
 
         return response()->json([
             'locations' => $locations,
-        ]);
+        ])->withHeaders($this->privateLocationHeaders());
+    }
+
+    public function privacyStatus(Request $request, Client $client)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canAccessClientPortal($client), 403);
+        $assignment = $this->trackingPrivacy->authorisedClientAssignment($client);
+
+        return response()->json([
+            'active' => $assignment !== null,
+            'checked_at' => now()->toISOString(),
+            'retention_days' => $assignment?->retention_days,
+            'export_allowed' => false,
+        ])->withHeaders($this->privateLocationHeaders());
+    }
+
+    private function privateLocationHeaders(): array
+    {
+        return [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+            'Vary' => 'Cookie',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
     }
 }

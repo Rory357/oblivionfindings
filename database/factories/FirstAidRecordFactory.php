@@ -38,9 +38,7 @@ class FirstAidRecordFactory extends Factory
             'injury_illness_description' => fake()->sentence(),
             'body_part' => fake()->randomElement(['Left hand', 'Right knee', 'Forehead', 'Lower back', 'Right ankle', 'Left wrist']),
             'treatment_given' => fake()->sentence(),
-            'treatment_outcome' => fake()->randomElement([
-                'returned_to_activity', 'sent_home', 'medical_centre', 'sent_to_hospital', 'ongoing_monitoring',
-            ]),
+            'treatment_outcome' => 'returned_to_activity',
             'ambulance_called' => false,
             'first_aider_id' => User::factory(),
             'incident_reported' => false,

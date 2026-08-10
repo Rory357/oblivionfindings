@@ -326,14 +326,29 @@ class PayrollJournalService
 
         $period = $payrollRun->period_start->format('d/m/Y').'-'.$payrollRun->period_end->format('d/m/Y');
 
-        $csv = "Employee Name,Bank Account Number,Amount,Reference\n";
+        $handle = fopen('php://temp', 'w+');
+        if ($handle === false) {
+            throw new RuntimeException('Unable to prepare the net-pay bank file.');
+        }
+
+        $this->putCsv($handle, ['Employee Name', 'Bank Account Number', 'Amount', 'Reference']);
         foreach ($payslips as $slip) {
-            // Names are user-chosen — neutralise formula-leading cells (OWASP CSV
-            // injection) so `=cmd|...` can't execute when the batch opens in Excel.
-            $name = (string) $this->sanitizeCsvCell(str_replace(',', ' ', (string) ($slip->user?->name ?? 'Employee')));
-            $bankAccount = (string) $this->sanitizeCsvCell(str_replace(',', ' ', (string) ($slip->employeeProfile?->bank_account ?? '')));
-            $amount = number_format((float) $slip->net_pay, 2, '.', '');
-            $csv .= "{$name},{$bankAccount},{$amount},Net pay {$period}\n";
+            // The shared writer both neutralises spreadsheet formula prefixes
+            // and correctly quotes commas, line breaks and double quotes.
+            $this->putCsv($handle, [
+                $slip->user?->name ?? 'Employee',
+                $slip->employeeProfile?->bank_account ?? '',
+                number_format((float) $slip->net_pay, 2, '.', ''),
+                "Net pay {$period}",
+            ]);
+        }
+
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        if ($csv === false) {
+            throw new RuntimeException('Unable to read the prepared net-pay bank file.');
         }
 
         return $csv;

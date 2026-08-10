@@ -78,7 +78,10 @@ const TIMELINE_TONE: Record<TimelineRow['tone'], string> = {
     live: 'bg-live-bg text-live',
 };
 
-function buildTimeline(entries: TimeEntry[], clockedIn: boolean): TimelineRow[] {
+function buildTimeline(
+    entries: TimeEntry[],
+    clockedIn: boolean,
+): TimelineRow[] {
     const rows: TimelineRow[] = [];
     for (const e of entries) {
         rows.push({
@@ -138,7 +141,10 @@ export default function MyTime({
 
     const timeline = buildTimeline(todayEntries, !!activeClock);
     const dailyEntries = Object.entries(weeklySummary.daily_hours ?? {});
-    const maxHours = Math.max(8, ...dailyEntries.map(([, h]) => Number(h) || 0));
+    const maxHours = Math.max(
+        8,
+        ...dailyEntries.map(([, h]) => Number(h) || 0),
+    );
     const target = myHr.weekly.target_hours;
 
     function openShiftCtx(e: React.MouseEvent, s: RosterShift, day: RosterDay) {
@@ -185,7 +191,8 @@ export default function MyTime({
                             <div className="flex flex-col items-center gap-2 py-8 text-center">
                                 <Clock className="h-8 w-8 text-muted-foreground/40" />
                                 <p className="text-[13px] text-muted-foreground">
-                                    No punches today yet — clock in from the card above.
+                                    No punches today yet — clock in from the
+                                    card above.
                                 </p>
                             </div>
                         ) : (
@@ -231,7 +238,9 @@ export default function MyTime({
                     {/* Hours this week */}
                     <Card className="p-[18px]">
                         <div className="mb-2 flex items-center justify-between">
-                            <h3 className="text-sm font-bold">Hours this week</h3>
+                            <h3 className="text-sm font-bold">
+                                Hours this week
+                            </h3>
                             <span className="text-[13px] font-bold">
                                 {weeklySummary.total_hours.toFixed(1)}h{' '}
                                 <span className="font-normal text-muted-foreground">
@@ -242,7 +251,10 @@ export default function MyTime({
                         <div className="flex h-[120px] items-end gap-2.5 pt-3.5">
                             {dailyEntries.map(([date, hours], i) => {
                                 const h = Number(hours) || 0;
-                                const barH = Math.max(4, Math.round((h / maxHours) * 88));
+                                const barH = Math.max(
+                                    4,
+                                    Math.round((h / maxHours) * 88),
+                                );
                                 const weekend = i >= 5;
                                 return (
                                     <div
@@ -275,7 +287,9 @@ export default function MyTime({
                 <Card className="p-[18px]">
                     <div className="mb-3.5 flex items-center gap-2">
                         <Calendar className="h-4 w-4 text-primary" />
-                        <h3 className="text-sm font-bold">This week’s roster</h3>
+                        <h3 className="text-sm font-bold">
+                            This week’s roster
+                        </h3>
                         <span className="ml-auto text-[11px] text-muted-foreground">
                             From Workforce · right-click a shift
                         </span>
@@ -300,13 +314,15 @@ export default function MyTime({
                                 {d.shifts.map((s) => (
                                     <div
                                         key={s.id}
-                                        onContextMenu={(e) => openShiftCtx(e, s, d)}
+                                        onContextMenu={(e) =>
+                                            openShiftCtx(e, s, d)
+                                        }
                                         className="m-2 cursor-default rounded-lg bg-muted p-2"
                                         style={{
                                             borderLeft: `3px solid oklch(0.62 0.17 ${hueFromId(s.service_context_id ?? s.id)})`,
                                         }}
                                     >
-                                        <div className="text-[11.5px] font-bold leading-tight">
+                                        <div className="text-[11.5px] leading-tight font-bold">
                                             {s.site}
                                         </div>
                                         <div className="mt-0.5 text-[10.5px] text-muted-foreground">
@@ -323,7 +339,9 @@ export default function MyTime({
                 </Card>
             </div>
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
         </MyHrShell>
     );
 }

@@ -146,7 +146,7 @@ class IncidentController extends Controller
                     'client.site:id,name',
                     'site:id,name',
                     'reporter:id,name',
-                    'hsEvent:id,site_id,worksafe_notifiable,worksafe_status,worksafe_reference,worksafe_notified_at,worksafe_acknowledged_at,worksafe_method,worksafe_site_preserved',
+                    'hsEvent:id,source_type,source_id,event_category,idempotency_key,client_id,site_id,control_room_alert_id,worksafe_notifiable,worksafe_status,worksafe_reference,worksafe_notified_at,worksafe_acknowledged_at,worksafe_method,worksafe_site_preserved',
                     'hsEvent.site:id,name',
                 ])
                 ->withCount([
@@ -158,7 +158,12 @@ class IncidentController extends Controller
                 ->paginate(50)
                 ->withQueryString()
                 ->through(function (ClientIncident $incident): array {
-                    $event = $incident->hsEvent;
+                    $directEvent = $incident->hsEvent;
+                    $event = $directEvent !== null
+                        && $this->journeys->hsEventIsCanonicalForIncident($incident, $directEvent)
+                            ? $directEvent
+                            : null;
+                    $journeyRepairRequired = $incident->hs_event_id !== null && $event === null;
 
                     return [
                         'id' => $incident->id,
@@ -170,12 +175,17 @@ class IncidentController extends Controller
                         'status' => $incident->status,
                         'source' => $incident->source,
                         'interactive' => $incident->interactive,
-                        'is_notifiable' => $event
+                        'is_notifiable' => $journeyRepairRequired
+                            ? false
+                            : ($event
                             ? (bool) $event->worksafe_notifiable
-                            : (bool) $incident->is_notifiable,
-                        'worksafe_notification_status' => $event
+                            : (bool) $incident->is_notifiable),
+                        'worksafe_notification_status' => $journeyRepairRequired
+                            ? null
+                            : ($event
                             ? $event->worksafe_status
-                            : $incident->worksafe_notification_status,
+                            : $incident->worksafe_notification_status),
+                        'journey_repair_required' => $journeyRepairRequired,
                         'potential_severity' => $incident->potential_severity,
                         'investigation_status' => $incident->investigation_status,
                         'control_room_alert_id' => $incident->control_room_alert_id,
@@ -262,7 +272,13 @@ class IncidentController extends Controller
                 $this->incidentReportSiteBypassPermissions(),
             );
             $sites = $siteQuery->orderBy('name')->get(['id', 'name']);
-            $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+            $clientQuery = Client::query();
+            app(UserSiteAccessService::class)->applyClientScope(
+                $clientQuery,
+                $user,
+                $this->incidentReportSiteBypassPermissions(),
+            );
+            $clients = $clientQuery->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
         }
 
         // Report-wizard data for the modal-first "+ Report": clients the user may
@@ -277,7 +293,6 @@ class IncidentController extends Controller
                 $user,
                 $this->incidentReportSiteBypassPermissions(),
             );
-            $this->applyOrganizationScope($reportClientQuery, $user);
 
             if (! $this->canReportAcrossHealthSafety($user) && ! $user->canDo('clients.viewAny')) {
                 $reportClientQuery->whereHas('supportWorkers', fn ($s) => $s->whereKey($user->id));
@@ -426,33 +441,26 @@ class IncidentController extends Controller
             return null;
         }
 
-        // Governance wrapper recorded by ClientIncidentObserver (idempotent).
-        $hsEventQuery = HsEvent::query()->with([
+        $journeyRepairRequired = false;
+        try {
+            $journey = $this->journeys->journeyForIncident($incident);
+            $hsEvent = $journey->hsEvent;
+            $linkedControlRoomAlert = $journey->alert;
+        } catch (\DomainException) {
+            // A contradictory direct link is an integrity signal, not authority
+            // to disclose another incident's linked records in this journey.
+            $journeyRepairRequired = true;
+            $hsEvent = null;
+            $linkedControlRoomAlert = null;
+        }
+
+        $hsEvent?->loadMissing([
             'site:id,name',
             'latestInvestigation',
             'correctiveActions.assignedTo:id,name',
             'owner:id,name',
             'acceptedBy:id,name',
         ]);
-        $hsEvent = $incident->hs_event_id
-            ? (clone $hsEventQuery)->find($incident->hs_event_id)
-            : null;
-        $historicCategory = $incident->type === 'near_miss'
-            ? HsEvent::CATEGORY_NEAR_MISS
-            : HsEvent::CATEGORY_INCIDENT;
-        $sourceEvents = $hsEvent ? collect() : (clone $hsEventQuery)
-            ->where('source_type', ClientIncident::class)
-            ->where('source_id', $incident->id)
-            ->where('event_category', $historicCategory)
-            ->where('idempotency_key', HsEvent::buildIdempotencyKey(
-                ClientIncident::class,
-                $incident->id,
-                $historicCategory,
-            ))
-            ->orderBy('id')
-            ->limit(2)
-            ->get();
-        $hsEvent ??= $sourceEvents->count() === 1 ? $sourceEvents->first() : null;
 
         $inv = $hsEvent?->latestInvestigation;
         $canOpenHsEvent = $hsEvent && $this->canOpenHsEvent($user, $hsEvent);
@@ -480,9 +488,6 @@ class IncidentController extends Controller
                 ->values()
                 ->all();
         }
-        $linkedControlRoomAlert = $this->journeys
-            ->journeyForIncident($incident)
-            ->alert;
         $linkedOperationalEvidence = $linkedControlRoomAlert
             ? $this->linkedEvidence->present(
                 $linkedControlRoomAlert,
@@ -490,8 +495,17 @@ class IncidentController extends Controller
                 fn (EvidenceItem $item): string => "/incidents/{$incident->id}/control-room-evidence/{$item->id}/download",
             )
             : null;
-        $closeGate = $this->journeys->closeGateForDisplay($incident);
-        $closeGatePayload = $closeGate->toArray();
+        $closeGatePayload = $journeyRepairRequired
+            ? [
+                'allowed' => false,
+                'requirements' => [[
+                    'key' => 'journey_integrity',
+                    'complete' => false,
+                    'label' => 'Repair the linked incident journey before closing this incident.',
+                    'href' => "/incidents/{$incident->id}",
+                ]],
+            ]
+            : $this->journeys->closeGateForDisplay($incident)->toArray();
         if (! $request->user()?->canDo('hazards.view')) {
             $closeGatePayload['requirements'] = collect($closeGatePayload['requirements'])
                 ->map(function (array $requirement): array {
@@ -524,18 +538,27 @@ class IncidentController extends Controller
             'description' => $incident->description,
             'immediate_action_taken' => $incident->immediate_action_taken,
             'witnesses' => $incident->witnesses,
-            'is_notifiable' => $hsEvent
+            'is_notifiable' => $journeyRepairRequired
+                ? false
+                : ($hsEvent
                 ? (bool) $hsEvent->worksafe_notifiable
-                : (bool) $incident->is_notifiable,
-            'worksafe_notification_status' => $hsEvent
+                : (bool) $incident->is_notifiable),
+            'worksafe_notification_status' => $journeyRepairRequired
+                ? null
+                : ($hsEvent
                 ? $hsEvent->worksafe_status
-                : $incident->worksafe_notification_status,
-            'worksafe_notified_at' => $hsEvent
+                : $incident->worksafe_notification_status),
+            'worksafe_notified_at' => $journeyRepairRequired
+                ? null
+                : ($hsEvent
                 ? $hsEvent->worksafe_notified_at
-                : $incident->worksafe_notified_at,
-            'worksafe_reference' => $hsEvent
+                : $incident->worksafe_notified_at),
+            'worksafe_reference' => $journeyRepairRequired
+                ? null
+                : ($hsEvent
                 ? $hsEvent->worksafe_reference
-                : $incident->worksafe_reference,
+                : $incident->worksafe_reference),
+            'journey_repair_required' => $journeyRepairRequired,
             'potential_severity' => $incident->potential_severity,
             'potential_consequence' => $incident->potential_consequence,
             'investigation_status' => $incident->investigation_status,
@@ -598,11 +621,13 @@ class IncidentController extends Controller
             ] : null,
             'linked_operational_evidence' => $linkedOperationalEvidence,
             'close_gate' => $closeGatePayload,
-            'journey_state' => $this->journeyPresenter->journeyState(
-                $incident,
-                $linkedControlRoomAlert,
-                $hsEvent,
-            ),
+            'journey_state' => $journeyRepairRequired
+                ? 'Journey repair required'
+                : $this->journeyPresenter->journeyState(
+                    $incident,
+                    $linkedControlRoomAlert,
+                    $hsEvent,
+                ),
             'hs_event' => $hsEvent ? [
                 'id' => $hsEvent->id,
                 'reference_number' => $hsEvent->reference_number,
@@ -732,15 +757,12 @@ class IncidentController extends Controller
         $params = ['report' => $request->query('type') === 'near_miss' ? 'near_miss' : 'incident'];
 
         if ($request->filled('shift_id')) {
-            $shiftQuery = Shift::query()->with('client:id,organization_id');
+            $shiftQuery = Shift::query()->with('client:id,site_id');
             app(UserSiteAccessService::class)->applyShiftScope(
                 $shiftQuery,
                 $user,
                 $this->incidentReportSiteBypassPermissions(),
             );
-            $shiftQuery->whereHas('client', function (Builder $clientQuery) use ($user): void {
-                $this->applyOrganizationScope($clientQuery, $user);
-            });
             $shift = $shiftQuery->find((int) $request->query('shift_id'));
 
             if (
@@ -748,7 +770,7 @@ class IncidentController extends Controller
                 && (
                     (int) $shift->user_id === (int) $user->id
                     || $user->canDo('incidents.viewAny')
-                    || $this->canReportAcrossHealthSafety($user, $shift->client)
+                    || $this->canReportAcrossHealthSafety($user)
                 )
             ) {
                 $params['report_shift_id'] = $shift->id;
@@ -757,8 +779,19 @@ class IncidentController extends Controller
                 }
             }
         }
-        if ($request->filled('client_id')) {
-            $params['report_client_id'] = (int) $request->query('client_id');
+        if ($request->filled('client_id') && ! isset($params['report_shift_id'])) {
+            $clientQuery = Client::query();
+            app(UserSiteAccessService::class)->applyClientScope(
+                $clientQuery,
+                $user,
+                $this->incidentReportSiteBypassPermissions(),
+            );
+            $client = $clientQuery->find((int) $request->query('client_id'));
+            if ($client
+                && ($user->can('view', $client) || $this->canReportAcrossHealthSafety($user))
+            ) {
+                $params['report_client_id'] = (int) $client->id;
+            }
         }
 
         return redirect()->route('incidents.index', $params);
@@ -791,7 +824,17 @@ class IncidentController extends Controller
             'occurred_at' => ['nullable', 'date'],
             'description' => ['nullable', 'string'],
             'requires_followup' => ['sometimes', 'boolean'],
-            'immediate_action_taken' => ['nullable', 'string'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => $request->input('intent') === 'submit'
+                    && (
+                        $request->input('severity') === 'high'
+                        || $request->input('reported_severity') === 'critical'
+                    )
+                ),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'witnesses' => ['nullable', 'string'],
             'harm_or_injury' => ['nullable', 'string', 'max:2000'],
             'consequence' => ['nullable', 'string', 'max:2000'],
@@ -826,7 +869,7 @@ class IncidentController extends Controller
         ]);
 
         $client = Client::query()->findOrFail($data['client_id']);
-        $healthSafetyFallback = $this->canReportAcrossHealthSafety($actor, $client);
+        $healthSafetyFallback = $this->canReportAcrossHealthSafety($actor);
         abort_unless($actor->can('view', $client) || $healthSafetyFallback, 403);
 
         app(UserSiteAccessService::class)->assertCanAccessClientId(
@@ -889,7 +932,9 @@ class IncidentController extends Controller
             'occurred_at' => $data['occurred_at'] ?? now(),
             'description' => $data['description'] ?? null,
             'requires_followup' => (bool) ($data['requires_followup'] ?? false) || ! empty($data['followups']),
-            'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
+            'immediate_action_taken' => filled($data['immediate_action_taken'] ?? null)
+                ? trim((string) $data['immediate_action_taken'])
+                : null,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'].' incident',
             'metadata' => $metadata,
@@ -942,7 +987,7 @@ class IncidentController extends Controller
                     }
 
                     if (! $created) {
-                        $this->assertCanReuseIncidentReport($actor, $incident, $client);
+                        $this->assertCanReuseIncidentReport($actor, $incident);
                         $this->assertIncidentIdentity($incident, $client, $shift, $siteId);
                     }
                 } elseif (! empty($data['incident_id'])) {
@@ -957,7 +1002,7 @@ class IncidentController extends Controller
                         ]);
                     }
 
-                    $this->assertCanReuseIncidentReport($actor, $incident, $client);
+                    $this->assertCanReuseIncidentReport($actor, $incident);
                     $this->assertIncidentIdentity($incident, $client, $shift, $siteId);
                 } else {
                     $incident = ClientIncident::query()->create($attributes);
@@ -966,6 +1011,7 @@ class IncidentController extends Controller
 
                 if (! $created) {
                     if ($incident->status === 'submitted' && $isSubmit) {
+                        $this->recordMissingImmediateActionForSubmission($incident, $data);
                         $journey = $journeys->ensureForSubmittedIncident($incident, $actor);
 
                         return [$journey->incident, $journey, false, false];
@@ -1070,7 +1116,7 @@ class IncidentController extends Controller
         }
 
         $shift = isset($data['shift_id'])
-            ? Shift::query()->with('client:id,site_id,organization_id')->find((int) $data['shift_id'])
+            ? Shift::query()->with('client:id,site_id')->find((int) $data['shift_id'])
             : null;
 
         if (isset($data['shift_id']) && ! $shift) {
@@ -1139,11 +1185,10 @@ class IncidentController extends Controller
     private function assertCanReuseIncidentReport(
         User $actor,
         ClientIncident $incident,
-        Client $client,
     ): void {
         abort_unless(
             (int) $incident->reported_by === (int) $actor->id
-            && ($actor->can('view', $incident) || $this->canReportAcrossHealthSafety($actor, $client)),
+            && ($actor->can('view', $incident) || $this->canReportAcrossHealthSafety($actor)),
             403,
         );
     }
@@ -1166,6 +1211,36 @@ class IncidentController extends Controller
         }
 
         return $metadata === [] ? null : $metadata;
+    }
+
+    /**
+     * A serious submission must carry the reporter's actual immediate response.
+     * A retry may repair a missing historical value, but must never replace one.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function recordMissingImmediateActionForSubmission(
+        ClientIncident $incident,
+        array $input = [],
+    ): void {
+        if (blank($incident->immediate_action_taken)) {
+            $providedAction = trim((string) ($input['immediate_action_taken'] ?? ''));
+
+            if ($providedAction !== '') {
+                $incident->forceFill([
+                    'immediate_action_taken' => $providedAction,
+                ])->save();
+            }
+        }
+
+        if (
+            in_array($incident->severity, ['high', 'critical'], true)
+            && blank($incident->immediate_action_taken)
+        ) {
+            throw ValidationException::withMessages([
+                'immediate_action_taken' => 'Record the immediate action taken before submitting a high or critical incident.',
+            ]);
+        }
     }
 
     /** @return array<string, string> */
@@ -1241,32 +1316,10 @@ class IncidentController extends Controller
         );
     }
 
-    private function canReportAcrossHealthSafety(User $user, ?Client $client = null): bool
+    private function canReportAcrossHealthSafety(User $user): bool
     {
-        $canReport = $user->canDo('incidents.create')
+        return $user->canDo('incidents.create')
             && $user->canDo('healthSafety.viewAllSites');
-
-        return $canReport && (! $client || $this->sharesOrganization($user, $client));
-    }
-
-    private function sharesOrganization(User $user, Client $client): bool
-    {
-        if ($user->organization_id === null || $client->organization_id === null) {
-            return true;
-        }
-
-        return (int) $user->organization_id === (int) $client->organization_id;
-    }
-
-    private function applyOrganizationScope(Builder $query, User $user): void
-    {
-        if ($user->organization_id === null) {
-            return;
-        }
-
-        $query->where(fn (Builder $organizationQuery) => $organizationQuery
-            ->whereNull('organization_id')
-            ->orWhere('organization_id', $user->organization_id));
     }
 
     /** @return array<int, string> */
@@ -1422,12 +1475,16 @@ class IncidentController extends Controller
             $this->authorize('submit', $incident);
         }
 
+        $submission = $request->validate([
+            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+        ]);
+
         $siteAccess = app(UserSiteAccessService::class);
         $siteBypassPermissions = $this->incidentReportSiteBypassPermissions();
         $siteAccess->assertCanAccessClientIncident($actor, $incident, $siteBypassPermissions);
 
         [$incident, $journey, $submittedNow] = DB::transaction(
-            function () use ($actor, $incident, $journeys, $siteAccess, $siteBypassPermissions): array {
+            function () use ($actor, $incident, $journeys, $siteAccess, $siteBypassPermissions, $submission): array {
                 $locked = ClientIncident::query()
                     ->whereKey($incident->id)
                     ->lockForUpdate()
@@ -1443,6 +1500,7 @@ class IncidentController extends Controller
                 $siteAccess->assertCanAccessClientIncident($actor, $locked, $siteBypassPermissions);
 
                 if ($locked->status === 'submitted') {
+                    $this->recordMissingImmediateActionForSubmission($locked, $submission);
                     $journey = $journeys->ensureForSubmittedIncident($locked, $actor);
 
                     return [$journey->incident, $journey, false];
@@ -1466,6 +1524,7 @@ class IncidentController extends Controller
                     'submitted_at' => now(),
                 ])->save();
 
+                $this->recordMissingImmediateActionForSubmission($locked, $submission);
                 $journey = $journeys->ensureForSubmittedIncident($locked, $actor);
 
                 return [$journey->incident, $journey, true];
@@ -1486,19 +1545,34 @@ class IncidentController extends Controller
     {
         $this->authorize('review', $incident);
 
-        // Guardrail: review is only valid for submitted incidents.
-        abort_unless($incident->status === 'submitted', 403);
-
         $data = $request->validate([
             'review_notes' => ['nullable', 'string'],
         ]);
 
-        $incident->update([
-            'status' => 'reviewed',
-            'reviewed_by' => $request->user()?->id,
-            'reviewed_at' => now(),
-            'review_notes' => $data['review_notes'] ?? $incident->review_notes,
-        ]);
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        $incident = DB::transaction(function () use ($actor, $data, $incident): ClientIncident {
+            $lockedIncident = ClientIncident::query()
+                ->whereKey($incident->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Re-authorize the locked record so a concurrent state change cannot
+            // move a different lifecycle snapshot through this action.
+            $this->authorize('review', $lockedIncident);
+            abort_unless($lockedIncident->status === 'submitted', 403);
+
+            $lockedIncident->update([
+                'status' => 'reviewed',
+                'reviewed_by' => $actor->id,
+                'reviewed_at' => now(),
+                'review_notes' => $data['review_notes'] ?? $lockedIncident->review_notes,
+            ]);
+
+            return $this->journeys
+                ->ensureForSubmittedIncident($lockedIncident, $actor)
+                ->incident;
+        }, 3);
 
         $incident->load(['client:id,first_name,last_name']);
         $client = $incident->client;
@@ -1537,7 +1611,9 @@ class IncidentController extends Controller
             'closed_notes' => ['nullable', 'string'],
         ]);
 
-        [$incident, $closeError] = DB::transaction(function () use ($incident, $data, $request): array {
+        $actor = $request->user();
+        abort_unless($actor, 403);
+        [$incident, $closeError] = DB::transaction(function () use ($actor, $incident, $data): array {
             $lockedIncident = ClientIncident::query()
                 ->whereKey($incident->id)
                 ->lockForUpdate()
@@ -1545,6 +1621,7 @@ class IncidentController extends Controller
 
             // Every close/follow-up writer locks this parent first. Whichever
             // operation wins is visible to the other before it can continue.
+            $this->authorize('close', $lockedIncident);
             abort_unless($lockedIncident->status === 'reviewed', 403);
 
             $gate = $this->journeys->closeGate($lockedIncident);
@@ -1557,13 +1634,18 @@ class IncidentController extends Controller
 
             $lockedIncident->update([
                 'status' => 'closed',
-                'closed_by' => $request->user()?->id,
+                'closed_by' => $actor->id,
                 'closed_at' => now(),
                 'closed_outcome' => $data['closed_outcome'],
                 'closed_notes' => $data['closed_notes'] ?? null,
             ]);
 
-            return [$lockedIncident, null];
+            $journey = $this->journeys->ensureForSubmittedIncident(
+                $lockedIncident,
+                $actor,
+            );
+
+            return [$journey->incident, null];
         }, 3);
 
         if ($closeError !== null) {
@@ -1647,18 +1729,22 @@ class IncidentController extends Controller
                 );
 
                 $lockedIncident->loadMissing([
-                    'client:id,site_id,organization_id',
-                    'shift.client:id,site_id,organization_id',
+                    'client:id,site_id',
+                    'shift.client:id,site_id',
                 ]);
                 $incidentSiteId = $lockedIncident->site_id
                     ?: $lockedIncident->client?->site_id
                     ?: $lockedIncident->shift?->site_id
                     ?: $lockedIncident->shift?->client?->site_id;
-                app(ControlRoomAlertProvenanceService::class)->assertIncidentTuple(
-                    $alert,
-                    (int) $lockedIncident->client_id,
-                    $incidentSiteId ? (int) $incidentSiteId : null,
-                );
+                try {
+                    app(ControlRoomAlertProvenanceService::class)->assertIncidentTuple(
+                        $alert,
+                        (int) $lockedIncident->client_id,
+                        $incidentSiteId ? (int) $incidentSiteId : null,
+                    );
+                } catch (\DomainException) {
+                    abort(404);
+                }
             }
 
             $at = now();
@@ -1701,7 +1787,14 @@ class IncidentController extends Controller
                 ]);
             }
 
-            return $lockedIncident->refresh();
+            // Verify and repair only the canonical links inside this transaction.
+            // attachAlertToIncident/ensureForSubmittedIncident never reopen the
+            // independently governed H&S, Control Room, or linked IT lifecycles.
+            $journey = $alert
+                ? $this->journeys->attachAlertToIncident($lockedIncident, $alert, $actor)
+                : $this->journeys->ensureForSubmittedIncident($lockedIncident, $actor);
+
+            return $journey->incident;
         }, 3);
 
         $incident->load(['client:id,first_name,last_name']);

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,6 +15,8 @@ class TimesheetProductionHardeningTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
+    protected Site $site;
 
     protected Client $client;
 
@@ -29,7 +32,12 @@ class TimesheetProductionHardeningTest extends TestCase
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create([
+            'name' => 'Timesheet Hardening Site',
+        ]);
+        $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
+        ]);
     }
 
     public function test_approved_timesheet_cannot_be_edited_through_http(): void

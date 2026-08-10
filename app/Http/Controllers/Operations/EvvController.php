@@ -4,11 +4,20 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
 use App\Models\EvvRecord;
-use App\Models\Site;
+use App\Models\Shift;
+use App\Models\User;
+use App\Services\Operations\EvvService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class EvvController extends Controller
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly EvvService $evv,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -20,17 +29,18 @@ class EvvController extends Controller
         ]);
         $status = $data['verification_status'] ?? $data['status'] ?? null;
 
-        $query = EvvRecord::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $baseQuery = $this->visibleRecordsQuery($auth);
+        $query = clone $baseQuery;
+        $query
             ->with(['user:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at'])
-            ->when(!empty($status), fn ($q) => $q->where('verification_status', $status))
+            ->when(! empty($status), fn ($q) => $q->where('verification_status', $status))
             ->orderByDesc('check_in_time');
 
         $stats = [
-            'total' => EvvRecord::where('organization_id', $auth->organization_id)->count(),
-            'verified' => EvvRecord::where('organization_id', $auth->organization_id)->where('verification_status', 'verified')->count(),
-            'pending' => EvvRecord::where('organization_id', $auth->organization_id)->where('verification_status', 'pending')->count(),
-            'flagged' => EvvRecord::where('organization_id', $auth->organization_id)->where('verification_status', 'flagged')->count(),
+            'total' => (clone $baseQuery)->count(),
+            'verified' => (clone $baseQuery)->where('verification_status', 'verified')->count(),
+            'pending' => (clone $baseQuery)->where('verification_status', 'pending')->count(),
+            'flagged' => (clone $baseQuery)->where('verification_status', 'flagged')->count(),
         ];
 
         $records = $query->paginate(20)
@@ -49,8 +59,7 @@ class EvvController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('evv.view') || $auth->canDo('evv.viewAny')), 403);
 
-        $record = EvvRecord::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $record = $this->visibleRecordsQuery($auth)
             ->with(['user:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at,site_id', 'shift.site:id,name'])
             ->findOrFail($record);
 
@@ -71,29 +80,27 @@ class EvvController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
         ]);
 
-        // Calculate distance from client site if available
-        $distance = null;
-        $shift = \App\Models\Shift::with('site')->find($data['shift_id']);
-        if ($shift && $shift->site && $shift->site->latitude && $shift->site->longitude) {
-            $distance = $this->calculateDistance(
-                $data['latitude'],
-                $data['longitude'],
-                $shift->site->latitude,
-                $shift->site->longitude
-            );
-        }
+        $shift = Shift::query()->with(['site', 'client:id,site_id'])->findOrFail($data['shift_id']);
+        abort_unless(
+            $shift->site_id
+                && $shift->client_id
+                && (int) $shift->client_id === (int) $data['client_id']
+                && (int) $shift->client?->site_id === (int) $shift->site_id,
+            422,
+            'The Shift, Client and Site must match.',
+        );
+        $this->siteAccess->assertCanAccessSiteId($auth, (int) $shift->site_id, ['shifts.manageAny']);
+        abort_unless(
+            $auth->canDo('shifts.manageAny') || (int) $shift->user_id === (int) $auth->id,
+            403,
+        );
 
-        $record = EvvRecord::create([
-            'organization_id' => $auth->organization_id,
-            'shift_id' => $data['shift_id'],
-            'client_id' => $data['client_id'],
-            'user_id' => $auth->id,
-            'check_in_time' => now(),
-            'check_in_latitude' => $data['latitude'],
-            'check_in_longitude' => $data['longitude'],
-            'distance_from_site_in' => $distance,
-            'verification_status' => 'pending',
-        ]);
+        $this->evv->processCheckIn(
+            $shift,
+            (int) $auth->id,
+            (float) $data['latitude'],
+            (float) $data['longitude'],
+        );
 
         return redirect()->back()->with('success', 'Checked in.');
     }
@@ -109,30 +116,19 @@ class EvvController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
         ]);
 
-        $record = EvvRecord::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->when(!empty($data['record_id']), fn ($q) => $q->whereKey($data['record_id']))
+        $record = $this->visibleRecordsQuery($auth)
+            ->when(! $auth->canDo('shifts.manageAny'), fn ($q) => $q->where('user_id', $auth->id))
+            ->when(! empty($data['record_id']), fn ($q) => $q->whereKey($data['record_id']))
             ->when(empty($data['record_id']), fn ($q) => $q->where('user_id', $auth->id)->whereNull('check_out_time'))
             ->with('shift.site')
             ->latest('check_in_time')
             ->firstOrFail();
 
-        $distance = null;
-        if ($record->shift?->site?->latitude && $record->shift?->site?->longitude) {
-            $distance = $this->calculateDistance(
-                $data['latitude'],
-                $data['longitude'],
-                $record->shift->site->latitude,
-                $record->shift->site->longitude
-            );
-        }
-
-        $record->update([
-            'check_out_time' => now(),
-            'check_out_latitude' => $data['latitude'],
-            'check_out_longitude' => $data['longitude'],
-            'distance_from_site_out' => $distance,
-        ]);
+        $this->evv->processCheckOut(
+            $record,
+            (float) $data['latitude'],
+            (float) $data['longitude'],
+        );
 
         return redirect()->back()->with('success', 'Checked out.');
     }
@@ -142,8 +138,7 @@ class EvvController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('evv.verify'), 403);
 
-        $record = EvvRecord::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $record = $this->visibleRecordsQuery($auth)
             ->findOrFail($record);
 
         $data = $request->validate([
@@ -157,20 +152,16 @@ class EvvController extends Controller
             'notes' => $data['verification_notes'] ?? $record->notes,
         ]);
 
-        return redirect()->back()->with('success', 'Record ' . $data['verification_status'] . '.');
+        return redirect()->back()->with('success', 'Record '.$data['verification_status'].'.');
     }
 
-    private function calculateDistance(float $lat1, float $lng1, float $lat2, float $lng2): float
+    private function visibleRecordsQuery(User $viewer): Builder
     {
-        $earthRadius = 6371000; // metres
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLng = deg2rad($lng2 - $lng1);
-        $a = sin($dLat / 2) * sin($dLat / 2)
-            + cos(deg2rad($lat1)) * cos(deg2rad($lat2))
-            * sin($dLng / 2) * sin($dLng / 2);
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-
-        return round($earthRadius * $c, 2);
+        return EvvRecord::query()
+            ->whereHas('shift', function (Builder $shiftQuery) use ($viewer): void {
+                $this->siteAccess->applyShiftScope($shiftQuery, $viewer, ['shifts.manageAny']);
+                $shiftQuery->whereColumn('shifts.client_id', 'evv_records.client_id');
+            });
     }
 
     private function serializeRecord(EvvRecord $record, bool $includeDetails = false): array

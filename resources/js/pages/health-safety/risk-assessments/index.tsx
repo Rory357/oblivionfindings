@@ -2,12 +2,28 @@
  * on-dark "Due for review" toggle and the hero search input are bespoke hero affordances
  * (styled native controls on the primary gradient) using semantic design tokens only,
  * matching the Incidents / Analytics registers. */
-import { ShiftContextMenu, type ShiftCtxState, EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { RaDetailDialog } from '@/components/health-safety/risk-assessments/ra-detail-dialog';
 import { RIBBON_STAGES } from '@/components/health-safety/risk-assessments/ra-kit';
-import { buildRaCtxItems, RaTable, type RaCtxHandlers } from '@/components/health-safety/risk-assessments/ra-table';
+import {
+    buildRaCtxItems,
+    RaTable,
+    type RaCtxHandlers,
+} from '@/components/health-safety/risk-assessments/ra-table';
 import { RaWizardDialog } from '@/components/health-safety/risk-assessments/ra-wizard-dialog';
-import type { AttachType, RaDetail, RaModalKind, RaPickers, RaRow } from '@/components/health-safety/risk-assessments/types';
+import type {
+    AttachType,
+    RaDetail,
+    RaModalKind,
+    RaPickers,
+    RaRow,
+} from '@/components/health-safety/risk-assessments/types';
+import {
+    EntityFilter,
+    ShiftContextMenu,
+    TabStrip,
+    type RosterTabItem,
+    type ShiftCtxState,
+} from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
@@ -16,11 +32,11 @@ import {
     HeroCluster,
     HeroClusterTile,
     HeroComplianceBadges,
-    type HeroComplianceBadge,
     HeroMedallion,
     HeroSegmented,
     HeroShell,
     HeroStatusPill,
+    type HeroComplianceBadge,
 } from '@/pages/health-safety/components/hs-hero-kit';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
@@ -93,7 +109,14 @@ interface Paginated<T> {
 
 interface Props {
     assessments: Paginated<RaRow>;
-    tabCounts: { all: number; active: number; drafts: number; due: number; high: number; closed: number };
+    tabCounts: {
+        all: number;
+        active: number;
+        drafts: number;
+        due: number;
+        high: number;
+        closed: number;
+    };
     hero: Hero;
     detail: RaDetail | null;
     pickers: RaPickers;
@@ -117,7 +140,15 @@ const LEVEL_ITEMS = [
     { key: 'extreme', label: 'Extreme' },
 ];
 
-export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, detail, pickers, can, filters }: Props) {
+export default function RiskAssessmentsIndex({
+    assessments,
+    tabCounts,
+    hero,
+    detail,
+    pickers,
+    can,
+    filters,
+}: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [modal, setModal] = useState<{
         kind: RaModalKind;
@@ -126,7 +157,9 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
     } | null>(null);
 
     /* -------- navigation -------- */
-    const paramsFrom = (f: Partial<Filters>): Record<string, string | number> => {
+    const paramsFrom = (
+        f: Partial<Filters>,
+    ): Record<string, string | number> => {
         const merged = { ...filters, ...f };
         const out: Record<string, string | number> = {};
         (Object.keys(merged) as (keyof Filters)[]).forEach((k) => {
@@ -135,20 +168,50 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
         });
         return out;
     };
-    const go = (next: Partial<Filters>) => router.get(BASE, paramsFrom(next), { preserveState: true, preserveScroll: true, replace: true });
-    const setTab = (id: string) => router.get(BASE, paramsFrom({ tab: id }), { preserveScroll: true });
-    const clearFilters = () => router.get(BASE, { tab: filters.tab }, { preserveState: true, preserveScroll: true, replace: true });
-    const hasFilters = !!(filters.status || filters.risk_level || filters.site_id || filters.client_id || filters.due_for_review || filters.search);
+    const go = (next: Partial<Filters>) =>
+        router.get(BASE, paramsFrom(next), {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+        });
+    const setTab = (id: string) =>
+        router.get(BASE, paramsFrom({ tab: id }), { preserveScroll: true });
+    const clearFilters = () =>
+        router.get(
+            BASE,
+            { tab: filters.tab },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
+    const hasFilters = !!(
+        filters.status ||
+        filters.risk_level ||
+        filters.site_id ||
+        filters.client_id ||
+        filters.due_for_review ||
+        filters.search
+    );
 
     /* -------- detail (deep-linkable via ?assessment=) -------- */
     const openDetail = (id: number) =>
-        router.get(BASE, { ...paramsFrom({}), assessment: id }, { only: ['detail'], preserveState: true, preserveScroll: true });
-    const closeDetail = () => router.get(BASE, paramsFrom({}), { only: ['detail'], preserveState: true, preserveScroll: true });
+        router.get(
+            BASE,
+            { ...paramsFrom({}), assessment: id },
+            { only: ['detail'], preserveState: true, preserveScroll: true },
+        );
+    const closeDetail = () =>
+        router.get(BASE, paramsFrom({}), {
+            only: ['detail'],
+            preserveState: true,
+            preserveScroll: true,
+        });
 
     /* -------- ctx-menu actions need the full record (JSON fetch) -------- */
     const fetchDetail = async (id: number): Promise<RaDetail | null> => {
         try {
-            const res = await fetch(`${BASE}/${id}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+            const res = await fetch(`${BASE}/${id}`, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
             if (!res.ok) return null;
             return ((await res.json()) as { detail: RaDetail }).detail;
         } catch {
@@ -161,7 +224,9 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
     };
 
     const copyLink = (r: RaRow) => {
-        void navigator.clipboard?.writeText(`${window.location.origin}${BASE}?assessment=${r.id}`);
+        void navigator.clipboard?.writeText(
+            `${window.location.origin}${BASE}?assessment=${r.id}`,
+        );
         setCtx(null);
     };
 
@@ -196,17 +261,55 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
             kind: 'new',
             detail: null,
             // Creating from an event-filtered register pre-attaches that event.
-            initialAttach: filters.hs_event_id ? { type: 'event', id: filters.hs_event_id } : null,
+            initialAttach: filters.hs_event_id
+                ? { type: 'event', id: filters.hs_event_id }
+                : null,
         });
 
     /* -------- tabs -------- */
     const TABS: RosterTabItem[] = [
-        { id: 'all', label: 'All', icon: LayoutGrid, tone: 'primary', badge: tabCounts.all || undefined },
-        { id: 'active', label: 'Active', icon: CircleDot, tone: 'success', badge: tabCounts.active || undefined },
-        { id: 'drafts', label: 'Drafts', icon: FileEdit, tone: 'warning', badge: tabCounts.drafts || undefined },
-        { id: 'due', label: 'Due for review', icon: Clock, tone: 'critical', badge: tabCounts.due || undefined },
-        { id: 'high', label: 'High/Extreme', icon: TriangleAlert, tone: 'critical', badge: tabCounts.high || undefined },
-        { id: 'closed', label: 'Superseded/Archived', icon: Archive, tone: 'info', badge: tabCounts.closed || undefined },
+        {
+            id: 'all',
+            label: 'All',
+            icon: LayoutGrid,
+            tone: 'primary',
+            badge: tabCounts.all || undefined,
+        },
+        {
+            id: 'active',
+            label: 'Active',
+            icon: CircleDot,
+            tone: 'success',
+            badge: tabCounts.active || undefined,
+        },
+        {
+            id: 'drafts',
+            label: 'Drafts',
+            icon: FileEdit,
+            tone: 'warning',
+            badge: tabCounts.drafts || undefined,
+        },
+        {
+            id: 'due',
+            label: 'Due for review',
+            icon: Clock,
+            tone: 'critical',
+            badge: tabCounts.due || undefined,
+        },
+        {
+            id: 'high',
+            label: 'High/Extreme',
+            icon: TriangleAlert,
+            tone: 'critical',
+            badge: tabCounts.high || undefined,
+        },
+        {
+            id: 'closed',
+            label: 'Superseded/Archived',
+            icon: Archive,
+            tone: 'info',
+            badge: tabCounts.closed || undefined,
+        },
     ];
 
     /* -------- compliance badges -------- */
@@ -217,9 +320,16 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
             tone: c.reviews_overdue > 0 ? 'critical' : 'success',
             label: `Reviews · ${c.reviews_overdue} overdue`,
         },
-        { icon: ShieldCheck, tone: 'success', label: 'Ngā Paerewa NZS 8134:2021 · Certified' },
         {
-            icon: c.high_extreme_without_approval > 0 ? AlertTriangle : CheckCircle2,
+            icon: ShieldCheck,
+            tone: 'success',
+            label: 'Ngā Paerewa NZS 8134:2021 · Certified',
+        },
+        {
+            icon:
+                c.high_extreme_without_approval > 0
+                    ? AlertTriangle
+                    : CheckCircle2,
             tone: c.high_extreme_without_approval > 0 ? 'critical' : 'success',
             label: `High/extreme · ${c.high_extreme_without_approval} without approved plan`,
         },
@@ -259,14 +369,35 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
                                 onChange={(k) => go({ risk_level: k || null })}
                             />
                             {pickers.sites.length ? (
-                                <EntityFilter label="Site" allLabel="All sites" items={pickers.sites} value={filters.site_id} onChange={(id) => go({ site_id: id })} onDark />
+                                <EntityFilter
+                                    label="Site"
+                                    allLabel="All sites"
+                                    items={pickers.sites}
+                                    value={filters.site_id}
+                                    onChange={(id) => go({ site_id: id })}
+                                    onDark
+                                />
                             ) : null}
                             {pickers.clients.length ? (
-                                <EntityFilter label="Client" allLabel="All clients" items={pickers.clients} value={filters.client_id} onChange={(id) => go({ client_id: id })} onDark />
+                                <EntityFilter
+                                    label="Client"
+                                    allLabel="All clients"
+                                    items={pickers.clients}
+                                    value={filters.client_id}
+                                    onChange={(id) => go({ client_id: id })}
+                                    onDark
+                                />
                             ) : null}
                             <button
                                 type="button"
-                                onClick={() => go({ due_for_review: filters.due_for_review === 'true' ? null : 'true' })}
+                                onClick={() =>
+                                    go({
+                                        due_for_review:
+                                            filters.due_for_review === 'true'
+                                                ? null
+                                                : 'true',
+                                    })
+                                }
                                 aria-pressed={filters.due_for_review === 'true'}
                                 className={cn(
                                     'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
@@ -285,7 +416,13 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
                                     placeholder="Search assessments…"
                                     defaultValue={filters.search ?? ''}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter') go({ search: (e.target as HTMLInputElement).value || null });
+                                        if (e.key === 'Enter')
+                                            go({
+                                                search:
+                                                    (
+                                                        e.target as HTMLInputElement
+                                                    ).value || null,
+                                            });
                                     }}
                                     className="w-52 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
                                 />
@@ -303,14 +440,30 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
                     }
                 >
                     {/* lifecycle ribbon */}
-                    <nav aria-label="Risk assessment lifecycle" className="flex flex-wrap items-center gap-0.5 text-xs">
-                        <Link href="/health-safety" className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground">
+                    <nav
+                        aria-label="Risk assessment lifecycle"
+                        className="flex flex-wrap items-center gap-0.5 text-xs"
+                    >
+                        <Link
+                            href="/health-safety"
+                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
+                        >
                             <LayoutGrid className="h-3.5 w-3.5" /> H&amp;S
                         </Link>
                         {RIBBON_STAGES.map((stage, i) => (
-                            <span key={stage} className="inline-flex items-center">
+                            <span
+                                key={stage}
+                                className="inline-flex items-center"
+                            >
                                 <ChevronRight className="mx-0.5 h-3.5 w-3.5 text-primary-foreground/40" />
-                                <span className={cn('rounded-md px-2 py-1 font-medium', i === 1 ? 'bg-primary-foreground/20 font-semibold text-primary-foreground' : 'text-primary-foreground/70')}>
+                                <span
+                                    className={cn(
+                                        'rounded-md px-2 py-1 font-medium',
+                                        i === 1
+                                            ? 'bg-primary-foreground/20 font-semibold text-primary-foreground'
+                                            : 'text-primary-foreground/70',
+                                    )}
+                                >
                                     {stage}
                                 </span>
                             </span>
@@ -322,11 +475,18 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={ShieldAlert} />
                             <div className="flex flex-col gap-1.5">
-                                <HeroStatusPill>Risk register · synced just now</HeroStatusPill>
-                                <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">Risk Assessments</h1>
+                                <HeroStatusPill>
+                                    Risk register · synced just now
+                                </HeroStatusPill>
+                                <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">
+                                    Risk Assessments
+                                </h1>
                                 <p className="max-w-xl text-sm leading-relaxed text-primary-foreground/75">
-                                    Identify, score and control hazards across sites, clients and the H&amp;S backbone — the ISO 31000 / SafePlus
-                                    5×5 register, from draft through approval, review and supersession.
+                                    Identify, score and control hazards across
+                                    sites, clients and the H&amp;S backbone —
+                                    the ISO 31000 / SafePlus 5×5 register, from
+                                    draft through approval, review and
+                                    supersession.
                                 </p>
                             </div>
                         </div>
@@ -336,12 +496,18 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
                                     href="/health-safety/reports/risk-assessment-register"
                                     className="inline-flex items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
                                 >
-                                    <FileDown className="h-3.5 w-3.5" /> Board export
+                                    <FileDown className="h-3.5 w-3.5" /> Board
+                                    export
                                 </a>
                             ) : null}
                             {can.manage ? (
-                                <Button size="sm" onClick={openNew} className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-                                    <Plus className="h-4 w-4" /> New risk assessment
+                                <Button
+                                    size="sm"
+                                    onClick={openNew}
+                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                >
+                                    <Plus className="h-4 w-4" /> New risk
+                                    assessment
                                 </Button>
                             ) : null}
                         </div>
@@ -350,23 +516,76 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
                     {/* clusters */}
                     <div className="grid gap-3 md:grid-cols-2">
                         <HeroCluster title="Live · register" icon={Activity}>
-                            <HeroClusterTile href={`${BASE}?tab=all`} label="Total" value={String(hero.total)} caption="all assessments" tone="neutral" />
-                            <HeroClusterTile href={`${BASE}?tab=active`} label="Active" value={String(hero.active)} caption="in force" tone="success" />
-                            <HeroClusterTile href={`${BASE}?tab=high`} label="High/extreme" value={String(hero.high_extreme_active)} caption="active register" tone="critical" />
-                            <HeroClusterTile href={`${BASE}?tab=drafts`} label="Drafts" value={String(hero.drafts)} caption="not yet active" tone="warning" />
+                            <HeroClusterTile
+                                href={`${BASE}?tab=all`}
+                                label="Total"
+                                value={String(hero.total)}
+                                caption="all assessments"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href={`${BASE}?tab=active`}
+                                label="Active"
+                                value={String(hero.active)}
+                                caption="in force"
+                                tone="success"
+                            />
+                            <HeroClusterTile
+                                href={`${BASE}?tab=high`}
+                                label="High/extreme"
+                                value={String(hero.high_extreme_active)}
+                                caption="active register"
+                                tone="critical"
+                            />
+                            <HeroClusterTile
+                                href={`${BASE}?tab=drafts`}
+                                label="Drafts"
+                                value={String(hero.drafts)}
+                                caption="not yet active"
+                                tone="warning"
+                            />
                         </HeroCluster>
                         <HeroCluster title="Needs attention" icon={Bell}>
-                            <HeroClusterTile href={`${BASE}?tab=due`} label="Due for review" value={String(hero.due_for_review)} caption="overdue / soon" tone="critical" />
-                            <HeroClusterTile href={`${BASE}?status=under_review`} label="Under review" value={String(hero.under_review)} caption="being revised" tone="warning" />
-                            <HeroClusterTile href={`${BASE}?risk_acceptable=0`} label="Residual not OK" value={String(hero.residual_not_acceptable)} caption="needs action" tone="critical" />
-                            <HeroClusterTile href={`${BASE}?tab=drafts`} label="Awaiting approval" value={String(hero.awaiting_approval)} caption="drafts to approve" tone="warning" />
+                            <HeroClusterTile
+                                href={`${BASE}?tab=due`}
+                                label="Due for review"
+                                value={String(hero.due_for_review)}
+                                caption="overdue / soon"
+                                tone="critical"
+                            />
+                            <HeroClusterTile
+                                href={`${BASE}?status=under_review`}
+                                label="Under review"
+                                value={String(hero.under_review)}
+                                caption="being revised"
+                                tone="warning"
+                            />
+                            <HeroClusterTile
+                                href={`${BASE}?risk_acceptable=0`}
+                                label="Residual not OK"
+                                value={String(hero.residual_not_acceptable)}
+                                caption="needs action"
+                                tone="critical"
+                            />
+                            <HeroClusterTile
+                                href={`${BASE}?tab=drafts`}
+                                label="Awaiting approval"
+                                value={String(hero.awaiting_approval)}
+                                caption="drafts to approve"
+                                tone="warning"
+                            />
                         </HeroCluster>
                     </div>
 
                     <HeroComplianceBadges items={badges} />
                 </HeroShell>
 
-                <TabStrip value={filters.tab} onChange={setTab} items={TABS} ariaLabel="Risk assessment views" />
+                <TabStrip
+                    value={filters.tab}
+                    onChange={setTab}
+                    items={TABS}
+                    ariaLabel="Risk assessment views"
+                />
 
                 <RaTable
                     rows={assessments.data}
@@ -385,14 +604,17 @@ export default function RiskAssessmentsIndex({ assessments, tabCounts, hero, det
                 {assessments.last_page > 1 ? (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
-                            Showing {assessments.from}–{assessments.to} of {assessments.total}
+                            Showing {assessments.from}–{assessments.to} of{' '}
+                            {assessments.total}
                         </p>
                         <LaravelPagination links={assessments.links} />
                     </div>
                 ) : null}
             </div>
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
 
             {detail ? (
                 <RaDetailDialog

@@ -47,7 +47,8 @@ export function ICalSubscribeDialog({
             {},
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('A fresh feed URL was generated'),
+                onSuccess: () =>
+                    toast.success('A fresh feed URL was generated'),
             },
         );
     };
@@ -66,8 +67,9 @@ export function ICalSubscribeDialog({
                         Subscribe to your calendar
                     </DialogTitle>
                     <DialogDescription>
-                        Add your events and approved leave to any calendar app. The feed
-                        updates automatically — your app refreshes it periodically.
+                        Add your events and approved leave to any calendar app.
+                        The feed updates automatically — your app refreshes it
+                        periodically.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -78,56 +80,106 @@ export function ICalSubscribeDialog({
                                 Feed URL
                             </label>
                             <div className="flex gap-2">
-                                <Input readOnly value={url} className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
-                                <Button type="button" variant="outline" size="icon" onClick={copy} aria-label="Copy feed URL">
-                                    {copied ? <Check className="h-4 w-4 text-status-success" /> : <Copy className="h-4 w-4" />}
+                                <Input
+                                    readOnly
+                                    value={url}
+                                    className="font-mono text-xs"
+                                    onFocus={(e) => e.currentTarget.select()}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={copy}
+                                    aria-label="Copy feed URL"
+                                >
+                                    {copied ? (
+                                        <Check className="h-4 w-4 text-status-success" />
+                                    ) : (
+                                        <Copy className="h-4 w-4" />
+                                    )}
                                 </Button>
                             </div>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
                             {googleUrl ? (
-                                <a href={googleUrl} target="_blank" rel="noopener noreferrer">
-                                    <Button type="button" variant="outline" size="sm" className="gap-1.5">
-                                        <ExternalLink className="h-3.5 w-3.5" /> Google Calendar
+                                <a
+                                    href={googleUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" />{' '}
+                                        Google Calendar
                                     </Button>
                                 </a>
                             ) : null}
                             {webcal ? (
                                 <a href={webcal}>
-                                    <Button type="button" variant="outline" size="sm" className="gap-1.5">
-                                        <ExternalLink className="h-3.5 w-3.5" /> Apple Calendar
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" />{' '}
+                                        Apple Calendar
                                     </Button>
                                 </a>
                             ) : null}
                             {webcal ? (
                                 <a href={webcal}>
-                                    <Button type="button" variant="outline" size="sm" className="gap-1.5">
-                                        <ExternalLink className="h-3.5 w-3.5" /> Outlook
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" />{' '}
+                                        Outlook
                                     </Button>
                                 </a>
                             ) : null}
                         </div>
 
                         <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
-                            Includes your approved leave and company / HR events from the last
-                            three months onward. Keep this URL private — anyone with it can read
-                            your feed. Lost it or shared it by mistake? Regenerate to revoke the old one.
+                            Includes your approved leave and company / HR events
+                            from the last three months onward. Keep this URL
+                            private — anyone with it can read your feed. Lost it
+                            or shared it by mistake? Regenerate to revoke the
+                            old one.
                         </div>
 
                         <div className="flex justify-end">
-                            <Button type="button" variant="ghost" size="sm" onClick={regenerate} className="gap-1.5 text-muted-foreground">
-                                <RefreshCw className="h-3.5 w-3.5" /> Regenerate URL
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={regenerate}
+                                className="gap-1.5 text-muted-foreground"
+                            >
+                                <RefreshCw className="h-3.5 w-3.5" /> Regenerate
+                                URL
                             </Button>
                         </div>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
-                            You don't have a feed URL yet. Generate one to subscribe from your
-                            calendar app.
+                            You don't have a feed URL yet. Generate one to
+                            subscribe from your calendar app.
                         </p>
-                        <Button type="button" onClick={regenerate} className="gap-1.5">
+                        <Button
+                            type="button"
+                            onClick={regenerate}
+                            className="gap-1.5"
+                        >
                             <Rss className="h-4 w-4" /> Generate feed URL
                         </Button>
                     </div>

@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Consents;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\Operations\ConsentRequestCreatedNotification;
 use App\Notifications\Operations\ConsentRequestRespondedNotification;
@@ -47,13 +49,39 @@ class ConsentRequestFlowTest extends TestCase
 
         $this->seed(RbacSeeder::class);
 
-        $this->staff = User::factory()->create();
-        $this->staff->roles()->attach(Role::where('name', 'admin')->first());
+        $site = Site::factory()->create(['is_active' => true]);
+        $this->staff = User::factory()->create([
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
+        $this->staff->roles()->attach(Role::where('name', 'admin')->firstOrFail());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->staff->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+            'end_date' => null,
+        ]);
 
-        $this->familyMember = User::factory()->create(['name' => 'Sarah Whanau']);
-        $this->strangerFamily = User::factory()->create(['name' => 'Stranger']);
+        $this->familyMember = User::factory()->create([
+            'name' => 'Sarah Whanau',
+            'role' => 'next_of_kin',
+            'approved_at' => now(),
+        ]);
+        $this->strangerFamily = User::factory()->create([
+            'name' => 'Stranger',
+            'role' => 'next_of_kin',
+            'approved_at' => now(),
+        ]);
+        $portalRole = Role::query()->where('name', 'next_of_kin')->firstOrFail();
+        $this->familyMember->roles()->attach($portalRole);
+        $this->strangerFamily->roles()->attach($portalRole);
 
-        $this->client = Client::factory()->create();
+        $this->client = Client::factory()->create([
+            'site_id' => $site->id,
+            'status' => 'active',
+        ]);
         $this->client->portalUsers()->attach($this->familyMember->id, ['relation' => 'next_of_kin']);
 
         $this->consentType = ConsentType::factory()->create();

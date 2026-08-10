@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CalendarSyncMapping extends Model
 {
+    use WritesLegacyStorageContext;
+
     public const DIRECTION_ONE_WAY = 'one_way';   // push obligations out only
+
     public const DIRECTION_TWO_WAY = 'two_way';   // push out + pull external busy back
 
     protected $fillable = [

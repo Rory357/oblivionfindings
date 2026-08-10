@@ -456,8 +456,8 @@ const SmartMonitoring: React.FC = () => {
                             <p className="mt-4 text-muted-foreground">
                                 We understand that CCTV in care settings
                                 requires a careful balance between safety and
-                                privacy. Our system is built with Privacy Act 2020
-                                compliance at its core.
+                                privacy. Our system is built with Privacy Act
+                                2020 compliance at its core.
                             </p>
                             <ul className="mt-6 space-y-3">
                                 {[

@@ -1,13 +1,6 @@
-import AppLayout from '@/layouts/app-layout';
+import InputError from '@/components/input-error';
 import { PageHero, PageLayout } from '@/components/page';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
-import { User, UserCircle, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Card,
     CardContent,
@@ -15,6 +8,9 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -22,7 +18,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import InputError from '@/components/input-error';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { User, UserCircle, UserPlus, Users } from 'lucide-react';
+import { useState } from 'react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'System', href: '/system/access' },
@@ -51,28 +51,42 @@ type Props = {
     can: {
         createStaff: boolean;
         createClient: boolean;
+        manageEmployees: boolean;
     };
+    staffLifecycleHref: string;
 };
 
-export default function CreateUser({ clients, roles, can }: Props) {
+export default function CreateUser({
+    clients,
+    roles,
+    can,
+    staffLifecycleHref,
+}: Props) {
     const { url } = usePage();
     const urlParams = new URLSearchParams(url.split('?')[1]);
-    const typeParam = urlParams.get('type') as 'staff' | 'client' | 'next_of_kin' | null;
-    
+    const typeParam = urlParams.get('type') as
+        | 'staff'
+        | 'client'
+        | 'next_of_kin'
+        | null;
+
     // Determine allowed types based on permissions
     const allowedTypes = [
         can.createStaff ? 'staff' : null,
         can.createClient ? 'client' : null,
         can.createClient ? 'next_of_kin' : null, // Next of kin requires client permission
     ].filter(Boolean) as Array<'staff' | 'client' | 'next_of_kin'>;
-    
+
     // Default to first allowed type if URL param not allowed
     const defaultType = allowedTypes[0] || 'staff';
-    const initialType = typeParam && allowedTypes.includes(typeParam as any) 
-        ? typeParam as 'staff' | 'client' | 'next_of_kin'
-        : defaultType;
-    
-    const [userType, setUserType] = useState<'staff' | 'client' | 'next_of_kin'>(initialType);
+    const initialType =
+        typeParam && allowedTypes.includes(typeParam as any)
+            ? (typeParam as 'staff' | 'client' | 'next_of_kin')
+            : defaultType;
+
+    const [userType, setUserType] = useState<
+        'staff' | 'client' | 'next_of_kin'
+    >(initialType);
 
     const form = useForm({
         name: '',
@@ -98,7 +112,10 @@ export default function CreateUser({ clients, roles, can }: Props) {
     });
 
     const setNestedData = (key: string, value: unknown) => {
-        (form.setData as unknown as (k: string, v: unknown) => void)(key, value);
+        (form.setData as unknown as (k: string, v: unknown) => void)(
+            key,
+            value,
+        );
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -117,11 +134,32 @@ export default function CreateUser({ clients, roles, can }: Props) {
                         backHref="/system/users"
                         icon={UserPlus}
                         title="Create User"
-                        description="Create a new user account and assign their organization role."
+                        description="Create a new user account and assign their application role."
                     />
                 }
             >
-                <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
+                <form onSubmit={handleSubmit} className="max-w-3xl space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Creating a staff account?</CardTitle>
+                            <CardDescription>
+                                Staff are created and offboarded in HR People so
+                                their Site, employee number, employment dates,
+                                and role stay in one complete record.
+                            </CardDescription>
+                        </CardHeader>
+                        {can.manageEmployees && (
+                            <CardContent>
+                                <Button asChild variant="outline">
+                                    <Link href={staffLifecycleHref}>
+                                        <Users className="mr-2 h-4 w-4" />
+                                        Open HR People
+                                    </Link>
+                                </Button>
+                            </CardContent>
+                        )}
+                    </Card>
+
                     {/* User Type Selection */}
                     <Card>
                         <CardHeader>
@@ -131,13 +169,23 @@ export default function CreateUser({ clients, roles, can }: Props) {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className={`grid gap-4 ${
-                                [can.createStaff, can.createClient, can.createClient].filter(Boolean).length === 3 
-                                    ? 'grid-cols-3' 
-                                    : [can.createStaff, can.createClient, can.createClient].filter(Boolean).length === 2 
-                                        ? 'grid-cols-2' 
-                                        : 'grid-cols-1'
-                            }`}>
+                            <div
+                                className={`grid gap-4 ${
+                                    [
+                                        can.createStaff,
+                                        can.createClient,
+                                        can.createClient,
+                                    ].filter(Boolean).length === 3
+                                        ? 'grid-cols-3'
+                                        : [
+                                                can.createStaff,
+                                                can.createClient,
+                                                can.createClient,
+                                            ].filter(Boolean).length === 2
+                                          ? 'grid-cols-2'
+                                          : 'grid-cols-1'
+                                }`}
+                            >
                                 {can.createStaff && (
                                     <Button
                                         type="button"
@@ -146,7 +194,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             setUserType('staff');
                                             form.setData('user_type', 'staff');
                                         }}
-                                        className={`h-auto flex-col justify-between whitespace-normal rounded-md border-2 p-4 transition-colors ${
+                                        className={`h-auto flex-col justify-between rounded-md border-2 p-4 whitespace-normal transition-colors ${
                                             userType === 'staff'
                                                 ? 'border-primary bg-primary/5'
                                                 : 'border-muted bg-transparent hover:bg-muted'
@@ -154,9 +202,11 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                     >
                                         <Users className="mb-3 h-6 w-6" />
                                         <div className="text-center">
-                                            <div className="font-medium">Staff</div>
+                                            <div className="font-medium">
+                                                Staff
+                                            </div>
                                             <div className="text-xs text-muted-foreground">
-                                                Organization employee
+                                                Employee account
                                             </div>
                                         </div>
                                     </Button>
@@ -169,7 +219,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             setUserType('client');
                                             form.setData('user_type', 'client');
                                         }}
-                                        className={`h-auto flex-col justify-between whitespace-normal rounded-md border-2 p-4 transition-colors ${
+                                        className={`h-auto flex-col justify-between rounded-md border-2 p-4 whitespace-normal transition-colors ${
                                             userType === 'client'
                                                 ? 'border-primary bg-primary/5'
                                                 : 'border-muted bg-transparent hover:bg-muted'
@@ -177,7 +227,9 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                     >
                                         <User className="mb-3 h-6 w-6" />
                                         <div className="text-center">
-                                            <div className="font-medium">Client</div>
+                                            <div className="font-medium">
+                                                Client
+                                            </div>
                                             <div className="text-xs text-muted-foreground">
                                                 Service recipient
                                             </div>
@@ -190,9 +242,12 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                         variant="outline"
                                         onClick={() => {
                                             setUserType('next_of_kin');
-                                            form.setData('user_type', 'next_of_kin');
+                                            form.setData(
+                                                'user_type',
+                                                'next_of_kin',
+                                            );
                                         }}
-                                        className={`h-auto flex-col justify-between whitespace-normal rounded-md border-2 p-4 transition-colors ${
+                                        className={`h-auto flex-col justify-between rounded-md border-2 p-4 whitespace-normal transition-colors ${
                                             userType === 'next_of_kin'
                                                 ? 'border-primary bg-primary/5'
                                                 : 'border-muted bg-transparent hover:bg-muted'
@@ -200,7 +255,9 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                     >
                                         <UserCircle className="mb-3 h-6 w-6" />
                                         <div className="text-center">
-                                            <div className="font-medium">Next of Kin</div>
+                                            <div className="font-medium">
+                                                Next of Kin
+                                            </div>
                                             <div className="text-xs text-muted-foreground">
                                                 Family member
                                             </div>
@@ -226,7 +283,9 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                     <Input
                                         id="name"
                                         value={form.data.name}
-                                        onChange={(e) => form.setData('name', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData('name', e.target.value)
+                                        }
                                         placeholder="John Doe"
                                     />
                                     <InputError message={form.errors.name} />
@@ -237,7 +296,12 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                         id="email"
                                         type="email"
                                         value={form.data.email}
-                                        onChange={(e) => form.setData('email', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'email',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="john@example.com"
                                     />
                                     <InputError message={form.errors.email} />
@@ -250,18 +314,30 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                         id="password"
                                         type="password"
                                         value={form.data.password}
-                                        onChange={(e) => form.setData('password', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'password',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    <InputError message={form.errors.password} />
+                                    <InputError
+                                        message={form.errors.password}
+                                    />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="password_confirmation">Confirm Password</Label>
+                                    <Label htmlFor="password_confirmation">
+                                        Confirm Password
+                                    </Label>
                                     <Input
                                         id="password_confirmation"
                                         type="password"
                                         value={form.data.password_confirmation}
                                         onChange={(e) =>
-                                            form.setData('password_confirmation', e.target.value)
+                                            form.setData(
+                                                'password_confirmation',
+                                                e.target.value,
+                                            )
                                         }
                                     />
                                 </div>
@@ -276,43 +352,79 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                 <CardHeader>
                                     <CardTitle>Employment Details</CardTitle>
                                     <CardDescription>
-                                        Enter the staff member&apos;s employment information.
+                                        Enter the staff member&apos;s employment
+                                        information.
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div className="space-y-2">
-                                            <Label htmlFor="employee_id">Employee ID</Label>
+                                            <Label htmlFor="employee_id">
+                                                Employee ID
+                                            </Label>
                                             <Input
                                                 id="employee_id"
-                                                value={form.data['staff.employee_id']}
+                                                value={
+                                                    form.data[
+                                                        'staff.employee_id'
+                                                    ]
+                                                }
                                                 onChange={(e) =>
-                                                    setNestedData('staff.employee_id', e.target.value)
+                                                    setNestedData(
+                                                        'staff.employee_id',
+                                                        e.target.value,
+                                                    )
                                                 }
                                                 placeholder="EMP001"
                                             />
-                                            <InputError message={form.errors['staff.employee_id']} />
+                                            <InputError
+                                                message={
+                                                    form.errors[
+                                                        'staff.employee_id'
+                                                    ]
+                                                }
+                                            />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="job_title">Job Title *</Label>
+                                            <Label htmlFor="job_title">
+                                                Job Title *
+                                            </Label>
                                             <Input
                                                 id="job_title"
-                                                value={form.data['staff.job_title']}
+                                                value={
+                                                    form.data['staff.job_title']
+                                                }
                                                 onChange={(e) =>
-                                                    setNestedData('staff.job_title', e.target.value)
+                                                    setNestedData(
+                                                        'staff.job_title',
+                                                        e.target.value,
+                                                    )
                                                 }
                                                 placeholder="Support Worker"
                                             />
-                                            <InputError message={form.errors['staff.job_title']} />
+                                            <InputError
+                                                message={
+                                                    form.errors[
+                                                        'staff.job_title'
+                                                    ]
+                                                }
+                                            />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="department">Department</Label>
+                                        <Label htmlFor="department">
+                                            Department
+                                        </Label>
                                         <Input
                                             id="department"
-                                            value={form.data['staff.department']}
+                                            value={
+                                                form.data['staff.department']
+                                            }
                                             onChange={(e) =>
-                                                setNestedData('staff.department', e.target.value)
+                                                setNestedData(
+                                                    'staff.department',
+                                                    e.target.value,
+                                                )
                                             }
                                             placeholder="Clinical Services"
                                         />
@@ -324,22 +436,30 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                 <CardHeader>
                                     <CardTitle>Role Assignment</CardTitle>
                                     <CardDescription>
-                                        Assign roles to this staff member. Defaults to Support Worker if none selected.
+                                        Assign roles to this staff member.
+                                        Defaults to Support Worker if none
+                                        selected.
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-4">
                                         <div className="space-y-2">
                                             <Label>Select Roles</Label>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                                 {roles
-                                                    .filter((r) => r.type === 'system')
+                                                    .filter(
+                                                        (r) =>
+                                                            r.type === 'system',
+                                                    )
                                                     .map((role) => {
-                                                        const checked = form.data.role_ids.includes(role.id);
+                                                        const checked =
+                                                            form.data.role_ids.includes(
+                                                                role.id,
+                                                            );
                                                         return (
                                                             <label
                                                                 key={role.id}
-                                                                className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+                                                                className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors ${
                                                                     checked
                                                                         ? 'border-primary bg-primary/5'
                                                                         : 'border-muted hover:bg-muted'
@@ -348,18 +468,46 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                                 <input
                                                                     type="checkbox"
                                                                     className="h-4 w-4"
-                                                                    checked={checked}
-                                                                    onChange={(e) => {
-                                                                        const next = e.target.checked
-                                                                            ? [...form.data.role_ids, role.id]
-                                                                            : form.data.role_ids.filter((id) => id !== role.id);
-                                                                        form.setData('role_ids', next);
+                                                                    checked={
+                                                                        checked
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) => {
+                                                                        const next =
+                                                                            e
+                                                                                .target
+                                                                                .checked
+                                                                                ? [
+                                                                                      ...form
+                                                                                          .data
+                                                                                          .role_ids,
+                                                                                      role.id,
+                                                                                  ]
+                                                                                : form.data.role_ids.filter(
+                                                                                      (
+                                                                                          id,
+                                                                                      ) =>
+                                                                                          id !==
+                                                                                          role.id,
+                                                                                  );
+                                                                        form.setData(
+                                                                            'role_ids',
+                                                                            next,
+                                                                        );
                                                                     }}
                                                                 />
                                                                 <div className="flex-1">
-                                                                    <div className="font-medium text-sm">{role.label}</div>
+                                                                    <div className="text-sm font-medium">
+                                                                        {
+                                                                            role.label
+                                                                        }
+                                                                    </div>
                                                                     <div className="text-xs text-muted-foreground">
-                                                                        Level {role.level}
+                                                                        Level{' '}
+                                                                        {
+                                                                            role.level
+                                                                        }
                                                                     </div>
                                                                 </div>
                                                             </label>
@@ -367,18 +515,29 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                     })}
                                             </div>
                                         </div>
-                                        {roles.some((r) => r.type === 'custom') && (
+                                        {roles.some(
+                                            (r) => r.type === 'custom',
+                                        ) && (
                                             <div className="space-y-2 pt-2">
                                                 <Label>Custom Roles</Label>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                                     {roles
-                                                        .filter((r) => r.type === 'custom')
+                                                        .filter(
+                                                            (r) =>
+                                                                r.type ===
+                                                                'custom',
+                                                        )
                                                         .map((role) => {
-                                                            const checked = form.data.role_ids.includes(role.id);
+                                                            const checked =
+                                                                form.data.role_ids.includes(
+                                                                    role.id,
+                                                                );
                                                             return (
                                                                 <label
-                                                                    key={role.id}
-                                                                    className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
+                                                                    key={
+                                                                        role.id
+                                                                    }
+                                                                    className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors ${
                                                                         checked
                                                                             ? 'border-primary bg-primary/5'
                                                                             : 'border-muted hover:bg-muted'
@@ -387,18 +546,46 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                                     <input
                                                                         type="checkbox"
                                                                         className="h-4 w-4"
-                                                                        checked={checked}
-                                                                        onChange={(e) => {
-                                                                            const next = e.target.checked
-                                                                                ? [...form.data.role_ids, role.id]
-                                                                                : form.data.role_ids.filter((id) => id !== role.id);
-                                                                            form.setData('role_ids', next);
+                                                                        checked={
+                                                                            checked
+                                                                        }
+                                                                        onChange={(
+                                                                            e,
+                                                                        ) => {
+                                                                            const next =
+                                                                                e
+                                                                                    .target
+                                                                                    .checked
+                                                                                    ? [
+                                                                                          ...form
+                                                                                              .data
+                                                                                              .role_ids,
+                                                                                          role.id,
+                                                                                      ]
+                                                                                    : form.data.role_ids.filter(
+                                                                                          (
+                                                                                              id,
+                                                                                          ) =>
+                                                                                              id !==
+                                                                                              role.id,
+                                                                                      );
+                                                                            form.setData(
+                                                                                'role_ids',
+                                                                                next,
+                                                                            );
                                                                         }}
                                                                     />
                                                                     <div className="flex-1">
-                                                                        <div className="font-medium text-sm">{role.label}</div>
+                                                                        <div className="text-sm font-medium">
+                                                                            {
+                                                                                role.label
+                                                                            }
+                                                                        </div>
                                                                         <div className="text-xs text-muted-foreground">
-                                                                            Level {role.level}
+                                                                            Level{' '}
+                                                                            {
+                                                                                role.level
+                                                                            }
                                                                         </div>
                                                                     </div>
                                                                 </label>
@@ -407,7 +594,9 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                 </div>
                                             </div>
                                         )}
-                                        <InputError message={form.errors.role_ids} />
+                                        <InputError
+                                            message={form.errors.role_ids}
+                                        />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -419,58 +608,98 @@ export default function CreateUser({ clients, roles, can }: Props) {
                             <CardHeader>
                                 <CardTitle>Client Information</CardTitle>
                                 <CardDescription>
-                                    Enter the client&apos;s personal information.
+                                    Enter the client&apos;s personal
+                                    information.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="nhi_number">NHI Number *</Label>
+                                    <Label htmlFor="nhi_number">
+                                        NHI Number *
+                                    </Label>
                                     <Input
                                         id="nhi_number"
                                         value={form.data['client.nhi_number']}
                                         onChange={(e) =>
-                                            setNestedData('client.nhi_number', e.target.value.toUpperCase())
+                                            setNestedData(
+                                                'client.nhi_number',
+                                                e.target.value.toUpperCase(),
+                                            )
                                         }
                                         placeholder="ABC1234"
                                         maxLength={10}
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                        3 letters followed by 4 numbers (e.g., ABC1234)
+                                        3 letters followed by 4 numbers (e.g.,
+                                        ABC1234)
                                     </p>
-                                    <InputError message={form.errors['client.nhi_number']} />
+                                    <InputError
+                                        message={
+                                            form.errors['client.nhi_number']
+                                        }
+                                    />
                                 </div>
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="first_name">First Name *</Label>
+                                        <Label htmlFor="first_name">
+                                            First Name *
+                                        </Label>
                                         <Input
                                             id="first_name"
-                                            value={form.data['client.first_name']}
+                                            value={
+                                                form.data['client.first_name']
+                                            }
                                             onChange={(e) =>
-                                                setNestedData('client.first_name', e.target.value)
+                                                setNestedData(
+                                                    'client.first_name',
+                                                    e.target.value,
+                                                )
                                             }
                                         />
-                                        <InputError message={form.errors['client.first_name']} />
+                                        <InputError
+                                            message={
+                                                form.errors['client.first_name']
+                                            }
+                                        />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="last_name">Last Name *</Label>
+                                        <Label htmlFor="last_name">
+                                            Last Name *
+                                        </Label>
                                         <Input
                                             id="last_name"
-                                            value={form.data['client.last_name']}
+                                            value={
+                                                form.data['client.last_name']
+                                            }
                                             onChange={(e) =>
-                                                setNestedData('client.last_name', e.target.value)
+                                                setNestedData(
+                                                    'client.last_name',
+                                                    e.target.value,
+                                                )
                                             }
                                         />
-                                        <InputError message={form.errors['client.last_name']} />
+                                        <InputError
+                                            message={
+                                                form.errors['client.last_name']
+                                            }
+                                        />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="date_of_birth">Date of Birth</Label>
+                                    <Label htmlFor="date_of_birth">
+                                        Date of Birth
+                                    </Label>
                                     <Input
                                         id="date_of_birth"
                                         type="date"
-                                        value={form.data['client.date_of_birth']}
+                                        value={
+                                            form.data['client.date_of_birth']
+                                        }
                                         onChange={(e) =>
-                                            setNestedData('client.date_of_birth', e.target.value)
+                                            setNestedData(
+                                                'client.date_of_birth',
+                                                e.target.value,
+                                            )
                                         }
                                     />
                                 </div>
@@ -483,82 +712,177 @@ export default function CreateUser({ clients, roles, can }: Props) {
                             <CardHeader>
                                 <CardTitle>Next of Kin Information</CardTitle>
                                 <CardDescription>
-                                    Link this next of kin to a client and specify their relationship.
+                                    Link this next of kin to a client and
+                                    specify their relationship.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="nok_client">Linked Client *</Label>
+                                    <Label htmlFor="nok_client">
+                                        Linked Client *
+                                    </Label>
                                     <Select
-                                        value={form.data['next_of_kin.client_id']}
+                                        value={
+                                            form.data['next_of_kin.client_id']
+                                        }
                                         onValueChange={(value) =>
-                                            setNestedData('next_of_kin.client_id', value)
+                                            setNestedData(
+                                                'next_of_kin.client_id',
+                                                value,
+                                            )
                                         }
                                     >
-                                        <SelectTrigger id="nok_client" className={form.errors['next_of_kin.client_id'] ? 'border-status-critical/30' : ''}>
+                                        <SelectTrigger
+                                            id="nok_client"
+                                            className={
+                                                form.errors[
+                                                    'next_of_kin.client_id'
+                                                ]
+                                                    ? 'border-status-critical/30'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select a client..." />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {clients.map((client) => (
-                                                <SelectItem key={client.id} value={String(client.id)}>
-                                                    {client.first_name} {client.last_name}
-                                                    {client.nhi_number ? ` (NHI: ${client.nhi_number})` : ''}
+                                                <SelectItem
+                                                    key={client.id}
+                                                    value={String(client.id)}
+                                                >
+                                                    {client.first_name}{' '}
+                                                    {client.last_name}
+                                                    {client.nhi_number
+                                                        ? ` (NHI: ${client.nhi_number})`
+                                                        : ''}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <InputError message={form.errors['next_of_kin.client_id']} />
+                                    <InputError
+                                        message={
+                                            form.errors['next_of_kin.client_id']
+                                        }
+                                    />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="nok_relationship">Relationship *</Label>
+                                    <Label htmlFor="nok_relationship">
+                                        Relationship *
+                                    </Label>
                                     <Select
-                                        value={form.data['next_of_kin.relationship']}
+                                        value={
+                                            form.data[
+                                                'next_of_kin.relationship'
+                                            ]
+                                        }
                                         onValueChange={(value) =>
-                                            setNestedData('next_of_kin.relationship', value)
+                                            setNestedData(
+                                                'next_of_kin.relationship',
+                                                value,
+                                            )
                                         }
                                     >
-                                        <SelectTrigger id="nok_relationship" className={form.errors['next_of_kin.relationship'] ? 'border-status-critical/30' : ''}>
+                                        <SelectTrigger
+                                            id="nok_relationship"
+                                            className={
+                                                form.errors[
+                                                    'next_of_kin.relationship'
+                                                ]
+                                                    ? 'border-status-critical/30'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select relationship..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="parent">Parent</SelectItem>
-                                            <SelectItem value="sibling">Sibling</SelectItem>
-                                            <SelectItem value="spouse">Spouse</SelectItem>
-                                            <SelectItem value="child">Child</SelectItem>
-                                            <SelectItem value="grandparent">Grandparent</SelectItem>
-                                            <SelectItem value="grandchild">Grandchild</SelectItem>
-                                            <SelectItem value="aunt_uncle">Aunt/Uncle</SelectItem>
-                                            <SelectItem value="niece_nephew">Niece/Nephew</SelectItem>
-                                            <SelectItem value="cousin">Cousin</SelectItem>
-                                            <SelectItem value="guardian">Legal Guardian</SelectItem>
-                                            <SelectItem value="friend">Friend</SelectItem>
-                                            <SelectItem value="other">Other</SelectItem>
+                                            <SelectItem value="parent">
+                                                Parent
+                                            </SelectItem>
+                                            <SelectItem value="sibling">
+                                                Sibling
+                                            </SelectItem>
+                                            <SelectItem value="spouse">
+                                                Spouse
+                                            </SelectItem>
+                                            <SelectItem value="child">
+                                                Child
+                                            </SelectItem>
+                                            <SelectItem value="grandparent">
+                                                Grandparent
+                                            </SelectItem>
+                                            <SelectItem value="grandchild">
+                                                Grandchild
+                                            </SelectItem>
+                                            <SelectItem value="aunt_uncle">
+                                                Aunt/Uncle
+                                            </SelectItem>
+                                            <SelectItem value="niece_nephew">
+                                                Niece/Nephew
+                                            </SelectItem>
+                                            <SelectItem value="cousin">
+                                                Cousin
+                                            </SelectItem>
+                                            <SelectItem value="guardian">
+                                                Legal Guardian
+                                            </SelectItem>
+                                            <SelectItem value="friend">
+                                                Friend
+                                            </SelectItem>
+                                            <SelectItem value="other">
+                                                Other
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    <InputError message={form.errors['next_of_kin.relationship']} />
+                                    <InputError
+                                        message={
+                                            form.errors[
+                                                'next_of_kin.relationship'
+                                            ]
+                                        }
+                                    />
                                 </div>
                                 <div className="flex flex-col gap-3 pt-2">
                                     <div className="flex items-center space-x-2">
                                         <Checkbox
                                             id="nok_primary"
-                                            checked={form.data['next_of_kin.is_primary_contact']}
+                                            checked={
+                                                form.data[
+                                                    'next_of_kin.is_primary_contact'
+                                                ]
+                                            }
                                             onCheckedChange={(checked) =>
-                                                setNestedData('next_of_kin.is_primary_contact', checked as boolean)
+                                                setNestedData(
+                                                    'next_of_kin.is_primary_contact',
+                                                    checked as boolean,
+                                                )
                                             }
                                         />
-                                        <Label htmlFor="nok_primary" className="text-sm font-normal">
+                                        <Label
+                                            htmlFor="nok_primary"
+                                            className="text-sm font-normal"
+                                        >
                                             Primary contact
                                         </Label>
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <Checkbox
                                             id="nok_emergency"
-                                            checked={form.data['next_of_kin.is_emergency_contact']}
+                                            checked={
+                                                form.data[
+                                                    'next_of_kin.is_emergency_contact'
+                                                ]
+                                            }
                                             onCheckedChange={(checked) =>
-                                                setNestedData('next_of_kin.is_emergency_contact', checked as boolean)
+                                                setNestedData(
+                                                    'next_of_kin.is_emergency_contact',
+                                                    checked as boolean,
+                                                )
                                             }
                                         />
-                                        <Label htmlFor="nok_emergency" className="text-sm font-normal">
+                                        <Label
+                                            htmlFor="nok_emergency"
+                                            className="text-sm font-normal"
+                                        >
                                             Emergency contact
                                         </Label>
                                     </div>

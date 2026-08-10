@@ -6,10 +6,14 @@ use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrGoalUpdate;
 use App\Domain\Hr\Models\HrKeyResult;
 use App\Domain\Hr\Models\HrKeyResultUpdate;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class GoalService
 {
+    public function __construct(private readonly HrGoalAccessService $access) {}
+
     /**
      * Create a new goal.
      */
@@ -17,7 +21,6 @@ class GoalService
     {
         return DB::transaction(function () use ($data) {
             return HrGoal::create([
-                'tenant_id' => $data['tenant_id'],
                 'user_id' => $data['user_id'],
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
@@ -183,18 +186,30 @@ class GoalService
     {
         return DB::transaction(function () use ($goal, $performanceReviewId) {
             $goal->update(['performance_review_id' => $performanceReviewId]);
+
             return $goal->fresh();
         });
     }
 
-    /**
-     * Get goal tree (hierarchical) for a tenant.
-     */
-    public function getGoalTree(?int $tenantId, ?int $userId = null): \Illuminate\Database\Eloquent\Collection
+    /** Get the Site-visible retained objective hierarchy. */
+    public function getGoalTree(User $viewer, ?int $userId = null): Collection
     {
-        $query = HrGoal::forTenant($tenantId)
+        $query = $this->access
+            ->applyHistoricalGoalScope(HrGoal::query(), $viewer)
             ->whereNull('parent_goal_id')
-            ->with(['childGoals.childGoals.user:id,name', 'childGoals.user:id,name', 'user:id,name', 'keyResults'])
+            ->with([
+                'user:id,name',
+                'keyResults',
+                'childGoals' => fn ($childQuery) => $this->access
+                    ->applyHistoricalGoalScope($childQuery, $viewer)
+                    ->with([
+                        'user:id,name',
+                        'keyResults',
+                        'childGoals' => fn ($grandchildQuery) => $this->access
+                            ->applyHistoricalGoalScope($grandchildQuery, $viewer)
+                            ->with(['user:id,name', 'keyResults']),
+                    ]),
+            ])
             ->orderBy('priority', 'desc')
             ->orderBy('due_date');
 
@@ -205,23 +220,27 @@ class GoalService
         return $query->get();
     }
 
-    /**
-     * Get cascading company → team → individual tree.
-     */
-    public function getCompanyGoalTree(?int $tenantId, ?int $cycleId = null): array
+    /** Get the Site-visible company to team to individual hierarchy. */
+    public function getCompanyGoalTree(User $viewer, ?int $cycleId = null): array
     {
-        $companyGoals = HrGoal::forTenant($tenantId)
+        $companyGoals = $this->access
+            ->applyHistoricalGoalScope(HrGoal::query(), $viewer)
             ->where('goal_type', 'company')
             ->when($cycleId, fn ($q) => $q->where('cycle_id', $cycleId))
-            ->whereNull('deleted_at')
             ->with([
                 'user:id,name',
                 'keyResults',
-                'childGoals' => fn ($q) => $q->where('goal_type', 'team')->with([
-                    'user:id,name',
-                    'keyResults',
-                    'childGoals' => fn ($q2) => $q2->where('goal_type', 'individual')->with(['user:id,name', 'keyResults']),
-                ]),
+                'childGoals' => fn ($teamQuery) => $this->access
+                    ->applyHistoricalGoalScope($teamQuery, $viewer)
+                    ->where('goal_type', 'team')
+                    ->with([
+                        'user:id,name',
+                        'keyResults',
+                        'childGoals' => fn ($individualQuery) => $this->access
+                            ->applyHistoricalGoalScope($individualQuery, $viewer)
+                            ->where('goal_type', 'individual')
+                            ->with(['user:id,name', 'keyResults']),
+                    ]),
             ])
             ->orderBy('priority', 'desc')
             ->get();
@@ -229,12 +248,11 @@ class GoalService
         return $companyGoals->map(fn (HrGoal $g) => $this->mapGoalForTree($g))->toArray();
     }
 
-    /**
-     * Get analytics/dashboard data.
-     */
-    public function getGoalAnalytics(?int $tenantId, ?int $cycleId = null): array
+    /** Get analytics for the viewer's Site-visible retained objectives. */
+    public function getGoalAnalytics(User $viewer, ?int $cycleId = null): array
     {
-        $baseQuery = HrGoal::forTenant($tenantId)->whereNull('deleted_at')
+        $baseQuery = $this->access
+            ->applyHistoricalGoalScope(HrGoal::query(), $viewer)
             ->when($cycleId, fn ($q) => $q->where('cycle_id', $cycleId));
 
         $total = (clone $baseQuery)->count();
@@ -297,7 +315,7 @@ class GoalService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     private function mapGoalForTree(HrGoal $goal): array

@@ -1,38 +1,5 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, useForm, router } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
 import { SettingsTabsFooter } from '@/components/finance/settings-hub';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+import { PageHero, PageLayout } from '@/components/page';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -44,7 +11,57 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { RefreshCw, Plus, Settings, Trash2, Link2, AlertCircle, CheckCircle2, Clock, XCircle, Plug } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, router, useForm } from '@inertiajs/react';
+import {
+    AlertCircle,
+    CheckCircle2,
+    Clock,
+    Link2,
+    Plug,
+    Plus,
+    RefreshCw,
+    Settings,
+    Trash2,
+    XCircle,
+} from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type SyncLog = {
@@ -133,13 +150,17 @@ function CreateIntegrationDialog() {
                 <DialogHeader>
                     <DialogTitle>Connect Accounting Provider</DialogTitle>
                     <DialogDescription>
-                        Set up a connection to Xero or MYOB for two-way GL synchronisation.
+                        Set up a connection to Xero or MYOB for two-way GL
+                        synchronisation.
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-1.5">
                         <Label htmlFor="provider">Provider *</Label>
-                        <Select value={data.provider} onValueChange={(v) => setData('provider', v)}>
+                        <Select
+                            value={data.provider}
+                            onValueChange={(v) => setData('provider', v)}
+                        >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select a provider" />
                             </SelectTrigger>
@@ -148,39 +169,73 @@ function CreateIntegrationDialog() {
                                 <SelectItem value="myob">MYOB</SelectItem>
                             </SelectContent>
                         </Select>
-                        {errors.provider && <p className="text-sm text-destructive">{errors.provider}</p>}
+                        {errors.provider && (
+                            <p className="text-sm text-destructive">
+                                {errors.provider}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-1.5">
                         <Label htmlFor="tenant_id">
-                            {data.provider === 'myob' ? 'Company File URI' : 'Tenant ID'} (optional)
+                            {data.provider === 'myob'
+                                ? 'Company File URI'
+                                : 'Tenant ID'}{' '}
+                            (optional)
                         </Label>
                         <Input
                             id="tenant_id"
                             value={data.tenant_id}
-                            onChange={(e) => setData('tenant_id', e.target.value)}
-                            placeholder={data.provider === 'myob' ? 'MYOB company file URI' : 'Xero tenant ID'}
+                            onChange={(e) =>
+                                setData('tenant_id', e.target.value)
+                            }
+                            placeholder={
+                                data.provider === 'myob'
+                                    ? 'MYOB company file URI'
+                                    : 'Xero tenant ID'
+                            }
                         />
-                        {errors.tenant_id && <p className="text-sm text-destructive">{errors.tenant_id}</p>}
+                        {errors.tenant_id && (
+                            <p className="text-sm text-destructive">
+                                {errors.tenant_id}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-1.5">
                         <Label htmlFor="sync_direction">Sync Direction *</Label>
-                        <Select value={data.sync_direction} onValueChange={(v) => setData('sync_direction', v)}>
+                        <Select
+                            value={data.sync_direction}
+                            onValueChange={(v) => setData('sync_direction', v)}
+                        >
                             <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="bidirectional">Bidirectional</SelectItem>
-                                <SelectItem value="push">Push Only (local to external)</SelectItem>
-                                <SelectItem value="pull">Pull Only (external to local)</SelectItem>
+                                <SelectItem value="bidirectional">
+                                    Bidirectional
+                                </SelectItem>
+                                <SelectItem value="push">
+                                    Push Only (local to external)
+                                </SelectItem>
+                                <SelectItem value="pull">
+                                    Pull Only (external to local)
+                                </SelectItem>
                             </SelectContent>
                         </Select>
-                        {errors.sync_direction && <p className="text-sm text-destructive">{errors.sync_direction}</p>}
+                        {errors.sync_direction && (
+                            <p className="text-sm text-destructive">
+                                {errors.sync_direction}
+                            </p>
+                        )}
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
@@ -199,16 +254,24 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 
     function handleSync() {
         setSyncing(true);
-        router.post(`/finance/integrations/${integration.id}/sync`, {}, {
-            onFinish: () => setSyncing(false),
-        });
+        router.post(
+            `/finance/integrations/${integration.id}/sync`,
+            {},
+            {
+                onFinish: () => setSyncing(false),
+            },
+        );
     }
 
     function handleTest() {
         setTesting(true);
-        router.post(`/finance/integrations/${integration.id}/test`, {}, {
-            onFinish: () => setTesting(false),
-        });
+        router.post(
+            `/finance/integrations/${integration.id}/test`,
+            {},
+            {
+                onFinish: () => setTesting(false),
+            },
+        );
     }
 
     function handleDisconnect() {
@@ -224,19 +287,35 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                             <Link2 className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                            <CardTitle className="text-lg">{providerLabels[integration.provider]}</CardTitle>
+                            <CardTitle className="text-lg">
+                                {providerLabels[integration.provider]}
+                            </CardTitle>
                             <CardDescription>
-                                {syncDirectionLabels[integration.sync_direction]}
-                                {integration.tenant_id && ` \u00B7 ${integration.tenant_id}`}
+                                {
+                                    syncDirectionLabels[
+                                        integration.sync_direction
+                                    ]
+                                }
+                                {integration.tenant_id &&
+                                    ` \u00B7 ${integration.tenant_id}`}
                             </CardDescription>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <StatusBadge variant={integration.is_active ? 'success' : 'neutral'} label={integration.is_active ? 'Active' : 'Inactive'} />
+                        <StatusBadge
+                            variant={
+                                integration.is_active ? 'success' : 'neutral'
+                            }
+                            label={
+                                integration.is_active ? 'Active' : 'Inactive'
+                            }
+                        />
                         {integration.last_sync_status && (
                             <StatusBadge status={integration.last_sync_status}>
                                 {statusIcons[integration.last_sync_status]}
-                                <span className="capitalize">{integration.last_sync_status}</span>
+                                <span className="capitalize">
+                                    {integration.last_sync_status}
+                                </span>
                             </StatusBadge>
                         )}
                     </div>
@@ -246,14 +325,22 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                 {/* Connection status */}
                 <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
-                        <span className="text-muted-foreground">Token Status</span>
+                        <span className="text-muted-foreground">
+                            Token Status
+                        </span>
                         <p className="font-medium">
                             {!integration.has_token ? (
-                                <span className="text-status-warning">Not configured</span>
+                                <span className="text-status-warning">
+                                    Not configured
+                                </span>
                             ) : integration.token_expired ? (
-                                <span className="text-status-critical">Expired</span>
+                                <span className="text-status-critical">
+                                    Expired
+                                </span>
                             ) : (
-                                <span className="text-status-success">Valid</span>
+                                <span className="text-status-success">
+                                    Valid
+                                </span>
                             )}
                         </p>
                     </div>
@@ -264,23 +351,31 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                         </p>
                     </div>
                     <div>
-                        <span className="text-muted-foreground">Total Syncs</span>
-                        <p className="font-medium">{integration.sync_logs_count}</p>
+                        <span className="text-muted-foreground">
+                            Total Syncs
+                        </span>
+                        <p className="font-medium">
+                            {integration.sync_logs_count}
+                        </p>
                     </div>
                 </div>
 
                 {/* Error display */}
                 {integration.last_error && (
                     <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3">
-                        <AlertCircle className="mt-0.5 h-4 w-4 text-destructive shrink-0" />
-                        <p className="text-sm text-destructive">{integration.last_error}</p>
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                        <p className="text-sm text-destructive">
+                            {integration.last_error}
+                        </p>
                     </div>
                 )}
 
                 {/* Recent sync logs */}
                 {integration.recent_logs.length > 0 && (
                     <div>
-                        <h4 className="mb-2 text-sm font-medium text-muted-foreground">Recent Activity</h4>
+                        <h4 className="mb-2 text-sm font-medium text-muted-foreground">
+                            Recent Activity
+                        </h4>
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -297,20 +392,37 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                                 {integration.recent_logs.map((log) => (
                                     <TableRow key={log.id}>
                                         <TableCell>
-                                            <Badge variant="outline" className="capitalize">
+                                            <Badge
+                                                variant="outline"
+                                                className="capitalize"
+                                            >
                                                 {log.direction}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="capitalize">{log.entity_type}</TableCell>
-                                        <TableCell>{log.entity_count}</TableCell>
-                                        <TableCell className="text-status-success">{log.success_count}</TableCell>
-                                        <TableCell className={log.error_count > 0 ? 'text-status-critical' : ''}>
+                                        <TableCell className="capitalize">
+                                            {log.entity_type}
+                                        </TableCell>
+                                        <TableCell>
+                                            {log.entity_count}
+                                        </TableCell>
+                                        <TableCell className="text-status-success">
+                                            {log.success_count}
+                                        </TableCell>
+                                        <TableCell
+                                            className={
+                                                log.error_count > 0
+                                                    ? 'text-status-critical'
+                                                    : ''
+                                            }
+                                        >
                                             {log.error_count}
                                         </TableCell>
                                         <TableCell>
-                                            {log.duration_ms ? `${(log.duration_ms / 1000).toFixed(1)}s` : '-'}
+                                            {log.duration_ms
+                                                ? `${(log.duration_ms / 1000).toFixed(1)}s`
+                                                : '-'}
                                         </TableCell>
-                                        <TableCell className="text-muted-foreground text-xs">
+                                        <TableCell className="text-xs text-muted-foreground">
                                             {log.started_at}
                                         </TableCell>
                                     </TableRow>
@@ -328,7 +440,9 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                         onClick={handleSync}
                         disabled={syncing || !integration.is_active}
                     >
-                        <RefreshCw className={`mr-1 h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
+                        <RefreshCw
+                            className={`mr-1 h-3 w-3 ${syncing ? 'animate-spin' : ''}`}
+                        />
                         {syncing ? 'Syncing...' : 'Sync Now'}
                     </Button>
                     <Button
@@ -342,7 +456,11 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => router.visit(`/finance/integrations/${integration.id}/mapping`)}
+                        onClick={() =>
+                            router.visit(
+                                `/finance/integrations/${integration.id}/mapping`,
+                            )
+                        }
                     >
                         <Settings className="mr-1 h-3 w-3" />
                         Account Mapping
@@ -351,22 +469,36 @@ function IntegrationCard({ integration }: { integration: Integration }) {
                     <div className="ml-auto">
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" className="text-destructive">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive"
+                                >
                                     <Trash2 className="mr-1 h-3 w-3" />
                                     Disconnect
                                 </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle>Disconnect {providerLabels[integration.provider]}?</AlertDialogTitle>
+                                    <AlertDialogTitle>
+                                        Disconnect{' '}
+                                        {providerLabels[integration.provider]}?
+                                    </AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        This will remove the integration connection. Your local data will not be affected,
-                                        but synchronisation will stop. You can reconnect later.
+                                        This will remove the integration
+                                        connection. Your local data will not be
+                                        affected, but synchronisation will stop.
+                                        You can reconnect later.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleDisconnect} className="bg-destructive text-destructive-foreground">
+                                    <AlertDialogCancel>
+                                        Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={handleDisconnect}
+                                        className="bg-destructive text-destructive-foreground"
+                                    >
                                         Disconnect
                                     </AlertDialogAction>
                                 </AlertDialogFooter>
@@ -381,7 +513,9 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 
 export default function IntegrationsIndex({ integrations }: PageProps) {
     const activeCount = integrations.filter((i) => i.is_active).length;
-    const errorCount = integrations.filter((i) => i.last_sync_status === 'failed').length;
+    const errorCount = integrations.filter(
+        (i) => i.last_sync_status === 'failed',
+    ).length;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -389,7 +523,8 @@ export default function IntegrationsIndex({ integrations }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Plug}
                         title="Accounting Integrations"
                         description="Connect to Xero or MYOB for two-way general ledger synchronisation"
@@ -407,9 +542,12 @@ export default function IntegrationsIndex({ integrations }: PageProps) {
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12">
                             <Link2 className="mb-4 h-12 w-12 text-muted-foreground/50" />
-                            <h3 className="text-lg font-medium">No integrations connected</h3>
+                            <h3 className="text-lg font-medium">
+                                No integrations connected
+                            </h3>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                Connect Xero or MYOB to start synchronising your chart of accounts, journals and invoices.
+                                Connect Xero or MYOB to start synchronising your
+                                chart of accounts, journals and invoices.
                             </p>
                             <div className="mt-4">
                                 <CreateIntegrationDialog />
@@ -419,7 +557,10 @@ export default function IntegrationsIndex({ integrations }: PageProps) {
                 ) : (
                     <div className="space-y-4">
                         {integrations.map((integration) => (
-                            <IntegrationCard key={integration.id} integration={integration} />
+                            <IntegrationCard
+                                key={integration.id}
+                                integration={integration}
+                            />
                         ))}
                     </div>
                 )}

@@ -1,13 +1,14 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { PageHero, PageLayout } from '@/components/page';
 import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { TabsContent } from '@/components/ui/tabs';
+import AppLayout from '@/layouts/app-layout';
+import { governanceStatusColor } from '@/lib/governance-status';
+import { cn } from '@/lib/utils';
+import { PageProps } from '@/types';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertOctagon,
     BookOpen,
@@ -26,10 +27,9 @@ import {
     ShieldCheck,
     Users,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { governanceStatusColor } from '@/lib/governance-status';
-import { CeoReportDialog, type MeetingOption } from './_dialogs';
+import { useState } from 'react';
 import { AttachmentsPanel, type Attachment } from './_attachments';
+import { CeoReportDialog, type MeetingOption } from './_dialogs';
 
 interface DecisionSought {
     title: string;
@@ -110,10 +110,14 @@ function SectionView({
     const paras = paragraphs(value);
     return (
         <Card>
-            <CardContent className="p-5 space-y-2 print:p-3">
-                <h3 className="text-base font-semibold text-foreground print:text-sm">{title}</h3>
+            <CardContent className="space-y-2 p-5 print:p-3">
+                <h3 className="text-base font-semibold text-foreground print:text-sm">
+                    {title}
+                </h3>
                 {paras.length === 0 ? (
-                    <p className="text-sm italic text-muted-foreground">{fallback}</p>
+                    <p className="text-sm text-muted-foreground italic">
+                        {fallback}
+                    </p>
                 ) : (
                     <div className="space-y-2 text-sm leading-relaxed text-foreground">
                         {paras.map((p, i) => (
@@ -127,7 +131,11 @@ function SectionView({
 }
 
 function StatusStrip({ report }: { report: Report }) {
-    type Tile = { label: string; value: string; tone: 'success' | 'info' | 'warning' | 'critical' | 'muted' };
+    type Tile = {
+        label: string;
+        value: string;
+        tone: 'success' | 'info' | 'warning' | 'critical' | 'muted';
+    };
 
     const periodValue = report.period_label ?? 'Not set';
     const deadlineValue = report.deadline
@@ -150,13 +158,25 @@ function StatusStrip({ report }: { report: Report }) {
         : '—';
 
     const tiles: Tile[] = [
-        { label: 'Period', value: periodValue, tone: report.period_label ? 'info' : 'warning' },
+        {
+            label: 'Period',
+            value: periodValue,
+            tone: report.period_label ? 'info' : 'warning',
+        },
         {
             label: 'Deadline',
             value: deadlineValue,
-            tone: report.is_overdue ? 'critical' : report.deadline ? 'info' : 'muted',
+            tone: report.is_overdue
+                ? 'critical'
+                : report.deadline
+                  ? 'info'
+                  : 'muted',
         },
-        { label: 'Author', value: report.author?.name ?? 'Unknown', tone: 'info' },
+        {
+            label: 'Author',
+            value: report.author?.name ?? 'Unknown',
+            tone: 'info',
+        },
         {
             label: 'Status',
             value: statusLabel,
@@ -167,11 +187,19 @@ function StatusStrip({ report }: { report: Report }) {
                       ? 'info'
                       : 'warning',
         },
-        { label: 'For meeting', value: meetingValue, tone: report.meeting ? 'info' : 'warning' },
+        {
+            label: 'For meeting',
+            value: meetingValue,
+            tone: report.meeting ? 'info' : 'warning',
+        },
         {
             label: report.status === 'presented' ? 'Presented' : 'Submitted',
-            value: report.status === 'presented' ? presentedValue : submittedValue,
-            tone: report.status === 'presented' || report.status === 'submitted' ? 'success' : 'muted',
+            value:
+                report.status === 'presented' ? presentedValue : submittedValue,
+            tone:
+                report.status === 'presented' || report.status === 'submitted'
+                    ? 'success'
+                    : 'muted',
         },
     ];
 
@@ -184,16 +212,19 @@ function StatusStrip({ report }: { report: Report }) {
     };
 
     return (
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6 print:grid-cols-3" data-dusk="ceo-status-strip">
+        <div
+            className="grid gap-3 md:grid-cols-3 xl:grid-cols-6 print:grid-cols-3"
+            data-dusk="ceo-status-strip"
+        >
             {tiles.map((t) => (
                 <Card key={t.label}>
                     <CardContent className="p-4">
-                        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                             {t.label}
                         </p>
                         <p
                             className={cn(
-                                'mt-1 truncate text-sm font-semibold leading-snug',
+                                'mt-1 truncate text-sm leading-snug font-semibold',
                                 TONE_VALUE[t.tone],
                             )}
                             title={t.value}
@@ -207,19 +238,28 @@ function StatusStrip({ report }: { report: Report }) {
     );
 }
 
-function KpiSnapshotView({ snapshot }: { snapshot: Record<string, any> | null }) {
+function KpiSnapshotView({
+    snapshot,
+}: {
+    snapshot: Record<string, any> | null;
+}) {
     if (!snapshot) {
         return (
             <Card>
                 <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                    No KPI snapshot was captured for this report. Snapshots are captured automatically
-                    when the report is submitted to the board.
+                    No KPI snapshot was captured for this report. Snapshots are
+                    captured automatically when the report is submitted to the
+                    board.
                 </CardContent>
             </Card>
         );
     }
 
-    const tiles: Array<{ label: string; value: string; tone: 'success' | 'warning' | 'critical' | 'info' | 'muted' }> = [];
+    const tiles: Array<{
+        label: string;
+        value: string;
+        tone: 'success' | 'warning' | 'critical' | 'info' | 'muted';
+    }> = [];
 
     const tr = snapshot.top_risks ?? {};
     tiles.push({
@@ -233,8 +273,12 @@ function KpiSnapshotView({ snapshot }: { snapshot: Record<string, any> | null })
         tone: (tr.above_appetite ?? 0) > 0 ? 'warning' : 'success',
     });
 
-    const cc = Array.isArray(snapshot.compliance_calendar) ? snapshot.compliance_calendar : [];
-    const overdueCompliance = cc.filter((c: any) => (c?.days_remaining ?? 1) < 0).length;
+    const cc = Array.isArray(snapshot.compliance_calendar)
+        ? snapshot.compliance_calendar
+        : [];
+    const overdueCompliance = cc.filter(
+        (c: any) => (c?.days_remaining ?? 1) < 0,
+    ).length;
     tiles.push({
         label: 'Overdue obligations',
         value: String(overdueCompliance),
@@ -261,7 +305,12 @@ function KpiSnapshotView({ snapshot }: { snapshot: Record<string, any> | null })
     tiles.push({
         label: 'Training compliance',
         value: training == null ? '—' : `${Number(training).toFixed(0)}%`,
-        tone: training == null ? 'muted' : Number(training) >= 95 ? 'success' : 'warning',
+        tone:
+            training == null
+                ? 'muted'
+                : Number(training) >= 95
+                  ? 'success'
+                  : 'warning',
     });
 
     const sg = snapshot.safeguarding ?? {};
@@ -292,14 +341,15 @@ function KpiSnapshotView({ snapshot }: { snapshot: Record<string, any> | null })
 
     return (
         <Card>
-            <CardContent className="p-5 space-y-4 print:p-3">
+            <CardContent className="space-y-4 p-5 print:p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                         <h3 className="text-base font-semibold text-foreground">
                             KPI snapshot at submission
                         </h3>
                         <p className="text-xs text-muted-foreground">
-                            The numbers as they stood when this report was submitted to the board.
+                            The numbers as they stood when this report was
+                            submitted to the board.
                         </p>
                     </div>
                     {capturedAt && (
@@ -311,11 +361,19 @@ function KpiSnapshotView({ snapshot }: { snapshot: Record<string, any> | null })
 
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 print:grid-cols-2">
                     {tiles.map((t) => (
-                        <div key={t.label} className="rounded-lg border border-border bg-muted/30 p-3">
-                            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <div
+                            key={t.label}
+                            className="rounded-lg border border-border bg-muted/30 p-3"
+                        >
+                            <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                                 {t.label}
                             </p>
-                            <p className={cn('mt-1 text-xl font-semibold', TONE_VALUE[t.tone])}>
+                            <p
+                                className={cn(
+                                    'mt-1 text-xl font-semibold',
+                                    TONE_VALUE[t.tone],
+                                )}
+                            >
                                 {t.value}
                             </p>
                         </div>
@@ -330,7 +388,7 @@ function DecisionsView({ items }: { items: DecisionSought[] }) {
     if (!items?.length) {
         return (
             <Card>
-                <CardContent className="p-6 text-center text-sm italic text-muted-foreground">
+                <CardContent className="p-6 text-center text-sm text-muted-foreground italic">
                     No board decisions requested in this report.
                 </CardContent>
             </Card>
@@ -340,7 +398,7 @@ function DecisionsView({ items }: { items: DecisionSought[] }) {
         <div className="grid gap-3 md:grid-cols-2 print:grid-cols-1">
             {items.map((d, i) => (
                 <Card key={i}>
-                    <CardContent className="p-4 space-y-2">
+                    <CardContent className="space-y-2 p-4">
                         <div className="flex items-start gap-2">
                             <Gavel className="mt-0.5 h-4 w-4 text-primary" />
                             <p className="text-sm font-semibold text-foreground">
@@ -348,14 +406,18 @@ function DecisionsView({ items }: { items: DecisionSought[] }) {
                             </p>
                         </div>
                         {d.detail && (
-                            <p className="text-sm text-muted-foreground">{d.detail}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {d.detail}
+                            </p>
                         )}
                         {d.recommendation && (
                             <div className="rounded-lg border border-primary/20 bg-primary/5 p-2">
-                                <p className="text-[10px] font-medium uppercase tracking-wide text-primary">
+                                <p className="text-[10px] font-medium tracking-wide text-primary uppercase">
                                     CEO recommendation
                                 </p>
-                                <p className="mt-0.5 text-sm text-foreground">{d.recommendation}</p>
+                                <p className="mt-0.5 text-sm text-foreground">
+                                    {d.recommendation}
+                                </p>
                             </div>
                         )}
                     </CardContent>
@@ -369,7 +431,7 @@ function MattersView({ items }: { items: MatterArising[] }) {
     if (!items?.length) {
         return (
             <Card>
-                <CardContent className="p-6 text-center text-sm italic text-muted-foreground">
+                <CardContent className="p-6 text-center text-sm text-muted-foreground italic">
                     Nothing carried forward from the previous report.
                 </CardContent>
             </Card>
@@ -384,16 +446,25 @@ function MattersView({ items }: { items: MatterArising[] }) {
         <div className="space-y-2">
             {items.map((m, i) => (
                 <Card key={i}>
-                    <CardContent className="p-4 space-y-2">
+                    <CardContent className="space-y-2 p-4">
                         <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-semibold text-foreground">
                                 {m.title || `Matter ${i + 1}`}
                             </p>
-                            <Badge className={cn('border text-[10px] uppercase', TONE[m.status] ?? TONE.open)}>
+                            <Badge
+                                className={cn(
+                                    'border text-[10px] uppercase',
+                                    TONE[m.status] ?? TONE.open,
+                                )}
+                            >
                                 {(m.status ?? 'open').replace('_', ' ')}
                             </Badge>
                         </div>
-                        {m.update && <p className="text-sm text-muted-foreground">{m.update}</p>}
+                        {m.update && (
+                            <p className="text-sm text-muted-foreground">
+                                {m.update}
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
             ))}
@@ -402,15 +473,28 @@ function MattersView({ items }: { items: MatterArising[] }) {
 }
 
 export default function CeoReportShow({ auth, report, meetings }: Props) {
-    const can = (auth as { can?: { governance?: { 'ceo-reports'?: { manage?: boolean } } } })?.can?.governance?.['ceo-reports']?.manage ?? false;
+    const can =
+        (
+            auth as {
+                can?: { governance?: { 'ceo-reports'?: { manage?: boolean } } };
+            }
+        )?.can?.governance?.['ceo-reports']?.manage ?? false;
 
     const [editOpen, setEditOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<string>('executive');
 
     const handleSubmit = () =>
-        router.post(`/governance/ceo-reports/${report.id}/submit`, {}, { preserveScroll: true });
+        router.post(
+            `/governance/ceo-reports/${report.id}/submit`,
+            {},
+            { preserveScroll: true },
+        );
     const handlePresent = () =>
-        router.post(`/governance/ceo-reports/${report.id}/present`, {}, { preserveScroll: true });
+        router.post(
+            `/governance/ceo-reports/${report.id}/present`,
+            {},
+            { preserveScroll: true },
+        );
     const handlePrint = () => window.print();
 
     const tabs: PageTabItem[] = [
@@ -420,10 +504,28 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
         { value: 'risks', label: 'Risk & Compliance', icon: ShieldCheck },
         { value: 'workforce', label: 'Workforce', icon: Users },
         { value: 'strategy', label: 'Strategy', icon: BookOpen },
-        { value: 'decisions', label: `Decisions (${report.decisions_sought.length})`, icon: Gavel },
-        { value: 'matters', label: `Matters arising (${report.matters_arising.length})`, icon: MessageCircleQuestion },
-        { value: 'kpi', label: 'KPI snapshot', icon: Gauge, overflowable: true },
-        { value: 'attachments', label: `Attachments (${report.attachments.length})`, icon: ClipboardList, overflowable: true },
+        {
+            value: 'decisions',
+            label: `Decisions (${report.decisions_sought.length})`,
+            icon: Gavel,
+        },
+        {
+            value: 'matters',
+            label: `Matters arising (${report.matters_arising.length})`,
+            icon: MessageCircleQuestion,
+        },
+        {
+            value: 'kpi',
+            label: 'KPI snapshot',
+            icon: Gauge,
+            overflowable: true,
+        },
+        {
+            value: 'attachments',
+            label: `Attachments (${report.attachments.length})`,
+            icon: ClipboardList,
+            overflowable: true,
+        },
     ];
 
     return (
@@ -436,9 +538,17 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                         backHref="/governance/ceo-reports"
                         icon={FileText}
                         title={
-                            <span className="flex flex-wrap items-center gap-3" dusk="ceo-report-title">
+                            <span
+                                className="flex flex-wrap items-center gap-3"
+                                dusk="ceo-report-title"
+                            >
                                 {report.title}
-                                <Badge className={cn('text-xs', governanceStatusColor(report.status))}>
+                                <Badge
+                                    className={cn(
+                                        'text-xs',
+                                        governanceStatusColor(report.status),
+                                    )}
+                                >
                                     {report.status}
                                 </Badge>
                                 {report.is_overdue && (
@@ -457,23 +567,39 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                                         {report.period_label}
                                     </span>
                                 )}
-                                {report.author && <span>By {report.author.name}</span>}
-                                {report.meeting && <span>For {report.meeting.title}</span>}
+                                {report.author && (
+                                    <span>By {report.author.name}</span>
+                                )}
+                                {report.meeting && (
+                                    <span>For {report.meeting.title}</span>
+                                )}
                             </div>
                         }
                         stats={[
-                            { label: 'Period', value: report.period_label ?? '—' },
+                            {
+                                label: 'Period',
+                                value: report.period_label ?? '—',
+                            },
                             {
                                 label: 'Sections',
                                 value: `${report.sections_complete}/${SECTION_LIST.length}`,
                             },
-                            { label: 'Decisions', value: report.decisions_sought.length },
-                            { label: 'Matters', value: report.matters_arising.length },
+                            {
+                                label: 'Decisions',
+                                value: report.decisions_sought.length,
+                            },
+                            {
+                                label: 'Matters',
+                                value: report.matters_arising.length,
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 {can && report.status === 'draft' && (
-                                    <Button variant="outline" onClick={() => setEditOpen(true)}>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setEditOpen(true)}
+                                    >
                                         <Pencil className="mr-1.5 h-4 w-4" />
                                         Edit report
                                     </Button>
@@ -506,16 +632,22 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                         meetings={meetings ?? []}
                         initial={{
                             id: report.id,
-                            governance_meeting_id: report.meeting?.id ? String(report.meeting.id) : '',
+                            governance_meeting_id: report.meeting?.id
+                                ? String(report.meeting.id)
+                                : '',
                             period_start: report.period_start ?? '',
                             period_end: report.period_end ?? '',
                             deadline: report.deadline
-                                ? new Date(report.deadline).toISOString().slice(0, 16)
+                                ? new Date(report.deadline)
+                                      .toISOString()
+                                      .slice(0, 16)
                                 : '',
                             executive_summary: report.executive_summary ?? '',
-                            operational_summary: report.operational_summary ?? '',
+                            operational_summary:
+                                report.operational_summary ?? '',
                             key_achievements: report.key_achievements ?? '',
-                            challenges_and_risks: report.challenges_and_risks ?? '',
+                            challenges_and_risks:
+                                report.challenges_and_risks ?? '',
                             staffing_update: report.staffing_update ?? '',
                             compliance_status: report.compliance_status ?? '',
                             financial_summary: report.financial_summary ?? '',
@@ -530,7 +662,11 @@ export default function CeoReportShow({ auth, report, meetings }: Props) {
                 <StatusStrip report={report} />
 
                 <div className="mt-6" data-dusk="ceo-report-tabs">
-                    <PageTabs value={activeTab} onValueChange={setActiveTab} items={tabs}>
+                    <PageTabs
+                        value={activeTab}
+                        onValueChange={setActiveTab}
+                        items={tabs}
+                    >
                         <TabsContent value="executive">
                             <SectionView
                                 title="Executive summary"

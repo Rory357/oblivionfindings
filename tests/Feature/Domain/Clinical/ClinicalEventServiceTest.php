@@ -11,10 +11,12 @@ use App\Enums\AlertSeverity;
 use App\Models\Client;
 use App\Models\HsEvent;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\HealthSafety\HsEventService;
+use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -24,14 +26,19 @@ class ClinicalEventServiceTest extends TestCase
     use RefreshDatabase;
 
     protected ClinicalEventService $service;
+
     protected Client $client;
+
+    protected Site $site;
+
     protected User $reporter;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->service = app(ClinicalEventService::class);
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create();
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
         $this->reporter = User::factory()->create();
     }
 
@@ -57,12 +64,16 @@ class ClinicalEventServiceTest extends TestCase
 
     public function test_records_with_shift_context(): void
     {
-        $shift = Shift::factory()->create(['client_id' => $this->client->id]);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+        ]);
 
         $event = $this->service->record($this->client, $this->reporter, [
             'event_type' => ClinicalEventType::Fall,
             'severity' => AlertSeverity::MEDIUM,
             'description' => 'Client fell while standing',
+            'immediate_action_taken' => 'Supported the client and completed an injury check.',
         ], $shift);
 
         $this->assertEquals($shift->id, $event->shift_id);
@@ -75,6 +86,7 @@ class ClinicalEventServiceTest extends TestCase
             'event_type' => 'seizure',
             'severity' => 'high',
             'description' => 'Tonic-clonic seizure observed',
+            'immediate_action_taken' => 'Protected the client from injury and timed the seizure.',
         ]);
 
         $this->assertEquals(ClinicalEventType::Seizure, $event->event_type);
@@ -101,6 +113,7 @@ class ClinicalEventServiceTest extends TestCase
             'event_type' => ClinicalEventType::Fall,
             'severity' => AlertSeverity::MEDIUM,
             'description' => 'Fall observed by two staff',
+            'immediate_action_taken' => 'Kept the client still and requested a clinical review.',
             'witnesses' => [$witness1->id, $witness2->id],
         ]);
 
@@ -113,6 +126,7 @@ class ClinicalEventServiceTest extends TestCase
             'event_type' => ClinicalEventType::Fall,
             'severity' => AlertSeverity::HIGH,
             'description' => 'Significant fall requiring medical review',
+            'immediate_action_taken' => 'Completed first aid and contacted the clinical lead.',
             'requires_followup' => true,
         ]);
 
@@ -127,6 +141,7 @@ class ClinicalEventServiceTest extends TestCase
             'event_type' => ClinicalEventType::Seizure,
             'severity' => AlertSeverity::HIGH,
             'description' => 'Seizure episode',
+            'immediate_action_taken' => 'Cleared the area and monitored breathing throughout.',
         ]);
 
         $this->assertDatabaseHas('timeline_events', [
@@ -147,12 +162,86 @@ class ClinicalEventServiceTest extends TestCase
 
     // ── H&S event auto-linking ───────────────────────────────────────────
 
+    public function test_hs_linked_event_requires_truthful_immediate_action_before_any_write(): void
+    {
+        try {
+            $this->service->record($this->client, $this->reporter, [
+                'event_type' => ClinicalEventType::Fall,
+                'severity' => AlertSeverity::MEDIUM,
+                'description' => 'Client fell from a chair.',
+                'immediate_action_taken' => '   ',
+            ]);
+
+            $this->fail('A linked clinical event without an immediate action should fail closed.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('Immediate action taken is required', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('clinical_events', 0);
+        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+    }
+
+    public function test_hs_link_failure_rolls_back_clinical_event_and_timeline(): void
+    {
+        $hsEventService = $this->createMock(HsEventService::class);
+        $hsEventService->expects($this->once())
+            ->method('recordEvent')
+            ->willReturn(null);
+        $service = new ClinicalEventService($hsEventService, app(ClinicalSignalService::class));
+
+        try {
+            $service->record($this->client, $this->reporter, [
+                'event_type' => ClinicalEventType::Seizure,
+                'severity' => AlertSeverity::HIGH,
+                'description' => 'Seizure requiring immediate clinical support.',
+                'immediate_action_taken' => 'Protected the client and monitored breathing.',
+            ]);
+
+            $this->fail('A failed H&S link should roll back the clinical journey.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('could not be linked', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('clinical_events', 0);
+        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+    }
+
+    public function test_hs_linked_event_rejects_conflicting_shift_site_provenance(): void
+    {
+        $otherSite = Site::factory()->create();
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $otherSite->id,
+        ]);
+        $timelineCount = TimelineEvent::query()->count();
+
+        try {
+            $this->service->record($this->client, $this->reporter, [
+                'event_type' => ClinicalEventType::Choking,
+                'severity' => AlertSeverity::CRITICAL,
+                'description' => 'Choking incident during a meal.',
+                'immediate_action_taken' => 'Cleared the airway and called emergency services.',
+            ], $shift);
+
+            $this->fail('Conflicting client and shift Sites should fail closed.');
+        } catch (DomainException $exception) {
+            $this->assertStringContainsString('does not match', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('clinical_events', 0);
+        $this->assertDatabaseCount('timeline_events', $timelineCount);
+        $this->assertDatabaseCount('hs_events', 0);
+    }
+
     public function test_auto_links_fall_to_hs_event(): void
     {
         $event = $this->service->record($this->client, $this->reporter, [
             'event_type' => ClinicalEventType::Fall,
             'severity' => AlertSeverity::MEDIUM,
             'description' => 'Client fell from chair',
+            'immediate_action_taken' => 'Assisted the client and checked for injury.',
         ]);
 
         $event->refresh();
@@ -163,6 +252,9 @@ class ClinicalEventServiceTest extends TestCase
         $this->assertEquals('injury', $hsEvent->event_category);
         $this->assertEquals(ClinicalEvent::class, $hsEvent->source_type);
         $this->assertEquals($event->id, $hsEvent->source_id);
+        $this->assertSame($this->site->id, $event->site_id);
+        $this->assertSame($this->site->id, $hsEvent->site_id);
+        $this->assertSame('Assisted the client and checked for injury.', $event->immediate_action_taken);
     }
 
     public function test_auto_links_seizure_to_hs_event(): void
@@ -171,6 +263,7 @@ class ClinicalEventServiceTest extends TestCase
             'event_type' => ClinicalEventType::Seizure,
             'severity' => AlertSeverity::HIGH,
             'description' => 'Seizure lasting 2 minutes',
+            'immediate_action_taken' => 'Protected the client and monitored breathing.',
         ]);
 
         $event->refresh();
@@ -186,6 +279,7 @@ class ClinicalEventServiceTest extends TestCase
             'event_type' => ClinicalEventType::Choking,
             'severity' => AlertSeverity::HIGH,
             'description' => 'Choking episode during meal',
+            'immediate_action_taken' => 'Cleared the airway and requested emergency support.',
         ]);
 
         $event->refresh();
@@ -220,6 +314,7 @@ class ClinicalEventServiceTest extends TestCase
             'event_type' => ClinicalEventType::Fall,
             'severity' => AlertSeverity::MEDIUM,
             'description' => 'Fall event',
+            'immediate_action_taken' => 'Assisted the client and checked for injury.',
         ]);
 
         $hsEventId = $event->fresh()->linked_hs_event_id;
@@ -229,6 +324,7 @@ class ClinicalEventServiceTest extends TestCase
             'event_type' => ClinicalEventType::Fall,
             'severity' => AlertSeverity::MEDIUM,
             'description' => 'Second fall event',
+            'immediate_action_taken' => 'Kept the client safe and requested a review.',
         ]);
 
         // Each event gets its own HsEvent (separate source_id)

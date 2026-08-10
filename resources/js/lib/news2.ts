@@ -38,7 +38,8 @@ export const NEWS2_BAND_LABEL: Record<News2Band, string> = {
 
 const BAND_ADVICE: Record<News2Band, string> = {
     low: 'Routine monitoring.',
-    low_medium: 'A single parameter scored 3 — urgent review by a registered nurse.',
+    low_medium:
+        'A single parameter scored 3 — urgent review by a registered nurse.',
     medium: 'Urgent review by a clinician — consider escalation.',
     high: 'Emergency response — escalate to senior clinical decision-maker now.',
 };
@@ -112,7 +113,13 @@ export function scoreNews2(data: News2VitalsInput): News2Result | null {
     const pulse = num(data.pulse);
     const temp = num(data.temperature);
 
-    if (rr === null || spo2 === null || sys === null || pulse === null || temp === null) {
+    if (
+        rr === null ||
+        spo2 === null ||
+        sys === null ||
+        pulse === null ||
+        temp === null
+    ) {
         return null;
     }
 
@@ -132,9 +139,23 @@ export function scoreNews2(data: News2VitalsInput): News2Result | null {
 
     const score = Object.values(breakdown).reduce((a, b) => a + b, 0);
     const redFlag = Object.values(breakdown).some((v) => v === 3);
-    const band: News2Band = score >= 7 ? 'high' : score >= 5 ? 'medium' : redFlag ? 'low_medium' : 'low';
+    const band: News2Band =
+        score >= 7
+            ? 'high'
+            : score >= 5
+              ? 'medium'
+              : redFlag
+                ? 'low_medium'
+                : 'low';
 
-    return { score, band, bandLabel: NEWS2_BAND_LABEL[band], redFlag, advice: BAND_ADVICE[band], breakdown };
+    return {
+        score,
+        band,
+        bandLabel: NEWS2_BAND_LABEL[band],
+        redFlag,
+        advice: BAND_ADVICE[band],
+        breakdown,
+    };
 }
 
 export const ACVPU_OPTIONS: { value: Acvpu; label: string }[] = [

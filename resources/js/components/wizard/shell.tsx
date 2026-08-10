@@ -89,7 +89,10 @@ export function WizardShell({
                 {success ? (
                     success
                 ) : (
-                    <div className="flex min-h-0 overflow-hidden" style={{ height: maxHeight }}>
+                    <div
+                        className="flex min-h-0 overflow-hidden"
+                        style={{ height: maxHeight }}
+                    >
                         {/* ── Stepper rail ── */}
                         <aside
                             data-wizard-region="rail"
@@ -167,7 +170,12 @@ export function WizardShell({
                             ) : null}
 
                             {pct != null ? (
-                                <div className={cn('pt-4', railExtra ? '' : 'mt-auto')}>
+                                <div
+                                    className={cn(
+                                        'pt-4',
+                                        railExtra ? '' : 'mt-auto',
+                                    )}
+                                >
                                     <div className="mb-1.5 flex justify-between text-[11px] text-muted-foreground">
                                         <span>{pctLabel}</span>
                                         <span className="font-bold text-primary">
@@ -199,16 +207,21 @@ export function WizardShell({
                             >
                                 <div className="text-[13px] font-semibold text-muted-foreground">
                                     {headerLabel ? (
-                                        <span className="text-foreground">{headerLabel}</span>
+                                        <span className="text-foreground">
+                                            {headerLabel}
+                                        </span>
                                     ) : steps.length > 1 ? (
                                         <>
-                                            Step {stepIndex + 1} of {steps.length} ·{' '}
+                                            Step {stepIndex + 1} of{' '}
+                                            {steps.length} ·{' '}
                                             <span className="text-foreground">
                                                 {steps[stepIndex]?.label}
                                             </span>
                                         </>
                                     ) : (
-                                        <span className="text-foreground">{steps[stepIndex]?.label}</span>
+                                        <span className="text-foreground">
+                                            {steps[stepIndex]?.label}
+                                        </span>
                                     )}
                                 </div>
                                 <button
@@ -260,7 +273,7 @@ export function WizardShell({
 /** Per-step body wrapper — 300ms fade/slide-in, motion-safe only. */
 export function WizardStepPane({ children }: { children: ReactNode }) {
     return (
-        <div className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-2 motion-safe:duration-300">
+        <div className="motion-safe:animate-in motion-safe:duration-300 motion-safe:fade-in-0 motion-safe:slide-in-from-right-2">
             {children}
         </div>
     );

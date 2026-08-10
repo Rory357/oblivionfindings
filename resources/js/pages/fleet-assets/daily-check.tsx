@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { formatTime } from '@/lib/datetime';
 import {
     FleetComplianceBadges,
     fmt,
@@ -21,7 +22,6 @@ import {
     Clock,
 } from 'lucide-react';
 import { useState } from 'react';
-import { formatTime } from '@/lib/datetime';
 
 type Vehicle = {
     id: number;
@@ -56,13 +56,24 @@ type Props = {
     };
 };
 
-export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary, compliance: rawCompliance }: Props) {
+export default function DailyCheck({
+    vehicles: rawVehicles,
+    summary: rawSummary,
+    compliance: rawCompliance,
+}: Props) {
     const vehicles = rawVehicles ?? [];
     const summary = rawSummary ?? { total: 0, checked: 0, unchecked: 0 };
     const compliance = rawCompliance ?? {
-        wof_due: 0, wof_expired: 0, rego_due: 0, rego_expired: 0,
-        cof_due: 0, cof_expired: 0, insurance_expiring: null,
-        insurance_expired: null, open_alerts: 0, critical_alerts: 0,
+        wof_due: 0,
+        wof_expired: 0,
+        rego_due: 0,
+        rego_expired: 0,
+        cof_due: 0,
+        cof_expired: 0,
+        insurance_expiring: null,
+        insurance_expired: null,
+        open_alerts: 0,
+        critical_alerts: 0,
     };
 
     const [activeCheck, setActiveCheck] = useState<number | null>(null);
@@ -71,21 +82,28 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
 
     const handleSubmit = (vehicleId: number, condition: 'good' | 'issue') => {
         setSubmitting(vehicleId);
-        router.post('/fleet-assets/daily-check', {
-            asset_id: vehicleId,
-            condition,
-            notes: notes[vehicleId] ?? '',
-        }, {
-            preserveState: true,
-            preserveScroll: true,
-            onFinish: () => {
-                setSubmitting(null);
-                setActiveCheck(null);
+        router.post(
+            '/fleet-assets/daily-check',
+            {
+                asset_id: vehicleId,
+                condition,
+                notes: notes[vehicleId] ?? '',
             },
-        });
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => {
+                    setSubmitting(null);
+                    setActiveCheck(null);
+                },
+            },
+        );
     };
 
-    const checkedPercentage = summary.total > 0 ? Math.round((summary.checked / summary.total) * 100) : 0;
+    const checkedPercentage =
+        summary.total > 0
+            ? Math.round((summary.checked / summary.total) * 100)
+            : 0;
 
     return (
         <AppLayout
@@ -122,31 +140,51 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={ClipboardCheck} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Daily vehicle checks · today</HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Daily Vehicle Checks</h1>
+                            <HeroStatusPill>
+                                Daily vehicle checks · today
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Daily Vehicle Checks
+                            </h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Complete a quick visual check for each vehicle at your site.
+                                Complete a quick visual check for each vehicle
+                                at your site.
                             </p>
                         </div>
                         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile label="Vehicles" value={fmt(summary.total)} caption="at your site" tone="neutral" />
+                            <HeroClusterTile
+                                label="Vehicles"
+                                value={fmt(summary.total)}
+                                caption="at your site"
+                                tone="neutral"
+                            />
                             <HeroClusterTile
                                 label="Checked today"
                                 value={fmt(summary.checked)}
                                 caption="done"
-                                tone={summary.checked > 0 ? 'success' : 'neutral'}
+                                tone={
+                                    summary.checked > 0 ? 'success' : 'neutral'
+                                }
                             />
                             <HeroClusterTile
                                 label="Not checked"
                                 value={fmt(summary.unchecked)}
                                 caption="still due"
-                                tone={summary.unchecked > 0 ? 'warning' : 'success'}
+                                tone={
+                                    summary.unchecked > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="Completion"
                                 value={`${checkedPercentage}%`}
                                 caption="of today's checks"
-                                tone={checkedPercentage === 100 ? 'success' : 'warning'}
+                                tone={
+                                    checkedPercentage === 100
+                                        ? 'success'
+                                        : 'warning'
+                                }
                             />
                         </div>
                     </div>
@@ -155,12 +193,16 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                 {/* Progress Bar */}
                 <div className="space-y-1">
                     <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Today&apos;s progress</span>
-                        <span className="font-medium">{checkedPercentage}%</span>
+                        <span className="text-muted-foreground">
+                            Today&apos;s progress
+                        </span>
+                        <span className="font-medium">
+                            {checkedPercentage}%
+                        </span>
                     </div>
                     <div className="h-3 w-full rounded-full bg-muted">
                         <div
-                            className="h-full rounded-full transition-all bg-primary"
+                            className="h-full rounded-full bg-primary transition-all"
                             style={{ width: `${checkedPercentage}%` }}
                         />
                     </div>
@@ -182,43 +224,74 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-3 min-w-0">
+                                        <div className="flex min-w-0 items-center gap-3">
                                             {vehicle.checked_today ? (
-                                                vehicle.check_result === 'good' ? (
-                                                    <CheckCircle className="h-5 w-5 text-primary shrink-0" />
+                                                vehicle.check_result ===
+                                                'good' ? (
+                                                    <CheckCircle className="h-5 w-5 shrink-0 text-primary" />
                                                 ) : (
-                                                    <AlertTriangle className="h-5 w-5 text-status-critical shrink-0" />
+                                                    <AlertTriangle className="h-5 w-5 shrink-0 text-status-critical" />
                                                 )
                                             ) : (
-                                                <Clock className="h-5 w-5 text-status-warning shrink-0" />
+                                                <Clock className="h-5 w-5 shrink-0 text-status-warning" />
                                             )}
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-sm truncate">{vehicle.name}</span>
+                                                    <span className="truncate text-sm font-semibold">
+                                                        {vehicle.name}
+                                                    </span>
                                                     {vehicle.asset_tag && (
-                                                        <Badge variant="outline" className="font-mono text-xs shrink-0">{vehicle.asset_tag}</Badge>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="shrink-0 font-mono text-xs"
+                                                        >
+                                                            {vehicle.asset_tag}
+                                                        </Badge>
                                                     )}
                                                 </div>
                                                 {vehicle.checked_today && (
                                                     <div className="mt-0.5 text-xs text-muted-foreground">
-                                                        Checked {formatTime(vehicle.checked_at, '')}
-                                                        {vehicle.checked_by && ` by ${vehicle.checked_by}`}
-                                                        {vehicle.check_notes && ` - ${vehicle.check_notes}`}
+                                                        Checked{' '}
+                                                        {formatTime(
+                                                            vehicle.checked_at,
+                                                            '',
+                                                        )}
+                                                        {vehicle.checked_by &&
+                                                            ` by ${vehicle.checked_by}`}
+                                                        {vehicle.check_notes &&
+                                                            ` - ${vehicle.check_notes}`}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 shrink-0">
+                                        <div className="flex shrink-0 items-center gap-2">
                                             {vehicle.checked_today ? (
-                                                <Badge variant={vehicle.check_result === 'good' ? 'default' : 'destructive'}>
-                                                    {vehicle.check_result === 'good' ? 'Good' : 'Issue'}
+                                                <Badge
+                                                    variant={
+                                                        vehicle.check_result ===
+                                                        'good'
+                                                            ? 'default'
+                                                            : 'destructive'
+                                                    }
+                                                >
+                                                    {vehicle.check_result ===
+                                                    'good'
+                                                        ? 'Good'
+                                                        : 'Issue'}
                                                 </Badge>
                                             ) : (
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => setActiveCheck(activeCheck === vehicle.id ? null : vehicle.id)}
+                                                    onClick={() =>
+                                                        setActiveCheck(
+                                                            activeCheck ===
+                                                                vehicle.id
+                                                                ? null
+                                                                : vehicle.id,
+                                                        )
+                                                    }
                                                 >
                                                     <Clock className="mr-1.5 h-3.5 w-3.5" />
                                                     Check
@@ -231,17 +304,35 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                                     {activeCheck === vehicle.id && (
                                         <article className="mt-4 space-y-3 rounded-lg border bg-background p-4">
                                             <div>
-                                                <label className="text-sm font-medium">Quick Notes (optional)</label>
+                                                <label className="text-sm font-medium">
+                                                    Quick Notes (optional)
+                                                </label>
                                                 <Input
-                                                    value={notes[vehicle.id] ?? ''}
-                                                    onChange={(e) => setNotes((prev) => ({ ...prev, [vehicle.id]: e.target.value }))}
+                                                    value={
+                                                        notes[vehicle.id] ?? ''
+                                                    }
+                                                    onChange={(e) =>
+                                                        setNotes((prev) => ({
+                                                            ...prev,
+                                                            [vehicle.id]:
+                                                                e.target.value,
+                                                        }))
+                                                    }
                                                     placeholder="Any notes about the vehicle condition..."
                                                 />
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Button
-                                                    onClick={() => handleSubmit(vehicle.id, 'good')}
-                                                    disabled={submitting === vehicle.id}
+                                                    onClick={() =>
+                                                        handleSubmit(
+                                                            vehicle.id,
+                                                            'good',
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        submitting ===
+                                                        vehicle.id
+                                                    }
                                                     className="bg-primary hover:bg-primary"
                                                 >
                                                     <CheckCircle className="mr-1.5 h-4 w-4" />
@@ -249,8 +340,16 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                                                 </Button>
                                                 <Button
                                                     variant="destructive"
-                                                    onClick={() => handleSubmit(vehicle.id, 'issue')}
-                                                    disabled={submitting === vehicle.id}
+                                                    onClick={() =>
+                                                        handleSubmit(
+                                                            vehicle.id,
+                                                            'issue',
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        submitting ===
+                                                        vehicle.id
+                                                    }
                                                 >
                                                     <AlertTriangle className="mr-1.5 h-4 w-4" />
                                                     Issue
@@ -258,7 +357,9 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => setActiveCheck(null)}
+                                                    onClick={() =>
+                                                        setActiveCheck(null)
+                                                    }
                                                 >
                                                     Cancel
                                                 </Button>
@@ -270,10 +371,13 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary,
                         ))
                     ) : (
                         <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
-                            <Car className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                            <h3 className="text-lg font-semibold">No vehicles at your site</h3>
-                            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                                Vehicles assigned to your site will appear here for daily checks.
+                            <Car className="mb-4 h-12 w-12 text-muted-foreground/50" />
+                            <h3 className="text-lg font-semibold">
+                                No vehicles at your site
+                            </h3>
+                            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                                Vehicles assigned to your site will appear here
+                                for daily checks.
                             </p>
                         </div>
                     )}

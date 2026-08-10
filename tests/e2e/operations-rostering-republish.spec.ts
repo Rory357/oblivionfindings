@@ -23,6 +23,8 @@ test.describe('operations rostering — republish flow', () => {
     test('manager sees a dirty roster diff and republishes it', async ({
         page,
     }) => {
+        test.setTimeout(60_000);
+
         const consoleErrors = collectConsoleErrors(page);
 
         resetRosteringReadinessFixtures();
@@ -30,15 +32,26 @@ test.describe('operations rostering — republish flow', () => {
         await publishCurrentWeek(page, ROSTERING_DEMO_PUBLISH_TARGET);
 
         await page.goto('/operations/shifts/9101');
-        await page.getByRole('button', { name: /^Edit$/ }).click();
+        await page.getByRole('button', { name: /^Edit shift$/ }).click();
         await expect(
-            page.getByRole('heading', { name: 'Edit shift' }),
+            page.getByRole('heading', { name: 'Edit shift', exact: true }),
         ).toBeVisible();
 
-        const datetimeInputs = page.locator('input[type="datetime-local"]');
-        await datetimeInputs.first().fill('2026-05-04T09:30');
-        await datetimeInputs.nth(1).fill('2026-05-04T12:30');
-        await page.getByRole('button', { name: /^Save changes$/ }).click();
+        const editDialog = page.getByRole('dialog', { name: /Edit shift/i });
+        await editDialog.getByRole('button', { name: /^Schedule\b/i }).click();
+        await editDialog.getByLabel(/^Start/).fill('2026-05-04T09:30');
+        await editDialog.getByLabel(/^End/).fill('2026-05-04T12:30');
+        await editDialog.getByRole('button', { name: /^Review\b/i }).click();
+        const updateResponse = page.waitForResponse(
+            (response) =>
+                response.url().endsWith('/operations/shifts/9101') &&
+                response.request().method() === 'PUT',
+        );
+        await editDialog
+            .getByRole('button', { name: /^Save changes$/ })
+            .click();
+        expect((await updateResponse).status()).toBe(303);
+        await expect(editDialog).not.toBeVisible();
 
         await expect(page).toHaveURL(/\/operations\/shifts\/9101(?:\?|$)/);
         await page.goto(
@@ -48,6 +61,9 @@ test.describe('operations rostering — republish flow', () => {
         const publishPanel = page.getByTestId('rostering-publish-panel');
         await expect(publishPanel).toContainText(/changed after publish/i);
         await page.getByRole('link', { name: /View diff/i }).click();
+        await expect(page).toHaveURL(
+            /\/operations\/rostering\/periods\/\d+\/diff$/,
+        );
 
         await expect(
             page.getByRole('heading', { name: /Publish diff/i }),

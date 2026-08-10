@@ -2,17 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PriceBook extends Model
 {
-    use HasFactory;
-    use SoftDeletes;
+    use HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'name',
         'description',
         'is_default',

@@ -52,10 +52,34 @@ export type EmarMedication = {
 };
 
 const OUTCOMES = [
-    { value: 'given', label: 'Given', desc: 'Administered', icon: Check, tone: 'bg-status-success-bg text-status-success' },
-    { value: 'refused', label: 'Refused', desc: 'Client declined', icon: X, tone: 'bg-status-critical-bg text-status-critical' },
-    { value: 'withheld', label: 'Withheld', desc: 'Clinical hold', icon: PauseCircle, tone: 'bg-status-warning-bg text-status-warning' },
-    { value: 'missed', label: 'Missed', desc: 'Not given', icon: XCircle, tone: 'bg-muted text-muted-foreground' },
+    {
+        value: 'given',
+        label: 'Given',
+        desc: 'Administered',
+        icon: Check,
+        tone: 'bg-status-success-bg text-status-success',
+    },
+    {
+        value: 'refused',
+        label: 'Refused',
+        desc: 'Client declined',
+        icon: X,
+        tone: 'bg-status-critical-bg text-status-critical',
+    },
+    {
+        value: 'withheld',
+        label: 'Withheld',
+        desc: 'Clinical hold',
+        icon: PauseCircle,
+        tone: 'bg-status-warning-bg text-status-warning',
+    },
+    {
+        value: 'missed',
+        label: 'Missed',
+        desc: 'Not given',
+        icon: XCircle,
+        tone: 'bg-muted text-muted-foreground',
+    },
 ] as const;
 
 const NOT_GIVEN_REASONS = [
@@ -106,7 +130,9 @@ export function EmarRecordDialog({
 
     useEffect(() => {
         if (open) {
-            setMedicationId(initialMedicationId ? String(initialMedicationId) : '');
+            setMedicationId(
+                initialMedicationId ? String(initialMedicationId) : '',
+            );
             setOutcome('given');
             setReasonCode('');
             setPrnReason('');
@@ -124,7 +150,8 @@ export function EmarRecordDialog({
 
     const needsReason = outcome !== 'given';
     const needsWitness = Boolean(
-        medication && (medication.controlled_drug || medication.witness_required),
+        medication &&
+        (medication.controlled_drug || medication.witness_required),
     );
     const isPrn = Boolean(medication?.is_prn);
 
@@ -147,17 +174,21 @@ export function EmarRecordDialog({
             {
                 status: outcome,
                 reason_code: needsReason ? reasonCode : undefined,
-                reason: isPrn && outcome === 'given' ? prnReason.trim() : undefined,
+                reason:
+                    isPrn && outcome === 'given' ? prnReason.trim() : undefined,
                 administered_at: administeredAt
                     ? new Date(administeredAt).toISOString()
                     : undefined,
-                witnessed_by: witnessedBy ? parseInt(witnessedBy, 10) : undefined,
+                witnessed_by: witnessedBy
+                    ? parseInt(witnessedBy, 10)
+                    : undefined,
                 notes: notes.trim() || undefined,
             },
             {
                 preserveScroll: true,
                 onSuccess: (page) => {
-                    const flash = (page.props as { flash?: { error?: string } }).flash;
+                    const flash = (page.props as { flash?: { error?: string } })
+                        .flash;
                     if (flash?.error) {
                         toast.error(flash.error);
                         setBusy(false);
@@ -171,7 +202,11 @@ export function EmarRecordDialog({
                 onError: (errors) => {
                     setBusy(false);
                     const first = Object.values(errors ?? {})[0];
-                    toast.error(first ? String(first) : 'Could not record the administration.');
+                    toast.error(
+                        first
+                            ? String(first)
+                            : 'Could not record the administration.',
+                    );
                 },
             },
         );
@@ -199,13 +234,19 @@ export function EmarRecordDialog({
                                 Medication{' '}
                                 <span className="text-status-critical">*</span>
                             </Label>
-                            <Select value={medicationId} onValueChange={setMedicationId}>
+                            <Select
+                                value={medicationId}
+                                onValueChange={setMedicationId}
+                            >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select medication…" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {medications.map((m) => (
-                                        <SelectItem key={m.id} value={String(m.id)}>
+                                        <SelectItem
+                                            key={m.id}
+                                            value={String(m.id)}
+                                        >
                                             {m.name}
                                             {m.dosage ? ` ${m.dosage}` : ''}
                                             {m.is_prn ? ' · PRN' : ''}
@@ -225,11 +266,14 @@ export function EmarRecordDialog({
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-[15px] font-semibold">
                                         {medication.name}
-                                        {medication.dosage ? ` ${medication.dosage}` : ''}
+                                        {medication.dosage
+                                            ? ` ${medication.dosage}`
+                                            : ''}
                                     </span>
                                     {medication.controlled_drug ? (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2 py-0.5 text-xs font-semibold text-status-critical">
-                                            <Lock className="h-3 w-3" /> Controlled
+                                            <Lock className="h-3 w-3" />{' '}
+                                            Controlled
                                         </span>
                                     ) : null}
                                     <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
@@ -290,13 +334,19 @@ export function EmarRecordDialog({
                                 Reason{' '}
                                 <span className="text-status-critical">*</span>
                             </Label>
-                            <Select value={reasonCode} onValueChange={setReasonCode}>
+                            <Select
+                                value={reasonCode}
+                                onValueChange={setReasonCode}
+                            >
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select reason…" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {NOT_GIVEN_REASONS.map((r) => (
-                                        <SelectItem key={r.value} value={r.value}>
+                                        <SelectItem
+                                            key={r.value}
+                                            value={r.value}
+                                        >
                                             {r.label}
                                         </SelectItem>
                                     ))}
@@ -321,26 +371,38 @@ export function EmarRecordDialog({
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         <div>
-                            <Label className="mb-1.5 block">Administered at</Label>
+                            <Label className="mb-1.5 block">
+                                Administered at
+                            </Label>
                             <Input
                                 type="datetime-local"
                                 value={administeredAt}
-                                onChange={(e) => setAdministeredAt(e.target.value)}
+                                onChange={(e) =>
+                                    setAdministeredAt(e.target.value)
+                                }
                             />
                         </div>
                         {needsWitness ? (
                             <div>
                                 <Label className="mb-1.5 block">
                                     Witnessed by{' '}
-                                    <span className="text-status-critical">*</span>
+                                    <span className="text-status-critical">
+                                        *
+                                    </span>
                                 </Label>
-                                <Select value={witnessedBy} onValueChange={setWitnessedBy}>
+                                <Select
+                                    value={witnessedBy}
+                                    onValueChange={setWitnessedBy}
+                                >
                                     <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Second signature…" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {staffOptions.map((s) => (
-                                            <SelectItem key={s.value} value={s.value}>
+                                            <SelectItem
+                                                key={s.value}
+                                                value={s.value}
+                                            >
                                                 {s.label}
                                             </SelectItem>
                                         ))}
@@ -367,8 +429,8 @@ export function EmarRecordDialog({
 
                     <div className="flex items-center gap-2 rounded-lg bg-muted/60 px-3 py-2 text-[11px] text-muted-foreground">
                         <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-                        Six rights checked: right person, drug, dose, route, time,
-                        documentation.
+                        Six rights checked: right person, drug, dose, route,
+                        time, documentation.
                     </div>
                 </div>
 

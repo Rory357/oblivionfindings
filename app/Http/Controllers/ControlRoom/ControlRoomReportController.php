@@ -218,8 +218,7 @@ class ControlRoomReportController extends Controller
             return $siteId;
         }
 
-        if ($siteAccess->canBypass($user, $bypassPermissions)
-            && $siteAccess->isUnrestrictedPlatformUser($user)) {
+        if ($siteAccess->canBypass($user, $bypassPermissions)) {
             return null;
         }
 

@@ -6,7 +6,13 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Calendar, CheckCircle2, MessageSquare, Send, Star } from 'lucide-react';
+import {
+    Calendar,
+    CheckCircle2,
+    MessageSquare,
+    Send,
+    Star,
+} from 'lucide-react';
 
 type User = { id: number; name: string };
 type FeedbackRequestData = {
@@ -144,7 +150,8 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                         });
 
                     return (
-                        <PageHero category="hr"
+                        <PageHero
+                            category="hr"
                             icon={MessageSquare}
                             backHref="/hr/feedback"
                             backLabel="Back to Feedback"
@@ -153,7 +160,8 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                                 <>
                                     for{' '}
                                     <strong className="text-primary-foreground">
-                                        {feedbackRequest.subject?.name ?? 'Unknown'}
+                                        {feedbackRequest.subject?.name ??
+                                            'Unknown'}
                                     </strong>
                                 </>
                             }

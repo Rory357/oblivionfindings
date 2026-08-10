@@ -23,7 +23,7 @@ test.describe('operations route canonicalization', () => {
 
         await gotoCanonical(page, '/timesheets/approvals');
         await expect(page).toHaveURL(
-            /\/operations\/timesheets\/approvals(?:\?|$)/,
+            /\/operations\/timesheets\?tab=submitted(?:&|$)/,
         );
 
         await gotoCanonical(page, '/rostering');
@@ -32,7 +32,9 @@ test.describe('operations route canonicalization', () => {
         expectNoConsoleErrors(consoleErrors);
     });
 
-    test('attendance remains a canonical frontline surface', async ({ page }) => {
+    test('attendance remains a canonical frontline surface', async ({
+        page,
+    }) => {
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsStaff(page);

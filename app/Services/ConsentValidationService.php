@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Str;
 
 class ConsentValidationService
 {
@@ -77,6 +78,28 @@ class ConsentValidationService
             ->latest('given_at')
             ->latest('id')
             ->first();
+    }
+
+    /**
+     * Confirm that a consent record is specifically for location tracking.
+     * A valid consent for another purpose must never authorise location.
+     */
+    public static function isTrackingConsent(ClientConsent $consent): bool
+    {
+        $name = Str::lower((string) $consent->consentType?->name);
+
+        return Str::contains($name, ['tracking', 'tracker', 'location']);
+    }
+
+    /**
+     * Apply the full current-state boundary to an assignment-linked consent.
+     */
+    public static function isValidTrackingConsent(ClientConsent $consent): bool
+    {
+        return self::isTrackingConsent($consent)
+            && $consent->isValid()
+            && $consent->withdrawn_at === null
+            && $consent->superseded_by_consent_id === null;
     }
 
     /**

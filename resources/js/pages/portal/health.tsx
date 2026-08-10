@@ -3,7 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
-import { Activity, AlertTriangle, Heart, Lock, Pill, ShieldCheck, Utensils, Waypoints } from 'lucide-react';
+import {
+    Activity,
+    AlertTriangle,
+    Heart,
+    Lock,
+    Pill,
+    ShieldCheck,
+    Utensils,
+    Waypoints,
+} from 'lucide-react';
 
 type MedicalProfile = {
     medical_history?: string;
@@ -79,8 +88,14 @@ export default function Health({
             <AppLayout
                 breadcrumbs={[
                     { title: 'Portal', href: '/portal' },
-                    { title: clientName, href: `/portal/clients/${client.id}/dashboard` },
-                    { title: 'Health', href: `/portal/clients/${client.id}/health` },
+                    {
+                        title: clientName,
+                        href: `/portal/clients/${client.id}/dashboard`,
+                    },
+                    {
+                        title: 'Health',
+                        href: `/portal/clients/${client.id}/health`,
+                    },
                 ]}
             >
                 <Head title={`${clientName} - Health`} />
@@ -89,10 +104,12 @@ export default function Health({
                         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                             <Lock className="mb-3 h-10 w-10 text-muted-foreground/40" />
                             <p className="text-sm font-medium text-muted-foreground">
-                                Medical information is not available for your access level
+                                Medical information is not available for your
+                                access level
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground/70">
-                                Please contact the care team if you need access to health records.
+                                Please contact the care team if you need access
+                                to health records.
                             </p>
                         </CardContent>
                     </Card>
@@ -105,8 +122,14 @@ export default function Health({
         <AppLayout
             breadcrumbs={[
                 { title: 'Portal', href: '/portal' },
-                { title: clientName, href: `/portal/clients/${client.id}/dashboard` },
-                { title: 'Health', href: `/portal/clients/${client.id}/health` },
+                {
+                    title: clientName,
+                    href: `/portal/clients/${client.id}/dashboard`,
+                },
+                {
+                    title: 'Health',
+                    href: `/portal/clients/${client.id}/health`,
+                },
             ]}
         >
             <Head title={`${clientName} - Health`} />
@@ -127,13 +150,15 @@ export default function Health({
                             <CardContent className="space-y-4">
                                 {medicalProfile?.allergies && (
                                     <div>
-                                        <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                        <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                             Allergies
                                         </p>
                                         <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical dark:text-status-critical">
                                             <div className="flex items-start gap-2">
                                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                                                <span>{medicalProfile.allergies}</span>
+                                                <span>
+                                                    {medicalProfile.allergies}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -141,10 +166,12 @@ export default function Health({
 
                                 {medicalProfile?.disabilities && (
                                     <div>
-                                        <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                        <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                             Disabilities
                                         </p>
-                                        <p className="text-sm">{medicalProfile.disabilities}</p>
+                                        <p className="text-sm">
+                                            {medicalProfile.disabilities}
+                                        </p>
                                     </div>
                                 )}
 
@@ -152,10 +179,12 @@ export default function Health({
                                     <>
                                         <Separator />
                                         <div>
-                                            <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                                 Medical History
                                             </p>
-                                            <p className="text-sm whitespace-pre-line">{medicalProfile.medical_history}</p>
+                                            <p className="text-sm whitespace-pre-line">
+                                                {medicalProfile.medical_history}
+                                            </p>
                                         </div>
                                     </>
                                 )}
@@ -164,10 +193,12 @@ export default function Health({
                                     <>
                                         <Separator />
                                         <div>
-                                            <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                                 Notes
                                             </p>
-                                            <p className="text-sm whitespace-pre-line">{medicalProfile.notes}</p>
+                                            <p className="text-sm whitespace-pre-line">
+                                                {medicalProfile.notes}
+                                            </p>
                                         </div>
                                     </>
                                 )}
@@ -200,7 +231,9 @@ export default function Health({
                                                 className="flex items-start justify-between gap-3 rounded-lg border p-3"
                                             >
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-medium">{condition.label}</p>
+                                                    <p className="text-sm font-medium">
+                                                        {condition.label}
+                                                    </p>
                                                     {condition.notes && (
                                                         <p className="mt-0.5 text-xs text-muted-foreground">
                                                             {condition.notes}
@@ -235,23 +268,44 @@ export default function Health({
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <Pill className="h-4 w-4 text-primary" />
                                         Medications
-                                        {permissions.show_medication_status && medications.length > 0 && (
-                                            <Badge variant="secondary" className="ml-auto text-xs">
-                                                {medications.length} active
-                                            </Badge>
-                                        )}
+                                        {permissions.show_medication_status &&
+                                            medications.length > 0 && (
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="ml-auto text-xs"
+                                                >
+                                                    {medications.length} active
+                                                </Badge>
+                                            )}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     {medications.length > 0 ? (
                                         <div className="space-y-3">
                                             {medications.map((med) => (
-                                                <div key={med.id} className="rounded-lg border p-3">
-                                                    <p className="text-sm font-semibold">{med.name}</p>
+                                                <div
+                                                    key={med.id}
+                                                    className="rounded-lg border p-3"
+                                                >
+                                                    <p className="text-sm font-semibold">
+                                                        {med.name}
+                                                    </p>
                                                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                                                        {med.dosage && <span>{med.dosage}</span>}
-                                                        {med.frequency && <span>{med.frequency}</span>}
-                                                        {med.route && <span>{med.route}</span>}
+                                                        {med.dosage && (
+                                                            <span>
+                                                                {med.dosage}
+                                                            </span>
+                                                        )}
+                                                        {med.frequency && (
+                                                            <span>
+                                                                {med.frequency}
+                                                            </span>
+                                                        )}
+                                                        {med.route && (
+                                                            <span>
+                                                                {med.route}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     {med.instructions && (
                                                         <p className="mt-1.5 text-xs text-muted-foreground italic">
@@ -282,19 +336,26 @@ export default function Health({
                                 <CardContent className="space-y-4">
                                     {carePlan.goals && (
                                         <div>
-                                            <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                                 Goals
                                             </p>
-                                            <p className="text-sm whitespace-pre-line">{carePlan.goals}</p>
+                                            <p className="text-sm whitespace-pre-line">
+                                                {carePlan.goals}
+                                            </p>
                                         </div>
                                     )}
-                                    {carePlan.goals && carePlan.important_to_me && <Separator />}
+                                    {carePlan.goals &&
+                                        carePlan.important_to_me && (
+                                            <Separator />
+                                        )}
                                     {carePlan.important_to_me && (
                                         <div>
-                                            <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                                 Important to Me
                                             </p>
-                                            <p className="text-sm whitespace-pre-line">{carePlan.important_to_me}</p>
+                                            <p className="text-sm whitespace-pre-line">
+                                                {carePlan.important_to_me}
+                                            </p>
                                         </div>
                                     )}
                                 </CardContent>
@@ -315,7 +376,9 @@ export default function Health({
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-sm">{client.dietary_requirements}</p>
+                                    <p className="text-sm">
+                                        {client.dietary_requirements}
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}
@@ -328,7 +391,9 @@ export default function Health({
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-sm">{client.mobility_needs}</p>
+                                    <p className="text-sm">
+                                        {client.mobility_needs}
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}

@@ -16,7 +16,17 @@ class ClientFundTransactionObserver implements ShouldHandleEventsAfterCommit
             return;
         }
 
-        if (! $transaction->organization_id) {
+        $hasCanonicalClientSite = ClientFundTransaction::query()
+            ->whereKey($transaction->id)
+            ->whereHas('fund.client', fn ($clientQuery) => $clientQuery
+                ->whereNotNull('site_id')
+                ->whereHas('site', fn ($siteQuery) => $siteQuery
+                    ->active()
+                    ->notArchived()
+                    ->whereNull('archived_at')))
+            ->exists();
+
+        if (! $hasCanonicalClientSite) {
             return;
         }
 

@@ -2,10 +2,12 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -14,20 +16,25 @@ beforeEach(function () {
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    $this->site = Site::factory()->create(['name' => 'Org Chart Test Site']);
+    orgChartProfile($this->hr, [
+        'employee_number' => 'EMP-ORG-VIEWER',
+        'primary_site_id' => $this->site->id,
+    ]);
 });
 
 function orgChartProfile(User $user, array $overrides = []): HrEmployeeProfile
 {
     return HrEmployeeProfile::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $user->id,
-        'employee_number' => 'EMP-' . $user->id,
+        'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
         'start_date' => now()->subMonth()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => Site::query()->orderBy('id')->value('id'),
     ], $overrides));
 }
 

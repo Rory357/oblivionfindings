@@ -8,9 +8,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Operations\Rostering\ApplyRosterTemplateRequest;
 use App\Http\Requests\Operations\Rostering\StoreRosterTemplateRequest;
 use App\Http\Requests\Operations\Rostering\UpdateRosterTemplateRequest;
+use App\Models\Client;
 use App\Models\RosterTemplate;
+use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -21,15 +24,17 @@ use Throwable;
 
 class RosterTemplateController extends Controller
 {
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function store(StoreRosterTemplateRequest $request)
     {
         $auth = $request->user();
         abort_unless($this->canCreateTemplates($auth), 403);
 
         $data = $request->validated();
+        $this->assertTemplateRowsAccessible($auth, $data['template_shifts']);
 
         $template = RosterTemplate::create([
-            'organization_id' => $auth->organization_id,
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'template_type' => $data['template_type'] ?? 'weekly',
@@ -39,10 +44,7 @@ class RosterTemplateController extends Controller
 
         $template->templateShifts()->createMany(
             collect($data['template_shifts'])
-                ->map(fn (array $row) => [
-                    ...$this->normalizeTemplateShift($row),
-                    'organization_id' => $auth->organization_id,
-                ])
+                ->map(fn (array $row) => $this->normalizeTemplateShift($row))
                 ->all()
         );
 
@@ -56,8 +58,9 @@ class RosterTemplateController extends Controller
         $auth = $request->user();
         abort_unless($this->canUpdateTemplates($auth), 403);
 
-        $template = RosterTemplate::where('organization_id', $auth->organization_id)->findOrFail($template);
+        $template = RosterTemplate::query()->findOrFail($template);
         $data = $request->validated();
+        $this->assertTemplateRowsAccessible($auth, $data['template_shifts']);
 
         $template->update([
             'name' => $data['name'],
@@ -69,10 +72,7 @@ class RosterTemplateController extends Controller
         $template->templateShifts()->delete();
         $template->templateShifts()->createMany(
             collect($data['template_shifts'])
-                ->map(fn (array $row) => [
-                    ...$this->normalizeTemplateShift($row),
-                    'organization_id' => $auth->organization_id,
-                ])
+                ->map(fn (array $row) => $this->normalizeTemplateShift($row))
                 ->all()
         );
 
@@ -86,7 +86,7 @@ class RosterTemplateController extends Controller
         $auth = $request->user();
         abort_unless($this->canDeleteTemplates($auth), 403);
 
-        $template = RosterTemplate::where('organization_id', $auth->organization_id)->findOrFail($template);
+        $template = RosterTemplate::query()->findOrFail($template);
         $template->delete();
 
         return redirect()
@@ -99,12 +99,12 @@ class RosterTemplateController extends Controller
         $auth = $request->user();
         abort_unless($this->canCreateTemplates($auth), 403);
 
-        $template = RosterTemplate::where('organization_id', $auth->organization_id)
+        $template = RosterTemplate::query()
             ->with('templateShifts')
             ->findOrFail($template);
+        $this->assertTemplateRowsAccessible($auth, $template->templateShifts->all());
 
         $copy = RosterTemplate::create([
-            'organization_id' => $auth->organization_id,
             'name' => $this->duplicateName($template->name),
             'description' => $template->description,
             'template_type' => $template->template_type,
@@ -115,7 +115,6 @@ class RosterTemplateController extends Controller
         $copy->templateShifts()->createMany(
             $template->templateShifts
                 ->map(fn ($shift) => [
-                    'organization_id' => $auth->organization_id,
                     'client_id' => $shift->client_id,
                     'user_id' => $shift->user_id,
                     'service_context_id' => $shift->service_context_id,
@@ -162,13 +161,14 @@ class RosterTemplateController extends Controller
         $auth = $request->user();
         abort_unless($this->canUpdateTemplates($auth), 403);
 
-        $template = RosterTemplate::where('organization_id', $auth->organization_id)
+        $template = RosterTemplate::query()
             ->with([
                 'templateShifts.client.site',
                 'templateShifts.serviceContext.site',
                 'templateShifts.user',
             ])
             ->findOrFail($template);
+        $this->assertTemplateRowsAccessible($auth, $template->templateShifts->all());
 
         $data = $request->validated();
 
@@ -259,7 +259,6 @@ class RosterTemplateController extends Controller
             $assignee = $templateShift->user_id ? $templateShift->user : null;
 
             $attributes = [
-                'organization_id' => $auth->organization_id,
                 'client_id' => $templateShift->client_id,
                 'site_id' => $site?->id,
                 'user_id' => null,
@@ -327,13 +326,53 @@ class RosterTemplateController extends Controller
     private function templateApplyIdempotencyKey(RosterTemplate $template, Carbon $weekStart, User $auth, int $cycles = 1, int $intervalWeeks = 1): string
     {
         return 'rostering:template-apply:'.sha1(implode('|', [
-            $auth->organization_id ?? 'global',
             $template->id,
             $weekStart->toDateString(),
             $auth->id,
             $cycles,
             $intervalWeeks,
         ]));
+    }
+
+    /**
+     * Template rows may only refer to Clients, service contexts and staff from
+     * Sites available to the actor. The template catalogue itself is shared by
+     * this single application; Site provenance lives on each row's references.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function assertTemplateRowsAccessible(User $actor, array $rows): void
+    {
+        $siteIds = $this->siteAccess->accessibleSiteIds($actor, ['shifts.manageAny']);
+        abort_if($siteIds === [], 403, UserSiteAccessService::DEFAULT_MESSAGE);
+
+        $clientIds = collect($rows)->pluck('client_id')->filter()->map(fn ($id) => (int) $id)->unique();
+        $serviceContextIds = collect($rows)->pluck('service_context_id')->filter()->map(fn ($id) => (int) $id)->unique();
+        $staffIds = collect($rows)->pluck('user_id')->filter()->map(fn ($id) => (int) $id)->unique();
+
+        if ($clientIds->isNotEmpty()) {
+            $visibleClientCount = Client::query()
+                ->whereKey($clientIds)
+                ->whereIn('site_id', $siteIds)
+                ->count();
+            abort_unless($visibleClientCount === $clientIds->count(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        }
+
+        if ($serviceContextIds->isNotEmpty()) {
+            $visibleServiceContextCount = ServiceContext::query()
+                ->availableToSites($siteIds)
+                ->whereKey($serviceContextIds)
+                ->count();
+            abort_unless($visibleServiceContextCount === $serviceContextIds->count(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        }
+
+        if ($staffIds->isNotEmpty()) {
+            $visibleStaffCount = $this->siteAccess
+                ->applyStaffScope(User::query(), $actor, ['shifts.manageAny'])
+                ->whereKey($staffIds)
+                ->count();
+            abort_unless($visibleStaffCount === $staffIds->count(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        }
     }
 
     private function cadenceIntervalWeeks(?string $cadence): int

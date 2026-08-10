@@ -42,6 +42,14 @@ function grantPhaseTwoThreePermissions(User $user, array $permissionKeys): void
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
+function makePhaseTwoThreeClient(array $attributes = []): Client
+{
+    return Client::factory()->create([
+        'site_id' => Site::factory()->create()->id,
+        ...$attributes,
+    ]);
+}
+
 it('stores leave requests with the canonical timeline projection', function () {
     $manager = User::factory()->create();
     grantPhaseTwoThreePermissions($manager, [
@@ -49,7 +57,7 @@ it('stores leave requests with the canonical timeline projection', function () {
         'clients.update',
     ]);
 
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     $this->actingAs($manager)
         ->post("/operations/clients/{$client->id}/leave", [
@@ -84,7 +92,7 @@ it('stores leave requests with the canonical timeline projection', function () {
 it('updates leave status and stamps approver', function () {
     $manager = User::factory()->create();
     grantPhaseTwoThreePermissions($manager, ['clients.viewAny', 'clients.update']);
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
     $leave = ClientLeaveRequest::create([
         'client_id' => $client->id,
         'starts_on' => '2026-07-01',
@@ -112,7 +120,7 @@ it('updates leave status and stamps approver', function () {
 it('creates excursions and emits a status_critical-free timeline event by default', function () {
     $manager = User::factory()->create();
     grantPhaseTwoThreePermissions($manager, ['clients.viewAny', 'clients.update']);
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     $this->actingAs($manager)
         ->post("/operations/clients/{$client->id}/excursions", [
@@ -149,7 +157,7 @@ it('respects per-client seizure escalation overrides', function () {
         'medications.administer.record',
     ]);
 
-    $client = Client::factory()->create([
+    $client = makePhaseTwoThreeClient([
         'seizure_duration_escalation_seconds' => 120, // 2-minute override
     ]);
 
@@ -174,7 +182,7 @@ it('respects per-client seizure escalation overrides', function () {
 it('preserves manually recorded timeline events when a model projection retypes', function () {
     // Verifies the meta._projected guard added to TimelineEmitter::project.
     $user = User::factory()->create();
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     $note = ClientNote::query()->create([
         'client_id' => $client->id,
@@ -216,7 +224,7 @@ it('aggregates behaviour patterns from clinical observations and concern notes',
         'progress_notes.viewAny',
     ]);
 
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     ClientNote::query()->create([
         'client_id' => $client->id,
@@ -306,7 +314,7 @@ it('upserts a PATH plan and surfaces overdue reviews in the actions aggregator',
         'care_plans.viewAny',
     ]);
 
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     $this->actingAs($manager)
         ->post("/operations/clients/{$client->id}/path-plan", [
@@ -353,7 +361,7 @@ it('surfaces purchase requests and financial discrepancies on the client profile
         'client_funds.manage',
     ]);
 
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     ClientPurchaseRequest::query()->create([
         'client_id' => $client->id,
@@ -394,7 +402,7 @@ it('exposes a categorised relationship for each next-of-kin via the enum', funct
         'clients.update',
     ]);
 
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     $parentUser = User::factory()->create(['name' => 'Sue Parent']);
     $guardianUser = User::factory()->create(['name' => 'Pat Guardian']);
@@ -434,7 +442,7 @@ it('exposes a categorised relationship for each next-of-kin via the enum', funct
 });
 
 it('honours DataRetentionPolicy overrides when pruning audit logs and timeline events', function () {
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     // Stored retention policies override the config defaults of 2 yrs audit /
     // 5 yrs timeline. Bumping audit to 7 yrs should spare a 3-year-old log;
@@ -484,7 +492,7 @@ it('honours DataRetentionPolicy overrides when pruning audit logs and timeline e
 
 it('migrates a legacy ProgressNote into a ClientNote idempotently', function () {
     $user = User::factory()->create();
-    $client = Client::factory()->create();
+    $client = makePhaseTwoThreeClient();
 
     $progress = ProgressNote::create([
         'organization_id' => 1,

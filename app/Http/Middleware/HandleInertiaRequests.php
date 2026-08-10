@@ -3,15 +3,17 @@
 namespace App\Http\Middleware;
 
 use App\Domain\Finance\Services\FinanceHubCountsService;
+use App\Domain\It\ItModuleNavigation;
 use App\Models\Announcement;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
-use App\Models\OpsMessage;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\User;
 use App\Services\MarScheduleService;
+use App\Services\Operations\OpsMessageVisibilityService;
 use App\Services\Tasks\TaskAggregator;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
@@ -148,7 +150,11 @@ class HandleInertiaRequests extends Middleware
             // Inertia partial-reloads never invoke it; every *TabsFooter reads its
             // own hub's slice from `financeHubCounts[hub]`.
             'financeHubCounts' => $user && str_starts_with((string) $request->route()?->getName(), 'finance.')
-                ? fn () => app(FinanceHubCountsService::class)->forOrganization($user->organization_id)
+                ? fn () => app(FinanceHubCountsService::class)->forApplication()
+                : null,
+
+            'itNavigation' => $user && str_starts_with((string) $request->route()?->getName(), 'it.')
+                ? fn () => ItModuleNavigation::forUser($user)
                 : null,
 
             'auth' => [
@@ -164,7 +170,6 @@ class HandleInertiaRequests extends Middleware
                     // Keep during migration (existing UI uses it)
                     'role' => $user->role ?? null,
 
-                    'organization_id' => $user->organization_id ?? null,
                 ] : null,
 
                 // NEW: capability map for the UI
@@ -185,13 +190,7 @@ class HandleInertiaRequests extends Middleware
                     ])->values()->all()
                     : null,
                 'unreadMessageCount' => $user && $hasOpsMessagingTables
-                    ? OpsMessage::query()
-                        ->whereExists(fn ($q) => $q->from('ops_conversation_participants')
-                            ->whereColumn('ops_conversation_participants.conversation_id', 'ops_messages.conversation_id')
-                            ->where('ops_conversation_participants.user_id', $user->id))
-                        ->where('sender_id', '!=', $user->id)
-                        ->where('is_read', false)
-                        ->count()
+                    ? app(OpsMessageVisibilityService::class)->unreadCount($user)
                     : 0,
             ],
 
@@ -342,7 +341,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v5';
+    protected const PERMISSIONS_CACHE_VERSION = 'v6';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -371,6 +370,7 @@ class HandleInertiaRequests extends Middleware
         return [
             'sites' => [
                 'viewAny' => $user->canDo('sites.viewAny'),
+                'viewAll' => $user->canDo('sites.viewAll'),
                 'create' => $user->canDo('sites.create'),
                 'update' => $user->canDo('sites.update'),
                 'archive' => $user->canDo('sites.archive'),
@@ -493,7 +493,9 @@ class HandleInertiaRequests extends Middleware
                 'maintenanceManage' => $user->canDo('securityDevices.maintenance.manage'),
                 'integrationsView' => $user->canDo('securityDevices.integrations.view'),
                 'integrationsManage' => $user->canDo('securityDevices.integrations.manage'),
+                'monitoringManage' => $user->canDo('securityDevices.monitoring.manage'),
                 'reportsView' => $user->canDo('securityDevices.reports.view'),
+                'commandsAdmin' => $user->canDo('securityDevices.commands.admin'),
             ],
 
             'calendar' => [
@@ -614,7 +616,7 @@ class HandleInertiaRequests extends Middleware
 
             'integrations' => [
                 'view' => $user->canDo('integrations.view'),
-                'manageTenantSecrets' => $user->canDo('integrations.manage_tenant_secrets'),
+                'manageSecrets' => $user->canDo('integrations.manage_secrets'),
                 'manageSiteSecrets' => $user->canDo('integrations.manage_site_secrets'),
             ],
 
@@ -1092,7 +1094,7 @@ class HandleInertiaRequests extends Middleware
         ];
     }
 
-    protected function jobBoardOpenCount($user): int
+    protected function jobBoardOpenCount(User $user): int
     {
         if (! Schema::hasTable('shift_open_positions')) {
             return 0;
@@ -1100,7 +1102,8 @@ class HandleInertiaRequests extends Middleware
 
         try {
             return ShiftOpenPosition::query()
-                ->when($user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
+                ->tap(fn ($query) => app(UserSiteAccessService::class)
+                    ->applyShiftOpenPositionScope($query, $user, ['reports.viewAny']))
                 ->where('status', 'open')
                 ->where(function ($query) {
                     $query->whereNull('expires_at')

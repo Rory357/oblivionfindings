@@ -228,9 +228,7 @@ export default function LeaveIndex({
     const [declineNotes, setDeclineNotes] = useState('');
     const [processing, setProcessing] = useState(false);
     const [bulkApproveDialogOpen, setBulkApproveDialogOpen] = useState(false);
-    const [cancelTarget, setCancelTarget] = useState<LeaveRequest | null>(
-        null,
-    );
+    const [cancelTarget, setCancelTarget] = useState<LeaveRequest | null>(null);
     const selectedPendingIds = useMemo(
         () =>
             selectedRequestIds.filter((id) =>

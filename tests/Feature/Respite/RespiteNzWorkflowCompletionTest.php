@@ -3,6 +3,7 @@
 namespace Tests\Feature\Respite;
 
 use App\Domain\Governance\Models\NotifiableIncident;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\DataRetentionPolicy;
@@ -176,9 +177,12 @@ class RespiteNzWorkflowCompletionTest extends TestCase
 
     public function test_respite_stay_records_restraint_and_notifiable_incident_then_blocks_discharge_until_reviewed(): void
     {
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $this->grantAdminSiteAccess($site);
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $booking = RespiteBooking::factory()->create([
             'client_id' => $client->id,
+            'location_id' => $site->id,
             'status' => 'confirmed',
         ]);
         $stay = RespiteStay::create([
@@ -214,6 +218,7 @@ class RespiteNzWorkflowCompletionTest extends TestCase
                 'title' => 'Fall during respite stay',
                 'description' => 'Client fell and required clinical review.',
                 'occurred_at' => now()->subHour()->format('Y-m-d H:i:s'),
+                'immediate_action_taken' => 'Client assessed, area made safe, and clinical review arranged.',
                 'is_notifiable' => true,
                 'notification_authority' => 'health_nz',
                 'incident_type' => 'serious_harm',
@@ -223,6 +228,8 @@ class RespiteNzWorkflowCompletionTest extends TestCase
 
         $incident = ClientIncident::firstOrFail();
         $this->assertSame($stay->id, $incident->respite_stay_id);
+        $this->assertSame($site->id, $incident->site_id);
+        $this->assertNotNull($incident->hs_event_id);
         $this->assertSame($incident->id, NotifiableIncident::firstOrFail()->related_incident_id);
 
         $this->actingAs($this->admin)
@@ -308,9 +315,12 @@ class RespiteNzWorkflowCompletionTest extends TestCase
 
     public function test_logging_a_complaint_persists_and_surfaces_in_the_evidence_manifest(): void
     {
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $this->grantAdminSiteAccess($site);
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $booking = RespiteBooking::factory()->create([
             'client_id' => $client->id,
+            'location_id' => $site->id,
             'status' => 'confirmed',
         ]);
         $stay = RespiteStay::create([
@@ -376,6 +386,18 @@ class RespiteNzWorkflowCompletionTest extends TestCase
         $payload = json_decode($response->streamedContent(), true);
 
         return collect($payload['manifest'])->firstWhere('type', 'complaints');
+    }
+
+    private function grantAdminSiteAccess(Site $site): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+        ]);
     }
 
     public function test_respite_retention_policy_seeder_creates_health_record_and_declined_referral_windows(): void

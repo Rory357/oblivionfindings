@@ -8,15 +8,15 @@
 import {
     CalendarDays,
     CalendarPlus,
-    LocateFixed,
     Layers,
+    LocateFixed,
     Rss,
     type LucideIcon,
 } from 'lucide-react';
 import { type CSSProperties } from 'react';
 
-import { cn } from '@/lib/utils';
 import { type CalendarLayer } from '@/lib/calendar/layer-feed';
+import { cn } from '@/lib/utils';
 
 export type CalendarHeroStats = {
     eventsThisWeek: number;
@@ -56,7 +56,8 @@ const HERO_STYLE: CSSProperties = {
     ['--hr-amber' as string]: 'oklch(0.86 0.13 90)',
     background:
         'linear-gradient(120deg, color-mix(in oklch, var(--primary) 72%, black 22%), var(--primary) 58%, color-mix(in oklch, var(--primary) 90%, white 8%))',
-    boxShadow: '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
+    boxShadow:
+        '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
 };
 
 /** Per-layer swatch token for the "Up next" dots. */
@@ -79,8 +80,12 @@ function relativeDay(iso: string): string {
     const days = Math.round((target.getTime() - today.getTime()) / 86_400_000);
     if (days === 0) return 'Today';
     if (days === 1) return 'Tomorrow';
-    if (days > 1 && days < 7) return target.toLocaleDateString('en-NZ', { weekday: 'short' });
-    return target.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+    if (days > 1 && days < 7)
+        return target.toLocaleDateString('en-NZ', { weekday: 'short' });
+    return target.toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+    });
 }
 
 /**
@@ -122,7 +127,7 @@ export function CalendarHero({
                             <CalendarDays className="h-[26px] w-[26px]" />
                         </span>
                         <div className="min-w-0">
-                            <h1 className="text-[28px] font-bold leading-[1.05] tracking-tight">
+                            <h1 className="text-[28px] leading-[1.05] font-bold tracking-tight">
                                 Calendar
                             </h1>
                             <p className="mt-1.5 text-[13px] font-medium text-primary-foreground/75">
@@ -136,7 +141,7 @@ export function CalendarHero({
                     </div>
 
                     {/* stats */}
-                    <div className="-ml-3 mt-[18px] flex flex-wrap gap-0.5">
+                    <div className="mt-[18px] -ml-3 flex flex-wrap gap-0.5">
                         <HeroStat
                             label="Events · this week"
                             value={stats.eventsThisWeek}
@@ -174,20 +179,32 @@ export function CalendarHero({
                             </button>
                         ) : null}
                         {handlers?.onToday ? (
-                            <QuickAction icon={LocateFixed} label="Today" onClick={handlers.onToday} />
+                            <QuickAction
+                                icon={LocateFixed}
+                                label="Today"
+                                onClick={handlers.onToday}
+                            />
                         ) : null}
                         {handlers?.onSubscribe ? (
-                            <QuickAction icon={Rss} label="Subscribe" onClick={handlers.onSubscribe} />
+                            <QuickAction
+                                icon={Rss}
+                                label="Subscribe"
+                                onClick={handlers.onSubscribe}
+                            />
                         ) : null}
                         {handlers?.onManageLayers ? (
-                            <QuickAction icon={Layers} label="Manage layers" onClick={handlers.onManageLayers} />
+                            <QuickAction
+                                icon={Layers}
+                                label="Manage layers"
+                                onClick={handlers.onManageLayers}
+                            />
                         ) : null}
                     </div>
 
                     {/* needs attention */}
                     {needs.length > 0 ? (
                         <div className="mt-[18px] flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/50">
+                            <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/50 uppercase">
                                 Needs attention
                             </span>
                             {needs.map((chip) => (
@@ -195,7 +212,7 @@ export function CalendarHero({
                                     key={chip.key}
                                     type="button"
                                     onClick={chip.onClick}
-                                    className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/[0.13] py-1.5 pl-2.5 pr-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
+                                    className="inline-flex items-center gap-2 rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/[0.13] py-1.5 pr-3 pl-2.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/25"
                                 >
                                     <span className="h-1.5 w-1.5 flex-none rounded-full bg-[color:var(--hr-amber)] shadow-[0_0_0_3px_color-mix(in_oklch,var(--hr-amber)_32%,transparent)]" />
                                     {chip.label}
@@ -206,8 +223,8 @@ export function CalendarHero({
                 </div>
 
                 {/* ── right rail: Up next ── */}
-                <div className="flex w-full flex-none flex-col border-t border-primary-foreground/15 bg-black/[0.08] p-[22px_24px] sm:w-[340px] sm:border-l sm:border-t-0">
-                    <span className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/55">
+                <div className="flex w-full flex-none flex-col border-t border-primary-foreground/15 bg-black/[0.08] p-[22px_24px] sm:w-[340px] sm:border-t-0 sm:border-l">
+                    <span className="mb-2 text-[10px] font-bold tracking-[0.1em] text-primary-foreground/55 uppercase">
                         Up next
                     </span>
                     {upNext.length === 0 ? (
@@ -220,17 +237,22 @@ export function CalendarHero({
                                 <li key={entry.id}>
                                     <button
                                         type="button"
-                                        onClick={() => handlers?.onUpNext?.(entry)}
+                                        onClick={() =>
+                                            handlers?.onUpNext?.(entry)
+                                        }
                                         className="flex w-full items-center gap-2.5 rounded-[10px] px-2 py-1.5 text-left transition-colors hover:bg-primary-foreground/10"
                                     >
                                         <span
                                             className="h-2 w-2 flex-none rounded-full"
-                                            style={{ background: LAYER_DOT[entry.layer] }}
+                                            style={{
+                                                background:
+                                                    LAYER_DOT[entry.layer],
+                                            }}
                                         />
                                         <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-primary-foreground/90">
                                             {entry.title}
                                         </span>
-                                        <span className="flex-none text-[11px] font-semibold tabular-nums text-primary-foreground/60">
+                                        <span className="flex-none text-[11px] font-semibold text-primary-foreground/60 tabular-nums">
                                             {relativeDay(entry.start)}
                                         </span>
                                     </button>
@@ -257,7 +279,7 @@ function HeroStat({
 }) {
     const inner = (
         <>
-            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+            <span className="text-[10px] font-bold tracking-[0.09em] whitespace-nowrap text-primary-foreground/60 uppercase">
                 {label}
             </span>
             <span

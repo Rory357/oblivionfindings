@@ -54,7 +54,10 @@ export function ModulesGrid({
             title: 'Job board',
             href: '/operations/job-board',
             icon: Briefcase,
-            badge: { text: `${openShifts} open`, tone: openShifts > 0 ? 'critical' : 'muted' },
+            badge: {
+                text: `${openShifts} open`,
+                tone: openShifts > 0 ? 'critical' : 'muted',
+            },
             description: 'Offer open shifts to bank staff · accept first',
         },
         {
@@ -85,7 +88,7 @@ export function ModulesGrid({
             <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Grid3x3 className="h-4 w-4 text-muted-foreground" />
-                    <h2 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h2 className="text-[13px] font-semibold tracking-wider text-muted-foreground uppercase">
                         More modules
                     </h2>
                 </div>
@@ -109,7 +112,10 @@ export function ModulesGrid({
                             <div className="flex items-center justify-between">
                                 <div
                                     className="flex h-8 w-8 items-center justify-center rounded-lg"
-                                    style={{ background: 'var(--accent)', color: 'var(--primary)' }}
+                                    style={{
+                                        background: 'var(--accent)',
+                                        color: 'var(--primary)',
+                                    }}
                                 >
                                     <Icon className="h-4 w-4" />
                                 </div>
@@ -119,17 +125,22 @@ export function ModulesGrid({
                                         style={
                                             m.badge.tone === 'critical'
                                                 ? {
-                                                      background: 'var(--status-critical-bg)',
+                                                      background:
+                                                          'var(--status-critical-bg)',
                                                       color: 'var(--status-critical)',
                                                   }
-                                                : { color: 'var(--muted-foreground)' }
+                                                : {
+                                                      color: 'var(--muted-foreground)',
+                                                  }
                                         }
                                     >
                                         {m.badge.text}
                                     </span>
                                 ) : null}
                             </div>
-                            <div className="mt-1 text-[13px] font-semibold">{m.title}</div>
+                            <div className="mt-1 text-[13px] font-semibold">
+                                {m.title}
+                            </div>
                             <div className="text-[10.5px] leading-snug text-muted-foreground">
                                 {m.description}
                             </div>

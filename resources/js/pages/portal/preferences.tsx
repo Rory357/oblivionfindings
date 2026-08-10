@@ -97,7 +97,11 @@ export default function Preferences({ preferences }: Props) {
                         description="Choose which notifications you'd like to receive."
                         stats={[
                             { label: 'Total', value: localPreferences.length },
-                            { label: 'Enabled', value: localPreferences.filter((p) => p.enabled).length },
+                            {
+                                label: 'Enabled',
+                                value: localPreferences.filter((p) => p.enabled)
+                                    .length,
+                            },
                         ]}
                     />
                 }

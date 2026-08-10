@@ -229,7 +229,8 @@ function RequestCard({
                                 {r.serviceAgreement.title ??
                                     `Agreement #${r.serviceAgreement.id}`}{' '}
                                 ·{' '}
-                                {r.serviceAgreement.carerSupportDaysRemaining != null
+                                {r.serviceAgreement.carerSupportDaysRemaining !=
+                                null
                                     ? `${r.serviceAgreement.carerSupportDaysRemaining}d left`
                                     : `${r.serviceAgreement.hoursRemaining}h left`}
                             </span>
@@ -270,8 +271,13 @@ function RequestCard({
                         </Button>
                     ) : null}
                     {can.update && r.clientId && !r.clientProfileComplete ? (
-                        <Button size="sm" variant="outline" onClick={() => onCompleteProfile(r)}>
-                            <ClipboardCheck className="h-3.5 w-3.5" /> Complete profile
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onCompleteProfile(r)}
+                        >
+                            <ClipboardCheck className="h-3.5 w-3.5" /> Complete
+                            profile
                         </Button>
                     ) : null}
                     {can.update && needsReview(r.status) ? (
@@ -323,7 +329,8 @@ function RequestMiniCard({
     onView: (row: RespiteRequestRow) => void;
 }) {
     return (
-        <Button unstyled
+        <Button
+            unstyled
             type="button"
             onClick={() => onView(r)}
             className="w-full rounded-xl border border-border bg-card p-3 text-left transition-shadow hover:shadow-sm"

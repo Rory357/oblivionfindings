@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
-use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplateItem;
 use App\Models\SiteDamage;
@@ -54,7 +53,7 @@ class SiteChecklistController extends Controller
             'signature_name' => 'nullable|string',
         ]);
 
-        $this->bulkUpsertResponses($run, $validated['responses']);
+        $this->persistResponses($run, $validated['responses']);
 
         // Answering a scheduled run marks it in progress (also covers the run
         // modal's save path, which never calls startRun explicitly).
@@ -93,7 +92,7 @@ class SiteChecklistController extends Controller
         ]);
 
         DB::transaction(function () use ($run, $validated, $request) {
-            $this->bulkUpsertResponses($run, $validated['responses']);
+            $this->persistResponses($run, $validated['responses']);
             $run->calculateCompletion();
             $this->raiseFollowUpsForFailures($run, $request->user()->id);
 
@@ -183,11 +182,11 @@ class SiteChecklistController extends Controller
     }
 
     /**
-     * Bulk-upsert responses keyed by (run_id, template_item_id).
-     * Single SQL statement instead of N updateOrCreate calls.
+     * Persist responses keyed by (run_id, template_item_id).
+     * Model writes supply the inert compatibility value without exposing it here.
      * Filters out any template_item_ids that don't belong to this run's template.
      */
-    private function bulkUpsertResponses(SiteChecklistRun $run, array $responses): void
+    private function persistResponses(SiteChecklistRun $run, array $responses): void
     {
         if (empty($responses)) {
             return;
@@ -198,35 +197,22 @@ class SiteChecklistController extends Controller
             ->all();
         $validIdSet = array_flip($validItemIds);
 
-        $now = now();
-        $rows = [];
         foreach ($responses as $r) {
             $itemId = (int) ($r['template_item_id'] ?? 0);
             if (! isset($validIdSet[$itemId])) {
                 continue;
             }
-            $rows[] = [
-                'run_id' => $run->id,
-                'tenant_id' => $run->tenant_id,
-                'template_item_id' => $itemId,
-                'response_value' => $r['response_value'] ?? null,
-                'notes' => $r['notes'] ?? null,
-                'photo_path' => $r['photo_path'] ?? null,
-                'is_failed' => (bool) ($r['is_failed'] ?? false),
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
 
-        if (empty($rows)) {
-            return;
+            $run->responses()->updateOrCreate(
+                ['template_item_id' => $itemId],
+                [
+                    'response_value' => $r['response_value'] ?? null,
+                    'notes' => $r['notes'] ?? null,
+                    'photo_path' => $r['photo_path'] ?? null,
+                    'is_failed' => (bool) ($r['is_failed'] ?? false),
+                ],
+            );
         }
-
-        SiteChecklistResponse::upsert(
-            $rows,
-            ['run_id', 'template_item_id'],
-            ['response_value', 'notes', 'photo_path', 'is_failed', 'updated_at'],
-        );
     }
 
     /**
@@ -253,7 +239,6 @@ class SiteChecklistController extends Controller
             if ($item->failure_creates_hazard && ! $response->created_hazard_id) {
                 $hazard = SiteHazard::create([
                     'site_id' => $run->site_id,
-                    'tenant_id' => $run->tenant_id,
                     'hazard_type' => 'safety',
                     'severity' => 'medium',
                     'likelihood' => 'possible',
@@ -266,9 +251,7 @@ class SiteChecklistController extends Controller
             }
 
             if ($item->failure_creates_damage && ! $response->created_damage_id) {
-                $damage = SiteDamage::create([
-                    'tenant_id' => $run->tenant_id,
-                    'site_id' => $run->site_id,
+                $damage = $run->site->damages()->create([
                     'reported_by' => $userId,
                     'title' => 'Checklist issue: '.Str::limit($item->question, 200),
                     'description' => $response->notes ?: $item->question,
@@ -306,7 +289,6 @@ class SiteChecklistController extends Controller
 
         $assignment = SiteChecklistAssignment::create([
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'template_id' => $validated['template_id'],
             'frequency' => $validated['frequency'],
             'start_date' => now()->toDateString(),
@@ -317,7 +299,6 @@ class SiteChecklistController extends Controller
         SiteChecklistRun::create([
             'assignment_id' => $assignment->id,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'template_id' => $validated['template_id'],
             'scheduled_date' => now()->toDateString(),
             'status' => 'scheduled',
@@ -370,7 +351,6 @@ class SiteChecklistController extends Controller
         $run = SiteChecklistRun::create([
             'assignment_id' => $assignment->id,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'template_id' => $assignment->template_id,
             'scheduled_date' => now()->toDateString(),
             'status' => 'in_progress',

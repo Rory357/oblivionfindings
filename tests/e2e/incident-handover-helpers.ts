@@ -3,7 +3,11 @@ import { expect, type APIResponse, type Page } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { runArtisan, runLaravelJson } from './helpers';
+import {
+    resetBrowserLoginThrottle,
+    runArtisan,
+    runLaravelJson,
+} from './helpers';
 
 export type FixtureUser = { id: number; email: string; name: string };
 
@@ -106,6 +110,7 @@ export function seedIncidentHandoverFixtures(): IncidentHandoverManifest {
 }
 
 export async function loginAsFixture(page: Page, user: FixtureUser) {
+    resetBrowserLoginThrottle(user.email);
     await page.context().clearCookies();
     const loginPage = await page.request.get('/login');
     expect(loginPage.status(), 'fixture login page should load').toBeLessThan(

@@ -6,14 +6,15 @@ use App\Domain\Finance\Jobs\PostPayrollJournalJob;
 use App\Domain\Finance\Services\PayrollJournalService;
 use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Hr\Services\HrPayrollAccessService;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\PayrollExportService;
 use App\Domain\Hr\Services\PayslipService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -23,13 +24,12 @@ use Inertia\Inertia;
 
 class PayrollExportController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         protected PayrollExportService $payrollService,
         protected HrWebhookService $webhookService,
         protected PayrollJournalService $payrollJournalService,
         protected PayslipService $payslipService,
+        private readonly HrPayrollAccessService $payrollAccess,
     ) {}
 
     /**
@@ -40,12 +40,11 @@ class PayrollExportController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $visibleRuns = $this->payrollAccess->visibleRunsQuery($user);
 
-        $runs = HrPayrollRun::query()
+        $runs = (clone $visibleRuns)
             ->with(['lockedBy:id,name', 'exportedBy:id,name', 'exportProfile:id,name,provider_key'])
             ->withCount('items')
-            ->where('tenant_id', $tenantId)
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderByDesc('period_end')
             ->paginate(20)
@@ -74,7 +73,6 @@ class PayrollExportController extends Controller
         ]);
 
         $profiles = HrPayrollExportProfile::query()
-            ->forTenant($tenantId)
             ->orderByDesc('is_default')
             ->orderBy('name')
             ->get()
@@ -99,11 +97,9 @@ class PayrollExportController extends Controller
             ])
             ->values();
 
-        // Server-side status counts across the whole tenant so the hero tiles
-        // stay true past page 1 (a client tally of $runs->data only sees the
-        // current 20 rows).
-        $statusCounts = HrPayrollRun::query()
-            ->where('tenant_id', $tenantId)
+        // Server-side counts use the same canonical access query as the list so
+        // the hero tiles stay true past page 1 without leaking hidden Sites.
+        $statusCounts = (clone $visibleRuns)
             ->selectRaw('status, COUNT(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
@@ -135,7 +131,6 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'period_start' => ['required', 'date'],
@@ -145,7 +140,6 @@ class PayrollExportController extends Controller
 
         try {
             $run = $this->payrollService->createRun(
-                $tenantId,
                 Carbon::parse($data['period_start']),
                 Carbon::parse($data['period_end']),
                 $user->id,
@@ -167,10 +161,7 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        if ($run->tenant_id !== $tenantId) {
-            abort(404);
-        }
+        $run = $this->payrollAccess->payrollRun($user, $run);
 
         // Locking auto-generates payslips only when none exist yet; capture that
         // so we notify employees exactly once (and not again if an admin already
@@ -195,7 +186,7 @@ class PayrollExportController extends Controller
             );
         }
 
-        $this->webhookService->publish($run->tenant_id, 'payroll.run.locked', [
+        $this->webhookService->publishApplicationEvent('payroll.run.locked', [
             'payroll_run_id' => $run->id,
             'period_start' => optional($run->period_start)->toDateString(),
             'period_end' => optional($run->period_end)->toDateString(),
@@ -216,10 +207,7 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        if ($run->tenant_id !== $tenantId) {
-            abort(404);
-        }
+        $run = $this->payrollAccess->payrollRun($user, $run);
 
         if ($run->locked_at === null) {
             return redirect()->back()->withErrors(['gl' => 'Lock the run before posting its journal.']);
@@ -246,10 +234,7 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        if ($run->tenant_id !== $tenantId) {
-            abort(404);
-        }
+        $run = $this->payrollAccess->payrollRun($user, $run);
 
         if ($run->journal_id === null) {
             return redirect()->back()->with('error', 'Post the payroll run to the GL before paying net pay.');
@@ -265,7 +250,7 @@ class PayrollExportController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        $this->webhookService->publish($run->tenant_id, 'payroll.run.paid', [
+        $this->webhookService->publishApplicationEvent('payroll.run.paid', [
             'payroll_run_id' => $run->id,
             'payment_journal_id' => $journal->id,
             'paid_by' => $user->id,
@@ -282,10 +267,7 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        if ($run->tenant_id !== $tenantId) {
-            abort(404);
-        }
+        $run = $this->payrollAccess->payrollRun($user, $run);
 
         abort_unless($run->net_paid_at !== null, 404, 'Net pay has not been disbursed for this run.');
 
@@ -294,7 +276,12 @@ class PayrollExportController extends Controller
         return response()->streamDownload(
             fn () => print ($csv),
             "net-pay-run-{$run->id}.csv",
-            ['Content-Type' => 'text/csv'],
+            [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Cache-Control' => 'no-store, private',
+                'Pragma' => 'no-cache',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
         );
     }
 
@@ -305,21 +292,15 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        if ($run->tenant_id !== $tenantId) {
-            abort(404);
-        }
+        $run = $this->payrollAccess->payrollRun($user, $run);
 
         $validated = $request->validate([
-            'profile_id' => ['nullable', 'integer', Rule::exists('hr_payroll_export_profiles', 'id')->where(
-                fn ($query) => $query->where('tenant_id', $tenantId)
-            )],
+            'profile_id' => ['nullable', 'integer', Rule::exists('hr_payroll_export_profiles', 'id')],
         ]);
 
         $profile = null;
         if (! empty($validated['profile_id'])) {
             $profile = HrPayrollExportProfile::query()->findOrFail((int) $validated['profile_id']);
-            $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
         }
 
         try {
@@ -328,16 +309,20 @@ class PayrollExportController extends Controller
             return redirect()->back()->withErrors(['export' => $e->getMessage()]);
         }
 
-        $this->webhookService->publish($run->tenant_id, 'payroll.run.exported', [
+        $this->webhookService->publishApplicationEvent('payroll.run.exported', [
             'payroll_run_id' => $run->id,
             'period_start' => optional($run->period_start)->toDateString(),
             'period_end' => optional($run->period_end)->toDateString(),
             'exported_by' => $user->id,
-            'storage_path' => $path,
+            'export_profile_id' => $profile?->id,
+            'export_format' => 'csv',
         ]);
 
         return Storage::disk('private')->download($path, basename($path), [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, private',
+            'Pragma' => 'no-cache',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -345,12 +330,10 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $fieldKeys = array_keys($this->payrollService->exportFieldCatalog());
         $sourceRule = Rule::in(array_merge($fieldKeys, ['static']));
-        $nameRule = Rule::unique('hr_payroll_export_profiles', 'name')
-            ->where(fn ($query) => $query->where('tenant_id', $tenantId));
+        $nameRule = Rule::unique('hr_payroll_export_profiles', 'name');
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:150', $nameRule],
@@ -374,37 +357,40 @@ class PayrollExportController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($validated, $normalizedMappings, $tenantId, $user) {
-            $demotedProfileIds = [];
-            if (! empty($validated['is_default'])) {
-                $demotedProfileIds = HrPayrollExportProfile::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('is_default', true)
-                    ->pluck('id')
-                    ->map(fn ($id) => (int) $id)
-                    ->all();
-                HrPayrollExportProfile::query()
-                    ->where('tenant_id', $tenantId)
-                    ->update(['is_default' => false]);
-            }
+        try {
+            DB::transaction(function () use ($validated, $normalizedMappings, $user) {
+                $demotedProfileIds = [];
+                if (! empty($validated['is_default'])) {
+                    $demotedProfileIds = HrPayrollExportProfile::query()
+                        ->where('is_default', true)
+                        ->pluck('id')
+                        ->map(fn ($id) => (int) $id)
+                        ->all();
+                    HrPayrollExportProfile::query()
+                        ->update(['is_default' => false]);
+                }
 
-            $profile = HrPayrollExportProfile::query()->create([
-                'tenant_id' => $tenantId,
-                'name' => $validated['name'],
-                'provider_key' => $validated['provider_key'] ?? null,
-                'description' => $validated['description'] ?? null,
-                'delimiter' => $validated['delimiter'] ?? ',',
-                'enclosure' => $validated['enclosure'] ?? '"',
-                'line_ending' => $validated['line_ending'] ?? "\n",
-                'include_headers' => (bool) ($validated['include_headers'] ?? true),
-                'is_default' => (bool) ($validated['is_default'] ?? false),
-                'mappings' => $normalizedMappings,
-                'created_by' => $user->id,
-                'updated_by' => $user->id,
+                $profile = HrPayrollExportProfile::query()->create([
+                    'name' => $validated['name'],
+                    'provider_key' => $validated['provider_key'] ?? null,
+                    'description' => $validated['description'] ?? null,
+                    'delimiter' => $validated['delimiter'] ?? ',',
+                    'enclosure' => $validated['enclosure'] ?? '"',
+                    'line_ending' => $validated['line_ending'] ?? "\n",
+                    'include_headers' => (bool) ($validated['include_headers'] ?? true),
+                    'is_default' => (bool) ($validated['is_default'] ?? false),
+                    'mappings' => $normalizedMappings,
+                    'created_by' => $user->id,
+                    'updated_by' => $user->id,
+                ]);
+
+                $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
+            });
+        } catch (UniqueConstraintViolationException) {
+            return redirect()->back()->withErrors([
+                'name' => 'That profile name or default selection is already in use. Refresh and try again.',
             ]);
-
-            $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
-        });
+        }
 
         return redirect()->back()->with('success', 'Payroll export profile created.');
     }
@@ -413,13 +399,10 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
         $fieldKeys = array_keys($this->payrollService->exportFieldCatalog());
         $sourceRule = Rule::in(array_merge($fieldKeys, ['static']));
         $nameRule = Rule::unique('hr_payroll_export_profiles', 'name')
-            ->where(fn ($query) => $query->where('tenant_id', $tenantId))
             ->ignore($profile->id);
 
         $validated = $request->validate([
@@ -457,25 +440,29 @@ class PayrollExportController extends Controller
             $updatePayload['mappings'] = $normalizedMappings;
         }
 
-        DB::transaction(function () use ($updatePayload, $tenantId, $profile, $user) {
-            $demotedProfileIds = [];
-            if (! empty($updatePayload['is_default'])) {
-                $demotedProfileIds = HrPayrollExportProfile::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('id', '!=', $profile->id)
-                    ->where('is_default', true)
-                    ->pluck('id')
-                    ->map(fn ($id) => (int) $id)
-                    ->all();
-                HrPayrollExportProfile::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('id', '!=', $profile->id)
-                    ->update(['is_default' => false]);
-            }
+        try {
+            DB::transaction(function () use ($updatePayload, $profile, $user) {
+                $demotedProfileIds = [];
+                if (! empty($updatePayload['is_default'])) {
+                    $demotedProfileIds = HrPayrollExportProfile::query()
+                        ->where('id', '!=', $profile->id)
+                        ->where('is_default', true)
+                        ->pluck('id')
+                        ->map(fn ($id) => (int) $id)
+                        ->all();
+                    HrPayrollExportProfile::query()
+                        ->where('id', '!=', $profile->id)
+                        ->update(['is_default' => false]);
+                }
 
-            $profile->update($updatePayload);
-            $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
-        });
+                $profile->update($updatePayload);
+                $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
+            });
+        } catch (UniqueConstraintViolationException) {
+            return redirect()->back()->withErrors([
+                'name' => 'That profile name or default selection is already in use. Refresh and try again.',
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Payroll export profile updated.');
     }
@@ -484,29 +471,31 @@ class PayrollExportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.payroll.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
-        DB::transaction(function () use ($tenantId, $profile, $user) {
-            $demotedProfileIds = HrPayrollExportProfile::query()
-                ->where('tenant_id', $tenantId)
-                ->where('id', '!=', $profile->id)
-                ->where('is_default', true)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+        try {
+            DB::transaction(function () use ($profile, $user) {
+                $demotedProfileIds = HrPayrollExportProfile::query()
+                    ->where('id', '!=', $profile->id)
+                    ->where('is_default', true)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
 
-            HrPayrollExportProfile::query()
-                ->where('tenant_id', $tenantId)
-                ->update(['is_default' => false]);
+                HrPayrollExportProfile::query()
+                    ->update(['is_default' => false]);
 
-            $profile->update([
-                'is_default' => true,
-                'updated_by' => $user->id,
+                $profile->update([
+                    'is_default' => true,
+                    'updated_by' => $user->id,
+                ]);
+
+                $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
+            });
+        } catch (UniqueConstraintViolationException) {
+            return redirect()->back()->withErrors([
+                'default' => 'The default profile changed at the same time. Refresh and try again.',
             ]);
-
-            $this->auditDefaultProfileChange($profile, $demotedProfileIds, $user);
-        });
+        }
 
         return redirect()->back()->with('success', 'Default payroll export profile updated.');
     }

@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import { Clock, MapPin, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -69,6 +70,12 @@ export function ShiftSummaryCard({ shift }: { shift: QueueShift }) {
                     </span>
                 ) : null}
             </div>
+            <Link
+                href={`/operations/shifts/${shift.id}`}
+                className="mt-3 inline-flex text-xs font-semibold text-primary underline-offset-4 hover:underline"
+            >
+                View shift
+            </Link>
         </div>
     );
 }

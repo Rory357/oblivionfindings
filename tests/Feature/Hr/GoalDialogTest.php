@@ -1,8 +1,10 @@
 <?php
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrGoal;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -17,7 +19,22 @@ beforeEach(function () {
     ]);
 
     $this->owner = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->site = Site::factory()->create(['name' => 'Goal dialog Site']);
+    goalDialogProfile($this->hr, $this->site);
+    goalDialogProfile($this->owner, $this->site);
 });
+
+function goalDialogProfile(User $user, Site $site): HrEmployeeProfile
+{
+    return HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
 
 test('the goals hub ships the goal-dialog options', function () {
     $response = $this->actingAs($this->hr)->get('/hr/goals');
@@ -53,7 +70,6 @@ test('a goal can be created via the dialog endpoint', function () {
 
 test('a goal can be edited via the now-wired update endpoint', function () {
     $goal = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->owner->id,
         'created_by' => $this->hr->id,
         'title' => 'Original',
@@ -84,7 +100,6 @@ test('the page-based goals create route redirects to the hub', function () {
 
 test('a development plan can roll up into an OKR objective and surfaces on it', function () {
     $objective = HrGoal::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->owner->id,
         'created_by' => $this->hr->id,
         'title' => 'Quarterly capability objective',

@@ -70,7 +70,7 @@ class HouseLedgerController extends Controller
             $file = $request->file('attachment');
             $path = $file->storeAs(
                 "house-ledger/{$site->id}",
-                time() . '_' . preg_replace('/\s+/', '_', $file->getClientOriginalName()),
+                time().'_'.preg_replace('/\s+/', '_', $file->getClientOriginalName()),
                 'private'
             );
             $data['attachments'] = [[
@@ -83,8 +83,8 @@ class HouseLedgerController extends Controller
         }
         unset($data['attachment']);
 
-        $ledger = $this->ledgerService->getOrCreateLedger($site);
-        $entry = $this->ledgerService->addEntry($ledger, $data, $request->user()->id);
+        $entry = $this->ledgerService->addEntry($site, $data, $request->user()->id);
+        $ledger = $entry->ledger;
 
         if ($request->expectsJson()) {
             $entry->load(['recordedBy:id,name', 'approvedBy:id,name']);
@@ -107,7 +107,7 @@ class HouseLedgerController extends Controller
         abort_unless($entry->house_ledger_id === $ledger->id, 404);
 
         $attachments = $entry->attachments;
-        if (empty($attachments) || !isset($attachments[0])) {
+        if (empty($attachments) || ! isset($attachments[0])) {
             abort(404, 'No attachment found.');
         }
 
@@ -130,8 +130,7 @@ class HouseLedgerController extends Controller
     {
         $this->authorizeLedgerAccess($request, $site, 'sites.ledger.manage');
 
-        $ledger = $this->ledgerService->getOrCreateLedger($site);
-        $this->ledgerService->reconcile($ledger, $request->user()->id);
+        $ledger = $this->ledgerService->reconcile($site, $request->user()->id);
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -150,16 +149,8 @@ class HouseLedgerController extends Controller
 
         $this->authorize('view', $site);
 
-        $user = $request->user();
-        $tenantId = $user?->organization_id;
-
-        if ($site->tenant_id && $tenantId && (int) $site->tenant_id !== (int) $tenantId) {
-            abort(403);
-        }
-
-        if (! $user?->canDo($permission)) {
+        if (! $request->user()?->canDo($permission)) {
             abort(403);
         }
     }
-
 }

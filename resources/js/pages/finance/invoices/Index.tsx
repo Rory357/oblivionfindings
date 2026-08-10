@@ -1,18 +1,53 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { type BreadcrumbItem, PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
+import {
+    formatMoney,
+    NewInvoiceDialog,
+    ReceivablesTabsFooter,
+    RecordReceiptDialog,
+    useRowContextMenu,
+    type ClientOption,
+    type RowCtxItem,
+    type TaxRateOption,
+} from '@/components/finance';
+import { FinanceSummaryCard } from '@/components/finance/summary-card';
 import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney, NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, useRowContextMenu, type ClientOption, type RowCtxItem, type TaxRateOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { FinanceSummaryCard } from '@/components/finance/summary-card';
-import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet, Download, Eye, Pencil } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { PageProps, type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle,
+    DollarSign,
+    Download,
+    Eye,
+    FileText,
+    Pencil,
+    Plus,
+    Receipt,
+    Search,
+    Send,
+    Wallet,
+} from 'lucide-react';
 import { useState } from 'react';
 
 interface InvoiceLine {
@@ -74,14 +109,26 @@ interface Props extends PageProps {
 }
 
 const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(date).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance' },
     { title: 'Invoices', href: '/finance/invoices' },
 ];
 
-export default function InvoicesIndex({ auth, invoices, filters, summary, canManage, clients, taxRates }: Props) {
+export default function InvoicesIndex({
+    auth,
+    invoices,
+    filters,
+    summary,
+    canManage,
+    clients,
+    taxRates,
+}: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
@@ -102,7 +149,10 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
         if (dateFrom) params.date_from = dateFrom;
         if (dateTo) params.date_to = dateTo;
 
-        router.get('/finance/invoices', params, { preserveState: true, preserveScroll: true });
+        router.get('/finance/invoices', params, {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     const clearFilters = () => {
@@ -113,10 +163,13 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
         router.get('/finance/invoices', {}, { preserveState: true });
     };
 
-    const hasFilters = Boolean(search || (status && status !== 'all') || dateFrom || dateTo);
+    const hasFilters = Boolean(
+        search || (status && status !== 'all') || dateFrom || dateTo,
+    );
 
     const isOverdue = (invoice: Invoice) => {
-        if (invoice.status === 'paid' || invoice.status === 'cancelled') return false;
+        if (invoice.status === 'paid' || invoice.status === 'cancelled')
+            return false;
         return new Date(invoice.due_date) < new Date();
     };
 
@@ -124,13 +177,28 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (invoice: Invoice): RowCtxItem[] => {
         const items: RowCtxItem[] = [
-            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.get(`/finance/invoices/${invoice.id}`) },
+            {
+                kind: 'item',
+                label: 'Open',
+                icon: Eye,
+                onSelect: () => router.get(`/finance/invoices/${invoice.id}`),
+            },
         ];
         if (canManage && invoice.status === 'draft') {
-            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => setEditInvoice(invoice) });
+            items.push({
+                kind: 'item',
+                label: 'Edit',
+                icon: Pencil,
+                onSelect: () => setEditInvoice(invoice),
+            });
         }
         if (canReceipt(invoice)) {
-            items.push({ kind: 'item', label: 'Record receipt', icon: Wallet, onSelect: () => setReceiptInvoice(invoice) });
+            items.push({
+                kind: 'item',
+                label: 'Record receipt',
+                icon: Wallet,
+                onSelect: () => setReceiptInvoice(invoice),
+            });
         }
         return items;
     };
@@ -141,27 +209,42 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Receipt}
                         title="Invoices"
                         description="Manage and send invoices to clients"
                         stats={[
-                            { label: 'Outstanding', value: formatMoney(summary.total_outstanding) },
-                            { label: 'Overdue', value: formatMoney(summary.total_overdue) },
+                            {
+                                label: 'Outstanding',
+                                value: formatMoney(summary.total_outstanding),
+                            },
+                            {
+                                label: 'Overdue',
+                                value: formatMoney(summary.total_overdue),
+                            },
                             { label: 'Drafts', value: summary.draft_count },
-                            { label: 'Paid this month', value: formatMoney(summary.paid_this_month) },
+                            {
+                                label: 'Paid this month',
+                                value: formatMoney(summary.paid_this_month),
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="outline" asChild>
-                                    <a href={`/finance/invoices/export?${new URLSearchParams(Object.entries({ status, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}>
-                                        <Download className="w-4 h-4 mr-1.5" />
+                                    <a
+                                        href={`/finance/invoices/export?${new URLSearchParams(Object.entries({ status, search, date_from: dateFrom, date_to: dateTo }).filter(([, v]) => v)).toString()}`}
+                                    >
+                                        <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
                                     </a>
                                 </Button>
                                 {canManage && (
-                                    <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
-                                        <Plus className="w-4 h-4 mr-1.5" />
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setNewInvoiceOpen(true)}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
                                         New Invoice
                                     </Button>
                                 )}
@@ -172,24 +255,46 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                 }
             >
                 {/* KPI Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <FinanceSummaryCard icon={DollarSign} tone="info" label="Outstanding" value={formatMoney(summary.total_outstanding)} />
-                    <FinanceSummaryCard icon={AlertTriangle} tone="critical" label="Overdue" value={formatMoney(summary.total_overdue)} />
-                    <FinanceSummaryCard icon={FileText} tone="muted" label="Drafts" value={summary.draft_count} />
-                    <FinanceSummaryCard icon={CheckCircle} tone="success" label="Paid This Month" value={formatMoney(summary.paid_this_month)} />
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <FinanceSummaryCard
+                        icon={DollarSign}
+                        tone="info"
+                        label="Outstanding"
+                        value={formatMoney(summary.total_outstanding)}
+                    />
+                    <FinanceSummaryCard
+                        icon={AlertTriangle}
+                        tone="critical"
+                        label="Overdue"
+                        value={formatMoney(summary.total_overdue)}
+                    />
+                    <FinanceSummaryCard
+                        icon={FileText}
+                        tone="muted"
+                        label="Drafts"
+                        value={summary.draft_count}
+                    />
+                    <FinanceSummaryCard
+                        icon={CheckCircle}
+                        tone="success"
+                        label="Paid This Month"
+                        value={formatMoney(summary.paid_this_month)}
+                    />
                 </div>
 
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     placeholder="Search invoice #, client..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    onKeyDown={(e) =>
+                                        e.key === 'Enter' && applyFilters()
+                                    }
                                     className="pl-9"
                                 />
                             </div>
@@ -198,13 +303,21 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                     <SelectValue placeholder="All Statuses" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="all">
+                                        All Statuses
+                                    </SelectItem>
                                     <SelectItem value="draft">Draft</SelectItem>
                                     <SelectItem value="sent">Sent</SelectItem>
-                                    <SelectItem value="viewed">Viewed</SelectItem>
+                                    <SelectItem value="viewed">
+                                        Viewed
+                                    </SelectItem>
                                     <SelectItem value="paid">Paid</SelectItem>
-                                    <SelectItem value="overdue">Overdue</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    <SelectItem value="overdue">
+                                        Overdue
+                                    </SelectItem>
+                                    <SelectItem value="cancelled">
+                                        Cancelled
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                             <Input
@@ -220,10 +333,18 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                 placeholder="To"
                             />
                             <div className="flex gap-2">
-                                <Button onClick={applyFilters} variant="secondary" className="shrink-0">
+                                <Button
+                                    onClick={applyFilters}
+                                    variant="secondary"
+                                    className="shrink-0"
+                                >
                                     Filter
                                 </Button>
-                                <Button onClick={clearFilters} variant="ghost" className="shrink-0">
+                                <Button
+                                    onClick={clearFilters}
+                                    variant="ghost"
+                                    className="shrink-0"
+                                >
                                     Clear
                                 </Button>
                             </div>
@@ -240,10 +361,14 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                 <TableHead>Client</TableHead>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Due Date</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
+                                <TableHead className="text-right">
+                                    Total
+                                </TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Sent</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                                <TableHead className="text-right">
+                                    Actions
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -265,7 +390,14 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                                 className="border-0"
                                                 action={
                                                     canManage ? (
-                                                        <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                setNewInvoiceOpen(
+                                                                    true,
+                                                                )
+                                                            }
+                                                        >
                                                             New invoice
                                                         </Button>
                                                     ) : undefined
@@ -280,64 +412,98 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                         key={invoice.id}
                                         className={cn(
                                             'cursor-pointer hover:bg-muted/50',
-                                            isOverdue(invoice) && 'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
+                                            isOverdue(invoice) &&
+                                                'bg-status-critical-bg hover:bg-status-critical-bg dark:hover:bg-status-critical',
                                         )}
-                                        onClick={() => router.get(`/finance/invoices/${invoice.id}`)}
-                                        onContextMenu={rowMenu.open(rowMenuItems(invoice))}
+                                        onClick={() =>
+                                            router.get(
+                                                `/finance/invoices/${invoice.id}`,
+                                            )
+                                        }
+                                        onContextMenu={rowMenu.open(
+                                            rowMenuItems(invoice),
+                                        )}
                                     >
                                         <TableCell className="font-medium">
-                                            <Link href={`/finance/invoices/${invoice.id}`} className="text-primary hover:underline">
+                                            <Link
+                                                href={`/finance/invoices/${invoice.id}`}
+                                                className="text-primary hover:underline"
+                                            >
                                                 {invoice.invoice_number}
                                             </Link>
                                         </TableCell>
                                         <TableCell>
                                             <div>{invoice.client_name}</div>
                                             {invoice.client_email && (
-                                                <div className="text-xs text-muted-foreground">{invoice.client_email}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {invoice.client_email}
+                                                </div>
                                             )}
                                         </TableCell>
-                                        <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
+                                        <TableCell>
+                                            {formatDate(invoice.invoice_date)}
+                                        </TableCell>
                                         <TableCell>
                                             <span className="inline-flex items-center gap-1">
-                                                {isOverdue(invoice) && <AlertTriangle className="w-3.5 h-3.5 text-status-critical" />}
-                                                <span className={cn(isOverdue(invoice) && 'text-status-critical font-medium dark:text-status-critical')}>
-                                                    {formatDate(invoice.due_date)}
+                                                {isOverdue(invoice) && (
+                                                    <AlertTriangle className="h-3.5 w-3.5 text-status-critical" />
+                                                )}
+                                                <span
+                                                    className={cn(
+                                                        isOverdue(invoice) &&
+                                                            'font-medium text-status-critical dark:text-status-critical',
+                                                    )}
+                                                >
+                                                    {formatDate(
+                                                        invoice.due_date,
+                                                    )}
                                                 </span>
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-right font-medium">
-                                            {formatMoney(invoice.total_amount, { currency: invoice.currency_code })}
+                                            {formatMoney(invoice.total_amount, {
+                                                currency: invoice.currency_code,
+                                            })}
                                         </TableCell>
                                         <TableCell>
-                                            <StatusBadge status={invoice.status} />
+                                            <StatusBadge
+                                                status={invoice.status}
+                                            />
                                         </TableCell>
                                         <TableCell>
                                             {invoice.sent_at ? (
-                                                <Send className="w-4 h-4 text-status-success" />
+                                                <Send className="h-4 w-4 text-status-success" />
                                             ) : (
-                                                <span className="text-muted-foreground">-</span>
+                                                <span className="text-muted-foreground">
+                                                    -
+                                                </span>
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {canManage && invoice.status === 'draft' && (
-                                                <Button
-                                                    size="sm"
-                                                    variant="ghost"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditInvoice(invoice);
-                                                    }}
-                                                >
-                                                    Edit
-                                                </Button>
-                                            )}
+                                            {canManage &&
+                                                invoice.status === 'draft' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditInvoice(
+                                                                invoice,
+                                                            );
+                                                        }}
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                )}
                                             {canReceipt(invoice) && (
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setReceiptInvoice(invoice);
+                                                        setReceiptInvoice(
+                                                            invoice,
+                                                        );
                                                     }}
                                                 >
                                                     <Wallet className="mr-1.5 h-3.5 w-3.5" />
@@ -353,15 +519,24 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
 
                     {/* Pagination */}
                     {invoices.last_page > 1 && (
-                        <div className="flex items-center justify-center gap-1 p-4 border-t">
+                        <div className="flex items-center justify-center gap-1 border-t p-4">
                             {invoices.links.map((link, i) => (
                                 <Button
                                     key={i}
                                     variant={link.active ? 'default' : 'ghost'}
                                     size="sm"
                                     disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                    onClick={() =>
+                                        link.url &&
+                                        router.get(
+                                            link.url,
+                                            {},
+                                            { preserveState: true },
+                                        )
+                                    }
+                                    dangerouslySetInnerHTML={{
+                                        __html: link.label,
+                                    }}
                                 />
                             ))}
                         </div>

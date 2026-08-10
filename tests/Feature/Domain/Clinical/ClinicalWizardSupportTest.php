@@ -5,10 +5,12 @@ namespace Tests\Feature\Domain\Clinical;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Models\ClientMedicalProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -25,6 +27,8 @@ class ClinicalWizardSupportTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected Site $site;
+
     protected User $user;
 
     protected function setUp(): void
@@ -32,6 +36,7 @@ class ClinicalWizardSupportTest extends TestCase
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
+        $this->site = Site::factory()->create();
         $this->user = $this->createUserWithRole('coordinator');
     }
 
@@ -42,14 +47,24 @@ class ClinicalWizardSupportTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
 
         return $user;
     }
 
     public function test_client_search_matches_name_and_nhi(): void
     {
-        $aroha = Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Ngata', 'nhi_number' => 'ZAC5961']);
-        Client::factory()->create(['first_name' => 'Hemi', 'last_name' => 'Walker', 'nhi_number' => 'ABC1234']);
+        $aroha = Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Aroha', 'last_name' => 'Ngata', 'nhi_number' => 'ZAC5961']);
+        Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Hemi', 'last_name' => 'Walker', 'nhi_number' => 'ABC1234']);
 
         $this->actingAs($this->user)
             ->getJson('/health-clinical/clients/search?q=ngata')
@@ -70,8 +85,8 @@ class ClinicalWizardSupportTest extends TestCase
         // A viewAssigned-only support worker must not discover other clients' names/NHI
         // through the wizard picker — only their own caseload.
         $worker = $this->createUserWithRole('support_worker');
-        $mine = Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Ngata']);
-        Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Solomon']);
+        $mine = Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Aroha', 'last_name' => 'Ngata']);
+        Client::factory()->create(['site_id' => $this->site->id, 'first_name' => 'Aroha', 'last_name' => 'Solomon']);
         $mine->supportWorkers()->attach($worker->id);
 
         $this->actingAs($worker)
@@ -89,7 +104,7 @@ class ClinicalWizardSupportTest extends TestCase
 
     public function test_clinical_card_returns_allergies_baseline_and_protocols(): void
     {
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         ClientMedicalProfile::create([
             'client_id' => $client->id,
             'allergies' => ['Penicillin', 'Peanuts'],
@@ -120,7 +135,7 @@ class ClinicalWizardSupportTest extends TestCase
     public function test_abc_store_saves_attachments(): void
     {
         Storage::fake('public');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $this->actingAs($this->user)
             ->from('/health-clinical')

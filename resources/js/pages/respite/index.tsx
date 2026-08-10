@@ -1,5 +1,8 @@
+import type {
+    RespiteCan,
+    RespiteWorkspaceData,
+} from '@/components/respite/types';
 import { RespiteWorkspace } from '@/components/respite/workspace';
-import type { RespiteCan, RespiteWorkspaceData } from '@/components/respite/types';
 import AppLayout from '@/layouts/app-layout';
 import { Head, usePage } from '@inertiajs/react';
 

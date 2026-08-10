@@ -19,7 +19,7 @@ class CompleteOnboardingTaskRequest extends FormRequest
     {
         return [
             'notes' => ['nullable', 'string', 'max:2000'],
-            'signed_off_by' => ['nullable', 'integer', 'exists:users,id'],
+            'signed_off_by' => ['nullable', 'integer'],
             'evidence' => [
                 'nullable',
                 'file',

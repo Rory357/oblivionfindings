@@ -8,6 +8,7 @@ use App\Domain\Finance\Services\FinancialInsightsService;
 use App\Domain\Finance\Services\FinancialKPIService;
 use App\Domain\Finance\Services\SiteFinancialDashboardService;
 use App\Http\Controllers\Controller;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -26,10 +27,11 @@ class FinancialInsightsApiController extends Controller
         private readonly ClientLedgerService $ledgerService,
         private readonly FinancialKPIService $kpiService,
         private readonly FinancialInsightsService $insightsService,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Site Endpoints                                                     */
+    /*  Site Endpoints */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -62,7 +64,7 @@ class FinancialInsightsApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Client Endpoints                                                   */
+    /*  Client Endpoints */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -72,6 +74,11 @@ class FinancialInsightsApiController extends Controller
      */
     public function clientFinancialSummary(Request $request, int $client): JsonResponse
     {
+        $this->siteAccess->assertCanAccessClientId(
+            $request->user(),
+            $client,
+            ['reports.viewAny'],
+        );
         [$from, $to] = $this->parsePeriod($request);
 
         $data = $this->clientSummaryService->getSummary($client, $from, $to);
@@ -86,6 +93,11 @@ class FinancialInsightsApiController extends Controller
      */
     public function clientLedger(Request $request, int $client): JsonResponse
     {
+        $this->siteAccess->assertCanAccessClientId(
+            $request->user(),
+            $client,
+            ['reports.viewAny'],
+        );
         [$from, $to] = $this->parsePeriod($request);
         $withBalance = $request->boolean('balance', false);
 
@@ -95,7 +107,7 @@ class FinancialInsightsApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  KPI Endpoints                                                      */
+    /*  KPI Endpoints */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -144,7 +156,7 @@ class FinancialInsightsApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Insights Endpoint                                                  */
+    /*  Insights Endpoint */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -165,7 +177,7 @@ class FinancialInsightsApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     /**

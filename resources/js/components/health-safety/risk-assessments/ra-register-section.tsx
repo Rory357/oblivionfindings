@@ -8,10 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { RaDetailDialog } from './ra-detail-dialog';
+import { statusMeta } from './ra-kit';
 import { buildRaCtxItems, RaTable, type RaCtxHandlers } from './ra-table';
 import { RaWizardDialog } from './ra-wizard-dialog';
-import { statusMeta } from './ra-kit';
-import type { LockedAssessable, RaDetail, RaModalKind, RaPickers, RaRow } from './types';
+import type {
+    LockedAssessable,
+    RaDetail,
+    RaModalKind,
+    RaPickers,
+    RaRow,
+} from './types';
 
 export function RaRegisterSection({
     assessments,
@@ -27,7 +33,10 @@ export function RaRegisterSection({
     title?: string;
 }) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [modal, setModal] = useState<{ kind: RaModalKind; detail: RaDetail | null } | null>(null);
+    const [modal, setModal] = useState<{
+        kind: RaModalKind;
+        detail: RaDetail | null;
+    } | null>(null);
     const [detail, setDetail] = useState<RaDetail | null>(null);
 
     const fetchDetail = async (id: number): Promise<RaDetail | null> => {
@@ -87,14 +96,20 @@ export function RaRegisterSection({
     };
 
     const newBtn = (
-        <Button type="button" size="sm" onClick={() => setModal({ kind: 'new', detail: null })}>
+        <Button
+            type="button"
+            size="sm"
+            onClick={() => setModal({ kind: 'new', detail: null })}
+        >
             <Plus className="h-4 w-4" /> New assessment
         </Button>
     );
 
     return (
         <div className="flex flex-col gap-3">
-            {canManage ? <div className="flex justify-end">{newBtn}</div> : null}
+            {canManage ? (
+                <div className="flex justify-end">{newBtn}</div>
+            ) : null}
 
             <RaTable
                 rows={assessments}
@@ -105,7 +120,9 @@ export function RaRegisterSection({
                 emptyCta={canManage ? newBtn : undefined}
             />
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
 
             {modal ? (
                 <RaWizardDialog

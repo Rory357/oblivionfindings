@@ -6,8 +6,10 @@ use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -19,17 +21,20 @@ class ClinicalProtocolManagementControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
+        $this->site = Site::factory()->create();
     }
 
     public function test_protocol_register_renders_with_adherence_context(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
             'client_id' => $client->id,
@@ -68,8 +73,8 @@ class ClinicalProtocolManagementControllerTest extends TestCase
     public function test_protocol_register_filters_for_view_only_user(): void
     {
         $user = $this->createUserWithRole('team_lead');
-        $client = Client::factory()->create();
-        $otherClient = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalProtocol::factory()->dailyWeight()->create([
             'client_id' => $client->id,
@@ -81,7 +86,7 @@ class ClinicalProtocolManagementControllerTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get('/health-clinical/protocols?client_id=' . $client->id . '&frequency=daily&status=active')
+            ->get('/health-clinical/protocols?client_id='.$client->id.'&frequency=daily&status=active')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('protocols.data', 1)
@@ -128,7 +133,7 @@ class ClinicalProtocolManagementControllerTest extends TestCase
     public function test_can_create_protocol(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $this->actingAs($user)
             ->post('/health-clinical/protocols', [
@@ -158,7 +163,9 @@ class ClinicalProtocolManagementControllerTest extends TestCase
     public function test_edit_page_exposes_when_structure_can_still_be_changed(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $client->id,
             'created_by' => $user->id,
         ]);
 
@@ -175,7 +182,9 @@ class ClinicalProtocolManagementControllerTest extends TestCase
     public function test_update_rejects_structural_changes_when_schedule_history_exists(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $client->id,
             'created_by' => $user->id,
         ]);
 
@@ -205,7 +214,9 @@ class ClinicalProtocolManagementControllerTest extends TestCase
     public function test_can_update_non_structural_protocol_fields(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $client->id,
             'created_by' => $user->id,
             'instructions' => 'Record before breakfast.',
             'alert_if_missed_hours' => 24,
@@ -238,7 +249,9 @@ class ClinicalProtocolManagementControllerTest extends TestCase
     public function test_can_toggle_protocol_active_state(): void
     {
         $user = $this->createUserWithRole('coordinator');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         $protocol = ClinicalProtocol::factory()->create([
+            'client_id' => $client->id,
             'created_by' => $user->id,
             'is_active' => true,
         ]);
@@ -263,6 +276,16 @@ class ClinicalProtocolManagementControllerTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
 
         return $user;
     }

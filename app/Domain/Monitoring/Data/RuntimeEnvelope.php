@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Domain\Monitoring\Data;
+
+use App\Domain\Monitoring\Enums\RuntimeMessageType;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Str;
+
+final readonly class RuntimeEnvelope
+{
+    /**
+     * @param  array<string|int, mixed>  $payload
+     */
+    public function __construct(
+        public int $schemaVersion,
+        public string $messageId,
+        public RuntimeMessageType $type,
+        public string $source,
+        public int $sequence,
+        public CarbonImmutable $occurredAt,
+        public CarbonImmutable $ingestedAt,
+        public string $idempotencyKey,
+        public string $traceId,
+        public array $payload,
+        public string $keyId = '',
+        public string $signature = '',
+        public int $payloadVersion = 1,
+    ) {}
+
+    /**
+     * @param  array<string|int, mixed>  $payload
+     */
+    public static function new(
+        RuntimeMessageType $type,
+        string $source,
+        int $sequence,
+        string $idempotencyKey,
+        array $payload,
+        ?int $payloadVersion = null,
+    ): self {
+        $now = CarbonImmutable::now('UTC');
+        $schemaVersion = (int) config('monitoring.contracts.current', 1);
+        $payloadVersion ??= (int) config(
+            "monitoring.contracts.payloads.{$type->value}.current",
+            1,
+        );
+
+        return new self(
+            schemaVersion: $schemaVersion,
+            messageId: (string) Str::orderedUuid(),
+            type: $type,
+            source: $source,
+            sequence: $sequence,
+            occurredAt: $now,
+            ingestedAt: $now,
+            idempotencyKey: $idempotencyKey,
+            traceId: (string) Str::orderedUuid(),
+            payload: $payload,
+            payloadVersion: $payloadVersion,
+        );
+    }
+}

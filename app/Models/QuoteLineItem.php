@@ -2,15 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class QuoteLineItem extends Model
 {
     use HasFactory;
+    use WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'quote_id',
         'price_book_item_id',
         'description',

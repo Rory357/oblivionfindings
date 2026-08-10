@@ -17,6 +17,7 @@ class GenerateBoardPack implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public array $backoff = [60, 300, 600];
 
     public function __construct(
@@ -28,10 +29,15 @@ class GenerateBoardPack implements ShouldQueue
         DashboardAggregatorService $aggregator
     ): void {
         try {
-            $meeting = GovernanceMeeting::findOrFail($this->meetingId);
+            $meeting = GovernanceMeeting::query()
+                ->with('creator')
+                ->findOrFail($this->meetingId);
+            if (! $meeting->creator || $meeting->creator->approved_at === null) {
+                throw new \LogicException('Board pack generation requires an approved meeting creator.');
+            }
 
             // Capture dashboard snapshot
-            $snapshot = $aggregator->captureSnapshot('month');
+            $snapshot = $aggregator->captureSnapshot('month', viewer: $meeting->creator);
 
             // Build the pack
             $pack = $builder->build($meeting, $snapshot);

@@ -51,12 +51,17 @@ export function BulkRejectDialog({
             candidate_ids: candidateIds,
             reason,
             send_decline_email: sendDecline,
-            decline_message: sendDecline && message.trim() !== '' ? message.trim() : null,
+            decline_message:
+                sendDecline && message.trim() !== '' ? message.trim() : null,
         }));
         form.post('/hr/recruitment/applications/bulk', {
             preserveScroll: true,
             onSuccess: (page) => {
-                const f = (page.props as { flash?: { error?: string; success?: string } }).flash;
+                const f = (
+                    page.props as {
+                        flash?: { error?: string; success?: string };
+                    }
+                ).flash;
                 if (f?.error) {
                     toast.error('Could not reject', { description: f.error });
                     return;
@@ -79,13 +84,16 @@ export function BulkRejectDialog({
                         Reject {count} candidate{count === 1 ? '' : 's'}
                     </DialogTitle>
                     <DialogDescription>
-                        Closes out every selected candidate's active applications. The reason is recorded to the audit trail.
+                        Closes out every selected candidate's active
+                        applications. The reason is recorded to the audit trail.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-4">
                     <div>
-                        <Label className="mb-1.5 block text-sm font-semibold">Reason</Label>
+                        <Label className="mb-1.5 block text-sm font-semibold">
+                            Reason
+                        </Label>
                         <div className="flex flex-wrap gap-2">
                             {REJECT_REASONS.map((r) => {
                                 const on = reason === r;
@@ -117,9 +125,12 @@ export function BulkRejectDialog({
                             className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
                         />
                         <span>
-                            <span className="block text-[13px] font-semibold">Send respectful decline email</span>
+                            <span className="block text-[13px] font-semibold">
+                                Send respectful decline email
+                            </span>
                             <span className="block text-[12px] text-muted-foreground">
-                                Optional — a warm, brand-consistent decline to each candidate with an email on file.
+                                Optional — a warm, brand-consistent decline to
+                                each candidate with an email on file.
                             </span>
                         </span>
                     </label>
@@ -127,7 +138,10 @@ export function BulkRejectDialog({
                     {sendDecline ? (
                         <div>
                             <Label className="mb-1.5 block text-sm font-semibold">
-                                Personal note <span className="font-normal text-muted-foreground">(optional, included in the email)</span>
+                                Personal note{' '}
+                                <span className="font-normal text-muted-foreground">
+                                    (optional, included in the email)
+                                </span>
                             </Label>
                             <textarea
                                 value={message}

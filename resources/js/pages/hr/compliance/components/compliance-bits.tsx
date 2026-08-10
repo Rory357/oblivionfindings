@@ -1,11 +1,11 @@
 /* eslint-disable no-restricted-syntax -- The compliance hub uses a few bespoke
  * on-surface controls (conic compliance ring, viewport-flipped portal context
  * menu) that the shadcn kit doesn't provide. All colours are semantic tokens. */
-import { cn } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { cn } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import type { LucideIcon } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
 /*  Status → badge mapping (shared across every tab)                   */
@@ -13,7 +13,10 @@ import type { LucideIcon } from 'lucide-react';
 
 type Variant = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
 
-export const VETTING_BADGE: Record<string, { label: string; variant: Variant }> = {
+export const VETTING_BADGE: Record<
+    string,
+    { label: string; variant: Variant }
+> = {
     cleared: { label: 'Clear', variant: 'success' },
     clear: { label: 'Clear', variant: 'success' },
     pending: { label: 'Pending', variant: 'warning' },
@@ -23,15 +26,19 @@ export const VETTING_BADGE: Record<string, { label: string; variant: Variant }> 
     none: { label: '—', variant: 'neutral' },
 };
 
-export const DRIVER_BADGE: Record<string, { label: string; variant: Variant }> = {
-    eligible: { label: 'Eligible', variant: 'success' },
-    pending_review: { label: 'Pending', variant: 'warning' },
-    suspended: { label: 'Suspended', variant: 'critical' },
-    expired: { label: 'Expired', variant: 'critical' },
-    none: { label: '—', variant: 'neutral' },
-};
+export const DRIVER_BADGE: Record<string, { label: string; variant: Variant }> =
+    {
+        eligible: { label: 'Eligible', variant: 'success' },
+        pending_review: { label: 'Pending', variant: 'warning' },
+        suspended: { label: 'Suspended', variant: 'critical' },
+        expired: { label: 'Expired', variant: 'critical' },
+        none: { label: '—', variant: 'neutral' },
+    };
 
-export const CHECK_TYPE_BADGE: Record<string, { label: string; variant: Variant }> = {
+export const CHECK_TYPE_BADGE: Record<
+    string,
+    { label: string; variant: Variant }
+> = {
     training_course: { label: 'Training', variant: 'info' },
     credential: { label: 'Credential', variant: 'info' },
     background_check: { label: 'Background', variant: 'warning' },
@@ -40,7 +47,10 @@ export const CHECK_TYPE_BADGE: Record<string, { label: string; variant: Variant 
     manual: { label: 'Manual', variant: 'neutral' },
 };
 
-export const RENEWAL_TYPE_BADGE: Record<string, { label: string; variant: Variant }> = {
+export const RENEWAL_TYPE_BADGE: Record<
+    string,
+    { label: string; variant: Variant }
+> = {
     compliance: { label: 'Compliance', variant: 'info' },
     vetting: { label: 'Vetting', variant: 'warning' },
     driver: { label: 'Driver', variant: 'info' },
@@ -67,10 +77,14 @@ export function complianceStatusBadge(row: {
 }): { label: string; variant: Variant } {
     // A person whose role carries no tracked requirements is not "expiring" —
     // surface that honestly rather than defaulting to a warning badge.
-    if (trackedCount(row) === 0) return { label: 'No requirements', variant: 'neutral' };
-    if (row.compliance_percent === 100) return { label: 'Compliant', variant: 'success' };
-    if (row.expired_count > 0) return { label: 'Has expired', variant: 'critical' };
-    if (row.not_started_count > 0) return { label: 'Incomplete', variant: 'neutral' };
+    if (trackedCount(row) === 0)
+        return { label: 'No requirements', variant: 'neutral' };
+    if (row.compliance_percent === 100)
+        return { label: 'Compliant', variant: 'success' };
+    if (row.expired_count > 0)
+        return { label: 'Has expired', variant: 'critical' };
+    if (row.not_started_count > 0)
+        return { label: 'Incomplete', variant: 'neutral' };
     return { label: 'Expiring', variant: 'warning' };
 }
 
@@ -81,7 +95,12 @@ export function trackedCount(row: {
     expired_count: number;
     not_started_count: number;
 }): number {
-    return row.compliant_count + row.expiring_soon_count + row.expired_count + row.not_started_count;
+    return (
+        row.compliant_count +
+        row.expiring_soon_count +
+        row.expired_count +
+        row.not_started_count
+    );
 }
 
 export function initials(name: string): string {
@@ -99,7 +118,13 @@ export function initials(name: string): string {
 /*  Conic compliance ring (% complete)                                 */
 /* ------------------------------------------------------------------ */
 
-export function ComplianceRing({ pct, size = 38 }: { pct: number; size?: number }) {
+export function ComplianceRing({
+    pct,
+    size = 38,
+}: {
+    pct: number;
+    size?: number;
+}) {
     const color =
         pct === 100
             ? 'var(--status-success)'
@@ -130,11 +155,21 @@ export function ComplianceRing({ pct, size = 38 }: { pct: number; size?: number 
 /*  Avatar bubble                                                       */
 /* ------------------------------------------------------------------ */
 
-export function AvatarBubble({ name, size = 34 }: { name: string; size?: number }) {
+export function AvatarBubble({
+    name,
+    size = 34,
+}: {
+    name: string;
+    size?: number;
+}) {
     return (
         <span
             className="grid shrink-0 place-items-center rounded-full bg-accent font-bold text-primary"
-            style={{ height: size, width: size, fontSize: size <= 30 ? 11 : 12 }}
+            style={{
+                height: size,
+                width: size,
+                fontSize: size <= 30 ? 11 : 12,
+            }}
         >
             {initials(name)}
         </span>
@@ -175,7 +210,13 @@ export function useContextMenu(): {
     return { ctx, open, close };
 }
 
-export function ComplianceContextMenu({ ctx, onClose }: { ctx: CtxState; onClose: () => void }) {
+export function ComplianceContextMenu({
+    ctx,
+    onClose,
+}: {
+    ctx: CtxState;
+    onClose: () => void;
+}) {
     useEffect(() => {
         if (!ctx) return;
         const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -197,7 +238,7 @@ export function ComplianceContextMenu({ ctx, onClose }: { ctx: CtxState; onClose
             />
             <div
                 role="menu"
-                className="fixed z-[81] min-w-[212px] rounded-xl border border-border bg-popover p-1.5 shadow-[0_18px_40px_-12px_rgba(20,10,40,0.4)] animate-in fade-in-0 zoom-in-95 duration-100"
+                className="fixed z-[81] min-w-[212px] animate-in rounded-xl border border-border bg-popover p-1.5 shadow-[0_18px_40px_-12px_rgba(20,10,40,0.4)] duration-100 fade-in-0 zoom-in-95"
                 style={{ left: ctx.x, top: ctx.y }}
             >
                 {ctx.items.map((item, i) =>
@@ -214,7 +255,9 @@ export function ComplianceContextMenu({ ctx, onClose }: { ctx: CtxState; onClose
                             }}
                             className={cn(
                                 'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors hover:bg-muted',
-                                item.tone === 'critical' ? 'text-status-critical' : 'text-foreground',
+                                item.tone === 'critical'
+                                    ? 'text-status-critical'
+                                    : 'text-foreground',
                             )}
                         >
                             <item.icon

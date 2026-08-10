@@ -2,15 +2,15 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrWellbeingCheckin extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'tenant_id',
@@ -40,10 +40,5 @@ class HrWellbeingCheckin extends Model
     public function manager(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_user_id');
-    }
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 }

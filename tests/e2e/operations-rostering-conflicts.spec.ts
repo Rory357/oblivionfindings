@@ -52,27 +52,18 @@ test.describe('operations rostering — conflicts page', () => {
         );
 
         await expect(
-            page.getByRole('heading', { name: /Conflict queue/i }),
+            page.getByRole('heading', { name: /conflicts need you/i }),
         ).toBeVisible();
         await expectNoBlockingAxeViolations(page);
 
-        const openShiftLink = page
-            .getByRole('link', { name: /Open shift/i })
-            .first();
-
-        if ((await openShiftLink.count()) > 0) {
-            await openShiftLink.click();
-            await expect(page).toHaveURL(/\/operations\/shifts\/\d+/);
-            await expect(page.getByRole('heading').first()).toBeVisible();
-        } else {
-            await expect(
-                page
-                    .getByText(
-                        /No (staff double-bookings detected|client overlap warnings detected|site demand gaps detected|open shifts this week|approved leave clashes detected|risky back-to-back shifts detected|recurring demand drift detected|active replacement workflows)/i,
-                    )
-                    .first(),
-            ).toBeVisible();
-        }
+        await page
+            .getByRole('button', {
+                name: /Rostering E2E House.*Rostering Publish/i,
+            })
+            .click();
+        await page.getByRole('link', { name: /View shift/i }).click();
+        await expect(page).toHaveURL(/\/operations\/shifts\/9201/);
+        await expect(page.getByRole('heading').first()).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);
     });

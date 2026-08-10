@@ -1,0 +1,49 @@
+[Unit]
+Description=Oblivion Findings remote monitoring collector cycle
+Documentation=file:/opt/oblivion-monitoring-collector/current/README.md
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+User=oblivion-monitoring-collector
+Group=oblivion-monitoring-collector
+EnvironmentFile=/etc/oblivion/monitoring-collector.env
+ExecStart=/usr/local/libexec/oblivion-monitoring-collector-run
+RuntimeDirectory=oblivion-monitoring-collector
+RuntimeDirectoryMode=0700
+StateDirectory=oblivion-monitoring-collector
+StateDirectoryMode=0700
+TimeoutStartSec=10min
+Restart=on-failure
+RestartSec=30s
+UMask=0077
+
+# The collector needs outbound network access and may execute fixed protocol
+# helpers, but it does not need privilege escalation, devices, home directories,
+# kernel controls, or writes outside its private state directory.
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/oblivion-monitoring-collector
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

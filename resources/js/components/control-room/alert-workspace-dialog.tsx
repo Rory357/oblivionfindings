@@ -4,6 +4,10 @@ import {
     type JourneyGateData,
 } from '@/components/incidents/journey-gate-list';
 import { JourneyTermHelp } from '@/components/journey-term-help';
+import {
+    MonitoringIncidentEvidenceCard,
+    type MonitoringIncidentEvidence,
+} from '@/components/monitoring/monitoring-incident-evidence-card';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -63,6 +67,7 @@ import {
     Radar,
     RadioTower,
     Send,
+    Server,
     ShieldAlert,
     ShieldQuestion,
     SkipForward,
@@ -304,6 +309,34 @@ export type AlertWorkspaceDetail = {
         investigation: { reference_number: string; status: string } | null;
         href: string | null;
     } | null;
+    linked_it_work?: {
+        id: number | null;
+        reference: string | null;
+        title: string | null;
+        status: string | null;
+        status_reason: string | null;
+        priority: string | null;
+        sla_state: string | null;
+        resolution_due_at: string | null;
+        monitoring_recovered_at: string | null;
+        assignee: UserRef | null;
+        href: string | null;
+        access: {
+            state: 'available' | 'restricted';
+            message: string | null;
+        };
+    } | null;
+    linked_device?: {
+        id: number | null;
+        uid: string | null;
+        name: string | null;
+        href: string | null;
+        access: {
+            state: 'available' | 'restricted';
+            message: string | null;
+        };
+    } | null;
+    monitoring_incident_evidence?: MonitoringIncidentEvidence | null;
     resolve_gate: JourneyGateData;
     close_gate: JourneyGateData;
     journey_state: string;
@@ -637,9 +670,13 @@ export function AlertWorkspaceDialog({
         {
             key: 'evidence',
             label: 'Evidence',
-            blurb: d.evidence_packs.length
-                ? `${d.evidence_packs.length} pack${d.evidence_packs.length === 1 ? '' : 's'}`
-                : 'no packs',
+            blurb: d.monitoring_incident_evidence
+                ? d.evidence_packs.length
+                    ? `sealed snapshot · ${d.evidence_packs.length} pack${d.evidence_packs.length === 1 ? '' : 's'}`
+                    : 'sealed monitoring snapshot'
+                : d.evidence_packs.length
+                  ? `${d.evidence_packs.length} pack${d.evidence_packs.length === 1 ? '' : 's'}`
+                  : 'no packs',
             icon: Package,
         },
         {
@@ -657,7 +694,10 @@ export function AlertWorkspaceDialog({
         {
             key: 'linked',
             label: 'Linked records',
-            blurb: 'incident · H&S · client',
+            blurb:
+                d.linked_it_work || d.linked_device
+                    ? 'Control Room · IT · Security & Devices'
+                    : 'incident · H&S · client',
             icon: LinkIcon,
         },
     ];
@@ -2938,6 +2978,19 @@ function EvidenceSection({ d }: { d: AlertWorkspaceDetail }) {
     const canManage = d.can.manage;
     return (
         <div className="flex flex-col gap-4">
+            {d.monitoring_incident_evidence ? (
+                <div className="space-y-2">
+                    <MonitoringIncidentEvidenceCard
+                        evidence={d.monitoring_incident_evidence}
+                    />
+                    <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                        This sealed monitoring snapshot is evidence, not another
+                        work queue. Live response remains in Control Room and
+                        technical work remains in IT.
+                    </p>
+                </div>
+            ) : null}
+
             {canManage ? (
                 creating ? (
                     <CreatePackForm
@@ -4579,6 +4632,53 @@ export function LinkedSection({ d }: { d: AlertWorkspaceDetail }) {
             showAction={false}
         />,
     );
+    if (d.linked_it_work) {
+        const work = d.linked_it_work;
+        const restricted = work.access.state === 'restricted' || !work.href;
+        rows.push(
+            <LinkedRow
+                key="it-work"
+                icon={FileText}
+                title="IT incident work"
+                sub={
+                    restricted
+                        ? (work.access.message ??
+                          'IT workspace access required')
+                        : [
+                              work.reference,
+                              work.status ? titleCase(work.status) : null,
+                              work.assignee
+                                  ? `with ${work.assignee.name}`
+                                  : 'awaiting IT triage',
+                              work.monitoring_recovered_at
+                                  ? 'monitoring recovered; technician closure still required'
+                                  : null,
+                          ]
+                              .filter(Boolean)
+                              .join(' · ')
+                }
+                href={restricted ? null : work.href}
+            />,
+        );
+    }
+    if (d.linked_device) {
+        const device = d.linked_device;
+        const restricted = device.access.state === 'restricted' || !device.href;
+        rows.push(
+            <LinkedRow
+                key="canonical-device"
+                icon={Server}
+                title="Canonical Device"
+                sub={
+                    restricted
+                        ? (device.access.message ??
+                          'Security & Devices access required')
+                        : [device.name, device.uid].filter(Boolean).join(' · ')
+                }
+                href={restricted ? null : device.href}
+            />,
+        );
+    }
     if (d.linked_incident) {
         rows.push(
             <LinkedRow

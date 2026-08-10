@@ -95,9 +95,7 @@ function PeoplePicker({
     onPick: (id: number) => void;
 }) {
     const isSel = (id: number) =>
-        multi
-            ? Array.isArray(value) && value.includes(id)
-            : value === id;
+        multi ? Array.isArray(value) && value.includes(id) : value === id;
     return (
         <div className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto rounded-xl border border-border p-2">
             {employees.length === 0 ? (
@@ -146,9 +144,19 @@ function PeoplePicker({
 /* ================================================================== */
 
 const UPLOAD_STEPS: WizardStep[] = [
-    { key: 'who', label: 'Who & what', blurb: 'Employee, title, type', icon: Users },
+    {
+        key: 'who',
+        label: 'Who & what',
+        blurb: 'Employee, title, type',
+        icon: Users,
+    },
     { key: 'file', label: 'File', blurb: 'Drag & drop', icon: Upload },
-    { key: 'details', label: 'Details', blurb: 'Expiry, access, notes', icon: Shield },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Expiry, access, notes',
+        icon: Shield,
+    },
     { key: 'review', label: 'Review & file', blurb: 'Confirm', icon: Check },
 ];
 
@@ -245,7 +253,9 @@ export function UploadWizard({
                     <button
                         type="button"
                         disabled={!canContinue || processing}
-                        onClick={() => (last ? submit() : setStep((s) => s + 1))}
+                        onClick={() =>
+                            last ? submit() : setStep((s) => s + 1)
+                        }
                         className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
                     >
                         {last ? 'File document' : 'Continue'}
@@ -255,7 +265,11 @@ export function UploadWizard({
         >
             {step === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={Users} title="Who & what" blurb="Attach this document to an employee record." />
+                    <StepHead
+                        icon={Users}
+                        title="Who & what"
+                        blurb="Attach this document to an employee record."
+                    />
                     <div className="space-y-4">
                         <Field label="Employee" required>
                             <PeoplePicker
@@ -284,7 +298,11 @@ export function UploadWizard({
 
             {step === 1 ? (
                 <WizardStepPane>
-                    <StepHead icon={Upload} title="File" blurb="Drag a PDF, image or Office file here." />
+                    <StepHead
+                        icon={Upload}
+                        title="File"
+                        blurb="Drag a PDF, image or Office file here."
+                    />
                     {files.length === 0 ? (
                         <FileDropzone
                             onFiles={(f) => setFiles(f.slice(0, 1))}
@@ -302,7 +320,11 @@ export function UploadWizard({
 
             {step === 2 ? (
                 <WizardStepPane>
-                    <StepHead icon={Shield} title="Details" blurb="Expiry, access and notes." />
+                    <StepHead
+                        icon={Shield}
+                        title="Details"
+                        blurb="Expiry, access and notes."
+                    />
                     <div className="space-y-4">
                         <Field label="Expiry date" hint="optional">
                             <Input
@@ -339,8 +361,16 @@ export function UploadWizard({
 
             {step === 3 ? (
                 <WizardStepPane>
-                    <StepHead icon={Check} title="Review & file" blurb="Confirm the details below." />
-                    <ReviewCard icon={FileText} title="Document" onEdit={() => setStep(0)}>
+                    <StepHead
+                        icon={Check}
+                        title="Review & file"
+                        blurb="Confirm the details below."
+                    />
+                    <ReviewCard
+                        icon={FileText}
+                        title="Document"
+                        onEdit={() => setStep(0)}
+                    >
                         <ReviewRow label="Employee" value={emp?.name} />
                         <ReviewRow label="Title" value={title} />
                         <ReviewRow label="Category" value={category} />
@@ -368,7 +398,12 @@ export function UploadWizard({
 const GENERATE_STEPS: WizardStep[] = [
     { key: 'tpl', label: 'Template', blurb: 'Pick a template', icon: FileText },
     { key: 'rec', label: 'Recipient', blurb: 'Choose employee', icon: Users },
-    { key: 'merge', label: 'Merge & preview', blurb: 'Live preview', icon: Eye },
+    {
+        key: 'merge',
+        label: 'Merge & preview',
+        blurb: 'Live preview',
+        icon: Eye,
+    },
     { key: 'gen', label: 'Generate', blurb: 'Produce PDF', icon: Check },
 ];
 
@@ -508,7 +543,11 @@ export function GenerateWizard({
         >
             {step === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={FileText} title="Template" blurb="Pick a template to merge." />
+                    <StepHead
+                        icon={FileText}
+                        title="Template"
+                        blurb="Pick a template to merge."
+                    />
                     {active.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             No active templates. Create one first.
@@ -530,13 +569,20 @@ export function GenerateWizard({
 
             {step === 1 ? (
                 <WizardStepPane>
-                    <StepHead icon={Users} title="Recipient" blurb="Merge fields resolve from this employee." />
+                    <StepHead
+                        icon={Users}
+                        title="Recipient"
+                        blurb="Merge fields resolve from this employee."
+                    />
                     <PeoplePicker
                         employees={employees}
                         value={employeeId}
                         onPick={setEmployeeId}
                     />
-                    <Field label="Document title" hint="optional — defaults to template name">
+                    <Field
+                        label="Document title"
+                        hint="optional — defaults to template name"
+                    >
                         <Input
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
@@ -548,7 +594,11 @@ export function GenerateWizard({
 
             {step === 2 ? (
                 <WizardStepPane>
-                    <StepHead icon={Eye} title="Merge & preview" blurb="Live preview with fields resolved." />
+                    <StepHead
+                        icon={Eye}
+                        title="Merge & preview"
+                        blurb="Live preview with fields resolved."
+                    />
                     {loadingPreview ? (
                         <p className="text-sm text-muted-foreground">
                             Resolving merge fields…
@@ -558,7 +608,9 @@ export function GenerateWizard({
                             <div
                                 className="max-h-[320px] overflow-y-auto rounded-lg border border-border bg-white p-7 text-[12.5px] leading-[1.8] text-[#1a1523]"
                                 dangerouslySetInnerHTML={{
-                                    __html: preview.content || '<em>Empty template</em>',
+                                    __html:
+                                        preview.content ||
+                                        '<em>Empty template</em>',
                                 }}
                             />
                             {preview.unresolved.length === 0 ? (
@@ -584,8 +636,16 @@ export function GenerateWizard({
 
             {step === 3 ? (
                 <WizardStepPane>
-                    <StepHead icon={Check} title="Generate" blurb="Confirm and produce the PDF." />
-                    <ReviewCard icon={Sparkles} title="Generation" onEdit={() => setStep(0)}>
+                    <StepHead
+                        icon={Check}
+                        title="Generate"
+                        blurb="Confirm and produce the PDF."
+                    />
+                    <ReviewCard
+                        icon={Sparkles}
+                        title="Generation"
+                        onEdit={() => setStep(0)}
+                    >
                         <ReviewRow label="Template" value={template?.name} />
                         <ReviewRow label="Recipient" value={emp?.name} />
                         <ReviewRow label="Output" value="PDF" />
@@ -606,7 +666,12 @@ export function GenerateWizard({
 /* ================================================================== */
 
 const SEND_STEPS: WizardStep[] = [
-    { key: 'doc', label: 'Document & signers', blurb: 'Who signs', icon: Users },
+    {
+        key: 'doc',
+        label: 'Document & signers',
+        blurb: 'Who signs',
+        icon: Users,
+    },
     { key: 'opt', label: 'Options', blurb: 'Order, due, message', icon: Send },
     { key: 'rev', label: 'Review & send', blurb: 'Confirm', icon: Check },
 ];
@@ -681,8 +746,7 @@ export function SendWizard({
         );
     };
 
-    const canContinue =
-        step === 0 ? !!docId && signerIds.length > 0 : true;
+    const canContinue = step === 0 ? !!docId && signerIds.length > 0 : true;
     const last = step === SEND_STEPS.length - 1;
 
     return (
@@ -712,7 +776,9 @@ export function SendWizard({
                     <button
                         type="button"
                         disabled={!canContinue || processing}
-                        onClick={() => (last ? submit() : setStep((s) => s + 1))}
+                        onClick={() =>
+                            last ? submit() : setStep((s) => s + 1)
+                        }
                         className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
                     >
                         {last ? 'Send request' : 'Continue'}
@@ -722,7 +788,11 @@ export function SendWizard({
         >
             {step === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={Users} title="Document & signers" blurb="Who needs to sign?" />
+                    <StepHead
+                        icon={Users}
+                        title="Document & signers"
+                        blurb="Who needs to sign?"
+                    />
                     <div className="space-y-4">
                         <Field label="Document" required>
                             {sendable.length === 0 ? (
@@ -762,7 +832,11 @@ export function SendWizard({
 
             {step === 1 ? (
                 <WizardStepPane>
-                    <StepHead icon={Send} title="Options" blurb="Signing order, due date and message." />
+                    <StepHead
+                        icon={Send}
+                        title="Options"
+                        blurb="Signing order, due date and message."
+                    />
                     <div className="space-y-4">
                         <Field label="Signing order">
                             <Segmented
@@ -770,7 +844,10 @@ export function SendWizard({
                                 onChange={setOrder}
                                 options={[
                                     { value: 'parallel', label: 'Parallel' },
-                                    { value: 'sequential', label: 'Sequential' },
+                                    {
+                                        value: 'sequential',
+                                        label: 'Sequential',
+                                    },
                                 ]}
                             />
                         </Field>
@@ -799,8 +876,16 @@ export function SendWizard({
 
             {step === 2 ? (
                 <WizardStepPane>
-                    <StepHead icon={Check} title="Review & send" blurb="Confirm the request." />
-                    <ReviewCard icon={Send} title="Request" onEdit={() => setStep(0)}>
+                    <StepHead
+                        icon={Check}
+                        title="Review & send"
+                        blurb="Confirm the request."
+                    />
+                    <ReviewCard
+                        icon={Send}
+                        title="Request"
+                        onEdit={() => setStep(0)}
+                    >
                         <ReviewRow label="Document" value={doc?.title} />
                         <ReviewRow
                             label="Signers"
@@ -819,8 +904,9 @@ export function SendWizard({
                         <ReviewRow label="Due" value={dueAt || 'Not set'} />
                     </ReviewCard>
                     <p className="mt-4 rounded-lg border border-primary/35 bg-primary/10 p-3 text-[13px] text-primary">
-                        Each signer is notified and signs with a drawn signature.
-                        A signed PDF + certificate is filed on completion.
+                        Each signer is notified and signs with a drawn
+                        signature. A signed PDF + certificate is filed on
+                        completion.
                     </p>
                 </WizardStepPane>
             ) : null}
@@ -833,9 +919,24 @@ export function SendWizard({
 /* ================================================================== */
 
 const TEMPLATE_STEPS: WizardStep[] = [
-    { key: 'basics', label: 'Basics', blurb: 'Name & category', icon: FileText },
-    { key: 'content', label: 'Content', blurb: 'Editor + merge fields', icon: Pencil },
-    { key: 'settings', label: 'Settings', blurb: 'Approval, active', icon: Shield },
+    {
+        key: 'basics',
+        label: 'Basics',
+        blurb: 'Name & category',
+        icon: FileText,
+    },
+    {
+        key: 'content',
+        label: 'Content',
+        blurb: 'Editor + merge fields',
+        icon: Pencil,
+    },
+    {
+        key: 'settings',
+        label: 'Settings',
+        blurb: 'Approval, active',
+        icon: Shield,
+    },
     { key: 'review', label: 'Review', blurb: 'Confirm', icon: Check },
 ];
 
@@ -878,7 +979,9 @@ export function TemplateWizard({
     };
 
     const insert = (token: string) =>
-        setContent((c) => `${c}${c.endsWith(' ') || c === '' ? '' : ' '}${token}`);
+        setContent(
+            (c) => `${c}${c.endsWith(' ') || c === '' ? '' : ' '}${token}`,
+        );
 
     const submit = () => {
         if (!name || !category || !content) return;
@@ -904,7 +1007,11 @@ export function TemplateWizard({
     };
 
     const canContinue =
-        step === 0 ? name.trim() !== '' && category !== '' : step === 1 ? content.trim() !== '' : true;
+        step === 0
+            ? name.trim() !== '' && category !== ''
+            : step === 1
+              ? content.trim() !== ''
+              : true;
     const last = step === TEMPLATE_STEPS.length - 1;
 
     return (
@@ -934,7 +1041,9 @@ export function TemplateWizard({
                     <button
                         type="button"
                         disabled={!canContinue || processing}
-                        onClick={() => (last ? submit() : setStep((s) => s + 1))}
+                        onClick={() =>
+                            last ? submit() : setStep((s) => s + 1)
+                        }
                         className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
                     >
                         {last ? 'Create template' : 'Continue'}
@@ -944,7 +1053,11 @@ export function TemplateWizard({
         >
             {step === 0 ? (
                 <WizardStepPane>
-                    <StepHead icon={FileText} title="Basics" blurb="Name and category." />
+                    <StepHead
+                        icon={FileText}
+                        title="Basics"
+                        blurb="Name and category."
+                    />
                     <div className="space-y-4">
                         <Field label="Template name" required>
                             <Input
@@ -958,9 +1071,12 @@ export function TemplateWizard({
                                 value={category}
                                 onChange={setCategory}
                                 options={CATEGORY_TILES.filter((c) =>
-                                    ['contract', 'offer', 'letter', 'policy'].includes(
-                                        c.key,
-                                    ),
+                                    [
+                                        'contract',
+                                        'offer',
+                                        'letter',
+                                        'policy',
+                                    ].includes(c.key),
                                 )}
                             />
                         </Field>
@@ -970,7 +1086,11 @@ export function TemplateWizard({
 
             {step === 1 ? (
                 <WizardStepPane>
-                    <StepHead icon={Pencil} title="Content" blurb="Write the body and insert merge fields." />
+                    <StepHead
+                        icon={Pencil}
+                        title="Content"
+                        blurb="Write the body and insert merge fields."
+                    />
                     <div className="mb-2 flex flex-wrap gap-1.5">
                         {MERGE_HINTS.map((f) => (
                             <button
@@ -994,7 +1114,11 @@ export function TemplateWizard({
 
             {step === 2 ? (
                 <WizardStepPane>
-                    <StepHead icon={Shield} title="Settings" blurb="Workflow controls." />
+                    <StepHead
+                        icon={Shield}
+                        title="Settings"
+                        blurb="Workflow controls."
+                    />
                     <div className="flex items-center justify-between rounded-lg border border-border p-3">
                         <div>
                             <Label className="text-[13px] font-semibold">
@@ -1005,15 +1129,26 @@ export function TemplateWizard({
                                 before they can be sent.
                             </p>
                         </div>
-                        <Switch checked={approval} onCheckedChange={setApproval} />
+                        <Switch
+                            checked={approval}
+                            onCheckedChange={setApproval}
+                        />
                     </div>
                 </WizardStepPane>
             ) : null}
 
             {step === 3 ? (
                 <WizardStepPane>
-                    <StepHead icon={Check} title="Review" blurb="Confirm the template." />
-                    <ReviewCard icon={FileText} title="Template" onEdit={() => setStep(0)}>
+                    <StepHead
+                        icon={Check}
+                        title="Review"
+                        blurb="Confirm the template."
+                    />
+                    <ReviewCard
+                        icon={FileText}
+                        title="Template"
+                        onEdit={() => setStep(0)}
+                    >
                         <ReviewRow label="Name" value={name} />
                         <ReviewRow label="Category" value={category} />
                         <ReviewRow

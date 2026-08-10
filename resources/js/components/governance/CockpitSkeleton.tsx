@@ -7,7 +7,12 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 export function CockpitSkeleton() {
     return (
-        <div className="space-y-6" aria-busy="true" aria-live="polite" data-dusk="cockpit-skeleton">
+        <div
+            className="space-y-6"
+            aria-busy="true"
+            aria-live="polite"
+            data-dusk="cockpit-skeleton"
+        >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {Array.from({ length: 4 }).map((_, idx) => (
                     <Card key={idx}>
@@ -28,7 +33,10 @@ export function CockpitSkeleton() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {Array.from({ length: 5 }).map((_, idx) => (
-                            <Skeleton key={idx} className="h-16 w-full rounded-lg" />
+                            <Skeleton
+                                key={idx}
+                                className="h-16 w-full rounded-lg"
+                            />
                         ))}
                     </CardContent>
                 </Card>
@@ -39,7 +47,10 @@ export function CockpitSkeleton() {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {Array.from({ length: 4 }).map((_, idx) => (
-                                <Skeleton key={idx} className="h-12 w-full rounded-lg" />
+                                <Skeleton
+                                    key={idx}
+                                    className="h-12 w-full rounded-lg"
+                                />
                             ))}
                         </CardContent>
                     </Card>

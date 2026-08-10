@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatRelative, formatTime } from '@/lib/datetime';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import 'leaflet/dist/leaflet.css';
 import {
     Activity,
@@ -20,6 +20,8 @@ import {
     MapPin,
     Radio,
     RefreshCw,
+    ShieldAlert,
+    ShieldCheck,
     Wifi,
     WifiOff,
 } from 'lucide-react';
@@ -29,20 +31,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface MapDevice {
     id: number;
-    device_uid: string;
+    device_uid: string | null;
     name: string;
     type: string;
+    type_label: string;
     status: string;
+    health_status: string | null;
     latitude: number;
     longitude: number;
-    location_description: string | null;
     battery_level: number | null;
     last_seen_at: string | null;
-    vendor: string | null;
+    position_source: string;
+    context_label: string | null;
+    manufacturer: string | null;
     model: string | null;
     site_id: number | null;
-    client_id: number | null;
-    asset_id: number | null;
+    identity_source: 'canonical';
+    privacy_state: string | null;
+    privacy_basis: string | null;
+    detail_url: string;
 }
 
 interface MapSite {
@@ -57,6 +64,7 @@ interface GeofenceShape {
     lat?: number;
     lon?: number;
     radius_m?: number;
+    center?: { lat?: number; lng?: number };
     points?: { lat: number; lng: number }[];
 }
 
@@ -79,8 +87,7 @@ interface MapAlert {
     site_id: number | null;
     latitude: number | null;
     longitude: number | null;
-    asset_name: string | null;
-    notes: string | null;
+    detail_url: string;
 }
 
 interface SiteOption {
@@ -93,6 +100,14 @@ interface Stats {
     online: number;
     offline: number;
     active_alerts: number;
+    location_restricted: number;
+}
+
+interface LocationBoundary {
+    position_access: boolean;
+    title: string;
+    description: string;
+    canonical_url: string | null;
 }
 
 interface Props {
@@ -102,7 +117,8 @@ interface Props {
     alerts: MapAlert[];
     all_sites: SiteOption[];
     stats: Stats;
-    filters: Record<string, string>;
+    location_boundary: LocationBoundary;
+    filters: Record<string, string | null>;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -111,6 +127,32 @@ function isRecentlySeen(lastSeen: string | null, minutes: number = 5): boolean {
     if (!lastSeen) return false;
     const diff = Date.now() - new Date(lastSeen).getTime();
     return diff < minutes * 60 * 1000;
+}
+
+export function escapeMapHtml(value: unknown): string {
+    return String(value ?? '').replace(/[&<>"']/g, (character) => {
+        const entities: Record<string, string> = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;',
+        };
+
+        return entities[character];
+    });
+}
+
+export function mapDeviceActivityLabel(device: {
+    status: string;
+    last_seen_at: string | null;
+}): string {
+    if (device.status === 'offline') return 'Offline';
+    if (device.status === 'unknown') return 'Status unknown';
+
+    return isRecentlySeen(device.last_seen_at, 5)
+        ? 'Recently updated'
+        : 'Reporting';
 }
 
 // ── Pulse animation CSS ─────────────────────────────────────────────────────
@@ -155,6 +197,7 @@ export default function ControlRoomMap({
     alerts,
     all_sites,
     stats,
+    location_boundary,
     filters,
 }: Props) {
     const mapRef = useRef<HTMLDivElement>(null);
@@ -265,13 +308,16 @@ export default function ControlRoomMap({
             geofences.forEach((gf) => {
                 if (!gf.shape) return;
 
+                const circleLatitude = gf.shape.lat ?? gf.shape.center?.lat;
+                const circleLongitude = gf.shape.lon ?? gf.shape.center?.lng;
+
                 if (
                     gf.type === 'circle' &&
-                    gf.shape.lat &&
-                    gf.shape.lon &&
+                    circleLatitude !== undefined &&
+                    circleLongitude !== undefined &&
                     gf.shape.radius_m
                 ) {
-                    L.circle([gf.shape.lat, gf.shape.lon], {
+                    L.circle([circleLatitude, circleLongitude], {
                         radius: gf.shape.radius_m,
                         color: '#6366f1',
                         fillColor: '#6366f1',
@@ -280,8 +326,8 @@ export default function ControlRoomMap({
                         dashArray: '5, 5',
                     })
                         .bindPopup(
-                            `<div class="text-sm"><strong>${gf.name}</strong><br/>` +
-                                `Type: ${gf.breach_type}<br/>` +
+                            `<div class="text-sm"><strong>${escapeMapHtml(gf.name)}</strong><br/>` +
+                                `Type: ${escapeMapHtml(gf.breach_type)}<br/>` +
                                 `Radius: ${gf.shape.radius_m}m</div>`,
                         )
                         .addTo(layers);
@@ -301,8 +347,8 @@ export default function ControlRoomMap({
                         dashArray: '5, 5',
                     })
                         .bindPopup(
-                            `<div class="text-sm"><strong>${gf.name}</strong><br/>` +
-                                `Type: ${gf.breach_type}</div>`,
+                            `<div class="text-sm"><strong>${escapeMapHtml(gf.name)}</strong><br/>` +
+                                `Type: ${escapeMapHtml(gf.breach_type)}</div>`,
                         )
                         .addTo(layers);
                 }
@@ -332,8 +378,8 @@ export default function ControlRoomMap({
                 })
                     .bindPopup(
                         `<div class="text-sm">` +
-                            `<strong>${site.name}</strong><br/>` +
-                            `<span style="color:#666">${site.address}</span>` +
+                            `<strong>${escapeMapHtml(site.name)}</strong><br/>` +
+                            `<span style="color:#666">${escapeMapHtml(site.address)}</span>` +
                             `</div>`,
                     )
                     .addTo(layers);
@@ -345,23 +391,21 @@ export default function ControlRoomMap({
 
             devices.forEach((device) => {
                 let color = '#6b7280'; // gray default
-                let label = device.status;
+                const label = mapDeviceActivityLabel(device);
 
                 if (device.type === 'personal_tracker') {
                     color = '#8b5cf6'; // purple
-                    label = 'Resident tracker';
+                } else if (device.type === 'asset_tracker') {
+                    color = '#0f766e'; // teal
                 } else if (
                     device.status === 'online' &&
                     isRecentlySeen(device.last_seen_at, 5)
                 ) {
-                    color = '#3b82f6'; // blue - moving/recently seen
-                    label = 'Moving';
+                    color = '#3b82f6'; // blue - recently updated
                 } else if (device.status === 'online') {
                     color = '#22c55e'; // green
-                    label = 'Online';
-                } else {
+                } else if (device.status === 'offline') {
                     color = '#ef4444'; // red offline
-                    label = 'Offline';
                 }
 
                 const deviceIcon = L.divIcon({
@@ -383,18 +427,19 @@ export default function ControlRoomMap({
 
                 const popupContent =
                     `<div class="text-sm" style="min-width:180px">` +
-                    `<strong>${device.name || device.device_uid}</strong><br/>` +
+                    `<strong>${escapeMapHtml(device.name || device.device_uid)}</strong><br/>` +
                     `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle"></span>` +
-                    `<span style="color:#666">${label}</span><br/>` +
-                    `<span style="color:#666">Type: ${device.type.replace(/_/g, ' ')}</span><br/>` +
+                    `<span style="color:#666">${escapeMapHtml(label)}</span><br/>` +
+                    `<span style="color:#666">Type: ${escapeMapHtml(device.type_label)}</span><br/>` +
                     `<span style="color:#666">Battery: ${batteryStr}</span><br/>` +
-                    `<span style="color:#666">Last seen: ${formatRelative(device.last_seen_at)}</span>` +
-                    (device.location_description
-                        ? `<br/><span style="color:#666">Location: ${device.location_description}</span>`
+                    `<span style="color:#666">Last reported: ${escapeMapHtml(formatRelative(device.last_seen_at))}</span>` +
+                    (device.context_label
+                        ? `<br/><span style="color:#666">Context: ${escapeMapHtml(device.context_label)}</span>`
                         : '') +
-                    (device.vendor
-                        ? `<br/><span style="color:#888;font-size:11px">${device.vendor}${device.model ? ' ' + device.model : ''}</span>`
+                    (device.manufacturer
+                        ? `<br/><span style="color:#888;font-size:11px">${escapeMapHtml(device.manufacturer)}${device.model ? ` ${escapeMapHtml(device.model)}` : ''}</span>`
                         : '') +
+                    `<br/><a href="${escapeMapHtml(device.detail_url)}" style="display:inline-block;margin-top:6px;font-weight:600;color:#2563eb">Open canonical device →</a>` +
                     `</div>`;
 
                 L.marker([device.latitude, device.longitude], {
@@ -423,18 +468,11 @@ export default function ControlRoomMap({
 
                 const popupContent =
                     `<div class="text-sm" style="min-width:180px">` +
-                    `<strong style="color:#ef4444">${alert.alert_type}</strong><br/>` +
-                    `<span style="color:#666">Severity: ${alert.severity}</span><br/>` +
-                    `<span style="color:#666">Status: ${alert.status}</span><br/>` +
-                    `<span style="color:#666">Triggered: ${formatRelative(alert.triggered_at)}</span>` +
-                    (alert.asset_name
-                        ? `<br/><span style="color:#666">Asset: ${alert.asset_name}</span>`
-                        : '') +
-                    (alert.notes
-                        ? `<br/><span style="color:#888;font-size:11px">${alert.notes}</span>`
-                        : '') +
-                    // Deep link into the guided alert workspace
-                    `<br/><a href="/control-room/alerts/${alert.id}" style="display:inline-block;margin-top:6px;font-weight:600;color:#2563eb">Open alert →</a>` +
+                    `<strong style="color:#ef4444">${escapeMapHtml(alert.alert_type)}</strong><br/>` +
+                    `<span style="color:#666">Severity: ${escapeMapHtml(alert.severity)}</span><br/>` +
+                    `<span style="color:#666">Status: ${escapeMapHtml(alert.status)}</span><br/>` +
+                    `<span style="color:#666">Triggered: ${escapeMapHtml(formatRelative(alert.triggered_at))}</span>` +
+                    `<br/><a href="${escapeMapHtml(alert.detail_url)}" style="display:inline-block;margin-top:6px;font-weight:600;color:#2563eb">Open alert →</a>` +
                     `</div>`;
 
                 L.marker([alert.latitude!, alert.longitude!], {
@@ -479,7 +517,7 @@ export default function ControlRoomMap({
         <AppLayout
             breadcrumbs={[
                 { title: 'Control Room', href: '/control-room' },
-                { title: 'Live Map', href: '#' },
+                { title: 'Live Map', href: '/control-room/map' },
             ]}
         >
             <Head title="Live Map — Control Room" />
@@ -493,23 +531,63 @@ export default function ControlRoomMap({
                     current="/control-room/map"
                     icon={Map}
                     title="Live map"
-                    description="Real-time positions of tracked vehicles and residents."
-                    status="Live location workspace"
+                    description="Latest governed positions for personal safety, Fleet and asset trackers."
+                    status="Governed location workspace"
                     freshness={`Updated ${formatTime(lastRefreshed)}`}
                     actions={
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={manualRefresh}
-                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            className="frontline-tap border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                         >
                             <RefreshCw className="mr-2 h-4 w-4" />
                             Refresh
                         </Button>
                     }
                 >
+                    <Card
+                        className={
+                            location_boundary.position_access
+                                ? 'border-status-info/30 bg-status-info-bg/40'
+                                : 'border-status-warning/30 bg-status-warning-bg/40'
+                        }
+                    >
+                        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 items-start gap-3">
+                                {location_boundary.position_access ? (
+                                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-status-info" />
+                                ) : (
+                                    <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
+                                )}
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold">
+                                        {location_boundary.title}
+                                    </p>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        {location_boundary.description}
+                                    </p>
+                                </div>
+                            </div>
+                            {location_boundary.canonical_url && (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="frontline-tap shrink-0"
+                                >
+                                    <Link
+                                        href={location_boundary.canonical_url}
+                                    >
+                                        Open Tracking
+                                    </Link>
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+
                     {/* Stats Bar */}
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
                         <Card>
                             <CardContent className="flex items-center gap-3 p-4">
                                 <div className="rounded-lg bg-status-info-bg p-2">
@@ -517,7 +595,7 @@ export default function ControlRoomMap({
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">
-                                        Total Devices
+                                        Positions available
                                     </p>
                                     <p className="text-2xl font-bold">
                                         {stats.total_devices}
@@ -532,7 +610,7 @@ export default function ControlRoomMap({
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">
-                                        Online
+                                        Reporting
                                     </p>
                                     <p className="text-2xl font-bold text-status-success">
                                         {stats.online}
@@ -570,6 +648,21 @@ export default function ControlRoomMap({
                                 </div>
                             </CardContent>
                         </Card>
+                        <Card>
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="rounded-lg bg-status-warning-bg p-2">
+                                    <ShieldAlert className="h-5 w-5 text-status-warning" />
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Location restricted
+                                    </p>
+                                    <p className="text-2xl font-bold text-status-warning">
+                                        {stats.location_restricted}
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
 
                     {/* Map + Sidebar Layout */}
@@ -592,12 +685,12 @@ export default function ControlRoomMap({
                                                 applyFilter('site_id', v)
                                             }
                                         >
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="All Sites" />
+                                            <SelectTrigger className="frontline-tap w-full">
+                                                <SelectValue placeholder="All sites" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">
-                                                    All Sites
+                                                    All sites
                                                 </SelectItem>
                                                 {all_sites.map((s) => (
                                                     <SelectItem
@@ -621,18 +714,21 @@ export default function ControlRoomMap({
                                                 applyFilter('type', v)
                                             }
                                         >
-                                            <SelectTrigger className="w-full">
+                                            <SelectTrigger className="frontline-tap w-full">
                                                 <SelectValue placeholder="All Types" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="all">
-                                                    All Trackers
+                                                    All trackers
                                                 </SelectItem>
                                                 <SelectItem value="vehicle_tracker">
-                                                    Vehicle Tracker
+                                                    Fleet tracker
                                                 </SelectItem>
                                                 <SelectItem value="personal_tracker">
-                                                    Resident Tracker
+                                                    Personal safety tracker
+                                                </SelectItem>
+                                                <SelectItem value="asset_tracker">
+                                                    Asset tracker
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
@@ -648,7 +744,7 @@ export default function ControlRoomMap({
                                                 applyFilter('status', v)
                                             }
                                         >
-                                            <SelectTrigger className="w-full">
+                                            <SelectTrigger className="frontline-tap w-full">
                                                 <SelectValue placeholder="All Statuses" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -660,6 +756,9 @@ export default function ControlRoomMap({
                                                 </SelectItem>
                                                 <SelectItem value="offline">
                                                     Offline
+                                                </SelectItem>
+                                                <SelectItem value="unknown">
+                                                    Status unknown
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
@@ -675,12 +774,12 @@ export default function ControlRoomMap({
                                                 applyFilter('alert_only', v)
                                             }
                                         >
-                                            <SelectTrigger className="w-full">
+                                            <SelectTrigger className="frontline-tap w-full">
                                                 <SelectValue placeholder="No" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="0">
-                                                    Show All
+                                                    Show all
                                                 </SelectItem>
                                                 <SelectItem value="1">
                                                     Alerts Only
@@ -693,10 +792,10 @@ export default function ControlRoomMap({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="w-full"
+                                            className="frontline-tap w-full"
                                             onClick={clearFilters}
                                         >
-                                            Clear Filters
+                                            Clear filters
                                         </Button>
                                     )}
                                 </CardContent>
@@ -711,19 +810,27 @@ export default function ControlRoomMap({
                                     <div className="space-y-1.5 text-xs">
                                         <div className="flex items-center gap-2">
                                             <span className="inline-block h-3 w-3 rounded-full bg-status-success" />
-                                            <span>Vehicle - Online</span>
+                                            <span>
+                                                Fleet tracker — reporting
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="inline-block h-3 w-3 rounded-full bg-status-info" />
-                                            <span>Vehicle - Moving</span>
+                                            <span>
+                                                Fleet tracker — recently updated
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="inline-block h-3 w-3 rounded-full bg-status-critical" />
-                                            <span>Vehicle - Offline</span>
+                                            <span>Tracker — offline</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="inline-block h-3 w-3 rounded-full bg-primary" />
-                                            <span>Resident Tracker</span>
+                                            <span>Personal safety tracker</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="inline-block h-3 w-3 rounded-full bg-category-fleet" />
+                                            <span>Asset tracker</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="inline-block h-3 w-3 rounded-full bg-status-warning" />
@@ -753,12 +860,15 @@ export default function ControlRoomMap({
                             <Card>
                                 <CardContent className="p-4">
                                     <h3 className="mb-2 text-sm font-semibold">
-                                        Devices ({devices.length})
+                                        Governed positions ({devices.length})
                                     </h3>
                                     <div className="max-h-64 space-y-1 overflow-y-auto">
                                         {devices.length === 0 && (
                                             <p className="py-2 text-xs text-muted-foreground">
-                                                No devices with location data.
+                                                No tracker positions are
+                                                available under the current
+                                                Site, source-permission and
+                                                privacy rules.
                                             </p>
                                         )}
                                         {devices.map((d) => (
@@ -766,7 +876,7 @@ export default function ControlRoomMap({
                                                 key={d.id}
                                                 type="button"
                                                 variant="ghost"
-                                                className="h-auto w-full justify-start gap-2 rounded px-2 py-1.5 text-left text-xs"
+                                                className="frontline-tap h-auto w-full justify-start gap-2 rounded px-2 py-1.5 text-left text-xs"
                                                 onClick={() => {
                                                     if (
                                                         mapInstanceRef.current
@@ -782,23 +892,35 @@ export default function ControlRoomMap({
                                                 }}
                                             >
                                                 <span
+                                                    aria-hidden="true"
                                                     className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
                                                         d.type ===
                                                         'personal_tracker'
                                                             ? 'bg-primary'
-                                                            : d.status ===
-                                                                'online'
-                                                              ? isRecentlySeen(
-                                                                    d.last_seen_at,
-                                                                    5,
-                                                                )
-                                                                  ? 'bg-status-info'
-                                                                  : 'bg-status-success'
-                                                              : 'bg-status-critical'
+                                                            : d.type ===
+                                                                'asset_tracker'
+                                                              ? 'bg-category-fleet'
+                                                              : d.status ===
+                                                                  'online'
+                                                                ? isRecentlySeen(
+                                                                      d.last_seen_at,
+                                                                      5,
+                                                                  )
+                                                                    ? 'bg-status-info'
+                                                                    : 'bg-status-success'
+                                                                : 'bg-status-critical'
                                                     }`}
                                                 />
-                                                <span className="min-w-0 flex-1 truncate">
-                                                    {d.name || d.device_uid}
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate">
+                                                        {d.name || d.device_uid}
+                                                    </span>
+                                                    <span className="block truncate text-[11px] text-muted-foreground">
+                                                        {d.type_label} ·{' '}
+                                                        {mapDeviceActivityLabel(
+                                                            d,
+                                                        )}
+                                                    </span>
                                                 </span>
                                                 {d.battery_level !== null &&
                                                     d.battery_level <= 20 && (
@@ -831,15 +953,16 @@ export default function ControlRoomMap({
                                 <div className="flex items-center gap-1">
                                     <Activity className="h-3 w-3" />
                                     <span>
-                                        Auto-refreshing every 30s | Last:{' '}
+                                        Refreshes every 30 seconds · Last:{' '}
                                         {formatTime(lastRefreshed)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <MapPin className="h-3 w-3" />
                                     <span>
-                                        {devices.length} devices, {sites.length}{' '}
-                                        sites, {alerts.length} alerts
+                                        {devices.length} governed positions,{' '}
+                                        {sites.length} sites, {alerts.length}{' '}
+                                        alerts
                                     </span>
                                 </div>
                             </div>

@@ -1,15 +1,13 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
-import { SettingsTabsFooter } from '@/components/finance/settings-hub';
 import {
     ConfirmDialog,
     FundingStreamDialog,
     type EditableFundingStream,
     type FundingStreamRevenueAccount,
 } from '@/components/finance';
-import { Button } from '@/components/ui/button';
+import { SettingsTabsFooter } from '@/components/finance/settings-hub';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
@@ -19,7 +17,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Banknote, Plus, Pencil, Trash2, Sprout } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router } from '@inertiajs/react';
+import { Banknote, Pencil, Plus, Sprout, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type RevenueAccount = FundingStreamRevenueAccount;
@@ -58,10 +58,18 @@ const funderTypeLabels: Record<string, string> = Object.fromEntries(
     funderTypes.map((ft) => [ft.value, ft.label]),
 );
 
-export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, canManage = false }: PageProps) {
+export default function FundingStreamsIndex({
+    fundingStreams,
+    revenueAccounts,
+    canManage = false,
+}: PageProps) {
     const [createOpen, setCreateOpen] = useState(false);
-    const [editStream, setEditStream] = useState<EditableFundingStream | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<FundingStream | null>(null);
+    const [editStream, setEditStream] = useState<EditableFundingStream | null>(
+        null,
+    );
+    const [deleteTarget, setDeleteTarget] = useState<FundingStream | null>(
+        null,
+    );
     const [deleting, setDeleting] = useState(false);
 
     const breadcrumbs = [
@@ -98,7 +106,8 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, c
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Sprout}
                         title="Funding Streams"
                         description="Manage funding sources and revenue allocations"
@@ -132,33 +141,64 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, c
                                     <TableHead>Code</TableHead>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Funder Type</TableHead>
-                                    <TableHead>Default Revenue Account</TableHead>
+                                    <TableHead>
+                                        Default Revenue Account
+                                    </TableHead>
                                     <TableHead>Status</TableHead>
-                                    {canManage && <TableHead className="text-right">Actions</TableHead>}
+                                    {canManage && (
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {fundingStreams.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={canManage ? 6 : 5} className="text-center text-muted-foreground py-8">
-                                            No funding streams defined yet. Create your first funding stream to get started.
+                                        <TableCell
+                                            colSpan={canManage ? 6 : 5}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            No funding streams defined yet.
+                                            Create your first funding stream to
+                                            get started.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     fundingStreams.map((fs) => (
                                         <TableRow key={fs.id}>
-                                            <TableCell className="font-mono text-sm">{fs.code}</TableCell>
-                                            <TableCell className="font-medium">{fs.name}</TableCell>
+                                            <TableCell className="font-mono text-sm">
+                                                {fs.code}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {fs.name}
+                                            </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
-                                                {fs.funder_type ? (funderTypeLabels[fs.funder_type] || fs.funder_type) : '-'}
+                                                {fs.funder_type
+                                                    ? funderTypeLabels[
+                                                          fs.funder_type
+                                                      ] || fs.funder_type
+                                                    : '-'}
                                             </TableCell>
                                             <TableCell className="text-sm">
                                                 {fs.default_revenue_account ? (
                                                     <span className="font-mono">
-                                                        {fs.default_revenue_account.code} - {fs.default_revenue_account.name}
+                                                        {
+                                                            fs
+                                                                .default_revenue_account
+                                                                .code
+                                                        }{' '}
+                                                        -{' '}
+                                                        {
+                                                            fs
+                                                                .default_revenue_account
+                                                                .name
+                                                        }
                                                     </span>
                                                 ) : (
-                                                    <span className="text-muted-foreground">-</span>
+                                                    <span className="text-muted-foreground">
+                                                        -
+                                                    </span>
                                                 )}
                                             </TableCell>
                                             <TableCell>
@@ -166,11 +206,13 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, c
                                                     variant="outline"
                                                     className={
                                                         fs.is_active
-                                                            ? 'bg-status-success-bg text-status-success border-status-success/30'
-                                                            : 'bg-muted-foreground/10 text-muted-foreground border-border/30'
+                                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                                            : 'border-border/30 bg-muted-foreground/10 text-muted-foreground'
                                                     }
                                                 >
-                                                    {fs.is_active ? 'Active' : 'Inactive'}
+                                                    {fs.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
                                                 </Badge>
                                             </TableCell>
                                             {canManage && (
@@ -180,7 +222,9 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, c
                                                             variant="ghost"
                                                             size="icon"
                                                             aria-label={`Edit ${fs.name}`}
-                                                            onClick={() => openEdit(fs)}
+                                                            onClick={() =>
+                                                                openEdit(fs)
+                                                            }
                                                         >
                                                             <Pencil className="h-4 w-4" />
                                                         </Button>
@@ -188,7 +232,11 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts, c
                                                             variant="ghost"
                                                             size="icon"
                                                             aria-label={`Delete ${fs.name}`}
-                                                            onClick={() => setDeleteTarget(fs)}
+                                                            onClick={() =>
+                                                                setDeleteTarget(
+                                                                    fs,
+                                                                )
+                                                            }
                                                         >
                                                             <Trash2 className="h-4 w-4 text-destructive" />
                                                         </Button>

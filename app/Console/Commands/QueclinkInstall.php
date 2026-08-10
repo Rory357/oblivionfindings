@@ -21,9 +21,9 @@ use RuntimeException;
  *   3. Enables + starts the service
  *   4. Opens the configured TCP port in UFW (if installed)
  *
- * On any other platform (Windows, no systemd) it prints next-steps
- * instructions and exits 0 — safe to run from a deploy hook that
- * doesn't know which OS it's on.
+ * On any other platform (Windows, no systemd), a normal install prints
+ * next-step instructions and exits 0. The explicit --check path fails closed
+ * because it cannot verify the supported systemd runtime.
  *
  * Re-running the command after the port changes rewrites the unit file
  * and restarts the listener. Safe to re-run on every deploy.
@@ -54,7 +54,11 @@ class QueclinkInstall extends Command
             return self::FAILURE;
         }
 
-        if (PHP_OS_FAMILY !== 'Linux') {
+        if ($this->option('check')) {
+            return $this->reportStatus();
+        }
+
+        if (! $this->isLinuxRuntime()) {
             $this->warn('queclink:install is a no-op on non-Linux platforms.');
             $this->line('On this machine, run the listener manually:');
             $this->line("  php artisan queclink:listen --port={$port}");
@@ -70,23 +74,20 @@ class QueclinkInstall extends Command
             return self::SUCCESS;
         }
 
-        if ($this->option('check')) {
-            return $this->reportStatus();
-        }
-
         $user = (string) ($this->option('user') ?: 'www-data');
         $projectRoot = base_path();
         $phpBinary = PHP_BINARY;
+        $unitFile = $this->unitFilePath();
 
         $unit = $this->renderUnit($phpBinary, $projectRoot, $port, $user);
-        $existing = is_readable(self::UNIT_FILE) ? file_get_contents(self::UNIT_FILE) : '';
+        $existing = is_readable($unitFile) ? file_get_contents($unitFile) : '';
 
         $changed = trim($existing) !== trim($unit);
 
         try {
             if ($changed) {
-                $this->line('Writing '.self::UNIT_FILE);
-                if (@file_put_contents(self::UNIT_FILE, $unit) === false) {
+                $this->line('Writing '.$unitFile);
+                if (@file_put_contents($unitFile, $unit) === false) {
                     $this->error('Could not write unit file. Re-run with sudo.');
 
                     return self::FAILURE;
@@ -103,6 +104,10 @@ class QueclinkInstall extends Command
 
             if (! $this->option('no-firewall')) {
                 $this->openFirewallPort($port);
+            }
+
+            if ($this->reportStatus() !== self::SUCCESS) {
+                throw new RuntimeException('Queclink listener readiness check failed after restart.');
             }
         } catch (RuntimeException $exception) {
             Log::error('queclink:install failed', [
@@ -125,17 +130,67 @@ class QueclinkInstall extends Command
 
     protected function reportStatus(): int
     {
-        $unitExists = is_readable(self::UNIT_FILE);
-        $this->line('Unit file:     '.(self::UNIT_FILE).' — '.($unitExists ? 'present' : 'missing'));
+        if (! $this->isLinuxRuntime()) {
+            $this->error('Queclink systemd readiness is unavailable on this platform.');
 
-        if ($unitExists) {
-            $output = [];
-            $code = 0;
-            exec('systemctl is-active '.escapeshellarg(self::SERVICE_NAME).' 2>&1', $output, $code);
-            $this->line('Service state: '.trim(implode("\n", $output)));
+            return self::FAILURE;
         }
 
+        if (! $this->isSystemdAvailable()) {
+            $this->error('Queclink systemd readiness is unavailable because systemd was not detected.');
+
+            return self::FAILURE;
+        }
+
+        $unitFile = $this->unitFilePath();
+        $unitExists = $this->unitFileIsReadable();
+        $this->line('Unit file:     '.$unitFile.' — '.($unitExists ? 'present' : 'missing'));
+
+        if (! $unitExists) {
+            $this->error('Queclink listener unit is missing.');
+
+            return self::FAILURE;
+        }
+
+        $status = $this->systemdServiceState();
+        $this->line('Service state: '.$status['state']);
+        if ($status['exit_code'] !== 0 || $status['state'] !== 'active') {
+            $this->error('Queclink listener service is not active.');
+
+            return self::FAILURE;
+        }
+
+        $this->info('Queclink listener systemd readiness verified.');
+
         return self::SUCCESS;
+    }
+
+    protected function isLinuxRuntime(): bool
+    {
+        return PHP_OS_FAMILY === 'Linux';
+    }
+
+    protected function unitFilePath(): string
+    {
+        return self::UNIT_FILE;
+    }
+
+    protected function unitFileIsReadable(): bool
+    {
+        return is_readable($this->unitFilePath());
+    }
+
+    /** @return array{state: string, exit_code: int} */
+    protected function systemdServiceState(): array
+    {
+        $output = [];
+        $code = 0;
+        exec('systemctl is-active '.escapeshellarg(self::SERVICE_NAME).' 2>&1', $output, $code);
+
+        return [
+            'state' => trim(implode(' ', $output)) ?: 'unknown',
+            'exit_code' => $code,
+        ];
     }
 
     protected function renderUnit(string $phpBinary, string $projectRoot, int $port, string $user): string

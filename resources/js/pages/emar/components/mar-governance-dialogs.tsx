@@ -1,16 +1,44 @@
 import { MedsWizardDialog } from '@/components/meds/wizard-shell';
-import { Field, InfoCard, SelectInput, Segmented, StepHead, TilePicker } from '@/components/wizard/primitives';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    Field,
+    InfoCard,
+    Segmented,
+    SelectInput,
+    StepHead,
+    TilePicker,
+} from '@/components/wizard/primitives';
 import { AddMedicationDialog } from '@/pages/emar/_dialogs';
 import type { WitnessOption } from '@/pages/meds/today/types';
 import { useForm } from '@inertiajs/react';
-import { AlertTriangle, ClipboardCheck, FileText, HeartPulse, Pill, ShieldCheck, Syringe } from 'lucide-react';
+import {
+    AlertTriangle,
+    ClipboardCheck,
+    FileText,
+    HeartPulse,
+    ShieldCheck,
+    Syringe,
+} from 'lucide-react';
 import { useState } from 'react';
 
-export type MarModal = 'addMed' | 'inr' | 'syringe' | 'alerts' | 'verify' | 'warnings' | 'corrections' | null;
+export type MarModal =
+    | 'addMed'
+    | 'inr'
+    | 'syringe'
+    | 'alerts'
+    | 'verify'
+    | 'warnings'
+    | 'corrections'
+    | null;
 
-type AttentionAlert = { id: number; type: string; title: string; detail?: string | null; prompt_on_open: boolean };
+type AttentionAlert = {
+    id: number;
+    type: string;
+    title: string;
+    detail?: string | null;
+    prompt_on_open: boolean;
+};
 type AwaitingOrder = { id: number; name: string; dosage: string };
 
 export type PendingCorrection = {
@@ -34,7 +62,17 @@ type Props = {
     suppression: { suppressed: boolean; reason: string | null };
 };
 
-function FooterRow({ onCancel, submitLabel, processing, onBack }: { onCancel: () => void; submitLabel: string; processing: boolean; onBack?: () => void }) {
+function FooterRow({
+    onCancel,
+    submitLabel,
+    processing,
+    onBack,
+}: {
+    onCancel: () => void;
+    submitLabel: string;
+    processing: boolean;
+    onBack?: () => void;
+}) {
     return (
         <>
             {onBack ? (
@@ -53,23 +91,66 @@ function FooterRow({ onCancel, submitLabel, processing, onBack }: { onCancel: ()
     );
 }
 
-export default function MarGovernanceDialogs({ modal, onClose, clientId, attentionAlerts, awaitingVerification, corrections, witnesses, suppression }: Props) {
+export default function MarGovernanceDialogs({
+    modal,
+    onClose,
+    clientId,
+    attentionAlerts,
+    awaitingVerification,
+    corrections,
+    witnesses,
+    suppression,
+}: Props) {
     return (
         <>
-            {modal === 'addMed' && <AddMedicationDialog clientId={clientId} onClose={onClose} />}
-            {modal === 'inr' && <RecordInrDialog clientId={clientId} onClose={onClose} />}
-            {modal === 'syringe' && <SyringeDriverDialog clientId={clientId} witnesses={witnesses} onClose={onClose} />}
-            {modal === 'alerts' && <ManageAlertsDialog clientId={clientId} suppression={suppression} onClose={onClose} />}
-            {modal === 'verify' && <VerifyOrderDialog orders={awaitingVerification} onClose={onClose} />}
-            {modal === 'corrections' && <CorrectionsReviewDialog corrections={corrections} onClose={onClose} />}
-            {modal === 'warnings' && <WarningsDialog alerts={attentionAlerts} onClose={onClose} />}
+            {modal === 'addMed' && (
+                <AddMedicationDialog clientId={clientId} onClose={onClose} />
+            )}
+            {modal === 'inr' && (
+                <RecordInrDialog clientId={clientId} onClose={onClose} />
+            )}
+            {modal === 'syringe' && (
+                <SyringeDriverDialog
+                    clientId={clientId}
+                    witnesses={witnesses}
+                    onClose={onClose}
+                />
+            )}
+            {modal === 'alerts' && (
+                <ManageAlertsDialog
+                    clientId={clientId}
+                    suppression={suppression}
+                    onClose={onClose}
+                />
+            )}
+            {modal === 'verify' && (
+                <VerifyOrderDialog
+                    orders={awaitingVerification}
+                    onClose={onClose}
+                />
+            )}
+            {modal === 'corrections' && (
+                <CorrectionsReviewDialog
+                    corrections={corrections}
+                    onClose={onClose}
+                />
+            )}
+            {modal === 'warnings' && (
+                <WarningsDialog alerts={attentionAlerts} onClose={onClose} />
+            )}
         </>
     );
 }
 
 // ── Add medication ─────────────────────────────────────────────────────────
 // ── Record INR ─────────────────────────────────────────────────────────────
-function RecordInrDialog({ clientId, onClose }: { clientId: number; onClose: () => void }) {
+function RecordInrDialog({
+    clientId,
+    onClose,
+}: {
+    clientId: number;
+    onClose: () => void;
+}) {
     const form = useForm({
         inr_value: '',
         tested_on: '',
@@ -82,7 +163,10 @@ function RecordInrDialog({ clientId, onClose }: { clientId: number; onClose: () 
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.post(`/emar/clients/${clientId}/inr`, { preserveScroll: true, onSuccess: onClose });
+        form.post(`/emar/clients/${clientId}/inr`, {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
     };
 
     return (
@@ -94,38 +178,120 @@ function RecordInrDialog({ clientId, onClose }: { clientId: number; onClose: () 
             railIcon={HeartPulse}
             railTitle="Record INR"
             railSubtitle="Warfarin monitoring"
-            steps={[{ key: 'result', label: 'Result', blurb: 'Value & schedule', icon: HeartPulse }]}
+            steps={[
+                {
+                    key: 'result',
+                    label: 'Result',
+                    blurb: 'Value & schedule',
+                    icon: HeartPulse,
+                },
+            ]}
             stepIndex={0}
             onStepClick={() => {}}
             footer={
                 <form onSubmit={submit} className="contents">
-                    <FooterRow onCancel={onClose} submitLabel="Record INR" processing={form.processing} />
+                    <FooterRow
+                        onCancel={onClose}
+                        submitLabel="Record INR"
+                        processing={form.processing}
+                    />
                 </form>
             }
         >
             <form onSubmit={submit}>
-                <StepHead icon={HeartPulse} title="INR result" blurb="Results are retained — disable, never delete." />
+                <StepHead
+                    icon={HeartPulse}
+                    title="INR result"
+                    blurb="Results are retained — disable, never delete."
+                />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <Field label="INR value" required error={form.errors.inr_value}>
-                        <Input type="number" step="0.1" value={form.data.inr_value} onChange={(e) => form.setData('inr_value', e.target.value)} placeholder="e.g. 2.4" />
+                    <Field
+                        label="INR value"
+                        required
+                        error={form.errors.inr_value}
+                    >
+                        <Input
+                            type="number"
+                            step="0.1"
+                            value={form.data.inr_value}
+                            onChange={(e) =>
+                                form.setData('inr_value', e.target.value)
+                            }
+                            placeholder="e.g. 2.4"
+                        />
                     </Field>
-                    <Field label="Tested on" required error={form.errors.tested_on}>
-                        <Input type="date" value={form.data.tested_on} onChange={(e) => form.setData('tested_on', e.target.value)} />
+                    <Field
+                        label="Tested on"
+                        required
+                        error={form.errors.tested_on}
+                    >
+                        <Input
+                            type="date"
+                            value={form.data.tested_on}
+                            onChange={(e) =>
+                                form.setData('tested_on', e.target.value)
+                            }
+                        />
                     </Field>
                     <Field label="Target range (low)">
-                        <Input type="number" step="0.1" value={form.data.target_range_low} onChange={(e) => form.setData('target_range_low', e.target.value)} placeholder="2.0" />
+                        <Input
+                            type="number"
+                            step="0.1"
+                            value={form.data.target_range_low}
+                            onChange={(e) =>
+                                form.setData('target_range_low', e.target.value)
+                            }
+                            placeholder="2.0"
+                        />
                     </Field>
-                    <Field label="Target range (high)" error={form.errors.target_range_high}>
-                        <Input type="number" step="0.1" value={form.data.target_range_high} onChange={(e) => form.setData('target_range_high', e.target.value)} placeholder="3.0" />
+                    <Field
+                        label="Target range (high)"
+                        error={form.errors.target_range_high}
+                    >
+                        <Input
+                            type="number"
+                            step="0.1"
+                            value={form.data.target_range_high}
+                            onChange={(e) =>
+                                form.setData(
+                                    'target_range_high',
+                                    e.target.value,
+                                )
+                            }
+                            placeholder="3.0"
+                        />
                     </Field>
                     <Field label="Dose (mg)">
-                        <Input type="number" step="0.01" value={form.data.dose_mg} onChange={(e) => form.setData('dose_mg', e.target.value)} placeholder="e.g. 5" />
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={form.data.dose_mg}
+                            onChange={(e) =>
+                                form.setData('dose_mg', e.target.value)
+                            }
+                            placeholder="e.g. 5"
+                        />
                     </Field>
-                    <Field label="Next test date" error={form.errors.next_test_date}>
-                        <Input type="date" value={form.data.next_test_date} onChange={(e) => form.setData('next_test_date', e.target.value)} />
+                    <Field
+                        label="Next test date"
+                        error={form.errors.next_test_date}
+                    >
+                        <Input
+                            type="date"
+                            value={form.data.next_test_date}
+                            onChange={(e) =>
+                                form.setData('next_test_date', e.target.value)
+                            }
+                        />
                     </Field>
                     <Field label="Notes" span>
-                        <Input value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} placeholder="Optional" />
+                        <Input
+                            value={form.data.notes}
+                            onChange={(e) =>
+                                form.setData('notes', e.target.value)
+                            }
+                            placeholder="Optional"
+                        />
                     </Field>
                 </div>
             </form>
@@ -134,7 +300,15 @@ function RecordInrDialog({ clientId, onClose }: { clientId: number; onClose: () 
 }
 
 // ── Start syringe driver ───────────────────────────────────────────────────
-function SyringeDriverDialog({ clientId, witnesses, onClose }: { clientId: number; witnesses: WitnessOption[]; onClose: () => void }) {
+function SyringeDriverDialog({
+    clientId,
+    witnesses,
+    onClose,
+}: {
+    clientId: number;
+    witnesses: WitnessOption[];
+    onClose: () => void;
+}) {
     const form = useForm({
         commenced_at: '',
         rate: '',
@@ -148,12 +322,19 @@ function SyringeDriverDialog({ clientId, witnesses, onClose }: { clientId: numbe
     const content = form.data.contents[0]!;
     const requiresWitness = content.requires_witness;
 
-    const setContent = (patch: Partial<typeof content>) => form.setData('contents', [{ ...content, ...patch }]);
+    const setContent = (patch: Partial<typeof content>) =>
+        form.setData('contents', [{ ...content, ...patch }]);
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.transform((data) => ({ ...data, witnessed_by: data.witnessed_by ? Number(data.witnessed_by) : null }));
-        form.post(`/emar/clients/${clientId}/syringe-drivers`, { preserveScroll: true, onSuccess: onClose });
+        form.transform((data) => ({
+            ...data,
+            witnessed_by: data.witnessed_by ? Number(data.witnessed_by) : null,
+        }));
+        form.post(`/emar/clients/${clientId}/syringe-drivers`, {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
     };
 
     return (
@@ -165,37 +346,91 @@ function SyringeDriverDialog({ clientId, witnesses, onClose }: { clientId: numbe
             railIcon={Syringe}
             railTitle="Syringe driver"
             railSubtitle="Commence infusion"
-            steps={[{ key: 'driver', label: 'Driver', blurb: 'Contents & rate', icon: Syringe }]}
+            steps={[
+                {
+                    key: 'driver',
+                    label: 'Driver',
+                    blurb: 'Contents & rate',
+                    icon: Syringe,
+                },
+            ]}
             stepIndex={0}
             onStepClick={() => {}}
             footer={
                 <form onSubmit={submit} className="contents">
-                    <FooterRow onCancel={onClose} submitLabel="Start driver" processing={form.processing} />
+                    <FooterRow
+                        onCancel={onClose}
+                        submitLabel="Start driver"
+                        processing={form.processing}
+                    />
                 </form>
             }
         >
             <form onSubmit={submit}>
-                <StepHead icon={Syringe} title="Commence syringe driver" blurb="Controlled-drug contents require a witness countersignature." />
+                <StepHead
+                    icon={Syringe}
+                    title="Commence syringe driver"
+                    blurb="Controlled-drug contents require a witness countersignature."
+                />
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Field label="Medication" required>
-                        <Input value={content.name} onChange={(e) => setContent({ name: e.target.value })} placeholder="e.g. Morphine sulfate" />
+                        <Input
+                            value={content.name}
+                            onChange={(e) =>
+                                setContent({ name: e.target.value })
+                            }
+                            placeholder="e.g. Morphine sulfate"
+                        />
                     </Field>
                     <Field label="Dose">
-                        <Input value={content.dose} onChange={(e) => setContent({ dose: e.target.value })} placeholder="e.g. 10" />
+                        <Input
+                            value={content.dose}
+                            onChange={(e) =>
+                                setContent({ dose: e.target.value })
+                            }
+                            placeholder="e.g. 10"
+                        />
                     </Field>
-                    <Field label="Commenced at" required error={form.errors.commenced_at}>
-                        <Input type="datetime-local" value={form.data.commenced_at} onChange={(e) => form.setData('commenced_at', e.target.value)} />
+                    <Field
+                        label="Commenced at"
+                        required
+                        error={form.errors.commenced_at}
+                    >
+                        <Input
+                            type="datetime-local"
+                            value={form.data.commenced_at}
+                            onChange={(e) =>
+                                form.setData('commenced_at', e.target.value)
+                            }
+                        />
                     </Field>
                     <Field label="Rate">
-                        <Input value={form.data.rate} onChange={(e) => form.setData('rate', e.target.value)} placeholder="e.g. 2 mL/hr" />
+                        <Input
+                            value={form.data.rate}
+                            onChange={(e) =>
+                                form.setData('rate', e.target.value)
+                            }
+                            placeholder="e.g. 2 mL/hr"
+                        />
                     </Field>
                     <Field label="Insertion site" span>
-                        <Input value={form.data.site_of_insertion} onChange={(e) => form.setData('site_of_insertion', e.target.value)} placeholder="e.g. Left upper arm" />
+                        <Input
+                            value={form.data.site_of_insertion}
+                            onChange={(e) =>
+                                form.setData(
+                                    'site_of_insertion',
+                                    e.target.value,
+                                )
+                            }
+                            placeholder="e.g. Left upper arm"
+                        />
                     </Field>
                     <Field label="Witness required" span>
                         <Segmented
                             value={requiresWitness ? 'yes' : 'no'}
-                            onChange={(v) => setContent({ requires_witness: v === 'yes' })}
+                            onChange={(v) =>
+                                setContent({ requires_witness: v === 'yes' })
+                            }
                             options={[
                                 { value: 'no', label: 'No' },
                                 { value: 'yes', label: 'Yes (CD)' },
@@ -204,16 +439,37 @@ function SyringeDriverDialog({ clientId, witnesses, onClose }: { clientId: numbe
                     </Field>
                     {requiresWitness && (
                         <>
-                            <Field label="Witness" error={form.errors.witnessed_by}>
+                            <Field
+                                label="Witness"
+                                error={form.errors.witnessed_by}
+                            >
                                 <SelectInput
                                     value={form.data.witnessed_by}
-                                    onChange={(v) => form.setData('witnessed_by', v)}
+                                    onChange={(v) =>
+                                        form.setData('witnessed_by', v)
+                                    }
                                     placeholder="Select witness…"
-                                    options={witnesses.map((w) => ({ value: String(w.id), label: w.name }))}
+                                    options={witnesses.map((w) => ({
+                                        value: String(w.id),
+                                        label: w.name,
+                                    }))}
                                 />
                             </Field>
-                            <Field label="Witness password / PIN" error={form.errors.witness_credential}>
-                                <Input type="password" value={form.data.witness_credential} onChange={(e) => form.setData('witness_credential', e.target.value)} placeholder="Re-authenticate" />
+                            <Field
+                                label="Witness password / PIN"
+                                error={form.errors.witness_credential}
+                            >
+                                <Input
+                                    type="password"
+                                    value={form.data.witness_credential}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'witness_credential',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="Re-authenticate"
+                                />
                             </Field>
                         </>
                     )}
@@ -224,8 +480,21 @@ function SyringeDriverDialog({ clientId, witnesses, onClose }: { clientId: numbe
 }
 
 // ── Manage attention alerts ────────────────────────────────────────────────
-function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: number; suppression: { suppressed: boolean; reason: string | null }; onClose: () => void }) {
-    const form = useForm({ type: 'warfarin', title: '', detail: '', prompt_on_open: true });
+function ManageAlertsDialog({
+    clientId,
+    suppression,
+    onClose,
+}: {
+    clientId: number;
+    suppression: { suppressed: boolean; reason: string | null };
+    onClose: () => void;
+}) {
+    const form = useForm({
+        type: 'warfarin',
+        title: '',
+        detail: '',
+        prompt_on_open: true,
+    });
     const suppressForm = useForm({
         suppress_med_admin_alerts: suppression.suppressed,
         reason: suppression.reason ?? '',
@@ -234,11 +503,17 @@ function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: numb
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.post(`/emar/clients/${clientId}/attention-alerts`, { preserveScroll: true, onSuccess: onClose });
+        form.post(`/emar/clients/${clientId}/attention-alerts`, {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
     };
 
     const saveSuppression = () => {
-        suppressForm.post(`/emar/clients/${clientId}/alert-suppression`, { preserveScroll: true, onSuccess: onClose });
+        suppressForm.post(`/emar/clients/${clientId}/alert-suppression`, {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
     };
 
     return (
@@ -250,12 +525,23 @@ function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: numb
             railIcon={AlertTriangle}
             railTitle="Attention alert"
             railSubtitle="Chart warning"
-            steps={[{ key: 'alert', label: 'Alert', blurb: 'Type & message', icon: AlertTriangle }]}
+            steps={[
+                {
+                    key: 'alert',
+                    label: 'Alert',
+                    blurb: 'Type & message',
+                    icon: AlertTriangle,
+                },
+            ]}
             stepIndex={0}
             onStepClick={() => {}}
             footer={
                 <form onSubmit={submit} className="contents">
-                    <FooterRow onCancel={onClose} submitLabel="Add alert" processing={form.processing} />
+                    <FooterRow
+                        onCancel={onClose}
+                        submitLabel="Add alert"
+                        processing={form.processing}
+                    />
                 </form>
             }
         >
@@ -264,12 +550,26 @@ function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: numb
             <div className="mb-4 rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
-                        <div className="text-sm font-semibold">Medication-admin alerts</div>
-                        <div className="text-xs text-muted-foreground">Suppress med-due reminders for this resident. Audited.</div>
+                        <div className="text-sm font-semibold">
+                            Medication-admin alerts
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            Suppress med-due reminders for this resident.
+                            Audited.
+                        </div>
                     </div>
                     <Segmented
-                        value={suppressForm.data.suppress_med_admin_alerts ? 'suppressed' : 'active'}
-                        onChange={(v) => suppressForm.setData('suppress_med_admin_alerts', v === 'suppressed')}
+                        value={
+                            suppressForm.data.suppress_med_admin_alerts
+                                ? 'suppressed'
+                                : 'active'
+                        }
+                        onChange={(v) =>
+                            suppressForm.setData(
+                                'suppress_med_admin_alerts',
+                                v === 'suppressed',
+                            )
+                        }
                         options={[
                             { value: 'active', label: 'Active' },
                             { value: 'suppressed', label: 'Suppressed' },
@@ -278,60 +578,123 @@ function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: numb
                 </div>
                 {suppressForm.data.suppress_med_admin_alerts && (
                     <div className="mt-3 grid gap-3">
-                        <Field label="Basis" required error={suppressForm.errors.basis}>
+                        <Field
+                            label="Basis"
+                            required
+                            error={suppressForm.errors.basis}
+                        >
                             <SelectInput
                                 value={suppressForm.data.basis}
-                                onChange={(v) => suppressForm.setData('basis', v)}
+                                onChange={(v) =>
+                                    suppressForm.setData('basis', v)
+                                }
                                 placeholder="Select the decision basis…"
                                 options={[
-                                    { value: 'capacity_assessment', label: 'Capacity assessment' },
-                                    { value: 'mdt_decision', label: 'MDT decision' },
-                                    { value: 'clinical_judgement', label: 'Clinical judgement' },
-                                    { value: 'client_preference', label: 'Client preference' },
+                                    {
+                                        value: 'capacity_assessment',
+                                        label: 'Capacity assessment',
+                                    },
+                                    {
+                                        value: 'mdt_decision',
+                                        label: 'MDT decision',
+                                    },
+                                    {
+                                        value: 'clinical_judgement',
+                                        label: 'Clinical judgement',
+                                    },
+                                    {
+                                        value: 'client_preference',
+                                        label: 'Client preference',
+                                    },
                                 ]}
                             />
                         </Field>
-                        <Field label="Reason" required error={suppressForm.errors.reason}>
+                        <Field
+                            label="Reason"
+                            required
+                            error={suppressForm.errors.reason}
+                        >
                             <Input
                                 value={suppressForm.data.reason}
-                                onChange={(e) => suppressForm.setData('reason', e.target.value)}
+                                onChange={(e) =>
+                                    suppressForm.setData(
+                                        'reason',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Why are med-admin alerts being suppressed?"
                             />
                         </Field>
                     </div>
                 )}
                 <div className="mt-3 flex justify-end">
-                    <Button type="button" variant="outline" size="sm" disabled={suppressForm.processing} onClick={saveSuppression}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={suppressForm.processing}
+                        onClick={saveSuppression}
+                    >
                         Save setting
                     </Button>
                 </div>
             </div>
 
             <form onSubmit={submit}>
-                <StepHead icon={AlertTriangle} title="Chart alert" blurb="Prompt-on-open alerts must be acknowledged before recording." />
+                <StepHead
+                    icon={AlertTriangle}
+                    title="Chart alert"
+                    blurb="Prompt-on-open alerts must be acknowledged before recording."
+                />
                 <Field label="Alert type" span>
                     <TilePicker
                         value={form.data.type}
                         onChange={(v) => form.setData('type', v)}
                         cols={3}
                         options={[
-                            { key: 'warfarin', label: 'Warfarin', icon: HeartPulse },
-                            { key: 'paper_prescription', label: 'Paper prescription', icon: FileText },
-                            { key: 'chart_warning', label: 'Other', icon: AlertTriangle },
+                            {
+                                key: 'warfarin',
+                                label: 'Warfarin',
+                                icon: HeartPulse,
+                            },
+                            {
+                                key: 'paper_prescription',
+                                label: 'Paper prescription',
+                                icon: FileText,
+                            },
+                            {
+                                key: 'chart_warning',
+                                label: 'Other',
+                                icon: AlertTriangle,
+                            },
                         ]}
                     />
                 </Field>
                 <div className="mt-4 grid grid-cols-1 gap-4">
                     <Field label="Title" required error={form.errors.title}>
-                        <Input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} placeholder="e.g. Warfarin — INR monitoring" />
+                        <Input
+                            value={form.data.title}
+                            onChange={(e) =>
+                                form.setData('title', e.target.value)
+                            }
+                            placeholder="e.g. Warfarin — INR monitoring"
+                        />
                     </Field>
                     <Field label="Detail">
-                        <Input value={form.data.detail} onChange={(e) => form.setData('detail', e.target.value)} placeholder="Optional detail" />
+                        <Input
+                            value={form.data.detail}
+                            onChange={(e) =>
+                                form.setData('detail', e.target.value)
+                            }
+                            placeholder="Optional detail"
+                        />
                     </Field>
                     <Field label="Prompt on chart open">
                         <Segmented
                             value={form.data.prompt_on_open ? 'yes' : 'no'}
-                            onChange={(v) => form.setData('prompt_on_open', v === 'yes')}
+                            onChange={(v) =>
+                                form.setData('prompt_on_open', v === 'yes')
+                            }
                             options={[
                                 { value: 'yes', label: 'Yes' },
                                 { value: 'no', label: 'No' },
@@ -345,14 +708,28 @@ function ManageAlertsDialog({ clientId, suppression, onClose }: { clientId: numb
 }
 
 // ── Verify order ───────────────────────────────────────────────────────────
-function VerifyOrderDialog({ orders, onClose }: { orders: AwaitingOrder[]; onClose: () => void }) {
+function VerifyOrderDialog({
+    orders,
+    onClose,
+}: {
+    orders: AwaitingOrder[];
+    onClose: () => void;
+}) {
     const [rejectId, setRejectId] = useState<number | null>(null);
     const form = useForm({ rejection_reason: '' });
 
-    const verify = (id: number) => form.post(`/emar/medications/${id}/verify`, { preserveScroll: true, onSuccess: onClose });
+    const verify = (id: number) =>
+        form.post(`/emar/medications/${id}/verify`, {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
     const reject = (e: React.FormEvent) => {
         e.preventDefault();
-        if (rejectId) form.post(`/emar/medications/${rejectId}/reject`, { preserveScroll: true, onSuccess: onClose });
+        if (rejectId)
+            form.post(`/emar/medications/${rejectId}/reject`, {
+                preserveScroll: true,
+                onSuccess: onClose,
+            });
     };
 
     return (
@@ -364,7 +741,14 @@ function VerifyOrderDialog({ orders, onClose }: { orders: AwaitingOrder[]; onClo
             railIcon={ShieldCheck}
             railTitle="Order verification"
             railSubtitle={`${orders.length} awaiting`}
-            steps={[{ key: 'verify', label: 'Verify', blurb: 'Approve or reject', icon: ShieldCheck }]}
+            steps={[
+                {
+                    key: 'verify',
+                    label: 'Verify',
+                    blurb: 'Approve or reject',
+                    icon: ShieldCheck,
+                },
+            ]}
             stepIndex={0}
             onStepClick={() => {}}
             footer={
@@ -373,35 +757,72 @@ function VerifyOrderDialog({ orders, onClose }: { orders: AwaitingOrder[]; onClo
                 </Button>
             }
         >
-            <StepHead icon={ShieldCheck} title="Awaiting verification" blurb="Unverified orders cannot be administered." />
+            <StepHead
+                icon={ShieldCheck}
+                title="Awaiting verification"
+                blurb="Unverified orders cannot be administered."
+            />
             {orders.length === 0 ? (
-                <InfoCard icon={ShieldCheck}>No orders are awaiting verification.</InfoCard>
+                <InfoCard icon={ShieldCheck}>
+                    No orders are awaiting verification.
+                </InfoCard>
             ) : (
                 <ul className="flex flex-col gap-2">
                     {orders.map((order) => (
                         <li key={order.id} className="rounded-lg border p-3">
                             <div className="flex items-center justify-between gap-2">
                                 <div>
-                                    <div className="text-sm font-medium">{order.name}</div>
-                                    <div className="text-xs text-muted-foreground">{order.dosage}</div>
+                                    <div className="text-sm font-medium">
+                                        {order.name}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {order.dosage}
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => setRejectId(rejectId === order.id ? null : order.id)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            setRejectId(
+                                                rejectId === order.id
+                                                    ? null
+                                                    : order.id,
+                                            )
+                                        }
+                                    >
                                         Reject
                                     </Button>
-                                    <Button size="sm" disabled={form.processing} onClick={() => verify(order.id)}>
+                                    <Button
+                                        size="sm"
+                                        disabled={form.processing}
+                                        onClick={() => verify(order.id)}
+                                    >
                                         Verify
                                     </Button>
                                 </div>
                             </div>
                             {rejectId === order.id && (
-                                <form onSubmit={reject} className="mt-2 flex items-center gap-2">
+                                <form
+                                    onSubmit={reject}
+                                    className="mt-2 flex items-center gap-2"
+                                >
                                     <Input
                                         value={form.data.rejection_reason}
-                                        onChange={(e) => form.setData('rejection_reason', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'rejection_reason',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Reason for rejection"
                                     />
-                                    <Button type="submit" variant="destructive" size="sm" disabled={form.processing}>
+                                    <Button
+                                        type="submit"
+                                        variant="destructive"
+                                        size="sm"
+                                        disabled={form.processing}
+                                    >
                                         Confirm
                                     </Button>
                                 </form>
@@ -415,14 +836,28 @@ function VerifyOrderDialog({ orders, onClose }: { orders: AwaitingOrder[]; onClo
 }
 
 // ── Review corrections ─────────────────────────────────────────────────────
-function CorrectionsReviewDialog({ corrections, onClose }: { corrections: PendingCorrection[]; onClose: () => void }) {
+function CorrectionsReviewDialog({
+    corrections,
+    onClose,
+}: {
+    corrections: PendingCorrection[];
+    onClose: () => void;
+}) {
     const [rejectId, setRejectId] = useState<number | null>(null);
     const form = useForm({ reason: '' });
 
-    const approve = (id: number) => form.post(`/emar/corrections/${id}/approve`, { preserveScroll: true, onSuccess: onClose });
+    const approve = (id: number) =>
+        form.post(`/emar/corrections/${id}/approve`, {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
     const reject = (e: React.FormEvent) => {
         e.preventDefault();
-        if (rejectId) form.post(`/emar/corrections/${rejectId}/reject`, { preserveScroll: true, onSuccess: onClose });
+        if (rejectId)
+            form.post(`/emar/corrections/${rejectId}/reject`, {
+                preserveScroll: true,
+                onSuccess: onClose,
+            });
     };
 
     return (
@@ -434,7 +869,14 @@ function CorrectionsReviewDialog({ corrections, onClose }: { corrections: Pendin
             railIcon={ClipboardCheck}
             railTitle="Corrections"
             railSubtitle={`${corrections.length} pending`}
-            steps={[{ key: 'review', label: 'Review', blurb: 'Approve or reject', icon: ClipboardCheck }]}
+            steps={[
+                {
+                    key: 'review',
+                    label: 'Review',
+                    blurb: 'Approve or reject',
+                    icon: ClipboardCheck,
+                },
+            ]}
             stepIndex={0}
             onStepClick={() => {}}
             footer={
@@ -443,47 +885,93 @@ function CorrectionsReviewDialog({ corrections, onClose }: { corrections: Pendin
                 </Button>
             }
         >
-            <StepHead icon={ClipboardCheck} title="Pending corrections" blurb="An approved correction supersedes the original record; both are kept in the audit trail." />
+            <StepHead
+                icon={ClipboardCheck}
+                title="Pending corrections"
+                blurb="An approved correction supersedes the original record; both are kept in the audit trail."
+            />
             {corrections.length === 0 ? (
-                <InfoCard icon={ClipboardCheck}>No corrections are pending review.</InfoCard>
+                <InfoCard icon={ClipboardCheck}>
+                    No corrections are pending review.
+                </InfoCard>
             ) : (
                 <ul className="flex flex-col gap-2">
                     {corrections.map((correction) => (
-                        <li key={correction.id} className="rounded-lg border p-3">
+                        <li
+                            key={correction.id}
+                            className="rounded-lg border p-3"
+                        >
                             <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                     <div className="text-sm font-medium">
                                         {correction.medication_name}
-                                        <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                        <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                                             {correction.status}
                                         </span>
                                     </div>
                                     <div className="mt-0.5 text-xs text-muted-foreground">
-                                        {[correction.dose_given, correction.submitted_by ? `by ${correction.submitted_by}` : null]
+                                        {[
+                                            correction.dose_given,
+                                            correction.submitted_by
+                                                ? `by ${correction.submitted_by}`
+                                                : null,
+                                        ]
                                             .filter(Boolean)
                                             .join(' · ')}
                                     </div>
                                     {correction.correction_reason && (
-                                        <div className="mt-1 text-[11.5px] italic text-muted-foreground">“{correction.correction_reason}”</div>
+                                        <div className="mt-1 text-[11.5px] text-muted-foreground italic">
+                                            “{correction.correction_reason}”
+                                        </div>
                                     )}
                                 </div>
                                 <div className="flex shrink-0 items-center gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => setRejectId(rejectId === correction.id ? null : correction.id)}>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            setRejectId(
+                                                rejectId === correction.id
+                                                    ? null
+                                                    : correction.id,
+                                            )
+                                        }
+                                    >
                                         Reject
                                     </Button>
-                                    <Button size="sm" disabled={form.processing} onClick={() => approve(correction.id)}>
+                                    <Button
+                                        size="sm"
+                                        disabled={form.processing}
+                                        onClick={() => approve(correction.id)}
+                                    >
                                         Approve
                                     </Button>
                                 </div>
                             </div>
                             {rejectId === correction.id && (
-                                <form onSubmit={reject} className="mt-2 flex items-center gap-2">
+                                <form
+                                    onSubmit={reject}
+                                    className="mt-2 flex items-center gap-2"
+                                >
                                     <Input
                                         value={form.data.reason}
-                                        onChange={(e) => form.setData('reason', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'reason',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Reason for rejection (required)"
                                     />
-                                    <Button type="submit" variant="destructive" size="sm" disabled={form.processing || !form.data.reason.trim()}>
+                                    <Button
+                                        type="submit"
+                                        variant="destructive"
+                                        size="sm"
+                                        disabled={
+                                            form.processing ||
+                                            !form.data.reason.trim()
+                                        }
+                                    >
                                         Confirm
                                     </Button>
                                 </form>
@@ -497,7 +985,13 @@ function CorrectionsReviewDialog({ corrections, onClose }: { corrections: Pendin
 }
 
 // ── Chart warnings prompt ──────────────────────────────────────────────────
-function WarningsDialog({ alerts, onClose }: { alerts: AttentionAlert[]; onClose: () => void }) {
+function WarningsDialog({
+    alerts,
+    onClose,
+}: {
+    alerts: AttentionAlert[];
+    onClose: () => void;
+}) {
     return (
         <MedsWizardDialog
             open
@@ -507,7 +1001,14 @@ function WarningsDialog({ alerts, onClose }: { alerts: AttentionAlert[]; onClose
             railIcon={AlertTriangle}
             railTitle="Chart warnings"
             railSubtitle={`${alerts.length} active`}
-            steps={[{ key: 'review', label: 'Review', blurb: 'Acknowledge warnings', icon: AlertTriangle }]}
+            steps={[
+                {
+                    key: 'review',
+                    label: 'Review',
+                    blurb: 'Acknowledge warnings',
+                    icon: AlertTriangle,
+                },
+            ]}
             stepIndex={0}
             onStepClick={() => {}}
             footer={
@@ -516,12 +1017,24 @@ function WarningsDialog({ alerts, onClose }: { alerts: AttentionAlert[]; onClose
                 </Button>
             }
         >
-            <StepHead icon={AlertTriangle} title="Active warnings" blurb="Review these before recording any dose." />
+            <StepHead
+                icon={AlertTriangle}
+                title="Active warnings"
+                blurb="Review these before recording any dose."
+            />
             <div className="flex flex-col gap-2">
                 {alerts.map((alert) => (
-                    <InfoCard key={alert.id} icon={AlertTriangle} tone={alert.type === 'warfarin' ? 'crit' : 'warn'}>
+                    <InfoCard
+                        key={alert.id}
+                        icon={AlertTriangle}
+                        tone={alert.type === 'warfarin' ? 'crit' : 'warn'}
+                    >
                         <span className="font-medium">{alert.title}</span>
-                        {alert.detail ? <span className="block text-xs text-muted-foreground">{alert.detail}</span> : null}
+                        {alert.detail ? (
+                            <span className="block text-xs text-muted-foreground">
+                                {alert.detail}
+                            </span>
+                        ) : null}
                     </InfoCard>
                 ))}
             </div>

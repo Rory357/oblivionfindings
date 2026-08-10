@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Contracts\CalendarOAuthToken;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Org-level OAuth connection to the IT support mailbox (email-to-ticket, E3).
+ * Application-level OAuth connection to the IT support mailbox (email-to-ticket, E3).
  * Mirrors {@see CalendarSyncConnection}: implements {@see CalendarOAuthToken}
  * so it drives MicrosoftGraphService / GoogleCalendarService interchangeably —
  * the mailbox poller pulls unread mail with the same token machinery the
@@ -16,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ItMailboxConnection extends Model implements CalendarOAuthToken
 {
+    use WritesLegacyStorageContext;
+
     public const STATUS_CONNECTED = 'connected';
 
     public const STATUS_DISCONNECTED = 'disconnected';
@@ -27,7 +30,6 @@ class ItMailboxConnection extends Model implements CalendarOAuthToken
     public const PROVIDER_MICROSOFT = 'microsoft';
 
     protected $fillable = [
-        'tenant_id',
         'provider',
         'status',
         'access_token',

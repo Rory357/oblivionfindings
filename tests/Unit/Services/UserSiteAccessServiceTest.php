@@ -5,14 +5,12 @@ namespace Tests\Unit\Services;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
-use App\Models\HsEvent;
 use App\Models\Permission;
-use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
-use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
+use App\Support\LegacyStorageContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -22,119 +20,224 @@ class UserSiteAccessServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_accessible_site_ids_include_primary_and_secondary_sites(): void
+    public function test_current_employee_profile_includes_primary_and_secondary_site_assignments(): void
     {
-        $siteA = Site::factory()->create();
-        $siteB = Site::factory()->create();
-        $siteC = Site::factory()->create();
-        $user = User::factory()->create();
-
-        HrEmployeeProfile::query()->create([
-            'tenant_id' => 1,
-            'user_id' => $user->id,
-            'employee_number' => 'EMP-USA-'.$user->id,
-            'work_email' => $user->email,
-            'position_title' => 'Support Worker',
-            'position_role' => 'support_worker',
-            'employment_type' => 'full_time',
-            'start_date' => now()->subMonth()->toDateString(),
-            'is_active' => true,
-            'primary_site_id' => $siteA->id,
-            'secondary_site_ids' => [$siteB->id, $siteC->id],
-        ]);
+        $primarySite = Site::factory()->create();
+        $secondarySite = Site::factory()->create();
+        $unassignedSite = Site::factory()->create();
+        $user = $this->siteBoundUser($primarySite, [$secondarySite->id, $primarySite->id]);
 
         $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds($user);
 
-        $this->assertSame([$siteA->id, $siteB->id, $siteC->id], $siteIds);
+        $this->assertSame([$primarySite->id, $secondarySite->id], $siteIds);
+        $this->assertNotContains($unassignedSite->id, $siteIds);
     }
 
-    public function test_shift_and_timesheet_scopes_only_return_accessible_site_records(): void
+    public function test_inactive_archived_and_soft_deleted_sites_are_excluded_from_assignments(): void
     {
-        $siteA = Site::factory()->create();
-        $siteB = Site::factory()->create();
-        $clientA = Client::factory()->create(['site_id' => $siteA->id, 'status' => 'active']);
-        $clientB = Client::factory()->create(['site_id' => $siteB->id, 'status' => 'active']);
-        $user = User::factory()->create();
-        $staff = User::factory()->create();
-
-        HrEmployeeProfile::query()->create([
-            'tenant_id' => 1,
-            'user_id' => $user->id,
-            'employee_number' => 'EMP-USA-'.$user->id,
-            'work_email' => $user->email,
-            'position_title' => 'Support Worker',
-            'position_role' => 'support_worker',
-            'employment_type' => 'full_time',
-            'start_date' => now()->subMonth()->toDateString(),
-            'is_active' => true,
-            'primary_site_id' => $siteA->id,
-            'secondary_site_ids' => [],
+        $activeSite = Site::factory()->create();
+        $inactiveSite = Site::factory()->create(['is_active' => false]);
+        $archivedSite = Site::factory()->create([
+            'archived' => true,
+            'archived_at' => now()->subDay(),
+        ]);
+        $softDeletedSite = Site::factory()->create();
+        $softDeletedSite->delete();
+        $user = $this->siteBoundUser($activeSite, [
+            $inactiveSite->id,
+            $archivedSite->id,
+            $softDeletedSite->id,
         ]);
 
-        $shiftA = Shift::factory()->create([
-            'client_id' => $clientA->id,
-            'site_id' => $siteA->id,
-            'user_id' => $staff->id,
-        ]);
+        $this->assertSame(
+            [$activeSite->id],
+            app(UserSiteAccessService::class)->accessibleSiteIds($user),
+        );
+    }
 
-        $shiftB = Shift::factory()->create([
-            'client_id' => $clientB->id,
-            'site_id' => $siteB->id,
-            'user_id' => $staff->id,
-        ]);
-
-        $timesheetA = Timesheet::factory()->create([
-            'shift_id' => $shiftA->id,
-            'user_id' => $staff->id,
-            'client_id' => $clientA->id,
-            'shift_site_id' => $siteA->id,
-        ]);
-
-        $timesheetB = Timesheet::factory()->create([
-            'shift_id' => $shiftB->id,
-            'user_id' => $staff->id,
-            'client_id' => $clientB->id,
-            'shift_site_id' => $siteB->id,
-        ]);
-
+    public function test_missing_inactive_future_and_ended_employee_profiles_have_no_site_access(): void
+    {
+        $site = Site::factory()->create();
         $service = app(UserSiteAccessService::class);
 
-        $shiftIds = $service->applyShiftScope(Shift::query(), $user)->pluck('id')->all();
-        $timesheetIds = $service->applyTimesheetScope(Timesheet::query(), $user)->pluck('id')->all();
+        $missingProfileUser = User::factory()->create();
+        $this->assertSame([], $service->accessibleSiteIds($missingProfileUser));
 
-        $this->assertSame([$shiftA->id], $shiftIds);
-        $this->assertSame([$timesheetA->id], $timesheetIds);
-        $this->assertNotContains($shiftB->id, $shiftIds);
-        $this->assertNotContains($timesheetB->id, $timesheetIds);
+        foreach ([
+            'inactive' => ['is_active' => false],
+            'future' => ['start_date' => now()->addDay()->toDateString()],
+            'ended' => ['end_date' => now()->subDay()->toDateString()],
+        ] as $state => $overrides) {
+            $user = $this->siteBoundUser($site, profileOverrides: $overrides);
+
+            $this->assertSame(
+                [],
+                $service->accessibleSiteIds($user),
+                $state.' employee profiles must not grant Site access.',
+            );
+        }
+    }
+
+    public function test_all_sites_bypass_requires_both_held_permission_and_explicit_caller_key(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unassignedSite = Site::factory()->create();
+        $inactiveSite = Site::factory()->create(['is_active' => false]);
+        $archivedSite = Site::factory()->create([
+            'archived' => true,
+            'archived_at' => now()->subDay(),
+        ]);
+        $softDeletedSite = Site::factory()->create();
+        $softDeletedSite->delete();
+        $permission = 'reports.viewAny';
+
+        $holder = $this->siteBoundUser($assignedSite);
+        $this->grantPermission($holder, $permission);
+
+        $nonHolder = $this->siteBoundUser($assignedSite);
+        $service = app(UserSiteAccessService::class);
+
+        $this->assertSame([$assignedSite->id], $service->accessibleSiteIds($holder));
+        $this->assertSame([$assignedSite->id], $service->accessibleSiteIds($nonHolder, [$permission]));
+        $this->assertSame(
+            [$assignedSite->id, $unassignedSite->id],
+            $service->accessibleSiteIds($holder, [$permission]),
+        );
+        $this->assertNotContains($inactiveSite->id, $service->accessibleSiteIds($holder, [$permission]));
+        $this->assertNotContains($archivedSite->id, $service->accessibleSiteIds($holder, [$permission]));
+        $this->assertNotContains($softDeletedSite->id, $service->accessibleSiteIds($holder, [$permission]));
+    }
+
+    public function test_ordinary_site_scope_stays_narrow_and_site_assertions_fail_closed(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unassignedSite = Site::factory()->create();
+        $user = $this->siteBoundUser($assignedSite);
+        $service = app(UserSiteAccessService::class);
+
+        $this->assertSame(
+            [$assignedSite->id],
+            $service->applySiteScope(Site::query()->orderBy('id'), $user)->pluck('id')->all(),
+        );
+        $service->assertCanAccessSiteId($user, $assignedSite->id);
+
+        foreach ([$unassignedSite->id, PHP_INT_MAX, null] as $siteId) {
+            $this->assertForbidden(fn () => $service->assertCanAccessSiteId($user, $siteId));
+        }
+    }
+
+    public function test_client_scope_and_assertions_use_site_provenance_and_fail_closed(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unassignedSite = Site::factory()->create();
+        $user = $this->siteBoundUser($assignedSite);
+        $visibleClient = Client::factory()->create([
+            'site_id' => $assignedSite->id,
+            'status' => 'active',
+        ]);
+        $hiddenClient = Client::factory()->create([
+            'site_id' => $unassignedSite->id,
+            'status' => 'active',
+        ]);
+        $unattributedClient = Client::factory()->create([
+            'site_id' => null,
+            'status' => 'active',
+        ]);
+        $service = app(UserSiteAccessService::class);
+
+        $this->assertSame(
+            [$visibleClient->id],
+            $service->applyClientScope(Client::query()->orderBy('id'), $user)->pluck('id')->all(),
+        );
+        $service->assertCanAccessClientId($user, $visibleClient->id);
+
+        foreach ([$hiddenClient->id, $unattributedClient->id, PHP_INT_MAX, null] as $clientId) {
+            $this->assertForbidden(fn () => $service->assertCanAccessClientId($user, $clientId));
+        }
+    }
+
+    public function test_client_incident_scope_uses_direct_site_provenance_before_legacy_relationship_fallback(): void
+    {
+        $assignedSite = Site::factory()->create();
+        $unassignedSite = Site::factory()->create();
+        $user = $this->siteBoundUser($assignedSite);
+        $visibleClient = Client::factory()->create([
+            'site_id' => $assignedSite->id,
+            'status' => 'active',
+        ]);
+        $hiddenClient = Client::factory()->create([
+            'site_id' => $unassignedSite->id,
+            'status' => 'active',
+        ]);
+        $directlyVisible = ClientIncident::factory()->create([
+            'client_id' => $hiddenClient->id,
+            'site_id' => $assignedSite->id,
+            'shift_id' => null,
+        ]);
+        $directlyHidden = ClientIncident::factory()->create([
+            'client_id' => $visibleClient->id,
+            'site_id' => $unassignedSite->id,
+            'shift_id' => null,
+        ]);
+        $visibleThroughClient = ClientIncident::factory()->create([
+            'client_id' => $visibleClient->id,
+            'site_id' => null,
+            'shift_id' => null,
+        ]);
+        $service = app(UserSiteAccessService::class);
+
+        $this->assertSame(
+            [$directlyVisible->id, $visibleThroughClient->id],
+            $service->applyClientIncidentScope(ClientIncident::query()->orderBy('id'), $user)->pluck('id')->all(),
+        );
+        $service->assertCanAccessClientIncident($user, $directlyVisible);
+        $service->assertCanAccessClientIncident($user, $visibleThroughClient);
+        $this->assertForbidden(fn () => $service->assertCanAccessClientIncident($user, $directlyHidden));
     }
 
     public function test_client_incident_scope_uses_client_and_shift_fallback_before_site_column_exists(): void
     {
-        $siteA = Site::factory()->create();
-        $siteB = Site::factory()->create();
-        $clientA = Client::factory()->create(['site_id' => $siteA->id, 'status' => 'active']);
-        $clientB = Client::factory()->create(['site_id' => $siteB->id, 'status' => 'active']);
-        $user = $this->siteBoundUser($siteA);
+        $assignedSite = Site::factory()->create();
+        $unassignedSite = Site::factory()->create();
+        $visibleClient = Client::factory()->create([
+            'site_id' => $assignedSite->id,
+            'status' => 'active',
+        ]);
+        $hiddenClient = Client::factory()->create([
+            'site_id' => $unassignedSite->id,
+            'status' => 'active',
+        ]);
+        $user = $this->siteBoundUser($assignedSite);
         $staff = User::factory()->create();
-        $siteAShift = Shift::factory()->create([
-            'client_id' => $clientB->id,
-            'site_id' => $siteA->id,
+        $visibleShift = Shift::factory()->create([
+            'client_id' => $hiddenClient->id,
+            'site_id' => $assignedSite->id,
             'user_id' => $staff->id,
         ]);
         $throughClient = ClientIncident::factory()->create([
-            'client_id' => $clientA->id,
+            'client_id' => $visibleClient->id,
+            'site_id' => null,
             'shift_id' => null,
         ]);
         $throughShift = ClientIncident::factory()->create([
-            'client_id' => $clientB->id,
-            'shift_id' => $siteAShift->id,
+            'client_id' => $hiddenClient->id,
+            'site_id' => null,
+            'shift_id' => $visibleShift->id,
         ]);
         $hidden = ClientIncident::factory()->create([
-            'client_id' => $clientB->id,
+            'client_id' => $hiddenClient->id,
+            'site_id' => null,
             'shift_id' => null,
         ]);
+        $service = new class extends UserSiteAccessService
+        {
+            protected function clientIncidentSiteColumnExists(Builder $query): bool
+            {
+                return false;
+            }
+        };
 
-        $ids = app(UserSiteAccessService::class)
+        $ids = $service
             ->applyClientIncidentScope(ClientIncident::query(), $user)
             ->orderBy('id')
             ->pluck('id')
@@ -186,179 +289,19 @@ class UserSiteAccessServiceTest extends TestCase
         $this->assertSame(1, $service->schemaChecks);
     }
 
-    public function test_bypass_permission_expands_only_to_sites_in_the_users_organization(): void
-    {
-        $localPrimary = Site::factory()->create(['tenant_id' => 11]);
-        $localUnassigned = Site::factory()->create(['tenant_id' => 11]);
-        $foreignStaleAssignment = Site::factory()->create(['tenant_id' => 22]);
-        $user = User::factory()->create(['organization_id' => 11]);
-        foreach (['reports.viewAny', 'healthSafety.viewAllSites', 'fleet.manage'] as $permission) {
-            $this->grantPermission($user, $permission);
-        }
-
-        HrEmployeeProfile::factory()->create([
-            'tenant_id' => 11,
-            'user_id' => $user->id,
-            'primary_site_id' => $localPrimary->id,
-            'secondary_site_ids' => [$foreignStaleAssignment->id],
-        ]);
-
-        $service = app(UserSiteAccessService::class);
-        foreach (['reports.viewAny', 'healthSafety.viewAllSites', 'fleet.manage'] as $permission) {
-            $bypass = [$permission];
-
-            $this->assertSame(
-                [$localPrimary->id, $localUnassigned->id],
-                $service->accessibleSiteIds($user, $bypass),
-                $permission.' must expand only within the user organization.',
-            );
-            $this->assertSame(
-                [$localPrimary->id, $localUnassigned->id],
-                $service->applySiteScope(Site::query()->orderBy('id'), $user, $bypass)->pluck('id')->all(),
-                $permission.' must not make site queries installation-wide.',
-            );
-
-            try {
-                $service->assertCanAccessSiteId($user, $foreignStaleAssignment->id, $bypass);
-                $this->fail($permission.' must not authorize a foreign-tenant site.');
-            } catch (HttpExceptionInterface $exception) {
-                $this->assertSame(403, $exception->getStatusCode());
-            }
-        }
-    }
-
-    public function test_ordinary_assignments_are_intersected_with_the_users_organization_sites(): void
-    {
-        $localSite = Site::factory()->create(['tenant_id' => 31]);
-        $foreignStaleAssignment = Site::factory()->create(['tenant_id' => 32]);
-        $user = User::factory()->create(['organization_id' => 31]);
-
-        HrEmployeeProfile::factory()->create([
-            'tenant_id' => 31,
-            'user_id' => $user->id,
-            'primary_site_id' => $localSite->id,
-            'secondary_site_ids' => [$foreignStaleAssignment->id],
-        ]);
-
-        $this->assertSame(
-            [$localSite->id],
-            app(UserSiteAccessService::class)->accessibleSiteIds($user),
-        );
-    }
-
-    public function test_client_scope_and_assertion_require_client_organization_agreement(): void
-    {
-        $localSite = Site::factory()->create(['tenant_id' => 41]);
-        $user = User::factory()->create(['organization_id' => 41]);
-        $this->grantPermission($user, 'reports.viewAny');
-        $localClient = Client::factory()->create([
-            'organization_id' => 41,
-            'site_id' => $localSite->id,
-        ]);
-        $foreignClientUsingLocalSite = Client::factory()->create([
-            'organization_id' => 42,
-            'site_id' => $localSite->id,
-        ]);
-
-        $service = app(UserSiteAccessService::class);
-        $bypass = ['reports.viewAny'];
-
-        $this->assertSame(
-            [$localClient->id],
-            $service->applyClientScope(Client::query()->orderBy('id'), $user, $bypass)->pluck('id')->all(),
-        );
-
-        try {
-            $service->assertCanAccessClientId($user, $foreignClientUsingLocalSite->id, $bypass);
-            $this->fail('A matching site must not override a foreign client organization.');
-        } catch (HttpExceptionInterface $exception) {
-            $this->assertSame(403, $exception->getStatusCode());
-        }
-    }
-
-    public function test_hs_event_scope_uses_site_provenance_and_rejects_conflicting_or_unattributed_records(): void
-    {
-        $localSite = Site::factory()->create(['tenant_id' => 45]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 46]);
-        $user = User::factory()->create(['organization_id' => 45]);
-        $this->grantPermission($user, 'healthSafety.viewAllSites');
-
-        $localLegacyEvent = HsEvent::factory()->create([
-            'organization_id' => null,
-            'site_id' => $localSite->id,
-        ]);
-        $localAttributedEvent = HsEvent::factory()->create([
-            'organization_id' => 45,
-            'site_id' => $localSite->id,
-        ]);
-        $localOrganizationOnlyEvent = HsEvent::factory()->create([
-            'organization_id' => 45,
-            'site_id' => null,
-        ]);
-        $foreignSiteWithLocalOrganization = HsEvent::factory()->create([
-            'organization_id' => 45,
-            'site_id' => $foreignSite->id,
-        ]);
-        $foreignOrganizationOnLocalSite = HsEvent::factory()->create([
-            'organization_id' => 46,
-            'site_id' => $localSite->id,
-        ]);
-        $unattributedEvent = HsEvent::factory()->create([
-            'organization_id' => null,
-            'site_id' => null,
-        ]);
-
-        $service = app(UserSiteAccessService::class);
-        $bypass = ['healthSafety.viewAllSites'];
-
-        $this->assertSame(
-            [$localLegacyEvent->id, $localAttributedEvent->id, $localOrganizationOnlyEvent->id],
-            $service->applyHsEventScope(HsEvent::query()->orderBy('id'), $user, $bypass)->pluck('id')->all(),
-        );
-        $service->assertCanAccessHsEvent($user, $localLegacyEvent, $bypass);
-        $service->assertCanAccessHsEvent($user, $localOrganizationOnlyEvent, $bypass);
-
-        foreach ([$foreignSiteWithLocalOrganization, $foreignOrganizationOnLocalSite, $unattributedEvent] as $event) {
-            try {
-                $service->assertCanAccessHsEvent($user, $event, $bypass);
-                $this->fail('Conflicting or missing H&S event tenant provenance must be rejected.');
-            } catch (HttpExceptionInterface $exception) {
-                $this->assertSame(403, $exception->getStatusCode());
-            }
-        }
-    }
-
-    public function test_only_an_explicit_platform_admin_without_an_organization_is_unrestricted(): void
-    {
-        $firstSite = Site::factory()->create(['tenant_id' => 51]);
-        $secondSite = Site::factory()->create(['tenant_id' => 52]);
-        $platformAdmin = User::factory()->create(['organization_id' => null]);
-        $adminRole = Role::query()->create([
-            'name' => 'admin',
-            'label' => 'Platform administrator',
-            'level' => 100,
-            'type' => 'system',
-        ]);
-        $platformAdmin->roles()->attach($adminRole);
-        $this->grantPermission($platformAdmin, 'reports.viewAny');
-
-        $service = app(UserSiteAccessService::class);
-        $bypass = ['reports.viewAny'];
-
-        $this->assertTrue($service->isUnrestrictedPlatformUser($platformAdmin));
-        $this->assertSame(
-            [$firstSite->id, $secondSite->id],
-            $service->applySiteScope(Site::query()->orderBy('id'), $platformAdmin, $bypass)->pluck('id')->all(),
-        );
-        $service->assertCanAccessSiteId($platformAdmin, $secondSite->id, $bypass);
-    }
-
-    private function siteBoundUser(Site $site): User
-    {
+    /**
+     * @param  array<int, int>  $secondarySiteIds
+     * @param  array<string, mixed>  $profileOverrides
+     */
+    private function siteBoundUser(
+        Site $primarySite,
+        array $secondarySiteIds = [],
+        array $profileOverrides = [],
+    ): User {
         $user = User::factory()->create();
 
         HrEmployeeProfile::query()->create([
-            'tenant_id' => 1,
+            ...LegacyStorageContext::attributes(),
             'user_id' => $user->id,
             'employee_number' => 'EMP-USA-'.$user->id,
             'work_email' => $user->email,
@@ -366,9 +309,11 @@ class UserSiteAccessServiceTest extends TestCase
             'position_role' => 'support_worker',
             'employment_type' => 'full_time',
             'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
             'is_active' => true,
-            'primary_site_id' => $site->id,
-            'secondary_site_ids' => [],
+            'primary_site_id' => $primarySite->id,
+            'secondary_site_ids' => $secondarySiteIds,
+            ...$profileOverrides,
         ]);
 
         return $user;
@@ -384,5 +329,15 @@ class UserSiteAccessServiceTest extends TestCase
         ]);
 
         $user->permissionOverrides()->attach($permission, ['allowed' => true]);
+    }
+
+    private function assertForbidden(callable $callback): void
+    {
+        try {
+            $callback();
+            $this->fail('Expected the inaccessible or forged identifier to be rejected.');
+        } catch (HttpExceptionInterface $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
     }
 }

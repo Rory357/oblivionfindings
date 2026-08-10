@@ -92,7 +92,12 @@ export const STATUS_OPTIONS: Opt[] = [
 
 /* ── GHS pictograms — tinted lucide glyphs (swap for raster assets if available) ── */
 
-export type GhsMeta = { code: string; label: string; icon: LucideIcon; tone: Tone };
+export type GhsMeta = {
+    code: string;
+    label: string;
+    icon: LucideIcon;
+    tone: Tone;
+};
 
 export const GHS_PICTOGRAMS: GhsMeta[] = [
     { code: 'GHS01', label: 'Explosive', icon: Bomb, tone: 'critical' },
@@ -101,18 +106,38 @@ export const GHS_PICTOGRAMS: GhsMeta[] = [
     { code: 'GHS04', label: 'Compressed gas', icon: Cylinder, tone: 'neutral' },
     { code: 'GHS05', label: 'Corrosive', icon: Droplets, tone: 'warning' },
     { code: 'GHS06', label: 'Toxic', icon: Skull, tone: 'critical' },
-    { code: 'GHS07', label: 'Harmful / irritant', icon: AlertTriangle, tone: 'warning' },
-    { code: 'GHS08', label: 'Health hazard', icon: HeartPulse, tone: 'critical' },
+    {
+        code: 'GHS07',
+        label: 'Harmful / irritant',
+        icon: AlertTriangle,
+        tone: 'warning',
+    },
+    {
+        code: 'GHS08',
+        label: 'Health hazard',
+        icon: HeartPulse,
+        tone: 'critical',
+    },
     { code: 'GHS09', label: 'Environmental', icon: Leaf, tone: 'success' },
 ];
 
-export const GHS_BY_CODE: Record<string, GhsMeta> = Object.fromEntries(GHS_PICTOGRAMS.map((p) => [p.code, p]));
+export const GHS_BY_CODE: Record<string, GhsMeta> = Object.fromEntries(
+    GHS_PICTOGRAMS.map((p) => [p.code, p]),
+);
 
 /* ── SDS lifecycle state → badge meta ── */
 
-export type SdsState = 'current' | 'expiring' | 'expired' | 'missing' | 'superseded';
+export type SdsState =
+    | 'current'
+    | 'expiring'
+    | 'expired'
+    | 'missing'
+    | 'superseded';
 
-export const SDS_STATE_META: Record<SdsState, { label: string; tone: FlagTone; icon: LucideIcon }> = {
+export const SDS_STATE_META: Record<
+    SdsState,
+    { label: string; tone: FlagTone; icon: LucideIcon }
+> = {
     current: { label: 'Current', tone: 'success', icon: CheckCircle2 },
     expiring: { label: 'Expiring', tone: 'warning', icon: Clock },
     expired: { label: 'Expired', tone: 'critical', icon: AlertTriangle },
@@ -127,7 +152,10 @@ export const STATUS_META: Record<string, { label: string; tone: Tone }> = {
 };
 
 /** Risk dot for a substance row: controlled or SDS-to-action ⇒ elevated. */
-export function substanceRiskTone(isControlled: boolean, sdsState: string): Tone {
+export function substanceRiskTone(
+    isControlled: boolean,
+    sdsState: string,
+): Tone {
     if (sdsState === 'expired' || sdsState === 'missing') return 'critical';
     if (isControlled || sdsState === 'expiring') return 'warning';
     return 'success';

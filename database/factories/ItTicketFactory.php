@@ -22,8 +22,11 @@ class ItTicketFactory extends Factory
             'requester_user_id' => User::factory(),
             'category' => fake()->randomElement(ItTicket::CATEGORIES),
             'priority' => 'normal',
+            'impact' => 'individual',
+            'urgency' => 'normal',
             'status' => 'open',
             'source' => 'portal',
+            'work_type' => 'incident',
         ];
     }
 

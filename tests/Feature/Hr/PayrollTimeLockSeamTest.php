@@ -25,21 +25,19 @@ test('S9 seam: a time entry in a LOCKED payroll period cannot be voided (payroll
     $actor = User::factory()->create();
 
     $entry = HrTimeEntry::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'entry_date' => '2026-06-15',
         'status' => 'submitted', // not 'approved' — so we reach the payroll-lock guard
     ]);
 
     HrPayrollRun::factory()->create([
-        'tenant_id' => 1,
         'status' => 'locked',
         'period_start' => '2026-06-01',
         'period_end' => '2026-06-30',
     ]);
 
     expect(fn () => app(TimeTrackingService::class)->voidEntry($entry->fresh(), $actor, 'test'))
-        ->toThrow(\LogicException::class, 'locked payroll period');
+        ->toThrow(LogicException::class, 'locked payroll period');
 });
 
 test('S9 seam: a time entry OUTSIDE any locked payroll period can still be voided', function () {
@@ -48,7 +46,6 @@ test('S9 seam: a time entry OUTSIDE any locked payroll period can still be voide
     $actor = User::factory()->create();
 
     $entry = HrTimeEntry::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'entry_date' => '2026-06-15',
         'status' => 'submitted',
@@ -56,7 +53,6 @@ test('S9 seam: a time entry OUTSIDE any locked payroll period can still be voide
 
     // A locked run for a DIFFERENT period — this entry's date is not covered.
     HrPayrollRun::factory()->create([
-        'tenant_id' => 1,
         'status' => 'locked',
         'period_start' => '2026-05-01',
         'period_end' => '2026-05-31',

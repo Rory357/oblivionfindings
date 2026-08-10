@@ -9,9 +9,14 @@ import {
     loginAsClockOutCleanWorker,
     loginAsIncidentBlockerWorker,
     loginAsStaff,
+    resetFrontlineLifecycleReadinessFixtures,
 } from './helpers';
 
 test.describe('attendance readiness workflows', () => {
+    test.beforeEach(() => {
+        resetFrontlineLifecycleReadinessFixtures();
+    });
+
     test('frontline worker can clock in from My Day', async ({
         page,
     }, testInfo) => {
@@ -27,9 +32,7 @@ test.describe('attendance readiness workflows', () => {
 
         await clockInButton.click();
 
-        await expect(
-            page.getByRole('heading', { name: /Active shift/i }),
-        ).toBeVisible();
+        await expect(page.getByTestId('clock-out-button')).toBeVisible();
         expectNoConsoleErrors(consoleErrors);
     });
 
@@ -48,8 +51,8 @@ test.describe('attendance readiness workflows', () => {
 
         await page.getByTestId('end-shift-submit').click();
 
-        await expect(page.getByText(/Clocked out/i).first()).toBeVisible();
-        await expect(page.getByText(/Active shift/i)).toHaveCount(0);
+        await expect(page.getByTestId('clock-in-button')).toBeVisible();
+        await expect(page.getByTestId('clock-out-button')).toHaveCount(0);
         expectNoConsoleErrors(consoleErrors);
     });
 
@@ -62,16 +65,21 @@ test.describe('attendance readiness workflows', () => {
         await gotoMyDay(page);
 
         await page.getByTestId('clock-out-button').first().click();
-        await expect(page.getByText(/Finish shift tasks/i)).toBeVisible();
-        await expect(page.getByText(/Write handover/i)).toBeVisible();
+        const dialog = page.getByRole('dialog', { name: /End shift for/i });
+        await expect(dialog.getByText(/Finish shift tasks/i)).toBeVisible();
+        await expect(dialog.getByText(/Write handover/i)).toBeVisible();
 
-        await page.getByRole('checkbox').first().check();
-        await page
+        await dialog
+            .getByRole('checkbox', { name: 'Playwright checklist task' })
+            .check();
+        await dialog
             .getByLabel(/What should the next shift know/i)
             .fill('Checklist completed during atomic clock-out test.');
-        await page.getByTestId('end-shift-submit').click();
+        const submit = dialog.getByTestId('end-shift-submit');
+        await expect(submit).toBeEnabled();
+        await submit.click();
 
-        await expect(page.getByText(/Clocked out/i).first()).toBeVisible();
+        await expect(page.getByTestId('clock-in-button')).toBeVisible();
         expectNoConsoleErrors(consoleErrors);
     });
 
@@ -94,6 +102,10 @@ test.describe('attendance readiness workflows', () => {
 });
 
 test.describe('timesheet approval readiness workflows', () => {
+    test.beforeEach(() => {
+        resetFrontlineLifecycleReadinessFixtures();
+    });
+
     test('manager can bulk approve submitted timesheets with stable selectors', async ({
         page,
     }) => {

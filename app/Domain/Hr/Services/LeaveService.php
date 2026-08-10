@@ -8,13 +8,13 @@ use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveBalanceLedger;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPublicHoliday;
-use App\Domain\Hr\Notifications\LeaveApprovedNotification;
 use App\Domain\Hr\Notifications\LeaveBalanceAdjustedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\StaffTimeOff;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -53,7 +53,9 @@ class LeaveService
     }
 
     public function __construct(
-        private readonly PublicHolidayCalendar $holidays = new PublicHolidayCalendar,
+        private readonly PublicHolidayCalendar $holidays,
+        private readonly HrLeaveAccessService $access,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -69,6 +71,10 @@ class LeaveService
      */
     public function submitRequest(User $user, array $data): HrLeaveRequest
     {
+        if (! $this->access->isCurrentStaff($user)) {
+            throw new \InvalidArgumentException('Leave can only be requested for current approved staff.');
+        }
+
         $leaveType = strtolower((string) ($data['leave_type'] ?? ''));
         if (! in_array($leaveType, self::LEAVE_TYPES, true)) {
             throw new \InvalidArgumentException("Unsupported leave type '{$leaveType}'.");
@@ -89,11 +95,9 @@ class LeaveService
         }
 
         $period = $this->normalisePeriod($data['period'] ?? null);
-        $tenantId = $this->resolveTenantId($user, $data['tenant_id'] ?? null);
-
         $hoursRequested = isset($data['hours_requested']) && (float) $data['hours_requested'] > 0
             ? (float) $data['hours_requested']
-            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $tenantId, $period);
+            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $period);
 
         if ($hoursRequested <= 0) {
             throw new \InvalidArgumentException('Requested leave hours must be greater than zero.');
@@ -112,9 +116,9 @@ class LeaveService
             throw new \InvalidArgumentException('Leave request overlaps with an existing pending or approved leave request.');
         }
 
-        return DB::transaction(function () use ($user, $data, $leaveType, $period, $tenantId, $localStartsAt, $startsAt, $endsAt, $hoursRequested) {
+        return DB::transaction(function () use ($user, $data, $leaveType, $period, $localStartsAt, $startsAt, $endsAt, $hoursRequested) {
             $year = $localStartsAt->year;
-            $balance = $this->ensureBalanceRecord($user, $leaveType, $year, false, $tenantId);
+            $balance = $this->ensureBalanceRecord($user, $leaveType, $year);
             $before = $this->snapshotBalance($balance);
 
             $availableBefore = $this->calculateAvailableHours($before['balance_hours'], $before['used_hours'], $before['pending_hours']);
@@ -131,7 +135,6 @@ class LeaveService
             $balance->save();
 
             $request = HrLeaveRequest::create([
-                'tenant_id' => $tenantId,
                 'user_id' => $user->id,
                 'leave_type' => $leaveType,
                 'period' => $period,
@@ -189,6 +192,10 @@ class LeaveService
      */
     public function previewRequest(User $user, array $data): array
     {
+        if (! $this->access->isCurrentStaff($user)) {
+            throw new \InvalidArgumentException('Leave can only be previewed for current approved staff.');
+        }
+
         $leaveType = strtolower((string) ($data['leave_type'] ?? ''));
         if (! in_array($leaveType, self::LEAVE_TYPES, true)) {
             throw new \InvalidArgumentException("Unsupported leave type '{$leaveType}'.");
@@ -209,11 +216,9 @@ class LeaveService
         }
 
         $period = $this->normalisePeriod($data['period'] ?? null);
-        $tenantId = $this->resolveTenantId($user, $data['tenant_id'] ?? null);
-
         $hours = isset($data['hours_requested']) && (float) $data['hours_requested'] > 0
             ? (float) $data['hours_requested']
-            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $tenantId, $period);
+            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt, $period);
 
         $year = $localStartsAt->year;
         $balance = HrLeaveBalance::query()
@@ -261,11 +266,12 @@ class LeaveService
      */
     public function approveRequest(HrLeaveRequest $request, User $reviewer, ?string $reviewNotes = null): HrLeaveRequest
     {
-        if ($request->status !== 'pending') {
-            throw new \LogicException("Cannot approve a '{$request->status}' leave request.");
-        }
-
         return DB::transaction(function () use ($request, $reviewer, $reviewNotes) {
+            $request = $this->access->currentRequest($reviewer, $request, lockForUpdate: true);
+            if ($request->status !== 'pending') {
+                throw new \LogicException("Cannot approve a '{$request->status}' leave request.");
+            }
+
             $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
             $year = Carbon::parse($request->starts_at)->setTimezone($timezone)->year;
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
@@ -274,12 +280,10 @@ class LeaveService
                 $request->leave_type,
                 $year,
                 true,
-                $request->tenant_id,
             );
             $before = $this->snapshotBalance($balance);
 
             $timeOff = StaffTimeOff::create([
-                'tenant_id' => $request->tenant_id,
                 'hr_leave_request_id' => $request->id,
                 'user_id' => $request->user_id,
                 'type' => $request->leave_type,
@@ -317,15 +321,9 @@ class LeaveService
                 notes: $reviewNotes,
             );
 
-            try {
-                $request->user?->notify(new LeaveApprovedNotification($request->fresh(['reviewer', 'user'])));
-            } catch (\Throwable $exception) {
-                Log::warning('Failed to send leave approval notification', [
-                    'leave_request_id' => $request->id,
-                    'user_id' => $request->user_id,
-                    'error' => $exception->getMessage(),
-                ]);
-            }
+            app(HrNotificationService::class)->notifyLeaveApproved(
+                $request->fresh(['reviewer', 'user']),
+            );
 
             return $request->fresh();
         });
@@ -342,11 +340,12 @@ class LeaveService
      */
     public function declineRequest(HrLeaveRequest $request, User $reviewer, string $reason): HrLeaveRequest
     {
-        if ($request->status !== 'pending') {
-            throw new \LogicException("Cannot decline a '{$request->status}' leave request.");
-        }
-
         return DB::transaction(function () use ($request, $reviewer, $reason) {
+            $request = $this->access->currentRequest($reviewer, $request, lockForUpdate: true);
+            if ($request->status !== 'pending') {
+                throw new \LogicException("Cannot decline a '{$request->status}' leave request.");
+            }
+
             $year = Carbon::parse($request->starts_at)->year;
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
             $balance = $this->ensureBalanceRecord(
@@ -354,7 +353,6 @@ class LeaveService
                 $request->leave_type,
                 $year,
                 true,
-                $request->tenant_id,
             );
             $before = $this->snapshotBalance($balance);
 
@@ -440,7 +438,6 @@ class LeaveService
         float $hours,
         ?string $reason,
         User $actor,
-        ?int $tenantId = null,
     ): HrLeaveBalance {
         $leaveType = strtolower($leaveType);
         if (! in_array($leaveType, self::LEAVE_TYPES, true)) {
@@ -453,8 +450,9 @@ class LeaveService
             throw new \InvalidArgumentException('Adjustment hours cannot be negative.');
         }
 
-        $result = DB::transaction(function () use ($target, $leaveType, $year, $mode, $hours, $reason, $actor, $tenantId) {
-            $balance = $this->ensureBalanceRecord($target, $leaveType, $year, true, $tenantId);
+        $result = DB::transaction(function () use ($target, $leaveType, $year, $mode, $hours, $reason, $actor) {
+            $target = $this->access->currentSubject($actor, $target);
+            $balance = $this->ensureBalanceRecord($target, $leaveType, $year, true);
             $before = $this->snapshotBalance($balance);
 
             $entryType = 'adjustment';
@@ -534,15 +532,27 @@ class LeaveService
      *
      * @throws \LogicException If request is already cancelled or declined
      */
-    public function cancelRequest(HrLeaveRequest $request, int $cancelledBy): HrLeaveRequest
+    public function cancelRequest(HrLeaveRequest $request, User $cancelledBy): HrLeaveRequest
     {
-        if (! in_array($request->status, ['pending', 'approved'], true)) {
-            throw new \LogicException("Cannot cancel a '{$request->status}' leave request.");
-        }
-
-        $wasApproved = $request->status === 'approved';
-
         $result = DB::transaction(function () use ($request, $cancelledBy) {
+            $isOwner = (int) $request->user_id === (int) $cancelledBy->getKey();
+            if ($isOwner) {
+                abort_unless($this->access->isCurrentStaff($cancelledBy), 404);
+                $request = HrLeaveRequest::query()
+                    ->whereKey($request->getKey())
+                    ->where('user_id', $cancelledBy->getKey())
+                    ->lockForUpdate()
+                    ->firstOrFail();
+            } else {
+                abort_unless($cancelledBy->canDo('hr.leave.manage'), 403);
+                $request = $this->access->request($cancelledBy, $request, true, lockForUpdate: true);
+            }
+
+            if (! in_array($request->status, ['pending', 'approved'], true)) {
+                throw new \LogicException("Cannot cancel a '{$request->status}' leave request.");
+            }
+
+            $wasApproved = $request->status === 'approved';
             $year = Carbon::parse($request->starts_at)->year;
             $hours = (float) $request->hours_requested;
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
@@ -551,7 +561,6 @@ class LeaveService
                 $request->leave_type,
                 $year,
                 true,
-                $request->tenant_id,
             );
             $before = $this->snapshotBalance($balance);
 
@@ -562,12 +571,12 @@ class LeaveService
                 $balance->pending_hours = max((float) $balance->pending_hours - $hours, 0);
             }
             $balance->last_synced_at = now();
-            $balance->updated_by = $cancelledBy;
+            $balance->updated_by = $cancelledBy->id;
             $balance->save();
 
             $request->update([
                 'status' => 'cancelled',
-                'reviewed_by' => $cancelledBy,
+                'reviewed_by' => $cancelledBy->id,
                 'reviewed_at' => now(),
                 'review_notes' => 'Cancelled by user.',
                 'approval_due_at' => null,
@@ -579,23 +588,27 @@ class LeaveService
                 entryType: 'cancelled',
                 hoursDelta: -$hours,
                 source: $request,
-                createdBy: $cancelledBy,
+                createdBy: $cancelledBy->id,
                 notes: 'Leave request cancelled.',
             );
 
-            return $request->fresh();
+            return ['request' => $request->fresh(), 'was_approved' => $wasApproved];
         });
 
         // Tell whoever was waiting on the request (best-effort, after commit —
         // mirrors the submit path's approver notification).
-        app(HrNotificationService::class)->notifyLeaveCancelled($result, $wasApproved, $cancelledBy);
+        app(HrNotificationService::class)->notifyLeaveCancelled(
+            $result['request'],
+            $result['was_approved'],
+            $cancelledBy->id,
+        );
 
-        return $result;
+        return $result['request'];
     }
 
     /**
      * Roster → HR (Direction B): a roster manager entering `leave` time off creates a
-     * real, auto-approved HrLeaveRequest so the balance/ledger/tenant are written and the
+     * real, auto-approved HrLeaveRequest so the balance and ledger are written and the
      * StaffTimeOff projection is linked — instead of a bare, HR-invisible row.
      *
      * `unavailable` / `training` stay roster-only and never reach here.
@@ -603,6 +616,7 @@ class LeaveService
     public function createRosterLeave(User $target, array $data, User $actor): HrLeaveRequest
     {
         return DB::transaction(function () use ($target, $data, $actor) {
+            $target = $this->access->currentSubject($actor, $target);
             $request = $this->submitRequest($target, [
                 'leave_type' => $data['leave_type'] ?? 'annual',
                 'starts_at' => $data['starts_at'],
@@ -635,7 +649,6 @@ class LeaveService
         }
 
         $timeOff->fill([
-            'tenant_id' => $request->tenant_id,
             'type' => $request->leave_type,
             'starts_at' => $request->starts_at,
             'ends_at' => $request->ends_at,
@@ -651,64 +664,26 @@ class LeaveService
      */
     protected function getEscalationTarget(User $user): ?int
     {
-        $chain = HrLeaveApprovalChain::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->orderBy('approval_level')
-            ->first();
-
-        if ($chain) {
-            return $chain->delegate_user_id ?: $chain->approver_user_id;
-        }
-
-        $approverRoles = ['admin', 'hr', 'provider_manager', 'team_lead'];
-
-        // Prefer an approver who shares the requester's primary site (closest first) before
-        // the global fallback — so a multi-site org routes to local management.
-        $requesterSiteId = HrEmployeeProfile::query()->where('user_id', $user->id)->value('primary_site_id');
-        if ($requesterSiteId) {
-            $sameSiteUserIds = HrEmployeeProfile::query()
-                ->where('primary_site_id', $requesterSiteId)
-                ->where('user_id', '!=', $user->id)
-                ->pluck('user_id');
-
-            if ($sameSiteUserIds->isNotEmpty()) {
-                $sameSite = User::query()
-                    ->whereIn('id', $sameSiteUserIds->all())
-                    ->where(function ($query) use ($approverRoles) {
-                        $query->whereHas('roles', fn ($roles) => $roles->whereIn('name', $approverRoles))
-                            ->orWhereIn('role', $approverRoles);
-                    })
-                    ->orderByRaw("CASE WHEN role = 'team_lead' THEN 0 WHEN role = 'provider_manager' THEN 1 WHEN role = 'hr' THEN 2 ELSE 3 END")
-                    ->first();
-
-                if ($sameSite) {
-                    return $sameSite->id;
-                }
-            }
-        }
-
-        $fallback = User::query()
-            ->where(function ($query) use ($approverRoles) {
-                $query->whereHas('roles', fn ($roles) => $roles->whereIn('name', $approverRoles))
-                    ->orWhereIn('role', $approverRoles);
+        return $this->access->eligibleApprovers($user)
+            ->sortBy(fn (User $candidate): int => match ($candidate->role) {
+                'team_lead' => 0,
+                'provider_manager' => 1,
+                'hr' => 2,
+                'admin' => 3,
+                default => 4,
             })
-            ->orderByRaw("CASE WHEN role = 'admin' THEN 0 WHEN role = 'hr' THEN 1 ELSE 2 END")
-            ->first();
-
-        return $fallback?->id;
+            ->first()?->id;
     }
 
     /**
      * Escalate pending leave requests that are past their approval due time.
      */
-    public function escalatePendingApprovals(?int $tenantId = null): int
+    public function escalatePendingApprovals(): int
     {
         $escalatedCount = 0;
 
         HrLeaveRequest::query()
             ->where('status', 'pending')
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereNotNull('approval_due_at')
             ->where('approval_due_at', '<=', now())
             ->orderBy('id')
@@ -730,7 +705,7 @@ class LeaveService
                         }
 
                         $requestUser = $locked->user ?: User::query()->find($locked->user_id);
-                        if (! $requestUser) {
+                        if (! $requestUser || ! $this->access->isCurrentStaff($requestUser)) {
                             return;
                         }
 
@@ -798,40 +773,33 @@ class LeaveService
      *   mix: array<int, array{type: string, count: int}>
      * }
      */
-    public function hubHeroData(?int $tenantId, User $viewer, bool $canViewAllQueue): array
+    public function hubHeroData(User $viewer, bool $canViewAllQueue): array
     {
-        $scoped = fn ($query) => $query
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->when(! $canViewAllQueue, fn ($q) => $q->where('user_id', $viewer->id));
+        $scoped = fn () => $this->access->visibleRequests($viewer, $canViewAllQueue);
 
         // Assigned to me (awaiting my decision) — pending requests routed to the viewer.
-        $awaiting = HrLeaveRequest::query()
+        $awaiting = $scoped()
             ->where('status', 'pending')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->where('escalated_to', $viewer->id)
             ->count();
 
-        $onLeaveToday = $scoped(
-            HrLeaveRequest::query()
-                ->where('status', 'approved')
-                ->where('starts_at', '<=', now())
-                ->where('ends_at', '>=', now())
-        )->count();
+        $onLeaveToday = $scoped()
+            ->where('status', 'approved')
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>=', now())
+            ->count();
 
-        $upcoming7d = $scoped(
-            HrLeaveRequest::query()
-                ->where('status', 'approved')
-                ->where('starts_at', '>', now())
-                ->where('starts_at', '<=', now()->copy()->addDays(7))
-        )->count();
+        $upcoming7d = $scoped()
+            ->where('status', 'approved')
+            ->where('starts_at', '>', now())
+            ->where('starts_at', '<=', now()->copy()->addDays(7))
+            ->count();
 
         // On-leave mix (active today or starting within 7 days) by type — donut.
-        $mix = $scoped(
-            HrLeaveRequest::query()
-                ->where('status', 'approved')
-                ->where('ends_at', '>=', now()->copy()->startOfDay())
-                ->where('starts_at', '<=', now()->copy()->addDays(7))
-        )
+        $mix = $scoped()
+            ->where('status', 'approved')
+            ->where('ends_at', '>=', now()->copy()->startOfDay())
+            ->where('starts_at', '<=', now()->copy()->addDays(7))
             ->selectRaw('leave_type, COUNT(*) as count')
             ->groupBy('leave_type')
             ->orderByDesc('count')
@@ -842,28 +810,23 @@ class LeaveService
         // Absence rate (sick hours / schedulable hours, last 30 days). Scope the
         // denominator the same way as the (viewer-scoped) sick-hours numerator so
         // a personal lens (non-manager) reads its own rate, not own-sick ÷ whole-org.
-        $totalActiveStaff = HrEmployeeProfile::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->when(! $canViewAllQueue, fn ($q) => $q->where('user_id', $viewer->id))
-            ->where('is_active', true)
-            ->count();
-        $sickHours = $scoped(
-            HrLeaveRequest::query()
-                ->where('status', 'approved')
-                ->where('leave_type', 'sick')
-                ->where('starts_at', '>=', now()->copy()->subDays(30))
-        )->sum('hours_requested');
+        $totalActiveStaff = $canViewAllQueue
+            ? $this->access->currentStaffQuery($viewer)->count()
+            : (int) $this->access->isCurrentStaff($viewer);
+        $sickHours = $scoped()
+            ->where('status', 'approved')
+            ->where('leave_type', 'sick')
+            ->where('starts_at', '>=', now()->copy()->subDays(30))
+            ->sum('hours_requested');
         $absenceRate = round(((float) $sickHours / max(1, $totalActiveStaff * 160)) * 100, 1);
 
-        $sla = $this->approvalSlaSummary($tenantId, $viewer->id, $canViewAllQueue);
+        $sla = $this->approvalSlaSummary($viewer, $canViewAllQueue);
 
         // Roster conflicts — shifts overlapping a pending leave request.
-        $pendingUserIds = $scoped(
-            HrLeaveRequest::query()->where('status', 'pending')
-        )->pluck('user_id')->unique();
+        $pendingUserIds = $scoped()->where('status', 'pending')->pluck('user_id')->unique();
         $rosterConflicts = 0;
         if ($pendingUserIds->isNotEmpty()) {
-            $rosterConflicts = Shift::query()
+            $rosterConflicts = $this->siteAccess->applyShiftScope(Shift::query(), $viewer)
                 ->whereIn('user_id', $pendingUserIds)
                 ->whereIn('status', ['scheduled', 'draft'])
                 ->where('starts_at', '>=', now())
@@ -871,9 +834,7 @@ class LeaveService
         }
 
         return [
-            'site_count' => Site::query()
-                ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-                ->count(),
+            'site_count' => count($this->access->accessibleSiteIds($viewer)),
             'awaiting_my_decision' => $awaiting,
             'on_leave_today' => $onLeaveToday,
             'upcoming_7d' => $upcoming7d,
@@ -884,12 +845,10 @@ class LeaveService
         ];
     }
 
-    public function approvalSlaSummary(?int $tenantId, ?int $viewerUserId, bool $canManage): array
+    public function approvalSlaSummary(User $viewer, bool $canManage): array
     {
-        $pending = HrLeaveRequest::query()
-            ->where('status', 'pending')
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->when(! $canManage && $viewerUserId !== null, fn ($query) => $query->where('user_id', $viewerUserId));
+        $pending = $this->access->visibleRequests($viewer, $canManage)
+            ->where('status', 'pending');
 
         $pendingRows = (clone $pending)->get(['id', 'leave_type', 'submitted_at', 'approval_due_at']);
 
@@ -908,13 +867,11 @@ class LeaveService
             ->map(fn (HrLeaveRequest $request) => round(abs($request->submitted_at->diffInMinutes(now())) / 60, 1))
             ->max() ?? 0.0;
 
-        $decisions = HrLeaveRequest::query()
+        $decisions = $this->access->visibleRequests($viewer, $canManage)
             ->whereIn('status', ['approved', 'declined', 'cancelled'])
             ->whereNotNull('submitted_at')
             ->whereNotNull('reviewed_at')
             ->where('reviewed_at', '>=', now()->subDays(30))
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->when(! $canManage && $viewerUserId !== null, fn ($query) => $query->where('user_id', $viewerUserId))
             ->get(['submitted_at', 'reviewed_at']);
 
         // Decision latency is a magnitude — guard against signed diffs (Carbon 3)
@@ -943,10 +900,9 @@ class LeaveService
      *
      * @return array<string, array{count: int, items: Collection<int, HrLeaveRequest>}>
      */
-    public function pendingInbox(?int $tenantId, User $viewer, bool $canManage, int $cap = 200): array
+    public function pendingInbox(User $viewer, bool $canManage, int $cap = 200): array
     {
-        $base = fn () => HrLeaveRequest::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $base = fn () => $this->access->visibleRequests($viewer, $canManage)
             ->with(['user:id,name,email', 'reviewer:id,name', 'escalatedTo:id,name']);
 
         // SLA urgency: nulls last, soonest due first, then oldest submitted.
@@ -955,8 +911,7 @@ class LeaveService
             ->orderBy('approval_due_at')
             ->orderBy('submitted_at');
 
-        $pendingScope = fn () => $base()->where('status', 'pending')
-            ->when(! $canManage, fn ($q) => $q->where('user_id', $viewer->id));
+        $pendingScope = fn () => $base()->where('status', 'pending');
 
         $segment = function ($query) use ($slaOrder, $cap): array {
             $count = (clone $query)->count();
@@ -975,7 +930,6 @@ class LeaveService
             'all_pending' => $segment($pendingScope()),
             'recently_decided' => $segment(
                 $base()->whereIn('status', ['approved', 'declined', 'cancelled'])
-                    ->when(! $canManage, fn ($q) => $q->where('user_id', $viewer->id))
                     ->whereNotNull('reviewed_at')
                     ->where('reviewed_at', '>=', now()->subDays(7))
                     ->reorder()->orderByDesc('reviewed_at')
@@ -991,7 +945,7 @@ class LeaveService
      * @param  Collection<int, HrLeaveRequest>  $requests
      * @return array<int, array{rosterConflict: array, balanceImpact: array|null}>
      */
-    public function annotateRequestsContext(Collection $requests): array
+    public function annotateRequestsContext(Collection $requests, User $viewer): array
     {
         if ($requests->isEmpty()) {
             return [];
@@ -1005,7 +959,7 @@ class LeaveService
         $minStart = $requests->min(fn ($r) => $r->starts_at);
         $maxEnd = $requests->max(fn ($r) => $r->ends_at);
 
-        $shifts = Shift::query()
+        $shifts = $this->siteAccess->applyShiftScope(Shift::query(), $viewer)
             ->whereIn('user_id', $userIds->all())
             ->whereNotIn('status', ['cancelled'])
             ->where('starts_at', '<=', $maxEnd)
@@ -1071,8 +1025,13 @@ class LeaveService
      *
      * @param  array{site_id?: int|string|null}  $filters
      */
-    public function calendarFeed(?int $tenantId, string $month, array $filters = [], ?int $viewerUserId = null, bool $canSeeSensitive = false): array
-    {
+    public function calendarFeed(
+        User $viewer,
+        string $month,
+        array $filters = [],
+        bool $canViewAllQueue = false,
+        bool $canSeeSensitive = false,
+    ): array {
         try {
             $start = Carbon::parse($month.'-01')->startOfMonth();
         } catch (\Throwable) {
@@ -1080,13 +1039,19 @@ class LeaveService
         }
         $end = $start->copy()->endOfMonth();
 
-        $requests = HrLeaveRequest::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+        $requests = $this->access->visibleRequests($viewer, $canViewAllQueue)
             ->whereIn('status', ['approved', 'pending'])
             ->where('starts_at', '<=', $end)
             ->where('ends_at', '>=', $start)
-            ->when(! empty($filters['site_id']), function ($q) use ($filters) {
-                $userIds = HrEmployeeProfile::query()
+            ->when(! empty($filters['site_id']), function ($q) use ($filters, $viewer) {
+                $siteId = (int) $filters['site_id'];
+                if (! in_array($siteId, $this->access->accessibleSiteIds($viewer), true)) {
+                    $q->whereRaw('1 = 0');
+
+                    return;
+                }
+
+                $userIds = HrEmployeeProfile::withTrashed()
                     ->where('primary_site_id', $filters['site_id'])
                     ->pluck('user_id');
                 $q->whereIn('user_id', $userIds);
@@ -1096,7 +1061,7 @@ class LeaveService
             ->get();
 
         $userIds = $requests->pluck('user_id')->filter()->unique();
-        $profiles = HrEmployeeProfile::query()
+        $profiles = HrEmployeeProfile::withTrashed()
             ->whereIn('user_id', $userIds->all())
             ->get(['user_id', 'primary_site_id'])
             ->keyBy('user_id');
@@ -1108,13 +1073,13 @@ class LeaveService
         // Per-request roster-conflict + balance-impact (batch, no N+1) so a
         // detail modal opened straight from a calendar bar has the same context
         // as the Approvals queue.
-        $context = $this->annotateRequestsContext($requests);
+        $context = $this->annotateRequestsContext($requests, $viewer);
 
-        $entries = $requests->map(function (HrLeaveRequest $r) use ($siteFor, $context, $viewerUserId, $canSeeSensitive) {
+        $entries = $requests->map(function (HrLeaveRequest $r) use ($siteFor, $context, $viewer, $canSeeSensitive) {
             $isPending = $r->status === 'pending';
             $reasonRestricted = self::isSensitiveLeaveType($r->leave_type)
                 && ! $canSeeSensitive
-                && $r->user_id !== $viewerUserId;
+                && $r->user_id !== $viewer->id;
 
             return [
                 'id' => $r->id,
@@ -1145,7 +1110,6 @@ class LeaveService
         ])->values();
 
         $holidays = HrPublicHoliday::query()
-            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->orderBy('date')
             ->get()
@@ -1176,13 +1140,12 @@ class LeaveService
      *
      * @return array<string, string>
      */
-    public function publicHolidayMap(int $tenantId, ?Carbon $from = null, ?Carbon $to = null): array
+    public function publicHolidayMap(?Carbon $from = null, ?Carbon $to = null): array
     {
         $from ??= now()->startOfMonth();
         $to ??= now()->copy()->addMonths(14)->endOfMonth();
 
         return HrPublicHoliday::query()
-            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
             ->whereBetween('date', [$from->toDateString(), $to->toDateString()])
             ->orderBy('date')
             ->get()
@@ -1202,10 +1165,14 @@ class LeaveService
             ->first();
 
         if ($chain) {
-            return [
-                'approver_user_id' => $chain->delegate_user_id ?: $chain->approver_user_id,
-                'escalation_after_hours' => max(1, (int) $chain->escalation_after_hours),
-            ];
+            $candidateId = $chain->delegate_user_id ?: $chain->approver_user_id;
+            $candidate = $candidateId ? User::query()->find($candidateId) : null;
+            if ($candidate && $this->access->isEligibleApprover($user, $candidate)) {
+                return [
+                    'approver_user_id' => $candidate->id,
+                    'escalation_after_hours' => max(1, (int) $chain->escalation_after_hours),
+                ];
+            }
         }
 
         return [
@@ -1214,8 +1181,12 @@ class LeaveService
         ];
     }
 
-    protected function ensureBalanceRecord(User $user, string $leaveType, int $year, bool $forUpdate = false, ?int $tenantId = null): HrLeaveBalance
+    protected function ensureBalanceRecord(User $user, string $leaveType, int $year, bool $forUpdate = false): HrLeaveBalance
     {
+        if (! $this->access->isCurrentStaff($user)) {
+            throw new \InvalidArgumentException('A leave balance requires current approved staff.');
+        }
+
         $query = HrLeaveBalance::query()
             ->where('user_id', $user->id)
             ->where('leave_type', $leaveType)
@@ -1265,10 +1236,8 @@ class LeaveService
         }
 
         $startingHours = round($opening + max($carryOver, 0), 2);
-        $resolvedTenantId = $this->resolveTenantId($user, $tenantId);
 
-        return HrLeaveBalance::create([
-            'tenant_id' => $resolvedTenantId,
+        return HrLeaveBalance::query()->create([
             'user_id' => $user->id,
             'leave_type' => $leaveType,
             'year' => $year,
@@ -1282,40 +1251,6 @@ class LeaveService
         ]);
     }
 
-    protected function resolveTenantId(User $user, mixed $tenantId = null): int
-    {
-        if (is_numeric($tenantId)) {
-            return (int) $tenantId;
-        }
-
-        $directTenantId = $user->getAttribute('tenant_id');
-        if (is_numeric($directTenantId)) {
-            return (int) $directTenantId;
-        }
-
-        $profileTenantId = HrEmployeeProfile::query()
-            ->where('user_id', $user->id)
-            ->value('tenant_id');
-
-        if (is_numeric($profileTenantId)) {
-            return (int) $profileTenantId;
-        }
-
-        $fallbackTenantId = HrLeaveBalance::query()
-            ->where('user_id', $user->id)
-            ->orderByDesc('id')
-            ->value('tenant_id')
-            ?? HrLeaveRequest::query()
-                ->where('user_id', $user->id)
-                ->orderByDesc('id')
-                ->value('tenant_id')
-            ?? HrEmployeeProfile::query()->orderBy('id')->value('tenant_id')
-            ?? HrLeaveRequest::query()->orderBy('id')->value('tenant_id')
-            ?? HrLeaveBalance::query()->orderBy('id')->value('tenant_id');
-
-        return (int) ($fallbackTenantId ?? 1);
-    }
-
     /**
      * Working hours for a leave range, excluding weekends AND public holidays (a stat day
      * inside the range is not charged to the balance — Holidays Act 2003). A single-day
@@ -1325,7 +1260,6 @@ class LeaveService
         User $user,
         Carbon $startsAt,
         Carbon $endsAt,
-        ?int $tenantId = null,
         ?string $period = null,
         ?string $region = null,
     ): float {
@@ -1339,7 +1273,7 @@ class LeaveService
         $day = $startsAt->copy()->startOfDay();
         $businessDays = 0;
         while ($day->lessThanOrEqualTo($endsAt)) {
-            if (! $day->isWeekend() && ! $this->holidays->isPublicHoliday($day, $tenantId, $region)) {
+            if (! $day->isWeekend() && ! $this->holidays->isPublicHoliday($day, $region)) {
                 $businessDays++;
             }
             $day->addDay();
@@ -1394,8 +1328,7 @@ class LeaveService
         ?int $createdBy,
         ?string $notes
     ): void {
-        HrLeaveBalanceLedger::create([
-            'tenant_id' => $balance->tenant_id,
+        HrLeaveBalanceLedger::query()->create([
             'user_id' => $balance->user_id,
             'leave_type' => $balance->leave_type,
             'year' => $balance->year,
@@ -1413,5 +1346,4 @@ class LeaveService
             'created_by' => $createdBy,
         ]);
     }
-
 }

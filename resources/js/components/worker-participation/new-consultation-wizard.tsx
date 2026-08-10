@@ -7,14 +7,6 @@
 import { Button } from '@/components/ui/button';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import {
-    ReviewCard,
-    ReviewRow,
-    WizardShell,
-    WizardStepPane,
-    WizardSuccessPane,
-    type WizardStep,
-} from '@/components/wizard/shell';
-import {
     Field,
     InfoCard,
     Ring,
@@ -22,6 +14,14 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+    type WizardStep,
+} from '@/components/wizard/shell';
 import {
     CONSULTATION_TYPES,
     WP_BASE,
@@ -66,10 +66,30 @@ type ConsultationForm = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'topic', label: 'Topic & type', blurb: 'What is being consulted on', icon: MessageSquare },
-    { key: 'scope', label: 'Scope', blurb: 'Site, date & who is involved', icon: Target },
-    { key: 'documents', label: 'Documents', blurb: 'Supporting file (optional)', icon: FileUp },
-    { key: 'review', label: 'Review', blurb: 'Check & raise consultation', icon: CheckCircle2 },
+    {
+        key: 'topic',
+        label: 'Topic & type',
+        blurb: 'What is being consulted on',
+        icon: MessageSquare,
+    },
+    {
+        key: 'scope',
+        label: 'Scope',
+        blurb: 'Site, date & who is involved',
+        icon: Target,
+    },
+    {
+        key: 'documents',
+        label: 'Documents',
+        blurb: 'Supporting file (optional)',
+        icon: FileUp,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Check & raise consultation',
+        icon: CheckCircle2,
+    },
 ] as const;
 
 const textareaCls =
@@ -108,16 +128,23 @@ const ACCEPT_MIME = [
 /*  Per-step validation (mirrors StoreConsultationRequest)             */
 /* ------------------------------------------------------------------ */
 
-function validateStep(key: string, data: ConsultationForm): Record<string, string> {
+function validateStep(
+    key: string,
+    data: ConsultationForm,
+): Record<string, string> {
     const e: Record<string, string> = {};
     if (key === 'topic') {
-        if (!data.title.trim()) e.title = 'Give the consultation a clear title.';
-        if (!data.consultation_type) e.consultation_type = 'Choose a consultation type.';
-        if (!data.description.trim()) e.description = 'Describe what kaimahi are being consulted on.';
+        if (!data.title.trim())
+            e.title = 'Give the consultation a clear title.';
+        if (!data.consultation_type)
+            e.consultation_type = 'Choose a consultation type.';
+        if (!data.description.trim())
+            e.description = 'Describe what kaimahi are being consulted on.';
     }
     if (key === 'scope') {
         if (!data.site_id) e.site_id = 'Select the site this affects.';
-        if (!data.consultation_date) e.consultation_date = 'Set the consultation date.';
+        if (!data.consultation_date)
+            e.consultation_date = 'Set the consultation date.';
     }
     return e;
 }
@@ -132,16 +159,24 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
     const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
     const [fileError, setFileError] = useState<string | null>(null);
 
-    const { data, setData, post, processing, errors, reset, clearErrors, transform } =
-        useForm<ConsultationForm>({
-            title: '',
-            consultation_type: 'hazard_review',
-            description: '',
-            site_id: '',
-            consultation_date: '',
-            workers_consulted: [],
-            document: null,
-        });
+    const {
+        data,
+        setData,
+        post,
+        processing,
+        errors,
+        reset,
+        clearErrors,
+        transform,
+    } = useForm<ConsultationForm>({
+        title: '',
+        consultation_type: 'hazard_review',
+        description: '',
+        site_id: '',
+        consultation_date: '',
+        workers_consulted: [],
+        document: null,
+    });
 
     const err = (name: keyof ConsultationForm): string | undefined =>
         localErrors[name] ?? (errors as Record<string, string>)[name];
@@ -160,7 +195,9 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
             data.workers_consulted.length > 0,
             !!data.document,
         ];
-        return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+        return Math.round(
+            (checks.filter(Boolean).length / checks.length) * 100,
+        );
     }, [data]);
 
     const goToStep = (key: string) => {
@@ -170,7 +207,9 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
     const jumpToFailingStep = (errs: Record<string, string>) => {
         const first = Object.keys(errs)[0];
         if (!first) return;
-        const owner = STEPS.find((s) => Object.keys(validateStep(s.key, data)).includes(first));
+        const owner = STEPS.find((s) =>
+            Object.keys(validateStep(s.key, data)).includes(first),
+        );
         if (owner) {
             goToStep(owner.key);
             return;
@@ -178,7 +217,9 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
         // Non-gating server keys (e.g. document, workers_consulted.0): route via the
         // static field→step fallback, longest matching prefix wins.
         const fallback = [...STEP_FOR_FIELD]
-            .filter((m) => first === m.prefix || first.startsWith(`${m.prefix}.`))
+            .filter(
+                (m) => first === m.prefix || first.startsWith(`${m.prefix}.`),
+            )
             .sort((a, b) => b.prefix.length - a.prefix.length)[0];
         if (fallback) setStepIndex(fallback.step);
     };
@@ -227,7 +268,9 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
             (ext && ACCEPT_EXTENSIONS.includes(ext)) ||
             (file.type && ACCEPT_MIME.includes(file.type));
         if (!okType) {
-            setFileError('Unsupported file type — use PDF, Word, Excel or an image.');
+            setFileError(
+                'Unsupported file type — use PDF, Word, Excel or an image.',
+            );
             return;
         }
         setFileError(null);
@@ -249,13 +292,17 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
             forceFormData: true,
             preserveScroll: true,
             preserveState: true,
-            onError: (errs) => jumpToFailingStep(errs as Record<string, string>),
+            onError: (errs) =>
+                jumpToFailingStep(errs as Record<string, string>),
             onSuccess: () => setDone(true),
         });
     };
 
-    const siteName = sites.find((s) => s.id === Number(data.site_id))?.name ?? null;
-    const selectedWorkers = staff.filter((s) => data.workers_consulted.includes(s.id));
+    const siteName =
+        sites.find((s) => s.id === Number(data.site_id))?.name ?? null;
+    const selectedWorkers = staff.filter((s) =>
+        data.workers_consulted.includes(s.id),
+    );
 
     /* ---- success pane ---- */
     const success = done ? (
@@ -263,9 +310,12 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
             title="Consultation raised"
             blurb={
                 <>
-                    <span className="font-medium text-foreground">{data.title || 'The consultation'}</span> is now
-                    open on the Worker Participation register. Record kaimahi feedback and the outcome as the
-                    consultation progresses.
+                    <span className="font-medium text-foreground">
+                        {data.title || 'The consultation'}
+                    </span>{' '}
+                    is now open on the Worker Participation register. Record
+                    kaimahi feedback and the outcome as the consultation
+                    progresses.
                 </>
             }
             actions={
@@ -280,11 +330,12 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
     ) : undefined;
 
     /* ---- footer (caller owns the buttons) ---- */
-    const footerStart = !done && stepIndex > 0 ? (
-        <Button variant="ghost" size="sm" onClick={back}>
-            <ChevronLeft className="mr-1 h-4 w-4" /> Back
-        </Button>
-    ) : null;
+    const footerStart =
+        !done && stepIndex > 0 ? (
+            <Button variant="ghost" size="sm" onClick={back}>
+                <ChevronLeft className="mr-1 h-4 w-4" /> Back
+            </Button>
+        ) : null;
 
     const footerEnd = !done ? (
         <>
@@ -293,7 +344,8 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
             </Button>
             {isReview ? (
                 <Button size="sm" onClick={submit} disabled={processing}>
-                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> {processing ? 'Raising…' : 'Raise consultation'}
+                    <CheckCircle2 className="mr-1.5 h-4 w-4" />{' '}
+                    {processing ? 'Raising…' : 'Raise consultation'}
                 </Button>
             ) : (
                 <Button size="sm" onClick={next}>
@@ -329,20 +381,32 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                         blurb="What are kaimahi being consulted on, and what kind of consultation is it?"
                     />
                     <div className="grid gap-5">
-                        <Field label="Consultation title" required error={err('title')}>
+                        <Field
+                            label="Consultation title"
+                            required
+                            error={err('title')}
+                        >
                             <input
                                 type="text"
                                 value={data.title}
-                                onChange={(e) => setData('title', e.target.value)}
+                                onChange={(e) =>
+                                    setData('title', e.target.value)
+                                }
                                 placeholder="e.g. Review of manual handling procedure"
                                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                             />
                         </Field>
 
-                        <Field label="Consultation type" required error={err('consultation_type')}>
+                        <Field
+                            label="Consultation type"
+                            required
+                            error={err('consultation_type')}
+                        >
                             <TilePicker
                                 value={data.consultation_type}
-                                onChange={(v) => setData('consultation_type', v)}
+                                onChange={(v) =>
+                                    setData('consultation_type', v)
+                                }
                                 cols={2}
                                 options={CONSULTATION_TYPES.map((t) => ({
                                     key: t.key,
@@ -361,7 +425,9 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                         >
                             <textarea
                                 value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    setData('description', e.target.value)
+                                }
                                 rows={4}
                                 placeholder="Describe the matter affecting health & safety…"
                                 className={textareaCls}
@@ -386,15 +452,27 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                                     value={data.site_id}
                                     onChange={(v) => setData('site_id', v)}
                                     placeholder="Select site…"
-                                    options={sites.map((s) => ({ value: String(s.id), label: s.name }))}
+                                    options={sites.map((s) => ({
+                                        value: String(s.id),
+                                        label: s.name,
+                                    }))}
                                 />
                             </Field>
 
-                            <Field label="Consultation date" required error={err('consultation_date')}>
+                            <Field
+                                label="Consultation date"
+                                required
+                                error={err('consultation_date')}
+                            >
                                 <input
                                     type="date"
                                     value={data.consultation_date}
-                                    onChange={(e) => setData('consultation_date', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'consultation_date',
+                                            e.target.value,
+                                        )
+                                    }
                                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                                 />
                             </Field>
@@ -409,17 +487,24 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                                 // eslint-disable-next-line no-restricted-syntax -- bespoke scrollable multi-select surface (worker checklist), tokens only
                                 <div className="flex max-h-56 flex-col gap-1.5 overflow-y-auto rounded-lg border border-border bg-card/40 p-2">
                                     {staff.map((s) => {
-                                        const checked = data.workers_consulted.includes(s.id);
+                                        const checked =
+                                            data.workers_consulted.includes(
+                                                s.id,
+                                            );
                                         return (
                                             // eslint-disable-next-line no-restricted-syntax -- selectable worker row (custom checkbox tile), tokens only
                                             <button
                                                 key={s.id}
                                                 type="button"
                                                 aria-pressed={checked}
-                                                onClick={() => toggleWorker(s.id)}
+                                                onClick={() =>
+                                                    toggleWorker(s.id)
+                                                }
                                                 className={
                                                     'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors ' +
-                                                    (checked ? 'bg-primary/10 text-foreground' : 'hover:bg-muted')
+                                                    (checked
+                                                        ? 'bg-primary/10 text-foreground'
+                                                        : 'hover:bg-muted')
                                                 }
                                             >
                                                 <span
@@ -430,9 +515,13 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                                                             : 'border-border bg-background')
                                                     }
                                                 >
-                                                    {checked ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                                                    {checked ? (
+                                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                                    ) : null}
                                                 </span>
-                                                <span className="font-medium">{s.name}</span>
+                                                <span className="font-medium">
+                                                    {s.name}
+                                                </span>
                                             </button>
                                         );
                                     })}
@@ -444,7 +533,8 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                             )}
                             {selectedWorkers.length ? (
                                 <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Users className="h-3.5 w-3.5" /> {selectedWorkers.length} selected
+                                    <Users className="h-3.5 w-3.5" />{' '}
+                                    {selectedWorkers.length} selected
                                 </p>
                             ) : null}
                         </Field>
@@ -462,7 +552,8 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                     />
                     <div className="grid gap-4">
                         <InfoCard icon={Info}>
-                            Optional — you can also add documents later from the consultation.
+                            Optional — you can also add documents later from the
+                            consultation.
                         </InfoCard>
 
                         <Field error={fileError ?? err('document')}>
@@ -475,7 +566,8 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                                     }}
                                 >
                                     <p className="text-[11px] text-muted-foreground">
-                                        This file will be attached when you raise the consultation.
+                                        This file will be attached when you
+                                        raise the consultation.
                                     </p>
                                 </StagedFileCard>
                             ) : (
@@ -503,35 +595,67 @@ export function NewConsultationWizard({ open, sites, staff, onClose }: Props) {
                     <div className="mb-5 flex items-center gap-4 rounded-xl border border-border bg-card/60 p-4">
                         <Ring pct={pct} />
                         <div>
-                            <div className="text-sm font-bold">Ready to raise</div>
+                            <div className="text-sm font-bold">
+                                Ready to raise
+                            </div>
                             <p className="text-[13px] text-muted-foreground">
-                                The consultation opens on the register and can progress through feedback and outcome.
+                                The consultation opens on the register and can
+                                progress through feedback and outcome.
                             </p>
                         </div>
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={MessageSquare} title="Topic" onEdit={() => goToStep('topic')}>
+                        <ReviewCard
+                            icon={MessageSquare}
+                            title="Topic"
+                            onEdit={() => goToStep('topic')}
+                        >
                             <ReviewRow label="Title" value={data.title} />
-                            <ReviewRow label="Type" value={consultationTypeLabel(data.consultation_type)} />
-                            <ReviewRow label="Description" value={data.description} />
+                            <ReviewRow
+                                label="Type"
+                                value={consultationTypeLabel(
+                                    data.consultation_type,
+                                )}
+                            />
+                            <ReviewRow
+                                label="Description"
+                                value={data.description}
+                            />
                         </ReviewCard>
 
-                        <ReviewCard icon={Target} title="Scope" onEdit={() => goToStep('scope')}>
+                        <ReviewCard
+                            icon={Target}
+                            title="Scope"
+                            onEdit={() => goToStep('scope')}
+                        >
                             <ReviewRow label="Site" value={siteName} />
-                            <ReviewRow label="Date" value={fmtDate(data.consultation_date)} />
+                            <ReviewRow
+                                label="Date"
+                                value={fmtDate(data.consultation_date)}
+                            />
                             <ReviewRow
                                 label="Kaimahi consulted"
                                 value={
                                     selectedWorkers.length
-                                        ? selectedWorkers.map((w) => w.name).join(', ')
+                                        ? selectedWorkers
+                                              .map((w) => w.name)
+                                              .join(', ')
                                         : undefined
                                 }
                             />
                         </ReviewCard>
 
-                        <ReviewCard icon={FileUp} title="Documents" span onEdit={() => goToStep('documents')}>
-                            <ReviewRow label="Supporting file" value={data.document?.name ?? 'None'} />
+                        <ReviewCard
+                            icon={FileUp}
+                            title="Documents"
+                            span
+                            onEdit={() => goToStep('documents')}
+                        >
+                            <ReviewRow
+                                label="Supporting file"
+                                value={data.document?.name ?? 'None'}
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>

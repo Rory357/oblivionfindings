@@ -1,13 +1,12 @@
-import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '@/lib/utils';
 import {
     getStaffStatusEntry,
     type StaffStatusKind,
     type StaffStatusStateMap,
     type StaffStatusTone,
 } from '@/lib/status-vocab';
+import { cn } from '@/lib/utils';
 
 /**
  * Tone → Tailwind class map.
@@ -19,16 +18,14 @@ import {
 const toneClasses: Record<StaffStatusTone, string> = {
     neutral:
         'border-border bg-muted text-foreground dark:border-border dark:bg-muted/60 dark:text-foreground',
-    info:
-        'border-status-info/30 bg-status-info-bg text-status-info-foreground dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info-foreground',
+    info: 'border-status-info/30 bg-status-info-bg text-status-info-foreground dark:border-status-info/40 dark:bg-status-info-bg dark:text-status-info-foreground',
     progress:
         'border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground',
     success:
         'border-status-success/30 bg-status-success-bg text-status-success-foreground dark:border-status-success/40 dark:bg-status-success-bg dark:text-status-success-foreground',
     warning:
         'border-status-warning/30 bg-status-warning-bg text-status-warning-foreground dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning-foreground',
-    danger:
-        'border-status-critical/30 bg-status-critical-bg text-status-critical-foreground dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical-foreground',
+    danger: 'border-status-critical/30 bg-status-critical-bg text-status-critical-foreground dark:border-status-critical/40 dark:bg-status-critical-bg dark:text-status-critical-foreground',
 };
 
 const staffStatusVariants = cva(

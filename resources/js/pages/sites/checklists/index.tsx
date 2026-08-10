@@ -1,7 +1,7 @@
 import { Head } from '@inertiajs/react';
 
-import { ChecklistsWorkspace } from '@/components/checklists/workspace';
 import type { ChecklistsData, SiteRef } from '@/components/checklists/types';
+import { ChecklistsWorkspace } from '@/components/checklists/workspace';
 import AppLayout from '@/layouts/app-layout';
 
 type Props = ChecklistsData & {
@@ -23,7 +23,10 @@ export default function SiteChecklistsIndex(props: Props) {
         >
             <Head title={`${site.name} — Checklists`} />
             <div className="p-4">
-                <ChecklistsWorkspace scope={{ mode: 'site', site, backHref }} data={data as ChecklistsData} />
+                <ChecklistsWorkspace
+                    scope={{ mode: 'site', site, backHref }}
+                    data={data as ChecklistsData}
+                />
             </div>
         </AppLayout>
     );

@@ -1,17 +1,24 @@
 <?php
 
 use App\Http\Controllers\Careers\CareerPortalController;
+use App\Http\Controllers\Careers\ReferenceController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\It\ItCatalogController;
+use App\Http\Controllers\It\ItChangeController;
 use App\Http\Controllers\It\ItKbController;
+use App\Http\Controllers\It\ItMajorIncidentController;
+use App\Http\Controllers\It\ItProblemController;
 use App\Http\Controllers\It\ItProvisioningController;
 use App\Http\Controllers\It\ItReportsController;
+use App\Http\Controllers\It\ItSavedTicketFilterController;
+use App\Http\Controllers\It\ItServiceManagementSetupController;
 use App\Http\Controllers\It\ItTicketController;
-use App\Http\Controllers\QualityChecklistController;
-use App\Http\Controllers\RosterController;
-use App\Http\Controllers\TodayDashboardController;
-use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
+use App\Http\Controllers\It\ItWorkTaskController;
+use App\Http\Controllers\LegacyRouteRedirectController;
+use App\Http\Controllers\MyCalendarController;
+use App\Http\Controllers\MyDayActionsController;
+use App\Http\Controllers\MyDayMedicationsController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -40,6 +47,12 @@ use Inertia\Inertia;
 |
 */
 
+use App\Http\Controllers\MyTasksController;
+use App\Http\Controllers\QualityChecklistController;
+use App\Http\Controllers\RosterController;
+use App\Http\Controllers\TodayDashboardController;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 use Laravel\Fortify\Features;
 
 Route::get('/robots.txt', function () {
@@ -106,8 +119,8 @@ Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondT
 Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');
 Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'submitApplication'])->name('careers.apply.store');
 // Public token-guarded reference questionnaire — must precede the /careers/{slug} catch-all.
-Route::get('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'show'])->middleware('throttle:30,1')->name('careers.reference.show');
-Route::post('/careers/references/{token}', [App\Http\Controllers\Careers\ReferenceController::class, 'submit'])->middleware('throttle:10,1')->name('careers.reference.submit');
+Route::get('/careers/references/{token}', [ReferenceController::class, 'show'])->middleware('throttle:30,1')->name('careers.reference.show');
+Route::post('/careers/references/{token}', [ReferenceController::class, 'submit'])->middleware('throttle:10,1')->name('careers.reference.submit');
 Route::get('/careers/{slug}', fn () => redirect()->route('careers.index'))->where('slug', '^(?!application|offers|jobs|references).*$')->name('careers.show');
 
 // Authenticated routes
@@ -126,6 +139,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         if (! $isAdmin && ! app()->environment(['local', 'testing'])) {
             abort(403);
         }
+
         return Inertia::render('internal/_design/page-hero');
     })->name('internal.design.page-hero');
 });
@@ -134,7 +148,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // `/my-day` is the single staff/frontline entry point. Legacy `/my-tasks`
 // links (including existing POST action endpoints) keep working via the
 // redirect below and the unchanged action routes.
-Route::get('/my-day', \App\Http\Controllers\MyTasksController::class)
+Route::get('/my-day', MyTasksController::class)
     ->middleware(['auth'])
     ->name('my-day');
 
@@ -142,12 +156,28 @@ Route::get('/my-roster', [RosterController::class, 'index'])
     ->middleware(['auth'])
     ->name('my-roster');
 
-// IT & Provisioning — self-service helpdesk (everyone on staff raises and
+// IT & Support — self-service helpdesk (everyone on staff raises and
 // tracks their own tickets) + the agent provisioning/ticket queues. Built
 // from docs/IT_PROVISIONING_WIREFRAME.md; ticketing per
 // docs/IT_TICKETING_GAP_ANALYSIS.md.
 Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () {
     Route::get('/it', [ItProvisioningController::class, 'index'])->name('it.index');
+    Route::post('/it/ticket-filters', [ItSavedTicketFilterController::class, 'store'])
+        ->middleware('permission:it.view')
+        ->name('it.ticket-filters.store');
+    Route::delete('/it/ticket-filters/{savedFilter}', [ItSavedTicketFilterController::class, 'destroy'])
+        ->middleware('permission:it.view')
+        ->name('it.ticket-filters.destroy');
+    Route::get('/it/catalog', [ItCatalogController::class, 'index'])->name('it.catalog.index');
+    Route::post('/it/catalog/{catalogItem}/submissions', [ItCatalogController::class, 'store'])->name('it.catalog.submissions.store');
+    Route::get('/it/changes', [ItChangeController::class, 'index'])->middleware('permission:it.view')->name('it.changes.index');
+    Route::get('/it/changes/{change}', [ItChangeController::class, 'show'])->middleware('permission:it.view')->name('it.changes.show');
+    Route::get('/it/major-incidents', [ItMajorIncidentController::class, 'index'])->middleware('permission:it.view')->name('it.major-incidents.index');
+    Route::get('/it/major-incidents/{majorIncident}', [ItMajorIncidentController::class, 'show'])->middleware('permission:it.view')->name('it.major-incidents.show');
+    Route::get('/it/major-incidents/{majorIncident}/status.json', [ItMajorIncidentController::class, 'statusJson'])->name('it.major-incidents.status.json');
+    Route::get('/it/major-incidents/{majorIncident}/status', [ItMajorIncidentController::class, 'status'])->name('it.major-incidents.status');
+    Route::get('/it/problems', [ItProblemController::class, 'index'])->middleware('permission:it.view')->name('it.problems.index');
+    Route::get('/it/problems/{problem}', [ItProblemController::class, 'show'])->middleware('permission:it.view')->name('it.problems.show');
     // Self-service: raising a ticket needs it.request (or it.manage for
     // agents logging on behalf of others) — enforced via ItTicketPolicy.
     Route::post('/it/tickets', [ItProvisioningController::class, 'storeTicket'])->name('it.tickets.store');
@@ -180,22 +210,57 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         ->name('it.reports.export');
 
     // Knowledge base browse — anyone who can reach /it (it.request or it.view)
-    // reads published articles and votes; the controller guards published + tenant.
+    // reads published articles and votes; the controller guards published + access rules.
     Route::post('/it/kb/{article}/view', [ItKbController::class, 'view'])->name('it.kb.view');
     Route::post('/it/kb/{article}/helpful', [ItKbController::class, 'helpful'])->name('it.kb.helpful');
 
     Route::middleware('permission:it.manage')->group(function () {
+        Route::get('/it/setup', [ItServiceManagementSetupController::class, 'index'])->name('it.setup.index');
+        Route::post('/it/setup/teams', [ItServiceManagementSetupController::class, 'storeTeam'])->name('it.setup.teams.store');
+        Route::patch('/it/setup/teams/{team}', [ItServiceManagementSetupController::class, 'updateTeam'])->name('it.setup.teams.update');
+        Route::post('/it/setup/queues', [ItServiceManagementSetupController::class, 'storeQueue'])->name('it.setup.queues.store');
+        Route::patch('/it/setup/queues/{queue}', [ItServiceManagementSetupController::class, 'updateQueue'])->name('it.setup.queues.update');
+        Route::post('/it/setup/services', [ItServiceManagementSetupController::class, 'storeService'])->name('it.setup.services.store');
+        Route::patch('/it/setup/services/{service}', [ItServiceManagementSetupController::class, 'updateService'])->name('it.setup.services.update');
+        Route::post('/it/setup/catalogue-items', [ItServiceManagementSetupController::class, 'storeCatalogItem'])->name('it.setup.catalogue-items.store');
+        Route::patch('/it/setup/catalogue-items/{catalogItem}', [ItServiceManagementSetupController::class, 'updateCatalogItem'])->name('it.setup.catalogue-items.update');
+        Route::post('/it/setup/catalogue-items/{catalogItem}/publish', [ItServiceManagementSetupController::class, 'publishCatalogItem'])->name('it.setup.catalogue-items.publish');
+        Route::post('/it/setup/catalogue-items/{catalogItem}/unpublish', [ItServiceManagementSetupController::class, 'unpublishCatalogItem'])->name('it.setup.catalogue-items.unpublish');
+        Route::post('/it/setup/api-identities', [ItServiceManagementSetupController::class, 'storeIdentity'])->name('it.setup.api-identities.store');
+        Route::post('/it/setup/api-identities/{identity}/revoke', [ItServiceManagementSetupController::class, 'revokeIdentity'])->name('it.setup.api-identities.revoke');
+        Route::post('/it/setup/provisioning-templates', [ItServiceManagementSetupController::class, 'storeProvisioningTemplate'])->name('it.setup.provisioning-templates.store');
+        Route::patch('/it/setup/provisioning-templates/{template}', [ItServiceManagementSetupController::class, 'updateProvisioningTemplate'])->name('it.setup.provisioning-templates.update');
+        Route::post('/it/setup/email-deliveries/{delivery}/retry', [ItServiceManagementSetupController::class, 'retryEmailDelivery'])->name('it.setup.email-deliveries.retry');
         Route::post('/it/provisioning', [ItProvisioningController::class, 'storeProvisioning'])->name('it.provisioning.store');
+        Route::post('/it/changes', [ItChangeController::class, 'store'])->name('it.changes.store');
+        Route::patch('/it/changes/{change}', [ItChangeController::class, 'update'])->name('it.changes.update');
+        Route::post('/it/changes/{change}/transitions', [ItChangeController::class, 'transition'])->name('it.changes.transitions.store');
+        Route::post('/it/major-incidents', [ItMajorIncidentController::class, 'store'])->name('it.major-incidents.store');
+        Route::patch('/it/major-incidents/{majorIncident}', [ItMajorIncidentController::class, 'update'])->name('it.major-incidents.update');
+        Route::post('/it/major-incidents/{majorIncident}/updates', [ItMajorIncidentController::class, 'storeUpdate'])->name('it.major-incidents.updates.store');
+        Route::post('/it/major-incidents/{majorIncident}/transitions', [ItMajorIncidentController::class, 'transition'])->name('it.major-incidents.transitions.store');
+        Route::post('/it/problems', [ItProblemController::class, 'store'])->name('it.problems.store');
+        Route::patch('/it/problems/{problem}', [ItProblemController::class, 'update'])->name('it.problems.update');
+        Route::post('/it/problems/{problem}/transitions', [ItProblemController::class, 'transition'])->name('it.problems.transitions.store');
         // Bulk assign/fulfil across a selection (§H) — literal `bulk` sits
         // above the {provisioning} routes so it is never bound as an id.
         Route::post('/it/provisioning/bulk', [ItProvisioningController::class, 'bulkProvisioning'])->name('it.provisioning.bulk');
         Route::post('/it/provisioning/{provisioning}/assign', [ItProvisioningController::class, 'assign'])->name('it.provisioning.assign');
+        Route::post('/it/provisioning/{provisioning}/approve', [ItProvisioningController::class, 'approve'])->name('it.provisioning.approve');
         Route::post('/it/provisioning/{provisioning}/fulfil', [ItProvisioningController::class, 'fulfil'])->name('it.provisioning.fulfil');
+        Route::post('/it/provisioning/{provisioning}/fail', [ItProvisioningController::class, 'fail'])->name('it.provisioning.fail');
         Route::post('/it/provisioning/{provisioning}/cancel', [ItProvisioningController::class, 'cancel'])->name('it.provisioning.cancel');
         Route::post('/it/tickets/bulk', [ItTicketController::class, 'bulk'])->name('it.tickets.bulk');
         Route::patch('/it/tickets/{ticket}', [ItProvisioningController::class, 'updateTicket'])->name('it.tickets.update');
+        Route::post('/it/tickets/{ticket}/devices', [ItTicketController::class, 'linkDevice'])->name('it.tickets.devices.store');
+        Route::delete('/it/tickets/{ticket}/devices/{device}', [ItTicketController::class, 'unlinkDevice'])->name('it.tickets.devices.destroy');
         Route::post('/it/tickets/{ticket}/resolve', [ItProvisioningController::class, 'resolveTicket'])->name('it.tickets.resolve');
         Route::post('/it/tickets/{ticket}/close', [ItTicketController::class, 'close'])->name('it.tickets.close');
+        Route::post('/it/tickets/{ticket}/transitions', [ItTicketController::class, 'transition'])->name('it.tickets.transitions.store');
+        Route::post('/it/tickets/{ticket}/tasks', [ItWorkTaskController::class, 'store'])->name('it.tickets.tasks.store');
+        Route::patch('/it/tickets/{ticket}/tasks/{task}', [ItWorkTaskController::class, 'update'])->name('it.tickets.tasks.update');
+        Route::post('/it/tickets/{ticket}/tasks/{task}/complete', [ItWorkTaskController::class, 'complete'])->name('it.tickets.tasks.complete');
+        Route::post('/it/tickets/{ticket}/tasks/{task}/reopen', [ItWorkTaskController::class, 'reopen'])->name('it.tickets.tasks.reopen');
         Route::post('/it/tickets/{ticket}/merge', [ItTicketController::class, 'merge'])->name('it.tickets.merge');
         Route::post('/it/tickets/{ticket}/approvals', [ItTicketController::class, 'requestApproval'])->name('it.tickets.approvals.request');
         Route::post('/it/approvals/{approval}/decide', [ItTicketController::class, 'decideApproval'])->name('it.approvals.decide');
@@ -206,6 +271,10 @@ Route::middleware(['auth', 'permission:it.request|it.view'])->group(function () 
         // Knowledge base authoring (§I) — agents create/edit/publish/delete.
         Route::post('/it/kb', [ItKbController::class, 'store'])->name('it.kb.store');
         Route::patch('/it/kb/{article}', [ItKbController::class, 'update'])->name('it.kb.update');
+        Route::post('/it/kb/{article}/submit-review', [ItKbController::class, 'submitReview'])->name('it.kb.submit-review');
+        Route::post('/it/kb/{article}/publish', [ItKbController::class, 'publish'])->name('it.kb.publish');
+        Route::post('/it/kb/{article}/retire', [ItKbController::class, 'retire'])->name('it.kb.retire');
+        Route::post('/it/kb/{article}/restore', [ItKbController::class, 'restore'])->name('it.kb.restore');
         Route::delete('/it/kb/{article}', [ItKbController::class, 'destroy'])->name('it.kb.destroy');
     });
 });
@@ -229,27 +298,27 @@ Route::redirect('/my-tasks', '/my-day')
 // which goes through AttendanceService and writes a real HrAttendanceSession and
 // draft Timesheet. Do not re-add quick-clock endpoints here.
 Route::middleware(['auth'])->group(function () {
-    Route::post('/my-tasks/shift-task/{task}/complete', [\App\Http\Controllers\MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
-    Route::post('/my-tasks/timesheet/ensure-today', [\App\Http\Controllers\MyDayActionsController::class, 'ensureTodayTimesheet'])->name('my-day.timesheet.ensure-today');
-    Route::post('/my-tasks/timesheet/{timesheet}/submit', [\App\Http\Controllers\MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');
+    Route::post('/my-tasks/shift-task/{task}/complete', [MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
+    Route::post('/my-tasks/timesheet/ensure-today', [MyDayActionsController::class, 'ensureTodayTimesheet'])->name('my-day.timesheet.ensure-today');
+    Route::post('/my-tasks/timesheet/{timesheet}/submit', [MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');
 
     // PR 17 — frontline alert quick actions. Scoped to the alert's assignee so
     // a frontline worker can acknowledge or snooze an alert from /my-day
     // without reaching into the Control Room operator surface.
-    Route::post('/my-day/alerts/{alert}/ack', [\App\Http\Controllers\MyDayActionsController::class, 'acknowledgeAlert'])->name('my-day.alert.ack');
-    Route::post('/my-day/alerts/{alert}/snooze', [\App\Http\Controllers\MyDayActionsController::class, 'snoozeAlert'])->name('my-day.alert.snooze');
+    Route::post('/my-day/alerts/{alert}/ack', [MyDayActionsController::class, 'acknowledgeAlert'])->name('my-day.alert.ack');
+    Route::post('/my-day/alerts/{alert}/snooze', [MyDayActionsController::class, 'snoozeAlert'])->name('my-day.alert.snooze');
 
     // Site-first redesign — frontline medication quick actions. The same
     // ClientMedicationAdministration writes flow through here as via the full
     // eMAR, but UX-light: one click marks a dose given/refused; snooze hides
     // the row from this worker's /my-day for 15m without touching the record.
-    Route::post('/my-day/medications/{medication}/administer', [\App\Http\Controllers\MyDayMedicationsController::class, 'administer'])->name('my-day.medications.administer');
-    Route::post('/my-day/medications/{medication}/refuse', [\App\Http\Controllers\MyDayMedicationsController::class, 'refuse'])->name('my-day.medications.refuse');
-    Route::post('/my-day/medications/{medication}/snooze', [\App\Http\Controllers\MyDayMedicationsController::class, 'snooze'])->name('my-day.medications.snooze');
+    Route::post('/my-day/medications/{medication}/administer', [MyDayMedicationsController::class, 'administer'])->name('my-day.medications.administer');
+    Route::post('/my-day/medications/{medication}/refuse', [MyDayMedicationsController::class, 'refuse'])->name('my-day.medications.refuse');
+    Route::post('/my-day/medications/{medication}/snooze', [MyDayMedicationsController::class, 'snooze'])->name('my-day.medications.snooze');
 });
 
-Route::get('/my-calendar', [\App\Http\Controllers\MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');
-Route::get('/my-calendar/events', [\App\Http\Controllers\MyCalendarController::class, 'events'])->middleware('auth')->name('my-calendar.events');
+Route::get('/my-calendar', [MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');
+Route::get('/my-calendar/events', [MyCalendarController::class, 'events'])->middleware('auth')->name('my-calendar.events');
 
 // ── Operations module ────────────────────────────────────────────────
 require __DIR__.'/operations.php';
@@ -311,18 +380,18 @@ require __DIR__.'/api_medications.php';
 // ── Backward-compatible redirects (old → new Operations URLs) ────────
 Route::middleware(['auth'])->group(function () {
     Route::redirect('/clients/{any}', '/operations/clients/{any}')->where('any', '.*');
-    Route::get('/shifts/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+    Route::get('/shifts/{any}', LegacyRouteRedirectController::class)
         ->where('any', '.*')
         ->defaults('destination_prefix', '/operations/shifts')
         ->defaults('status', 301);
-    Route::get('/timesheets/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+    Route::get('/timesheets/{any}', LegacyRouteRedirectController::class)
         ->where('any', '.*')
         ->defaults('destination_prefix', '/operations/timesheets')
         ->defaults('status', 301);
-    Route::get('/rostering', \App\Http\Controllers\LegacyRouteRedirectController::class)
+    Route::get('/rostering', LegacyRouteRedirectController::class)
         ->defaults('destination', '/operations/rostering')
         ->defaults('status', 301);
-    Route::get('/rostering/{any}', \App\Http\Controllers\LegacyRouteRedirectController::class)
+    Route::get('/rostering/{any}', LegacyRouteRedirectController::class)
         ->where('any', '.*')
         ->defaults('destination_prefix', '/operations/rostering')
         ->defaults('status', 301);

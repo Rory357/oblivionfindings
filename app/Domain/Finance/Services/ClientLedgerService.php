@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinCostAllocation;
+use App\Models\Client;
 use App\Models\ClientFundTransaction;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\DB;
  *      ClientFundJournalService). [C4: repointed from the dormant, never-written
  *      ClientLedgerEntry to this working store — Chane's canonical-store decision.]
  *   2. fin_cost_allocations with client_id (GL-backed operational costs attributed
- *      to the client — the org's cost of support).
+ *      to the client — the provider's cost of support).
  *
  * Returns a unified chronological ledger with optional running balance. The personal
  * running balance moves ONLY on the resident's own trust transactions; operational
@@ -45,6 +46,7 @@ class ClientLedgerService
      */
     public function getLedger(int $clientId, Carbon $from, Carbon $to, bool $withRunningBalance = false): array
     {
+        $this->assertCanonicalClientSite($clientId);
         $entries = $this->buildEntries($clientId, $from, $to);
 
         // Sort chronologically
@@ -77,7 +79,7 @@ class ClientLedgerService
                     $runningBalance = bcadd($runningBalance, $signed, 2);
                 }
             } else {
-                // Operational cost allocation — informational only; the org's cost of
+                // Operational cost allocation — informational only; the provider's cost of
                 // support is never deducted from the resident's personal balance.
                 $operationalOutflows = bcadd($operationalOutflows, $signed, 2);
             }
@@ -100,7 +102,7 @@ class ClientLedgerService
                 'total_inflows' => $totalInflows,
                 'total_outflows' => $totalOutflows,
                 'net' => bcadd($totalInflows, $totalOutflows, 2),
-                // Org cost-of-support attributed to the client; segregated from the
+                // Provider cost-of-support attributed to the client; segregated from the
                 // personal balance for transparency.
                 'operational_outflows' => $operationalOutflows,
             ],
@@ -113,6 +115,7 @@ class ClientLedgerService
      */
     public function summary(int $clientId, Carbon $from, Carbon $to): array
     {
+        $this->assertCanonicalClientSite($clientId);
         $txns = $this->clientFundTransactions($clientId)
             ->whereBetween('transaction_date', [$from, $to])
             ->select(
@@ -164,6 +167,18 @@ class ClientLedgerService
             ->whereHas('fund', fn ($q) => $q->where('client_id', $clientId));
     }
 
+    private function assertCanonicalClientSite(int $clientId): void
+    {
+        Client::query()
+            ->whereKey($clientId)
+            ->whereNotNull('site_id')
+            ->whereHas('site', fn ($siteQuery) => $siteQuery
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at'))
+            ->firstOrFail(['id']);
+    }
+
     private function isInflow(?string $transactionType): bool
     {
         return in_array(strtolower((string) $transactionType), self::INFLOW_TYPES, true);
@@ -203,7 +218,7 @@ class ClientLedgerService
             ]);
         }
 
-        // Source 2: fin_cost_allocations with client_id (operational costs — the org's
+        // Source 2: fin_cost_allocations with client_id (operational costs — the provider's
         // cost of support). Informational only; never move the personal balance.
         $allocations = FinCostAllocation::forClient($clientId)
             ->forPeriod($from, $to)
@@ -235,7 +250,7 @@ class ClientLedgerService
      * Calculate the PERSONAL opening balance as of a given date.
      *
      * Personal inflows minus outflows from the resident's trust transactions only.
-     * Operational cost allocations (the org's cost of supporting the client) are
+     * Operational cost allocations (the provider's cost of supporting the client) are
      * deliberately NOT subtracted — they are not deductions from the resident's
      * personal trust money, so they must never reduce the personal balance.
      */

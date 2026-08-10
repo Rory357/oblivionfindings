@@ -1,7 +1,7 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -76,7 +76,10 @@ function statusBadge(status: string) {
             );
         case 'submitted':
             return (
-                <Badge variant="outline" className="gap-1 border-status-warning/30 text-status-warning">
+                <Badge
+                    variant="outline"
+                    className="gap-1 border-status-warning/30 text-status-warning"
+                >
                     <Clock className="h-3 w-3" />
                     Submitted
                 </Badge>
@@ -96,7 +99,14 @@ function displayListItem(item: unknown): string {
     if (item && typeof item === 'object') {
         const record = item as Record<string, unknown>;
 
-        for (const key of ['label', 'description', 'name', 'title', 'note', 'value']) {
+        for (const key of [
+            'label',
+            'description',
+            'name',
+            'title',
+            'note',
+            'value',
+        ]) {
             const value = record[key];
             if (typeof value === 'string' && value.trim() !== '') {
                 return value;
@@ -104,7 +114,10 @@ function displayListItem(item: unknown): string {
         }
 
         return Object.values(record)
-            .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+            .filter(
+                (value): value is string =>
+                    typeof value === 'string' && value.trim() !== '',
+            )
             .join(' ');
     }
 
@@ -137,11 +150,16 @@ function DetailList({
             </CardHeader>
             <CardContent>
                 {values.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {emptyLabel}
+                    </p>
                 ) : (
                     <ul className="space-y-2 text-sm">
                         {values.map((value, index) => (
-                            <li key={`${title}-${index}`} className="rounded-md border bg-muted/20 px-3 py-2">
+                            <li
+                                key={`${title}-${index}`}
+                                className="rounded-md border bg-muted/20 px-3 py-2"
+                            >
                                 {value}
                             </li>
                         ))}
@@ -157,14 +175,17 @@ function personName(person: Person): string {
 }
 
 function clientName(client: Client): string {
-    return client ? `${client.first_name} ${client.last_name}` : 'No client linked';
+    return client
+        ? `${client.first_name} ${client.last_name}`
+        : 'No client linked';
 }
 
 export default function HandoversShow({ handover }: Props) {
     return (
         <AppLayout>
             <Head title={`Shift Handover #${handover.id}`} />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title={`Shift Handover #${handover.id}`}
                 description="Review outgoing notes, pending work, and the shift-to-shift handover trail."
                 backHref="/operations/handovers"
@@ -175,31 +196,54 @@ export default function HandoversShow({ handover }: Props) {
                         <Card>
                             <CardHeader>
                                 <div className="flex flex-wrap items-center justify-between gap-3">
-                                    <CardTitle className="text-lg">Handover Notes</CardTitle>
+                                    <CardTitle className="text-lg">
+                                        Handover Notes
+                                    </CardTitle>
                                     <div className="flex items-center gap-2">
                                         {statusBadge(handover.status)}
                                         {handover.client_mood ? (
-                                            <Badge variant="outline">Mood: {handover.client_mood}</Badge>
+                                            <Badge variant="outline">
+                                                Mood: {handover.client_mood}
+                                            </Badge>
                                         ) : null}
                                     </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
-                                <p className="whitespace-pre-wrap text-sm leading-6">
-                                    {handover.handover_notes || 'No handover notes recorded.'}
+                                <p className="text-sm leading-6 whitespace-pre-wrap">
+                                    {handover.handover_notes ||
+                                        'No handover notes recorded.'}
                                 </p>
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <div className="rounded-md border bg-muted/20 p-3">
-                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Created</div>
-                                        <div className="mt-1 text-sm font-medium">{formatDateTime(handover.created_at)}</div>
+                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                            Created
+                                        </div>
+                                        <div className="mt-1 text-sm font-medium">
+                                            {formatDateTime(
+                                                handover.created_at,
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="rounded-md border bg-muted/20 p-3">
-                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Submitted</div>
-                                        <div className="mt-1 text-sm font-medium">{formatDateTime(handover.submitted_at)}</div>
+                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                            Submitted
+                                        </div>
+                                        <div className="mt-1 text-sm font-medium">
+                                            {formatDateTime(
+                                                handover.submitted_at,
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="rounded-md border bg-muted/20 p-3">
-                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Acknowledged</div>
-                                        <div className="mt-1 text-sm font-medium">{formatDateTime(handover.acknowledged_at)}</div>
+                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                            Acknowledged
+                                        </div>
+                                        <div className="mt-1 text-sm font-medium">
+                                            {formatDateTime(
+                                                handover.acknowledged_at,
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </CardContent>
@@ -250,18 +294,31 @@ export default function HandoversShow({ handover }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-3 text-sm">
                                 <div>
-                                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Outgoing staff</div>
-                                    <div className="mt-1 font-medium">{personName(handover.outgoing_staff)}</div>
+                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                        Outgoing staff
+                                    </div>
+                                    <div className="mt-1 font-medium">
+                                        {personName(handover.outgoing_staff)}
+                                    </div>
                                 </div>
                                 <div>
-                                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Incoming staff</div>
-                                    <div className="mt-1 font-medium">{personName(handover.incoming_staff)}</div>
+                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                        Incoming staff
+                                    </div>
+                                    <div className="mt-1 font-medium">
+                                        {personName(handover.incoming_staff)}
+                                    </div>
                                 </div>
                                 <div>
-                                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Client</div>
+                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                        Client
+                                    </div>
                                     <div className="mt-1 font-medium">
                                         {handover.client ? (
-                                            <Link href={`/operations/clients/${handover.client.id}`} className="hover:underline">
+                                            <Link
+                                                href={`/operations/clients/${handover.client.id}`}
+                                                className="hover:underline"
+                                            >
                                                 {clientName(handover.client)}
                                             </Link>
                                         ) : (
@@ -270,12 +327,20 @@ export default function HandoversShow({ handover }: Props) {
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Submitted by</div>
-                                    <div className="mt-1 font-medium">{personName(handover.submitter)}</div>
+                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                        Submitted by
+                                    </div>
+                                    <div className="mt-1 font-medium">
+                                        {personName(handover.submitter)}
+                                    </div>
                                 </div>
                                 <div>
-                                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Acknowledged by</div>
-                                    <div className="mt-1 font-medium">{personName(handover.acknowledger)}</div>
+                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                        Acknowledged by
+                                    </div>
+                                    <div className="mt-1 font-medium">
+                                        {personName(handover.acknowledger)}
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -289,35 +354,81 @@ export default function HandoversShow({ handover }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-3 text-sm">
                                 <div className="rounded-md border bg-muted/20 p-3">
-                                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Outgoing shift</div>
+                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                        Outgoing shift
+                                    </div>
                                     {handover.outgoing_shift ? (
                                         <div className="mt-1 space-y-1">
-                                            <Link href={`/operations/shifts/${handover.outgoing_shift.id}`} className="font-medium hover:underline">
-                                                Shift #{handover.outgoing_shift.id}
+                                            <Link
+                                                href={`/operations/shifts/${handover.outgoing_shift.id}`}
+                                                className="font-medium hover:underline"
+                                            >
+                                                Shift #
+                                                {handover.outgoing_shift.id}
                                             </Link>
-                                            <div>{formatDateTime(handover.outgoing_shift.starts_at)} to {formatDateTime(handover.outgoing_shift.ends_at)}</div>
+                                            <div>
+                                                {formatDateTime(
+                                                    handover.outgoing_shift
+                                                        .starts_at,
+                                                )}{' '}
+                                                to{' '}
+                                                {formatDateTime(
+                                                    handover.outgoing_shift
+                                                        .ends_at,
+                                                )}
+                                            </div>
                                             <div className="text-muted-foreground">
-                                                Staff: {personName(handover.outgoing_shift.staff ?? handover.outgoing_staff)}
+                                                Staff:{' '}
+                                                {personName(
+                                                    handover.outgoing_shift
+                                                        .staff ??
+                                                        handover.outgoing_staff,
+                                                )}
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="mt-1 text-muted-foreground">No outgoing shift linked.</div>
+                                        <div className="mt-1 text-muted-foreground">
+                                            No outgoing shift linked.
+                                        </div>
                                     )}
                                 </div>
                                 <div className="rounded-md border bg-muted/20 p-3">
-                                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Incoming shift</div>
+                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
+                                        Incoming shift
+                                    </div>
                                     {handover.incoming_shift ? (
                                         <div className="mt-1 space-y-1">
-                                            <Link href={`/operations/shifts/${handover.incoming_shift.id}`} className="font-medium hover:underline">
-                                                Shift #{handover.incoming_shift.id}
+                                            <Link
+                                                href={`/operations/shifts/${handover.incoming_shift.id}`}
+                                                className="font-medium hover:underline"
+                                            >
+                                                Shift #
+                                                {handover.incoming_shift.id}
                                             </Link>
-                                            <div>{formatDateTime(handover.incoming_shift.starts_at)} to {formatDateTime(handover.incoming_shift.ends_at)}</div>
+                                            <div>
+                                                {formatDateTime(
+                                                    handover.incoming_shift
+                                                        .starts_at,
+                                                )}{' '}
+                                                to{' '}
+                                                {formatDateTime(
+                                                    handover.incoming_shift
+                                                        .ends_at,
+                                                )}
+                                            </div>
                                             <div className="text-muted-foreground">
-                                                Staff: {personName(handover.incoming_shift.staff ?? handover.incoming_staff)}
+                                                Staff:{' '}
+                                                {personName(
+                                                    handover.incoming_shift
+                                                        .staff ??
+                                                        handover.incoming_staff,
+                                                )}
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="mt-1 text-muted-foreground">No incoming shift linked.</div>
+                                        <div className="mt-1 text-muted-foreground">
+                                            No incoming shift linked.
+                                        </div>
                                     )}
                                 </div>
                             </CardContent>
@@ -332,13 +443,21 @@ export default function HandoversShow({ handover }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm text-muted-foreground">
                                 <p>
-                                    {personName(handover.outgoing_staff)} handed over to {personName(handover.incoming_staff)}.
+                                    {personName(handover.outgoing_staff)} handed
+                                    over to{' '}
+                                    {personName(handover.incoming_staff)}.
                                 </p>
                                 <p>
-                                    Current status: <span className="font-medium text-foreground">{handover.status.replace(/_/g, ' ')}</span>
+                                    Current status:{' '}
+                                    <span className="font-medium text-foreground">
+                                        {handover.status.replace(/_/g, ' ')}
+                                    </span>
                                 </p>
                                 <p>
-                                    Client context: <span className="font-medium text-foreground">{clientName(handover.client)}</span>
+                                    Client context:{' '}
+                                    <span className="font-medium text-foreground">
+                                        {clientName(handover.client)}
+                                    </span>
                                 </p>
                             </CardContent>
                         </Card>

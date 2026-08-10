@@ -1,10 +1,9 @@
 import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
     BarChart3,
     MessageSquare,
@@ -127,7 +126,8 @@ export default function FeedbackSummary({
             <Head title={`Feedback Summary - ${subjectUser.name}`} />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <PageHero category="hr"
+                <PageHero
+                    category="hr"
                     icon={BarChart3}
                     backHref="/hr/feedback"
                     backLabel="Back to Feedback"
@@ -143,8 +143,14 @@ export default function FeedbackSummary({
                     stats={
                         overallAvg !== null
                             ? [
-                                  { label: 'Overall', value: overallAvg.toFixed(1) },
-                                  { label: 'Reviews', value: summary.total_reviews },
+                                  {
+                                      label: 'Overall',
+                                      value: overallAvg.toFixed(1),
+                                  },
+                                  {
+                                      label: 'Reviews',
+                                      value: summary.total_reviews,
+                                  },
                               ]
                             : undefined
                     }

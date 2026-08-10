@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
+use App\Domain\Finance\Presenters\AssetFinanceTechnologyProjectionPresenter;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
@@ -9,13 +11,22 @@ use App\Models\Client;
 use App\Models\ClientEmergencyContact;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Assets\AssetMutationIntegrityService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class AssetController extends Controller
 {
+    public function __construct(
+        private readonly SecurityDevicesAccessService $deviceAccess,
+        private readonly AssetFinanceTechnologyProjectionPresenter $financeTechnology,
+        private readonly AssetMutationIntegrityService $mutationIntegrity,
+    ) {}
+
     private function mapAssetAssignment(AssetAssignment $assignment): array
     {
         return [
@@ -37,10 +48,10 @@ class AssetController extends Controller
             'client' => Client::query()
                 ->whereKey($assignment->assignee_id)
                 ->get(['first_name', 'last_name'])
-                ->map(fn ($client) => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')))
+                ->map(fn ($client) => trim(($client->first_name ?? '').' '.($client->last_name ?? '')))
                 ->first() ?: "Client #{$assignment->assignee_id}",
             'whanau' => ClientEmergencyContact::query()->whereKey($assignment->assignee_id)->value('name') ?? "Whanau #{$assignment->assignee_id}",
-            default => ucfirst((string) $assignment->assignee_type) . " #{$assignment->assignee_id}",
+            default => ucfirst((string) $assignment->assignee_type)." #{$assignment->assignee_id}",
         };
     }
 
@@ -56,19 +67,23 @@ class AssetController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
+        abort_unless($user, 403);
         $hasFleetFields = $this->hasFleetFields();
 
-        $eagerLoads = ['site:id,name', 'categoryRef:id,name,slug', 'trackers' => fn ($q) => $q->where('status', 'paired')];
+        $eagerLoads = ['site:id,name', 'categoryRef:id,name,slug'];
         if ($hasFleetFields) {
             $eagerLoads[] = 'homeSite';
         }
 
-        $query = Asset::query()
+        $accessibleAssets = $this->deviceAccess->accessibleAssets($user);
+        $query = (clone $accessibleAssets)
             ->with($eagerLoads);
 
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = (clone $query)->orderBy('name');
+
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Manufacturer', 'Model', 'Serial Number']);
@@ -115,36 +130,48 @@ class AssetController extends Controller
         $allowedSorts = ['name', 'asset_tag', 'status', 'category'];
         $sort = $request->input('sort', 'name');
         $direction = $request->input('direction', 'asc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'name';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'asc';
+        if (! in_array($sort, $allowedSorts)) {
+            $sort = 'name';
+        }
+        if (! in_array($direction, ['asc', 'desc'])) {
+            $direction = 'asc';
+        }
         $query->orderBy($sort, $direction);
 
         $assets = $query->paginate(25)->withQueryString();
+        $canViewTechnology = $user->canDo('securityDevices.devices.view');
+        $visibleDeviceCounts = $canViewTechnology
+            ? $this->deviceAccess->visibleActiveDeviceCountsForAssets(
+                $user,
+                $assets->getCollection()->pluck('id'),
+            )
+            : collect();
 
-        $sites = Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $sites = $this->deviceAccess->accessibleSites($user)
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         // Asset wizard (create mode) — client picker + auto-set-site behaviour.
-        $clients = Client::query()
-            ->orderBy('first_name')
-            ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'site_id']);
+        $clients = $this->deviceAccess->assignableClients($user);
 
         // ?new=1 opens the wizard on mount; these seed it (e.g. from a site page).
         $prefillCategory = $request->string('category')->toString();
+        $requestedSiteId = $request->integer('site_id') ?: null;
+        $requestedClientId = $request->integer('client_id') ?: null;
         $prefill = [
-            'site_id' => $request->integer('site_id') ?: null,
-            'client_id' => $request->integer('client_id') ?: null,
+            'site_id' => $requestedSiteId && $sites->contains('id', $requestedSiteId) ? $requestedSiteId : null,
+            'client_id' => $requestedClientId && $clients->contains('id', $requestedClientId) ? $requestedClientId : null,
             'category' => in_array($prefillCategory, ['vehicle', 'equipment', 'property', 'other'], true)
                 ? $prefillCategory
                 : null,
         ];
 
         // Hero stats — whole-register counts (independent of filters/pagination).
-        $heroTotal = Asset::query()->count();
-        $heroActive = Asset::query()->where('status', 'active')->count();
-        $heroMaintenance = Asset::query()->whereIn('status', ['maintenance', 'out_of_service'])->count();
+        $heroTotal = (clone $accessibleAssets)->count();
+        $heroActive = (clone $accessibleAssets)->where('status', 'active')->count();
+        $heroMaintenance = (clone $accessibleAssets)->whereIn('status', ['maintenance', 'out_of_service'])->count();
         $heroInspectionsDue = Schema::hasColumn('assets', 'inspection_due_at')
-            ? Asset::query()
+            ? (clone $accessibleAssets)
                 ->whereNotNull('inspection_due_at')
                 ->where('inspection_due_at', '<=', now()->addDays(30))
                 ->count()
@@ -177,7 +204,9 @@ class AssetController extends Controller
                     'manufacturer' => $a->manufacturer,
                     'model' => $a->model,
                     'serial_number' => $a->serial_number,
-                    'tracker_count' => $a->trackers->count(),
+                    'tracker_count' => $canViewTechnology
+                        ? (int) $visibleDeviceCounts->get((int) $a->id, 0)
+                        : null,
                 ])->values(),
                 'links' => $assets->linkCollection()->toArray(),
                 'meta' => [
@@ -198,8 +227,11 @@ class AssetController extends Controller
 
     public function show(Request $request, Asset $asset)
     {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $asset = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey()) ?? abort(404);
         $hasFleetFields = $this->hasFleetFields();
-        $hasDeviceAssetLinks = $this->hasTable('device_asset_links');
         $hasFleetVehicleStateSnapshots = $this->hasTable('fleet_vehicle_state_snapshots');
         $hasFleetVehicleBookings = $this->hasTable('fleet_vehicle_bookings');
         $hasFleetWorkOrders = $this->hasTable('fleet_work_orders');
@@ -251,6 +283,7 @@ class AssetController extends Controller
         }
 
         $asset->load($eagerLoads);
+        $assetFinanceTechnology = $this->financeTechnology->forOperationalAsset($user, $asset);
 
         // Build lifecycle timeline from all events
         $timeline = collect();
@@ -326,7 +359,7 @@ class AssetController extends Controller
             'site_id' => $asset->site_id,
             'client_id' => $asset->client_id,
             'site' => $asset->site ? ['id' => $asset->site->id, 'name' => $asset->site->name] : null,
-            'client' => $asset->client ? ['id' => $asset->client->id, 'name' => trim(($asset->client->first_name ?? '') . ' ' . ($asset->client->last_name ?? ''))] : null,
+            'client' => $asset->client ? ['id' => $asset->client->id, 'name' => trim(($asset->client->first_name ?? '').' '.($asset->client->last_name ?? ''))] : null,
             'category_ref' => $asset->categoryRef ? ['id' => $asset->categoryRef->id, 'name' => $asset->categoryRef->name, 'slug' => $asset->categoryRef->slug] : null,
             'registration_number' => $asset->registration_number ?? null,
             'fuel_type' => $asset->fuel_type ?? null,
@@ -345,30 +378,21 @@ class AssetController extends Controller
             'requires_maintenance' => (bool) $asset->requires_maintenance,
             'maintenance_due_at' => optional($asset->maintenance_due_at)->toDateString(),
             'notes' => $asset->notes,
-            'trackers' => $hasDeviceAssetLinks
-                ? \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
-                    ->active()
-                    ->forAsset($asset->id)
-                    ->with('device:id,device_uid,name,status,health_status,provider,last_seen_at,battery_level,imei,serial_number')
-                    ->get()
-                    ->map(fn ($link) => [
-                        'id' => $link->device?->id,
-                        'device_uid' => $link->device?->device_uid,
-                        'name' => $link->device?->name,
-                        'vendor' => $link->device?->provider,
-                        'status' => $link->device?->status?->value,
-                        'health_status' => $link->device?->health_status?->value,
-                        'last_seen_at' => $link->device?->last_seen_at?->toISOString(),
-                        'battery_level' => $link->device?->battery_level,
-                        'imei' => $link->device?->imei,
-                        'serial_number' => $link->device?->serial_number,
-                        'link_type' => $link->link_type?->value,
-                        'linked_at' => $link->linked_at?->toISOString(),
-                        'detail_url' => $link->device ? "/security-devices/devices/{$link->device->id}" : null,
-                    ])
-                    ->filter(fn ($t) => $t['id'] !== null)
-                    ->values()
-                : collect(),
+            'trackers' => collect(data_get($assetFinanceTechnology, 'technology.devices', []))
+                ->map(fn (array $device) => [
+                    'id' => $device['id'],
+                    'device_uid' => $device['device_uid'],
+                    'name' => $device['name'],
+                    'vendor' => $device['provider'],
+                    'status' => $device['status'],
+                    'health_status' => $device['health'],
+                    'last_seen_at' => $device['last_seen_at'],
+                    'battery_level' => $device['battery'],
+                    'link_type' => $device['link_type'],
+                    'linked_at' => $device['linked_at'],
+                    'detail_url' => $device['href'],
+                ])
+                ->values(),
             'fleet_state' => $hasFleetVehicleStateSnapshots && $asset->fleetState ? [
                 'status' => $asset->fleetState->status,
                 'latitude' => $asset->fleetState->latitude,
@@ -460,11 +484,10 @@ class AssetController extends Controller
             'asset' => $safeAsset,
             'timeline' => $timeline,
             // Edit wizard (AssetWizardDialog) option lists — mirrors index/create.
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'clients' => Client::query()
-                ->orderBy('first_name')
-                ->orderBy('last_name')
-                ->get(['id', 'first_name', 'last_name', 'site_id']),
+            'sites' => $this->deviceAccess->accessibleSites($user)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'clients' => $this->deviceAccess->assignableClients($user),
             'hr_asset' => $hrAsset ? [
                 'id' => $hrAsset->id,
                 'asset_tag' => $hrAsset->asset_tag,
@@ -472,6 +495,7 @@ class AssetController extends Controller
                 'current_holder_name' => $hrAsset->currentAssignment?->employeeProfile?->user?->name,
             ] : null,
             'can_view_hr_assets' => (bool) $request->user()?->canDo('hr.assets.view'),
+            'asset_finance_technology' => $assetFinanceTechnology,
         ]);
     }
 
@@ -493,6 +517,7 @@ class AssetController extends Controller
 
     public function store(Request $request)
     {
+        $user = $request->user() ?? abort(403);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
@@ -513,7 +538,7 @@ class AssetController extends Controller
             'odometer_km' => ['nullable', 'numeric', 'min:0'],
             'purchase_date' => ['nullable', 'date'],
             'warranty_expires_at' => ['nullable', 'date'],
-            'status' => ['required', 'in:active,out_of_service,retired'],
+            'status' => ['required', 'in:active,out_of_service'],
             'risk_level' => ['required', 'in:low,medium,high'],
             'location' => ['nullable', 'string', 'max:255'],
             'requires_inspection' => ['boolean'],
@@ -523,35 +548,28 @@ class AssetController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        // If a client was picked, derive the owning site from the client.
-        if (!empty($data['client_id'])) {
-            $client = Client::query()->select('id', 'site_id')->findOrFail($data['client_id']);
-            $data['site_id'] = $client->site_id;
-        }
-
-        // Must belong to at least a site or client.
-        if (empty($data['site_id']) && empty($data['client_id'])) {
-            return back()->withErrors(['site_id' => 'Select a site or a client.'])->withInput();
-        }
-
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
-        if (!$this->hasFleetFields()) {
+        if (! $this->hasFleetFields()) {
             $data = collect($data)->except($fleetFields)->toArray();
         }
 
-        $userId = $request->user()->id;
+        $userId = $user->id;
         $data['created_by_user_id'] = $userId;
         $data['updated_by_user_id'] = $userId;
         $data['status'] = $data['status'] ?? 'active';
 
-        $asset = Asset::create($data);
+        $asset = DB::transaction(function () use ($user, $data): Asset {
+            $data = $this->authorisePlacement($user, $data, true);
+            $asset = Asset::query()->create($data);
+            AuditLogger::logOrFail('assets.create', $asset, [
+                'asset_id' => $asset->id,
+                'name' => $asset->name,
+                'site_id' => $asset->site_id,
+                'client_id' => $asset->client_id,
+            ]);
 
-        AuditLogger::log('assets.create', $asset, [
-            'asset_id' => $asset->id,
-            'name' => $asset->name,
-            'site_id' => $asset->site_id,
-            'client_id' => $asset->client_id,
-        ]);
+            return $asset;
+        }, 3);
 
         // The AssetWizardDialog submits with _modal so we land back on the
         // index (dialog stays mounted via preserveState) with the created id
@@ -571,11 +589,16 @@ class AssetController extends Controller
      */
     public function edit(Request $request, Asset $asset)
     {
+        $user = $request->user() ?? abort(403);
+        $asset = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey()) ?? abort(404);
+
         return redirect()->route('fleet-assets.assets.show', ['asset' => $asset, 'edit' => 1]);
     }
 
     public function update(Request $request, Asset $asset)
     {
+        $user = $request->user() ?? abort(403);
+        $asset = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey()) ?? abort(404);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
@@ -607,19 +630,65 @@ class AssetController extends Controller
         ]);
 
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
-        if (!$this->hasFleetFields()) {
+        if (! $this->hasFleetFields()) {
             $data = collect($data)->except($fleetFields)->toArray();
         }
 
-        $data['updated_by_user_id'] = $request->user()->id;
+        $data['updated_by_user_id'] = $user->id;
 
-        $asset->update($data);
+        $asset = DB::transaction(function () use ($user, $asset, $data): Asset {
+            $locked = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey(), true) ?? abort(404);
+            $data = $this->authorisePlacement($user, $data, true);
+            $this->mutationIntegrity->assertOrdinaryStatusUpdate($locked, $data['status'] ?? null);
+            $this->mutationIntegrity->assertPlacementChangeAllowed($locked, $data);
+            $before = $locked->only(['site_id', 'home_site_id', 'client_id', 'status']);
+            $locked->update($data);
+            AuditLogger::logOrFail('assets.update', $locked, [
+                'asset_id' => $locked->id,
+                'before' => $before,
+                'after' => $locked->only(['site_id', 'home_site_id', 'client_id', 'status']),
+            ]);
 
-        AuditLogger::log('assets.update', $asset, [
-            'asset_id' => $asset->id,
-        ]);
+            return $locked->fresh();
+        }, 3);
 
         return redirect()->route('fleet-assets.assets.show', $asset)
             ->with('success', 'Asset updated successfully.');
+    }
+
+    /** @param array<string, mixed> $data @return array<string, mixed> */
+    private function authorisePlacement(User $user, array $data, bool $lockForUpdate = false): array
+    {
+        if (! empty($data['client_id'])) {
+            $client = $this->deviceAccess->assignableClient($user, (int) $data['client_id'], $lockForUpdate) ?? abort(404);
+            abort_unless(is_numeric($client->site_id), 422, 'The selected client has no canonical Site.');
+            $this->accessibleSite($user, (int) $client->site_id, $lockForUpdate);
+            $data['site_id'] = (int) $client->site_id;
+        } elseif (! empty($data['site_id'])) {
+            $this->accessibleSite($user, (int) $data['site_id'], $lockForUpdate);
+            $data['client_id'] = null;
+        }
+
+        if (! empty($data['home_site_id'])) {
+            $this->accessibleSite($user, (int) $data['home_site_id'], $lockForUpdate);
+        }
+
+        if (empty($data['site_id']) && empty($data['client_id'])) {
+            throw ValidationException::withMessages([
+                'site_id' => 'Select a Site or a client.',
+            ]);
+        }
+
+        return $data;
+    }
+
+    private function accessibleSite(User $user, int $siteId, bool $lockForUpdate): Site
+    {
+        $query = $this->deviceAccess->accessibleSites($user)->whereKey($siteId);
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first() ?? abort(404);
     }
 }

@@ -1,11 +1,11 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Activity, CalendarDays, Clock, Filter, Users } from 'lucide-react';
+import { Activity, CalendarDays, Clock, Users } from 'lucide-react';
 
 type ActivityItem = {
     id: string;
@@ -74,7 +74,11 @@ export default function ActivityFeed({ activities, filter }: Props) {
     ];
 
     const setFilter = (f: string) => {
-        router.get('/operations/activity', { filter: f }, { preserveState: true, replace: true });
+        router.get(
+            '/operations/activity',
+            { filter: f },
+            { preserveState: true, replace: true },
+        );
     };
 
     return (
@@ -86,7 +90,14 @@ export default function ActivityFeed({ activities, filter }: Props) {
                 description={`Recent operational activity across shifts, timesheets, and ${clientPlural.toLowerCase()}.`}
                 stats={[
                     { label: 'Events', value: activities.length },
-                    { label: 'Filter', value: filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1) },
+                    {
+                        label: 'Filter',
+                        value:
+                            filter === 'all'
+                                ? 'All'
+                                : filter.charAt(0).toUpperCase() +
+                                  filter.slice(1),
+                    },
                 ]}
             />
             <PageShell>
@@ -111,7 +122,9 @@ export default function ActivityFeed({ activities, filter }: Props) {
                         <Card>
                             <CardContent className="py-12 text-center">
                                 <Activity className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                                <p className="text-sm text-muted-foreground">No activity found for the selected filter.</p>
+                                <p className="text-sm text-muted-foreground">
+                                    No activity found for the selected filter.
+                                </p>
                             </CardContent>
                         </Card>
                     )}
@@ -119,20 +132,31 @@ export default function ActivityFeed({ activities, filter }: Props) {
                         <Link key={item.id} href={item.link} className="block">
                             <Card className="transition-all hover:border-border hover:shadow-sm">
                                 <CardContent className="flex items-center gap-4 p-3">
-                                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${actionColor(item.action)}`}>
+                                    <div
+                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${actionColor(item.action)}`}
+                                    >
                                         {typeIcon(item.type)}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium">{item.title}</span>
-                                            <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">
+                                            <span className="text-sm font-medium">
+                                                {item.title}
+                                            </span>
+                                            <Badge
+                                                variant="outline"
+                                                className="h-4 px-1.5 text-[9px] capitalize"
+                                            >
                                                 {item.type}
                                             </Badge>
                                         </div>
-                                        <p className="truncate text-xs text-muted-foreground">{item.description}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {item.description}
+                                        </p>
                                     </div>
                                     <span className="shrink-0 text-xs text-muted-foreground">
-                                        {item.timestamp ? formatRelativeTime(item.timestamp) : ''}
+                                        {item.timestamp
+                                            ? formatRelativeTime(item.timestamp)
+                                            : ''}
                                     </span>
                                 </CardContent>
                             </Card>

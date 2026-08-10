@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -12,6 +13,7 @@ use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ShiftHandoverService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -41,13 +43,23 @@ class HandoverMedicationLensTest extends TestCase
         parent::setUp();
         $this->seed(RbacSeeder::class);
 
+        $this->site = Site::factory()->create(['type' => 'house', 'name' => 'Tui House', 'is_active' => true]);
         $this->worker = $this->makeUser('admin', [
             'medications.view', 'handovers.create', 'handovers.viewAny',
             'shifts.update', 'shifts.manageAny', 'clients.update',
         ]);
         $this->witness = $this->makeUser('support_worker', ['shifts.update']);
+        foreach ([$this->worker, $this->witness] as $staff) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $staff->id,
+                'primary_site_id' => $this->site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'start_date' => now()->subMonth()->toDateString(),
+                'end_date' => null,
+            ]);
+        }
 
-        $this->site = Site::factory()->create(['type' => 'house', 'name' => 'Tui House', 'is_active' => true]);
         $this->serviceContext = ServiceContext::factory()->create([
             'name' => 'Residential', 'type' => 'residential', 'is_active' => true,
         ]);
@@ -212,7 +224,7 @@ class HandoverMedicationLensTest extends TestCase
 
     public function test_presence_lock_blocks_a_second_editor_until_released(): void
     {
-        $service = app(\App\Services\ShiftHandoverService::class);
+        $service = app(ShiftHandoverService::class);
         $shift = $this->makeShift();
         $handover = ShiftHandover::factory()->draft()->create([
             'outgoing_shift_id' => $shift->id,

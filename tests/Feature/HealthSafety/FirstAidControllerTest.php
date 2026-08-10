@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\FirstAidAttachment;
 use App\Models\FirstAidRecord;
+use App\Models\HsEvent;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -216,7 +217,7 @@ class FirstAidControllerTest extends TestCase
 
     public function test_link_incident_creates_incident_for_a_client_treatment(): void
     {
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         $record = $this->record([
             'treated_person_type' => 'client',
             'client_id' => $client->id,
@@ -235,6 +236,35 @@ class FirstAidControllerTest extends TestCase
         $incident = ClientIncident::find($record->related_incident_id);
         $this->assertNotNull($incident);
         $this->assertSame($client->id, $incident->client_id);
+        $this->assertSame($this->site->id, $incident->site_id);
+        $this->assertSame(HsEvent::query()->sole()->id, $incident->hs_event_id);
+    }
+
+    public function test_serious_client_treatment_requires_immediate_action_before_incident_escalation(): void
+    {
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
+        $record = $this->record([
+            'treated_person_type' => 'client',
+            'client_id' => $client->id,
+            'ambulance_called' => true,
+            'related_incident_id' => null,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post('/health-safety/first-aid/'.$record->id.'/link-incident')
+            ->assertSessionHasErrors(['immediate_action_taken']);
+
+        $this->assertDatabaseCount('client_incidents', 0);
+
+        $this->actingAs($this->admin)
+            ->post('/health-safety/first-aid/'.$record->id.'/link-incident', [
+                'immediate_action_taken' => 'Ambulance called and the client monitored until handover.',
+            ])
+            ->assertSessionDoesntHaveErrors();
+
+        $incident = ClientIncident::query()->sole();
+        $this->assertSame('Ambulance called and the client monitored until handover.', $incident->immediate_action_taken);
+        $this->assertSame($this->site->id, $incident->site_id);
     }
 
     public function test_link_incident_links_an_existing_incident(): void

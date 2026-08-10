@@ -413,7 +413,9 @@ const Contact: React.FC = () => {
                                         className="block text-sm font-medium text-foreground"
                                     >
                                         Message{' '}
-                                        <span className="text-status-critical">*</span>
+                                        <span className="text-status-critical">
+                                            *
+                                        </span>
                                     </label>
                                     <textarea
                                         id="message"

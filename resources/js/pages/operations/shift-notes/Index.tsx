@@ -4,6 +4,7 @@ import { Head, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import {
     CardsView,
     EmptyState,
@@ -27,7 +28,6 @@ import {
 } from './components/shared';
 import { ShiftNotesHero } from './components/shift-notes-hero';
 import { Toolbar } from './components/toolbar';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 type Props = {
     notes: ShiftNote[];
@@ -251,7 +251,8 @@ export default function ShiftNotesIndex({
                                     month: 'long',
                                 })}
                             </span>
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 type="button"
                                 onClick={() => setSelectedDay(null)}
                                 className="font-medium text-primary hover:underline"

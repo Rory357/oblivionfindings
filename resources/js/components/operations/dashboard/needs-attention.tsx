@@ -23,7 +23,10 @@ type AttentionCardProps = {
     icon: LucideIcon;
 };
 
-const TONE_STYLES: Record<AttentionTone, { bg: string; fg: string; bar: string }> = {
+const TONE_STYLES: Record<
+    AttentionTone,
+    { bg: string; fg: string; bar: string }
+> = {
     critical: {
         bg: 'var(--status-critical-bg)',
         fg: 'var(--status-critical)',
@@ -64,7 +67,7 @@ function AttentionCard({ item, title, href, icon: Icon }: AttentionCardProps) {
                 onBlur={onLeave}
             >
                 <span
-                    className="absolute left-0 top-0 h-full w-0.5"
+                    className="absolute top-0 left-0 h-full w-0.5"
                     style={{ background: tone.bar }}
                 />
                 <div
@@ -75,16 +78,25 @@ function AttentionCard({ item, title, href, icon: Icon }: AttentionCardProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-1.5">
-                        <span className="text-[16px] font-bold tabular-nums">{item.count}</span>
-                        <span className="text-[11.5px] font-semibold">{title}</span>
+                        <span className="text-[16px] font-bold tabular-nums">
+                            {item.count}
+                        </span>
+                        <span className="text-[11.5px] font-semibold">
+                            {title}
+                        </span>
                         <span
-                            className="ml-auto rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide"
-                            style={{ background: tagTone.bg, color: tagTone.fg }}
+                            className="ml-auto rounded px-1 py-0.5 text-[9px] font-bold tracking-wide uppercase"
+                            style={{
+                                background: tagTone.bg,
+                                color: tagTone.fg,
+                            }}
                         >
                             {item.tag}
                         </span>
                     </div>
-                    <div className="truncate text-[10.5px] text-muted-foreground">{item.context}</div>
+                    <div className="truncate text-[10.5px] text-muted-foreground">
+                        {item.context}
+                    </div>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground group-hover:text-primary" />
             </Link>
@@ -113,7 +125,7 @@ export function NeedsAttentionStrip({ attention }: Props) {
             <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <BellRing className="h-3.5 w-3.5 text-[color:var(--status-warning)]" />
-                    <h2 className="text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h2 className="text-[12px] font-semibold tracking-wider text-muted-foreground uppercase">
                         Needs attention
                     </h2>
                     <span className="text-[11px] text-muted-foreground">

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ class FleetIncident extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes;
     use Concerns\HasReferenceNumber;
+    use WritesLegacyStorageContext;
 
     public const REFERENCE_PREFIX = 'FLT';
 
@@ -34,7 +36,6 @@ class FleetIncident extends Model
 
     protected $fillable = [
         'reference_number',
-        'tenant_id',
         'asset_id',
         'reported_by_user_id',
         'driver_user_id',

@@ -34,7 +34,6 @@ class ClientFluidChartController extends Controller
         ClientFluidEntry::query()->create([
             ...$data,
             'client_id' => $client->id,
-            'organization_id' => $request->user()?->organization_id ?? $client->organization_id,
             'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
             'recorded_by' => $request->user()?->id,
         ]);

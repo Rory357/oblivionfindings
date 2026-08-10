@@ -1,16 +1,40 @@
-import { Head } from '@inertiajs/react';
-import { type BreadcrumbItem, PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { ReportsTabsFooter } from '@/components/finance';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Printer, DollarSign, CheckCircle, AlertTriangle, ArrowUpFromLine } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { chartColor } from '@/components/finance/chart-palette';
 import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem, PageProps } from '@/types';
+import { Head } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    ArrowUpFromLine,
+    CheckCircle,
+    DollarSign,
+    Printer,
+} from 'lucide-react';
 import { useMemo } from 'react';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 interface AgedRow {
     client_name: string;
@@ -41,11 +65,31 @@ interface Props extends PageProps {
 }
 
 const agingColumns = [
-    { key: 'current' as const, label: 'Current', className: 'text-status-success dark:text-status-success' },
-    { key: 'days_1_30' as const, label: '1-30 Days', className: 'text-status-warning dark:text-status-warning' },
-    { key: 'days_31_60' as const, label: '31-60 Days', className: 'text-status-warning dark:text-status-warning' },
-    { key: 'days_61_90' as const, label: '61-90 Days', className: 'text-status-critical dark:text-status-critical' },
-    { key: 'days_90_plus' as const, label: '90+ Days', className: 'text-status-critical dark:text-status-critical' },
+    {
+        key: 'current' as const,
+        label: 'Current',
+        className: 'text-status-success dark:text-status-success',
+    },
+    {
+        key: 'days_1_30' as const,
+        label: '1-30 Days',
+        className: 'text-status-warning dark:text-status-warning',
+    },
+    {
+        key: 'days_31_60' as const,
+        label: '31-60 Days',
+        className: 'text-status-warning dark:text-status-warning',
+    },
+    {
+        key: 'days_61_90' as const,
+        label: '61-90 Days',
+        className: 'text-status-critical dark:text-status-critical',
+    },
+    {
+        key: 'days_90_plus' as const,
+        label: '90+ Days',
+        className: 'text-status-critical dark:text-status-critical',
+    },
 ];
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -57,28 +101,40 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function AgedReceivables({ report }: Props) {
     const { grand_total } = report;
 
-    const currentPct = grand_total.total > 0
-        ? ((grand_total.current / grand_total.total) * 100).toFixed(1)
-        : '0.0';
+    const currentPct =
+        grand_total.total > 0
+            ? ((grand_total.current / grand_total.total) * 100).toFixed(1)
+            : '0.0';
 
-    const overdueAmount = grand_total.days_31_60 + grand_total.days_61_90 + grand_total.days_90_plus;
+    const overdueAmount =
+        grand_total.days_31_60 +
+        grand_total.days_61_90 +
+        grand_total.days_90_plus;
 
-    const pieData = useMemo(() => [
-        { name: 'Current', value: grand_total.current },
-        { name: '1-30 Days', value: grand_total.days_1_30 },
-        { name: '31-60 Days', value: grand_total.days_31_60 },
-        { name: '61-90 Days', value: grand_total.days_61_90 },
-        { name: '90+ Days', value: grand_total.days_90_plus },
-    ].filter(d => d.value > 0), [grand_total]);
+    const pieData = useMemo(
+        () =>
+            [
+                { name: 'Current', value: grand_total.current },
+                { name: '1-30 Days', value: grand_total.days_1_30 },
+                { name: '31-60 Days', value: grand_total.days_31_60 },
+                { name: '61-90 Days', value: grand_total.days_61_90 },
+                { name: '90+ Days', value: grand_total.days_90_plus },
+            ].filter((d) => d.value > 0),
+        [grand_total],
+    );
 
-    const barData = useMemo(() =>
-        [...report.rows]
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 10)
-            .map(r => ({
-                name: r.client_name.length > 20 ? r.client_name.substring(0, 20) + '...' : r.client_name,
-                total: r.total,
-            })),
+    const barData = useMemo(
+        () =>
+            [...report.rows]
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 10)
+                .map((r) => ({
+                    name:
+                        r.client_name.length > 20
+                            ? r.client_name.substring(0, 20) + '...'
+                            : r.client_name,
+                    total: r.total,
+                })),
         [report.rows],
     );
 
@@ -88,17 +144,29 @@ export default function AgedReceivables({ report }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={ArrowUpFromLine}
                         title="Aged Receivables"
                         description="Outstanding receivables by client and aging period."
                         stats={[
-                            { label: 'Outstanding', value: formatMoney(grand_total.total) },
+                            {
+                                label: 'Outstanding',
+                                value: formatMoney(grand_total.total),
+                            },
                             { label: 'Current', value: `${currentPct}%` },
-                            { label: 'Overdue 31+', value: formatMoney(overdueAmount) },
+                            {
+                                label: 'Overdue 31+',
+                                value: formatMoney(overdueAmount),
+                            },
                         ]}
                         actions={
-                            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.print()}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Printer className="mr-1 h-4 w-4" />
                                 Print
                             </Button>
@@ -113,8 +181,12 @@ export default function AgedReceivables({ report }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
-                                    <p className="text-sm text-muted-foreground">Total Outstanding</p>
-                                    <p className="text-2xl font-bold tabular-nums">{formatMoney(grand_total.total)}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Total Outstanding
+                                    </p>
+                                    <p className="text-2xl font-bold tabular-nums">
+                                        {formatMoney(grand_total.total)}
+                                    </p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <DollarSign className="h-5 w-5 text-muted-foreground" />
@@ -126,9 +198,16 @@ export default function AgedReceivables({ report }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
-                                    <p className="text-sm text-muted-foreground">Current %</p>
-                                    <p className="text-2xl font-bold tabular-nums text-status-success dark:text-status-success">{currentPct}%</p>
-                                    <p className="text-xs text-muted-foreground">{formatMoney(grand_total.current)} current</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Current %
+                                    </p>
+                                    <p className="text-2xl font-bold text-status-success tabular-nums dark:text-status-success">
+                                        {currentPct}%
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {formatMoney(grand_total.current)}{' '}
+                                        current
+                                    </p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <CheckCircle className="h-5 w-5 text-muted-foreground" />
@@ -140,8 +219,12 @@ export default function AgedReceivables({ report }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">
-                                    <p className="text-sm text-muted-foreground">Overdue (31+ Days)</p>
-                                    <p className="text-2xl font-bold tabular-nums text-status-critical dark:text-status-critical">{formatMoney(overdueAmount)}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Overdue (31+ Days)
+                                    </p>
+                                    <p className="text-2xl font-bold text-status-critical tabular-nums dark:text-status-critical">
+                                        {formatMoney(overdueAmount)}
+                                    </p>
                                 </div>
                                 <div className="rounded-lg bg-muted p-3">
                                     <AlertTriangle className="h-5 w-5 text-muted-foreground" />
@@ -155,7 +238,9 @@ export default function AgedReceivables({ report }: Props) {
                 <div className="grid gap-6 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Aging Bucket Breakdown</CardTitle>
+                            <CardTitle className="text-base">
+                                Aging Bucket Breakdown
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="h-64">
@@ -169,13 +254,22 @@ export default function AgedReceivables({ report }: Props) {
                                             outerRadius={90}
                                             paddingAngle={2}
                                             dataKey="value"
-                                            label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                                            label={({ name, percent }) =>
+                                                `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                                            }
                                         >
                                             {pieData.map((_, idx) => (
-                                                <Cell key={idx} fill={chartColor(idx)} />
+                                                <Cell
+                                                    key={idx}
+                                                    fill={chartColor(idx)}
+                                                />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value) => formatMoney(value as number)} />
+                                        <Tooltip
+                                            formatter={(value) =>
+                                                formatMoney(value as number)
+                                            }
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                             </div>
@@ -183,17 +277,41 @@ export default function AgedReceivables({ report }: Props) {
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Top 10 Clients by Amount</CardTitle>
+                            <CardTitle className="text-base">
+                                Top 10 Clients by Amount
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="h-64">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={barData} layout="vertical" margin={{ left: 20, right: 20 }}>
+                                    <BarChart
+                                        data={barData}
+                                        layout="vertical"
+                                        margin={{ left: 20, right: 20 }}
+                                    >
                                         <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis type="number" tickFormatter={(v) => formatMoney(v)} />
-                                        <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 12 }} />
-                                        <Tooltip formatter={(value) => formatMoney(value as number)} />
-                                        <Bar dataKey="total" fill={chartColor(0)} radius={[0, 4, 4, 0]} />
+                                        <XAxis
+                                            type="number"
+                                            tickFormatter={(v) =>
+                                                formatMoney(v)
+                                            }
+                                        />
+                                        <YAxis
+                                            type="category"
+                                            dataKey="name"
+                                            width={130}
+                                            tick={{ fontSize: 12 }}
+                                        />
+                                        <Tooltip
+                                            formatter={(value) =>
+                                                formatMoney(value as number)
+                                            }
+                                        />
+                                        <Bar
+                                            dataKey="total"
+                                            fill={chartColor(0)}
+                                            radius={[0, 4, 4, 0]}
+                                        />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -208,7 +326,9 @@ export default function AgedReceivables({ report }: Props) {
                     </CardHeader>
                     <CardContent>
                         {report.rows.length === 0 ? (
-                            <p className="text-muted-foreground text-center py-8">No outstanding receivables.</p>
+                            <p className="py-8 text-center text-muted-foreground">
+                                No outstanding receivables.
+                            </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <Table>
@@ -216,20 +336,34 @@ export default function AgedReceivables({ report }: Props) {
                                         <TableRow>
                                             <TableHead>Client</TableHead>
                                             {agingColumns.map((col) => (
-                                                <TableHead key={col.key} className={`text-right ${col.className}`}>
+                                                <TableHead
+                                                    key={col.key}
+                                                    className={`text-right ${col.className}`}
+                                                >
                                                     {col.label}
                                                 </TableHead>
                                             ))}
-                                            <TableHead className="text-right font-bold">Total</TableHead>
+                                            <TableHead className="text-right font-bold">
+                                                Total
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {report.rows.map((row, idx) => (
                                             <TableRow key={idx}>
-                                                <TableCell className="font-medium">{row.client_name}</TableCell>
+                                                <TableCell className="font-medium">
+                                                    {row.client_name}
+                                                </TableCell>
                                                 {agingColumns.map((col) => (
-                                                    <TableCell key={col.key} className="text-right">
-                                                        {row[col.key] > 0 ? formatMoney(row[col.key]) : '-'}
+                                                    <TableCell
+                                                        key={col.key}
+                                                        className="text-right"
+                                                    >
+                                                        {row[col.key] > 0
+                                                            ? formatMoney(
+                                                                  row[col.key],
+                                                              )
+                                                            : '-'}
                                                     </TableCell>
                                                 ))}
                                                 <TableCell className="text-right font-semibold">
@@ -240,12 +374,21 @@ export default function AgedReceivables({ report }: Props) {
                                         <TableRow className="border-t-2 font-bold">
                                             <TableCell>Grand Total</TableCell>
                                             {agingColumns.map((col) => (
-                                                <TableCell key={col.key} className={`text-right ${col.className}`}>
-                                                    {formatMoney(report.grand_total[col.key])}
+                                                <TableCell
+                                                    key={col.key}
+                                                    className={`text-right ${col.className}`}
+                                                >
+                                                    {formatMoney(
+                                                        report.grand_total[
+                                                            col.key
+                                                        ],
+                                                    )}
                                                 </TableCell>
                                             ))}
                                             <TableCell className="text-right">
-                                                {formatMoney(report.grand_total.total)}
+                                                {formatMoney(
+                                                    report.grand_total.total,
+                                                )}
                                             </TableCell>
                                         </TableRow>
                                     </TableBody>

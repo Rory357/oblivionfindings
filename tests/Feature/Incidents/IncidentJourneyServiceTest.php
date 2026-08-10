@@ -60,6 +60,78 @@ class IncidentJourneyServiceTest extends TestCase
         );
     }
 
+    public function test_direct_submitted_journey_freezes_the_clients_canonical_site(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'site_id' => null,
+        ]);
+
+        $journey = app(IncidentJourneyService::class)
+            ->ensureForSubmittedIncident($incident, $actor);
+
+        $this->assertSame($site->id, $journey->incident->site_id);
+        $this->assertSame($site->id, $journey->hsEvent?->site_id);
+
+        $client->update(['site_id' => Site::factory()->create()->id]);
+        $retry = app(IncidentJourneyService::class)
+            ->ensureForSubmittedIncident($journey->incident, $actor);
+
+        $this->assertSame($site->id, $retry->incident->site_id);
+        $this->assertSame($site->id, $retry->hsEvent?->site_id);
+    }
+
+    public function test_direct_serious_journey_requires_recorded_immediate_action(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'severity' => 'high',
+            'immediate_action_taken' => null,
+        ]);
+
+        try {
+            app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
+            $this->fail('A serious incident without immediate action must fail closed.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'Immediate action is required for a high or critical incident.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertNull($incident->fresh()->hs_event_id);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
+    public function test_direct_journey_rejects_a_client_without_a_canonical_site(): void
+    {
+        $actor = User::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => null]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $actor, [
+            'site_id' => null,
+        ]);
+
+        try {
+            app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
+            $this->fail('A submitted incident without canonical Site provenance must fail closed.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'A canonical Site is required before an incident can enter the H&S journey.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertNull($incident->fresh()->site_id);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+    }
+
     public function test_incident_journey_is_a_readonly_value_object_that_allows_legacy_gaps(): void
     {
         $incident = $this->incidentWithoutEvents();
@@ -206,10 +278,7 @@ class IncidentJourneyServiceTest extends TestCase
         $actor = User::factory()->create();
         $otherReporter = User::factory()->create();
         $site = Site::factory()->create();
-        $client = Client::factory()->create([
-            'site_id' => $site->id,
-            'organization_id' => $site->tenant_id,
-        ]);
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $occurredAt = now()->subMinutes(20);
         $originalContext = [
             'signal_id' => 812,
@@ -287,7 +356,6 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($alert->id, $hsEvent->control_room_alert_id);
         $this->assertSame($site->id, $hsEvent->site_id);
         $this->assertSame($client->id, $hsEvent->client_id);
-        $this->assertSame($site->tenant_id, $hsEvent->organization_id);
         $this->assertSame($actor->id, $hsEvent->staff_id);
         $this->assertNull($hsEvent->worksafe_notifiable);
         $this->assertNull($hsEvent->worksafe_decided_at);
@@ -349,7 +417,7 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage(
-            'Immediate action is required for a high or critical Control Room incident.',
+            'Immediate action is required for a high or critical incident.',
         );
 
         app(IncidentJourneyService::class)->submitFromAlert(
@@ -425,7 +493,7 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage(
-            'Immediate action is required for a high or critical Control Room incident.',
+            'Immediate action is required for a high or critical incident.',
         );
 
         app(IncidentJourneyService::class)->submitFromAlert(
@@ -459,7 +527,7 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage(
-            'Immediate action is required for a high or critical Control Room incident.',
+            'Immediate action is required for a high or critical incident.',
         );
 
         app(IncidentJourneyService::class)->attachAlertToIncident(
@@ -491,7 +559,7 @@ class IncidentJourneyServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage(
-            'Immediate action is required for a high or critical Control Room incident.',
+            'Immediate action is required for a high or critical incident.',
         );
 
         app(IncidentJourneyService::class)->submitFromAlert(
@@ -2257,7 +2325,7 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('control_room_alerts', 1);
     }
 
-    public function test_direct_links_beat_legacy_context_and_repair_a_safe_hs_tuple(): void
+    public function test_direct_links_beat_legacy_context_and_repair_safe_alert_context(): void
     {
         $actor = User::factory()->create();
         $site = Site::factory()->create();
@@ -2276,15 +2344,16 @@ class IncidentJourneyServiceTest extends TestCase
             'control_room_alert_id' => $directAlert->id,
             'hs_event_id' => $directEvent->id,
         ]);
-        $legacyCategory = HsEvent::CATEGORY_NEAR_MISS;
         $directEvent->updateQuietly([
             'source_type' => ClientIncident::class,
             'source_id' => $incident->id,
-            'event_category' => $legacyCategory,
+            'event_category' => HsEvent::CATEGORY_INCIDENT,
+            'site_id' => $incident->site_id,
+            'client_id' => $incident->client_id,
             'idempotency_key' => HsEvent::buildIdempotencyKey(
                 ClientIncident::class,
                 $incident->id,
-                $legacyCategory,
+                HsEvent::CATEGORY_INCIDENT,
             ),
         ]);
         $legacyAlert = ControlRoomAlert::factory()->create([
@@ -2529,6 +2598,36 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($before, $alert->fresh()->only(array_keys($before)));
     }
 
+    public function test_direct_health_safety_reads_fail_closed_on_client_or_site_mismatch(): void
+    {
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $otherClient = Client::factory()->create(['site_id' => $site->id]);
+
+        foreach ([
+            ['client_id' => $otherClient->id, 'site_id' => $site->id, 'field' => 'client_id'],
+            ['client_id' => $client->id, 'site_id' => $otherSite->id, 'field' => 'site_id'],
+        ] as $mismatch) {
+            $incident = $this->incidentWithoutEvents([
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+            ]);
+            $event = HsEvent::factory()->forClientIncident($incident)->create([
+                'client_id' => $mismatch['client_id'],
+                'site_id' => $mismatch['site_id'],
+            ]);
+            $incident->updateQuietly(['hs_event_id' => $event->id]);
+
+            try {
+                app(IncidentJourneyService::class)->journeyForIncident($incident->fresh());
+                $this->fail("A mismatched direct H&S {$mismatch['field']} was accepted.");
+            } catch (\DomainException $exception) {
+                $this->assertStringContainsString($mismatch['field'], $exception->getMessage());
+            }
+        }
+    }
+
     public function test_journey_lookup_uses_legacy_fallbacks_without_creating_or_repairing_records(): void
     {
         $actor = User::factory()->create();
@@ -2618,6 +2717,7 @@ class IncidentJourneyServiceTest extends TestCase
             'submitted_at' => now(),
             'type' => 'fall',
             'severity' => 'low',
+            'immediate_action_taken' => 'Resident checked and immediate hazards controlled.',
             'title' => 'Submitted incident',
             'description' => 'Submitted without model events for journey testing.',
             'occurred_at' => now()->subMinutes(5),

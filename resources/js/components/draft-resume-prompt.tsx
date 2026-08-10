@@ -1,7 +1,7 @@
-import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import { AlertTriangle } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
 /*  Shared draft recovery prompt                                              */
@@ -44,10 +44,14 @@ export default function DraftResumePrompt({
                     <AlertTriangle className="h-4 w-4" aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
-                    <div className="font-medium text-status-warning dark:text-status-warning">{title}</div>
+                    <div className="font-medium text-status-warning dark:text-status-warning">
+                        {title}
+                    </div>
                     <p className="mt-0.5 text-xs text-status-warning dark:text-status-warning">
                         {description}
-                        {savedAt ? ` Last saved ${formatDateTime(savedAt)}.` : null}
+                        {savedAt
+                            ? ` Last saved ${formatDateTime(savedAt)}.`
+                            : null}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                         <Button size="sm" onClick={onResume}>

@@ -74,7 +74,9 @@ export type CreateShiftParams = {
 };
 
 const numberOrNull = (value: number | string | null | undefined) =>
-    value === null || value === undefined || value === '' ? null : Number(value);
+    value === null || value === undefined || value === ''
+        ? null
+        : Number(value);
 
 /**
  * Opens the shared inline CreateShiftDialog from any "create a shift" entry
@@ -99,7 +101,11 @@ export function useCreateShiftLauncher() {
                     continue;
                 }
                 query[key] =
-                    typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+                    typeof value === 'boolean'
+                        ? value
+                            ? '1'
+                            : '0'
+                        : String(value);
             }
             const res = await fetch(createShift.url({ query }), {
                 headers: {

@@ -27,7 +27,6 @@ function gvcVendor(Site $site, array $attrs = []): SiteVendor
 {
     return SiteVendor::create(array_merge([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Hamilton Electrical Ltd',
         'preferred_contact_method' => 'phone',
@@ -39,7 +38,6 @@ function gvcCredential(Site $site, array $attrs = []): SiteCredential
 {
     return SiteCredential::create(array_merge([
         'site_id' => $site->id,
-        'tenant_id' => $site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
         'encrypted_value' => Crypt::encryptString('1234'),
@@ -196,7 +194,9 @@ test('global audit feed returns scoped JSON for credential revealers', function 
     $credential = gvcCredential($this->site, ['label' => 'Server Room PIN']);
     SiteCredentialAuditLog::create([
         'credential_id' => $credential->id,
-        'tenant_id' => $this->site->tenant_id,
+        'site_id' => $this->site->id,
+        'credential_label' => $credential->label,
+        'credential_type' => $credential->credential_type,
         'user_id' => $this->admin->id,
         'action' => 'reveal',
         'ip_address' => '127.0.0.1',
@@ -250,7 +250,9 @@ test('global feeds are scoped to the user\'s assigned sites (no horizontal acces
     foreach ([$credA, $credB] as $cred) {
         SiteCredentialAuditLog::create([
             'credential_id' => $cred->id,
-            'tenant_id' => $cred->tenant_id,
+            'site_id' => $cred->site_id,
+            'credential_label' => $cred->label,
+            'credential_type' => $cred->credential_type,
             'user_id' => $this->admin->id,
             'action' => 'reveal',
             'ip_address' => '127.0.0.1',
@@ -264,7 +266,6 @@ test('global feeds are scoped to the user\'s assigned sites (no horizontal acces
     $scoped->roles()->syncWithoutDetaching([Role::query()->where('name', 'maintenance_coordinator')->firstOrFail()->id]);
     HrEmployeeProfile::create([
         'user_id' => $scoped->id,
-        'tenant_id' => $siteA->tenant_id,
         'employee_number' => 'EMP-'.$scoped->id,
         'work_email' => 'scoped@example.test',
         'position_title' => 'Maintenance Coordinator',
@@ -343,7 +344,9 @@ test('global audit feed excludes routine view_list rows', function () {
     foreach (['view_list', 'reveal'] as $action) {
         SiteCredentialAuditLog::create([
             'credential_id' => $credential->id,
-            'tenant_id' => $credential->tenant_id,
+            'site_id' => $credential->site_id,
+            'credential_label' => $credential->label,
+            'credential_type' => $credential->credential_type,
             'user_id' => $this->admin->id,
             'action' => $action,
             'ip_address' => '127.0.0.1',

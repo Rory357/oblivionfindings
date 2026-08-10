@@ -2,6 +2,7 @@
  * Single-purpose 2-step picker that builds a GET download URL for the existing
  * eMAR export/PDF routes and triggers the download (window.location.href). */
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
+import { Button } from '@/components/ui/button';
 import {
     Field,
     InfoCard,
@@ -9,7 +10,6 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
-import { Button } from '@/components/ui/button';
 import { FileText, Info, Printer } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -28,12 +28,62 @@ type ReportDef = {
 };
 
 const REPORTS: ReportDef[] = [
-    { key: 'mar_pdf', label: 'MAR chart (PDF)', description: 'Full medication chart for one client', url: '/emar/pdf/mar-chart', format: 'PDF', client: 'required', range: true },
-    { key: 'cd_pdf', label: 'CD register (PDF)', description: 'Controlled-drug register for one client', url: '/emar/pdf/controlled-register', format: 'PDF', client: 'required', range: true },
-    { key: 'round_pdf', label: 'Round sheet (PDF)', description: 'Printable round sheet for a day', url: '/emar/pdf/round-sheet', format: 'PDF', client: 'none', range: false, single: true },
-    { key: 'mar_csv', label: 'MAR administrations (CSV)', description: 'Administration records export', url: '/emar/reports/export-mar', format: 'CSV', client: 'optional', range: true },
-    { key: 'cd_csv', label: 'CD discrepancies (CSV)', description: 'Controlled-drug discrepancies export', url: '/emar/reports/export-controlled-discrepancies', format: 'CSV', client: 'optional', range: true },
-    { key: 'activity_csv', label: 'eMAR activity report (CSV)', description: 'Administrations · PRN · controlled · rounds · errors', url: '/emar/reports/export', format: 'CSV', client: 'optional', range: true, reportType: true },
+    {
+        key: 'mar_pdf',
+        label: 'MAR chart (PDF)',
+        description: 'Full medication chart for one client',
+        url: '/emar/pdf/mar-chart',
+        format: 'PDF',
+        client: 'required',
+        range: true,
+    },
+    {
+        key: 'cd_pdf',
+        label: 'CD register (PDF)',
+        description: 'Controlled-drug register for one client',
+        url: '/emar/pdf/controlled-register',
+        format: 'PDF',
+        client: 'required',
+        range: true,
+    },
+    {
+        key: 'round_pdf',
+        label: 'Round sheet (PDF)',
+        description: 'Printable round sheet for a day',
+        url: '/emar/pdf/round-sheet',
+        format: 'PDF',
+        client: 'none',
+        range: false,
+        single: true,
+    },
+    {
+        key: 'mar_csv',
+        label: 'MAR administrations (CSV)',
+        description: 'Administration records export',
+        url: '/emar/reports/export-mar',
+        format: 'CSV',
+        client: 'optional',
+        range: true,
+    },
+    {
+        key: 'cd_csv',
+        label: 'CD discrepancies (CSV)',
+        description: 'Controlled-drug discrepancies export',
+        url: '/emar/reports/export-controlled-discrepancies',
+        format: 'CSV',
+        client: 'optional',
+        range: true,
+    },
+    {
+        key: 'activity_csv',
+        label: 'eMAR activity report (CSV)',
+        description: 'Administrations · PRN · controlled · rounds · errors',
+        url: '/emar/reports/export',
+        format: 'CSV',
+        client: 'optional',
+        range: true,
+        reportType: true,
+    },
 ];
 
 const ACTIVITY_TYPES = [
@@ -70,7 +120,10 @@ export function ReportsModal({
     const [singleDate, setSingleDate] = useState(defaultDate);
     const [reportType, setReportType] = useState('administration');
 
-    const report = useMemo(() => REPORTS.find((r) => r.key === reportKey), [reportKey]);
+    const report = useMemo(
+        () => REPORTS.find((r) => r.key === reportKey),
+        [reportKey],
+    );
 
     const reset = () => {
         setStep(0);
@@ -87,7 +140,8 @@ export function ReportsModal({
         onClose();
     };
 
-    const canGenerate = !!report && (report.client !== 'required' || clientId !== '');
+    const canGenerate =
+        !!report && (report.client !== 'required' || clientId !== '');
 
     const generate = () => {
         if (!report) return;
@@ -98,18 +152,23 @@ export function ReportsModal({
             params.set('date_from', dateFrom);
             params.set('date_to', dateTo);
         }
-        if (report.client !== 'none' && clientId) params.set('client_id', clientId);
+        if (report.client !== 'none' && clientId)
+            params.set('client_id', clientId);
         if (report.reportType) params.set('report_type', reportType);
         // GET download — leave the SPA in place, let the browser fetch the file.
         window.location.href = `${report.url}?${params.toString()}`;
         close();
     };
 
-    const clientName = clients.find((c) => String(c.id) === clientId)?.name ?? 'All clients';
+    const clientName =
+        clients.find((c) => String(c.id) === clientId)?.name ?? 'All clients';
 
     const footer = (
         <>
-            <Button variant="ghost" onClick={step === 0 ? close : () => setStep(0)}>
+            <Button
+                variant="ghost"
+                onClick={step === 0 ? close : () => setStep(0)}
+            >
                 {step === 0 ? 'Cancel' : 'Back'}
             </Button>
             {step === 0 ? (
@@ -135,8 +194,18 @@ export function ReportsModal({
             railTitle="Reports & exports"
             railSubtitle="MAR · CD · activity"
             steps={[
-                { key: 'choose', label: 'Choose report', blurb: 'What to export', icon: FileText },
-                { key: 'range', label: 'Range & format', blurb: 'Scope & generate', icon: Printer },
+                {
+                    key: 'choose',
+                    label: 'Choose report',
+                    blurb: 'What to export',
+                    icon: FileText,
+                },
+                {
+                    key: 'range',
+                    label: 'Range & format',
+                    blurb: 'Scope & generate',
+                    icon: Printer,
+                },
             ]}
             stepIndex={step}
             onStepClick={(i) => i < step && setStep(i)}
@@ -144,7 +213,11 @@ export function ReportsModal({
         >
             {step === 0 ? (
                 <div>
-                    <StepHead icon={FileText} title="Choose a report" blurb="Pick the register or export to generate." />
+                    <StepHead
+                        icon={FileText}
+                        title="Choose a report"
+                        blurb="Pick the register or export to generate."
+                    />
                     <TilePicker
                         value={reportKey}
                         onChange={setReportKey}
@@ -159,7 +232,11 @@ export function ReportsModal({
                 </div>
             ) : (
                 <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead icon={Printer} title="Range & scope" blurb="Set the period and client, then generate." />
+                    <StepHead
+                        icon={Printer}
+                        title="Range & scope"
+                        blurb="Set the period and client, then generate."
+                    />
                     {report?.single ? (
                         <Field label="Date" required span>
                             {/* eslint-disable-next-line no-restricted-syntax -- native date input; no shadcn date control in wizard primitives. */}
@@ -177,7 +254,9 @@ export function ReportsModal({
                                 <input
                                     type="date"
                                     value={dateFrom}
-                                    onChange={(e) => setDateFrom(e.target.value)}
+                                    onChange={(e) =>
+                                        setDateFrom(e.target.value)
+                                    }
                                     className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
                                 />
                             </Field>
@@ -193,34 +272,68 @@ export function ReportsModal({
                         </>
                     )}
                     {report && report.client !== 'none' ? (
-                        <Field label="Client" required={report.client === 'required'} span>
+                        <Field
+                            label="Client"
+                            required={report.client === 'required'}
+                            span
+                        >
                             <SelectInput
                                 value={clientId}
                                 onChange={setClientId}
-                                placeholder={report.client === 'required' ? 'Select client' : 'All clients'}
+                                placeholder={
+                                    report.client === 'required'
+                                        ? 'Select client'
+                                        : 'All clients'
+                                }
                                 options={[
-                                    ...(report.client === 'optional' ? [{ value: '', label: 'All clients' }] : []),
-                                    ...clients.map((c) => ({ value: String(c.id), label: c.name })),
+                                    ...(report.client === 'optional'
+                                        ? [{ value: '', label: 'All clients' }]
+                                        : []),
+                                    ...clients.map((c) => ({
+                                        value: String(c.id),
+                                        label: c.name,
+                                    })),
                                 ]}
                             />
                         </Field>
                     ) : null}
                     {report?.reportType ? (
                         <Field label="Activity type" span>
-                            <SelectInput value={reportType} onChange={setReportType} placeholder="Select activity" options={ACTIVITY_TYPES} />
+                            <SelectInput
+                                value={reportType}
+                                onChange={setReportType}
+                                placeholder="Select activity"
+                                options={ACTIVITY_TYPES}
+                            />
                         </Field>
                     ) : null}
                     <div className="col-span-full rounded-lg border border-border">
                         <div className="px-4">
-                            <SummaryRow label="Report" value={report?.label ?? '—'} />
-                            <SummaryRow label="Format" value={report?.format ?? '—'} />
-                            <SummaryRow label="Scope" value={report?.single ? singleDate : `${dateFrom} → ${dateTo}`} />
-                            {report && report.client !== 'none' ? <SummaryRow label="Client" value={clientName} /> : null}
+                            <SummaryRow
+                                label="Report"
+                                value={report?.label ?? '—'}
+                            />
+                            <SummaryRow
+                                label="Format"
+                                value={report?.format ?? '—'}
+                            />
+                            <SummaryRow
+                                label="Scope"
+                                value={
+                                    report?.single
+                                        ? singleDate
+                                        : `${dateFrom} → ${dateTo}`
+                                }
+                            />
+                            {report && report.client !== 'none' ? (
+                                <SummaryRow label="Client" value={clientName} />
+                            ) : null}
                         </div>
                     </div>
                     <InfoCard icon={Info}>
-                        The file downloads in your browser. PDF charts and the CD register cover one client;
-                        CSV exports can span all clients.
+                        The file downloads in your browser. PDF charts and the
+                        CD register cover one client; CSV exports can span all
+                        clients.
                     </InfoCard>
                 </div>
             )}

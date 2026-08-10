@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -94,7 +94,8 @@ export default function ConsentRequestShow({ client, request }: Props) {
             <Head title={`Consent request #${request.id}`} />
             <PageShell>
                 <div data-test="consent-request-show">
-                    <PageHero variant="compact"
+                    <PageHero
+                        variant="compact"
                         title={request.consent_type?.name ?? 'Consent request'}
                         description={`For ${client.full_name}`}
                         actions={

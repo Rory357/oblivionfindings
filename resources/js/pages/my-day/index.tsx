@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -75,9 +75,9 @@ import type {
 /*  /my-day — desktop frontline home                                          */
 /* -------------------------------------------------------------------------- */
 /*
- * Site-first redesign that replaces the original mobile-first /my-day. The
- * page is intentionally web-only (≥768 px); native iOS/Android apps own the
- * mobile surface.
+ * Site-first redesign for the desktop web application. The page is
+ * intentionally web-only (≥768 px); no native application surface is part of
+ * this product scope.
  *
  * Top-down composition:
  *   • AppLayout (default experience) with the AppSidebar
@@ -888,6 +888,30 @@ export default function MyDay() {
                         </ChecklistConfigProvider>
                     ) : null}
 
+                    {(props.pending_claims_count ?? 0) > 0 ? (
+                        <Card>
+                            <CardContent className="p-4">
+                                <Link
+                                    href="/operations/job-board?scope=mine"
+                                    data-test="pending-claims-link"
+                                    className="frontline-focus flex items-center justify-between gap-4 rounded-lg"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="font-semibold">
+                                            Pending claims (
+                                            {props.pending_claims_count})
+                                        </div>
+                                        <div className="mt-0.5 text-sm text-muted-foreground">
+                                            Awaiting manager approval — review
+                                            your claimed shifts
+                                        </div>
+                                    </div>
+                                    <ClipboardCheck className="h-5 w-5 shrink-0 text-primary" />
+                                </Link>
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
                     <DigestPanel
                         tab={digestTab}
                         onTabChange={setDigestTab}
@@ -1205,20 +1229,20 @@ function LoneWorkerCheckInCard({
                 </div>
             </div>
 
-            <dl className="mt-3 space-y-1.5 text-xs">
+            <ul className="mt-3 space-y-1.5 text-xs">
                 {session.site ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <li className="flex items-center gap-2 text-muted-foreground">
                         <Home className="h-3.5 w-3.5 shrink-0" />
                         <span className="truncate">{session.site.name}</span>
-                    </div>
+                    </li>
                 ) : null}
                 {session.expected_end_at ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <li className="flex items-center gap-2 text-muted-foreground">
                         <Calendar className="h-3.5 w-3.5 shrink-0" />
                         <span>Until {formatTime(session.expected_end_at)}</span>
-                    </div>
+                    </li>
                 ) : null}
-                <div className="flex items-center gap-2 text-muted-foreground">
+                <li className="flex items-center gap-2 text-muted-foreground">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     {state === 'overdue' ? (
                         <span className={tone.fg}>
@@ -1235,8 +1259,8 @@ function LoneWorkerCheckInCard({
                     ) : (
                         <span>Check in any time</span>
                     )}
-                </div>
-            </dl>
+                </li>
+            </ul>
 
             <div className="mt-3 flex gap-2">
                 <Button type="button" className="flex-1" onClick={onCheckIn}>
@@ -1381,9 +1405,7 @@ function MyTasksCard({ tasks }: { tasks: MyDayMyTasks }) {
                         {/* eslint-disable-next-line no-restricted-syntax -- custom card-row selector (tone-by-overdue), not a shadcn Button */}
                         <button
                             type="button"
-                            onClick={() =>
-                                item.link && router.visit(item.link)
-                            }
+                            onClick={() => item.link && router.visit(item.link)}
                             className={`flex w-full flex-col gap-1 rounded-lg border p-2.5 text-left transition-colors ${
                                 item.overdue
                                     ? 'border-status-critical/30 bg-status-critical-bg hover:bg-status-critical-bg/70'

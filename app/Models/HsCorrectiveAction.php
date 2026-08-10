@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use App\Models\ControlRoom\AlertTask;
 use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HsCorrectiveAction extends Model
 {
-    use AuditableChanges, HasFactory, SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $table = 'hs_corrective_actions';
 
@@ -64,7 +65,6 @@ class HsCorrectiveAction extends Model
         'hs_event_id',
         'hs_investigation_id',
         'source_control_room_task_id',
-        'organization_id',
         'reference_number',
         'recommendation_index',
         'action_type',

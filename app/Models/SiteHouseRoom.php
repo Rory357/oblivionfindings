@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,10 +10,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SiteHouseRoom extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'site_id',
+        'site_room_id',
         'tenant_id',
         'name',
         'notes',
@@ -41,6 +43,12 @@ class SiteHouseRoom extends Model
         return $this->belongsTo(Site::class);
     }
 
+    /** Canonical physical-space identity used by Devices and monitoring. */
+    public function canonicalRoom(): BelongsTo
+    {
+        return $this->belongsTo(SiteRoom::class, 'site_room_id');
+    }
+
     public function assignedClient(): BelongsTo
     {
         return $this->belongsTo(Client::class, 'assigned_client_id');
@@ -59,8 +67,8 @@ class SiteHouseRoom extends Model
     public function scopeAvailable($query)
     {
         return $query->where('is_active', true)
-                     ->where('is_assignable', true)
-                     ->whereNull('assigned_client_id');
+            ->where('is_assignable', true)
+            ->whereNull('assigned_client_id');
     }
 
     public function scopeAssignable($query)
@@ -75,16 +83,17 @@ class SiteHouseRoom extends Model
 
     public function isAssigned(): bool
     {
-        return !is_null($this->assigned_client_id);
+        return ! is_null($this->assigned_client_id);
     }
 
     public function isCurrentlyAssigned(): bool
     {
-        if (!$this->isAssigned()) {
+        if (! $this->isAssigned()) {
             return false;
         }
 
         $now = now()->toDateString();
+
         return $this->assigned_from <= $now &&
                (is_null($this->assigned_until) || $this->assigned_until >= $now);
     }

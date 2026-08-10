@@ -128,7 +128,13 @@ export type DrillDetail = {
     findings: DrillFinding[];
     attachments: DrillAttachment[];
     timeline: DrillTimelineItem[];
-    hs_event: { id: number; reference_number: string; status: string; severity: string; url: string } | null;
+    hs_event: {
+        id: number;
+        reference_number: string;
+        status: string;
+        severity: string;
+        url: string;
+    } | null;
     assignable_staff: { id: number; name: string }[];
     can: { manage: boolean };
 };
@@ -143,8 +149,18 @@ export type DrillFilters = {
 };
 
 export type DrillHero = {
-    live: { scheduled: number; overdue: number; in_progress: number; completed: number };
-    attention: { sites_overdue: number; findings_open: number; findings_overdue: number; awaiting_writeup: number };
+    live: {
+        scheduled: number;
+        overdue: number;
+        in_progress: number;
+        completed: number;
+    };
+    attention: {
+        sites_overdue: number;
+        findings_open: number;
+        findings_overdue: number;
+        awaiting_writeup: number;
+    };
     badges: {
         sites_drilled_pct: number;
         drills_overdue: number;
@@ -189,17 +205,35 @@ export const ICON_TEXT: Record<ChipTone, string> = {
 export type DrillTypeMeta = { label: string; icon: LucideIcon; tone: ChipTone };
 
 export const DRILL_TYPE_META: Record<string, DrillTypeMeta> = {
-    fire_evacuation: { label: 'Fire evacuation', icon: Flame, tone: 'critical' },
+    fire_evacuation: {
+        label: 'Fire evacuation',
+        icon: Flame,
+        tone: 'critical',
+    },
     earthquake: { label: 'Earthquake', icon: Activity, tone: 'warning' },
     lockdown: { label: 'Lockdown', icon: Lock, tone: 'info' },
     tsunami: { label: 'Tsunami', icon: Waves, tone: 'info' },
-    chemical_spill: { label: 'Chemical spill', icon: FlaskConical, tone: 'warning' },
-    medical_emergency: { label: 'Medical emergency', icon: HeartPulse, tone: 'critical' },
+    chemical_spill: {
+        label: 'Chemical spill',
+        icon: FlaskConical,
+        tone: 'warning',
+    },
+    medical_emergency: {
+        label: 'Medical emergency',
+        icon: HeartPulse,
+        tone: 'critical',
+    },
     other: { label: 'Other', icon: Siren, tone: 'neutral' },
 };
 
 export function typeMeta(type: string): DrillTypeMeta {
-    return DRILL_TYPE_META[type] ?? { label: titleCase(type), icon: Siren, tone: 'neutral' };
+    return (
+        DRILL_TYPE_META[type] ?? {
+            label: titleCase(type),
+            icon: Siren,
+            tone: 'neutral',
+        }
+    );
 }
 
 export type StatusMeta = { label: string; icon: LucideIcon; tone: ChipTone };
@@ -222,9 +256,13 @@ export const OUTCOME_META: Record<string, { label: string; tone: ChipTone }> = {
     failed: { label: 'Failed', tone: 'critical' },
 };
 
-export function outcomeMeta(outcome: string | null): { label: string; tone: ChipTone } | null {
+export function outcomeMeta(
+    outcome: string | null,
+): { label: string; tone: ChipTone } | null {
     if (!outcome) return null;
-    return OUTCOME_META[outcome] ?? { label: titleCase(outcome), tone: 'neutral' };
+    return (
+        OUTCOME_META[outcome] ?? { label: titleCase(outcome), tone: 'neutral' }
+    );
 }
 
 export const SEVERITY_TONE: Record<string, ChipTone> = {
@@ -241,7 +279,10 @@ export const FINDING_TYPE_LABEL: Record<string, string> = {
     positive: 'Positive',
 };
 
-export const FINDING_STATUS_META: Record<string, { label: string; tone: ChipTone }> = {
+export const FINDING_STATUS_META: Record<
+    string,
+    { label: string; tone: ChipTone }
+> = {
     open: { label: 'Open', tone: 'warning' },
     in_progress: { label: 'In progress', tone: 'info' },
     resolved: { label: 'Resolved', tone: 'success' },
@@ -249,7 +290,12 @@ export const FINDING_STATUS_META: Record<string, { label: string; tone: ChipTone
 };
 
 /** Drill types offered as pickable tiles in the Schedule wizard (design: 4 tiles). */
-export const SCHEDULE_TYPE_KEYS = ['fire_evacuation', 'earthquake', 'lockdown', 'tsunami'] as const;
+export const SCHEDULE_TYPE_KEYS = [
+    'fire_evacuation',
+    'earthquake',
+    'lockdown',
+    'tsunami',
+] as const;
 
 /** Full drill-type options for the filter <select> and edit form. */
 export const DRILL_TYPE_OPTIONS = [
@@ -275,24 +321,33 @@ export const PARTICIPANT_ROLE_OPTIONS = [
 /* ------------------------------------------------------------------ */
 
 export function titleCase(s: string): string {
-    return s
-        .replace(/[_-]+/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+    return s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function fmtDate(iso: string | null | undefined): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', { weekday: 'short', day: '2-digit', month: 'short' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        weekday: 'short',
+        day: '2-digit',
+        month: 'short',
+    });
 }
 
 export function fmtDateFull(iso: string | null | undefined): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 export function fmtTime(iso: string | null | undefined): string {
     if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 export function fmtDateTime(iso: string | null | undefined): string {
@@ -304,7 +359,8 @@ export function fmtDateTime(iso: string | null | undefined): string {
 export function whenLabel(row: DrillRow): string {
     const iso = row.completed_at ?? row.started_at ?? row.scheduled_at;
     if (!iso) return '—';
-    if (row.status === 'overdue') return `Was ${fmtDate(iso)} · ${fmtTime(iso)}`;
+    if (row.status === 'overdue')
+        return `Was ${fmtDate(iso)} · ${fmtTime(iso)}`;
     return `${fmtDate(iso)} · ${fmtTime(iso)}`;
 }
 

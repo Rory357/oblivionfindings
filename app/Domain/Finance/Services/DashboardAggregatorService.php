@@ -106,7 +106,10 @@ class DashboardAggregatorService
             ->whereNotNull('journal_id')
             ->pluck('id');
 
-        $filedRunIds = FinIrdFiling::forOrganization($orgId)
+        // IRD filings are application-wide canonical records. The legacy
+        // organization storage column is inert and must not be an access or
+        // ownership boundary.
+        $filedRunIds = FinIrdFiling::query()
             ->ofType('payday')
             ->whereNotNull('payroll_run_id')
             ->pluck('payroll_run_id');

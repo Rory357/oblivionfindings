@@ -21,8 +21,8 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { formatDateTime, formatTime } from '@/lib/datetime';
 
-import type { RosterShift } from './types';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import type { RosterShift } from './types';
 
 function ShiftDetail({ shift }: { shift: RosterShift }) {
     const completedTasks = shift.tasks.filter(
@@ -135,7 +135,10 @@ function ShiftDetail({ shift }: { shift: RosterShift }) {
             </div>
 
             {shift.timesheet ? (
-                <GuardrailCard unstyled className="rounded-lg border bg-card p-3 text-sm">
+                <GuardrailCard
+                    unstyled
+                    className="rounded-lg border bg-card p-3 text-sm"
+                >
                     <div className="font-medium">
                         Timesheet {shift.timesheet.status}
                     </div>

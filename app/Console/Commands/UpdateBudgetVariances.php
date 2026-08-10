@@ -9,19 +9,14 @@ use Illuminate\Console\Command;
 class UpdateBudgetVariances extends Command
 {
     protected $signature = 'governance:update-budget-variances';
+
     protected $description = 'Update budget variance calculations from actuals';
 
-    public function __construct(
-        protected BudgetActualsService $budgetActualsService,
-    ) {
-        parent::__construct();
-    }
-
-    public function handle(): int
+    public function handle(BudgetActualsService $budgetActualsService): int
     {
         $this->info('Updating budget variances...');
 
-        $this->budgetActualsService->syncActuals(null);
+        $budgetActualsService->syncActuals(null);
 
         $budgets = Budget::approved()->get();
 
@@ -30,7 +25,7 @@ class UpdateBudgetVariances extends Command
                 $item->calculateVariance();
                 $item->save();
             }
-            
+
             $this->info("Updated variances for budget: {$budget->fiscal_year}");
         }
 

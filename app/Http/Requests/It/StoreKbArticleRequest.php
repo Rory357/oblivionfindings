@@ -28,7 +28,23 @@ class StoreKbArticleRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'category' => ['required', Rule::in(ItKbArticle::CATEGORIES)],
             'body' => ['required', 'string', 'max:20000'],
-            'status' => ['required', Rule::in(ItKbArticle::STATUSES)],
+            'status' => ['prohibited'],
+            'audience' => ['sometimes', 'required', Rule::in(ItKbArticle::AUDIENCES)],
+            'site_scope' => ['nullable', 'array', 'max:100', 'required_if:audience,specific_sites'],
+            'site_scope.*' => [
+                'integer',
+                Rule::exists('sites', 'id')->where(fn ($query) => $query
+                    ->where('is_active', true)
+                    ->where('archived', false)
+                    ->whereNull('archived_at')),
+            ],
+            'owner_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'related_service_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('it_services', 'id')->where(fn ($query) => $query->where('is_active', true)),
+            ],
+            'review_due_at' => ['nullable', 'date'],
         ];
     }
 }

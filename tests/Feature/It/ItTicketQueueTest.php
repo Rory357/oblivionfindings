@@ -1,9 +1,14 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\ItQueue;
+use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\DB;
 
 function itQueueUser(string $role): User
 {
@@ -17,20 +22,32 @@ function itQueueUser(string $role): User
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
+    $this->site = Site::factory()->create();
     $this->hr = itQueueUser('hr');
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'created_by' => $this->hr->id,
+        'updated_by' => $this->hr->id,
+    ]);
 });
 
-test('created tickets are stamped with sequential per-tenant references and a created event', function () {
+test('created tickets are stamped with sequential application references and a created event', function () {
     $this->actingAs($this->hr)->post('/it/tickets', [
         'title' => 'First ticket',
         'category' => 'other',
         'priority' => 'low',
+        'site_id' => $this->site->id,
     ])->assertRedirect();
 
     $this->actingAs($this->hr)->post('/it/tickets', [
         'title' => 'Second ticket',
         'category' => 'other',
         'priority' => 'low',
+        'site_id' => $this->site->id,
     ])->assertRedirect();
 
     $first = ItTicket::query()->firstWhere('title', 'First ticket');
@@ -43,10 +60,11 @@ test('created tickets are stamped with sequential per-tenant references and a cr
     // Every create writes a `created` row on the activity trail.
     expect($first->events()->where('type', 'created')->count())->toBe(1);
 
-    // The generator is max-based, so gaps and manual references never
-    // produce collisions.
+    // The application sequence raises its global floor above imported/manual
+    // references before allocating under the shared row lock.
     ItTicket::factory()->create(['reference' => 'IT-000500']);
-    expect(ItTicket::nextReference(1))->toBe('IT-000501');
+    expect(ItTicket::nextReference())->toBe('IT-000501');
+    expect(DB::table('reference_sequences')->where('scope', 'IT')->value('next_value'))->toBe(502);
 
     // Factory creates (no explicit reference) get one from the hook too.
     $fromFactory = ItTicket::factory()->create();
@@ -54,7 +72,10 @@ test('created tickets are stamped with sequential per-tenant references and a cr
 });
 
 test('the tickets queue paginates server-side', function () {
-    ItTicket::factory()->count(20)->create(['requester_user_id' => $this->hr->id]);
+    ItTicket::factory()->count(20)->create([
+        'site_id' => $this->site->id,
+        'requester_user_id' => $this->hr->id,
+    ]);
 
     $this->actingAs($this->hr)
         ->get('/it')
@@ -77,20 +98,23 @@ test('saved views filter the queue server-side', function () {
     $me = $this->hr;
     $other = User::factory()->create();
 
-    ItTicket::factory()->create(['title' => 'Unassigned open', 'requester_user_id' => $other->id]);
+    ItTicket::factory()->create(['site_id' => $this->site->id, 'title' => 'Unassigned open', 'requester_user_id' => $other->id]);
     ItTicket::factory()->create([
+        'site_id' => $this->site->id,
         'title' => 'Mine in progress',
         'requester_user_id' => $other->id,
         'assigned_to_user_id' => $me->id,
         'status' => 'in_progress',
     ]);
     ItTicket::factory()->create([
+        'site_id' => $this->site->id,
         'title' => 'Waiting on requester',
         'requester_user_id' => $other->id,
         'assigned_to_user_id' => $other->id,
         'status' => 'waiting',
     ]);
     ItTicket::factory()->resolved()->create([
+        'site_id' => $this->site->id,
         'title' => 'Fresh resolve',
         'requester_user_id' => $other->id,
     ]);
@@ -118,20 +142,78 @@ test('saved views filter the queue server-side', function () {
         ->assertInertia(fn ($page) => $page->where('filters.view', null));
 });
 
+test('routed ownership is visible and drives owned and team work views', function () {
+    $team = ItTeam::factory()->create(['manager_user_id' => null]);
+    $team->members()->attach($this->hr->id, ['role' => 'member']);
+    $queue = ItQueue::factory()->create(['team_id' => $team->id]);
+    $other = User::factory()->create();
+
+    $owned = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'title' => 'Owned service request',
+        'requester_user_id' => $other->id,
+        'owner_user_id' => $this->hr->id,
+        'team_id' => $team->id,
+        'queue_id' => $queue->id,
+    ]);
+    $teamTicket = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'title' => 'Team incident',
+        'requester_user_id' => $other->id,
+        'owner_user_id' => $other->id,
+        'team_id' => $team->id,
+        'queue_id' => $queue->id,
+    ]);
+    $unrelated = ItTicket::factory()->create([
+        'site_id' => $this->site->id,
+        'title' => 'Unrelated incident',
+        'requester_user_id' => $other->id,
+    ]);
+
+    $this->actingAs($this->hr)
+        ->get('/it?view=owned_by_me')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('tickets.data', 1)
+            ->where('tickets.data.0.title', 'Owned service request')
+            ->where('tickets.data.0.routing.queue.name', $queue->name)
+            ->where('tickets.data.0.routing.team.name', $team->name)
+            ->where('tickets.data.0.routing.owner.name', $this->hr->name)
+            ->where('filters.view', 'owned_by_me')
+            ->where('summary.tickets.views.owned_by_me', 1)
+            ->where('summary.tickets.views.my_team', 2));
+
+    $this->actingAs($this->hr)
+        ->get('/it?view=my_team')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('tickets.data', 2)
+            ->where('filters.view', 'my_team'));
+
+    // These setup records influence future routing by design. Remove this
+    // test's rule explicitly so the later activity-feed scenario remains
+    // independent even when a database driver cannot roll back setup tables.
+    ItTicket::query()->whereKey([$owned->id, $teamTicket->id, $unrelated->id])->delete();
+    $team->members()->detach();
+    $queue->delete();
+    $team->delete();
+});
+
 test('the summary counts the whole table, not the page', function () {
     $me = $this->hr;
     $other = User::factory()->create();
 
     // 2 unassigned open (1 urgent) + 1 mine in_progress + 1 waiting + 1 resolved now.
-    ItTicket::factory()->create(['requester_user_id' => $other->id]);
-    ItTicket::factory()->urgent()->create(['requester_user_id' => $other->id]);
+    ItTicket::factory()->create(['site_id' => $this->site->id, 'requester_user_id' => $other->id]);
+    ItTicket::factory()->urgent()->create(['site_id' => $this->site->id, 'requester_user_id' => $other->id]);
     ItTicket::factory()->create([
+        'site_id' => $this->site->id,
         'requester_user_id' => $other->id,
         'assigned_to_user_id' => $me->id,
         'status' => 'in_progress',
     ]);
-    ItTicket::factory()->create(['requester_user_id' => $me->id, 'status' => 'waiting']);
-    ItTicket::factory()->resolved()->create(['requester_user_id' => $me->id]);
+    ItTicket::factory()->create(['site_id' => $this->site->id, 'requester_user_id' => $me->id, 'status' => 'waiting']);
+    ItTicket::factory()->resolved()->create(['site_id' => $this->site->id, 'requester_user_id' => $me->id]);
 
     $this->actingAs($this->hr)
         ->get('/it')
@@ -151,13 +233,17 @@ test('the summary counts the whole table, not the page', function () {
             ->where('summary.my.resolved_30d', 1));
 });
 
-test('the summary counts SLA-met settlements for the hero compliance ring', function () {
-    // Two tickets settled this month — one met its SLA target, one breached.
-    ItTicket::factory()->resolved()->create(['sla_state' => 'met']);
-    ItTicket::factory()->resolved()->create(['sla_state' => 'breached']);
+test('the summary counts only measured SLA settlements for the hero compliance ring', function () {
+    // Three tickets settled this month: one met, one breached, and one has no
+    // final SLA outcome. The unmeasured ticket remains in resolved throughput
+    // but must not dilute the compliance percentage.
+    ItTicket::factory()->resolved()->create(['site_id' => $this->site->id, 'sla_state' => 'met']);
+    ItTicket::factory()->resolved()->create(['site_id' => $this->site->id, 'sla_state' => 'breached']);
+    ItTicket::factory()->resolved()->create(['site_id' => $this->site->id, 'sla_state' => 'ok']);
     // An older met settlement (>30d) is outside the window and must not count.
     ItTicket::factory()->resolved()->create([
         'sla_state' => 'met',
+        'site_id' => $this->site->id,
         'resolved_at' => now()->subDays(40),
     ]);
 
@@ -165,17 +251,19 @@ test('the summary counts SLA-met settlements for the hero compliance ring', func
         ->get('/it')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('summary.tickets.resolved_30d', 2)
+            ->where('summary.tickets.resolved_30d', 3)
+            ->where('summary.tickets.measured_30d', 2)
             ->where('summary.tickets.met_30d', 1));
 });
 
 test('the overview board serves agents needs-attention lanes and hides from requesters', function () {
     // A breached open ticket → SLA lane (normal priority, unassigned).
-    ItTicket::factory()->create(['status' => 'open', 'sla_state' => 'breached']);
+    ItTicket::factory()->create(['site_id' => $this->site->id, 'status' => 'open', 'sla_state' => 'breached']);
     // An unassigned urgent open ticket, no first response → awaiting + urgent chip.
-    ItTicket::factory()->urgent()->create(['status' => 'open']);
+    ItTicket::factory()->urgent()->create(['site_id' => $this->site->id, 'status' => 'open']);
     // A responded ticket — 60 minutes to first reply — feeds the avg.
     ItTicket::factory()->create([
+        'site_id' => $this->site->id,
         'created_at' => now()->subMinutes(120),
         'first_responded_at' => now()->subMinutes(60),
     ]);
@@ -200,11 +288,14 @@ test('the overview board serves agents needs-attention lanes and hides from requ
 
 test('the overview activity feed surfaces recent ticket events for agents', function () {
     // Raise a ticket through the real write path → a `created` event lands.
+    // A configured queue may also add a legitimate `routing_applied` event,
+    // so the feed contract is presence rather than a brittle exact size.
     $this->actingAs($this->hr)
         ->post('/it/tickets', [
             'title' => 'Feed fixture',
             'category' => 'other',
             'priority' => 'normal',
+            'site_id' => $this->site->id,
         ])
         ->assertRedirect();
 
@@ -212,8 +303,8 @@ test('the overview activity feed surfaces recent ticket events for agents', func
         ->get('/it')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->has('overview.recent_activity', 1)
-            ->where('overview.recent_activity.0.type', 'created')
-            ->where('overview.recent_activity.0.actor', $this->hr->name)
-            ->where('overview.recent_activity.0.reference', 'IT-000001'));
+            ->where('overview.recent_activity', fn ($activity) => collect($activity)
+                ->contains(fn ($event) => $event['type'] === 'created'
+                    && $event['actor'] === $this->hr->name
+                    && $event['reference'] === 'IT-000001')));
 });

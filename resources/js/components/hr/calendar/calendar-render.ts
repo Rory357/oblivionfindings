@@ -42,13 +42,23 @@ export function fmtTime(d: Date): string {
     const m = d.getMinutes();
     const ap = h < 12 ? 'am' : 'pm';
     const h12 = h % 12 === 0 ? 12 : h % 12;
-    return m === 0 ? `${h12}${ap}` : `${h12}:${String(m).padStart(2, '0')}${ap}`;
+    return m === 0
+        ? `${h12}${ap}`
+        : `${h12}:${String(m).padStart(2, '0')}${ap}`;
 }
 export function fmtDayMon(d: Date): string {
-    return d.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('en-NZ', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+    });
 }
 export function fmtLong(d: Date): string {
-    return d.toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' });
+    return d.toLocaleDateString('en-NZ', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+    });
 }
 
 /* ── feed accessors ──────────────────────────────────────────────────────── */
@@ -92,7 +102,11 @@ export function secondaryFor(e: CalendarLayerFeed): string {
 /* ── style builders (mirror the prototype) ──────────────────────────────── */
 
 /** A spanning all-day bar (month grid) / all-day chip (time-grid). */
-export function barStyle(c: string, dashed: boolean, extra?: CSSProperties): CSSProperties {
+export function barStyle(
+    c: string,
+    dashed: boolean,
+    extra?: CSSProperties,
+): CSSProperties {
     return {
         display: 'flex',
         alignItems: 'center',
@@ -113,5 +127,11 @@ export function barStyle(c: string, dashed: boolean, extra?: CSSProperties): CSS
 }
 
 export function dotStyle(c: string): CSSProperties {
-    return { height: 7, width: 7, flex: 'none', borderRadius: 2, background: c };
+    return {
+        height: 7,
+        width: 7,
+        flex: 'none',
+        borderRadius: 2,
+        background: c,
+    };
 }

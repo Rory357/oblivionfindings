@@ -3,13 +3,18 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
+use App\Services\References\ReferenceNumberGenerator;
 use App\Support\It\BusinessHours;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\QueryException;
 
 /**
  * A helpdesk ticket, raised self-service by any staff member (source
@@ -19,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  */
 class ItTicket extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     public const CATEGORIES = ['hardware', 'account', 'network', 'other'];
 
@@ -29,35 +34,75 @@ class ItTicket extends Model
 
     public const SOURCES = ['portal', 'agent', 'system', 'email'];
 
+    public const WORK_TYPES = [
+        'incident',
+        'service_request',
+        'problem',
+        'change',
+        'task',
+        'security_request',
+        'major_incident',
+    ];
+
+    /** Work types that may enter through the ordinary helpdesk intake/triage journey. */
+    public const INTAKE_WORK_TYPES = [
+        'incident',
+        'service_request',
+        'security_request',
+    ];
+
+    public const IMPACTS = ['individual', 'team', 'site', 'organization'];
+
+    public const URGENCIES = ['low', 'normal', 'high', 'critical'];
+
     public const SLA_STATES = ['ok', 'at_risk', 'breached', 'met'];
 
     /** Statuses that count as "open" for queues, badges and saved views. */
     public const OPEN_STATUSES = ['open', 'in_progress', 'waiting'];
 
     protected $fillable = [
-        'tenant_id',
         'reference',
         'title',
         'description',
         'requester_user_id',
+        'requested_for_user_id',
         'assigned_to_user_id',
+        'owner_user_id',
         'asset_id',
+        'site_id',
+        'is_organisation_wide',
+        'team_id',
+        'queue_id',
+        'it_service_id',
         'provisioning_request_id',
         'merged_into_ticket_id',
         'merged_at',
         'category',
         'subcategory',
         'source',
+        'work_type',
+        'workflow_state',
         'priority',
+        'impact',
+        'urgency',
+        'is_sensitive',
         'status',
+        'status_reason',
+        'waiting_reason',
+        'waiting_party',
+        'next_action',
         'requires_approval',
         'first_response_due_at',
         'resolution_due_at',
+        'due_at',
         'first_responded_at',
         'sla_state',
         'sla_paused_minutes',
         'waiting_since',
         'resolved_at',
+        'resolution_code',
+        'resolution_summary',
+        'monitoring_recovered_at',
         'closed_at',
         'reopened_count',
         'csat_score',
@@ -71,6 +116,7 @@ class ItTicket extends Model
         'first_responded_at' => 'datetime',
         'waiting_since' => 'datetime',
         'resolved_at' => 'datetime',
+        'monitoring_recovered_at' => 'datetime',
         'closed_at' => 'datetime',
         'merged_at' => 'datetime',
         'csat_submitted_at' => 'datetime',
@@ -78,6 +124,9 @@ class ItTicket extends Model
         'reopened_count' => 'integer',
         'csat_score' => 'integer',
         'requires_approval' => 'boolean',
+        'is_sensitive' => 'boolean',
+        'is_organisation_wide' => 'boolean',
+        'due_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -88,25 +137,26 @@ class ItTicket extends Model
     {
         // Every ticket gets a human-facing reference (IT-000123) — filled
         // here so factories and secondary write paths never miss it. The
-        // tenant-unique index is the backstop; createWithReference() adds
-        // the retry for genuinely concurrent creates.
+        // application-global index is the final backstop.
         static::creating(function (self $ticket) {
-            if (! $ticket->reference && $ticket->tenant_id) {
-                $ticket->reference = static::nextReference((int) $ticket->tenant_id);
+            if (! $ticket->reference) {
+                $ticket->reference = static::nextReference();
             }
         });
     }
 
-    /** Next per-tenant sequence value, based on the highest stamped so far. */
-    public static function nextReference(int $tenantId): string
+    /** Allocate the next globally serialized application reference. */
+    public static function nextReference(): string
     {
         $max = (int) static::query()
-            ->forTenant($tenantId)
             ->whereNotNull('reference')
-            ->selectRaw("MAX(CAST(SUBSTRING(reference, 4) AS UNSIGNED)) AS seq")
+            ->selectRaw('MAX(CAST(SUBSTRING(reference, 4) AS UNSIGNED)) AS seq')
             ->value('seq');
 
-        return sprintf('IT-%06d', $max + 1);
+        $generator = app(ReferenceNumberGenerator::class);
+        $generator->ensureAtLeast('IT', $max + 1);
+
+        return $generator->nextGlobal('IT', 6);
     }
 
     /**
@@ -124,9 +174,9 @@ class ItTicket extends Model
         do {
             try {
                 return static::create($attributes);
-            } catch (\Illuminate\Database\QueryException $exception) {
+            } catch (QueryException $exception) {
                 $attempts++;
-                $collidedOnReference = str_contains($exception->getMessage(), 'it_tickets_tenant_reference_uq');
+                $collidedOnReference = str_contains($exception->getMessage(), 'it_tickets_reference_uq');
                 if (! $collidedOnReference || $attempts >= 5) {
                     throw $exception;
                 }
@@ -143,15 +193,45 @@ class ItTicket extends Model
         return $this->belongsTo(User::class, 'requester_user_id');
     }
 
+    public function requestedFor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_for_user_id');
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
+    }
+
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_user_id');
     }
 
     /** Linked entry in the canonical (fleet-)assets register. */
     public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class, 'asset_id');
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class, 'site_id');
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(ItTeam::class, 'team_id');
+    }
+
+    public function queue(): BelongsTo
+    {
+        return $this->belongsTo(ItQueue::class, 'queue_id');
+    }
+
+    public function service(): BelongsTo
+    {
+        return $this->belongsTo(ItService::class, 'it_service_id');
     }
 
     /** The provisioning request this ticket was raised from, if any. */
@@ -210,10 +290,52 @@ class ItTicket extends Model
         return $this->morphMany(ItTicketEvent::class, 'subject');
     }
 
+    public function links(): HasMany
+    {
+        return $this->hasMany(ItTicketLink::class, 'ticket_id');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(ItWorkTask::class, 'ticket_id')->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function problemProfile(): HasOne
+    {
+        return $this->hasOne(ItProblem::class, 'ticket_id');
+    }
+
+    public function changeProfile(): HasOne
+    {
+        return $this->hasOne(ItChange::class, 'ticket_id');
+    }
+
+    public function majorIncidentProfile(): HasOne
+    {
+        return $this->hasOne(ItMajorIncident::class, 'ticket_id');
+    }
+
+    public function linked(string $relationship): HasMany
+    {
+        return $this->links()->where('relationship', $relationship);
+    }
+
     public function watchers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'it_ticket_watchers', 'ticket_id', 'user_id')
             ->withTimestamps();
+    }
+
+    /**
+     * Resolved without reopening and with no more than one requester-visible
+     * reply. Internal technician notes do not change first-contact resolution.
+     */
+    public function scopeFirstContactResolved(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('resolved_at')
+            ->where('reopened_count', 0)
+            ->whereHas('comments', fn (Builder $comments) => $comments->where('is_internal', false), '<=', 1);
     }
 
     /** Files attached at raise time (thread replies carry their own). */
@@ -227,22 +349,19 @@ class ItTicket extends Model
     /* ------------------------------------------------------------------ */
 
     /**
-     * Stamp/restamp the SLA due dates from the tenant policy for the
+     * Stamp/restamp the SLA due dates from the application policy for the
      * ticket's CURRENT priority, anchored at creation — a priority change
      * re-targets the same clock, it doesn't restart it. Mutates without
      * saving; callers persist.
      */
     public function stampSlaDueDates(): void
     {
-        [$firstResponseMinutes, $resolutionMinutes] = ItSlaPolicy::minutesFor(
-            (int) $this->tenant_id,
-            (string) $this->priority,
-        );
+        [$firstResponseMinutes, $resolutionMinutes] = ItSlaPolicy::minutesFor((string) $this->priority);
 
-        $calendar = ItSlaPolicy::calendarFor((int) $this->tenant_id, (string) $this->priority);
+        $calendar = ItSlaPolicy::calendarFor((string) $this->priority);
         $anchor = $this->created_at ?? now();
 
-        // Working-time targets when the tenant set a business-hours calendar;
+        // Working-time targets when the application has a business-hours calendar;
         // a null calendar keeps the continuous 24/7 clock (unchanged). ->utc()
         // so a worker-timezone result stores as the correct instant.
         $this->first_response_due_at = BusinessHours::addWorkingMinutes($anchor, $firstResponseMinutes, $calendar)->utc();
@@ -282,8 +401,4 @@ class ItTicket extends Model
     /*  Scopes */
     /* ------------------------------------------------------------------ */
 
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 }

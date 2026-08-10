@@ -266,7 +266,8 @@ function StayCard({
                                 variant="outline"
                                 onClick={() => onRecordRestraint(s)}
                             >
-                                <ShieldAlert className="h-3.5 w-3.5" /> Restraint
+                                <ShieldAlert className="h-3.5 w-3.5" />{' '}
+                                Restraint
                             </Button>
                             <Button
                                 size="sm"
@@ -280,7 +281,8 @@ function StayCard({
                                 variant="outline"
                                 onClick={() => onLogComplaint(s)}
                             >
-                                <MessageSquareWarning className="h-3.5 w-3.5" /> Complaint
+                                <MessageSquareWarning className="h-3.5 w-3.5" />{' '}
+                                Complaint
                             </Button>
                         </>
                     ) : null}

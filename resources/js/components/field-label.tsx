@@ -35,7 +35,7 @@ export function FieldLabel({
             {indicator && (
                 <span
                     className={cn(
-                        'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        'rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase',
                         required
                             ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
                             : recommended

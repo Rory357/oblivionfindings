@@ -14,7 +14,11 @@ interface PaperworkPanelProps {
     onSubmitTimesheet: (timesheet: MyDayTimesheet) => void;
 }
 
-export function PaperworkPanel({ timesheets, hrTasks, onSubmitTimesheet }: PaperworkPanelProps) {
+export function PaperworkPanel({
+    timesheets,
+    hrTasks,
+    onSubmitTimesheet,
+}: PaperworkPanelProps) {
     const t = useMyDayLabels();
     const dueCount = timesheets.length + hrTasks.length;
     if (dueCount === 0) {
@@ -27,7 +31,9 @@ export function PaperworkPanel({ timesheets, hrTasks, onSubmitTimesheet }: Paper
         >
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
                 <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                <div className="text-[13px] font-semibold">{t('paperwork_title')}</div>
+                <div className="text-[13px] font-semibold">
+                    {t('paperwork_title')}
+                </div>
                 <Badge
                     variant="outline"
                     className="ml-auto border-status-warning/30 bg-status-warning-bg text-[10.5px] text-status-warning"
@@ -36,7 +42,11 @@ export function PaperworkPanel({ timesheets, hrTasks, onSubmitTimesheet }: Paper
                 </Badge>
             </div>
             {timesheets.map((ts) => (
-                <TimesheetRow key={ts.id} timesheet={ts} onSubmit={onSubmitTimesheet} />
+                <TimesheetRow
+                    key={ts.id}
+                    timesheet={ts}
+                    onSubmit={onSubmitTimesheet}
+                />
             ))}
             {hrTasks.map((task) => (
                 <HrTaskRow key={task.id} task={task} />
@@ -54,7 +64,10 @@ function TimesheetRow({
 }) {
     const t = useMyDayLabels();
     const date = ts.work_date_iso
-        ? new Date(ts.work_date_iso).toLocaleDateString([], { day: '2-digit', month: 'short' })
+        ? new Date(ts.work_date_iso).toLocaleDateString([], {
+              day: '2-digit',
+              month: 'short',
+          })
         : ts.work_date;
     // Multi-client timesheets get a richer label than just the primary
     // client name — show the breakdown count so the worker knows what
@@ -69,11 +82,15 @@ function TimesheetRow({
         <div className="border-b border-border px-4 py-2.5 last:border-b-0">
             <div className="flex items-center gap-2">
                 <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <div className="flex-1 text-[12.5px] font-medium">{summary}</div>
+                <div className="flex-1 text-[12.5px] font-medium">
+                    {summary}
+                </div>
                 <div className="text-[11px] text-muted-foreground">{date}</div>
             </div>
             {ts.needs ? (
-                <div className="mt-1 pl-[21px] text-[11px] text-muted-foreground">{ts.needs}</div>
+                <div className="mt-1 pl-[21px] text-[11px] text-muted-foreground">
+                    {ts.needs}
+                </div>
             ) : null}
             {isMultiClient ? (
                 <div className="mt-1 pl-[21px] text-[10.5px] text-muted-foreground">
@@ -89,7 +106,9 @@ function TimesheetRow({
                     variant={ts.status === 'returned' ? 'default' : 'secondary'}
                     onClick={() => onSubmit(ts)}
                 >
-                    {ts.status === 'returned' ? t('ts_fix_and_resubmit') : t('ts_send_for_approval')}
+                    {ts.status === 'returned'
+                        ? t('ts_fix_and_resubmit')
+                        : t('ts_send_for_approval')}
                 </Button>
             </div>
         </div>
@@ -111,7 +130,9 @@ function HrTaskRow({ task }: { task: MyDayHrTask }) {
             </div>
             <div className="min-w-0 flex-1">
                 <div className="text-[12.5px] font-medium">{task.title}</div>
-                <div className="text-[10.5px] text-muted-foreground">Due {task.due}</div>
+                <div className="text-[10.5px] text-muted-foreground">
+                    Due {task.due}
+                </div>
             </div>
             {task.href ? <Link href={task.href}>{button}</Link> : button}
         </div>

@@ -383,6 +383,7 @@ class EmarController extends Controller
                 'difference' => $discrepancy->difference,
                 'reason' => $discrepancy->reason,
                 'notes' => $discrepancy->notes,
+                'immediate_action_taken' => $discrepancy->immediate_action_taken,
                 'status' => $discrepancy->status,
                 'reported_at' => $discrepancy->reported_at?->toIso8601String(),
             ])
@@ -685,7 +686,7 @@ class EmarController extends Controller
      */
     private function handoverBypassPermissions(): array
     {
-        return ['shifts.manageAny', 'handovers.viewAny', 'reports.viewAny'];
+        return ['reports.viewAny'];
     }
 
     private function buildMedicationPayload(array $validated): array
@@ -1186,6 +1187,34 @@ class EmarController extends Controller
         $timezone = $scheduleService->workerTimezone();
         $now = Carbon::now($timezone);
 
+        // The Site picker and explicit filter must use the same medication
+        // visibility boundary as every PRN data query. Assigned-only workers
+        // remain constrained to current HR Sites; explicitly unrestricted
+        // medication viewers retain the existing all-Sites behaviour.
+        $sitesQuery = Site::query()
+            ->select(['id', 'name', 'brand_colour'])
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->orderBy('name');
+        if ($viewableClientIds !== null) {
+            $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
+            $viewableClientIds = Client::query()
+                ->whereIn('id', $viewableClientIds)
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+            $sitesQuery->whereIn('id', $accessibleSiteIds);
+        }
+        $sites = $sitesQuery->get();
+        if ($siteFilter !== null && ! $sites->contains('id', $siteFilter)) {
+            abort(403, UserSiteAccessService::DEFAULT_MESSAGE);
+        }
+        $activeSite = $siteFilter !== null
+            ? $sites->firstWhere('id', $siteFilter)
+            : null;
+
         // Date anchor + lookback window for the register (mirrors the meds/today
         // hero day-stepper). The register ends on the selected day and looks back
         // `range` days; the page filters by tab/search/status client-side.
@@ -1264,7 +1293,6 @@ class EmarController extends Controller
         $dataClientIds = $clientFilter
             ? array_values(array_intersect($siteClientIds, [$clientFilter]))
             : $siteClientIds;
-        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         // BK3 — enrich near/over-limit PRN meds with today's per-dose timeline
         // (derived; no schema) and, for over-limit meds, any incident already
@@ -1329,6 +1357,7 @@ class EmarController extends Controller
             : null;
         $history = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($viewableClientIds !== null, fn ($q) => $q->whereIn('client_id', $viewableClientIds))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
@@ -1348,6 +1377,7 @@ class EmarController extends Controller
 
         $giverIds = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($viewableClientIds !== null, fn ($q) => $q->whereIn('client_id', $viewableClientIds))
             ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->when($clientFilter, fn ($q) => $q->where('client_id', $clientFilter))
             ->whereBetween('administered_at', [$windowStart->copy()->utc(), $windowEnd->copy()->utc()])
@@ -1389,7 +1419,7 @@ class EmarController extends Controller
             'range' => $rangeDays,
             'client_id' => $clientFilter,
             'q' => $search,
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'sites' => $sites,
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
         ]);
@@ -1625,6 +1655,7 @@ class EmarController extends Controller
                 'reported_at' => $discrepancy->reported_at?->toIso8601String(),
                 'reported_by_name' => $discrepancy->reportedBy?->name,
                 'witnessed_by_name' => $discrepancy->witnessedBy?->name,
+                'immediate_action_taken' => $discrepancy->immediate_action_taken,
                 'resolved_at' => $discrepancy->resolved_at instanceof \DateTimeInterface ? $discrepancy->resolved_at->toIso8601String() : null,
                 'resolved_by_name' => $discrepancy->resolvedBy?->name,
                 'resolution_notes' => $discrepancy->resolution_notes,
@@ -1665,6 +1696,7 @@ class EmarController extends Controller
                 'quantity_lost' => $report->quantity_lost,
                 'unit' => $report->unit,
                 'circumstances' => $report->circumstances,
+                'immediate_action_taken' => $report->immediate_action_taken,
                 'accountable_officer_name' => $report->accountable_officer_name,
                 'reported_to_police' => (bool) $report->reported_to_police,
                 'police_reference' => $report->police_reference,
@@ -2841,6 +2873,13 @@ class EmarController extends Controller
         // the reused cards/rail/detail/wizard components — no second shape.
         $presenter = app(HandoverPresenter::class);
         $siteFilter = $request->integer('site_id') ?: null;
+        if ($siteFilter) {
+            $this->siteAccess()->assertCanAccessSiteId(
+                $auth,
+                $siteFilter,
+                $this->handoverBypassPermissions(),
+            );
+        }
 
         // Week (Mon–Sun) is the unit of navigation. Compute the window in the
         // worker timezone, then query the UTC-stored columns with UTC bounds.
@@ -2855,10 +2894,9 @@ class EmarController extends Controller
         $canViewAny = $this->handoverService->canViewAny($auth);
 
         $handovers = ShiftHandover::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
             ->with($presenter->mapEagerLoads())
-            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->when($siteFilter, fn ($query) => $this->siteAccess()->applyHandoverSiteScopeForSiteIds($query, [$siteFilter]))
             ->where(function ($dateScope) use ($startUtc, $endUtc) {
                 $dateScope
                     ->whereHas('outgoingShift', fn ($s) => $s->whereNotNull('starts_at')->whereBetween('starts_at', [$startUtc, $endUtc]))
@@ -4699,6 +4737,13 @@ class EmarController extends Controller
             'actual_balance' => 'required|numeric|min:0',
             'witnessed_by' => 'required|exists:users,id|different:'.auth()->id(),
             'discrepancy_notes' => 'nullable|string|max:2000',
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn (): bool => (float) ($request->input('on_hand_before') ?? $request->input('expected_balance'))
+                    !== (float) ($request->input('on_hand_after') ?? $request->input('actual_balance'))),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'client_request_uuid' => 'nullable|uuid',
             'captured_offline_at' => 'nullable|date',
             'origin_device_id' => 'nullable|string|max:255',
@@ -4778,9 +4823,13 @@ class EmarController extends Controller
                     'reported_by' => auth()->id(),
                     'witnessed_by' => $validated['witnessed_by'],
                     'notes' => $validated['discrepancy_notes'] ?? null,
+                    'immediate_action_taken' => trim((string) $validated['immediate_action_taken']),
                     'status' => 'open',
                     'reported_at' => now(),
                 ]);
+
+                app(MedicationIncidentIntegrationService::class)
+                    ->handleControlledDiscrepancy($discrepancy, auth()->id());
             }
         });
 
@@ -4794,16 +4843,6 @@ class EmarController extends Controller
                 ->where('status', 'active')
                 ->get()
                 ->each(fn ($alert) => $alert->resolve('Balance check recorded.'));
-        }
-
-        if ($discrepancy) {
-            $incident = app(MedicationIncidentIntegrationService::class)
-                ->handleControlledDiscrepancy($discrepancy, auth()->id());
-
-            // Persist the link so the discrepancy detail can surface the incident.
-            if ($incident) {
-                $discrepancy->forceFill(['incident_id' => $incident->id])->save();
-            }
         }
 
         $refreshedStock = $medication?->stock()->first();

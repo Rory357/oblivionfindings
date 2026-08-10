@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Jobs\CheckLoneWorkerOverdueJob;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
@@ -29,10 +30,10 @@ class CheckLoneWorkerOverdueJobIntegrityTest extends TestCase
 
     public function test_a_corrupt_first_session_rolls_back_without_blocking_a_valid_later_session_and_rerun_is_idempotent(): void
     {
-        $validSite = Site::factory()->create(['tenant_id' => 701]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 702]);
-        $corruptWorker = User::factory()->create(['organization_id' => 701]);
-        $validWorker = User::factory()->create(['organization_id' => 701]);
+        $validSite = Site::factory()->create();
+        $foreignSite = Site::factory()->create();
+        $corruptWorker = $this->currentSiteWorker($validSite);
+        $validWorker = $this->currentSiteWorker($validSite);
         $corrupt = $this->overdueSession($corruptWorker, $foreignSite);
         $valid = $this->overdueSession($validWorker, $validSite);
         $job = new CheckLoneWorkerOverdueJob;
@@ -91,6 +92,20 @@ class CheckLoneWorkerOverdueJobIntegrityTest extends TestCase
         $this->assertSame('overdue', $valid->fresh()->status);
         $this->assertSame(1, $this->sessionSignalCount($valid));
         $this->assertSame(1, $this->sessionAlertCount($valid));
+    }
+
+    private function currentSiteWorker(Site $site): User
+    {
+        $worker = User::factory()->create([
+            'approved_at' => now(),
+        ]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+        ]);
+
+        return $worker;
     }
 
     private function overdueSession(User $worker, Site $site): LoneWorkerSession

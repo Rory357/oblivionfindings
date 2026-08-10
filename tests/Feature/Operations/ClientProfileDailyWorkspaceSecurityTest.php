@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
 use App\Models\Client;
 use App\Models\ClientConsent;
@@ -11,6 +12,7 @@ use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\TimelineEventComment;
 use App\Models\User;
@@ -35,17 +37,46 @@ function grantClientProfileDailyWorkspacePermissions(User $user, array $permissi
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
-it('rejects support worker assignments from another organisation', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, [
+/** @return array{User, Site} */
+function clientProfileDailyWorkspaceSiteScopedCarePlanUser(array $permissionKeys): array
+{
+    $site = Site::factory()->create();
+    $user = clientProfileDailyWorkspaceUserAtSite($site, $permissionKeys);
+
+    return [$user, $site];
+}
+
+function clientProfileDailyWorkspaceUserAtSite(
+    Site $site,
+    array $permissionKeys,
+    string $role = 'manager',
+): User {
+    $user = User::factory()->create([
+        'approved_at' => now(),
+        'role' => $role,
+    ]);
+    grantClientProfileDailyWorkspacePermissions($user, $permissionKeys);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    return $user;
+}
+
+it('rejects support worker assignments from another Site', function () {
+    $site = Site::factory()->create();
+    $foreignSite = Site::factory()->create();
+    $manager = clientProfileDailyWorkspaceUserAtSite($site, [
         'clients.assignments.update',
         'clients.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $foreignWorker = User::factory()->create([
-        'organization_id' => 2,
-        'role' => 'support_worker',
-    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $foreignWorker = clientProfileDailyWorkspaceUserAtSite($foreignSite, [], 'support_worker');
 
     $this->actingAs($manager)
         ->from("/operations/clients/{$client->id}")
@@ -61,21 +92,15 @@ it('rejects support worker assignments from another organisation', function () {
     ]);
 });
 
-it('assigns only same-organisation care-delivery roles', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, [
+it('assigns only current care-delivery roles from the Clients Site', function () {
+    $site = Site::factory()->create();
+    $manager = clientProfileDailyWorkspaceUserAtSite($site, [
         'clients.assignments.update',
         'clients.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $supportWorker = User::factory()->create([
-        'organization_id' => 1,
-        'role' => 'support_worker',
-    ]);
-    $financeUser = User::factory()->create([
-        'organization_id' => 1,
-        'role' => 'finance',
-    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $supportWorker = clientProfileDailyWorkspaceUserAtSite($site, [], 'support_worker');
+    $financeUser = clientProfileDailyWorkspaceUserAtSite($site, [], 'finance');
 
     $this->actingAs($manager)
         ->put("/operations/clients/{$client->id}/assignments", [
@@ -102,15 +127,12 @@ it('assigns only same-organisation care-delivery roles', function () {
 });
 
 it('does not expose or mutate assignments without actual client update authority', function () {
-    $assigner = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($assigner, [
+    $site = Site::factory()->create();
+    $assigner = clientProfileDailyWorkspaceUserAtSite($site, [
         'clients.assignments.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $supportWorker = User::factory()->create([
-        'organization_id' => 1,
-        'role' => 'support_worker',
-    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $supportWorker = clientProfileDailyWorkspaceUserAtSite($site, [], 'support_worker');
 
     $this->actingAs($assigner)
         ->getJson("/operations/clients/{$client->id}/assignments?modal=1")
@@ -122,10 +144,11 @@ it('does not expose or mutate assignments without actual client update authority
         ->assertForbidden();
 });
 
-it('rejects onboarding workflows for a client from another organisation', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, ['clients.create']);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+it('rejects onboarding workflows for a client from another Site', function () {
+    $site = Site::factory()->create();
+    $foreignSite = Site::factory()->create();
+    $manager = clientProfileDailyWorkspaceUserAtSite($site, ['clients.create']);
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
 
     $this->actingAs($manager)
         ->from('/operations/onboarding/create')
@@ -135,23 +158,44 @@ it('rejects onboarding workflows for a client from another organisation', functi
         ->assertSessionHasErrors('client_id');
 
     $this->assertDatabaseMissing('client_onboarding_workflows', [
-        'organization_id' => 1,
         'client_id' => $foreignClient->id,
     ]);
 });
 
-it('rejects onboarding step assignees from another organisation', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, ['clients.create']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+it('enforces onboarding workflow Site assignee and nested-step provenance', function () {
+    $site = Site::factory()->create();
+    $foreignSite = Site::factory()->create();
+    $manager = clientProfileDailyWorkspaceUserAtSite($site, [
+        'clients.create',
+        'onboarding.view',
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $workflow = ClientOnboardingWorkflow::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'status' => 'in_progress',
         'started_at' => now(),
         'created_by' => $manager->id,
     ]);
-    $foreignAssignee = User::factory()->create(['organization_id' => 2]);
+    $foreignAssignee = clientProfileDailyWorkspaceUserAtSite($foreignSite, [], 'support_worker');
+    $otherClient = Client::factory()->create(['site_id' => $site->id]);
+    $otherWorkflow = ClientOnboardingWorkflow::query()->create([
+        'client_id' => $otherClient->id,
+        'status' => 'in_progress',
+        'started_at' => now(),
+        'created_by' => $manager->id,
+    ]);
+    $otherStep = $otherWorkflow->steps()->create([
+        'step_name' => 'Other Clients orientation',
+        'step_order' => 1,
+        'status' => 'pending',
+    ]);
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
+    $foreignWorkflow = ClientOnboardingWorkflow::query()->create([
+        'client_id' => $foreignClient->id,
+        'status' => 'in_progress',
+        'started_at' => now(),
+        'created_by' => $manager->id,
+    ]);
 
     $this->actingAs($manager)
         ->from("/operations/onboarding/{$workflow->id}")
@@ -165,19 +209,40 @@ it('rejects onboarding step assignees from another organisation', function () {
         'workflow_id' => $workflow->id,
         'assigned_to' => $foreignAssignee->id,
     ]);
+
+    $this->actingAs($manager)
+        ->patch("/operations/onboarding/{$workflow->id}/steps/{$otherStep->id}", [
+            'status' => 'completed',
+        ])
+        ->assertNotFound();
+    $this->actingAs($manager)
+        ->get("/operations/onboarding/{$foreignWorkflow->id}")
+        ->assertNotFound();
+    $this->actingAs($manager)
+        ->post("/operations/onboarding/{$foreignWorkflow->id}/steps", [
+            'step_name' => 'Hidden cross-Site step',
+        ])
+        ->assertNotFound();
+    $this->actingAs($manager)
+        ->post("/operations/onboarding/{$foreignWorkflow->id}/complete")
+        ->assertNotFound();
+
+    expect($otherStep->fresh()->status)->toBe('pending')
+        ->and($foreignWorkflow->fresh()->status)->toBe('in_progress');
 });
 
 it('rejects a daily note linked to another clients shift', function () {
-    $worker = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($worker, [
+    $site = Site::factory()->create();
+    $worker = clientProfileDailyWorkspaceUserAtSite($site, [
         'clients.viewAny',
         'progress_notes.create',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $otherClient = Client::factory()->create(['site_id' => $site->id]);
     $otherClientsShift = Shift::factory()->create([
         'client_id' => $otherClient->id,
         'user_id' => $worker->id,
+        'site_id' => $site->id,
         'created_by' => $worker->id,
     ]);
 
@@ -196,10 +261,14 @@ it('rejects a daily note linked to another clients shift', function () {
 });
 
 it('does not delete a timeline comment through another clients route', function () {
-    $worker = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($worker, ['clients.viewAny']);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $worker = clientProfileDailyWorkspaceUserAtSite($site, [
+        'clients.viewAny',
+        'timeline.viewAny',
+        'timeline.create',
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $otherClient = Client::factory()->create(['site_id' => $site->id]);
     $otherClientsEvent = TimelineEvent::factory()->create([
         'client_id' => $otherClient->id,
         'actor_user_id' => $worker->id,
@@ -222,9 +291,14 @@ it('does not delete a timeline comment through another clients route', function 
 });
 
 it('does not delete a portal family note through another clients route', function () {
-    $familyMember = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $familyMember = User::factory()->create();
+    $familyMember->roles()->attach(Role::query()->firstOrCreate(
+        ['name' => 'next_of_kin'],
+        ['label' => 'Next of Kin', 'level' => 10, 'type' => 'system'],
+    ));
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $otherClient = Client::factory()->create(['site_id' => $site->id]);
     $client->portalUsers()->attach($familyMember->id, [
         'relation' => 'next_of_kin',
     ]);
@@ -275,10 +349,11 @@ it('does not delete a portal family note through another clients route', functio
     ]);
 });
 
-it('forbids meal preference changes for a client in another organisation', function () {
-    $kitchenWorker = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($kitchenWorker, ['sites.meals.view']);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+it('forbids meal preference changes for a client at another Site', function () {
+    $site = Site::factory()->create();
+    $foreignSite = Site::factory()->create();
+    $kitchenWorker = clientProfileDailyWorkspaceUserAtSite($site, ['sites.meals.view']);
+    $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
 
     $this->actingAs($kitchenWorker)
         ->post("/clients/{$foreignClient->id}/meal-preferences/dislikes", [
@@ -292,14 +367,13 @@ it('forbids meal preference changes for a client in another organisation', funct
     ]);
 });
 
-it('forbids starting a care plan review across organisations', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, ['care_plans.update']);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+it('forbids starting a care plan review outside the assigned Site', function () {
+    [$manager] = clientProfileDailyWorkspaceSiteScopedCarePlanUser(['care_plans.update']);
+    $outsideSite = Site::factory()->create();
+    $outsideClient = Client::factory()->create(['site_id' => $outsideSite->id]);
     $foreignPlan = CarePlan::query()->create([
-        'organization_id' => 2,
-        'client_id' => $foreignClient->id,
-        'title' => 'Foreign organisation support plan',
+        'client_id' => $outsideClient->id,
+        'title' => 'Outside Site support plan',
         'status' => 'active',
         'plan_type' => 'support_plan',
         'version' => 1,
@@ -314,51 +388,49 @@ it('forbids starting a care plan review across organisations', function () {
         ->exists())->toBeFalse();
 });
 
-it('rejects creating or reassigning care plans across organisations', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, [
+it('rejects creating or reassigning care plans outside the assigned Site', function () {
+    [$manager, $visibleSite] = clientProfileDailyWorkspaceSiteScopedCarePlanUser([
         'care_plans.create',
         'care_plans.update',
     ]);
-    $sameOrgClient = Client::factory()->create(['organization_id' => 1]);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+    $outsideSite = Site::factory()->create();
+    $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
+    $outsideClient = Client::factory()->create(['site_id' => $outsideSite->id]);
 
     $this->actingAs($manager)
-        ->from("/operations/clients/{$foreignClient->id}?tab=care_plans")
+        ->from("/operations/clients/{$outsideClient->id}?tab=care_plans")
         ->post('/operations/care-plans', [
-            'client_id' => $foreignClient->id,
-            'title' => 'Cross-organisation plan',
+            'client_id' => $outsideClient->id,
+            'title' => 'Outside Site plan',
             'plan_type' => 'support_plan',
         ])
-        ->assertSessionHasErrors('client_id');
+        ->assertForbidden();
 
     $plan = CarePlan::query()->create([
-        'organization_id' => 1,
-        'client_id' => $sameOrgClient->id,
-        'title' => 'Same organisation plan',
+        'client_id' => $visibleClient->id,
+        'title' => 'Visible Site plan',
         'status' => 'draft',
         'plan_type' => 'support_plan',
         'version' => 1,
     ]);
 
     $this->actingAs($manager)
-        ->from("/operations/clients/{$sameOrgClient->id}?tab=care_plans")
+        ->from("/operations/clients/{$visibleClient->id}?tab=care_plans")
         ->put("/operations/care-plans/{$plan->id}", [
-            'client_id' => $foreignClient->id,
+            'client_id' => $outsideClient->id,
         ])
         ->assertSessionHasErrors('client_id');
 
-    expect($plan->fresh()->client_id)->toBe($sameOrgClient->id);
+    expect($plan->fresh()->client_id)->toBe($visibleClient->id);
 });
 
-it('forbids completing a care plan review across organisations', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, ['care_plans.update']);
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
+it('forbids completing a care plan review outside the assigned Site', function () {
+    [$manager] = clientProfileDailyWorkspaceSiteScopedCarePlanUser(['care_plans.update']);
+    $outsideSite = Site::factory()->create();
+    $outsideClient = Client::factory()->create(['site_id' => $outsideSite->id]);
     $foreignReview = CarePlan::query()->create([
-        'organization_id' => 2,
-        'client_id' => $foreignClient->id,
-        'title' => 'Foreign review',
+        'client_id' => $outsideClient->id,
+        'title' => 'Outside Site review',
         'status' => 'review',
         'plan_type' => 'support_plan',
         'version' => 2,
@@ -379,11 +451,9 @@ it('forbids completing a care plan review across organisations', function () {
 });
 
 it('copies goals steps domains and sign off context into a care plan review', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    [$manager, $site] = clientProfileDailyWorkspaceSiteScopedCarePlanUser(['care_plans.update']);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $plan = CarePlan::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Active support plan',
         'status' => 'active',
@@ -402,7 +472,6 @@ it('copies goals steps domains and sign off context into a care plan review', fu
         ],
     ]);
     $goal = $plan->goals()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Prepare breakfast independently',
         'category' => 'daily_living',
@@ -412,7 +481,6 @@ it('copies goals steps domains and sign off context into a care plan review', fu
         'created_by' => $manager->id,
     ]);
     $goal->steps()->create([
-        'organization_id' => 1,
         'title' => 'Collect ingredients',
         'sort_order' => 1,
         'is_complete' => true,
@@ -421,7 +489,6 @@ it('copies goals steps domains and sign off context into a care plan review', fu
         'created_by' => $manager->id,
     ]);
     $plan->signOffs()->create([
-        'organization_id' => 1,
         'party_role' => 'client',
         'party_name' => 'Aroha Client',
         'agreed_on' => today(),
@@ -451,11 +518,9 @@ it('copies goals steps domains and sign off context into a care plan review', fu
 });
 
 it('starts only one review from an active plan and rejects invalid source states', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    [$manager, $site] = clientProfileDailyWorkspaceSiteScopedCarePlanUser(['care_plans.update']);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $draft = CarePlan::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Draft plan',
         'status' => 'draft',
@@ -469,7 +534,6 @@ it('starts only one review from an active plan and rejects invalid source states
         ->assertSessionHasErrors('status');
 
     $active = CarePlan::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Active plan',
         'status' => 'active',
@@ -477,7 +541,6 @@ it('starts only one review from an active plan and rejects invalid source states
         'created_by' => $manager->id,
     ]);
     $active->goals()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Stay connected',
         'category' => 'Community',
@@ -499,11 +562,9 @@ it('starts only one review from an active plan and rejects invalid source states
 });
 
 it('completes a review by archiving the prior version and retaining review notes', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileDailyWorkspacePermissions($manager, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    [$manager, $site] = clientProfileDailyWorkspaceSiteScopedCarePlanUser(['care_plans.update']);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $active = CarePlan::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Active support plan',
         'status' => 'active',
@@ -512,7 +573,6 @@ it('completes a review by archiving the prior version and retaining review notes
         'created_by' => $manager->id,
     ]);
     $active->goals()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Choose weekly activities',
         'category' => 'Choice',
@@ -528,7 +588,6 @@ it('completes a review by archiving the prior version and retaining review notes
         ->where('status', 'review')
         ->sole();
     $review->signOffs()->create([
-        'organization_id' => 1,
         'party_role' => 'client',
         'party_name' => 'Fresh review signatory',
         'agreed_on' => today(),

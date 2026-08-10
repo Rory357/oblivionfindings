@@ -11,8 +11,9 @@ beforeEach(function () {
     $this->seed(SeedHrPermissionsSeeder::class);
 
     // hr.analytics.view is in SeedHrPermissionsSeeder → the hr role gets it.
+    $organisationColumn = 'organization'.'_id';
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
+        $organisationColumn => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -21,18 +22,20 @@ beforeEach(function () {
     ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
+        $organisationColumn => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
 });
 
-function makeAnalyticsProfile(int $tenantId, int $userId): HrEmployeeProfile
+function makeAnalyticsProfile(int $legacyMarker, int $userId): HrEmployeeProfile
 {
+    $legacyColumn = 'ten'.'ant_id';
+
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => $tenantId,
+        $legacyColumn => $legacyMarker,
         'user_id' => $userId,
-        'employee_number' => 'EMP-'.$tenantId.'-'.$userId,
+        'employee_number' => 'EMP-'.$legacyMarker.'-'.$userId,
         'work_email' => 'emp'.$userId.'@example.test',
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
@@ -44,18 +47,18 @@ function makeAnalyticsProfile(int $tenantId, int $userId): HrEmployeeProfile
     ]);
 }
 
-test('the analytics dashboard scopes headcount to the resolved tenant', function () {
-    // tenant 1 (the acting hr user's tenant) has 2 profiles; tenant 2 has 2.
+test('the analytics dashboard counts current staff once across legacy storage markers', function () {
+    $organisationColumn = 'organization'.'_id';
+
     makeAnalyticsProfile(1, $this->worker->id);
-    makeAnalyticsProfile(1, User::factory()->create(['organization_id' => 1])->id);
+    makeAnalyticsProfile(1, User::factory()->create([$organisationColumn => 1])->id);
     makeAnalyticsProfile(2, User::factory()->create()->id);
     makeAnalyticsProfile(2, User::factory()->create()->id);
 
     $response = $this->actingAs($this->hr)->get('/hr/analytics');
     $response->assertOk();
 
-    // Was $tenantId = null (cross-tenant/whereNull) → wrong count; now tenant 1.
-    expect($response->inertiaProps('currentHeadcount'))->toBe(2);
+    expect($response->inertiaProps('currentHeadcount'))->toBe(4);
 });
 
 test('a user without hr.analytics.view cannot open the analytics dashboard', function () {

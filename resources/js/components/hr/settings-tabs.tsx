@@ -17,9 +17,19 @@ const TAB_URLS: Record<SettingsTab, string> = {
 };
 
 const ITEMS: HrTabItem[] = [
-    { id: 'automations', label: 'Automations', icon: Workflow, tone: 'primary' },
+    {
+        id: 'automations',
+        label: 'Automations',
+        icon: Workflow,
+        tone: 'primary',
+    },
     { id: 'webhooks', label: 'Webhooks', icon: Webhook, tone: 'info' },
-    { id: 'custom-fields', label: 'Custom fields', icon: Settings2, tone: 'success' },
+    {
+        id: 'custom-fields',
+        label: 'Custom fields',
+        icon: Settings2,
+        tone: 'success',
+    },
     { id: 'audit-log', label: 'Audit log', icon: History, tone: 'violet' },
 ];
 

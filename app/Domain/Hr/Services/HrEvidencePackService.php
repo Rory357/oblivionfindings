@@ -4,13 +4,10 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Hr\Models\HrPolicyAttestation;
-use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\User;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use App\Services\UserSiteAccessService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Storage;
 
 class HrEvidencePackService
 {
@@ -28,7 +25,9 @@ class HrEvidencePackService
     ];
 
     public function __construct(
-        private readonly ComplianceMatrixService $complianceService,
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly HrCurrentStaffService $currentStaff,
+        private readonly ComplianceMatrixService $complianceMatrix,
     ) {}
 
     /**
@@ -38,12 +37,11 @@ class HrEvidencePackService
      * background checks, and policy attestations. Applies redaction
      * based on the requesting user's permissions.
      *
-     * @param  HrEmployeeProfile  $profile
-     * @param  User               $requestedBy  The user generating the pack (for permission checks)
-     * @param  array              $options       Options: include_documents, include_training_certs, redact_pii
+     * @param  User  $requestedBy  The user generating the pack (for permission checks)
+     * @param  array  $options  Options: include_documents, include_training_certs, redact_pii
      * @return array{employee: array, compliance: array, documents: array, generated_at: string}
      *
-     * @throws \Illuminate\Auth\Access\AuthorizationException If user lacks permission
+     * @throws AuthorizationException If user lacks permission
      */
     public function generateEmployeePack(HrEmployeeProfile $profile, User $requestedBy, array $options = []): array
     {
@@ -55,14 +53,15 @@ class HrEvidencePackService
         $includeDocuments = $options['include_documents'] ?? true;
         $includeTrainingCerts = $options['include_training_certs'] ?? true;
 
-        $isPrivileged = $this->hasPrivilegedAccess($requestedBy);
-        if (! $isPrivileged) {
+        if (! $this->canViewUnredactedProfile($requestedBy, $profile)) {
             $redactPii = true;
         }
 
         $employeeData = $this->buildEmployeeSection($profile, $redactPii);
         $complianceData = $this->buildComplianceSection($profile);
-        $documents = $includeDocuments ? $this->buildDocumentsSection($profile, $includeTrainingCerts) : [];
+        $documents = $includeDocuments
+            ? $this->buildDocumentsSection($profile, $includeTrainingCerts, $requestedBy)
+            : [];
 
         return [
             'employee' => $employeeData,
@@ -75,25 +74,28 @@ class HrEvidencePackService
     }
 
     /**
-     * Generate a bulk compliance evidence pack for a site or tenant.
+     * Generate a bulk compliance evidence pack for the application or one Site.
      *
      * Iterates all active employees (optionally filtered by site) and
      * generates individual packs, combining them into a single report.
      *
-     * @param  int        $tenantId
-     * @param  User       $requestedBy
-     * @param  int|null   $siteId       Filter to a specific site
-     * @param  array      $options
+     * @param  int|null  $siteId  Filter to a specific visible Site
      * @return array{summary: array, employees: array, generated_at: string}
      */
-    public function generateBulkPack(?int $tenantId, User $requestedBy, ?int $siteId = null, array $options = []): array
+    public function generateBulkPack(User $requestedBy, ?int $siteId = null, array $options = []): array
     {
-        if (! $this->hasPrivilegedAccess($requestedBy)) {
+        if (! $requestedBy->canDo('hr.compliance.manage')) {
             throw new AuthorizationException('Only HR/compliance administrators can generate bulk evidence packs.');
         }
 
-        $query = HrEmployeeProfile::where('tenant_id', $tenantId)->active();
+        $staff = $this->currentStaff->currentUsersQuery()->select('users.id');
+        $this->siteAccess->applyStaffScope($staff, $requestedBy);
+        $query = HrEmployeeProfile::query()->whereIn('user_id', $staff);
         if ($siteId) {
+            abort_unless(
+                in_array($siteId, $this->siteAccess->accessibleSiteIds($requestedBy), true),
+                404,
+            );
             $query->atSite($siteId);
         }
 
@@ -106,7 +108,10 @@ class HrEvidencePackService
             $employees[] = $pack;
 
             $statuses = collect($pack['compliance']);
-            if ($statuses->where('status', 'expired')->isNotEmpty() || $statuses->where('status', 'not_started')->isNotEmpty()) {
+            if ($statuses->isEmpty()
+                || $statuses->where('status', 'expired')->isNotEmpty()
+                || $statuses->where('status', 'not_started')->isNotEmpty()
+            ) {
                 $stats['non_compliant']++;
             } elseif ($statuses->where('status', 'expiring_soon')->isNotEmpty()) {
                 $stats['expiring_soon']++;
@@ -129,14 +134,17 @@ class HrEvidencePackService
     /**
      * Store a generated evidence pack to disk for audit retention.
      *
-     * @param  array   $pack      The pack data from generateEmployeePack or generateBulkPack
+     * @param  array  $pack  The pack data from generateEmployeePack or generateBulkPack
      * @param  string  $filename  Optional custom filename
-     * @return string  Storage path
+     * @return string Storage path
      */
     public function storePack(array $pack, ?string $filename = null): string
     {
-        $tenantPrefix = data_get($pack, 'summary.tenant_id', data_get($pack, 'employee.tenant_id', 'global'));
-        $filename = $filename ?? sprintf('evidence-packs/%s_%s_%s.json', $tenantPrefix, now()->format('Y-m-d_His'), $pack['generated_by'] ?? 'system');
+        $filename = $filename ?? sprintf(
+            'evidence-packs/application_%s_%s.json',
+            now()->format('Y-m-d_His'),
+            $pack['generated_by'] ?? 'system',
+        );
 
         Storage::disk('private')->put($filename, json_encode($pack, JSON_PRETTY_PRINT));
 
@@ -180,29 +188,46 @@ class HrEvidencePackService
      */
     protected function buildComplianceSection(HrEmployeeProfile $profile): array
     {
-        $statuses = HrStaffComplianceStatus::where('user_id', $profile->user_id)
-            ->with('requirement:id,code,name,category,hard_stop')
-            ->get();
+        $staff = User::query()
+            ->with(['roles:id,name', 'complianceStatuses'])
+            ->findOrFail($profile->user_id);
+        $snapshots = $this->complianceMatrix
+            ->snapshotsForUsers(collect([$staff]))
+            ->get((int) $staff->id, collect());
 
-        return $statuses->map(fn($s) => [
-            'requirement_code' => $s->requirement?->code,
-            'requirement_name' => $s->requirement?->name,
-            'category' => $s->requirement?->category,
-            'hard_stop' => $s->requirement?->hard_stop,
-            'status' => $s->status,
-            'evidence_type' => $s->evidence_type,
-            'valid_from' => $s->valid_from?->toDateString(),
-            'expires_at' => $s->expires_at?->toDateString(),
-            'last_checked_at' => $s->last_checked_at?->toIso8601String(),
+        return $snapshots->map(fn (array $snapshot) => [
+            'requirement_code' => $snapshot['requirement']->code,
+            'requirement_name' => $snapshot['requirement']->name,
+            'category' => $snapshot['requirement']->category,
+            'hard_stop' => (bool) $snapshot['requirement']->hard_stop,
+            'status' => $snapshot['status'],
+            'evidence_type' => $snapshot['status_row']?->evidence_type,
+            'valid_from' => $snapshot['status_row']?->valid_from?->toDateString(),
+            'expires_at' => $snapshot['status_row']?->expires_at?->toDateString(),
+            'last_checked_at' => $snapshot['status_row']?->last_checked_at?->toIso8601String(),
         ])->toArray();
     }
 
     /**
      * Build the documents section (non-restricted documents only for non-privileged users).
      */
-    protected function buildDocumentsSection(HrEmployeeProfile $profile, bool $includeTrainingCerts): array
-    {
+    protected function buildDocumentsSection(
+        HrEmployeeProfile $profile,
+        bool $includeTrainingCerts,
+        User $requestedBy,
+    ): array {
+        $isOwnPack = (int) $requestedBy->id === (int) $profile->user_id;
+        $canViewDocuments = $isOwnPack
+            || $requestedBy->canDo('hr.documents.view')
+            || $requestedBy->canDo('hr.documents.manage');
+        if (! $canViewDocuments) {
+            return [];
+        }
+
         $query = HrDocument::where('employee_profile_id', $profile->id);
+        if (! $requestedBy->canDo('hr.documents.manage')) {
+            $query->where('is_restricted', false);
+        }
 
         if ($includeTrainingCerts) {
             $query->whereIn('category', ['compliance', 'training', 'certificate', 'background_check']);
@@ -210,7 +235,7 @@ class HrEvidencePackService
             $query->whereIn('category', ['compliance', 'background_check']);
         }
 
-        return $query->get()->map(fn($doc) => [
+        return $query->get()->map(fn ($doc) => [
             'id' => $doc->id,
             'title' => $doc->title,
             'category' => $doc->category,
@@ -223,21 +248,34 @@ class HrEvidencePackService
     /**
      * Check if the requesting user has privileged access (can see unredacted data).
      */
-    protected function hasPrivilegedAccess(User $user): bool
+    protected function canViewUnredactedProfile(User $user, HrEmployeeProfile $profile): bool
     {
-        if ($user->canDo('hr.compliance.manage') || $user->canDo('hr.compliance.view')) {
+        if ((int) $user->id === (int) $profile->user_id) {
             return true;
         }
 
-        return $user->hasRole('admin', 'hr', 'provider_manager', 'compliance_lead');
+        return $user->canDo('hr.employees.viewRestricted');
     }
 
     protected function canGeneratePack(User $requestedBy, HrEmployeeProfile $profile): bool
     {
-        if ($this->hasPrivilegedAccess($requestedBy)) {
+        if ((int) $requestedBy->id === (int) $profile->user_id) {
             return true;
         }
 
-        return (int) $requestedBy->id === (int) $profile->user_id;
+        if (! $requestedBy->canDo('hr.compliance.view')
+            && ! $requestedBy->canDo('hr.compliance.manage')
+        ) {
+            return false;
+        }
+
+        if (! $this->currentStaff->isCurrent((int) $profile->user_id)) {
+            return false;
+        }
+
+        $visibleStaff = User::query()->whereKey($profile->user_id);
+        $this->siteAccess->applyStaffScope($visibleStaff, $requestedBy);
+
+        return $visibleStaff->exists();
     }
 }

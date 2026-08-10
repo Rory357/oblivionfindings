@@ -1,16 +1,7 @@
 import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,7 +15,16 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDuration, formatTime } from '@/lib/fleet-utils';
-import { Head, Link, router } from '@inertiajs/react';
+import {
+    FleetHeroAction,
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
+import { Head, router } from '@inertiajs/react';
 import {
     Car,
     Clock,
@@ -106,12 +106,12 @@ type Props = {
 };
 
 const TRANSPORT_TYPE_COLORS: Record<string, string> = {
-    medical: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
+    medical:
+        'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
     appointment:
         'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     social: 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
-    shopping:
-        'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary',
+    shopping: 'bg-primary/10 text-primary dark:bg-primary/30 dark:text-primary',
     community:
         'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
     respite:
@@ -161,7 +161,10 @@ export default function TransportsIndex({
         completed_7d: 0,
         with_medications_7d: 0,
     };
-    const transports = useMemo(() => rawTransports?.data ?? [], [rawTransports?.data]);
+    const transports = useMemo(
+        () => rawTransports?.data ?? [],
+        [rawTransports?.data],
+    );
     const meta = rawTransports?.meta ?? {
         current_page: 1,
         last_page: 1,
@@ -235,7 +238,9 @@ export default function TransportsIndex({
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={Truck} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Resident transports · duty of care</HeroStatusPill>
+                            <HeroStatusPill>
+                                Resident transports · duty of care
+                            </HeroStatusPill>
                             <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
                                 Resident Transport Logs
                             </h1>
@@ -254,7 +259,9 @@ export default function TransportsIndex({
                                 label="In progress"
                                 value={fmt(hero.in_progress)}
                                 caption="on the road now"
-                                tone={hero.in_progress > 0 ? 'warning' : 'success'}
+                                tone={
+                                    hero.in_progress > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="Completed 7d"
@@ -267,7 +274,11 @@ export default function TransportsIndex({
                                 label="With medications"
                                 value={fmt(hero.with_medications_7d)}
                                 caption="med transit · 7d"
-                                tone={hero.with_medications_7d > 0 ? 'warning' : 'success'}
+                                tone={
+                                    hero.with_medications_7d > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
                             />
                         </div>
                     </div>
@@ -422,147 +433,165 @@ export default function TransportsIndex({
                 {/* Table */}
                 <div className="overflow-hidden rounded-lg border">
                     <FleetResponsiveTable>
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Date/Time
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Vehicle
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Driver
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Resident
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Type
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Pickup
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Dropoff
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Duration
-                                </th>
-                                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                                    Status
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {transports.length > 0 ? (
-                                transports.map((t) => (
-                                    <tr
-                                        key={t.id}
-                                        className="cursor-pointer border-b transition-colors hover:bg-muted/30"
-                                        onClick={() =>
-                                            router.visit(
-                                                `/fleet-assets/transports/${t.id}`,
-                                            )
-                                        }
-                                    >
-                                        <td data-fleet-row-time className="px-3 py-2 whitespace-nowrap">
-                                            {t.departed_at
-                                                ? formatDate(t.departed_at)
-                                                : '---'}
-                                            <br />
-                                            <span className="text-xs text-muted-foreground">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Date/Time
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Vehicle
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Driver
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Resident
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Type
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Pickup
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Dropoff
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Duration
+                                    </th>
+                                    <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+                                        Status
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {transports.length > 0 ? (
+                                    transports.map((t) => (
+                                        <tr
+                                            key={t.id}
+                                            className="cursor-pointer border-b transition-colors hover:bg-muted/30"
+                                            onClick={() =>
+                                                router.visit(
+                                                    `/fleet-assets/transports/${t.id}`,
+                                                )
+                                            }
+                                        >
+                                            <td
+                                                data-fleet-row-time
+                                                className="px-3 py-2 whitespace-nowrap"
+                                            >
                                                 {t.departed_at
-                                                    ? formatTime(t.departed_at)
-                                                    : ''}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <div className="flex items-center gap-1.5">
-                                                <Car className="h-3.5 w-3.5 text-muted-foreground" />
-                                                <span className="font-medium">
-                                                    {t.asset?.name ?? '---'}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <div className="flex items-center gap-1.5">
-                                                <User className="h-3.5 w-3.5 text-muted-foreground" />
-                                                <span>
-                                                    {t.driver?.name ?? '---'}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td data-fleet-row-identity className="px-3 py-2">
-                                            <div className="font-medium">
-                                                {t.resident_name}
-                                            </div>
-                                            {(t.shift || t.service_context) && (
-                                                <div className="text-[10px] text-muted-foreground">
-                                                    {t.shift
-                                                        ? `Shift #${t.shift.id}`
-                                                        : 'Direct transport'}
-                                                    {t.service_context
-                                                        ? ` · ${t.service_context}`
+                                                    ? formatDate(t.departed_at)
+                                                    : '---'}
+                                                <br />
+                                                <span className="text-xs text-muted-foreground">
+                                                    {t.departed_at
+                                                        ? formatTime(
+                                                              t.departed_at,
+                                                          )
                                                         : ''}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Car className="h-3.5 w-3.5 text-muted-foreground" />
+                                                    <span className="font-medium">
+                                                        {t.asset?.name ?? '---'}
+                                                    </span>
                                                 </div>
-                                            )}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            <span
-                                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TRANSPORT_TYPE_COLORS[t.transport_type] ?? TRANSPORT_TYPE_COLORS.other}`}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <User className="h-3.5 w-3.5 text-muted-foreground" />
+                                                    <span>
+                                                        {t.driver?.name ??
+                                                            '---'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td
+                                                data-fleet-row-identity
+                                                className="px-3 py-2"
                                             >
-                                                {t.transport_type}
-                                            </span>
-                                            {t.shift && (
-                                                <div className="mt-1 text-[10px] text-muted-foreground">
-                                                    {(
-                                                        t.shift.shift_type ??
-                                                        'standard'
-                                                    ).replace(/_/g, ' ')}
-                                                    {t.shift.staff_name
-                                                        ? ` · ${t.shift.staff_name}`
-                                                        : ''}
+                                                <div className="font-medium">
+                                                    {t.resident_name}
                                                 </div>
-                                            )}
-                                        </td>
-                                        <td className="max-w-[120px] truncate px-3 py-2 text-muted-foreground">
-                                            {t.pickup_location ?? '---'}
-                                        </td>
-                                        <td className="max-w-[120px] truncate px-3 py-2 text-muted-foreground">
-                                            {t.dropoff_location ?? '---'}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                            {formatDurationMinutes(
-                                                t.duration_minutes,
-                                            )}
-                                        </td>
-                                        <td data-fleet-row-status data-fleet-row-action className="px-3 py-2">
-                                            <Badge
-                                                variant={statusVariant(
-                                                    t.status,
+                                                {(t.shift ||
+                                                    t.service_context) && (
+                                                    <div className="text-[10px] text-muted-foreground">
+                                                        {t.shift
+                                                            ? `Shift #${t.shift.id}`
+                                                            : 'Direct transport'}
+                                                        {t.service_context
+                                                            ? ` · ${t.service_context}`
+                                                            : ''}
+                                                    </div>
                                                 )}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <span
+                                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TRANSPORT_TYPE_COLORS[t.transport_type] ?? TRANSPORT_TYPE_COLORS.other}`}
+                                                >
+                                                    {t.transport_type}
+                                                </span>
+                                                {t.shift && (
+                                                    <div className="mt-1 text-[10px] text-muted-foreground">
+                                                        {(
+                                                            t.shift
+                                                                .shift_type ??
+                                                            'standard'
+                                                        ).replace(/_/g, ' ')}
+                                                        {t.shift.staff_name
+                                                            ? ` · ${t.shift.staff_name}`
+                                                            : ''}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="max-w-[120px] truncate px-3 py-2 text-muted-foreground">
+                                                {t.pickup_location ?? '---'}
+                                            </td>
+                                            <td className="max-w-[120px] truncate px-3 py-2 text-muted-foreground">
+                                                {t.dropoff_location ?? '---'}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                {formatDurationMinutes(
+                                                    t.duration_minutes,
+                                                )}
+                                            </td>
+                                            <td
+                                                data-fleet-row-status
+                                                data-fleet-row-action
+                                                className="px-3 py-2"
                                             >
-                                                {t.status.replace(/_/g, ' ')}
-                                            </Badge>
+                                                <Badge
+                                                    variant={statusVariant(
+                                                        t.status,
+                                                    )}
+                                                >
+                                                    {t.status.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={9} className="px-3 py-12">
+                                            <FleetEmptyState
+                                                icon={Users}
+                                                title="No transport logs yet"
+                                                description="Log a resident transport to get started."
+                                                actionLabel="Log Transport"
+                                                actionHref="/fleet-assets/transports?new=1"
+                                            />
                                         </td>
                                     </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan={9} className="px-3 py-12">
-                                        <FleetEmptyState
-                                            icon={Users}
-                                            title="No transport logs yet"
-                                            description="Log a resident transport to get started."
-                                            actionLabel="Log Transport"
-                                            actionHref="/fleet-assets/transports?new=1"
-                                        />
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                )}
+                            </tbody>
+                        </table>
                     </FleetResponsiveTable>
                 </div>
 

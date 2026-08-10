@@ -75,7 +75,9 @@ export default function ProtocolForm({
         name: protocol?.name ?? '',
         observation_type: protocol?.observation_type ?? '',
         frequency: protocol?.frequency ?? '',
-        custom_frequency_hours: protocol?.custom_frequency_hours ? String(protocol.custom_frequency_hours) : '',
+        custom_frequency_hours: protocol?.custom_frequency_hours
+            ? String(protocol.custom_frequency_hours)
+            : '',
         instructions: protocol?.instructions ?? '',
         alert_if_missed_hours: String(protocol?.alert_if_missed_hours ?? 24),
         is_active: protocol?.is_active ?? true,
@@ -87,8 +89,9 @@ export default function ProtocolForm({
     const clientName = protocol?.client
         ? `${protocol.client.first_name} ${protocol.client.last_name}`
         : '';
-    const showCustomFrequencyHours = data.frequency === 'custom'
-        || (structuralLocked && Boolean(protocol?.custom_frequency_hours));
+    const showCustomFrequencyHours =
+        data.frequency === 'custom' ||
+        (structuralLocked && Boolean(protocol?.custom_frequency_hours));
 
     const handleSubmit = (event: FormEvent) => {
         event.preventDefault();
@@ -114,7 +117,8 @@ export default function ProtocolForm({
                 <CardContent className="space-y-6">
                     {structuralLocked ? (
                         <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
-                            Observation type and frequency are locked because this protocol already has schedule history.
+                            Observation type and frequency are locked because
+                            this protocol already has schedule history.
                         </div>
                     ) : null}
 
@@ -124,7 +128,9 @@ export default function ProtocolForm({
                             <Input
                                 id="name"
                                 value={data.name}
-                                onChange={(event) => setData('name', event.target.value)}
+                                onChange={(event) =>
+                                    setData('name', event.target.value)
+                                }
                                 placeholder="e.g. Daily weight monitoring"
                                 maxLength={255}
                             />
@@ -136,15 +142,21 @@ export default function ProtocolForm({
                                 <Label>Client</Label>
                                 <Select
                                     value={data.client_id}
-                                    onValueChange={(value) => setData('client_id', value)}
+                                    onValueChange={(value) =>
+                                        setData('client_id', value)
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select client" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {clients.map((client) => (
-                                            <SelectItem key={client.id} value={String(client.id)}>
-                                                {client.first_name} {client.last_name}
+                                            <SelectItem
+                                                key={client.id}
+                                                value={String(client.id)}
+                                            >
+                                                {client.first_name}{' '}
+                                                {client.last_name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -154,7 +166,11 @@ export default function ProtocolForm({
                         ) : (
                             <div className="space-y-1.5">
                                 <Label htmlFor="client_name">Client</Label>
-                                <Input id="client_name" value={clientName} disabled />
+                                <Input
+                                    id="client_name"
+                                    value={clientName}
+                                    disabled
+                                />
                             </div>
                         )}
                     </div>
@@ -164,7 +180,9 @@ export default function ProtocolForm({
                             <Label>Observation Type</Label>
                             <Select
                                 value={data.observation_type}
-                                onValueChange={(value) => setData('observation_type', value)}
+                                onValueChange={(value) =>
+                                    setData('observation_type', value)
+                                }
                                 disabled={structuralLocked}
                             >
                                 <SelectTrigger>
@@ -172,7 +190,10 @@ export default function ProtocolForm({
                                 </SelectTrigger>
                                 <SelectContent>
                                     {observationTypes.map((type) => (
-                                        <SelectItem key={type.value} value={type.value}>
+                                        <SelectItem
+                                            key={type.value}
+                                            value={type.value}
+                                        >
                                             {type.label}
                                         </SelectItem>
                                     ))}
@@ -198,7 +219,10 @@ export default function ProtocolForm({
                                 </SelectTrigger>
                                 <SelectContent>
                                     {frequencies.map((frequency) => (
-                                        <SelectItem key={frequency.value} value={frequency.value}>
+                                        <SelectItem
+                                            key={frequency.value}
+                                            value={frequency.value}
+                                        >
                                             {frequency.label}
                                         </SelectItem>
                                     ))}
@@ -210,17 +234,26 @@ export default function ProtocolForm({
 
                     {showCustomFrequencyHours ? (
                         <div className="space-y-1.5">
-                            <Label htmlFor="custom_frequency_hours">Custom Frequency Hours</Label>
+                            <Label htmlFor="custom_frequency_hours">
+                                Custom Frequency Hours
+                            </Label>
                             <Input
                                 id="custom_frequency_hours"
                                 type="number"
                                 min={1}
                                 max={8760}
                                 value={data.custom_frequency_hours}
-                                onChange={(event) => setData('custom_frequency_hours', event.target.value)}
+                                onChange={(event) =>
+                                    setData(
+                                        'custom_frequency_hours',
+                                        event.target.value,
+                                    )
+                                }
                                 disabled={structuralLocked}
                             />
-                            <InputError message={errors.custom_frequency_hours} />
+                            <InputError
+                                message={errors.custom_frequency_hours}
+                            />
                         </div>
                     ) : null}
 
@@ -230,7 +263,9 @@ export default function ProtocolForm({
                             id="instructions"
                             rows={4}
                             value={data.instructions}
-                            onChange={(event) => setData('instructions', event.target.value)}
+                            onChange={(event) =>
+                                setData('instructions', event.target.value)
+                            }
                             placeholder="Add frontline guidance for recording staff."
                         />
                         <InputError message={errors.instructions} />
@@ -245,16 +280,25 @@ export default function ProtocolForm({
                 <CardContent className="space-y-6">
                     <div className="grid gap-4 md:grid-cols-3">
                         <div className="space-y-1.5">
-                            <Label htmlFor="alert_if_missed_hours">Alert If Missed (Hours)</Label>
+                            <Label htmlFor="alert_if_missed_hours">
+                                Alert If Missed (Hours)
+                            </Label>
                             <Input
                                 id="alert_if_missed_hours"
                                 type="number"
                                 min={1}
                                 max={8760}
                                 value={data.alert_if_missed_hours}
-                                onChange={(event) => setData('alert_if_missed_hours', event.target.value)}
+                                onChange={(event) =>
+                                    setData(
+                                        'alert_if_missed_hours',
+                                        event.target.value,
+                                    )
+                                }
                             />
-                            <InputError message={errors.alert_if_missed_hours} />
+                            <InputError
+                                message={errors.alert_if_missed_hours}
+                            />
                         </div>
 
                         <div className="space-y-1.5">
@@ -263,7 +307,9 @@ export default function ProtocolForm({
                                 id="starts_at"
                                 type="date"
                                 value={data.starts_at}
-                                onChange={(event) => setData('starts_at', event.target.value)}
+                                onChange={(event) =>
+                                    setData('starts_at', event.target.value)
+                                }
                             />
                             <InputError message={errors.starts_at} />
                         </div>
@@ -274,7 +320,9 @@ export default function ProtocolForm({
                                 id="ends_at"
                                 type="date"
                                 value={data.ends_at}
-                                onChange={(event) => setData('ends_at', event.target.value)}
+                                onChange={(event) =>
+                                    setData('ends_at', event.target.value)
+                                }
                             />
                             <InputError message={errors.ends_at} />
                         </div>
@@ -282,17 +330,23 @@ export default function ProtocolForm({
 
                     <div className="flex items-center justify-between rounded-lg border p-4">
                         <div className="space-y-1">
-                            <Label htmlFor="is_active" className="text-sm font-medium">
+                            <Label
+                                htmlFor="is_active"
+                                className="text-sm font-medium"
+                            >
                                 Active Protocol
                             </Label>
                             <p className="text-sm text-muted-foreground">
-                                Inactive protocols stay visible in the register but no longer count as active.
+                                Inactive protocols stay visible in the register
+                                but no longer count as active.
                             </p>
                         </div>
                         <Switch
                             id="is_active"
                             checked={data.is_active}
-                            onCheckedChange={(checked) => setData('is_active', checked)}
+                            onCheckedChange={(checked) =>
+                                setData('is_active', checked)
+                            }
                         />
                     </div>
                     <InputError message={errors.is_active} />
@@ -302,19 +356,22 @@ export default function ProtocolForm({
                             <div>
                                 <p className="font-medium">Schedule history</p>
                                 <p className="text-muted-foreground">
-                                    {protocol.schedule_counts.total} items created
+                                    {protocol.schedule_counts.total} items
+                                    created
                                 </p>
                             </div>
                             <div>
                                 <p className="font-medium">Pending / overdue</p>
                                 <p className="text-muted-foreground">
-                                    {protocol.schedule_counts.pending} pending, {protocol.schedule_counts.overdue} overdue
+                                    {protocol.schedule_counts.pending} pending,{' '}
+                                    {protocol.schedule_counts.overdue} overdue
                                 </p>
                             </div>
                             <div>
                                 <p className="font-medium">Completed (30d)</p>
                                 <p className="text-muted-foreground">
-                                    {protocol.schedule_counts.completed_30d} completed
+                                    {protocol.schedule_counts.completed_30d}{' '}
+                                    completed
                                 </p>
                             </div>
                         </div>
@@ -330,8 +387,12 @@ export default function ProtocolForm({
                 </Link>
                 <Button type="submit" disabled={processing}>
                     {processing
-                        ? (mode === 'create' ? 'Creating...' : 'Saving...')
-                        : (mode === 'create' ? 'Create Protocol' : 'Save Protocol')}
+                        ? mode === 'create'
+                            ? 'Creating...'
+                            : 'Saving...'
+                        : mode === 'create'
+                          ? 'Create Protocol'
+                          : 'Save Protocol'}
                 </Button>
             </div>
         </form>

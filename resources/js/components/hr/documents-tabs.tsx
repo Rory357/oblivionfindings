@@ -26,24 +26,44 @@ type HrCan = {
  * rendered so the current page never hides its own tab.
  */
 export function DocumentsTabs({ active }: { active: DocumentsTab }) {
-    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth?.can
-        ?.hr;
+    const hr = (usePage().props as { auth?: { can?: { hr?: HrCan } } }).auth
+        ?.can?.hr;
 
     const all: Array<{ item: HrTabItem; show: boolean }> = [
         {
-            item: { id: 'library', label: 'Documents', icon: FolderOpen, tone: 'primary' },
+            item: {
+                id: 'library',
+                label: 'Documents',
+                icon: FolderOpen,
+                tone: 'primary',
+            },
             show: !!hr?.documents?.view,
         },
         {
-            item: { id: 'policies', label: 'Policies', icon: BookOpen, tone: 'violet' },
+            item: {
+                id: 'policies',
+                label: 'Policies',
+                icon: BookOpen,
+                tone: 'violet',
+            },
             show: !!hr?.policies?.view,
         },
         {
-            item: { id: 'signatures', label: 'Signatures', icon: PenSquare, tone: 'warning' },
+            item: {
+                id: 'signatures',
+                label: 'Signatures',
+                icon: PenSquare,
+                tone: 'warning',
+            },
             show: true,
         },
         {
-            item: { id: 'templates', label: 'Templates', icon: LayoutTemplate, tone: 'info' },
+            item: {
+                id: 'templates',
+                label: 'Templates',
+                icon: LayoutTemplate,
+                tone: 'info',
+            },
             show: !!hr?.documents?.manage,
         },
     ];

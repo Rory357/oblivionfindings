@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -23,6 +24,7 @@ class AttendanceController extends Controller
         protected ShiftHandoverService $handoverService,
         protected HandoverPresenter $handoverPresenter,
         protected TimeTrackingService $timeTrackingService,
+        protected UserSiteAccessService $siteAccess,
     ) {}
 
     public function index(Request $request)
@@ -139,7 +141,7 @@ class AttendanceController extends Controller
         // signed-in user, as does the `incoming` treatment only when viewing
         // yourself.
         $handovers = ShiftHandover::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess->applyHandoverScope($query, $auth, ['reports.viewAny']))
             ->whereIn('status', [ShiftHandoverService::STATUS_SUBMITTED, ShiftHandoverService::STATUS_ACKNOWLEDGED])
             ->where(function ($involving) use ($targetUserId) {
                 $involving->where('outgoing_staff_id', $targetUserId)
@@ -559,6 +561,13 @@ class AttendanceController extends Controller
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
+        $this->siteAccess->assertCanAccessHandover(
+            $auth,
+            $handover,
+            ['reports.viewAny'],
+            'You are not authorized to access handovers for this site.',
+        );
+
         $handover->loadMissing(['incomingShift:id,user_id', 'client:id,site_id']);
         $isUnassigned = $handover->incoming_staff_id === null && $handover->incoming_shift_id === null;
         $relatedToUser = (int) $handover->incoming_staff_id === (int) $auth->id
@@ -602,6 +611,7 @@ class AttendanceController extends Controller
         $windowEnd = $workerNow->copy()->addHours(36)->utc();
 
         return Shift::query()
+            ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
             ->where('user_id', $auth->id)
             ->where('client_id', $clientId)
             ->whereNotIn('status', ['cancelled', 'completed'])

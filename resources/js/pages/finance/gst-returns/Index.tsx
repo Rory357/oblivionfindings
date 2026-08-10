@@ -1,14 +1,34 @@
+import {
+    TaxTabsFooter,
+    formatMoney,
+    useRowContextMenu,
+    type RowCtxItem,
+} from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
-import { TaxTabsFooter, formatMoney, useRowContextMenu, type RowCtxItem } from '@/components/finance';
-import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
-import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator, Download, Eye } from 'lucide-react';
+import {
+    Calculator,
+    DollarSign,
+    Download,
+    Eye,
+    FileText,
+    Plus,
+    TrendingDown,
+    TrendingUp,
+} from 'lucide-react';
 import { useMemo } from 'react';
 
 type GstReturn = {
@@ -43,7 +63,11 @@ type PageProps = {
 };
 
 const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    new Date(dateStr).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 
 const frequencyLabels: Record<string, string> = {
     monthly: 'Monthly',
@@ -68,9 +92,18 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
 
     const kpis = useMemo(() => {
         const data = gstReturns.data;
-        const totalCollected = data.reduce((sum, r) => sum + Number(r.total_gst_collected), 0);
-        const totalPaid = data.reduce((sum, r) => sum + Number(r.total_gst_paid), 0);
-        const totalPayable = data.reduce((sum, r) => sum + Number(r.gst_payable), 0);
+        const totalCollected = data.reduce(
+            (sum, r) => sum + Number(r.total_gst_collected),
+            0,
+        );
+        const totalPaid = data.reduce(
+            (sum, r) => sum + Number(r.total_gst_paid),
+            0,
+        );
+        const totalPayable = data.reduce(
+            (sum, r) => sum + Number(r.gst_payable),
+            0,
+        );
         const draftCount = data.filter((r) => r.status === 'draft').length;
         return { totalCollected, totalPaid, totalPayable, draftCount };
     }, [gstReturns.data]);
@@ -90,13 +123,20 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
     };
 
     const hasFilters = Boolean(
-        (filters.status && filters.status !== 'all') || (filters.year && filters.year !== 'all'),
+        (filters.status && filters.status !== 'all') ||
+        (filters.year && filters.year !== 'all'),
     );
 
     // Right-click row menu — mirrors the row's existing navigation (Open).
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (gstReturn: GstReturn): RowCtxItem[] => [
-        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/gst-returns/${gstReturn.id}`) },
+        {
+            kind: 'item',
+            label: 'Open',
+            icon: Eye,
+            onSelect: () =>
+                router.visit(`/finance/gst-returns/${gstReturn.id}`),
+        },
     ];
 
     return (
@@ -105,20 +145,32 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Calculator}
                         title="GST Returns"
                         description="Manage and file GST returns with IRD"
                         stats={[
-                            { label: 'GST collected', value: formatMoney(kpis.totalCollected) },
-                            { label: 'GST paid', value: formatMoney(kpis.totalPaid) },
-                            { label: 'Net payable', value: formatMoney(Math.abs(kpis.totalPayable)) },
+                            {
+                                label: 'GST collected',
+                                value: formatMoney(kpis.totalCollected),
+                            },
+                            {
+                                label: 'GST paid',
+                                value: formatMoney(kpis.totalPaid),
+                            },
+                            {
+                                label: 'Net payable',
+                                value: formatMoney(Math.abs(kpis.totalPayable)),
+                            },
                             { label: 'Drafts', value: kpis.draftCount },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Button size="sm" variant="outline" asChild>
-                                    <a href={`/finance/gst-returns/export?${new URLSearchParams(Object.entries({ status: filters.status ?? '', year: filters.year ?? '' }).filter(([, v]) => v)).toString()}`}>
+                                    <a
+                                        href={`/finance/gst-returns/export?${new URLSearchParams(Object.entries({ status: filters.status ?? '', year: filters.year ?? '' }).filter(([, v]) => v)).toString()}`}
+                                    >
                                         <Download className="mr-1.5 h-4 w-4" />
                                         Export CSV
                                     </a>
@@ -144,8 +196,12 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                     <TrendingUp className="h-5 w-5 text-status-success" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">GST Collected</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">{formatMoney(kpis.totalCollected)}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        GST Collected
+                                    </p>
+                                    <p className="font-mono text-xl font-bold tabular-nums">
+                                        {formatMoney(kpis.totalCollected)}
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
@@ -157,8 +213,12 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                     <TrendingDown className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">GST Paid</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">{formatMoney(kpis.totalPaid)}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        GST Paid
+                                    </p>
+                                    <p className="font-mono text-xl font-bold tabular-nums">
+                                        {formatMoney(kpis.totalPaid)}
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
@@ -170,10 +230,18 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                     <DollarSign className="h-5 w-5 text-status-warning" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Net Payable</p>
-                                    <p className={`text-xl font-bold font-mono tabular-nums ${kpis.totalPayable < 0 ? 'text-status-success' : ''}`}>
-                                        {formatMoney(Math.abs(kpis.totalPayable))}
-                                        {kpis.totalPayable < 0 ? ' (Refund)' : ''}
+                                    <p className="text-sm text-muted-foreground">
+                                        Net Payable
+                                    </p>
+                                    <p
+                                        className={`font-mono text-xl font-bold tabular-nums ${kpis.totalPayable < 0 ? 'text-status-success' : ''}`}
+                                    >
+                                        {formatMoney(
+                                            Math.abs(kpis.totalPayable),
+                                        )}
+                                        {kpis.totalPayable < 0
+                                            ? ' (Refund)'
+                                            : ''}
                                     </p>
                                 </div>
                             </div>
@@ -186,8 +254,12 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                     <FileText className="h-5 w-5 text-muted-foreground" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Draft Returns</p>
-                                    <p className="text-xl font-bold">{kpis.draftCount}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Draft Returns
+                                    </p>
+                                    <p className="text-xl font-bold">
+                                        {kpis.draftCount}
+                                    </p>
                                 </div>
                             </div>
                         </CardContent>
@@ -204,29 +276,52 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                             <div className="flex items-center gap-3">
                                 <Select
                                     value={filters.status ?? 'all'}
-                                    onValueChange={(v) => applyFilter('status', v)}
+                                    onValueChange={(v) =>
+                                        applyFilter('status', v)
+                                    }
                                 >
-                                    <SelectTrigger className="w-[140px]" aria-label="Filter by status">
+                                    <SelectTrigger
+                                        className="w-[140px]"
+                                        aria-label="Filter by status"
+                                    >
                                         <SelectValue placeholder="Status" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Statuses</SelectItem>
-                                        <SelectItem value="draft">Draft</SelectItem>
-                                        <SelectItem value="filed">Filed</SelectItem>
-                                        <SelectItem value="amended">Amended</SelectItem>
+                                        <SelectItem value="all">
+                                            All Statuses
+                                        </SelectItem>
+                                        <SelectItem value="draft">
+                                            Draft
+                                        </SelectItem>
+                                        <SelectItem value="filed">
+                                            Filed
+                                        </SelectItem>
+                                        <SelectItem value="amended">
+                                            Amended
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <Select
                                     value={filters.year ?? 'all'}
-                                    onValueChange={(v) => applyFilter('year', v)}
+                                    onValueChange={(v) =>
+                                        applyFilter('year', v)
+                                    }
                                 >
-                                    <SelectTrigger className="w-[120px]" aria-label="Filter by year">
+                                    <SelectTrigger
+                                        className="w-[120px]"
+                                        aria-label="Filter by year"
+                                    >
                                         <SelectValue placeholder="Year" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All Years</SelectItem>
+                                        <SelectItem value="all">
+                                            All Years
+                                        </SelectItem>
                                         {years.map((y) => (
-                                            <SelectItem key={y} value={String(y)}>
+                                            <SelectItem
+                                                key={y}
+                                                value={String(y)}
+                                            >
                                                 {y}
                                             </SelectItem>
                                         ))}
@@ -240,14 +335,30 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b text-left text-muted-foreground">
-                                        <th className="pb-3 pr-4 font-medium">Period</th>
-                                        <th className="pb-3 pr-4 font-medium">Frequency</th>
-                                        <th className="pb-3 pr-4 font-medium">Basis</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Total Sales</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">GST Collected</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">GST Paid</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Net Payable</th>
-                                        <th className="pb-3 font-medium">Status</th>
+                                        <th className="pr-4 pb-3 font-medium">
+                                            Period
+                                        </th>
+                                        <th className="pr-4 pb-3 font-medium">
+                                            Frequency
+                                        </th>
+                                        <th className="pr-4 pb-3 font-medium">
+                                            Basis
+                                        </th>
+                                        <th className="pr-4 pb-3 text-right font-medium">
+                                            Total Sales
+                                        </th>
+                                        <th className="pr-4 pb-3 text-right font-medium">
+                                            GST Collected
+                                        </th>
+                                        <th className="pr-4 pb-3 text-right font-medium">
+                                            GST Paid
+                                        </th>
+                                        <th className="pr-4 pb-3 text-right font-medium">
+                                            Net Payable
+                                        </th>
+                                        <th className="pb-3 font-medium">
+                                            Status
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -269,7 +380,10 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                         className="border-0"
                                                         action={
                                                             <Link href="/finance/gst-returns/prepare">
-                                                                <Button size="sm">New GST return</Button>
+                                                                <Button size="sm">
+                                                                    New GST
+                                                                    return
+                                                                </Button>
                                                             </Link>
                                                         }
                                                     />
@@ -278,56 +392,87 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                         </tr>
                                     ) : (
                                         gstReturns.data.map((gstReturn) => {
-                                            const payable = Number(gstReturn.gst_payable);
+                                            const payable = Number(
+                                                gstReturn.gst_payable,
+                                            );
                                             const isRefund = payable < 0;
 
                                             return (
                                                 <tr
                                                     key={gstReturn.id}
-                                                    className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
+                                                    className="cursor-pointer border-b last:border-0 hover:bg-muted/50"
                                                     onClick={() =>
                                                         router.visit(
                                                             `/finance/gst-returns/${gstReturn.id}`,
                                                         )
                                                     }
-                                                    onContextMenu={rowMenu.open(rowMenuItems(gstReturn))}
+                                                    onContextMenu={rowMenu.open(
+                                                        rowMenuItems(gstReturn),
+                                                    )}
                                                 >
                                                     <td className="py-3 pr-4">
                                                         <div className="font-medium">
-                                                            {formatDate(gstReturn.period_start)} &ndash;{' '}
-                                                            {formatDate(gstReturn.period_end)}
+                                                            {formatDate(
+                                                                gstReturn.period_start,
+                                                            )}{' '}
+                                                            &ndash;{' '}
+                                                            {formatDate(
+                                                                gstReturn.period_end,
+                                                            )}
                                                         </div>
                                                         <div className="text-xs text-muted-foreground">
-                                                            IRD Period: {gstReturn.ird_period}
+                                                            IRD Period:{' '}
+                                                            {
+                                                                gstReturn.ird_period
+                                                            }
                                                         </div>
                                                     </td>
                                                     <td className="py-3 pr-4">
-                                                        {frequencyLabels[gstReturn.filing_frequency] ??
+                                                        {frequencyLabels[
+                                                            gstReturn
+                                                                .filing_frequency
+                                                        ] ??
                                                             gstReturn.filing_frequency}
                                                     </td>
                                                     <td className="py-3 pr-4">
-                                                        {basisLabels[gstReturn.basis] ?? gstReturn.basis}
+                                                        {basisLabels[
+                                                            gstReturn.basis
+                                                        ] ?? gstReturn.basis}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatMoney(gstReturn.total_sales)}
+                                                        {formatMoney(
+                                                            gstReturn.total_sales,
+                                                        )}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatMoney(gstReturn.total_gst_collected)}
+                                                        {formatMoney(
+                                                            gstReturn.total_gst_collected,
+                                                        )}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatMoney(gstReturn.total_gst_paid)}
+                                                        {formatMoney(
+                                                            gstReturn.total_gst_paid,
+                                                        )}
                                                     </td>
                                                     <td
                                                         className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
-                                                            isRefund ? 'text-status-success' : 'text-destructive'
+                                                            isRefund
+                                                                ? 'text-status-success'
+                                                                : 'text-destructive'
                                                         }`}
                                                     >
                                                         {isRefund ? '(' : ''}
-                                                        {formatMoney(Math.abs(payable))}
+                                                        {formatMoney(
+                                                            Math.abs(payable),
+                                                        )}
                                                         {isRefund ? ')' : ''}
                                                     </td>
                                                     <td className="py-3">
-                                                        <StatusBadge status={gstReturn.status} />
+                                                        <StatusBadge
+                                                            status={
+                                                                gstReturn.status
+                                                            }
+                                                        />
                                                     </td>
                                                 </tr>
                                             );
@@ -342,11 +487,17 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 {gstReturns.links.map((link, i) => (
                                     <Button
                                         key={i}
-                                        variant={link.active ? 'default' : 'outline'}
+                                        variant={
+                                            link.active ? 'default' : 'outline'
+                                        }
                                         size="sm"
                                         disabled={!link.url}
-                                        onClick={() => link.url && router.visit(link.url)}
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                        onClick={() =>
+                                            link.url && router.visit(link.url)
+                                        }
+                                        dangerouslySetInnerHTML={{
+                                            __html: link.label,
+                                        }}
                                     />
                                 ))}
                             </div>

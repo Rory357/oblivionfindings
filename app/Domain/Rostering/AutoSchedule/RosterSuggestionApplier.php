@@ -259,6 +259,12 @@ class RosterSuggestionApplier
             ]);
         }
 
+        if (! $suggestion->run?->site_id || (int) $suggestion->shift->site_id !== (int) $suggestion->run->site_id) {
+            throw ValidationException::withMessages([
+                'suggestion' => 'The suggested shift no longer belongs to this Site run.',
+            ]);
+        }
+
         if ($suggestion->shift->user_id) {
             $suggestion->forceFill(['status' => RosterSuggestion::STATUS_CONFLICTED])->save();
 

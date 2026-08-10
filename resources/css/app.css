@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-@import "tw-animate-css";
+@import 'tw-animate-css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -129,8 +129,10 @@
     --color-amberx-bg: var(--amberx-bg);
 
     /* Meal planner elevation — brand-derived (was a fixed green hue 153) */
-    --shadow-float: 0 18px 40px -12px oklch(from var(--primary) 0.30 0.06 h / 0.30);
-    --shadow-hero: 0 24px 60px -22px oklch(from var(--primary) 0.40 0.13 h / 0.45);
+    --shadow-float: 0 18px 40px -12px
+        oklch(from var(--primary) 0.3 0.06 h / 0.3);
+    --shadow-hero: 0 24px 60px -22px
+        oklch(from var(--primary) 0.4 0.13 h / 0.45);
 
     --color-brand-deep: var(--brand-deep);
     --color-brand-tint-deep: var(--brand-tint-deep);
@@ -139,15 +141,15 @@
 
 :root {
     --color-purple-50: oklch(97% 0.015 277);
-    --color-purple-100: oklch(94% 0.030 277);
-    --color-purple-200: oklch(88% 0.060 277);
-    --color-purple-300: oklch(78% 0.110 277);
-    --color-purple-400: oklch(66% 0.170 277);
+    --color-purple-100: oklch(94% 0.03 277);
+    --color-purple-200: oklch(88% 0.06 277);
+    --color-purple-300: oklch(78% 0.11 277);
+    --color-purple-400: oklch(66% 0.17 277);
     --color-purple-500: oklch(58.5% 0.233 277);
     --color-purple-600: oklch(51.1% 0.262 277);
     --color-purple-700: oklch(45% 0.225 277);
     --color-purple-800: oklch(39.8% 0.195 277);
-    --color-purple-900: oklch(32% 0.160 277);
+    --color-purple-900: oklch(32% 0.16 277);
     --background: oklch(0.98 0.006 277);
     --foreground: oklch(0.15 0.015 277);
     --card: oklch(1 0 0);
@@ -157,29 +159,29 @@
     --primary: var(--color-purple-600);
     --primary-foreground: oklch(1 0 0);
     --secondary: oklch(0.96 0.008 277);
-    --secondary-foreground: oklch(0.20 0.015 277);
+    --secondary-foreground: oklch(0.2 0.015 277);
     --muted: oklch(0.96 0.006 277);
     --muted-foreground: oklch(0.33 0.015 277);
     --accent: var(--color-purple-100);
-    --accent-foreground: oklch(0.20 0.015 277);
+    --accent-foreground: oklch(0.2 0.015 277);
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(0.577 0.245 27.325);
-    --border: oklch(0.92 0.010 277);
-    --input: oklch(0.92 0.010 277);
+    --border: oklch(0.92 0.01 277);
+    --input: oklch(0.92 0.01 277);
     --ring: var(--color-purple-500);
     --chart-1: var(--color-purple-500);
     --chart-2: oklch(0.65 0.18 150);
-    --chart-3: oklch(0.55 0.20 30);
+    --chart-3: oklch(0.55 0.2 30);
     --chart-4: oklch(0.75 0.15 85);
     --chart-5: var(--color-purple-300);
     --radius: 0.75rem;
     --sidebar: oklch(0.97 0.005 277);
-    --sidebar-foreground: oklch(0.32 0.020 277);
+    --sidebar-foreground: oklch(0.32 0.02 277);
     --sidebar-primary: var(--color-purple-500);
     --sidebar-primary-foreground: oklch(1 0 0);
     --sidebar-accent: oklch(0.93 0.015 277);
     --sidebar-accent-foreground: oklch(0.25 0.015 277);
-    --sidebar-border: oklch(0.92 0.010 277);
+    --sidebar-border: oklch(0.92 0.01 277);
     --sidebar-ring: var(--color-purple-400);
 
     /* Status tokens — semantic meaning, not brand-tied. Foreground L values
@@ -187,7 +189,7 @@
        *-bg token; verified via axe-core in tests/e2e/my-day-a11y.spec.ts. */
     --status-success: oklch(45% 0.15 150);
     --status-success-bg: oklch(94% 0.05 150);
-    --status-success-foreground: oklch(28% 0.10 150);
+    --status-success-foreground: oklch(28% 0.1 150);
     --status-warning: oklch(42% 0.13 85);
     --status-warning-bg: oklch(95% 0.06 85);
     --status-warning-foreground: oklch(30% 0.11 85);
@@ -210,20 +212,44 @@
     --category-ops: var(--primary);
     --category-ops-bg: color-mix(in oklch, var(--primary) 12%, transparent);
     --category-hr: oklch(from var(--primary) l c calc(h + 120));
-    --category-hr-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 120)) 12%, transparent);
+    --category-hr-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 120)) 12%,
+        transparent
+    );
     --category-compliance: oklch(from var(--primary) l c calc(h + 60));
-    --category-compliance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 60)) 12%, transparent);
+    --category-compliance-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 60)) 12%,
+        transparent
+    );
     --category-incidents: var(--status-critical);
     --category-incidents-bg: var(--status-critical-bg);
     --category-governance: var(--primary);
-    --category-governance-bg: color-mix(in oklch, var(--primary) 12%, transparent);
+    --category-governance-bg: color-mix(
+        in oklch,
+        var(--primary) 12%,
+        transparent
+    );
     --category-sites: oklch(from var(--primary) l c calc(h + 210));
-    --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 12%, transparent);
+    --category-sites-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 210)) 12%,
+        transparent
+    );
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
-    --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 12%, transparent);
+    --category-fleet-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 45)) 12%,
+        transparent
+    );
     /* Finance — teal/green "money" hue (+170), distinct from sites +210 / fleet +45 */
     --category-finance: oklch(from var(--primary) l c calc(h + 170));
-    --category-finance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 170)) 12%, transparent);
+    --category-finance-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 170)) 12%,
+        transparent
+    );
 
     /* Meal Planner accent — brand-derived. Was the Sites green; now follows --primary
        so the planner matches the brand colour from Settings → Branding (parity with the
@@ -238,25 +264,59 @@
     /* Site Calendar event-source palette — a fixed, distinct-hue set (NOT brand
        tied) so the up-to-11 obligation sources stay legible against each other.
        Per source: base (label/dot), -bg (chip fill), -ln (chip border). */
-    --src-event: oklch(52% 0.16 255);        --src-event-bg: oklch(96% 0.035 255);     --src-event-ln: oklch(87% 0.07 255);
-    --src-inspection: oklch(54% 0.14 70);    --src-inspection-bg: oklch(96% 0.05 75);  --src-inspection-ln: oklch(86% 0.09 75);
-    --src-compliance: oklch(51% 0.20 290);   --src-compliance-bg: oklch(96% 0.04 290); --src-compliance-ln: oklch(88% 0.07 290);
-    --src-credential: oklch(50% 0.17 322);   --src-credential-bg: oklch(96% 0.035 322);--src-credential-ln: oklch(88% 0.06 322);
-    --src-checklist: oklch(48% 0.13 155);    --src-checklist-bg: oklch(95% 0.05 155);  --src-checklist-ln: oklch(85% 0.08 155);
-    --src-hazard: oklch(52% 0.20 28);        --src-hazard-bg: oklch(96% 0.05 28);      --src-hazard-ln: oklch(87% 0.09 28);
-    --src-vendor: oklch(48% 0.14 205);       --src-vendor-bg: oklch(96% 0.04 200);     --src-vendor-ln: oklch(86% 0.07 200);
-    --src-asset: oklch(48% 0.13 235);        --src-asset-bg: oklch(96% 0.035 230);    --src-asset-ln: oklch(87% 0.06 230);
-    --src-meal: oklch(56% 0.15 8);           --src-meal-bg: oklch(96% 0.04 8);         --src-meal-ln: oklch(89% 0.07 8);
-    --src-damage: oklch(56% 0.15 52);        --src-damage-bg: oklch(96% 0.06 55);      --src-damage-ln: oklch(87% 0.10 55);
-    --src-emergency: oklch(48% 0.21 18);     --src-emergency-bg: oklch(95% 0.06 18);   --src-emergency-ln: oklch(86% 0.10 18);
-    --src-drill: oklch(55% 0.18 45);         --src-drill-bg: oklch(96% 0.05 45);       --src-drill-ln: oklch(87% 0.10 45);
-    --src-respite: oklch(50% 0.16 190);      --src-respite-bg: oklch(96% 0.04 190);    --src-respite-ln: oklch(88% 0.07 190);
-    --src-participation: oklch(52% 0.17 340); --src-participation-bg: oklch(96% 0.045 340); --src-participation-ln: oklch(88% 0.07 340);
-    --src-ppe: oklch(52% 0.16 120);          --src-ppe-bg: oklch(96% 0.05 120);        --src-ppe-ln: oklch(86% 0.09 120);
-    --src-medication: oklch(50% 0.15 172);   --src-medication-bg: oklch(96% 0.04 172); --src-medication-ln: oklch(87% 0.07 172);
+    --src-event: oklch(52% 0.16 255);
+    --src-event-bg: oklch(96% 0.035 255);
+    --src-event-ln: oklch(87% 0.07 255);
+    --src-inspection: oklch(54% 0.14 70);
+    --src-inspection-bg: oklch(96% 0.05 75);
+    --src-inspection-ln: oklch(86% 0.09 75);
+    --src-compliance: oklch(51% 0.2 290);
+    --src-compliance-bg: oklch(96% 0.04 290);
+    --src-compliance-ln: oklch(88% 0.07 290);
+    --src-credential: oklch(50% 0.17 322);
+    --src-credential-bg: oklch(96% 0.035 322);
+    --src-credential-ln: oklch(88% 0.06 322);
+    --src-checklist: oklch(48% 0.13 155);
+    --src-checklist-bg: oklch(95% 0.05 155);
+    --src-checklist-ln: oklch(85% 0.08 155);
+    --src-hazard: oklch(52% 0.2 28);
+    --src-hazard-bg: oklch(96% 0.05 28);
+    --src-hazard-ln: oklch(87% 0.09 28);
+    --src-vendor: oklch(48% 0.14 205);
+    --src-vendor-bg: oklch(96% 0.04 200);
+    --src-vendor-ln: oklch(86% 0.07 200);
+    --src-asset: oklch(48% 0.13 235);
+    --src-asset-bg: oklch(96% 0.035 230);
+    --src-asset-ln: oklch(87% 0.06 230);
+    --src-meal: oklch(56% 0.15 8);
+    --src-meal-bg: oklch(96% 0.04 8);
+    --src-meal-ln: oklch(89% 0.07 8);
+    --src-damage: oklch(56% 0.15 52);
+    --src-damage-bg: oklch(96% 0.06 55);
+    --src-damage-ln: oklch(87% 0.1 55);
+    --src-emergency: oklch(48% 0.21 18);
+    --src-emergency-bg: oklch(95% 0.06 18);
+    --src-emergency-ln: oklch(86% 0.1 18);
+    --src-drill: oklch(55% 0.18 45);
+    --src-drill-bg: oklch(96% 0.05 45);
+    --src-drill-ln: oklch(87% 0.1 45);
+    --src-respite: oklch(50% 0.16 190);
+    --src-respite-bg: oklch(96% 0.04 190);
+    --src-respite-ln: oklch(88% 0.07 190);
+    --src-participation: oklch(52% 0.17 340);
+    --src-participation-bg: oklch(96% 0.045 340);
+    --src-participation-ln: oklch(88% 0.07 340);
+    --src-ppe: oklch(52% 0.16 120);
+    --src-ppe-bg: oklch(96% 0.05 120);
+    --src-ppe-ln: oklch(86% 0.09 120);
+    --src-medication: oklch(50% 0.15 172);
+    --src-medication-bg: oklch(96% 0.04 172);
+    --src-medication-ln: oklch(87% 0.07 172);
     /* External busy (two-way sync, pull-only) — deliberately desaturated slate so it
        reads as "not ours / blocked" against the chromatic obligation sources. */
-    --src-external: oklch(46% 0.03 265);     --src-external-bg: oklch(95% 0.012 265);  --src-external-ln: oklch(87% 0.02 265);
+    --src-external: oklch(46% 0.03 265);
+    --src-external-bg: oklch(95% 0.012 265);
+    --src-external-ln: oklch(87% 0.02 265);
 
     /* Brand-derived shades used by the /my-day redesign. The hero uses
        --brand-tint-deep for the "now" rule borders, and --text-faint for
@@ -279,36 +339,36 @@
 }
 
 .dark {
-    --background: oklch(0.10 0.012 277);
+    --background: oklch(0.1 0.012 277);
     --foreground: oklch(0.95 0.005 277);
     --card: oklch(0.14 0.018 277);
     --card-foreground: oklch(0.95 0.005 277);
     --popover: oklch(0.14 0.018 277);
     --popover-foreground: oklch(0.95 0.005 277);
-    --primary: oklch(0.65 0.200 277);
+    --primary: oklch(0.65 0.2 277);
     --primary-foreground: oklch(1 0 0);
-    --secondary: oklch(0.20 0.015 277);
+    --secondary: oklch(0.2 0.015 277);
     --secondary-foreground: oklch(0.95 0.005 277);
     --muted: oklch(0.18 0.012 277);
-    --muted-foreground: oklch(0.60 0.015 277);
+    --muted-foreground: oklch(0.6 0.015 277);
     --accent: var(--color-purple-800);
     --accent-foreground: oklch(0.95 0.005 277);
-    --destructive: oklch(0.50 0.200 25);
-    --destructive-foreground: oklch(0.90 0.05 25);
+    --destructive: oklch(0.5 0.2 25);
+    --destructive-foreground: oklch(0.9 0.05 25);
     --border: oklch(0.22 0.018 277);
     --input: oklch(0.22 0.018 277);
     --ring: var(--color-purple-400);
     --chart-1: var(--color-purple-400);
-    --chart-2: oklch(0.70 0.16 150);
+    --chart-2: oklch(0.7 0.16 150);
     --chart-3: oklch(0.65 0.18 30);
     --chart-4: oklch(0.78 0.14 85);
     --chart-5: var(--color-purple-300);
     --sidebar: oklch(0.16 0.018 277);
-    --sidebar-foreground: oklch(0.70 0.015 277);
+    --sidebar-foreground: oklch(0.7 0.015 277);
     --sidebar-primary: var(--color-purple-400);
     --sidebar-primary-foreground: oklch(1 0 0);
-    --sidebar-accent: oklch(0.22 0.020 277);
-    --sidebar-accent-foreground: oklch(0.90 0.005 277);
+    --sidebar-accent: oklch(0.22 0.02 277);
+    --sidebar-accent-foreground: oklch(0.9 0.005 277);
     --sidebar-border: oklch(0.22 0.015 277);
     --sidebar-ring: var(--color-purple-400);
 
@@ -320,8 +380,8 @@
     --status-warning: oklch(75% 0.15 85);
     --status-warning-bg: oklch(24% 0.08 85);
     --status-warning-foreground: oklch(92% 0.06 85);
-    --status-critical: oklch(70% 0.20 25);
-    --status-critical-bg: oklch(24% 0.10 25);
+    --status-critical: oklch(70% 0.2 25);
+    --status-critical-bg: oklch(24% 0.1 25);
     --status-critical-foreground: oklch(92% 0.06 25);
     --status-info: var(--primary);
     --status-info-bg: var(--accent);
@@ -330,26 +390,50 @@
     --status-neutral-bg: var(--muted);
 
     /* "Live" (in-progress) teal pair — dark variants */
-    --live: oklch(72% 0.10 200);
+    --live: oklch(72% 0.1 200);
     --live-bg: oklch(28% 0.05 200);
 
     /* Category tokens — dark variants (same derivation pattern, different opacity) */
     --category-ops: var(--primary);
     --category-ops-bg: color-mix(in oklch, var(--primary) 20%, transparent);
     --category-hr: oklch(from var(--primary) l c calc(h + 120));
-    --category-hr-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 120)) 20%, transparent);
+    --category-hr-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 120)) 20%,
+        transparent
+    );
     --category-compliance: oklch(from var(--primary) l c calc(h + 60));
-    --category-compliance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 60)) 20%, transparent);
+    --category-compliance-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 60)) 20%,
+        transparent
+    );
     --category-incidents: var(--status-critical);
     --category-incidents-bg: var(--status-critical-bg);
     --category-governance: var(--primary);
-    --category-governance-bg: color-mix(in oklch, var(--primary) 20%, transparent);
+    --category-governance-bg: color-mix(
+        in oklch,
+        var(--primary) 20%,
+        transparent
+    );
     --category-sites: oklch(from var(--primary) l c calc(h + 210));
-    --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 20%, transparent);
+    --category-sites-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 210)) 20%,
+        transparent
+    );
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
-    --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 20%, transparent);
+    --category-fleet-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 45)) 20%,
+        transparent
+    );
     --category-finance: oklch(from var(--primary) l c calc(h + 170));
-    --category-finance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 170)) 20%, transparent);
+    --category-finance-bg: color-mix(
+        in oklch,
+        oklch(from var(--primary) l c calc(h + 170)) 20%,
+        transparent
+    );
 
     /* Meal Planner accent — brand-derived (dark) */
     --sites: var(--primary);
@@ -360,8 +444,8 @@
 
     /* Brand-derived shades — dark variants */
     --brand-deep: oklch(from var(--primary) calc(l + 0.06) c h);
-    --brand-tint-deep: oklch(from var(--primary) 0.42 0.10 h);
-    --text-faint: oklch(from var(--foreground) 0.50 c h);
+    --brand-tint-deep: oklch(from var(--primary) 0.42 0.1 h);
+    --text-faint: oklch(from var(--foreground) 0.5 c h);
 }
 
 @layer base {
@@ -392,14 +476,14 @@ html.reduce-motion *::after {
     scroll-behavior: auto !important;
 }
 
-html[data-density="compact"] [data-sidebar-item],
-html[data-density="compact"] [data-slot="sidebar-menu-button"] {
+html[data-density='compact'] [data-sidebar-item],
+html[data-density='compact'] [data-slot='sidebar-menu-button'] {
     padding-block: 0.25rem;
     font-size: 0.8125rem;
 }
 
-html[data-density="comfortable"] [data-sidebar-item],
-html[data-density="comfortable"] [data-slot="sidebar-menu-button"] {
+html[data-density='comfortable'] [data-sidebar-item],
+html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     padding-block: 0.5rem;
 }
 
@@ -423,29 +507,48 @@ html[data-density="comfortable"] [data-slot="sidebar-menu-button"] {
 }
 
 /* Hide scrollbars on icon sidebar */
-.scrollbar-none::-webkit-scrollbar { display: none; }
-.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
 
 /* Slim, themed scrollbar (used on horizontally-scrolling tab strips) */
-.scrollbar-pretty { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.scrollbar-pretty::-webkit-scrollbar { height: 6px; width: 6px; }
-.scrollbar-pretty::-webkit-scrollbar-track { background: transparent; }
-.scrollbar-pretty::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 9999px; }
-.scrollbar-pretty:hover::-webkit-scrollbar-thumb { background-color: var(--muted-foreground); opacity: 0.4; }
+.scrollbar-pretty {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+.scrollbar-pretty::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+.scrollbar-pretty::-webkit-scrollbar-track {
+    background: transparent;
+}
+.scrollbar-pretty::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+}
+.scrollbar-pretty:hover::-webkit-scrollbar-thumb {
+    background-color: var(--muted-foreground);
+    opacity: 0.4;
+}
 
 /* Instagram-style gradient hover for sidebar icons */
 .group\/item:hover .icon-gradient-bg {
-    background: linear-gradient(135deg, 
-        #6366f1 0%,    /* Indigo */
-        #a855f7 50%,   /* Purple */
-        #ec4899 100%   /* Pink */
+    background: linear-gradient(
+        135deg,
+        #6366f1 0%,
+        /* Indigo */ #a855f7 50%,
+        /* Purple */ #ec4899 100% /* Pink */
     );
 }
 
 .group\/item:hover .icon-gradient-bg svg {
     color: white;
 }
-
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Frontline / staff shell support (PR 24)
@@ -626,7 +729,12 @@ html[data-density="comfortable"] [data-slot="sidebar-menu-button"] {
 /* Slim scrollbars for meal-planner grids, popovers & dropdowns. */
 .nice-scroll {
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
+    scrollbar-color: color-mix(
+            in oklch,
+            var(--muted-foreground) 35%,
+            transparent
+        )
+        transparent;
 }
 .nice-scroll::-webkit-scrollbar {
     width: 8px;

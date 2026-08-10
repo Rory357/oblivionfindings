@@ -13,28 +13,23 @@ use App\Domain\Hr\Models\HrTimeEntry;
 test('core HR workhorse factories create valid records', function () {
     $profile = HrEmployeeProfile::factory()->create();
     $balance = HrLeaveBalance::factory()->create([
-        'tenant_id' => $profile->tenant_id,
         'user_id' => $profile->user_id,
         'leave_type' => 'annual',
         'year' => 2026,
     ]);
     $candidate = HrCandidate::factory()->create();
     $application = HrApplication::factory()->create([
-        'tenant_id' => $candidate->tenant_id,
         'candidate_id' => $candidate->id,
     ]);
     $timeEntry = HrTimeEntry::factory()->create([
-        'tenant_id' => $profile->tenant_id,
         'user_id' => $profile->user_id,
     ]);
     $document = HrDocument::factory()->create([
-        'tenant_id' => $profile->tenant_id,
         'employee_profile_id' => $profile->id,
     ]);
     $payrollRun = HrPayrollRun::factory()->create();
     $course = HrCourse::factory()->create();
     $enrollment = HrCourseEnrollment::factory()->create([
-        'tenant_id' => $course->tenant_id,
         'course_id' => $course->id,
         'user_id' => $profile->user_id,
     ]);

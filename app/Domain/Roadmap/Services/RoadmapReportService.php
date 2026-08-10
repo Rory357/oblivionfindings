@@ -11,24 +11,22 @@ class RoadmapReportService
     public function generate(
         string $reportType,
         ?QuarterlyRoadmapPlan $plan,
-        ?int $tenantId,
         ?int $generatedBy = null
     ): ReportSnapshot {
         $payload = match ($reportType) {
-            'budget_first' => $this->budgetFirstPayload($plan, $tenantId),
-            'board_ceo_short' => $this->boardCeoShortPayload($plan, $tenantId),
-            'security_compliance' => $this->securityCompliancePayload($plan, $tenantId),
-            'house_rollout' => $this->houseRolloutPayload($plan, $tenantId),
-            'maintenance_sop' => $this->maintenanceSopPayload($plan, $tenantId),
-            'scoring_transparency' => $this->scoringTransparencyPayload($plan, $tenantId),
-            default => $this->bestAllRoundPayload($plan, $tenantId),
+            'budget_first' => $this->budgetFirstPayload($plan),
+            'board_ceo_short' => $this->boardCeoShortPayload($plan),
+            'security_compliance' => $this->securityCompliancePayload($plan),
+            'house_rollout' => $this->houseRolloutPayload($plan),
+            'maintenance_sop' => $this->maintenanceSopPayload($plan),
+            'scoring_transparency' => $this->scoringTransparencyPayload($plan),
+            default => $this->bestAllRoundPayload($plan),
         };
 
         $checksum = hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE));
         $name = strtoupper($reportType).' '.now()->format('Y-m-d H:i');
 
         return ReportSnapshot::create([
-            'tenant_id' => $tenantId,
             'quarterly_plan_id' => $plan?->id,
             'report_type' => $reportType,
             'name' => $name,
@@ -40,9 +38,9 @@ class RoadmapReportService
         ]);
     }
 
-    protected function bestAllRoundPayload(?QuarterlyRoadmapPlan $plan, ?int $tenantId): array
+    protected function bestAllRoundPayload(?QuarterlyRoadmapPlan $plan): array
     {
-        $initiatives = $this->baseInitiatives($plan, $tenantId);
+        $initiatives = $this->baseInitiatives($plan);
 
         return [
             'type' => 'best_all_round',
@@ -57,9 +55,9 @@ class RoadmapReportService
         ];
     }
 
-    protected function budgetFirstPayload(?QuarterlyRoadmapPlan $plan, ?int $tenantId): array
+    protected function budgetFirstPayload(?QuarterlyRoadmapPlan $plan): array
     {
-        $initiatives = $this->baseInitiatives($plan, $tenantId)
+        $initiatives = $this->baseInitiatives($plan)
             ->sortByDesc(function ($item) {
                 $cost = max(1, (float) $item['budget_total']);
 
@@ -76,9 +74,9 @@ class RoadmapReportService
         ];
     }
 
-    protected function boardCeoShortPayload(?QuarterlyRoadmapPlan $plan, ?int $tenantId): array
+    protected function boardCeoShortPayload(?QuarterlyRoadmapPlan $plan): array
     {
-        $initiatives = $this->baseInitiatives($plan, $tenantId)
+        $initiatives = $this->baseInitiatives($plan)
             ->sortByDesc('score')
             ->take(8)
             ->values();
@@ -98,9 +96,9 @@ class RoadmapReportService
         ];
     }
 
-    protected function securityCompliancePayload(?QuarterlyRoadmapPlan $plan, ?int $tenantId): array
+    protected function securityCompliancePayload(?QuarterlyRoadmapPlan $plan): array
     {
-        $initiatives = $this->baseInitiatives($plan, $tenantId)
+        $initiatives = $this->baseInitiatives($plan)
             ->filter(fn ($item) => in_array($item['stream'], ['it', 'continuous_improvement'], true))
             ->values();
 
@@ -118,10 +116,9 @@ class RoadmapReportService
         ];
     }
 
-    protected function houseRolloutPayload(?QuarterlyRoadmapPlan $plan, ?int $tenantId): array
+    protected function houseRolloutPayload(?QuarterlyRoadmapPlan $plan): array
     {
         $initiatives = Initiative::query()
-            ->forTenant($tenantId)
             ->with(['siteScope.sites.site'])
             ->when($plan !== null, function ($query) use ($plan) {
                 $query->whereIn('id', $plan->items()->pluck('initiative_id'));
@@ -154,10 +151,9 @@ class RoadmapReportService
         ];
     }
 
-    protected function maintenanceSopPayload(?QuarterlyRoadmapPlan $plan, ?int $tenantId): array
+    protected function maintenanceSopPayload(?QuarterlyRoadmapPlan $plan): array
     {
         $initiatives = Initiative::query()
-            ->forTenant($tenantId)
             ->whereIn('stream', ['maintenance', 'operations'])
             ->with(['tasks'])
             ->when($plan !== null, function ($query) use ($plan) {
@@ -182,10 +178,9 @@ class RoadmapReportService
         ];
     }
 
-    protected function scoringTransparencyPayload(?QuarterlyRoadmapPlan $plan, ?int $tenantId): array
+    protected function scoringTransparencyPayload(?QuarterlyRoadmapPlan $plan): array
     {
         $initiatives = Initiative::query()
-            ->forTenant($tenantId)
             ->when($plan !== null, fn ($q) => $q->whereIn('id', $plan->items()->pluck('initiative_id')))
             ->get();
 
@@ -206,10 +201,9 @@ class RoadmapReportService
         ];
     }
 
-    protected function baseInitiatives(?QuarterlyRoadmapPlan $plan, ?int $tenantId)
+    protected function baseInitiatives(?QuarterlyRoadmapPlan $plan)
     {
         return Initiative::query()
-            ->forTenant($tenantId)
             ->with(['budgets', 'riskLinks', 'assurancePlans'])
             ->when($plan !== null, fn ($q) => $q->whereIn('id', $plan->items()->pluck('initiative_id')))
             ->get()

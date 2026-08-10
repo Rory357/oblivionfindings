@@ -1,15 +1,21 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import { type BreadcrumbItem } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
-import { BankingTabsFooter, PettyCashFundDialog, formatMoney, useRowContextMenu, type RowCtxItem, type UserOption } from '@/components/finance';
 import type { AccountOption } from '@/components/finance';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import {
+    BankingTabsFooter,
+    PettyCashFundDialog,
+    formatMoney,
+    useRowContextMenu,
+    type RowCtxItem,
+    type UserOption,
+} from '@/components/finance';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyList } from '@/components/ui/empty-state';
-import { Plus, Wallet, Coins, Download, Eye } from 'lucide-react';
+import AppLayout from '@/layouts/app-layout';
+import { PageProps, type BreadcrumbItem } from '@/types';
+import { Head, Link, router } from '@inertiajs/react';
+import { Coins, Download, Eye, Plus, Wallet } from 'lucide-react';
 import { useState } from 'react';
 
 interface Fund {
@@ -34,7 +40,12 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Petty Cash', href: '/finance/petty-cash' },
 ];
 
-export default function PettyCashIndex({ funds, canManage = false, accounts = [], users = [] }: Props) {
+export default function PettyCashIndex({
+    funds,
+    canManage = false,
+    accounts = [],
+    users = [],
+}: Props) {
     const [createOpen, setCreateOpen] = useState(false);
     const activeCount = funds.filter((f) => f.is_active).length;
     const totalFloat = funds.reduce((s, f) => s + f.float_amount, 0);
@@ -43,7 +54,12 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
     // Right-click row menu — mirrors the card's existing navigation (Open).
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (fund: Fund): RowCtxItem[] => [
-        { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/petty-cash/${fund.id}`) },
+        {
+            kind: 'item',
+            label: 'Open',
+            icon: Eye,
+            onSelect: () => router.visit(`/finance/petty-cash/${fund.id}`),
+        },
     ];
 
     return (
@@ -52,15 +68,22 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Coins}
                         title="Petty Cash Funds"
                         description="Manage petty cash floats and transactions"
                         stats={[
                             { label: 'Funds', value: funds.length },
                             { label: 'Active', value: activeCount },
-                            { label: 'Total float', value: formatMoney(totalFloat) },
-                            { label: 'Total balance', value: formatMoney(totalBalance) },
+                            {
+                                label: 'Total float',
+                                value: formatMoney(totalFloat),
+                            },
+                            {
+                                label: 'Total balance',
+                                value: formatMoney(totalBalance),
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
@@ -71,7 +94,10 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                                     </a>
                                 </Button>
                                 {canManage && (
-                                    <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         New Fund
                                     </Button>
@@ -93,7 +119,10 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                                 className="border-0"
                                 action={
                                     canManage ? (
-                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setCreateOpen(true)}
+                                        >
                                             New fund
                                         </Button>
                                     ) : undefined
@@ -104,44 +133,69 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                 ) : (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {funds.map((fund) => {
-                            const variance = fund.current_balance - fund.float_amount;
+                            const variance =
+                                fund.current_balance - fund.float_amount;
                             return (
-                                <Link key={fund.id} href={`/finance/petty-cash/${fund.id}`}>
+                                <Link
+                                    key={fund.id}
+                                    href={`/finance/petty-cash/${fund.id}`}
+                                >
                                     <Card
                                         className="transition-shadow hover:shadow-md"
-                                        onContextMenu={rowMenu.open(rowMenuItems(fund))}
+                                        onContextMenu={rowMenu.open(
+                                            rowMenuItems(fund),
+                                        )}
                                     >
                                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                            <CardTitle className="text-lg">{fund.name}</CardTitle>
+                                            <CardTitle className="text-lg">
+                                                {fund.name}
+                                            </CardTitle>
                                             {fund.is_active ? (
-                                                <Badge variant="outline" className="border-status-success/30 text-status-success">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-status-success/30 text-status-success"
+                                                >
                                                     Active
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="secondary">Inactive</Badge>
+                                                <Badge variant="secondary">
+                                                    Inactive
+                                                </Badge>
                                             )}
                                         </CardHeader>
                                         <CardContent className="space-y-3">
                                             <div className="grid grid-cols-2 gap-2 text-sm">
                                                 <div>
-                                                    <p className="text-muted-foreground">Float</p>
+                                                    <p className="text-muted-foreground">
+                                                        Float
+                                                    </p>
                                                     <p className="font-semibold">
-                                                        {formatMoney(fund.float_amount)}
+                                                        {formatMoney(
+                                                            fund.float_amount,
+                                                        )}
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-muted-foreground">Current Balance</p>
+                                                    <p className="text-muted-foreground">
+                                                        Current Balance
+                                                    </p>
                                                     <p className="font-semibold">
-                                                        {formatMoney(fund.current_balance)}
+                                                        {formatMoney(
+                                                            fund.current_balance,
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
                                             {variance !== 0 && (
                                                 <div className="text-sm">
-                                                    <span className="text-muted-foreground">Variance: </span>
+                                                    <span className="text-muted-foreground">
+                                                        Variance:{' '}
+                                                    </span>
                                                     <span
                                                         className={
-                                                            variance < 0 ? 'font-medium text-destructive' : 'text-status-success'
+                                                            variance < 0
+                                                                ? 'font-medium text-destructive'
+                                                                : 'text-status-success'
                                                         }
                                                     >
                                                         {formatMoney(variance)}
@@ -150,8 +204,12 @@ export default function PettyCashIndex({ funds, canManage = false, accounts = []
                                             )}
                                             {fund.custodian_name && (
                                                 <div className="text-sm">
-                                                    <span className="text-muted-foreground">Custodian: </span>
-                                                    <span>{fund.custodian_name}</span>
+                                                    <span className="text-muted-foreground">
+                                                        Custodian:{' '}
+                                                    </span>
+                                                    <span>
+                                                        {fund.custodian_name}
+                                                    </span>
                                                 </div>
                                             )}
                                             {fund.gl_account_name && (

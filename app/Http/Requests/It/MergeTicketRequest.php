@@ -2,26 +2,25 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use App\Models\ItTicket;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Merge the route ticket (SOURCE) into a TARGET survivor. Authorisation is the
- * ItTicketPolicy@merge gate over both tickets — agent-only, no self-merge, no
- * re-merging a merged source, a live target, same tenant.
+ * Controller-owned canonical access checks conceal either inaccessible parent
+ * before the lifecycle policy evaluates the two visible tickets.
  */
 class MergeTicketRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
         $user = $this->user();
-        $source = $this->route('ticket');
-        $target = $this->targetTicket();
+        $this->workableMergeParentsOrNotFound();
 
-        return $user !== null
-            && $source instanceof ItTicket
-            && $target instanceof ItTicket
-            && $user->can('merge', [$source, $target]);
+        return $user !== null && $user->canDo('it.manage');
     }
 
     /**
@@ -31,6 +30,7 @@ class MergeTicketRequest extends FormRequest
     {
         return [
             'target_ticket_id' => ['required', 'integer', 'exists:it_tickets,id'],
+            'reason' => ['required', 'string', 'max:1000'],
         ];
     }
 

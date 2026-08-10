@@ -11,7 +11,9 @@ use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DeviceAssignmentServiceTest extends TestCase
@@ -64,6 +66,31 @@ class DeviceAssignmentServiceTest extends TestCase
         $this->assertEquals(1, $device->assignments()->active()->count());
     }
 
+    public function test_assign_locks_the_canonical_device_and_accepts_a_historical_assignment_time(): void
+    {
+        $device = Device::factory()->create();
+        $site = Site::factory()->create();
+        $assignedAt = now()->subYears(2)->startOfSecond();
+        $queries = collect();
+        DB::listen(function (QueryExecuted $query) use ($queries): void {
+            $queries->push(strtolower($query->sql));
+        });
+
+        $assignment = $this->service->assign(
+            device: $device,
+            assignableType: DeviceAssignment::TARGET_SITE,
+            assignableId: $site->id,
+            assignedByUserId: null,
+            assignedAt: $assignedAt,
+        );
+
+        $this->assertSame($assignedAt->toDateTimeString(), $assignment->assigned_at->toDateTimeString());
+        $this->assertTrue($queries->contains(
+            fn (string $sql): bool => str_contains($sql, 'from `devices`')
+                && str_contains($sql, 'for update'),
+        ), 'The canonical Device row must be locked before replacing an assignment.');
+    }
+
     public function test_release_sets_released_at(): void
     {
         $device = Device::factory()->create();
@@ -85,6 +112,31 @@ class DeviceAssignmentServiceTest extends TestCase
         $result = $this->service->release($device, $user->id);
 
         $this->assertNull($result);
+    }
+
+    public function test_target_scoped_release_does_not_release_a_device_that_has_moved_elsewhere(): void
+    {
+        $device = Device::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create();
+        $user = User::factory()->create();
+        $assignment = $this->service->assign(
+            $device,
+            DeviceAssignment::TARGET_SITE,
+            $site->id,
+            $user->id,
+        );
+
+        $released = $this->service->releaseForTarget(
+            $device,
+            DeviceAssignment::TARGET_CLIENT,
+            $client->id,
+            $user->id,
+        );
+
+        $this->assertNull($released);
+        $this->assertNull($assignment->fresh()->released_at);
+        $this->assertSame(1, $device->assignments()->active()->count());
     }
 
     public function test_transfer_releases_old_and_creates_new(): void
@@ -129,7 +181,7 @@ class DeviceAssignmentServiceTest extends TestCase
         $user = User::factory()->create();
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('consent_id');
+        $this->expectExceptionMessage('assignment-linked location-tracking consent');
 
         $this->service->assign(
             $device,
@@ -146,7 +198,10 @@ class DeviceAssignmentServiceTest extends TestCase
         $user = User::factory()->create();
         $consent = ClientConsent::create([
             'client_id' => $client->id,
-            'consent_type_id' => ConsentType::factory()->create()->id,
+            'consent_type_id' => ConsentType::factory()->create([
+                'name' => 'Personal Tracker (Wandering Risk)',
+                'purpose' => 'Client personal safety tracking',
+            ])->id,
             'status' => 'given',
             'given_at' => now(),
             'given_by_user_id' => $user->id,

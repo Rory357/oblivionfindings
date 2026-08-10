@@ -4,16 +4,19 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrSuccessionCandidate;
 use App\Domain\Hr\Models\HrSuccessionPlan;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 
-function makeSuccessionProfile(): HrEmployeeProfile
+function makeSuccessionProfile(Site $site, ?User $user = null): HrEmployeeProfile
 {
-    $user = User::factory()->create();
+    $user ??= User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
 
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
@@ -21,21 +24,26 @@ function makeSuccessionProfile(): HrEmployeeProfile
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
+        'end_date' => null,
         'is_active' => true,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
     ]);
 }
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Succession dialog Site']);
 
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    makeSuccessionProfile($this->site, $this->hr);
 
     $this->plan = HrSuccessionPlan::query()->create([
-        'tenant_id' => null,
+        'site_id' => $this->site->id,
         'role_title' => 'House Manager',
         'risk_level' => 'high',
         'is_active' => true,
@@ -44,7 +52,7 @@ beforeEach(function () {
 });
 
 test('the succession plan page ships the candidate-dialog employees', function () {
-    makeSuccessionProfile();
+    makeSuccessionProfile($this->site);
 
     $response = $this->actingAs($this->hr)->get("/hr/succession/{$this->plan->id}");
     $response->assertOk();
@@ -53,7 +61,7 @@ test('the succession plan page ships the candidate-dialog employees', function (
 });
 
 test('a candidate can be added to a plan via the dialog endpoint', function () {
-    $profile = makeSuccessionProfile();
+    $profile = makeSuccessionProfile($this->site);
 
     $this->actingAs($this->hr)
         ->post("/hr/succession/{$this->plan->id}/candidates", [
@@ -74,7 +82,7 @@ test('a candidate can be added to a plan via the dialog endpoint', function () {
 });
 
 test('a candidate can be updated via the dialog endpoint', function () {
-    $profile = makeSuccessionProfile();
+    $profile = makeSuccessionProfile($this->site);
     $candidate = $this->plan->candidates()->create([
         'employee_profile_id' => $profile->id,
         'readiness' => 'developing',

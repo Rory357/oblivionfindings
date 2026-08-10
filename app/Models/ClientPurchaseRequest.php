@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,11 +10,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientPurchaseRequest extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
         'client_id',
-        'organization_id',
         'description',
         'amount',
         'category',

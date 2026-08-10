@@ -5,7 +5,7 @@ namespace App\Domain\Hr\Jobs;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveBalanceLedger;
-use App\Models\User;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -13,42 +13,24 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 
 class ProcessLeaveBalanceAccrualJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public ?int $tenantId = null
-    ) {}
-
-    public function handle(): void
+    public function handle(HrCurrentStaffService $currentStaff): void
     {
         try {
-            $tenantIds = $this->tenantId
-                ? collect([$this->tenantId])
-                : (
-                    Schema::hasColumn('users', 'tenant_id')
-                        ? User::select('tenant_id')
-                            ->whereNotNull('tenant_id')
-                            ->distinct()
-                            ->pluck('tenant_id')
-                        : collect([null])
-                );
-
-            foreach ($tenantIds as $tenantId) {
-                $this->accrueForTenant($tenantId !== null ? (int) $tenantId : null);
-            }
+            $this->accrueApplication($currentStaff);
         } catch (\Throwable $e) {
-            \Log::error('ProcessLeaveBalanceAccrualJob failed: ' . $e->getMessage(), ['exception' => $e]);
+            Log::error('ProcessLeaveBalanceAccrualJob failed: '.$e->getMessage(), ['exception' => $e]);
             throw $e;
         }
     }
 
-    private function accrueForTenant(?int $tenantId): void
+    private function accrueApplication(HrCurrentStaffService $currentStaff): void
     {
-        DB::transaction(function () use ($tenantId) {
+        DB::transaction(function () use ($currentStaff) {
             $accrued = 0;
             $year = now()->year;
             $accrualPeriod = now()->format('Y-m');
@@ -60,8 +42,7 @@ class ProcessLeaveBalanceAccrualJob implements ShouldQueue
             ]);
 
             $profiles = HrEmployeeProfile::query()
-                ->where('is_active', true)
-                ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+                ->whereIn('user_id', $currentStaff->currentUsersQuery()->select('users.id'))
                 ->get(['user_id', 'employment_type', 'hours_per_week']);
 
             foreach ($profiles as $profile) {
@@ -86,7 +67,6 @@ class ProcessLeaveBalanceAccrualJob implements ShouldQueue
                     }
 
                     $alreadyAccrued = HrLeaveBalanceLedger::query()
-                        ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
                         ->where('user_id', $profile->user_id)
                         ->where('leave_type', $leaveType)
                         ->where('year', $year)
@@ -100,7 +80,6 @@ class ProcessLeaveBalanceAccrualJob implements ShouldQueue
 
                     $balance = HrLeaveBalance::query()->firstOrCreate(
                         [
-                            'tenant_id' => $tenantId,
                             'user_id' => $profile->user_id,
                             'leave_type' => $leaveType,
                             'year' => $year,
@@ -124,7 +103,6 @@ class ProcessLeaveBalanceAccrualJob implements ShouldQueue
                     $balance->save();
 
                     HrLeaveBalanceLedger::create([
-                        'tenant_id' => $tenantId,
                         'user_id' => $profile->user_id,
                         'leave_type' => $leaveType,
                         'year' => $year,
@@ -143,7 +121,7 @@ class ProcessLeaveBalanceAccrualJob implements ShouldQueue
                 }
             }
 
-            Log::info("Leave balance accrual processed for tenant {$tenantId}: {$accrued} employees accrued.");
+            Log::info('Application leave balance accrual processed.', ['employees_accrued' => $accrued]);
         });
     }
 }

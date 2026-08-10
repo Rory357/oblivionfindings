@@ -1,12 +1,45 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Field,
+    InfoCard,
+    Ring,
+    Segmented,
+    SelectInput,
+    StepHead,
+    TilePicker,
+} from '@/components/wizard/primitives';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+    type WizardStep,
+} from '@/components/wizard/shell';
 import { cn } from '@/lib/utils';
-import { Field, InfoCard, Ring, Segmented, SelectInput, StepHead, TilePicker } from '@/components/wizard/primitives';
-import { ReviewCard, ReviewRow, WizardShell, WizardStepPane, WizardSuccessPane, type WizardStep } from '@/components/wizard/shell';
-import { RESTRAINT_TYPE_META, RESTRAINT_TYPE_OPTIONS, titleCase, type ClientOption, type StaffOption } from '@/pages/health-safety/restraints/shared';
+import {
+    RESTRAINT_TYPE_META,
+    RESTRAINT_TYPE_OPTIONS,
+    titleCase,
+    type ClientOption,
+    type StaffOption,
+} from '@/pages/health-safety/restraints/shared';
 import { useForm, usePage } from '@inertiajs/react';
-import { Activity, BookOpen, CalendarClock, CheckCircle2, ClipboardList, Plus, ShieldCheck, ThumbsDown, ThumbsUp, User, X } from 'lucide-react';
+import {
+    Activity,
+    BookOpen,
+    CalendarClock,
+    CheckCircle2,
+    ClipboardList,
+    Plus,
+    ShieldCheck,
+    ThumbsDown,
+    ThumbsUp,
+    User,
+    X,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type PlanForm = {
@@ -25,11 +58,36 @@ type PlanForm = {
 };
 
 const STEPS: WizardStep[] = [
-    { key: 'person', label: 'Person & plan', blurb: 'Who & the title', icon: User },
-    { key: 'triggers', label: 'Triggers & de-escalation', blurb: 'Antecedents & strategies', icon: Activity },
-    { key: 'interventions', label: 'Interventions', blurb: 'Approved vs prohibited', icon: ClipboardList },
-    { key: 'practice', label: 'Practice & review', blurb: 'Type & review cadence', icon: CalendarClock },
-    { key: 'review', label: 'Review & create', blurb: 'Check and save', icon: CheckCircle2 },
+    {
+        key: 'person',
+        label: 'Person & plan',
+        blurb: 'Who & the title',
+        icon: User,
+    },
+    {
+        key: 'triggers',
+        label: 'Triggers & de-escalation',
+        blurb: 'Antecedents & strategies',
+        icon: Activity,
+    },
+    {
+        key: 'interventions',
+        label: 'Interventions',
+        blurb: 'Approved vs prohibited',
+        icon: ClipboardList,
+    },
+    {
+        key: 'practice',
+        label: 'Practice & review',
+        blurb: 'Type & review cadence',
+        icon: CalendarClock,
+    },
+    {
+        key: 'review',
+        label: 'Review & create',
+        blurb: 'Check and save',
+        icon: CheckCircle2,
+    },
 ];
 
 const TYPE_TILES = RESTRAINT_TYPE_OPTIONS.map((o) => ({
@@ -39,8 +97,21 @@ const TYPE_TILES = RESTRAINT_TYPE_OPTIONS.map((o) => ({
     icon: RESTRAINT_TYPE_META[o.value]?.icon,
 }));
 
-const APPROVED_SUGGESTIONS = ['Verbal de-escalation', 'Offer a quiet space', 'Distraction / redirection', 'Two-person guided hold', 'PRN as charted', 'Sensory tools'];
-const PROHIBITED_SUGGESTIONS = ['Prone (face-down) restraint', 'Seclusion beyond agreed limit', 'Pain-compliance techniques', 'Restriction of food or fluids', 'Restraint as punishment'];
+const APPROVED_SUGGESTIONS = [
+    'Verbal de-escalation',
+    'Offer a quiet space',
+    'Distraction / redirection',
+    'Two-person guided hold',
+    'PRN as charted',
+    'Sensory tools',
+];
+const PROHIBITED_SUGGESTIONS = [
+    'Prone (face-down) restraint',
+    'Seclusion beyond agreed limit',
+    'Pain-compliance techniques',
+    'Restriction of food or fluids',
+    'Restraint as punishment',
+];
 
 const ERROR_STEP: { prefix: string; step: number }[] = [
     { prefix: 'client_id', step: 0 },
@@ -57,7 +128,9 @@ const ERROR_STEP: { prefix: string; step: number }[] = [
 
 function todayLocal(): string {
     const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 10);
 }
 
 /**
@@ -81,7 +154,10 @@ export function BspWizard({
     defaultClientId?: number | null;
     onOpenPlan?: (id: number) => void;
 }) {
-    const page = usePage().props as { flash?: { error?: string }; detail?: { id?: number } | null };
+    const page = usePage().props as {
+        flash?: { error?: string };
+        detail?: { id?: number } | null;
+    };
     const [stepIndex, setStepIndex] = useState(0);
     const [submitted, setSubmitted] = useState(false);
 
@@ -104,15 +180,37 @@ export function BspWizard({
     const lastIndex = STEPS.length - 1;
     const stepKey = STEPS[stepIndex].key;
 
-    const clientOptions = useMemo(() => clients.map((c) => ({ value: String(c.id), label: c.name })), [clients]);
-    const staffOptions = useMemo(() => staff.map((s) => ({ value: String(s.id), label: s.name })), [staff]);
+    const clientOptions = useMemo(
+        () => clients.map((c) => ({ value: String(c.id), label: c.name })),
+        [clients],
+    );
+    const staffOptions = useMemo(
+        () => staff.map((s) => ({ value: String(s.id), label: s.name })),
+        [staff],
+    );
 
-    const approved = useMemo(() => splitLines(data.approved_interventions), [data.approved_interventions]);
-    const prohibited = useMemo(() => splitLines(data.prohibited_interventions), [data.prohibited_interventions]);
+    const approved = useMemo(
+        () => splitLines(data.approved_interventions),
+        [data.approved_interventions],
+    );
+    const prohibited = useMemo(
+        () => splitLines(data.prohibited_interventions),
+        [data.prohibited_interventions],
+    );
 
     const pct = useMemo(() => {
-        const checks = [!!data.client_id, !!data.title.trim(), !!data.triggers.trim(), !!data.de_escalation_strategies.trim(), approved.length > 0, !!data.restrictive_practice_type, !!data.review_date];
-        return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+        const checks = [
+            !!data.client_id,
+            !!data.title.trim(),
+            !!data.triggers.trim(),
+            !!data.de_escalation_strategies.trim(),
+            approved.length > 0,
+            !!data.restrictive_practice_type,
+            !!data.review_date,
+        ];
+        return Math.round(
+            (checks.filter(Boolean).length / checks.length) * 100,
+        );
     }, [data, approved.length]);
 
     const stepValid = (key: string): boolean => {
@@ -157,7 +255,12 @@ export function BspWizard({
     const reset = () => {
         form.reset();
         form.clearErrors();
-        setData((d) => ({ ...d, client_id: defaultClientId ? String(defaultClientId) : '', developed_at: todayLocal(), status: 'draft' }));
+        setData((d) => ({
+            ...d,
+            client_id: defaultClientId ? String(defaultClientId) : '',
+            developed_at: todayLocal(),
+            status: 'draft',
+        }));
         setStepIndex(0);
         setSubmitted(false);
     };
@@ -168,12 +271,23 @@ export function BspWizard({
             title="Behaviour support plan created"
             blurb={
                 <>
-                    Saved as <span className="font-semibold">{titleCase(data.status)}</span>. {data.status === 'draft' ? 'Activate it from the plan detail when it’s ready to govern restrictive practice.' : 'It now governs restrictive practice for this person.'}
+                    Saved as{' '}
+                    <span className="font-semibold">
+                        {titleCase(data.status)}
+                    </span>
+                    .{' '}
+                    {data.status === 'draft'
+                        ? 'Activate it from the plan detail when it’s ready to govern restrictive practice.'
+                        : 'It now governs restrictive practice for this person.'}
                 </>
             }
             actions={
                 <>
-                    {createdId && onOpenPlan ? <Button onClick={() => onOpenPlan(createdId)}>Open plan</Button> : null}
+                    {createdId && onOpenPlan ? (
+                        <Button onClick={() => onOpenPlan(createdId)}>
+                            Open plan
+                        </Button>
+                    ) : null}
                     <Button variant="outline" onClick={reset}>
                         Create another
                     </Button>
@@ -203,16 +317,31 @@ export function BspWizard({
                 submitted ? undefined : (
                     <div className="flex items-center gap-2">
                         {stepIndex > 0 ? (
-                            <Button variant="outline" onClick={() => setStepIndex((i) => Math.max(0, i - 1))}>
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    setStepIndex((i) => Math.max(0, i - 1))
+                                }
+                            >
                                 Back
                             </Button>
                         ) : null}
                         {stepIndex < lastIndex ? (
-                            <Button onClick={() => setStepIndex((i) => Math.min(lastIndex, i + 1))} disabled={!stepValid(stepKey)}>
+                            <Button
+                                onClick={() =>
+                                    setStepIndex((i) =>
+                                        Math.min(lastIndex, i + 1),
+                                    )
+                                }
+                                disabled={!stepValid(stepKey)}
+                            >
                                 Continue
                             </Button>
                         ) : (
-                            <Button onClick={submit} disabled={processing || !canSubmit}>
+                            <Button
+                                onClick={submit}
+                                disabled={processing || !canSubmit}
+                            >
                                 Create plan
                             </Button>
                         )}
@@ -224,19 +353,51 @@ export function BspWizard({
             <WizardStepPane>
                 {stepKey === 'person' ? (
                     <div className="flex flex-col gap-4">
-                        <StepHead icon={User} title="Person & plan" blurb="Who is this plan for, and what is it called?" />
+                        <StepHead
+                            icon={User}
+                            title="Person & plan"
+                            blurb="Who is this plan for, and what is it called?"
+                        />
                         <Field label="Client" required error={errors.client_id}>
-                            <SelectInput value={data.client_id} onChange={(v) => setData('client_id', v)} placeholder="Select client" options={clientOptions} />
+                            <SelectInput
+                                value={data.client_id}
+                                onChange={(v) => setData('client_id', v)}
+                                placeholder="Select client"
+                                options={clientOptions}
+                            />
                         </Field>
                         <Field label="Plan title" required error={errors.title}>
-                            <Input value={data.title} onChange={(e) => setData('title', e.target.value)} placeholder="e.g. Positive behaviour support plan" />
+                            <Input
+                                value={data.title}
+                                onChange={(e) =>
+                                    setData('title', e.target.value)
+                                }
+                                placeholder="e.g. Positive behaviour support plan"
+                            />
                         </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Developed by" error={errors.developed_by}>
-                                <SelectInput value={data.developed_by} onChange={(v) => setData('developed_by', v)} placeholder="Select author" options={staffOptions} />
+                            <Field
+                                label="Developed by"
+                                error={errors.developed_by}
+                            >
+                                <SelectInput
+                                    value={data.developed_by}
+                                    onChange={(v) => setData('developed_by', v)}
+                                    placeholder="Select author"
+                                    options={staffOptions}
+                                />
                             </Field>
-                            <Field label="Developed on" error={errors.developed_at}>
-                                <Input type="date" value={data.developed_at} onChange={(e) => setData('developed_at', e.target.value)} />
+                            <Field
+                                label="Developed on"
+                                error={errors.developed_at}
+                            >
+                                <Input
+                                    type="date"
+                                    value={data.developed_at}
+                                    onChange={(e) =>
+                                        setData('developed_at', e.target.value)
+                                    }
+                                />
                             </Field>
                         </div>
                     </div>
@@ -244,40 +405,127 @@ export function BspWizard({
 
                 {stepKey === 'triggers' ? (
                     <div className="flex flex-col gap-4">
-                        <StepHead icon={Activity} title="Triggers & de-escalation" blurb="What sets off behaviours of concern, and what works." />
-                        <Field label="Triggers / antecedents" error={errors.triggers}>
-                            <Textarea rows={4} value={data.triggers} onChange={(e) => setData('triggers', e.target.value)} placeholder="Known triggers and early-warning signs" />
+                        <StepHead
+                            icon={Activity}
+                            title="Triggers & de-escalation"
+                            blurb="What sets off behaviours of concern, and what works."
+                        />
+                        <Field
+                            label="Triggers / antecedents"
+                            error={errors.triggers}
+                        >
+                            <Textarea
+                                rows={4}
+                                value={data.triggers}
+                                onChange={(e) =>
+                                    setData('triggers', e.target.value)
+                                }
+                                placeholder="Known triggers and early-warning signs"
+                            />
                         </Field>
-                        <Field label="De-escalation strategies" error={errors.de_escalation_strategies}>
-                            <Textarea rows={4} value={data.de_escalation_strategies} onChange={(e) => setData('de_escalation_strategies', e.target.value)} placeholder="Least-restrictive strategies that help this person" />
+                        <Field
+                            label="De-escalation strategies"
+                            error={errors.de_escalation_strategies}
+                        >
+                            <Textarea
+                                rows={4}
+                                value={data.de_escalation_strategies}
+                                onChange={(e) =>
+                                    setData(
+                                        'de_escalation_strategies',
+                                        e.target.value,
+                                    )
+                                }
+                                placeholder="Least-restrictive strategies that help this person"
+                            />
                         </Field>
                     </div>
                 ) : null}
 
                 {stepKey === 'interventions' ? (
                     <div className="flex flex-col gap-4">
-                        <StepHead icon={ClipboardList} title="Approved vs prohibited" blurb="Be explicit about what is and isn't allowed." />
+                        <StepHead
+                            icon={ClipboardList}
+                            title="Approved vs prohibited"
+                            blurb="Be explicit about what is and isn't allowed."
+                        />
                         <InfoCard icon={ShieldCheck} tone="info">
-                            Listing prohibited interventions is as important as approved ones — it protects the person and gives staff clear boundaries.
+                            Listing prohibited interventions is as important as
+                            approved ones — it protects the person and gives
+                            staff clear boundaries.
                         </InfoCard>
-                        <Field label="Approved interventions" hint="What staff may use">
-                            <TagListInput tone="approved" icon={ThumbsUp} values={approved} suggestions={APPROVED_SUGGESTIONS} onChange={(v) => setData('approved_interventions', v.join('\n'))} placeholder="Add an approved intervention…" />
+                        <Field
+                            label="Approved interventions"
+                            hint="What staff may use"
+                        >
+                            <TagListInput
+                                tone="approved"
+                                icon={ThumbsUp}
+                                values={approved}
+                                suggestions={APPROVED_SUGGESTIONS}
+                                onChange={(v) =>
+                                    setData(
+                                        'approved_interventions',
+                                        v.join('\n'),
+                                    )
+                                }
+                                placeholder="Add an approved intervention…"
+                            />
                         </Field>
-                        <Field label="Prohibited interventions" hint="What staff must never use">
-                            <TagListInput tone="prohibited" icon={ThumbsDown} values={prohibited} suggestions={PROHIBITED_SUGGESTIONS} onChange={(v) => setData('prohibited_interventions', v.join('\n'))} placeholder="Add a prohibited intervention…" />
+                        <Field
+                            label="Prohibited interventions"
+                            hint="What staff must never use"
+                        >
+                            <TagListInput
+                                tone="prohibited"
+                                icon={ThumbsDown}
+                                values={prohibited}
+                                suggestions={PROHIBITED_SUGGESTIONS}
+                                onChange={(v) =>
+                                    setData(
+                                        'prohibited_interventions',
+                                        v.join('\n'),
+                                    )
+                                }
+                                placeholder="Add a prohibited intervention…"
+                            />
                         </Field>
                     </div>
                 ) : null}
 
                 {stepKey === 'practice' ? (
                     <div className="flex flex-col gap-4">
-                        <StepHead icon={CalendarClock} title="Practice & review" blurb="What restrictive practice does this cover, and when is it reviewed?" />
-                        <Field label="Restrictive practice type" error={errors.restrictive_practice_type}>
-                            <TilePicker value={data.restrictive_practice_type} onChange={(v) => setData('restrictive_practice_type', v)} options={TYPE_TILES} cols={3} />
+                        <StepHead
+                            icon={CalendarClock}
+                            title="Practice & review"
+                            blurb="What restrictive practice does this cover, and when is it reviewed?"
+                        />
+                        <Field
+                            label="Restrictive practice type"
+                            error={errors.restrictive_practice_type}
+                        >
+                            <TilePicker
+                                value={data.restrictive_practice_type}
+                                onChange={(v) =>
+                                    setData('restrictive_practice_type', v)
+                                }
+                                options={TYPE_TILES}
+                                cols={3}
+                            />
                         </Field>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Next review date" hint="When the plan must be reviewed" error={errors.review_date}>
-                                <Input type="date" value={data.review_date} onChange={(e) => setData('review_date', e.target.value)} />
+                            <Field
+                                label="Next review date"
+                                hint="When the plan must be reviewed"
+                                error={errors.review_date}
+                            >
+                                <Input
+                                    type="date"
+                                    value={data.review_date}
+                                    onChange={(e) =>
+                                        setData('review_date', e.target.value)
+                                    }
+                                />
                             </Field>
                             <Field label="Status">
                                 <Segmented
@@ -291,30 +539,103 @@ export function BspWizard({
                             </Field>
                         </div>
                         <Field label="Notes" hint="Optional">
-                            <Textarea rows={3} value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Any other context for this plan" />
+                            <Textarea
+                                rows={3}
+                                value={data.notes}
+                                onChange={(e) =>
+                                    setData('notes', e.target.value)
+                                }
+                                placeholder="Any other context for this plan"
+                            />
                         </Field>
                     </div>
                 ) : null}
 
                 {stepKey === 'review' ? (
                     <div className="flex flex-col gap-4">
-                        <StepHead icon={CheckCircle2} title="Review & create" blurb="Check the plan, then save." />
+                        <StepHead
+                            icon={CheckCircle2}
+                            title="Review & create"
+                            blurb="Check the plan, then save."
+                        />
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <ReviewCard icon={User} title="Person & plan" onEdit={() => setStepIndex(0)}>
-                                <ReviewRow label="Client" value={clientOptions.find((o) => o.value === data.client_id)?.label} />
+                            <ReviewCard
+                                icon={User}
+                                title="Person & plan"
+                                onEdit={() => setStepIndex(0)}
+                            >
+                                <ReviewRow
+                                    label="Client"
+                                    value={
+                                        clientOptions.find(
+                                            (o) => o.value === data.client_id,
+                                        )?.label
+                                    }
+                                />
                                 <ReviewRow label="Title" value={data.title} />
-                                <ReviewRow label="Status" value={titleCase(data.status)} />
+                                <ReviewRow
+                                    label="Status"
+                                    value={titleCase(data.status)}
+                                />
                             </ReviewCard>
-                            <ReviewCard icon={CalendarClock} title="Practice & review" onEdit={() => setStepIndex(3)}>
-                                <ReviewRow label="Type" value={data.restrictive_practice_type ? titleCase(data.restrictive_practice_type) : undefined} />
-                                <ReviewRow label="Next review" value={data.review_date} />
-                                <ReviewRow label="Developed by" value={staffOptions.find((o) => o.value === data.developed_by)?.label} />
+                            <ReviewCard
+                                icon={CalendarClock}
+                                title="Practice & review"
+                                onEdit={() => setStepIndex(3)}
+                            >
+                                <ReviewRow
+                                    label="Type"
+                                    value={
+                                        data.restrictive_practice_type
+                                            ? titleCase(
+                                                  data.restrictive_practice_type,
+                                              )
+                                            : undefined
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Next review"
+                                    value={data.review_date}
+                                />
+                                <ReviewRow
+                                    label="Developed by"
+                                    value={
+                                        staffOptions.find(
+                                            (o) =>
+                                                o.value === data.developed_by,
+                                        )?.label
+                                    }
+                                />
                             </ReviewCard>
-                            <ReviewCard icon={ThumbsUp} title="Approved interventions" onEdit={() => setStepIndex(2)}>
-                                <p className="text-[13px] text-foreground">{approved.length ? approved.join(', ') : <span className="text-muted-foreground">—</span>}</p>
+                            <ReviewCard
+                                icon={ThumbsUp}
+                                title="Approved interventions"
+                                onEdit={() => setStepIndex(2)}
+                            >
+                                <p className="text-[13px] text-foreground">
+                                    {approved.length ? (
+                                        approved.join(', ')
+                                    ) : (
+                                        <span className="text-muted-foreground">
+                                            —
+                                        </span>
+                                    )}
+                                </p>
                             </ReviewCard>
-                            <ReviewCard icon={ThumbsDown} title="Prohibited interventions" onEdit={() => setStepIndex(2)}>
-                                <p className="text-[13px] text-foreground">{prohibited.length ? prohibited.join(', ') : <span className="text-muted-foreground">—</span>}</p>
+                            <ReviewCard
+                                icon={ThumbsDown}
+                                title="Prohibited interventions"
+                                onEdit={() => setStepIndex(2)}
+                            >
+                                <p className="text-[13px] text-foreground">
+                                    {prohibited.length ? (
+                                        prohibited.join(', ')
+                                    ) : (
+                                        <span className="text-muted-foreground">
+                                            —
+                                        </span>
+                                    )}
+                                </p>
                             </ReviewCard>
                         </div>
                     </div>
@@ -357,7 +678,10 @@ function TagListInput({
         setDraft('');
     };
     const remove = (v: string) => onChange(values.filter((x) => x !== v));
-    const chipCls = tone === 'approved' ? 'border-status-success/40 bg-status-success-bg text-status-success' : 'border-status-critical/40 bg-status-critical-bg text-status-critical';
+    const chipCls =
+        tone === 'approved'
+            ? 'border-status-success/40 bg-status-success-bg text-status-success'
+            : 'border-status-critical/40 bg-status-critical-bg text-status-critical';
     const remaining = suggestions.filter((s) => !values.includes(s));
 
     return (
@@ -365,10 +689,22 @@ function TagListInput({
             {values.length ? (
                 <div className="flex flex-wrap gap-1.5">
                     {values.map((v) => (
-                        <span key={v} className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-medium', chipCls)}>
+                        <span
+                            key={v}
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-medium',
+                                chipCls,
+                            )}
+                        >
                             <Icon className="h-3 w-3" />
                             {v}
-                            <Button unstyled type="button" aria-label={`Remove ${v}`} onClick={() => remove(v)} className="ml-0.5 opacity-70 hover:opacity-100">
+                            <Button
+                                unstyled
+                                type="button"
+                                aria-label={`Remove ${v}`}
+                                onClick={() => remove(v)}
+                                className="ml-0.5 opacity-70 hover:opacity-100"
+                            >
                                 <X className="h-3 w-3" />
                             </Button>
                         </span>
@@ -388,14 +724,26 @@ function TagListInput({
                     placeholder={placeholder}
                     className="h-9"
                 />
-                <Button type="button" variant="outline" size="sm" onClick={() => add(draft)} disabled={!draft.trim()}>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => add(draft)}
+                    disabled={!draft.trim()}
+                >
                     <Plus className="h-4 w-4" />
                 </Button>
             </div>
             {remaining.length ? (
                 <div className="flex flex-wrap gap-1.5">
                     {remaining.map((s) => (
-                        <Button unstyled key={s} type="button" onClick={() => add(s)} className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">
+                        <Button
+                            unstyled
+                            key={s}
+                            type="button"
+                            onClick={() => add(s)}
+                            className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                        >
                             <Plus className="h-3 w-3" /> {s}
                         </Button>
                     ))}

@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrSupervisionNote extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'tenant_id',
@@ -66,15 +67,6 @@ class HrSupervisionNote extends Model
     public function supervisor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'supervisor_user_id');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Scopes */
-    /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function scopeForEmployee(Builder $query, int $userId): Builder

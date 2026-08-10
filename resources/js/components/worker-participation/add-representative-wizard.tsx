@@ -10,14 +10,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-    ReviewCard,
-    ReviewRow,
-    WizardShell,
-    WizardStepPane,
-    WizardSuccessPane,
-    type WizardStep,
-} from '@/components/wizard/shell';
-import {
     Field,
     InfoCard,
     Ring,
@@ -25,6 +17,14 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import {
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+    WizardSuccessPane,
+    type WizardStep,
+} from '@/components/wizard/shell';
 import {
     ELECTION_METHODS,
     WP_BASE,
@@ -82,7 +82,12 @@ const EMPTY: RepForm = {
 const STEPS: WizardStep[] = [
     { key: 'who', label: 'Who', blurb: 'Person & site', icon: Users },
     { key: 'election', label: 'Election', blurb: 'Method & term', icon: Vote },
-    { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: UserCheck },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & create',
+        icon: UserCheck,
+    },
 ];
 
 /* Map each server-validated field back to the step that owns it, so an
@@ -103,12 +108,19 @@ const STEP_OF: Record<string, number> = {
 function validateStep(step: number, data: RepForm): Record<string, string> {
     const e: Record<string, string> = {};
     if (step === 0) {
-        if (!data.user_id) e.user_id = 'Choose the staff member who is the representative.';
-        if (!data.site_id) e.site_id = 'Select the site this representative covers.';
+        if (!data.user_id)
+            e.user_id = 'Choose the staff member who is the representative.';
+        if (!data.site_id)
+            e.site_id = 'Select the site this representative covers.';
     }
     if (step === 1) {
-        if (!data.elected_at) e.elected_at = 'Record the date elected / appointed.';
-        if (data.term_expires_at && data.elected_at && data.term_expires_at <= data.elected_at)
+        if (!data.elected_at)
+            e.elected_at = 'Record the date elected / appointed.';
+        if (
+            data.term_expires_at &&
+            data.elected_at &&
+            data.term_expires_at <= data.elected_at
+        )
             e.term_expires_at = 'Term expiry must be after the elected date.';
         if (!Number.isInteger(Number(data.training_days_completed)))
             e.training_days_completed = 'Enter whole training days.';
@@ -131,7 +143,12 @@ function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
 /*  Wizard                                                              */
 /* ------------------------------------------------------------------ */
 
-export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) {
+export function AddRepresentativeWizard({
+    open,
+    sites,
+    staff,
+    onClose,
+}: Props) {
     const form = useForm<RepForm>({ ...EMPTY });
     const { data, setData, processing, errors } = form;
 
@@ -142,12 +159,18 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
     const err = (name: keyof RepForm): string | undefined =>
         localErrors[name] ?? (errors as Record<string, string>)[name];
 
-    const staffOpts = staff.map((s) => ({ value: String(s.id), label: s.name }));
+    const staffOpts = staff.map((s) => ({
+        value: String(s.id),
+        label: s.name,
+    }));
     const siteOpts = sites.map((s) => ({ value: String(s.id), label: s.name }));
-    const staffName = staff.find((s) => String(s.id) === data.user_id)?.name ?? '';
-    const siteName = sites.find((s) => String(s.id) === data.site_id)?.name ?? '';
+    const staffName =
+        staff.find((s) => String(s.id) === data.user_id)?.name ?? '';
+    const siteName =
+        sites.find((s) => String(s.id) === data.site_id)?.name ?? '';
     const methodLabel =
-        ELECTION_METHODS.find((m) => m.key === data.election_method)?.label ?? data.election_method;
+        ELECTION_METHODS.find((m) => m.key === data.election_method)?.label ??
+        data.election_method;
 
     /* Rough completeness for the rail ring (8 meaningful fields). */
     const filled = [
@@ -186,10 +209,13 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
     const submit = (addAnother: boolean) => {
         // Re-validate every gating step; jump to the first that fails.
         const all: Record<string, string> = {};
-        for (let i = 0; i < STEPS.length; i += 1) Object.assign(all, validateStep(i, data));
+        for (let i = 0; i < STEPS.length; i += 1)
+            Object.assign(all, validateStep(i, data));
         if (Object.keys(all).length) {
             setLocalErrors(all);
-            const firstStep = [0, 1].find((i) => Object.keys(validateStep(i, data)).length);
+            const firstStep = [0, 1].find(
+                (i) => Object.keys(validateStep(i, data)).length,
+            );
             if (firstStep != null) setStepIndex(firstStep);
             return;
         }
@@ -198,7 +224,9 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
         // payload (transform mutates the body at post time, unlike async setData).
         form.transform((payload) => ({
             ...payload,
-            training_days_completed: Math.round(Number(payload.training_days_completed) || 0),
+            training_days_completed: Math.round(
+                Number(payload.training_days_completed) || 0,
+            ),
         }));
         form.post(`${WP_BASE}/representatives`, {
             preserveScroll: true,
@@ -209,7 +237,9 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                 if (first) setStepIndex(STEP_OF[first] ?? 1);
             },
             onSuccess: (page) => {
-                const flash = page.props.flash as { error?: string } | undefined;
+                const flash = page.props.flash as
+                    | { error?: string }
+                    | undefined;
                 if (flash?.error) return;
                 if (addAnother) resetAll();
                 else setDone(true);
@@ -236,15 +266,19 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                         title="Representative added"
                         blurb={
                             <>
-                                <span className="font-semibold text-foreground">{staffName || 'The representative'}</span>{' '}
-                                is now serving on the worker-participation register. Record their training days and term as
+                                <span className="font-semibold text-foreground">
+                                    {staffName || 'The representative'}
+                                </span>{' '}
+                                is now serving on the worker-participation
+                                register. Record their training days and term as
                                 they progress through the kaupapa.
                             </>
                         }
                         actions={
                             <>
                                 <Button variant="outline" onClick={resetAll}>
-                                    <Plus className="mr-1.5 h-4 w-4" /> Add another
+                                    <Plus className="mr-1.5 h-4 w-4" /> Add
+                                    another
                                 </Button>
                                 <Button onClick={onClose}>Done</Button>
                             </>
@@ -259,23 +293,50 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
     const isLast = stepIndex === STEPS.length - 1;
     const footerStart =
         stepIndex > 0 ? (
-            <Button variant="ghost" size="sm" onClick={back} disabled={processing}>
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={back}
+                disabled={processing}
+            >
                 <ChevronLeft className="mr-1 h-4 w-4" /> Back
             </Button>
         ) : null;
     const footerEnd = (
         <>
-            <Button variant="outline" size="sm" onClick={onClose} disabled={processing}>
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={onClose}
+                disabled={processing}
+            >
                 Cancel
             </Button>
             {isLast ? (
                 <>
-                    <Button variant="outline" size="sm" onClick={() => submit(true)} disabled={processing}>
-                        {processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Plus className="mr-1.5 h-4 w-4" />}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => submit(true)}
+                        disabled={processing}
+                    >
+                        {processing ? (
+                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Plus className="mr-1.5 h-4 w-4" />
+                        )}
                         Save &amp; add another
                     </Button>
-                    <Button size="sm" onClick={() => submit(false)} disabled={processing}>
-                        {processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <UserCheck className="mr-1.5 h-4 w-4" />}
+                    <Button
+                        size="sm"
+                        onClick={() => submit(false)}
+                        disabled={processing}
+                    >
+                        {processing ? (
+                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                        ) : (
+                            <UserCheck className="mr-1.5 h-4 w-4" />
+                        )}
                         Create representative
                     </Button>
                 </>
@@ -312,7 +373,11 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                         blurb="Pick the kaimahi and the site or work area they represent under HSWA 2015."
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Staff member" required error={err('user_id')}>
+                        <Field
+                            label="Staff member"
+                            required
+                            error={err('user_id')}
+                        >
                             <SelectInput
                                 value={data.user_id}
                                 onChange={(v) => setData('user_id', v)}
@@ -328,16 +393,24 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                                 options={siteOpts}
                             />
                         </Field>
-                        <Field label="Work group" hint="optional" span error={err('work_group')}>
+                        <Field
+                            label="Work group"
+                            hint="optional"
+                            span
+                            error={err('work_group')}
+                        >
                             <Input
                                 value={data.work_group}
-                                onChange={(e) => setData('work_group', e.target.value)}
+                                onChange={(e) =>
+                                    setData('work_group', e.target.value)
+                                }
                                 placeholder="e.g. Night shift, Community support, Kitchen"
                             />
                         </Field>
                         <InfoCard icon={Users}>
-                            A work group is the group of workers the representative speaks for. Leave it blank when the rep
-                            covers the whole site.
+                            A work group is the group of workers the
+                            representative speaks for. Leave it blank when the
+                            rep covers the whole site.
                         </InfoCard>
                     </div>
                 </WizardStepPane>
@@ -352,7 +425,12 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                         blurb="Record how the representative was chosen, when their term started, and their paid training."
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Selection method" required span error={err('election_method')}>
+                        <Field
+                            label="Selection method"
+                            required
+                            span
+                            error={err('election_method')}
+                        >
                             <TilePicker
                                 value={data.election_method}
                                 onChange={(v) => setData('election_method', v)}
@@ -364,26 +442,43 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                                 cols={3}
                             />
                         </Field>
-                        <Field label="Date elected / appointed" required error={err('elected_at')}>
+                        <Field
+                            label="Date elected / appointed"
+                            required
+                            error={err('elected_at')}
+                        >
                             <Input
                                 type="date"
                                 value={data.elected_at}
-                                onChange={(e) => setData('elected_at', e.target.value)}
+                                onChange={(e) =>
+                                    setData('elected_at', e.target.value)
+                                }
                             />
                         </Field>
-                        <Field label="Term expires" hint="optional" error={err('term_expires_at')}>
+                        <Field
+                            label="Term expires"
+                            hint="optional"
+                            error={err('term_expires_at')}
+                        >
                             <Input
                                 type="date"
                                 min={data.elected_at || undefined}
                                 value={data.term_expires_at}
-                                onChange={(e) => setData('term_expires_at', e.target.value)}
+                                onChange={(e) =>
+                                    setData('term_expires_at', e.target.value)
+                                }
                             />
                         </Field>
                         <InfoCard icon={Vote}>
-                            An HSR&rsquo;s term is capped at 3 years (re-electable). Leave the expiry blank if no fixed term
-                            has been agreed.
+                            An HSR&rsquo;s term is capped at 3 years
+                            (re-electable). Leave the expiry blank if no fixed
+                            term has been agreed.
                         </InfoCard>
-                        <Field label="Training days completed" hint="paid days" error={err('training_days_completed')}>
+                        <Field
+                            label="Training days completed"
+                            hint="paid days"
+                            error={err('training_days_completed')}
+                        >
                             <Input
                                 type="number"
                                 min={0}
@@ -391,27 +486,50 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                                 step={1}
                                 value={String(data.training_days_completed)}
                                 onChange={(e) =>
-                                    setData('training_days_completed', e.target.value === '' ? 0 : Number(e.target.value))
+                                    setData(
+                                        'training_days_completed',
+                                        e.target.value === ''
+                                            ? 0
+                                            : Number(e.target.value),
+                                    )
                                 }
                             />
                         </Field>
-                        <Field label="Initial training completed" hint="NZQA US 29315 — optional" error={err('initial_training_completed_at')}>
+                        <Field
+                            label="Initial training completed"
+                            hint="NZQA US 29315 — optional"
+                            error={err('initial_training_completed_at')}
+                        >
                             <Input
                                 type="date"
                                 max={new Date().toISOString().slice(0, 10)}
                                 value={data.initial_training_completed_at}
-                                onChange={(e) => setData('initial_training_completed_at', e.target.value)}
+                                onChange={(e) =>
+                                    setData(
+                                        'initial_training_completed_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                         <InfoCard icon={GraduationCap}>
-                            HSWA entitles each rep to 2 days&rsquo; paid training per year; NZQA US 29315 must be completed
-                            before a rep can issue PINs or direct an unsafe-work cease. Recording the completion date adds a
-                            tracked credential to the rep&rsquo;s HR record.
+                            HSWA entitles each rep to 2 days&rsquo; paid
+                            training per year; NZQA US 29315 must be completed
+                            before a rep can issue PINs or direct an unsafe-work
+                            cease. Recording the completion date adds a tracked
+                            credential to the rep&rsquo;s HR record.
                         </InfoCard>
-                        <Field label="Notes" hint="optional" span error={err('notes')}>
+                        <Field
+                            label="Notes"
+                            hint="optional"
+                            span
+                            error={err('notes')}
+                        >
                             <Textarea
                                 value={data.notes}
-                                onChange={(e) => setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    setData('notes', e.target.value)
+                                }
                                 placeholder="Anything else worth recording about this representative…"
                             />
                         </Field>
@@ -438,7 +556,8 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                             <p className="mt-0.5 text-[13px] text-muted-foreground">
                                 {siteName ? (
                                     <span className="inline-flex items-center gap-1">
-                                        <MapPin className="h-3.5 w-3.5" /> {siteName}
+                                        <MapPin className="h-3.5 w-3.5" />{' '}
+                                        {siteName}
                                     </span>
                                 ) : (
                                     'Site not set'
@@ -449,17 +568,38 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={Users} title="Who" onEdit={() => goStep(0)}>
-                            <ReviewRow label="Representative" value={staffName} />
+                        <ReviewCard
+                            icon={Users}
+                            title="Who"
+                            onEdit={() => goStep(0)}
+                        >
+                            <ReviewRow
+                                label="Representative"
+                                value={staffName}
+                            />
                             <ReviewRow label="Site" value={siteName} />
-                            <ReviewRow label="Work group" value={data.work_group} />
+                            <ReviewRow
+                                label="Work group"
+                                value={data.work_group}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Vote} title="Election" onEdit={() => goStep(1)}>
+                        <ReviewCard
+                            icon={Vote}
+                            title="Election"
+                            onEdit={() => goStep(1)}
+                        >
                             <ReviewRow label="Method" value={methodLabel} />
-                            <ReviewRow label="Elected / appointed" value={fmtDate(data.elected_at)} />
+                            <ReviewRow
+                                label="Elected / appointed"
+                                value={fmtDate(data.elected_at)}
+                            />
                             <ReviewRow
                                 label="Term expires"
-                                value={data.term_expires_at ? fmtDate(data.term_expires_at) : undefined}
+                                value={
+                                    data.term_expires_at
+                                        ? fmtDate(data.term_expires_at)
+                                        : undefined
+                                }
                             />
                             <ReviewRow
                                 label="Training days"
@@ -467,12 +607,25 @@ export function AddRepresentativeWizard({ open, sites, staff, onClose }: Props) 
                             />
                             <ReviewRow
                                 label="Initial training (US 29315)"
-                                value={data.initial_training_completed_at ? fmtDate(data.initial_training_completed_at) : undefined}
+                                value={
+                                    data.initial_training_completed_at
+                                        ? fmtDate(
+                                              data.initial_training_completed_at,
+                                          )
+                                        : undefined
+                                }
                             />
                         </ReviewCard>
                         {data.notes ? (
-                            <ReviewCard icon={UserCheck} title="Notes" onEdit={() => goStep(1)} span>
-                                <p className="text-[13px] whitespace-pre-wrap text-muted-foreground">{data.notes}</p>
+                            <ReviewCard
+                                icon={UserCheck}
+                                title="Notes"
+                                onEdit={() => goStep(1)}
+                                span
+                            >
+                                <p className="text-[13px] whitespace-pre-wrap text-muted-foreground">
+                                    {data.notes}
+                                </p>
                             </ReviewCard>
                         ) : null}
                     </div>

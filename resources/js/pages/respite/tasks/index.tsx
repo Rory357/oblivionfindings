@@ -1,11 +1,17 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import RespiteSubnav from '@/components/respite-subnav';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { ListChecks } from 'lucide-react';
@@ -37,11 +43,20 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
     const ANY = '__any__';
 
     const onFilter = (next: Record<string, any>) => {
-        router.get('/respite/tasks', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/respite/tasks',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Tasks', href: '/respite/tasks' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Tasks', href: '/respite/tasks' },
+            ]}
+        >
             <Head title="Respite Tasks" />
 
             <PageLayout
@@ -52,8 +67,18 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
                         description="Tasks linked to procedure runs and respite stays."
                         stats={[
                             { label: 'Total', value: tasks.data.length },
-                            { label: 'In progress', value: tasks.data.filter((t: any) => t.status === 'in_progress').length },
-                            { label: 'Urgent', value: tasks.data.filter((t: any) => t.priority === 'urgent').length },
+                            {
+                                label: 'In progress',
+                                value: tasks.data.filter(
+                                    (t: any) => t.status === 'in_progress',
+                                ).length,
+                            },
+                            {
+                                label: 'Urgent',
+                                value: tasks.data.filter(
+                                    (t: any) => t.priority === 'urgent',
+                                ).length,
+                            },
                         ]}
                     />
                 }
@@ -66,37 +91,85 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
-                            <Select value={filters.status ?? ANY} onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}>
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
+                            <Select
+                                value={filters.status ?? ANY}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === ANY ? null : v })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {['pending', 'assigned', 'in_progress', 'completed', 'submitted_for_approval', 'approved', 'rejected'].map((s) => (
-                                        <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+                                    {[
+                                        'pending',
+                                        'assigned',
+                                        'in_progress',
+                                        'completed',
+                                        'submitted_for_approval',
+                                        'approved',
+                                        'rejected',
+                                    ].map((s) => (
+                                        <SelectItem key={s} value={s}>
+                                            {s.replace(/_/g, ' ')}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Priority</Label>
-                            <Select value={filters.priority ?? ANY} onValueChange={(v) => onFilter({ priority: v === ANY ? null : v })}>
-                                <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
+                            <Label className="text-xs text-muted-foreground">
+                                Priority
+                            </Label>
+                            <Select
+                                value={filters.priority ?? ANY}
+                                onValueChange={(v) =>
+                                    onFilter({ priority: v === ANY ? null : v })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Priority" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {['low', 'medium', 'high', 'urgent'].map((p) => (
-                                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                                    ))}
+                                    {['low', 'medium', 'high', 'urgent'].map(
+                                        (p) => (
+                                            <SelectItem key={p} value={p}>
+                                                {p}
+                                            </SelectItem>
+                                        ),
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label className="text-xs text-muted-foreground">Assigned To</Label>
-                            <Select value={filters.assigned_to ?? ANY} onValueChange={(v) => onFilter({ assigned_to: v === ANY ? null : v })}>
-                                <SelectTrigger><SelectValue placeholder="Staff" /></SelectTrigger>
+                            <Label className="text-xs text-muted-foreground">
+                                Assigned To
+                            </Label>
+                            <Select
+                                value={filters.assigned_to ?? ANY}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        assigned_to: v === ANY ? null : v,
+                                    })
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Staff" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     {staff.map((s: any) => (
-                                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                        <SelectItem
+                                            key={s.id}
+                                            value={String(s.id)}
+                                        >
+                                            {s.name}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -111,26 +184,64 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
                                 <CardTitle className="text-base">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
-                                            <div className="font-semibold">{t.title}</div>
+                                            <div className="font-semibold">
+                                                {t.title}
+                                            </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge className={priorityColors[t.priority] || ''}>{t.priority}</Badge>
-                                                <Badge className={statusColors[t.status] || ''}>{t.status?.replace(/_/g, ' ')}</Badge>
+                                                <Badge
+                                                    className={
+                                                        priorityColors[
+                                                            t.priority
+                                                        ] || ''
+                                                    }
+                                                >
+                                                    {t.priority}
+                                                </Badge>
+                                                <Badge
+                                                    className={
+                                                        statusColors[
+                                                            t.status
+                                                        ] || ''
+                                                    }
+                                                >
+                                                    {t.status?.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
                                             </div>
                                             {t.assigned_to && (
-                                                <div className="mt-2 text-xs text-muted-foreground">Assigned to: {t.assigned_to?.name}</div>
+                                                <div className="mt-2 text-xs text-muted-foreground">
+                                                    Assigned to:{' '}
+                                                    {t.assigned_to?.name}
+                                                </div>
                                             )}
                                             {t.due_at && (
-                                                <div className="mt-1 text-xs text-muted-foreground">Due: {formatDateTimeLong(t.due_at)}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                    Due:{' '}
+                                                    {formatDateTimeLong(
+                                                        t.due_at,
+                                                    )}
+                                                </div>
                                             )}
                                             {t.procedure_run && (
                                                 <div className="mt-1">
-                                                    <Link href={`/respite/procedure-runs/${t.procedure_run.id}`} className="text-xs text-primary hover:text-primary">
-                                                        Procedure: {t.procedure_run.template?.name || `Run #${t.procedure_run.id}`}
+                                                    <Link
+                                                        href={`/respite/procedure-runs/${t.procedure_run.id}`}
+                                                        className="text-xs text-primary hover:text-primary"
+                                                    >
+                                                        Procedure:{' '}
+                                                        {t.procedure_run
+                                                            .template?.name ||
+                                                            `Run #${t.procedure_run.id}`}
                                                     </Link>
                                                 </div>
                                             )}
                                         </div>
-                                        <Link href={`/respite/tasks/${t.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link
+                                            href={`/respite/tasks/${t.id}`}
+                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                        >
                                             View
                                         </Link>
                                     </div>
@@ -139,7 +250,9 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
                         </Card>
                     ))}
                     {!tasks.data.length && (
-                        <div className="py-8 text-center text-sm text-muted-foreground">No tasks found.</div>
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                            No tasks found.
+                        </div>
                     )}
                 </div>
 
@@ -151,7 +264,17 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
                                 variant="outline"
                                 size="sm"
                                 disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

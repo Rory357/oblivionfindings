@@ -1,10 +1,10 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { PageHero } from '@/components/page';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -163,7 +163,7 @@ export default function ClientAssignments({
                                 {assignedWorkers.map((w) => (
                                     <Card
                                         key={w.id}
-                                        className="bg-primary/10 border-primary transition-all hover:shadow-sm"
+                                        className="border-primary bg-primary/10 transition-all hover:shadow-sm"
                                     >
                                         <CardContent className="flex items-center justify-between p-3">
                                             <div className="flex items-center gap-3">

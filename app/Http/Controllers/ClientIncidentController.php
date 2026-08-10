@@ -10,7 +10,6 @@ use App\Models\IncidentTemplate;
 use App\Services\NotificationService;
 use App\Support\WorkerClock;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ClientIncidentController extends Controller
@@ -87,6 +86,7 @@ class ClientIncidentController extends Controller
 
         $incident = ClientIncident::create([
             'client_id' => $client->id,
+            'site_id' => $client->site_id,
             'reported_by' => $request->user()?->id,
             'shift_id' => null,
             'template_id' => $data['template_id'] ?? null,

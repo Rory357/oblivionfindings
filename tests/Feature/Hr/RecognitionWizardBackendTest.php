@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrFeedAttachment;
 use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrKudos;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -27,6 +28,17 @@ beforeEach(function () {
 
     $this->r1 = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     $this->r2 = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+
+    $this->site = Site::factory()->create();
+    foreach ([$this->hr, $this->hr2, $this->r1, $this->r2] as $employee) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $employee->id,
+            'primary_site_id' => $this->site->id,
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
 });
 
 test('multi-recipient kudos creates one kudos and feed post per recipient', function () {
@@ -140,19 +152,21 @@ test('only the giver or receiver can reply to a kudos thread', function () {
         ->assertForbidden();
 });
 
-test('the employee picker is scoped to the tenant (no cross-tenant leak)', function () {
-    // hr + r1 belong to tenant 1; a third employee belongs to tenant 2.
-    HrEmployeeProfile::factory()->create(['user_id' => $this->hr->id, 'tenant_id' => 1, 'is_active' => true]);
-    HrEmployeeProfile::factory()->create(['user_id' => $this->r1->id, 'tenant_id' => 1, 'is_active' => true]);
-
-    $otherTenantUser = User::factory()->create(['approved_at' => now()]);
-    HrEmployeeProfile::factory()->create(['user_id' => $otherTenantUser->id, 'tenant_id' => 2, 'is_active' => true]);
+test('the employee picker includes current approved staff and excludes archived profiles', function () {
+    $archivedUser = User::factory()->create(['approved_at' => now()]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $archivedUser->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => false,
+        'end_date' => today()->subDay(),
+    ]);
 
     $this->actingAs($this->hr)
         ->get('/hr/feed')
         ->assertInertia(fn ($page) => $page
             ->component('hr/feed/index')
-            ->has('employees', 2));
+            ->has('employees', 4)
+            ->where('employees', fn ($employees) => ! collect($employees)->pluck('id')->contains($archivedUser->id)));
 });
 
 test('the feed index exposes the recognition payload shape', function () {
@@ -215,36 +229,41 @@ test('a non-image post attachment is rejected', function () {
         ->assertSessionHasErrors('attachment');
 });
 
-test('kudos cannot be sent to a colleague in a different tenant', function () {
-    HrEmployeeProfile::factory()->create(['user_id' => $this->hr->id, 'tenant_id' => 1, 'is_active' => true]);
-    $otherTenantUser = User::factory()->create(['approved_at' => now()]);
-    HrEmployeeProfile::factory()->create(['user_id' => $otherTenantUser->id, 'tenant_id' => 2, 'is_active' => true]);
+test('kudos cannot be sent to a former staff member', function () {
+    $formerStaff = User::factory()->create(['approved_at' => now()]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $formerStaff->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => false,
+        'end_date' => today()->subDay(),
+    ]);
 
     $this->actingAs($this->hr)
         ->post('/hr/feed/kudos', [
-            'to_user_id' => $otherTenantUser->id,
+            'to_user_id' => $formerStaff->id,
             'category' => 'teamwork',
-            'message' => 'Cross-tenant attempt',
+            'message' => 'Former staff attempt',
         ])
         ->assertSessionHasErrors('to_user_id');
 
     expect(HrKudos::count())->toBe(0);
 });
 
-test('a cross-tenant feed attachment is not served', function () {
+test('a Site-targeted feed attachment is not served outside its audience', function () {
+    $hiddenSite = Site::factory()->create();
     $post = HrFeedPost::create([
-        'tenant_id' => 2,
-        'user_id' => $this->hr->id,
+        'user_id' => $this->r1->id,
         'post_type' => 'update',
-        'content' => 'Another org post',
+        'target_audience' => 'site',
+        'target_value' => (string) $hiddenSite->id,
+        'content' => 'Another Site post',
     ]);
     $attachment = HrFeedAttachment::create([
-        'tenant_id' => 2,
         'feed_post_id' => $post->id,
         'uploaded_by' => $this->hr->id,
         'disk' => 'private',
         'original_name' => 'secret.jpg',
-        'path' => 'hr/feed/2/secret.jpg',
+        'path' => 'hr/feed/hidden/secret.jpg',
         'mime' => 'image/jpeg',
         'size' => 100,
     ]);
@@ -295,7 +314,6 @@ test('an unknown composer kind is rejected', function () {
 
 test('reacting to an announcement toggles the polymorphic feed reaction', function () {
     $announcement = HrAnnouncement::create([
-        'tenant_id' => 1,
         'title' => 'All-hands Friday',
         'content' => 'See you there.',
         'priority' => 'normal',
@@ -326,7 +344,6 @@ test('reacting to an announcement toggles the polymorphic feed reaction', functi
 
 test('replying to a non-kudos post stores a polymorphic feed reply', function () {
     $post = HrFeedPost::create([
-        'tenant_id' => 1,
         'user_id' => $this->hr->id,
         'post_type' => 'update',
         'content' => 'Team update of the week.',
@@ -344,16 +361,18 @@ test('replying to a non-kudos post stores a polymorphic feed reply', function ()
     ]);
 });
 
-test('a cross-tenant feed reaction subject is rejected', function () {
-    $otherTenantPost = HrFeedPost::create([
-        'tenant_id' => 2,
-        'user_id' => $this->hr->id,
+test('a Site-targeted feed reaction subject is rejected outside its audience', function () {
+    $hiddenSite = Site::factory()->create();
+    $hiddenPost = HrFeedPost::create([
+        'user_id' => $this->r1->id,
         'post_type' => 'update',
-        'content' => 'Another org.',
+        'target_audience' => 'site',
+        'target_value' => (string) $hiddenSite->id,
+        'content' => 'Another Site.',
     ]);
 
     $this->actingAs($this->hr)
-        ->post('/hr/feed/react', ['subject_type' => 'post', 'subject_id' => $otherTenantPost->id, 'emoji' => 'heart'])
+        ->post('/hr/feed/react', ['subject_type' => 'post', 'subject_id' => $hiddenPost->id, 'emoji' => 'heart'])
         ->assertNotFound();
 });
 
@@ -365,13 +384,11 @@ test('an unknown feed subject type is rejected', function () {
 
 test('the wall search filters posts server-side', function () {
     HrFeedPost::create([
-        'tenant_id' => 1,
         'user_id' => $this->hr->id,
         'post_type' => 'update',
         'content' => 'Quarterly roster zebra update',
     ]);
     HrFeedPost::create([
-        'tenant_id' => 1,
         'user_id' => $this->hr->id,
         'post_type' => 'update',
         'content' => 'An unrelated kai note',
@@ -386,22 +403,17 @@ test('the wall search filters posts server-side', function () {
 });
 
 test('a site-scoped post is hidden from viewers outside that site', function () {
-    $siteA = \App\Models\Site::factory()->create(['tenant_id' => 1]);
-    $siteB = \App\Models\Site::factory()->create(['tenant_id' => 1]);
-    HrEmployeeProfile::factory()->create([
-        'user_id' => $this->hr->id,
-        'tenant_id' => 1,
-        'is_active' => true,
-        'primary_site_id' => $siteA->id,
-    ]);
+    $siteA = Site::factory()->create();
+    $siteB = Site::factory()->create();
+    $this->hr->hrEmployeeProfile()->update(['primary_site_id' => $siteA->id]);
 
     // r1 (not the viewer) posts one update to site B, then one to site A.
     HrFeedPost::create([
-        'tenant_id' => 1, 'user_id' => $this->r1->id, 'post_type' => 'update',
+        'user_id' => $this->r1->id, 'post_type' => 'update',
         'target_audience' => 'site', 'target_value' => (string) $siteB->id, 'content' => 'Site B only update',
     ]);
     HrFeedPost::create([
-        'tenant_id' => 1, 'user_id' => $this->r1->id, 'post_type' => 'update',
+        'user_id' => $this->r1->id, 'post_type' => 'update',
         'target_audience' => 'site', 'target_value' => (string) $siteA->id, 'content' => 'Site A only update',
     ]);
 

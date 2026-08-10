@@ -4,6 +4,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Role;
 use App\Models\Site;
+use App\Models\SiteHouseRoom;
 use App\Models\SiteTypePlan;
 use App\Models\User;
 use App\Services\Sites\SiteTypePlanService;
@@ -59,10 +60,10 @@ function sampleSitePlanLayout(string $label = 'Bedroom 1'): array
 function createSiteTypePlanForTest(Site $site, string $status = 'draft', array $pins = []): int
 {
     $planId = DB::table('site_type_plans')->insertGetId([
-        'tenant_id' => $site->tenant_id,
         'site_id' => $site->id,
         'site_type' => $site->type,
         'status' => $status,
+        'current_slot' => in_array($status, ['draft', 'published'], true) ? $status : null,
         'version' => 1,
         'layout' => json_encode(sampleSitePlanLayout()),
         'published_at' => $status === 'published' ? now() : null,
@@ -74,7 +75,6 @@ function createSiteTypePlanForTest(Site $site, string $status = 'draft', array $
 
     foreach ($pins as $index => $pin) {
         DB::table('site_type_plan_pins')->insert(array_merge([
-            'tenant_id' => $site->tenant_id,
             'site_type_plan_id' => $planId,
             'kind' => 'custom_marker',
             'label' => 'Marker',
@@ -457,7 +457,7 @@ test('device pin validation requires a current assignment to the site', function
     $otherSite = Site::factory()->create(['type' => 'house']);
     createSiteTypePlanForTest($site);
 
-    $assignedDevice = Device::factory()->security()->create(['tenant_id' => $site->tenant_id]);
+    $assignedDevice = Device::factory()->security()->create();
     DeviceAssignment::query()->create([
         'device_id' => $assignedDevice->id,
         'assignable_type' => DeviceAssignment::TARGET_SITE,
@@ -465,7 +465,7 @@ test('device pin validation requires a current assignment to the site', function
         'assigned_at' => now(),
     ]);
 
-    $otherDevice = Device::factory()->security()->create(['tenant_id' => $site->tenant_id]);
+    $otherDevice = Device::factory()->security()->create();
     DeviceAssignment::query()->create([
         'device_id' => $otherDevice->id,
         'assignable_type' => DeviceAssignment::TARGET_SITE,
@@ -501,6 +501,146 @@ test('device pin validation requires a current assignment to the site', function
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('pins.0.device_id');
+});
+
+test('direct pin updates revalidate the current Site device assignment', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    $otherSite = Site::factory()->create(['type' => 'house']);
+
+    $assignedDevice = Device::factory()->security()->create();
+    DeviceAssignment::query()->create([
+        'device_id' => $assignedDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $site->id,
+        'assigned_at' => now(),
+    ]);
+    $otherDevice = Device::factory()->security()->create();
+    DeviceAssignment::query()->create([
+        'device_id' => $otherDevice->id,
+        'assignable_type' => DeviceAssignment::TARGET_SITE,
+        'assignable_id' => $otherSite->id,
+        'assigned_at' => now(),
+    ]);
+
+    $planId = createSiteTypePlanForTest($site, 'draft', [[
+        'kind' => 'device',
+        'device_id' => $assignedDevice->id,
+        'label' => 'Current Site camera',
+    ]]);
+    $pinId = DB::table('site_type_plan_pins')->where('site_type_plan_id', $planId)->value('id');
+
+    $this->actingAs($user)
+        ->putJson("/sites/{$site->id}/plan/pins/{$pinId}", [
+            'device_id' => $otherDevice->id,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('device_id');
+
+    expect(DB::table('site_type_plan_pins')->find($pinId)->device_id)->toBe($assignedDevice->id);
+});
+
+test('pin room references must resolve to the same Site', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    $otherSite = Site::factory()->create(['type' => 'house']);
+    createSiteTypePlanForTest($site);
+
+    $room = SiteHouseRoom::query()->create([
+        'site_id' => $site->id,
+        'name' => 'Communications room',
+        'is_active' => true,
+    ]);
+    $otherRoom = SiteHouseRoom::query()->create([
+        'site_id' => $otherSite->id,
+        'name' => 'Other Site room',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [[
+                'kind' => 'smoke_alarm',
+                'room_ref_type' => 'house_room',
+                'room_ref_id' => $room->id,
+                'label' => 'Comms room alarm',
+                'x' => 0.2,
+                'y' => 0.3,
+            ]],
+        ])
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/pins", [
+            'replace' => true,
+            'pins' => [[
+                'kind' => 'smoke_alarm',
+                'room_ref_type' => 'house_room',
+                'room_ref_id' => $otherRoom->id,
+                'label' => 'Foreign room alarm',
+                'x' => 0.4,
+                'y' => 0.5,
+            ]],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('pins.0.room_ref_id');
+
+    $this->assertDatabaseHas('site_type_plan_pins', [
+        'room_ref_type' => 'house_room',
+        'room_ref_id' => $room->id,
+        'label' => 'Comms room alarm',
+    ]);
+    $this->assertDatabaseMissing('site_type_plan_pins', ['room_ref_id' => $otherRoom->id]);
+});
+
+test('published pins are immutable until the plan is copied to a draft', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    $publishedId = createSiteTypePlanForTest($site, 'published', [[
+        'kind' => 'smoke_alarm',
+        'label' => 'Published alarm',
+    ]]);
+    $publishedPinId = DB::table('site_type_plan_pins')->where('site_type_plan_id', $publishedId)->value('id');
+
+    $this->actingAs($user)
+        ->putJson("/sites/{$site->id}/plan/pins/{$publishedPinId}", ['label' => 'Changed in place'])
+        ->assertStatus(409);
+    $this->actingAs($user)
+        ->deleteJson("/sites/{$site->id}/plan/pins/{$publishedPinId}")
+        ->assertStatus(409);
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/duplicate-to-draft")
+        ->assertOk();
+
+    $draftId = DB::table('site_type_plans')->where('site_id', $site->id)->where('status', 'draft')->value('id');
+    $draftPinId = DB::table('site_type_plan_pins')->where('site_type_plan_id', $draftId)->value('id');
+
+    $this->actingAs($user)
+        ->putJson("/sites/{$site->id}/plan/pins/{$draftPinId}", ['label' => 'Draft alarm'])
+        ->assertOk()
+        ->assertJsonPath('pin.label', 'Draft alarm');
+
+    expect(DB::table('site_type_plan_pins')->find($publishedPinId)->label)->toBe('Published alarm')
+        ->and(DB::table('site_type_plan_pins')->find($draftPinId)->label)->toBe('Draft alarm');
+});
+
+test('pin direct objects from another Site are concealed before mutation', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+    $otherSite = Site::factory()->create(['type' => 'house']);
+    $planId = createSiteTypePlanForTest($otherSite, 'draft', [[
+        'kind' => 'smoke_alarm',
+        'label' => 'Other Site alarm',
+    ]]);
+    $pinId = DB::table('site_type_plan_pins')->where('site_type_plan_id', $planId)->value('id');
+
+    $this->actingAs($user)
+        ->putJson("/sites/{$site->id}/plan/pins/{$pinId}", ['label' => 'Smuggled change'])
+        ->assertNotFound();
+
+    expect(DB::table('site_type_plan_pins')->find($pinId)->label)->toBe('Other Site alarm');
 });
 
 test('path points are validated for evacuation routes only', function () {

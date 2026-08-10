@@ -2,7 +2,14 @@ import { FleetStatCard } from '@/components/fleet-stat-card';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/fleet-utils';
 import type { BreadcrumbItem } from '@/types';
@@ -32,19 +39,58 @@ type LedgerEntry = {
 };
 
 type Props = {
-    client: { id: number; first_name: string; last_name: string; full_name: string };
+    client: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        full_name: string;
+    };
     summary: {
-        balance: { current: string; total_inflows: string; total_outflows: string; net: string };
-        personal: { contributions: string; purchases: string; reimbursements: string };
+        balance: {
+            current: string;
+            total_inflows: string;
+            total_outflows: string;
+            net: string;
+        };
+        personal: {
+            contributions: string;
+            purchases: string;
+            reimbursements: string;
+        };
         cost_of_care: {
-            direct: { payroll: string; employer_oncost: string; mileage: string; transport: string; purchases: string; other: string; total: string };
-            overheads: { rent: string; utilities: string; maintenance: string; house_operating: string; other: string; total: string };
+            direct: {
+                payroll: string;
+                employer_oncost: string;
+                mileage: string;
+                transport: string;
+                purchases: string;
+                other: string;
+                total: string;
+            };
+            overheads: {
+                rent: string;
+                utilities: string;
+                maintenance: string;
+                house_operating: string;
+                other: string;
+                total: string;
+            };
             total: string;
             weekly_equivalent: string;
             resident_days: number;
         };
-        funding: { agreement_count: number; total_budget: string; period_allocation: string; remaining: string };
-        gap_analysis: { total_gap: string; weekly_gap: string; is_underfunded: boolean; funding_coverage_pct: string };
+        funding: {
+            agreement_count: number;
+            total_budget: string;
+            period_allocation: string;
+            remaining: string;
+        };
+        gap_analysis: {
+            total_gap: string;
+            weekly_gap: string;
+            is_underfunded: boolean;
+            funding_coverage_pct: string;
+        };
     };
     ledger: {
         entries: LedgerEntry[];
@@ -54,7 +100,8 @@ type Props = {
 };
 
 const $ = (v: string | number) => formatCurrency(Number(v));
-const formatDate = (d: string) => new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short' });
+const formatDate = (d: string) =>
+    new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short' });
 
 const typeLabel: Record<string, string> = {
     contribution: 'Contribution',
@@ -71,7 +118,12 @@ const typeLabel: Record<string, string> = {
     cost_allocation: 'Allocated Cost',
 };
 
-export default function ClientFinancials({ client, summary, ledger, filters }: Props) {
+export default function ClientFinancials({
+    client,
+    summary,
+    ledger,
+    filters,
+}: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Clients', href: '/clients' },
         { title: client.full_name, href: `/clients/${client.id}` },
@@ -92,9 +144,15 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
                         title="Financials"
                         description={`${client.full_name} · ${filters.from} to ${filters.to}`}
                         stats={[
-                            { label: 'Weekly cost', value: $(care.weekly_equivalent) },
+                            {
+                                label: 'Weekly cost',
+                                value: $(care.weekly_equivalent),
+                            },
                             { label: 'Weekly gap', value: $(gap.weekly_gap) },
-                            { label: 'Ledger balance', value: $(summary.balance.current) },
+                            {
+                                label: 'Ledger balance',
+                                value: $(summary.balance.current),
+                            },
                         ]}
                     />
                 }
@@ -110,17 +168,49 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
                     />
                     <FleetStatCard
                         label="Weekly Funding"
-                        value={summary.funding.agreement_count > 0 ? $(Number(summary.funding.period_allocation) / Math.max(1, Math.round((new Date(filters.to).getTime() - new Date(filters.from).getTime()) / (7 * 86400000)))) : 'No funding'}
+                        value={
+                            summary.funding.agreement_count > 0
+                                ? $(
+                                      Number(
+                                          summary.funding.period_allocation,
+                                      ) /
+                                          Math.max(
+                                              1,
+                                              Math.round(
+                                                  (new Date(
+                                                      filters.to,
+                                                  ).getTime() -
+                                                      new Date(
+                                                          filters.from,
+                                                      ).getTime()) /
+                                                      (7 * 86400000),
+                                              ),
+                                          ),
+                                  )
+                                : 'No funding'
+                        }
                         icon={Banknote}
-                        color={summary.funding.agreement_count > 0 ? 'blue' : 'slate'}
-                        subtitle={summary.funding.agreement_count > 0 ? `${summary.funding.agreement_count} agreement(s)` : 'No active agreements'}
+                        color={
+                            summary.funding.agreement_count > 0
+                                ? 'blue'
+                                : 'slate'
+                        }
+                        subtitle={
+                            summary.funding.agreement_count > 0
+                                ? `${summary.funding.agreement_count} agreement(s)`
+                                : 'No active agreements'
+                        }
                     />
                     <FleetStatCard
                         label="Weekly Gap"
                         value={$(gap.weekly_gap)}
                         icon={gap.is_underfunded ? AlertTriangle : Wallet}
                         color={gap.is_underfunded ? 'red' : 'cyan'}
-                        subtitle={gap.is_underfunded ? `${gap.funding_coverage_pct}% funded` : 'Fully funded'}
+                        subtitle={
+                            gap.is_underfunded
+                                ? `${gap.funding_coverage_pct}% funded`
+                                : 'Fully funded'
+                        }
                     />
                     <FleetStatCard
                         label="Ledger Balance"
@@ -136,10 +226,13 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
                     <div className="flex items-start gap-3 rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 dark:border-status-critical/30">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-status-critical dark:text-status-critical" />
                         <div>
-                            <p className="text-sm font-medium text-status-critical dark:text-status-critical">Underfunded Client</p>
+                            <p className="text-sm font-medium text-status-critical dark:text-status-critical">
+                                Underfunded Client
+                            </p>
                             <p className="mt-0.5 text-sm text-status-critical dark:text-status-critical">
-                                This client's cost of care exceeds funding by {$(gap.weekly_gap)}/week.
-                                Funding covers {gap.funding_coverage_pct}% of costs.
+                                This client's cost of care exceeds funding by{' '}
+                                {$(gap.weekly_gap)}/week. Funding covers{' '}
+                                {gap.funding_coverage_pct}% of costs.
                             </p>
                         </div>
                     </div>
@@ -150,18 +243,45 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
                     {/* Direct Costs */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Direct Costs</CardTitle>
+                            <CardTitle className="text-base">
+                                Direct Costs
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-3">
-                                <CostRow label="Wages" amount={care.direct.payroll} />
-                                <CostRow label="Employer On-Costs" amount={care.direct.employer_oncost} muted />
-                                <CostRow label="Mileage" amount={care.direct.mileage} />
-                                <CostRow label="Transport" amount={care.direct.transport} />
-                                <CostRow label="Personal Purchases" amount={care.direct.purchases} />
-                                {Number(care.direct.other) > 0 && <CostRow label="Other" amount={care.direct.other} />}
+                                <CostRow
+                                    label="Wages"
+                                    amount={care.direct.payroll}
+                                />
+                                <CostRow
+                                    label="Employer On-Costs"
+                                    amount={care.direct.employer_oncost}
+                                    muted
+                                />
+                                <CostRow
+                                    label="Mileage"
+                                    amount={care.direct.mileage}
+                                />
+                                <CostRow
+                                    label="Transport"
+                                    amount={care.direct.transport}
+                                />
+                                <CostRow
+                                    label="Personal Purchases"
+                                    amount={care.direct.purchases}
+                                />
+                                {Number(care.direct.other) > 0 && (
+                                    <CostRow
+                                        label="Other"
+                                        amount={care.direct.other}
+                                    />
+                                )}
                                 <div className="border-t pt-2">
-                                    <CostRow label="Total Direct" amount={care.direct.total} bold />
+                                    <CostRow
+                                        label="Total Direct"
+                                        amount={care.direct.total}
+                                        bold
+                                    />
                                 </div>
                             </div>
                         </CardContent>
@@ -170,20 +290,48 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
                     {/* Allocated Overheads */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Allocated Overheads</CardTitle>
+                            <CardTitle className="text-base">
+                                Allocated Overheads
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-3">
-                                <CostRow label="Rent" amount={care.overheads.rent} />
-                                <CostRow label="Utilities" amount={care.overheads.utilities} />
-                                <CostRow label="Maintenance" amount={care.overheads.maintenance} />
-                                <CostRow label="House Operating" amount={care.overheads.house_operating} />
-                                {Number(care.overheads.other) > 0 && <CostRow label="Other" amount={care.overheads.other} />}
+                                <CostRow
+                                    label="Rent"
+                                    amount={care.overheads.rent}
+                                />
+                                <CostRow
+                                    label="Utilities"
+                                    amount={care.overheads.utilities}
+                                />
+                                <CostRow
+                                    label="Maintenance"
+                                    amount={care.overheads.maintenance}
+                                />
+                                <CostRow
+                                    label="House Operating"
+                                    amount={care.overheads.house_operating}
+                                />
+                                {Number(care.overheads.other) > 0 && (
+                                    <CostRow
+                                        label="Other"
+                                        amount={care.overheads.other}
+                                    />
+                                )}
                                 <div className="border-t pt-2">
-                                    <CostRow label="Total Overheads" amount={care.overheads.total} bold />
+                                    <CostRow
+                                        label="Total Overheads"
+                                        amount={care.overheads.total}
+                                        bold
+                                    />
                                 </div>
                                 <div className="border-t pt-2">
-                                    <CostRow label="Total Cost of Care" amount={care.total} bold highlight />
+                                    <CostRow
+                                        label="Total Cost of Care"
+                                        amount={care.total}
+                                        bold
+                                        highlight
+                                    />
                                 </div>
                             </div>
                         </CardContent>
@@ -203,28 +351,55 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
                                         <TableHead>Date</TableHead>
                                         <TableHead>Type</TableHead>
                                         <TableHead>Description</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
-                                        <TableHead className="text-right">Balance</TableHead>
+                                        <TableHead className="text-right">
+                                            Amount
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Balance
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {ledger.entries.map((entry, i) => (
                                         <TableRow key={i}>
-                                            <TableCell className="tabular-nums text-sm">{formatDate(entry.date)}</TableCell>
+                                            <TableCell className="text-sm tabular-nums">
+                                                {formatDate(entry.date)}
+                                            </TableCell>
                                             <TableCell>
-                                                <Badge variant={entry.direction === 'inflow' ? 'default' : 'secondary'} className="text-[10px]">
-                                                    {typeLabel[entry.type] || entry.type}
+                                                <Badge
+                                                    variant={
+                                                        entry.direction ===
+                                                        'inflow'
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
+                                                    className="text-[10px]"
+                                                >
+                                                    {typeLabel[entry.type] ||
+                                                        entry.type}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="max-w-[300px] truncate text-sm">{entry.description}</TableCell>
+                                            <TableCell className="max-w-[300px] truncate text-sm">
+                                                {entry.description}
+                                            </TableCell>
                                             <TableCell className="text-right tabular-nums">
-                                                <span className={`flex items-center justify-end gap-1 ${entry.direction === 'inflow' ? 'text-status-success' : 'text-status-critical'}`}>
-                                                    {entry.direction === 'inflow' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                                <span
+                                                    className={`flex items-center justify-end gap-1 ${entry.direction === 'inflow' ? 'text-status-success' : 'text-status-critical'}`}
+                                                >
+                                                    {entry.direction ===
+                                                    'inflow' ? (
+                                                        <ArrowUpRight className="h-3 w-3" />
+                                                    ) : (
+                                                        <ArrowDownRight className="h-3 w-3" />
+                                                    )}
                                                     {$(entry.amount)}
                                                 </span>
                                             </TableCell>
-                                            <TableCell className="text-right tabular-nums text-sm">
-                                                {entry.running_balance !== undefined ? $(entry.running_balance) : '-'}
+                                            <TableCell className="text-right text-sm tabular-nums">
+                                                {entry.running_balance !==
+                                                undefined
+                                                    ? $(entry.running_balance)
+                                                    : '-'}
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -233,7 +408,9 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
                         ) : (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
                                 <Receipt className="h-10 w-10 text-muted-foreground/40" />
-                                <p className="mt-3 text-sm text-muted-foreground">No ledger entries for this period</p>
+                                <p className="mt-3 text-sm text-muted-foreground">
+                                    No ledger entries for this period
+                                </p>
                             </div>
                         )}
                     </CardContent>
@@ -243,11 +420,33 @@ export default function ClientFinancials({ client, summary, ledger, filters }: P
     );
 }
 
-function CostRow({ label, amount, bold, muted, highlight }: { label: string; amount: string; bold?: boolean; muted?: boolean; highlight?: boolean }) {
+function CostRow({
+    label,
+    amount,
+    bold,
+    muted,
+    highlight,
+}: {
+    label: string;
+    amount: string;
+    bold?: boolean;
+    muted?: boolean;
+    highlight?: boolean;
+}) {
     return (
-        <div className={`flex items-center justify-between ${bold ? 'font-semibold' : ''} ${muted ? 'text-muted-foreground' : ''}`}>
-            <span className={`text-sm ${highlight ? 'text-primary dark:text-primary/70' : ''}`}>{label}</span>
-            <span className={`tabular-nums text-sm ${highlight ? 'text-primary dark:text-primary/70' : ''}`}>{$(amount)}</span>
+        <div
+            className={`flex items-center justify-between ${bold ? 'font-semibold' : ''} ${muted ? 'text-muted-foreground' : ''}`}
+        >
+            <span
+                className={`text-sm ${highlight ? 'text-primary dark:text-primary/70' : ''}`}
+            >
+                {label}
+            </span>
+            <span
+                className={`text-sm tabular-nums ${highlight ? 'text-primary dark:text-primary/70' : ''}`}
+            >
+                {$(amount)}
+            </span>
         </div>
     );
 }

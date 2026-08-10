@@ -8,12 +8,41 @@ const baselineEnv =
 process.env.PLAYWRIGHT_BASELINE_ENV = baselineEnv;
 process.env.FEATURE_ROSTERING_PUBLISH ??= 'true';
 process.env.FEATURE_ROSTERING_AUTO_SCHEDULE ??= 'true';
+// The browser server and fixture helpers run in separate PHP processes. A
+// shared test-only cache lets the helper clear the exact Laravel login limiter
+// key between isolated acceptance journeys; the array store cannot cross that
+// process boundary.
+process.env.CACHE_STORE = 'database';
 
 const webServerEnv = Object.fromEntries(
     Object.entries(process.env).filter(
         (entry): entry is [string, string] => typeof entry[1] === 'string',
     ),
 );
+
+const itSecurityDesktopOnlySpecs = [
+    'device-profile-acceptance',
+    'facilities-workspace-acceptance',
+    'healthcare-workspace-acceptance',
+    'it-service-management-acceptance',
+    'it-service-management-navigation',
+    'native-monitoring-runtime-acceptance',
+    'network-it-workspace-acceptance',
+    'operations-workspaces-acceptance',
+    'security-devices-accessibility',
+    'security-devices-estate-operations',
+    'security-devices-navigation',
+    'security-devices-workspace-shell',
+    'security-workspace-acceptance',
+    'tracking-workspace-acceptance',
+];
+
+const itSecurityDesktopOnlyTestMatch = new RegExp(
+    `tests[\\\\/]e2e[\\\\/](?:${itSecurityDesktopOnlySpecs.join('|')})\\.spec\\.ts$`,
+);
+
+const legacyAppShellVisualTestMatch =
+    /tests[\\/]visual[\\/]app-shell\.spec\.ts$/;
 
 export default defineConfig({
     testDir: './tests',
@@ -44,14 +73,40 @@ export default defineConfig({
     projects: [
         {
             name: 'chromium-desktop',
+            testIgnore: [
+                itSecurityDesktopOnlyTestMatch,
+                legacyAppShellVisualTestMatch,
+            ],
             use: {
                 ...devices['Desktop Chrome'],
                 viewport: { width: 1440, height: 1000 },
             },
         },
         {
-            name: 'chromium-mobile',
-            use: { ...devices['Pixel 7'] },
+            name: 'chromium-desktop-visual',
+            testMatch: legacyAppShellVisualTestMatch,
+            snapshotPathTemplate:
+                '{testDir}/__screenshots__/chromium-desktop/{arg}{ext}',
+            use: {
+                ...devices['Desktop Chrome'],
+                viewport: { width: 1440, height: 1000 },
+            },
+        },
+        {
+            name: 'it-security-desktop-1440',
+            testMatch: itSecurityDesktopOnlyTestMatch,
+            use: {
+                ...devices['Desktop Chrome'],
+                viewport: { width: 1440, height: 900 },
+            },
+        },
+        {
+            name: 'it-security-desktop-1280',
+            testMatch: itSecurityDesktopOnlyTestMatch,
+            use: {
+                ...devices['Desktop Chrome'],
+                viewport: { width: 1280, height: 800 },
+            },
         },
     ],
     webServer: {

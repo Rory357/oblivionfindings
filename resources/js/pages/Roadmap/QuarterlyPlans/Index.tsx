@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { CalendarRange } from 'lucide-react';
@@ -43,7 +43,15 @@ type Props = {
     can: RoadmapCan;
 };
 
-const statusOptions = ['', 'draft', 'manager_review', 'exec_review', 'approved', 'published', 'closed'];
+const statusOptions = [
+    '',
+    'draft',
+    'manager_review',
+    'exec_review',
+    'approved',
+    'published',
+    'closed',
+];
 
 export default function QuarterlyPlanIndex({ items, filters }: Props) {
     const [fiscalYear, setFiscalYear] = useState(filters.fiscal_year ?? '');
@@ -73,11 +81,15 @@ export default function QuarterlyPlanIndex({ items, filters }: Props) {
                     { label: 'Total', value: items.data?.length ?? 0 },
                     {
                         label: 'Approved',
-                        value: items.data?.filter((p) => p.status === 'approved').length ?? 0,
+                        value:
+                            items.data?.filter((p) => p.status === 'approved')
+                                .length ?? 0,
                     },
                     {
                         label: 'Draft',
-                        value: items.data?.filter((p) => p.status === 'draft').length ?? 0,
+                        value:
+                            items.data?.filter((p) => p.status === 'draft')
+                                .length ?? 0,
                     },
                 ]}
             />
@@ -88,7 +100,9 @@ export default function QuarterlyPlanIndex({ items, filters }: Props) {
                             inputMode="numeric"
                             placeholder="Fiscal year"
                             value={fiscalYear}
-                            onChange={(event) => setFiscalYear(event.target.value)}
+                            onChange={(event) =>
+                                setFiscalYear(event.target.value)
+                            }
                         />
                         <select
                             className="h-10 rounded-md border bg-background px-3 text-sm"
@@ -110,7 +124,9 @@ export default function QuarterlyPlanIndex({ items, filters }: Props) {
                         >
                             {statusOptions.map((option) => (
                                 <option key={option || 'all'} value={option}>
-                                    {option ? statusLabel(option) : 'All statuses'}
+                                    {option
+                                        ? statusLabel(option)
+                                        : 'All statuses'}
                                 </option>
                             ))}
                         </select>
@@ -122,7 +138,9 @@ export default function QuarterlyPlanIndex({ items, filters }: Props) {
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <Table data-testid="quarterly-plan-history-table">
-                                <caption className="sr-only">Roadmap quarterly plan history</caption>
+                                <caption className="sr-only">
+                                    Roadmap quarterly plan history
+                                </caption>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Quarter</TableHead>
@@ -136,23 +154,44 @@ export default function QuarterlyPlanIndex({ items, filters }: Props) {
                                 <TableBody>
                                     {items.data.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-muted-foreground">
-                                                No quarterly plans match these filters.
+                                            <TableCell
+                                                colSpan={6}
+                                                className="text-muted-foreground"
+                                            >
+                                                No quarterly plans match these
+                                                filters.
                                             </TableCell>
                                         </TableRow>
                                     )}
                                     {items.data.map((plan) => (
                                         <TableRow key={plan.id}>
                                             <TableCell>{`FY${plan.fiscal_year} Q${plan.quarter}`}</TableCell>
-                                            <TableCell>{plan.revision_no}</TableCell>
-                                            <TableCell>{statusLabel(plan.preset_profile)}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline">{statusLabel(plan.status)}</Badge>
+                                                {plan.revision_no}
                                             </TableCell>
-                                            <TableCell>{plan.items_count ?? 0}</TableCell>
                                             <TableCell>
-                                                <Link href={`/roadmap/quarterly-plans/${plan.id}`}>
-                                                    <Button size="sm" variant="outline">Open</Button>
+                                                {statusLabel(
+                                                    plan.preset_profile,
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">
+                                                    {statusLabel(plan.status)}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {plan.items_count ?? 0}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Link
+                                                    href={`/roadmap/quarterly-plans/${plan.id}`}
+                                                >
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                    >
+                                                        Open
+                                                    </Button>
                                                 </Link>
                                             </TableCell>
                                         </TableRow>
@@ -167,7 +206,10 @@ export default function QuarterlyPlanIndex({ items, filters }: Props) {
                     <div className="text-sm text-muted-foreground">
                         Showing {items.data.length} of {items.total} plans.
                     </div>
-                    <LaravelPagination links={items.links} lastPage={items.last_page} />
+                    <LaravelPagination
+                        links={items.links}
+                        lastPage={items.last_page}
+                    />
                 </div>
             </PageShell>
         </AppLayout>

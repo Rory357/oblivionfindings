@@ -2,9 +2,14 @@
  * the shared Add-Client wizard chrome (MedsWizardDialog + wizard/primitives).
  * Posts to emar.rounds.generate. */
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
-import { Field, InfoCard, Segmented, StepHead } from '@/components/wizard/primitives';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+    Field,
+    InfoCard,
+    Segmented,
+    StepHead,
+} from '@/components/wizard/primitives';
 import { router } from '@inertiajs/react';
 import { CalendarClock, Info, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -17,7 +22,12 @@ const STEPS = [
         blurb: 'Date & scope',
         icon: CalendarClock,
     },
-    { key: 'review', label: 'Review & generate', blurb: 'Confirm', icon: RefreshCw },
+    {
+        key: 'review',
+        label: 'Review & generate',
+        blurb: 'Confirm',
+        icon: RefreshCw,
+    },
 ];
 
 export function GenerateRoundsModal({
@@ -127,15 +137,18 @@ export function GenerateRoundsModal({
                             value={scope}
                             onChange={setScope}
                             options={[
-                                { value: 'today', label: 'Day-matched templates' },
+                                {
+                                    value: 'today',
+                                    label: 'Day-matched templates',
+                                },
                                 { value: 'all', label: 'All active templates' },
                             ]}
                         />
                     </Field>
                     <InfoCard icon={Info}>
-                        Existing rounds for a template on this day are skipped, so it's safe
-                        to re-run. Generated rounds start as <strong>pending</strong> and can
-                        be assigned afterwards.
+                        Existing rounds for a template on this day are skipped,
+                        so it's safe to re-run. Generated rounds start as{' '}
+                        <strong>pending</strong> and can be assigned afterwards.
                     </InfoCard>
                 </div>
             ) : (

@@ -40,7 +40,9 @@ vi.mock('@/layouts/app-layout', () => ({
 }));
 
 vi.mock('@/components/page-shell', () => ({
-    default: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,
+    default: ({ children }: { children: React.ReactNode }) => (
+        <main>{children}</main>
+    ),
 }));
 
 vi.mock('./components/create-shift-dialog', () => ({

@@ -16,6 +16,7 @@ use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftTask;
+use App\Models\Site;
 use App\Models\Staff;
 use App\Models\Timesheet;
 use App\Models\User;
@@ -39,18 +40,62 @@ class FrontlineLifecycleDemoSeeder extends Seeder
     {
         $worker = User::query()->where('email', 'sw1@demo.test')->first();
         $admin = User::query()->where('role', 'admin')->first();
-        $serviceContext = ServiceContext::query()->first();
 
-        if (! $worker || ! $admin || ! $serviceContext) {
+        if (! $worker || ! $admin) {
             return;
         }
 
-        $client = Client::query()->whereHas('supportWorkers', fn ($q) => $q->where('users.id', $worker->id))->first()
-            ?? Client::query()->first();
+        $site = Site::updateOrCreate(
+            ['name' => 'Playwright Lifecycle House'],
+            [
+                'type' => 'house',
+                'address_line_1' => '2 Playwright Way',
+                'suburb' => 'Eden Terrace',
+                'city' => 'Auckland',
+                'postcode' => '1021',
+                'country' => 'New Zealand',
+                'is_active' => true,
+            ],
+        );
 
-        if (! $client) {
-            return;
-        }
+        $serviceContext = ServiceContext::firstOrCreate(
+            [
+                'type' => 'residential',
+                'site_id' => $site->id,
+            ],
+            [
+                'name' => 'Frontline Lifecycle Readiness',
+                'description' => 'Deterministic desktop readiness context',
+                'is_active' => true,
+            ],
+        );
+
+        $client = Client::query()
+            ->where('site_id', $site->id)
+            ->where('status', 'active')
+            ->whereHas('supportWorkers', fn ($query) => $query->where('users.id', $worker->id))
+            ->first()
+            ?? Client::query()
+                ->where('site_id', $site->id)
+                ->where('status', 'active')
+                ->first()
+            ?? Client::withoutEvents(fn () => Client::updateOrCreate(
+                [
+                    'first_name' => 'Playwright',
+                    'last_name' => 'Lifecycle',
+                ],
+                [
+                    'site_id' => $site->id,
+                    'service_context_id' => $serviceContext->id,
+                    'preferred_name' => 'PW Lifecycle',
+                    'date_of_birth' => now()->subYears(40)->toDateString(),
+                    'gender' => 'not_stated',
+                    'status' => 'active',
+                    'city' => $site->city ?: 'Auckland',
+                    'funding_type' => 'demo',
+                ],
+            ));
+        $client->supportWorkers()->syncWithoutDetaching([$worker->id]);
 
         // Site access: TimesheetController::assertCanAccessTimesheet checks
         // hrEmployeeProfile.primary_site_id (or secondary_site_ids / user.site_id)
@@ -79,7 +124,9 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         $this->grantSiteAccess($restrictedMedsWorker, $medsClient);
         $this->seedMedicationReadinessFixtures($medsWorker, $admin, $medsClient, $medsServiceContext);
 
-        $this->seedPlaywrightAttendanceFixtures($admin, $client, $serviceContext);
+        $attendanceClient = $this->ensureAttendanceReadinessClient($client, $serviceContext);
+        $this->grantSiteAccess($admin, $attendanceClient);
+        $this->seedPlaywrightAttendanceFixtures($admin, $attendanceClient, $serviceContext);
     }
 
     private function ensureMedicationReadinessWorker(): User
@@ -228,7 +275,7 @@ class FrontlineLifecycleDemoSeeder extends Seeder
 
     private function ensureMedicationReadinessClient(Client $fallbackClient, ServiceContext $serviceContext): Client
     {
-        return Client::updateOrCreate(
+        return Client::withoutEvents(fn () => Client::updateOrCreate(
             [
                 'first_name' => 'Playwright',
                 'last_name' => 'Meds',
@@ -243,7 +290,59 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'city' => $fallbackClient->city ?: 'Auckland',
                 'funding_type' => 'demo',
             ],
+        ));
+    }
+
+    private function ensureAttendanceReadinessClient(Client $fallbackClient, ServiceContext $serviceContext): Client
+    {
+        $site = Site::updateOrCreate(
+            ['name' => 'Playwright Attendance House'],
+            [
+                'tenant_id' => (int) ($fallbackClient->tenant_id ?? 1),
+                'type' => 'house',
+                'address_line_1' => '1 Playwright Way',
+                'suburb' => 'Eden Terrace',
+                'city' => 'Auckland',
+                'postcode' => '1021',
+                'country' => 'New Zealand',
+                'is_active' => true,
+                'archived' => false,
+                'archived_at' => null,
+            ],
         );
+
+        $client = Client::withoutEvents(fn () => Client::updateOrCreate(
+            [
+                'first_name' => 'Playwright',
+                'last_name' => 'Attendance',
+            ],
+            [
+                'site_id' => $site->id,
+                'service_context_id' => $serviceContext->id,
+                'preferred_name' => 'PW Attendance',
+                'date_of_birth' => now()->subYears(40)->toDateString(),
+                'gender' => 'not_stated',
+                'status' => 'active',
+                'city' => $fallbackClient->city ?: 'Auckland',
+                'funding_type' => 'demo',
+            ],
+        ));
+
+        // SystemMedicationsSeeder may attach broad demo medication coverage
+        // after the first lifecycle-seeder pass. Attendance readiness needs a
+        // genuinely clean clinical state, so cease only this named fixture's
+        // medication rows while leaving the real unsigned-MAR gate intact.
+        ClientMedication::query()
+            ->where('client_id', $client->id)
+            ->update([
+                'active' => false,
+                'state' => 'ceased',
+                'end_date' => now()->subDay()->toDateString(),
+                'ceased_at' => now(),
+                'ceased_reason' => 'Playwright attendance readiness fixture has no scheduled medications.',
+            ]);
+
+        return $client;
     }
 
     private function grantSiteAccess(User $worker, Client $client): void
@@ -437,6 +536,21 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         $timezone = config('app.worker_timezone', 'Pacific/Auckland');
         $now = Carbon::now($timezone);
         $anchor = $now->copy();
+
+        // The broad demo seeders also attach example prescriptions to active
+        // clients. Keep this named browser fixture deterministic by ceasing
+        // only unrelated prescriptions for the exact Playwright meds client.
+        ClientMedication::query()
+            ->where('client_id', $client->id)
+            ->where('name', 'not like', 'PW Meds %')
+            ->update([
+                'active' => false,
+                'state' => 'ceased',
+                'end_date' => $now->copy()->subDay()->toDateString(),
+                'ceased_at' => $now,
+                'ceased_reason' => 'Excluded from the deterministic Playwright medication round.',
+                'ceased_by' => $admin->id,
+            ]);
 
         if ($anchor->hour === 0 && $anchor->minute < 30) {
             $anchor->setTime(0, 30);

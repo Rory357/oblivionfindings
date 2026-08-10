@@ -2,6 +2,8 @@
 
 namespace App\Services\Queclink;
 
+use App\Services\Queclink\Exceptions\IntakeRejected;
+
 /**
  * Parser for Queclink @Track Air Interface Protocol (ASCII frames).
  *
@@ -11,9 +13,9 @@ namespace App\Services\Queclink;
  *
  * Frame terminator is "$". Fields are comma-separated. The header determines
  * direction and frame type; the command word (e.g. GTFRI) determines payload
- * field layout. We handle the most common reports inline and fall back to a
- * generic field-array for less common ones — the raw frame is always stored
- * so unrecognised commands can still be inspected from the debug console.
+ * field layout. We handle the most common device-originated reports inline
+ * and fall back to a bounded generic field-array for less common valid ones.
+ * Invalid or server-direction frames are rejected before persistence.
  *
  * HEX frames are detected and tagged but not decoded — operators should
  * configure devices for ASCII via AT+GTSRI Protocol Format = 0.
@@ -27,21 +29,51 @@ class AtTrackProtocolParser
      *
      * @return list<string> Complete frames (each ending with "$").
      */
-    public function splitFrames(string $incoming, string &$buffer): array
-    {
-        $buffer .= $incoming;
-        $frames = [];
+    public function splitFrames(
+        string $incoming,
+        string &$buffer,
+        int $maxBufferBytes = 32768,
+        int $maxFrameBytes = 16384,
+    ): array {
+        if ($maxFrameBytes < 1 || $maxBufferBytes < $maxFrameBytes) {
+            $buffer = '';
 
-        while (($idx = strpos($buffer, '$')) !== false) {
-            $frame = substr($buffer, 0, $idx + 1);
-            $buffer = substr($buffer, $idx + 1);
+            throw new IntakeRejected('buffer_limit');
+        }
+
+        // The listener bounds each fread to maxBufferBytes + 1. Reject an
+        // unexpectedly larger direct caller before concatenation so input can
+        // never cause unbounded buffer growth.
+        if (strlen($incoming) > ($maxBufferBytes + 1) || strlen($buffer) > $maxBufferBytes) {
+            $buffer = '';
+
+            throw new IntakeRejected('buffer_limit');
+        }
+
+        $combined = $buffer.$incoming;
+        $buffer = '';
+        $frames = [];
+        $offset = 0;
+
+        while (($idx = strpos($combined, '$', $offset)) !== false) {
+            $length = $idx - $offset + 1;
+            if ($length > $maxFrameBytes) {
+                throw new IntakeRejected('frame_limit');
+            }
+
+            $frame = substr($combined, $offset, $length);
+            $offset = $idx + 1;
 
             $frame = ltrim($frame, "\r\n\0 ");
-            if ($frame === '' || $frame === '$') {
-                continue;
-            }
             $frames[] = $frame;
         }
+
+        $remaining = substr($combined, $offset);
+        if (strlen($remaining) > $maxBufferBytes || strlen($remaining) > $maxFrameBytes) {
+            throw new IntakeRejected(strlen($remaining) > $maxFrameBytes ? 'frame_limit' : 'buffer_limit');
+        }
+
+        $buffer = $remaining;
 
         return $frames;
     }
@@ -90,10 +122,18 @@ class AtTrackProtocolParser
 
         $commandWord = $fields[0];
 
+        if (! $this->validCommandWord($commandWord)) {
+            return $this->failed($raw, 'invalid command word');
+        }
+
         if ($frameType === 'SACK') {
             // +SACK:GTHBD,<protocolVer>,<count>$  - rarely received inbound but supported.
             $proto = $fields[1] ?? null;
             $count = $fields[2] ?? null;
+
+            if (! $this->validProtocolVersion($proto) || ! $this->validCountNumber($count)) {
+                return $this->failed($raw, 'invalid SACK fields');
+            }
 
             return new AtTrackFrame(
                 rawFrame: $raw,
@@ -117,6 +157,18 @@ class AtTrackProtocolParser
 
         if (! $this->looksLikeImei($imei)) {
             return $this->failed($raw, 'invalid IMEI in field[2]');
+        }
+
+        if (! $this->validProtocolVersion($proto)) {
+            return $this->failed($raw, 'invalid protocol version');
+        }
+
+        if (! $this->validDeviceName($deviceName)) {
+            return $this->failed($raw, 'invalid device name');
+        }
+
+        if (! $this->validCountNumber($count)) {
+            return $this->failed($raw, 'invalid count number');
         }
 
         // Tail layout for RESP/ACK/BUFF frames:
@@ -515,6 +567,10 @@ class AtTrackProtocolParser
         $commandWord = 'GT'.($commaPos === false ? $afterPrefix : substr($afterPrefix, 0, $commaPos));
         $fields = $commaPos === false ? [] : explode(',', substr($afterPrefix, $commaPos + 1));
 
+        if (! $this->validCommandWord($commandWord)) {
+            return $this->failed($raw, 'invalid command word');
+        }
+
         return new AtTrackFrame(
             rawFrame: $raw,
             frameType: 'AT',
@@ -558,5 +614,28 @@ class AtTrackProtocolParser
             fields: [],
             parseError: $reason,
         );
+    }
+
+    private function validCommandWord(?string $value): bool
+    {
+        return is_string($value)
+            && preg_match('/^GT[A-Z0-9]{3,8}$/', $value) === 1;
+    }
+
+    private function validProtocolVersion(?string $value): bool
+    {
+        return is_string($value)
+            && preg_match('/^[0-9A-F]{1,10}$/i', $value) === 1;
+    }
+
+    private function validDeviceName(?string $value): bool
+    {
+        return $value === null || strlen($value) <= 50;
+    }
+
+    private function validCountNumber(?string $value): bool
+    {
+        return is_string($value)
+            && preg_match('/^[0-9A-F]{4}$/i', $value) === 1;
     }
 }

@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,7 +21,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -85,8 +85,10 @@ const NONE = '__none__';
 // Presentational helpers (file icons, category tones, formatters, expiry) are
 // shared with the Documents hub + self-service via document-library-kit.
 // The single-employee library keeps its tighter 30-day "expiring" window.
-const isExpiringSoon = (date: string | null) => expiryStatus(date, 30)?.state === 'expiring';
-const isExpired = (date: string | null) => expiryStatus(date, 30)?.state === 'expired';
+const isExpiringSoon = (date: string | null) =>
+    expiryStatus(date, 30)?.state === 'expiring';
+const isExpired = (date: string | null) =>
+    expiryStatus(date, 30)?.state === 'expired';
 const getFileInfo = fileTypeInfo;
 const formatLabel = labelize;
 const formatDate = formatDocDate;
@@ -239,7 +241,8 @@ export default function StaffDocuments({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref={`/hr/people/${profile.id}`}
                         title="Documents"
@@ -815,7 +818,7 @@ export default function StaffDocuments({
                         className="space-y-4"
                     >
                         {/* Drop zone */}
-                        <label className="bg-primary/5 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary p-8 transition-colors hover:bg-primary/10">
+                        <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary bg-primary/5 p-8 transition-colors hover:bg-primary/10">
                             <Upload className="mb-2 h-8 w-8 text-primary" />
                             <p className="text-sm font-medium text-primary">
                                 {uploadForm.data.file
@@ -1150,7 +1153,8 @@ export default function StaffDocuments({
                         <DialogDescription>
                             Move &quot;
                             {deletingDoc?.title || deletingDoc?.original_name}
-                            &quot; to the Archive folder while retaining its file and history?
+                            &quot; to the Archive folder while retaining its
+                            file and history?
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>

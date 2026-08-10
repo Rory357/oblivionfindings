@@ -351,7 +351,7 @@ class ConsentRequestService
         if (
             ! $lockedUser
             || ! $client
-            || ! $this->sameOrganisation($lockedUser->organization_id, $client->organization_id)
+            || ! $lockedUser->canAccessClientPortal($client)
             || ! $client->portalUsers()
                 ->whereKey($lockedUser->id)
                 ->lockForUpdate()
@@ -364,8 +364,8 @@ class ConsentRequestService
     private function assertStaffContext(ConsentRequest $request, User $staff): void
     {
         $client = $request->client;
-        if (! $client || ! $this->sameOrganisation($staff->organization_id, $client->organization_id)) {
-            throw new ConflictHttpException('This consent request does not belong to the staff member\'s organisation.');
+        if (! $client || ! $staff->can('view', $client)) {
+            throw new ConflictHttpException('This consent request is not available to this staff member.');
         }
     }
 
@@ -402,13 +402,13 @@ class ConsentRequestService
         $client = Client::query()->find($data['client_id'] ?? null);
         $recipient = User::query()->find($data['recipient_user_id'] ?? null);
 
-        if (! $client || ! $this->sameOrganisation($requester->organization_id, $client->organization_id)) {
+        if (! $client || ! $requester->can('view', $client)) {
             throw ValidationException::withMessages([
-                'client_id' => 'The client must belong to your organisation.',
+                'client_id' => 'The Client must be available to you.',
             ]);
         }
 
-        $portalRecipient = $recipient && $this->sameOrganisation($recipient->organization_id, $client->organization_id)
+        $portalRecipient = $recipient && $recipient->canAccessClientPortal($client)
             ? $client->portalUsers()
                 ->whereKey($recipient->id)
                 ->lockForUpdate()
@@ -476,11 +476,6 @@ class ConsentRequestService
             ->with(['client', 'consentType', 'requestedBy'])
             ->lockForUpdate()
             ->findOrFail($request->getKey());
-    }
-
-    private function sameOrganisation(mixed $first, mixed $second): bool
-    {
-        return $first === null || $second === null || (int) $first === (int) $second;
     }
 
     /**

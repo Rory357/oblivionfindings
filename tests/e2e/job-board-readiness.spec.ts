@@ -4,34 +4,39 @@ import {
     collectConsoleErrors,
     expectNoConsoleErrors,
     gotoMyDay,
-    loginAsFrontlineDemoWorker,
+    loginAsJobBoardDemoWorker,
+    resetJobBoardReadinessFixtures,
 } from './helpers';
 
 test.describe('job board readiness', () => {
+    test.beforeEach(() => {
+        resetJobBoardReadinessFixtures();
+    });
+
     test('worker can see eligibility feedback and switch to My claims', async ({
         page,
     }) => {
         const consoleErrors = collectConsoleErrors(page);
 
-        await loginAsFrontlineDemoWorker(page);
+        await loginAsJobBoardDemoWorker(page);
         await page.goto('/operations/job-board');
         await page.waitForLoadState('domcontentloaded');
 
         await expect(
-            page.getByRole('heading', { name: 'Job Board' }),
+            page.getByRole('heading', { name: /shifts ready to claim/i }),
         ).toBeVisible();
         await expect(page.getByTestId('job-board-card').first()).toBeVisible();
-        await expect(
-            page.getByTestId('viewer-eligibility').first(),
-        ).toBeVisible();
-        await expect(
-            page.getByTestId('job-board-claim-button').first(),
-        ).toBeVisible();
+        const eligibility = page.getByTestId('viewer-eligibility').first();
+        await expect(eligibility).toBeVisible();
+        await expect(eligibility).toContainText(/Eligible|warning/);
+        const claimButton = page.getByTestId('job-board-claim-button').first();
+        await expect(claimButton).toBeVisible();
+        await expect(claimButton).toBeEnabled();
 
         await page.getByTestId('job-board-my-claims-tab').click();
         await expect(page).toHaveURL(/\/operations\/job-board\?scope=mine/);
         await expect(page.getByTestId('job-board-card').first()).toBeVisible();
-        await expect(page.getByText(/Claimed by:/).first()).toBeVisible();
+        await expect(page.getByText(/Claimed by/).first()).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);
     });
@@ -41,7 +46,7 @@ test.describe('job board readiness', () => {
     }) => {
         const consoleErrors = collectConsoleErrors(page);
 
-        await loginAsFrontlineDemoWorker(page);
+        await loginAsJobBoardDemoWorker(page);
         await gotoMyDay(page);
 
         const pendingClaimsLink = page.locator(
@@ -62,7 +67,7 @@ test.describe('job board readiness', () => {
     }) => {
         const consoleErrors = collectConsoleErrors(page);
 
-        await loginAsFrontlineDemoWorker(page);
+        await loginAsJobBoardDemoWorker(page);
         await page.goto('/operations/job-board');
         await page.waitForLoadState('domcontentloaded');
 

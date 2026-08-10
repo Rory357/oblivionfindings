@@ -563,108 +563,92 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
             ->assertOk();
     }
 
-    public function test_tenant_hs_all_sites_view_never_aggregates_or_exports_foreign_tenant_data(): void
+    public function test_explicit_hs_all_sites_permission_aggregates_and_exports_every_site(): void
     {
-        $localSiteA = Site::factory()->create(['tenant_id' => 71, 'name' => 'Local Alpha']);
-        $localSiteB = Site::factory()->create(['tenant_id' => 71, 'name' => 'Local Bravo']);
-        $foreignSite = Site::factory()->create(['tenant_id' => 72, 'name' => 'Foreign Tenant Site']);
+        $primarySite = Site::factory()->create(['name' => 'Primary Site']);
+        $secondarySite = Site::factory()->create(['name' => 'Secondary Site']);
+        $remoteSite = Site::factory()->create(['name' => 'Remote Site']);
         $viewer = $this->userWithPermissions(
             ['hazards.view', 'healthSafety.viewAllSites'],
-            'Tenant H&S lead',
+            'Application H&S lead',
         );
-        $viewer->update(['organization_id' => 71]);
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 71,
             'user_id' => $viewer->id,
-            'primary_site_id' => $localSiteA->id,
-            'secondary_site_ids' => [$foreignSite->id],
+            'primary_site_id' => $primarySite->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
             'created_by' => $viewer->id,
             'updated_by' => $viewer->id,
         ]);
 
-        $localClientA = Client::factory()->create([
-            'organization_id' => 71,
-            'site_id' => $localSiteA->id,
-        ]);
-        $localClientB = Client::factory()->create([
-            'organization_id' => 71,
-            'site_id' => $localSiteB->id,
-        ]);
-        $foreignClient = Client::factory()->create([
-            'organization_id' => 72,
-            'site_id' => $foreignSite->id,
-        ]);
-        $localIncidentIds = collect([$localClientA, $localClientB])->map(fn (Client $client) => ClientIncident::factory()->create([
+        $clients = collect([$primarySite, $secondarySite, $remoteSite])->map(
+            fn (Site $site) => Client::factory()->create(['site_id' => $site->id]),
+        );
+        $incidentIds = $clients->map(fn (Client $client) => ClientIncident::factory()->create([
             'client_id' => $client->id,
             'site_id' => $client->site_id,
             'type' => 'near_miss',
             'occurred_at' => now()->subDay(),
         ])->id)->all();
-        $foreignIncident = ClientIncident::factory()->create([
-            'client_id' => $foreignClient->id,
-            'site_id' => $foreignSite->id,
-            'type' => 'near_miss',
-            'occurred_at' => now()->subDay(),
-        ]);
 
-        $localHazard = $this->makeOpenHazard($localSiteB, $viewer, 'Local tenant hazard');
-        $foreignHazard = $this->makeOpenHazard($foreignSite, $viewer, 'Foreign tenant hazard');
-        $localInjury = WorkplaceInjury::factory()->create([
-            'site_id' => $localSiteA->id,
+        $secondaryHazard = $this->makeOpenHazard($secondarySite, $viewer, 'Secondary Site hazard');
+        $remoteHazard = $this->makeOpenHazard($remoteSite, $viewer, 'Remote Site hazard');
+        $primaryInjury = WorkplaceInjury::factory()->create([
+            'site_id' => $primarySite->id,
             'injury_date' => now()->subDays(3),
             'lost_time_days' => 2,
         ]);
-        $foreignInjury = WorkplaceInjury::factory()->create([
-            'site_id' => $foreignSite->id,
+        $remoteInjury = WorkplaceInjury::factory()->create([
+            'site_id' => $remoteSite->id,
             'injury_date' => now()->subDay(),
             'lost_time_days' => 50,
         ]);
 
-        SafeguardingConcern::factory()->investigating()->withSite($localSiteA)->create();
-        SafeguardingConcern::factory()->investigating()->withSite($foreignSite)->create();
+        SafeguardingConcern::factory()->investigating()->withSite($primarySite)->create();
+        SafeguardingConcern::factory()->investigating()->withSite($remoteSite)->create();
 
-        $localAsset = Asset::factory()->forSite($localSiteB)->create([
+        $secondaryAsset = Asset::factory()->forSite($secondarySite)->create([
             'created_by_user_id' => $viewer->id,
             'updated_by_user_id' => $viewer->id,
         ]);
-        $foreignAsset = Asset::factory()->forSite($foreignSite)->create([
+        $remoteAsset = Asset::factory()->forSite($remoteSite)->create([
             'created_by_user_id' => $viewer->id,
             'updated_by_user_id' => $viewer->id,
         ]);
         FleetIncident::factory()->create([
-            'asset_id' => $localAsset->id,
+            'asset_id' => $secondaryAsset->id,
             'reported_by_user_id' => $viewer->id,
             'driver_user_id' => $viewer->id,
             'status' => 'investigating',
             'occurred_at' => now()->subDay(),
         ]);
         FleetIncident::factory()->create([
-            'asset_id' => $foreignAsset->id,
+            'asset_id' => $remoteAsset->id,
             'reported_by_user_id' => $viewer->id,
             'driver_user_id' => $viewer->id,
             'status' => 'investigating',
             'occurred_at' => now()->subDay(),
         ]);
 
-        PpeInventory::factory()->inspectionDue()->expiring()->create(['site_id' => $localSiteA->id]);
-        PpeInventory::factory()->inspectionDue()->expiring()->create(['site_id' => $foreignSite->id]);
+        PpeInventory::factory()->inspectionDue()->expiring()->create(['site_id' => $primarySite->id]);
+        PpeInventory::factory()->inspectionDue()->expiring()->create(['site_id' => $remoteSite->id]);
 
-        $localEvent = HsEvent::factory()->create([
-            'organization_id' => 71,
-            'site_id' => $localSiteB->id,
+        $secondaryEvent = HsEvent::factory()->create([
+            'site_id' => $secondarySite->id,
             'created_by' => $viewer->id,
         ]);
-        $foreignEvent = HsEvent::factory()->create([
-            'organization_id' => 72,
-            'site_id' => $foreignSite->id,
+        $remoteEvent = HsEvent::factory()->create([
+            'site_id' => $remoteSite->id,
             'created_by' => $viewer->id,
         ]);
-        $localAction = HsCorrectiveAction::factory()->overdue()->create([
-            'hs_event_id' => $localEvent->id,
+        $secondaryAction = HsCorrectiveAction::factory()->overdue()->create([
+            'hs_event_id' => $secondaryEvent->id,
             'created_by' => $viewer->id,
         ]);
-        HsCorrectiveAction::factory()->overdue()->create([
-            'hs_event_id' => $foreignEvent->id,
+        $remoteAction = HsCorrectiveAction::factory()->overdue()->create([
+            'hs_event_id' => $remoteEvent->id,
             'created_by' => $viewer->id,
         ]);
 
@@ -673,25 +657,25 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.site', null)
-                ->has('sites', 2)
-                ->where('sites', fn ($sites) => collect($sites)->pluck('id')->sort()->values()->all() === collect([$localSiteA->id, $localSiteB->id])->sort()->values()->all())
-                ->where('kpis.incidents_30d', 2)
-                ->where('kpis.near_misses_30d', 2)
-                ->where('kpis.open_hazards', 1)
-                ->where('kpis.workplace_injuries_ytd', 1)
-                ->where('kpis.lost_time_days_ytd', 2)
-                ->where('kpis.open_safeguarding', 1)
-                ->where('kpis.fleet_incidents_30d', 1)
-                ->where('kpis.fleet_unresolved', 1)
-                ->where('kpis.ppe_inspections_overdue', 1)
-                ->where('kpis.ppe_expiring', 1)
+                ->has('sites', 3)
+                ->where('sites', fn ($sites) => collect($sites)->pluck('id')->sort()->values()->all() === collect([$primarySite->id, $secondarySite->id, $remoteSite->id])->sort()->values()->all())
+                ->where('kpis.incidents_30d', 3)
+                ->where('kpis.near_misses_30d', 3)
+                ->where('kpis.open_hazards', 2)
+                ->where('kpis.workplace_injuries_ytd', 2)
+                ->where('kpis.lost_time_days_ytd', 52)
+                ->where('kpis.open_safeguarding', 2)
+                ->where('kpis.fleet_incidents_30d', 2)
+                ->where('kpis.fleet_unresolved', 2)
+                ->where('kpis.ppe_inspections_overdue', 2)
+                ->where('kpis.ppe_expiring', 2)
                 ->has('incident_trends', 1)
-                ->where('incident_trends.0.count', 2)
-                ->has('worklists.overdue_corrective_actions', 1)
-                ->where('worklists.overdue_corrective_actions.0.id', $localAction->id)
-                ->has('open_hazards_list', 1)
-                ->where('open_hazards_list.0.id', $localHazard->id)
-                ->has('site_league', 2)
+                ->where('incident_trends.0.count', 3)
+                ->has('worklists.overdue_corrective_actions', 2)
+                ->where('worklists.overdue_corrective_actions', fn ($actions) => collect($actions)->pluck('id')->sort()->values()->all() === collect([$secondaryAction->id, $remoteAction->id])->sort()->values()->all())
+                ->has('open_hazards_list', 2)
+                ->where('open_hazards_list', fn ($hazards) => collect($hazards)->pluck('id')->sort()->values()->all() === collect([$secondaryHazard->id, $remoteHazard->id])->sort()->values()->all())
+                ->has('site_league', 3)
             );
 
         $this->actingAs($viewer)
@@ -699,17 +683,17 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.site_id', null)
-                ->has('sites', 2)
-                ->has('site_comparison', 2)
-                ->where('period_summary.incidents', 2)
-                ->where('period_summary.open_hazards', 1)
+                ->has('sites', 3)
+                ->has('site_comparison', 3)
+                ->where('period_summary.incidents', 3)
+                ->where('period_summary.open_hazards', 2)
             );
 
         foreach ([
-            'incidents' => [$localIncidentIds, $foreignIncident->id],
-            'injuries' => [[$localInjury->id], $foreignInjury->id],
-            'hazards' => [[$localHazard->id], $foreignHazard->id],
-        ] as $view => [$visibleIds, $hiddenId]) {
+            'incidents' => $incidentIds,
+            'injuries' => [$primaryInjury->id, $remoteInjury->id],
+            'hazards' => [$secondaryHazard->id, $remoteHazard->id],
+        ] as $view => $visibleIds) {
             $this->actingAs($viewer)
                 ->getJson('/health-safety/analytics/records?view='.$view)
                 ->assertOk()
@@ -718,22 +702,21 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
                     ->where('rows', fn ($rows) => collect($rows)->pluck(0)->sort()->values()->all() === collect($visibleIds)->sort()->values()->all())
                     ->etc()
                 );
-            $this->assertNotContains($hiddenId, $visibleIds);
         }
 
         $export = $this->actingAs($viewer)
             ->get('/health-safety/analytics/export?view=hazards')
             ->assertOk();
         $exportContent = $export->streamedContent();
-        $this->assertStringContainsString('Local Bravo', $exportContent);
-        $this->assertStringNotContainsString('Foreign Tenant Site', $exportContent);
+        $this->assertStringContainsString('Secondary Site', $exportContent);
+        $this->assertStringContainsString('Remote Site', $exportContent);
 
         $this->actingAs($viewer)
-            ->get('/health-safety?site='.$foreignSite->id)
-            ->assertForbidden();
+            ->get('/health-safety?site='.$remoteSite->id)
+            ->assertOk();
         $this->actingAs($viewer)
-            ->get('/health-safety/analytics?site_id='.$foreignSite->id)
-            ->assertForbidden();
+            ->get('/health-safety/analytics?site_id='.$remoteSite->id)
+            ->assertOk();
     }
 
     private function makeOpenHazard(Site $site, User $reporter, string $description): SiteHazard
@@ -760,8 +743,14 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
 
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
+            'position_role' => in_array('hazards.manage', $permissionKeys, true)
+                ? 'coordinator'
+                : 'support_worker',
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
             'created_by' => $user->id,
             'updated_by' => $user->id,
         ]);

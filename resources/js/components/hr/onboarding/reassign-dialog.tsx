@@ -47,13 +47,21 @@ export function ReassignDialog({
             router.patch(
                 `/hr/onboarding/tasks/${target.id}`,
                 { assigned_to_user_id: selected },
-                { preserveScroll: true, onSuccess: () => onClose(), onFinish: () => setProcessing(false) },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => onClose(),
+                    onFinish: () => setProcessing(false),
+                },
             );
         } else {
             router.post(
                 `/hr/onboarding/${target.id}/reassign`,
                 { owner_id: selected },
-                { preserveScroll: true, onSuccess: () => onClose(), onFinish: () => setProcessing(false) },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => onClose(),
+                    onFinish: () => setProcessing(false),
+                },
             );
         }
     };
@@ -62,7 +70,9 @@ export function ReassignDialog({
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="p-0 sm:max-w-[460px]">
                 <DialogHeader className="border-b border-border px-6 py-4">
-                    <DialogTitle>Reassign {target.kind === 'task' ? 'task' : 'owner'}</DialogTitle>
+                    <DialogTitle>
+                        Reassign {target.kind === 'task' ? 'task' : 'owner'}
+                    </DialogTitle>
                     <DialogDescription>
                         {target.label} — they'll be notified.
                     </DialogDescription>
@@ -73,12 +83,15 @@ export function ReassignDialog({
                         const active = selected === o.id;
                         const av = avatarStyle(o.name ?? '');
                         return (
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 key={o.id}
                                 type="button"
                                 onClick={() => setSelected(o.id)}
                                 className={`flex w-full items-center gap-3 rounded-[10px] border px-3.5 py-2.5 text-left transition-colors ${
-                                    active ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'
+                                    active
+                                        ? 'border-primary bg-primary/10'
+                                        : 'border-border hover:bg-muted'
                                 }`}
                             >
                                 <span
@@ -87,7 +100,9 @@ export function ReassignDialog({
                                 >
                                     {initials(o.name)}
                                 </span>
-                                <span className="text-sm font-semibold">{o.name}</span>
+                                <span className="text-sm font-semibold">
+                                    {o.name}
+                                </span>
                             </Button>
                         );
                     })}

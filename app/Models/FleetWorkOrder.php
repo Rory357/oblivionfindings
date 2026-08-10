@@ -4,20 +4,20 @@ namespace App\Models;
 
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FleetWorkOrder extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
     use Concerns\HasReferenceNumber;
 
     public const REFERENCE_PREFIX = 'WO';
 
     protected $fillable = [
         'reference_number',
-        'tenant_id',
         'asset_id',
         'reported_by_user_id',
         'assigned_to_user_id',

@@ -1,18 +1,3 @@
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import {
-    HeroShell,
-    HeroStatusPill,
-    HeroMedallion,
-    HeroCluster,
-    HeroClusterTile,
-    HeroSegmented,
-    fmt,
-    type Tone,
-} from '@/pages/health-safety/components/hs-hero-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
 import {
     EntityFilter,
     ShiftContextMenu,
@@ -21,11 +6,30 @@ import {
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { SafeguardingConcernDialog, type ConcernDetail, type ActionKey, type SectionKey } from '@/components/safeguarding/concern-dialog';
+import {
+    SafeguardingConcernDialog,
+    type ActionKey,
+    type ConcernDetail,
+    type SectionKey,
+} from '@/components/safeguarding/concern-dialog';
 import { SafeguardingRaiseWizard } from '@/components/safeguarding/raise-wizard';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
+import {
+    HeroCluster,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroSegmented,
+    HeroShell,
+    HeroStatusPill,
+    fmt,
+    type Tone,
+} from '@/pages/health-safety/components/hs-hero-kit';
+import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
 import { Head, router } from '@inertiajs/react';
-import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 import {
     Activity,
     BadgeCheck,
@@ -47,11 +51,12 @@ import {
     Search,
     Shield,
     ShieldAlert,
-    User as UserIcon,
     UserCheck,
     UserCog,
+    User as UserIcon,
     X,
 } from 'lucide-react';
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -70,7 +75,11 @@ type ConcernRow = {
     current_risk_level: string | null;
     restricted: boolean;
     attachments_count: number;
-    subject: { name: string | null; site: string | null; href: string | null } | null;
+    subject: {
+        name: string | null;
+        site: string | null;
+        href: string | null;
+    } | null;
     subject_informed: boolean;
     assigned_to: { name: string } | null;
     flags: {
@@ -99,7 +108,11 @@ type ReviewRow = {
     overdue: boolean;
 };
 
-type Paginated<T> = { data: T[]; links: { url: string | null; label: string; active: boolean }[]; last_page: number };
+type Paginated<T> = {
+    data: T[];
+    links: { url: string | null; label: string; active: boolean }[];
+    last_page: number;
+};
 
 type Filters = {
     q: string | null;
@@ -165,15 +178,50 @@ const TONE_DOT: Record<Tone, string> = {
     neutral: 'bg-muted-foreground',
 };
 
-const STATUS: Record<string, { label: string; cls: string; icon: typeof Clock }> = {
-    reported: { label: 'Awaiting triage', cls: 'bg-status-warning-bg text-status-warning', icon: ClipboardList },
-    triaged: { label: 'Triaged', cls: 'bg-status-info-bg text-status-info', icon: ClipboardCheck },
-    investigating: { label: 'Under investigation', cls: 'bg-primary/10 text-primary', icon: Search },
-    action_plan: { label: 'Action plan', cls: 'bg-status-info-bg text-status-info', icon: ListTodo },
-    monitoring: { label: 'Monitoring', cls: 'bg-status-success-bg text-status-success', icon: Activity },
-    referred_external: { label: 'Referred external', cls: 'bg-status-critical-bg text-status-critical', icon: Landmark },
-    closed: { label: 'Closed', cls: 'bg-status-success-bg text-status-success', icon: CheckCircle2 },
-    no_action_required: { label: 'No further action', cls: 'bg-muted text-muted-foreground', icon: CircleSlash },
+const STATUS: Record<
+    string,
+    { label: string; cls: string; icon: typeof Clock }
+> = {
+    reported: {
+        label: 'Awaiting triage',
+        cls: 'bg-status-warning-bg text-status-warning',
+        icon: ClipboardList,
+    },
+    triaged: {
+        label: 'Triaged',
+        cls: 'bg-status-info-bg text-status-info',
+        icon: ClipboardCheck,
+    },
+    investigating: {
+        label: 'Under investigation',
+        cls: 'bg-primary/10 text-primary',
+        icon: Search,
+    },
+    action_plan: {
+        label: 'Action plan',
+        cls: 'bg-status-info-bg text-status-info',
+        icon: ListTodo,
+    },
+    monitoring: {
+        label: 'Monitoring',
+        cls: 'bg-status-success-bg text-status-success',
+        icon: Activity,
+    },
+    referred_external: {
+        label: 'Referred external',
+        cls: 'bg-status-critical-bg text-status-critical',
+        icon: Landmark,
+    },
+    closed: {
+        label: 'Closed',
+        cls: 'bg-status-success-bg text-status-success',
+        icon: CheckCircle2,
+    },
+    no_action_required: {
+        label: 'No further action',
+        cls: 'bg-muted text-muted-foreground',
+        icon: CircleSlash,
+    },
 };
 
 const CATEGORY_OPTIONS = [
@@ -198,12 +246,16 @@ function titleCase(s: string): string {
 /* date helpers (browser-local) */
 const todayStr = () => {
     const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 10);
 };
 const daysAgoStr = (n: number) => {
     const d = new Date();
     d.setDate(d.getDate() - n);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 10);
 };
 
 /* ------------------------------------------------------------------ */
@@ -228,26 +280,53 @@ export default function SafeguardingIndex({
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [raiseOpen, setRaiseOpen] = useState(raise);
     // Which pane the detail dialog should open on (set by the row right-click menu).
-    const [pendingOpen, setPendingOpen] = useState<{ action?: ActionKey; section?: SectionKey } | null>(null);
+    const [pendingOpen, setPendingOpen] = useState<{
+        action?: ActionKey;
+        section?: SectionKey;
+    } | null>(null);
 
     const go = (next: Partial<Filters>) =>
-        router.get('/safeguarding', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(
+            '/safeguarding',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
 
-    const setTab = (id: string) => router.get('/safeguarding', { ...filters, tab: id }, { preserveScroll: true });
+    const setTab = (id: string) =>
+        router.get(
+            '/safeguarding',
+            { ...filters, tab: id },
+            { preserveScroll: true },
+        );
 
     // Detail-over-list: fetch only the `detail` prop and open the dialog without
     // navigating away; closing drops the param so `detail` comes back null.
-    const openConcern = (id: number, opts?: { action?: ActionKey; section?: SectionKey }) => {
+    const openConcern = (
+        id: number,
+        opts?: { action?: ActionKey; section?: SectionKey },
+    ) => {
         setPendingOpen(opts ?? null);
-        router.get('/safeguarding', { ...filters, concern: id }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            '/safeguarding',
+            { ...filters, concern: id },
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     };
     const closeDetail = () => {
         setPendingOpen(null);
-        router.get('/safeguarding', { ...filters }, { preserveState: true, preserveScroll: true, only: ['detail'] });
+        router.get(
+            '/safeguarding',
+            { ...filters },
+            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        );
     };
 
     const clearFilters = () =>
-        router.get('/safeguarding', { tab }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(
+            '/safeguarding',
+            { tab },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
 
     const hasFilters = !!(
         filters.q ||
@@ -263,15 +342,69 @@ export default function SafeguardingIndex({
     const at = hero.attention;
 
     const TABS: RosterTabItem[] = [
-        { id: 'all', label: 'All', icon: LayoutList, tone: 'primary', badge: tabCounts.all || undefined },
-        { id: 'triage', label: 'Awaiting triage', icon: ClipboardList, tone: 'warning', badge: tabCounts.triage || undefined },
-        { id: 'investigation', label: 'Under investigation', icon: Search, tone: 'primary', badge: tabCounts.investigation || undefined },
-        { id: 'action_plan', label: 'Action plan', icon: ListTodo, tone: 'info', badge: tabCounts.action_plan || undefined },
-        { id: 'monitoring', label: 'Monitoring', icon: Activity, tone: 'success', badge: tabCounts.monitoring || undefined },
-        { id: 'referrals', label: 'External referrals', icon: Landmark, tone: 'critical', badge: tabCounts.referrals || undefined },
-        { id: 'reviews', label: 'Reviews due', icon: Clock, tone: 'warning', badge: tabCounts.reviews || undefined },
-        { id: 'closed', label: 'Closed', icon: CheckCircle2, tone: 'success', badge: tabCounts.closed || undefined },
-        { id: 'mine', label: 'Assigned to me', icon: UserCheck, tone: 'info', badge: tabCounts.mine || undefined },
+        {
+            id: 'all',
+            label: 'All',
+            icon: LayoutList,
+            tone: 'primary',
+            badge: tabCounts.all || undefined,
+        },
+        {
+            id: 'triage',
+            label: 'Awaiting triage',
+            icon: ClipboardList,
+            tone: 'warning',
+            badge: tabCounts.triage || undefined,
+        },
+        {
+            id: 'investigation',
+            label: 'Under investigation',
+            icon: Search,
+            tone: 'primary',
+            badge: tabCounts.investigation || undefined,
+        },
+        {
+            id: 'action_plan',
+            label: 'Action plan',
+            icon: ListTodo,
+            tone: 'info',
+            badge: tabCounts.action_plan || undefined,
+        },
+        {
+            id: 'monitoring',
+            label: 'Monitoring',
+            icon: Activity,
+            tone: 'success',
+            badge: tabCounts.monitoring || undefined,
+        },
+        {
+            id: 'referrals',
+            label: 'External referrals',
+            icon: Landmark,
+            tone: 'critical',
+            badge: tabCounts.referrals || undefined,
+        },
+        {
+            id: 'reviews',
+            label: 'Reviews due',
+            icon: Clock,
+            tone: 'warning',
+            badge: tabCounts.reviews || undefined,
+        },
+        {
+            id: 'closed',
+            label: 'Closed',
+            icon: CheckCircle2,
+            tone: 'success',
+            badge: tabCounts.closed || undefined,
+        },
+        {
+            id: 'mine',
+            label: 'Assigned to me',
+            icon: UserCheck,
+            tone: 'info',
+            badge: tabCounts.mine || undefined,
+        },
     ];
 
     /* ---- date range (footer pills) ---- */
@@ -317,44 +450,143 @@ export default function SafeguardingIndex({
         const sev = SEV[c.severity] ?? SEV.low;
         const subjectName = c.subject?.name ?? 'Subject withheld';
         const can = c.can;
-        const terminal = c.status === 'closed' || c.status === 'no_action_required';
+        const terminal =
+            c.status === 'closed' || c.status === 'no_action_required';
         const reported = c.status === 'reported';
-        const markInformed = () => router.post(`/safeguarding/${c.id}/subject-informed`, {}, { preserveScroll: true });
+        const markInformed = () =>
+            router.post(
+                `/safeguarding/${c.id}/subject-informed`,
+                {},
+                { preserveScroll: true },
+            );
 
         // Navigation (always-available views).
         const items: ShiftCtxItem[] = [
-            { icon: <Eye className="h-3.5 w-3.5" />, label: 'View concern', sub: c.reference_number, tone: 'primary', onClick: () => openConcern(c.id) },
+            {
+                icon: <Eye className="h-3.5 w-3.5" />,
+                label: 'View concern',
+                sub: c.reference_number,
+                tone: 'primary',
+                onClick: () => openConcern(c.id),
+            },
             ...(c.subject?.href
-                ? [{ icon: <UserIcon className="h-3.5 w-3.5" />, label: 'View subject', sub: subjectName, onClick: () => router.visit(c.subject!.href!) } satisfies ShiftCtxItem]
+                ? [
+                      {
+                          icon: <UserIcon className="h-3.5 w-3.5" />,
+                          label: 'View subject',
+                          sub: subjectName,
+                          onClick: () => router.visit(c.subject!.href!),
+                      } satisfies ShiftCtxItem,
+                  ]
                 : []),
             ...(c.related_incident_id
-                ? [{ icon: <ShieldAlert className="h-3.5 w-3.5" />, label: 'View linked incident', sub: c.related_incident_ref ?? `INC-${c.related_incident_id}`, onClick: () => router.visit(`/incidents?incident=${c.related_incident_id}`) } satisfies ShiftCtxItem]
+                ? [
+                      {
+                          icon: <ShieldAlert className="h-3.5 w-3.5" />,
+                          label: 'View linked incident',
+                          sub:
+                              c.related_incident_ref ??
+                              `INC-${c.related_incident_id}`,
+                          onClick: () =>
+                              router.visit(
+                                  `/incidents?incident=${c.related_incident_id}`,
+                              ),
+                      } satisfies ShiftCtxItem,
+                  ]
                 : []),
         ];
 
         // Workflow actions — gated identically to the dialog Options bar.
         const workflow: ShiftCtxItem[] = [];
-        if (can.update && reported) workflow.push({ icon: <ClipboardCheck className="h-3.5 w-3.5" />, label: 'Triage', onClick: () => openConcern(c.id, { action: 'triage' }) });
-        if (can.update && !terminal) workflow.push({ icon: <UserCog className="h-3.5 w-3.5" />, label: 'Assign lead', onClick: () => openConcern(c.id, { action: 'assign' }) });
-        if (can.update && !terminal) workflow.push({ icon: <Activity className="h-3.5 w-3.5" />, label: 'Add risk assessment', onClick: () => openConcern(c.id, { action: 'risk' }) });
-        if (can.investigate && !terminal && !reported) workflow.push({ icon: <Search className="h-3.5 w-3.5" />, label: 'Start investigation', onClick: () => openConcern(c.id, { action: 'investigation' }) });
-        if (can.report_external && !terminal && !reported) workflow.push({ icon: <Landmark className="h-3.5 w-3.5" />, label: 'Log external referral', onClick: () => openConcern(c.id, { action: 'report' }) });
-        if (can.update && !terminal && !reported) workflow.push({ icon: <ListTodo className="h-3.5 w-3.5" />, label: 'Add action', onClick: () => openConcern(c.id, { action: 'action' }) });
-        if (can.update && !terminal) workflow.push({ icon: <Paperclip className="h-3.5 w-3.5" />, label: 'Add evidence', onClick: () => openConcern(c.id, { section: 'evidence' }) });
-        if (can.update && !terminal && !c.subject_informed) workflow.push({ icon: <BadgeCheck className="h-3.5 w-3.5" />, label: 'Mark subject informed', onClick: markInformed });
-        if (can.update && c.status === 'action_plan') workflow.push({ icon: <Activity className="h-3.5 w-3.5" />, label: 'Move to monitoring', onClick: () => router.patch(`/safeguarding/${c.id}/status`, { status: 'monitoring' }, { preserveScroll: true }) });
-        if (can.update && !terminal && !reported) workflow.push({ icon: <CheckCircle2 className="h-3.5 w-3.5" />, label: 'Close concern', tone: 'critical', onClick: () => openConcern(c.id, { action: 'close' }) });
+        if (can.update && reported)
+            workflow.push({
+                icon: <ClipboardCheck className="h-3.5 w-3.5" />,
+                label: 'Triage',
+                onClick: () => openConcern(c.id, { action: 'triage' }),
+            });
+        if (can.update && !terminal)
+            workflow.push({
+                icon: <UserCog className="h-3.5 w-3.5" />,
+                label: 'Assign lead',
+                onClick: () => openConcern(c.id, { action: 'assign' }),
+            });
+        if (can.update && !terminal)
+            workflow.push({
+                icon: <Activity className="h-3.5 w-3.5" />,
+                label: 'Add risk assessment',
+                onClick: () => openConcern(c.id, { action: 'risk' }),
+            });
+        if (can.investigate && !terminal && !reported)
+            workflow.push({
+                icon: <Search className="h-3.5 w-3.5" />,
+                label: 'Start investigation',
+                onClick: () => openConcern(c.id, { action: 'investigation' }),
+            });
+        if (can.report_external && !terminal && !reported)
+            workflow.push({
+                icon: <Landmark className="h-3.5 w-3.5" />,
+                label: 'Log external referral',
+                onClick: () => openConcern(c.id, { action: 'report' }),
+            });
+        if (can.update && !terminal && !reported)
+            workflow.push({
+                icon: <ListTodo className="h-3.5 w-3.5" />,
+                label: 'Add action',
+                onClick: () => openConcern(c.id, { action: 'action' }),
+            });
+        if (can.update && !terminal)
+            workflow.push({
+                icon: <Paperclip className="h-3.5 w-3.5" />,
+                label: 'Add evidence',
+                onClick: () => openConcern(c.id, { section: 'evidence' }),
+            });
+        if (can.update && !terminal && !c.subject_informed)
+            workflow.push({
+                icon: <BadgeCheck className="h-3.5 w-3.5" />,
+                label: 'Mark subject informed',
+                onClick: markInformed,
+            });
+        if (can.update && c.status === 'action_plan')
+            workflow.push({
+                icon: <Activity className="h-3.5 w-3.5" />,
+                label: 'Move to monitoring',
+                onClick: () =>
+                    router.patch(
+                        `/safeguarding/${c.id}/status`,
+                        { status: 'monitoring' },
+                        { preserveScroll: true },
+                    ),
+            });
+        if (can.update && !terminal && !reported)
+            workflow.push({
+                icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+                label: 'Close concern',
+                tone: 'critical',
+                onClick: () => openConcern(c.id, { action: 'close' }),
+            });
 
         if (workflow.length) items.push({ sep: true }, ...workflow);
 
-        setCtx({ x: e.clientX, y: e.clientY, tag: sev.label.toUpperCase(), meta: `${c.reference_number} · ${titleCase(c.concern_type)}`, items });
+        setCtx({
+            x: e.clientX,
+            y: e.clientY,
+            tag: sev.label.toUpperCase(),
+            meta: `${c.reference_number} · ${titleCase(c.concern_type)}`,
+            items,
+        });
     };
 
-    const concernRows = rowsKind === 'concerns' ? (rows.data as ConcernRow[]) : [];
+    const concernRows =
+        rowsKind === 'concerns' ? (rows.data as ConcernRow[]) : [];
     const reviewRows = rowsKind === 'reviews' ? (rows.data as ReviewRow[]) : [];
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Safeguarding', href: '/safeguarding' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Health & Safety', href: '/health-safety' },
+                { title: 'Safeguarding', href: '/safeguarding' },
+            ]}
+        >
             <Head title="Safeguarding" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -362,12 +594,33 @@ export default function SafeguardingIndex({
                 <HeroShell
                     footer={
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroSegmented label="Period" variant="pill" ariaLabel="Date range" items={RANGE_ITEMS} value={activeRange} onChange={onRange} />
+                            <HeroSegmented
+                                label="Period"
+                                variant="pill"
+                                ariaLabel="Date range"
+                                items={RANGE_ITEMS}
+                                value={activeRange}
+                                onChange={onRange}
+                            />
                             {sites?.length ? (
-                                <EntityFilter label="Site" allLabel="All sites" items={sites} value={filters.site_id} onChange={(id) => go({ site_id: id })} onDark />
+                                <EntityFilter
+                                    label="Site"
+                                    allLabel="All sites"
+                                    items={sites}
+                                    value={filters.site_id}
+                                    onChange={(id) => go({ site_id: id })}
+                                    onDark
+                                />
                             ) : null}
                             {subjects?.length ? (
-                                <EntityFilter label="Subject" allLabel="All subjects" items={subjects} value={filters.subject_id} onChange={(id) => go({ subject_id: id })} onDark />
+                                <EntityFilter
+                                    label="Subject"
+                                    allLabel="All subjects"
+                                    items={subjects}
+                                    value={filters.subject_id}
+                                    onChange={(id) => go({ subject_id: id })}
+                                    onDark
+                                />
                             ) : null}
                             <HeroSegmented
                                 label="Severity"
@@ -375,13 +628,19 @@ export default function SafeguardingIndex({
                                 ariaLabel="Severity"
                                 items={SEVERITY_ITEMS}
                                 value={filters.severity ?? 'all'}
-                                onChange={(key) => go({ severity: key === 'all' ? null : key })}
+                                onChange={(key) =>
+                                    go({ severity: key === 'all' ? null : key })
+                                }
                             />
                             <label className="inline-flex items-center gap-1.5">
-                                <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">Category</span>
+                                <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
+                                    Category
+                                </span>
                                 <select
                                     value={filters.category ?? ''}
-                                    onChange={(e) => go({ category: e.target.value || null })}
+                                    onChange={(e) =>
+                                        go({ category: e.target.value || null })
+                                    }
                                     className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2 py-1 text-xs text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none [&>option]:text-foreground"
                                 >
                                     <option value="">All categories</option>
@@ -399,7 +658,13 @@ export default function SafeguardingIndex({
                                     placeholder="Search concerns…"
                                     defaultValue={filters.q ?? ''}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter') go({ q: (e.target as HTMLInputElement).value || null });
+                                        if (e.key === 'Enter')
+                                            go({
+                                                q:
+                                                    (
+                                                        e.target as HTMLInputElement
+                                                    ).value || null,
+                                            });
                                     }}
                                     className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
                                 />
@@ -423,17 +688,30 @@ export default function SafeguardingIndex({
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={ShieldAlert} />
                             <div className="flex flex-col gap-1.5">
-                                <HeroStatusPill>Safeguarding register · need-to-know</HeroStatusPill>
-                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">Safeguarding</h1>
+                                <HeroStatusPill>
+                                    Safeguarding register · need-to-know
+                                </HeroStatusPill>
+                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
+                                    Safeguarding
+                                </h1>
                                 <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    Protecting people at risk of abuse, neglect or harm. Every concern is triaged, risk-assessed and worked through to a safe close — confidential, blame-free, and visible only to those who need to know.
+                                    Protecting people at risk of abuse, neglect
+                                    or harm. Every concern is triaged,
+                                    risk-assessed and worked through to a safe
+                                    close — confidential, blame-free, and
+                                    visible only to those who need to know.
                                 </p>
                             </div>
                         </div>
 
                         {can.create ? (
-                            <Button size="sm" onClick={() => setRaiseOpen(true)} className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-                                <Plus className="mr-1.5 h-4 w-4" /> Raise concern
+                            <Button
+                                size="sm"
+                                onClick={() => setRaiseOpen(true)}
+                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" /> Raise
+                                concern
                             </Button>
                         ) : null}
                     </div>
@@ -441,32 +719,117 @@ export default function SafeguardingIndex({
                     {/* counts-only stat clusters (never subject identities) */}
                     <div className="grid gap-3 lg:grid-cols-2">
                         <HeroCluster title="Open work" icon={Shield}>
-                            <HeroClusterTile href="/safeguarding?tab=all" label="Open" value={fmt(ow.open.value)} caption="not yet closed" tone="neutral" />
-                            <HeroClusterTile href="/safeguarding?tab=triage" label="Awaiting triage" value={fmt(ow.awaitingTriage.value)} caption="needs triage" tone={ow.awaitingTriage.value > 0 ? 'warning' : 'success'} />
-                            <HeroClusterTile href="/safeguarding?tab=investigation" label="Under investigation" value={fmt(ow.investigating.value)} caption="in progress" tone="neutral" />
-                            <HeroClusterTile href="/safeguarding?tab=referrals" label="Referred external" value={fmt(ow.referred.value)} caption="with an authority" tone={ow.referred.value > 0 ? 'critical' : 'neutral'} />
+                            <HeroClusterTile
+                                href="/safeguarding?tab=all"
+                                label="Open"
+                                value={fmt(ow.open.value)}
+                                caption="not yet closed"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/safeguarding?tab=triage"
+                                label="Awaiting triage"
+                                value={fmt(ow.awaitingTriage.value)}
+                                caption="needs triage"
+                                tone={
+                                    ow.awaitingTriage.value > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
+                            />
+                            <HeroClusterTile
+                                href="/safeguarding?tab=investigation"
+                                label="Under investigation"
+                                value={fmt(ow.investigating.value)}
+                                caption="in progress"
+                                tone="neutral"
+                            />
+                            <HeroClusterTile
+                                href="/safeguarding?tab=referrals"
+                                label="Referred external"
+                                value={fmt(ow.referred.value)}
+                                caption="with an authority"
+                                tone={
+                                    ow.referred.value > 0
+                                        ? 'critical'
+                                        : 'neutral'
+                                }
+                            />
                         </HeroCluster>
                         <HeroCluster title="Needs attention" icon={Bell}>
-                            <HeroClusterTile href="/safeguarding?tab=action_plan" label="Overdue actions" value={fmt(at.overdueActions.value)} caption={at.overdueActions.value > 0 ? 'past due' : 'all on track'} tone={at.overdueActions.value > 0 ? 'critical' : 'success'} />
-                            <HeroClusterTile href="/safeguarding?tab=reviews" label="Risk reviews due" value={fmt(at.reviewsDue.value)} caption="review now" tone={at.reviewsDue.value > 0 ? 'warning' : 'success'} />
-                            <HeroClusterTile href="/safeguarding?tab=reviews" label="Acks awaited" value={fmt(at.acksAwaited.value)} caption="from authorities" tone={at.acksAwaited.value > 0 ? 'warning' : 'success'} />
-                            <HeroClusterTile label="Critical · open" value={fmt(at.criticalOpen.value)} caption="highest risk" tone={at.criticalOpen.value > 0 ? 'critical' : 'success'} />
+                            <HeroClusterTile
+                                href="/safeguarding?tab=action_plan"
+                                label="Overdue actions"
+                                value={fmt(at.overdueActions.value)}
+                                caption={
+                                    at.overdueActions.value > 0
+                                        ? 'past due'
+                                        : 'all on track'
+                                }
+                                tone={
+                                    at.overdueActions.value > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
+                            />
+                            <HeroClusterTile
+                                href="/safeguarding?tab=reviews"
+                                label="Risk reviews due"
+                                value={fmt(at.reviewsDue.value)}
+                                caption="review now"
+                                tone={
+                                    at.reviewsDue.value > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
+                            />
+                            <HeroClusterTile
+                                href="/safeguarding?tab=reviews"
+                                label="Acks awaited"
+                                value={fmt(at.acksAwaited.value)}
+                                caption="from authorities"
+                                tone={
+                                    at.acksAwaited.value > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
+                            />
+                            <HeroClusterTile
+                                label="Critical · open"
+                                value={fmt(at.criticalOpen.value)}
+                                caption="highest risk"
+                                tone={
+                                    at.criticalOpen.value > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
+                            />
                         </HeroCluster>
                     </div>
                 </HeroShell>
 
                 {/* ---- Tabs ---- */}
-                <TabStrip value={tab} onChange={setTab} items={TABS} ariaLabel="Safeguarding views" />
+                <TabStrip
+                    value={tab}
+                    onChange={setTab}
+                    items={TABS}
+                    ariaLabel="Safeguarding views"
+                />
 
                 {/* ---- External-referral banner ---- */}
-                {referralOverdueCount > 0 && (tab === 'all' || tab === 'referrals') ? (
+                {referralOverdueCount > 0 &&
+                (tab === 'all' || tab === 'referrals') ? (
                     <div className="flex items-center gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/50 px-4 py-3">
                         <Landmark className="h-5 w-5 shrink-0 text-status-critical" />
                         <p className="text-sm text-foreground">
                             <b>
-                                {referralOverdueCount} concern{referralOverdueCount === 1 ? '' : 's'} flagged for external referral with no report logged.
+                                {referralOverdueCount} concern
+                                {referralOverdueCount === 1 ? '' : 's'} flagged
+                                for external referral with no report logged.
                             </b>{' '}
-                            A referral was indicated at triage but no authority has been notified — log the report to advance the concern.
+                            A referral was indicated at triage but no authority
+                            has been notified — log the report to advance the
+                            concern.
                         </p>
                     </div>
                 ) : null}
@@ -475,17 +838,28 @@ export default function SafeguardingIndex({
                 <Card>
                     <CardContent className="p-0">
                         {rowsKind === 'concerns' ? (
-                            <ConcernTable rows={concernRows} onRowCtx={openRowCtx} onOpen={openConcern} />
+                            <ConcernTable
+                                rows={concernRows}
+                                onRowCtx={openRowCtx}
+                                onOpen={openConcern}
+                            />
                         ) : (
-                            <ReviewTable rows={reviewRows} onOpen={openConcern} />
+                            <ReviewTable
+                                rows={reviewRows}
+                                onOpen={openConcern}
+                            />
                         )}
                     </CardContent>
                 </Card>
 
-                {rows.last_page > 1 ? <LaravelPagination links={rows.links} /> : null}
+                {rows.last_page > 1 ? (
+                    <LaravelPagination links={rows.links} />
+                ) : null}
             </div>
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
 
             {detail ? (
                 <SafeguardingConcernDialog
@@ -532,8 +906,12 @@ function ConcernTable({
         return (
             <div className="px-4 py-16 text-center">
                 <Shield className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                <p className="font-medium text-muted-foreground">No concerns here</p>
-                <p className="mt-1 text-sm text-muted-foreground/70">Nothing matches this tab and filters.</p>
+                <p className="font-medium text-muted-foreground">
+                    No concerns here
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground/70">
+                    Nothing matches this tab and filters.
+                </p>
             </div>
         );
     }
@@ -559,12 +937,21 @@ function ConcernTable({
                         return (
                             <tr
                                 key={c.id}
-                                onClick={() => (c.restricted ? undefined : onOpen(c.id))}
+                                onClick={() =>
+                                    c.restricted ? undefined : onOpen(c.id)
+                                }
                                 onContextMenu={(e) => onRowCtx(e, c)}
                                 tabIndex={c.restricted ? -1 : 0}
-                                aria-label={c.restricted ? undefined : `Open concern ${c.reference_number}`}
+                                aria-label={
+                                    c.restricted
+                                        ? undefined
+                                        : `Open concern ${c.reference_number}`
+                                }
                                 onKeyDown={(e) => {
-                                    if (!c.restricted && (e.key === 'Enter' || e.key === ' ')) {
+                                    if (
+                                        !c.restricted &&
+                                        (e.key === 'Enter' || e.key === ' ')
+                                    ) {
                                         e.preventDefault();
                                         onOpen(c.id);
                                     }
@@ -576,29 +963,55 @@ function ConcernTable({
                                 }
                             >
                                 <td className="px-4 py-3 align-top whitespace-nowrap">
-                                    <div className="font-medium">{c.reference_number}</div>
+                                    <div className="font-medium">
+                                        {c.reference_number}
+                                    </div>
                                     <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground/70">
                                         <Calendar className="h-3 w-3" />
-                                        {c.occurred_at ? formatDateTime(c.occurred_at) : '—'}
+                                        {c.occurred_at
+                                            ? formatDateTime(c.occurred_at)
+                                            : '—'}
                                     </div>
                                 </td>
                                 {c.restricted ? (
-                                    <td className="px-4 py-3 align-top" colSpan={2}>
+                                    <td
+                                        className="px-4 py-3 align-top"
+                                        colSpan={2}
+                                    >
                                         <div className="flex items-center gap-2 text-muted-foreground">
                                             <Lock className="h-4 w-4" />
-                                            <span className="text-sm font-medium">Restricted · need-to-know</span>
+                                            <span className="text-sm font-medium">
+                                                Restricted · need-to-know
+                                            </span>
                                         </div>
-                                        <p className="mt-0.5 text-xs text-muted-foreground/70">Visible to the assigned lead and reporter only.</p>
+                                        <p className="mt-0.5 text-xs text-muted-foreground/70">
+                                            Visible to the assigned lead and
+                                            reporter only.
+                                        </p>
                                     </td>
                                 ) : (
                                     <>
                                         <td className="px-4 py-3 align-top">
                                             <div className="flex items-center gap-2">
-                                                <span className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`} />
-                                                <span className="font-medium">{titleCase(c.concern_type)}</span>
-                                                {c.abuse_category ? <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{titleCase(c.abuse_category)}</span> : null}
+                                                <span
+                                                    className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`}
+                                                />
+                                                <span className="font-medium">
+                                                    {titleCase(c.concern_type)}
+                                                </span>
+                                                {c.abuse_category ? (
+                                                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                        {titleCase(
+                                                            c.abuse_category,
+                                                        )}
+                                                    </span>
+                                                ) : null}
                                             </div>
-                                            {c.description ? <p className="mt-0.5 line-clamp-1 max-w-[28rem] text-xs text-muted-foreground/80">{c.description}</p> : null}
+                                            {c.description ? (
+                                                <p className="mt-0.5 line-clamp-1 max-w-[28rem] text-xs text-muted-foreground/80">
+                                                    {c.description}
+                                                </p>
+                                            ) : null}
                                         </td>
                                         <td className="px-4 py-3 align-top">
                                             {c.subject?.name ? (
@@ -611,48 +1024,92 @@ function ConcernTable({
                                                             .join('')}
                                                     </span>
                                                     <span className="min-w-0">
-                                                        <span className="block truncate font-medium">{c.subject.name}</span>
-                                                        {c.subject.site ? <span className="block truncate text-xs text-muted-foreground">{c.subject.site}</span> : null}
+                                                        <span className="block truncate font-medium">
+                                                            {c.subject.name}
+                                                        </span>
+                                                        {c.subject.site ? (
+                                                            <span className="block truncate text-xs text-muted-foreground">
+                                                                {c.subject.site}
+                                                            </span>
+                                                        ) : null}
                                                     </span>
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-muted-foreground">—</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    —
+                                                </span>
                                             )}
                                         </td>
                                     </>
                                 )}
                                 <td className="px-4 py-3 align-top">
-                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[sev.tone]}`}>{sev.label}</span>
+                                    <span
+                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[sev.tone]}`}
+                                    >
+                                        {sev.label}
+                                    </span>
                                 </td>
                                 <td className="px-4 py-3 align-top">
-                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${stat.cls}`}>
+                                    <span
+                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${stat.cls}`}
+                                    >
                                         <StatusIcon className="h-3 w-3" />
                                         {stat.label}
                                     </span>
                                 </td>
                                 <td className="px-4 py-3 align-top">
                                     {c.assigned_to ? (
-                                        <span className="text-xs text-foreground">{c.assigned_to.name}</span>
+                                        <span className="text-xs text-foreground">
+                                            {c.assigned_to.name}
+                                        </span>
                                     ) : (
-                                        <span className="text-xs text-muted-foreground">Unassigned</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Unassigned
+                                        </span>
                                     )}
                                 </td>
                                 <td className="px-4 py-3 align-top">
                                     <div className="flex items-center gap-1.5 text-muted-foreground">
-                                        {c.flags.has_alert ? <RadioTower className="h-3.5 w-3.5 text-status-info" aria-label="Active alert" /> : null}
+                                        {c.flags.has_alert ? (
+                                            <RadioTower
+                                                className="h-3.5 w-3.5 text-status-info"
+                                                aria-label="Active alert"
+                                            />
+                                        ) : null}
                                         {c.flags.referral_overdue ? (
-                                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full ring-2 ring-status-critical" aria-label="Referral indicated, none logged">
+                                            <span
+                                                className="inline-flex h-5 w-5 items-center justify-center rounded-full ring-2 ring-status-critical"
+                                                aria-label="Referral indicated, none logged"
+                                            >
                                                 <Landmark className="h-3 w-3 text-status-critical" />
                                             </span>
                                         ) : c.flags.requires_referral ? (
-                                            <Landmark className="h-3.5 w-3.5 text-status-warning" aria-label="External referral" />
+                                            <Landmark
+                                                className="h-3.5 w-3.5 text-status-warning"
+                                                aria-label="External referral"
+                                            />
                                         ) : null}
-                                        {c.flags.review_due ? <Clock className="h-3.5 w-3.5 text-status-warning" aria-label="Risk review due" /> : null}
-                                        {c.flags.action_overdue ? <ListTodo className="h-3.5 w-3.5 text-status-critical" aria-label="Overdue action" /> : null}
+                                        {c.flags.review_due ? (
+                                            <Clock
+                                                className="h-3.5 w-3.5 text-status-warning"
+                                                aria-label="Risk review due"
+                                            />
+                                        ) : null}
+                                        {c.flags.action_overdue ? (
+                                            <ListTodo
+                                                className="h-3.5 w-3.5 text-status-critical"
+                                                aria-label="Overdue action"
+                                            />
+                                        ) : null}
                                         {c.attachments_count > 0 ? (
-                                            <span className="inline-flex items-center gap-0.5" aria-label={`${c.attachments_count} evidence file${c.attachments_count === 1 ? '' : 's'}`}>
+                                            <span
+                                                className="inline-flex items-center gap-0.5"
+                                                aria-label={`${c.attachments_count} evidence file${c.attachments_count === 1 ? '' : 's'}`}
+                                            >
                                                 <Paperclip className="h-3.5 w-3.5" />
-                                                <span className="text-[10px] font-medium">{c.attachments_count}</span>
+                                                <span className="text-[10px] font-medium">
+                                                    {c.attachments_count}
+                                                </span>
                                             </span>
                                         ) : null}
                                     </div>
@@ -670,13 +1127,27 @@ function ConcernTable({
 /*  Reviews / monitoring worklist                                      */
 /* ------------------------------------------------------------------ */
 
-function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number, opts?: { action?: ActionKey; section?: SectionKey }) => void }) {
+function ReviewTable({
+    rows,
+    onOpen,
+}: {
+    rows: ReviewRow[];
+    onOpen: (
+        id: number,
+        opts?: { action?: ActionKey; section?: SectionKey },
+    ) => void;
+}) {
     if (!rows.length) {
         return (
             <div className="px-4 py-16 text-center">
                 <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-status-success/50" />
-                <p className="font-medium text-muted-foreground">Nothing to review</p>
-                <p className="mt-1 text-sm text-muted-foreground/70">No risk reviews are due and every authority has acknowledged.</p>
+                <p className="font-medium text-muted-foreground">
+                    Nothing to review
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground/70">
+                    No risk reviews are due and every authority has
+                    acknowledged.
+                </p>
             </div>
         );
     }
@@ -695,8 +1166,15 @@ function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number,
                 </thead>
                 <tbody className="divide-y">
                     {rows.map((r, i) => {
-                        const open = () => onOpen(r.id, r.open_section ? { section: r.open_section } : undefined);
-                        const actionLabel = r.kind === 'risk' ? 'Review' : 'Record ack';
+                        const open = () =>
+                            onOpen(
+                                r.id,
+                                r.open_section
+                                    ? { section: r.open_section }
+                                    : undefined,
+                            );
+                        const actionLabel =
+                            r.kind === 'risk' ? 'Review' : 'Record ack';
                         return (
                             <tr
                                 key={`${r.id}-${r.kind}-${i}`}
@@ -711,7 +1189,9 @@ function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number,
                                 }}
                                 className="cursor-pointer transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                             >
-                                <td className="px-4 py-3 align-top font-medium whitespace-nowrap">{r.reference_number}</td>
+                                <td className="px-4 py-3 align-top font-medium whitespace-nowrap">
+                                    {r.reference_number}
+                                </td>
                                 <td className="px-4 py-3 align-top">
                                     <div className="flex items-start gap-2">
                                         {r.kind === 'risk' ? (
@@ -725,27 +1205,35 @@ function ReviewTable({ rows, onOpen }: { rows: ReviewRow[]; onOpen: (id: number,
                                 <td className="px-4 py-3 align-top">
                                     {r.restricted ? (
                                         <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                            <Lock className="h-3 w-3" /> Restricted
+                                            <Lock className="h-3 w-3" />{' '}
+                                            Restricted
                                         </span>
                                     ) : (
-                                        r.subject ?? '—'
+                                        (r.subject ?? '—')
                                     )}
                                 </td>
-                                <td className="px-4 py-3 align-top text-xs text-muted-foreground">{r.owner ?? 'Unassigned'}</td>
+                                <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+                                    {r.owner ?? 'Unassigned'}
+                                </td>
                                 <td className="px-4 py-3 align-top whitespace-nowrap">
                                     {r.due_at ? (
-                                        <span className={`inline-flex items-center gap-1 text-xs ${r.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}>
+                                        <span
+                                            className={`inline-flex items-center gap-1 text-xs ${r.overdue ? 'font-semibold text-status-critical' : 'text-muted-foreground'}`}
+                                        >
                                             <Clock className="h-3.5 w-3.5" />
                                             {formatDateTime(r.due_at)}
                                             {r.overdue ? ' · overdue' : ''}
                                         </span>
                                     ) : (
-                                        <span className="text-xs text-muted-foreground">—</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            —
+                                        </span>
                                     )}
                                 </td>
-                                <td className="px-4 py-3 align-top text-right">
+                                <td className="px-4 py-3 text-right align-top">
                                     <span className="inline-flex items-center gap-1 text-xs font-medium text-primary">
-                                        <Eye className="h-3.5 w-3.5" /> {actionLabel}
+                                        <Eye className="h-3.5 w-3.5" />{' '}
+                                        {actionLabel}
                                     </span>
                                 </td>
                             </tr>

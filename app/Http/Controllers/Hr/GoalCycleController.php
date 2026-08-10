@@ -5,61 +5,64 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrGoalCycle;
 use App\Domain\Hr\Services\CycleService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Domain\Hr\Services\HrGoalAccessService;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class GoalCycleController extends Controller
 {
     public function __construct(
-        protected CycleService $cycleService,
+        private readonly CycleService $cycleService,
+        private readonly HrGoalAccessService $goalAccess,
+        private readonly HrCurrentStaffService $currentStaff,
     ) {}
 
-    /** List cycles for the tenant (JSON — used by selectors / API callers). */
+    /** List the application-wide cycle catalogue used by selectors. */
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
-        abort_unless($this->canView($user), 403);
+        $this->viewer($request);
 
-        $tenantId = $user->tenant_id ?? 1;
-
-        $cycles = $this->cycleService->cyclesForTenant($tenantId)
+        $cycles = $this->cycleService->cycles()
             ->sortBy('starts_at')
             ->values()
-            ->map(fn (HrGoalCycle $c) => [
-                'id' => $c->id,
-                'name' => $c->name,
-                'type' => $c->type,
-                'status' => $c->status,
-                'starts_at' => $c->starts_at?->toDateString(),
-                'ends_at' => $c->ends_at?->toDateString(),
+            ->map(fn (HrGoalCycle $cycle) => [
+                'id' => $cycle->id,
+                'name' => $cycle->name,
+                'type' => $cycle->type,
+                'status' => $cycle->status,
+                'starts_at' => $cycle->starts_at?->toDateString(),
+                'ends_at' => $cycle->ends_at?->toDateString(),
             ]);
 
         return response()->json([
             'cycles' => $cycles,
-            'current_cycle_id' => $this->cycleService->currentCycle($tenantId)?->id,
+            'current_cycle_id' => $this->cycleService->currentCycle()?->id,
         ]);
     }
 
     public function store(Request $request)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-
-        $tenantId = $user->tenant_id ?? 1;
+        $this->manager($request);
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:120'],
+            'name' => ['required', 'string', 'max:120', Rule::unique('hr_goal_cycles', 'name')],
             'type' => ['required', 'string', 'in:quarter,half,year,custom'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
-            'parent_cycle_id' => ['nullable', 'integer', Rule::exists('hr_goal_cycles', 'id')->where('tenant_id', $tenantId)],
+            'parent_cycle_id' => ['nullable', 'integer'],
         ]);
+        $parent = isset($data['parent_cycle_id'])
+            ? $this->cycle((int) $data['parent_cycle_id'])
+            : null;
 
-        HrGoalCycle::create([
-            'tenant_id' => $tenantId,
+        HrGoalCycle::query()->create([
             ...$data,
+            'parent_cycle_id' => $parent?->id,
             'status' => 'upcoming',
         ]);
 
@@ -68,53 +71,79 @@ class GoalCycleController extends Controller
 
     public function update(Request $request, HrGoalCycle $cycle)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-        abort_unless(($user->tenant_id ?? 1) === $cycle->tenant_id, 403);
+        $this->manager($request);
+        $cycle = $this->cycle((int) $cycle->getKey());
 
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:120'],
+            'name' => [
+                'sometimes',
+                'string',
+                'max:120',
+                Rule::unique('hr_goal_cycles', 'name')->ignore($cycle->id),
+            ],
             'type' => ['sometimes', 'string', 'in:quarter,half,year,custom'],
             'starts_at' => ['sometimes', 'date'],
             'ends_at' => ['sometimes', 'date', 'after_or_equal:starts_at'],
             'status' => ['sometimes', 'string', 'in:upcoming,active,closed'],
         ]);
 
-        $cycle->update($data);
+        DB::transaction(function () use ($cycle, $data): void {
+            HrGoalCycle::query()
+                ->lockForUpdate()
+                ->findOrFail($cycle->id)
+                ->update($data);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Cycle updated.');
     }
 
     public function close(Request $request, HrGoalCycle $cycle)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-        abort_unless(($user->tenant_id ?? 1) === $cycle->tenant_id, 403);
+        $user = $this->manager($request);
+        $cycle = $this->cycle((int) $cycle->getKey());
 
-        $cycle->update(['status' => 'closed']);
+        [$autoCompleted, $remainOpen] = DB::transaction(function () use ($cycle, $user): array {
+            $lockedCycle = HrGoalCycle::query()
+                ->lockForUpdate()
+                ->findOrFail($cycle->id);
+            $allCurrentGoals = HrGoal::query()
+                ->where('cycle_id', $lockedCycle->id)
+                ->whereIn('user_id', $this->currentStaff->currentUsersQuery()->select('users.id'))
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->get();
+            $visibleCurrentGoalIds = $this->goalAccess
+                ->applyCurrentGoalScope(HrGoal::query(), $user)
+                ->where('cycle_id', $lockedCycle->id)
+                ->where('status', 'active')
+                ->pluck('id');
 
-        // Close-out: objectives that reached 100% are auto-completed; anything
-        // else is left untouched for the existing rollover flow.
-        $autoCompleted = 0;
-        HrGoal::query()
-            ->forTenant($cycle->tenant_id)
-            ->where('cycle_id', $cycle->id)
-            ->where('status', 'active')
-            ->where('progress_percentage', '>=', 100)
-            ->get()
-            ->each(function (HrGoal $goal) use (&$autoCompleted) {
+            abort_unless(
+                $allCurrentGoals->pluck('id')->sort()->values()->all()
+                    === $visibleCurrentGoalIds->sort()->values()->all(),
+                403,
+                'This cycle contains current objectives outside your approved Sites.',
+            );
+
+            $lockedCycle->update(['status' => 'closed']);
+            $autoCompleted = 0;
+            foreach ($allCurrentGoals as $goal) {
+                if ((int) $goal->progress_percentage < 100) {
+                    continue;
+                }
+
                 $goal->update([
                     'status' => 'completed',
                     'completed_at' => now(),
                 ]);
                 $autoCompleted++;
-            });
+            }
 
-        $remainOpen = HrGoal::query()
-            ->forTenant($cycle->tenant_id)
-            ->where('cycle_id', $cycle->id)
-            ->where('status', 'active')
-            ->count();
+            return [
+                $autoCompleted,
+                $allCurrentGoals->count() - $autoCompleted,
+            ];
+        }, attempts: 1);
 
         return redirect()->back()->with(
             'success',
@@ -122,29 +151,62 @@ class GoalCycleController extends Controller
         );
     }
 
-    /** Clone selected objectives from this cycle into another. */
+    /** Clone an exact Site-visible selection from this cycle into another. */
     public function rollover(Request $request, HrGoalCycle $cycle)
     {
-        $user = $request->user();
-        abort_unless($this->canManage($user), 403);
-        abort_unless(($user->tenant_id ?? 1) === $cycle->tenant_id, 403);
-
-        $tenantId = $user->tenant_id ?? 1;
+        $user = $this->manager($request);
+        $cycle = $this->cycle((int) $cycle->getKey());
 
         $data = $request->validate([
-            'target_cycle_id' => ['required', 'integer', Rule::exists('hr_goal_cycles', 'id')->where('tenant_id', $tenantId)],
+            'target_cycle_id' => ['required', 'integer'],
             'goal_ids' => ['required', 'array', 'min:1'],
-            'goal_ids.*' => ['integer'],
+            'goal_ids.*' => ['integer', 'distinct'],
             'with_key_results' => ['sometimes', 'boolean'],
         ]);
+        $target = $this->cycle((int) $data['target_cycle_id']);
+        abort_if($target->id === $cycle->id, 422, 'Choose a different target cycle.');
 
-        $target = HrGoalCycle::findOrFail($data['target_cycle_id']);
-        $count = $this->cycleService->rollover($target, $data['goal_ids'], $data['with_key_results'] ?? true);
+        $goalIds = collect($data['goal_ids'])->map(fn ($id) => (int) $id)->values();
+        $goals = $this->goalAccess
+            ->applyCurrentGoalScope(HrGoal::query(), $user)
+            ->where('cycle_id', $cycle->id)
+            ->whereKey($goalIds->all())
+            ->get();
+        abort_unless($goals->count() === $goalIds->count(), 404);
+
+        $count = $this->cycleService->rollover(
+            $user,
+            $target,
+            $goals,
+            $data['with_key_results'] ?? true,
+            source: $cycle,
+        );
 
         return redirect()->back()->with('success', "{$count} objective(s) rolled over to “{$target->name}”.");
     }
 
-    private function canView($user): bool
+    private function viewer(Request $request): User
+    {
+        $user = $this->goalAccess->currentViewer($request->user());
+        abort_unless($this->canView($user), 403);
+
+        return $user;
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $this->goalAccess->currentViewer($request->user());
+        abort_unless($this->canManage($user), 403);
+
+        return $user;
+    }
+
+    private function cycle(int $cycleId): HrGoalCycle
+    {
+        return HrGoalCycle::query()->findOrFail($cycleId);
+    }
+
+    private function canView(?User $user): bool
     {
         return (bool) $user && (
             $user->canDo('hr.performance.view')
@@ -152,7 +214,7 @@ class GoalCycleController extends Controller
         );
     }
 
-    private function canManage($user): bool
+    private function canManage(?User $user): bool
     {
         return (bool) $user && $user->canDo('hr.performance.manage');
     }

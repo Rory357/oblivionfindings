@@ -7,11 +7,30 @@
 /*  Status badge config (admin)                                        */
 /* ------------------------------------------------------------------ */
 
-export const statusConfig: Record<string, { className: string; label: string }> = {
-    draft: { className: 'border-border/30 text-muted-foreground bg-muted-foreground/10', label: 'Draft' },
-    pending_approval: { className: 'border-status-warning/30 text-status-warning bg-status-warning', label: 'Pending Approval' },
-    published: { className: 'border-status-success/30 text-status-success bg-status-success', label: 'Published' },
-    closed: { className: 'border-status-critical/30 text-status-critical bg-status-critical', label: 'Closed' },
+export const statusConfig: Record<
+    string,
+    { className: string; label: string }
+> = {
+    draft: {
+        className:
+            'border-border/30 text-muted-foreground bg-muted-foreground/10',
+        label: 'Draft',
+    },
+    pending_approval: {
+        className:
+            'border-status-warning/30 text-status-warning bg-status-warning',
+        label: 'Pending Approval',
+    },
+    published: {
+        className:
+            'border-status-success/30 text-status-success bg-status-success',
+        label: 'Published',
+    },
+    closed: {
+        className:
+            'border-status-critical/30 text-status-critical bg-status-critical',
+        label: 'Closed',
+    },
 };
 
 /* ------------------------------------------------------------------ */

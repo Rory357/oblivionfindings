@@ -2,16 +2,20 @@
 
 namespace Tests\Feature\Queclink;
 
-use App\Models\Queclink\QueclinkAuditEvent;
+use App\Domain\SecurityDevices\Management\Models\DeviceConfigurationProfile;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Models\AuditLog;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkPreset;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Queclink\QueclinkConfigurationProfileService;
 use Database\Seeders\QueclinkPresetSeeder;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class QueclinkPresetTest extends TestCase
@@ -32,8 +36,16 @@ class QueclinkPresetTest extends TestCase
 
     private function pairedGl30(string $imei = '867963069916998'): QueclinkDevice
     {
+        $device = Device::factory()->tracking()->create([
+            'provider' => 'queclink',
+            'category' => 'personal_tracker',
+            'imei' => $imei,
+            'device_uid' => $imei,
+        ]);
+
         return QueclinkDevice::create([
             'imei' => $imei,
+            'device_id' => $device->id,
             'tenant_id' => 1,
             'status' => QueclinkDevice::STATUS_PAIRED,
             'model_hint' => 'GL30MEU',
@@ -60,31 +72,19 @@ class QueclinkPresetTest extends TestCase
                     && collect($presets)->firstWhere('slug', 'resident-safety')['is_system'] === true));
     }
 
-    public function test_applying_resident_safety_preset_queues_identical_cfg_to_the_button(): void
+    public function test_applying_resident_safety_preset_hands_off_without_queuing_provider_commands(): void
     {
         $device = $this->pairedGl30();
         $preset = QueclinkPreset::where('slug', 'resident-safety')->firstOrFail();
 
         $this->actingAs($this->admin)
             ->post("/security-devices/integrations/queclink/devices/{$device->id}/presets/{$preset->id}/apply")
-            ->assertRedirect();
+            ->assertRedirectContains('/security-devices/devices/'.$device->device_id)
+            ->assertRedirectContains('action=configuration.apply');
 
-        $this->assertSame(1, QueclinkPendingCommand::query()->where('queclink_device_id', $device->id)->count());
-
-        $cmd = QueclinkPendingCommand::first();
-        $this->assertSame('GTCFG', $cmd->command_word);
-        // Byte-for-byte the same payload the one-click resident-safety button emits.
-        $this->assertStringContainsString(
-            'AT+GTCFG=gl30,,GL30MEU,150,08E3,006F,1,30,,0,1200,,1,,,,1,1,0000,,,20,1,,1,2,1,0,',
-            $cmd->raw_command,
-        );
-
-        $this->assertDatabaseHas('queclink_audit_events', [
-            'queclink_device_id' => $device->id,
-            'event_type' => 'preset_apply',
-            'section' => 'tracking',
-            'raw_command' => $cmd->raw_command,
-        ]);
+        $this->assertSame(0, QueclinkPendingCommand::query()->count());
+        $this->assertNotNull($preset->configurationProfile);
+        $this->assertSame([], $preset->payload);
     }
 
     public function test_apply_preset_rejects_unpaired_device(): void
@@ -125,8 +125,16 @@ class QueclinkPresetTest extends TestCase
         $this->assertFalse($preset->is_system);
         $this->assertSame(1, (int) $preset->tenant_id);
         $this->assertSame($this->admin->id, $preset->created_by_user_id);
-        $this->assertEquals(120, $preset->payload['tracking']['continuous_send_interval_seconds']);
-        $this->assertArrayNotHasKey('battery_low_percentage', $preset->payload['tracking']);
+        $this->assertEquals(120, $preset->sectionPayloads()['tracking']['continuous_send_interval_seconds']);
+        $this->assertArrayNotHasKey('battery_low_percentage', $preset->sectionPayloads()['tracking']);
+        $this->assertSame([], $preset->payload);
+        $this->assertNotNull($preset->configurationProfile);
+        $this->assertStringNotContainsString(
+            'continuous_send_interval_seconds',
+            (string) DB::table('device_configuration_profiles')
+                ->where('id', $preset->device_configuration_profile_id)
+                ->value('encrypted_payload'),
+        );
     }
 
     public function test_saving_a_preset_rejects_unknown_sections(): void
@@ -154,33 +162,133 @@ class QueclinkPresetTest extends TestCase
         $this->assertDatabaseHas('queclink_presets', ['id' => $preset->id]);
     }
 
-    public function test_operator_can_delete_their_own_preset(): void
+    public function test_operator_reasonedly_retires_preset_and_governed_profile_without_losing_history(): void
     {
-        $preset = QueclinkPreset::create([
-            'tenant_id' => 1,
-            'name' => 'Temporary',
-            'slug' => 'temporary',
-            'target_category' => 'personal_tracker',
-            'payload' => ['tracking' => ['continuous_send_interval_seconds' => 90]],
-            'is_system' => false,
-            'created_by_user_id' => $this->admin->id,
-        ]);
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/queclink/presets', [
+                'name' => 'Temporary',
+                'sections' => [
+                    'tracking' => ['continuous_send_interval_seconds' => 90],
+                ],
+            ])
+            ->assertRedirect();
+
+        $preset = QueclinkPreset::query()->where('slug', 'temporary')->firstOrFail();
+        $profile = $preset->configurationProfile()->firstOrFail();
 
         $this->actingAs($this->admin)
             ->delete("/security-devices/integrations/queclink/presets/{$preset->id}")
+            ->assertSessionHasErrors('reason');
+
+        $this->assertNull($preset->fresh()->retired_at);
+        $this->assertSame(DeviceConfigurationProfile::STATUS_ACTIVE, $profile->fresh()->status);
+
+        $this->actingAs($this->admin)
+            ->delete("/security-devices/integrations/queclink/presets/{$preset->id}", [
+                'reason' => 'Replaced by the approved current tracker baseline.',
+            ])
             ->assertRedirect();
 
-        $this->assertDatabaseMissing('queclink_presets', ['id' => $preset->id]);
+        $retired = $preset->fresh();
+        $this->assertNotNull($retired->retired_at);
+        $this->assertSame($this->admin->id, $retired->retired_by_user_id);
+        $this->assertSame('Replaced by the approved current tracker baseline.', $retired->retirement_reason);
+        $this->assertSame(DeviceConfigurationProfile::STATUS_RETIRED, $profile->fresh()->status);
+        $this->assertFalse(
+            app(QueclinkConfigurationProfileService::class)
+                ->compatibleProfiles($this->pairedGl30()->device)
+                ->contains('id', $profile->id),
+        );
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.queclink.preset.retired',
+            'auditable_id' => $preset->id,
+        ]);
+        $audit = AuditLog::query()
+            ->where('action', 'security_devices.queclink.preset.retired')
+            ->where('auditable_id', $preset->id)
+            ->sole();
+        $this->assertSame('Replaced by the approved current tracker baseline.', $audit->meta['reason']);
+
+        $device = $this->pairedGl30('867963069916997');
+        $this->actingAs($this->admin)
+            ->post("/security-devices/integrations/queclink/devices/{$device->id}/presets/{$preset->id}/apply")
+            ->assertNotFound();
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/integrations/queclink')
+            ->assertInertia(fn ($page) => $page
+                ->where('presets', fn ($presets) => ! collect($presets)->pluck('id')->contains($preset->id))
+                ->where('retiredPresets.0.id', $preset->id)
+                ->where('retiredPresets.0.retired_by', $this->admin->name)
+                ->where('retiredPresets.0.retirement_reason', 'Replaced by the approved current tracker baseline.')
+                ->where('retiredPresets.0.profile_version', $profile->version));
+
+        $this->expectException(\UnexpectedValueException::class);
+        $retired->delete();
     }
 
-    public function test_bulk_apply_preset_queues_one_command_per_section_for_each_device(): void
+    public function test_retired_preset_actor_reason_and_retirement_time_are_immutable(): void
     {
-        $devices = collect(range(1, 3))->map(fn (int $i) => QueclinkDevice::create([
-            'imei' => '86796306991690'.$i,
-            'tenant_id' => 1,
-            'status' => QueclinkDevice::STATUS_PAIRED,
-            'model_hint' => 'GL30MEU',
-        ]));
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/queclink/presets', [
+                'name' => 'Immutable retirement',
+                'sections' => [
+                    'tracking' => ['continuous_send_interval_seconds' => 90],
+                ],
+            ])
+            ->assertRedirect();
+        $preset = QueclinkPreset::query()->where('slug', 'immutable-retirement')->firstOrFail();
+        $this->actingAs($this->admin)
+            ->delete("/security-devices/integrations/queclink/presets/{$preset->id}", [
+                'reason' => 'Replaced by the approved current tracker baseline.',
+            ])
+            ->assertRedirect();
+
+        $this->expectException(\UnexpectedValueException::class);
+        $preset->fresh()->forceFill([
+            'retirement_reason' => 'Rewritten after retirement.',
+        ])->save();
+    }
+
+    public function test_preset_and_profile_retirement_roll_back_together_when_audit_fails(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/queclink/presets', [
+                'name' => 'Rollback preset',
+                'sections' => [
+                    'tracking' => ['continuous_send_interval_seconds' => 90],
+                ],
+            ])
+            ->assertRedirect();
+
+        $preset = QueclinkPreset::query()->where('slug', 'rollback-preset')->firstOrFail();
+        $profile = $preset->configurationProfile()->firstOrFail();
+        $failOnce = true;
+        AuditLog::creating(function () use (&$failOnce): void {
+            if ($failOnce) {
+                $failOnce = false;
+                throw new \RuntimeException('Simulated preset audit failure.');
+            }
+        });
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->admin)
+                ->delete("/security-devices/integrations/queclink/presets/{$preset->id}", [
+                    'reason' => 'Replaced by the approved current tracker baseline.',
+                ]);
+            $this->fail('The simulated audit failure was not raised.');
+        } catch (\RuntimeException $failure) {
+            $this->assertSame('Simulated preset audit failure.', $failure->getMessage());
+        }
+
+        $this->assertNull($preset->fresh()->retired_at);
+        $this->assertSame(DeviceConfigurationProfile::STATUS_ACTIVE, $profile->fresh()->status);
+    }
+
+    public function test_bulk_apply_preset_hands_off_to_governed_bulk_management(): void
+    {
+        $devices = collect(range(1, 3))->map(fn (int $i) => $this->pairedGl30('86796306991690'.$i));
         $preset = QueclinkPreset::where('slug', 'resident-safety')->firstOrFail();
 
         $this->actingAs($this->admin)
@@ -189,13 +297,9 @@ class QueclinkPresetTest extends TestCase
                 'action' => 'apply_preset',
                 'preset_id' => $preset->id,
             ])
-            ->assertRedirect();
+            ->assertRedirectContains('/security-devices/tracking')
+            ->assertRedirectContains('bulk_action=configuration.apply');
 
-        // resident-safety has one section (tracking) → one GTCFG per device.
-        $this->assertSame(3, QueclinkPendingCommand::query()->where('command_word', 'GTCFG')->count());
-        $this->assertSame(3, QueclinkAuditEvent::query()
-            ->where('event_type', 'bulk_apply')
-            ->where('section', 'tracking')
-            ->count());
+        $this->assertSame(0, QueclinkPendingCommand::query()->count());
     }
 }

@@ -18,6 +18,7 @@ export type SiteProfileDataProp =
     | 'assetsData'
     | 'fleetData'
     | 'hardwareData'
+    | 'technology'
     | 'planData'
     | 'documentsData'
     | 'financialsData'

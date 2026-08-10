@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\It;
 
-use App\Http\Controllers\It\Concerns\StoresItAttachments;
-use App\Models\ItTicket;
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
+use App\Models\ItAttachment;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -14,23 +14,13 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class StoreTicketCommentRequest extends FormRequest
 {
-    use StoresItAttachments;
+    use ConcealsInaccessibleItWork;
 
     public function authorize(): bool
     {
-        /** @var ItTicket $ticket */
-        $ticket = $this->route('ticket');
-        $user = $this->user();
+        $this->visibleTicketOrNotFound();
 
-        if (! $user || ! $user->can('comment', $ticket)) {
-            return false;
-        }
-
-        if ($this->boolean('is_internal') && ! $user->canDo('it.manage')) {
-            return false;
-        }
-
-        return true;
+        return $this->user() !== null;
     }
 
     public function rules(): array
@@ -38,7 +28,12 @@ class StoreTicketCommentRequest extends FormRequest
         return [
             'body' => ['required', 'string', 'max:5000'],
             'is_internal' => ['sometimes', 'boolean'],
-            ...$this->itAttachmentRules(),
+            'attachments' => ['sometimes', 'array', 'max:5'],
+            'attachments.*' => [
+                'file',
+                'max:'.ItAttachment::MAX_SIZE_KB,
+                'mimes:'.ItAttachment::ALLOWED_MIMES,
+            ],
         ];
     }
 }

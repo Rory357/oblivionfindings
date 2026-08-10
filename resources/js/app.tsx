@@ -13,7 +13,11 @@ import { bootOfflineQueue } from './lib/offline-queue';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
-function renderInertiaPage(Component: any, pageProps: Record<string, unknown>, key: number | null) {
+function renderInertiaPage(
+    Component: any,
+    pageProps: Record<string, unknown>,
+    key: number | null,
+) {
     const page = <Component key={key} {...pageProps} />;
 
     if (typeof Component.layout === 'function') {
@@ -24,7 +28,9 @@ function renderInertiaPage(Component: any, pageProps: Record<string, unknown>, k
         return Component.layout
             .concat(page)
             .reverse()
-            .reduce((children: unknown, Layout: any) => createElement(Layout, { children, ...pageProps }));
+            .reduce((children: unknown, Layout: any) =>
+                createElement(Layout, { children, ...pageProps }),
+            );
     }
 
     return page;

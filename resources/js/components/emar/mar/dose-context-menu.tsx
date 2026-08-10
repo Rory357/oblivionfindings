@@ -13,10 +13,13 @@
  * opens the full RecordDoseWizard instead, so the required input is captured
  * and nothing is signed to the MAR without it.
  */
-import { ShiftContextMenu, type ShiftCtxItem } from '@/components/rostering/shift-context-menu';
+import {
+    ShiftContextMenu,
+    type ShiftCtxItem,
+} from '@/components/rostering/shift-context-menu';
 import type { DoseStatus, ScheduleRow } from '@/pages/meds/today/types';
 import { router } from '@inertiajs/react';
-import { Ban, Check, ClipboardCheck, Eye, FileText, Hand, History } from 'lucide-react';
+import { Ban, Check, ClipboardCheck, Eye, Hand, History } from 'lucide-react';
 
 /** What the MAR page tracks when a dose cell is right-clicked. `requiresObservation`
  *  comes from the rich `marData.scheduled` row (not on the flat ScheduleRow). */
@@ -31,9 +34,18 @@ export type DoseCtxTarget = {
 const TAG_TONE: Record<DoseStatus, { bg: string; color: string }> = {
     given: { bg: 'var(--status-success-bg)', color: 'var(--status-success)' },
     refused: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
-    withheld: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning)' },
-    missed: { bg: 'var(--status-critical-bg)', color: 'var(--status-critical)' },
-    overdue: { bg: 'var(--status-critical-bg)', color: 'var(--status-critical)' },
+    withheld: {
+        bg: 'var(--status-warning-bg)',
+        color: 'var(--status-warning)',
+    },
+    missed: {
+        bg: 'var(--status-critical-bg)',
+        color: 'var(--status-critical)',
+    },
+    overdue: {
+        bg: 'var(--status-critical-bg)',
+        color: 'var(--status-critical)',
+    },
     due: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
     upcoming: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
 };
@@ -85,7 +97,12 @@ export function DoseContextMenu({
     // need a reading, an overdue/missed dose needs a late reason, and a non-today
     // board makes "now" the wrong timestamp.
     const isLate = row.status === 'overdue' || row.status === 'missed';
-    const needsWizardForGiven = row.is_controlled || row.requires_witness || target.requiresObservation || isLate || !isToday;
+    const needsWizardForGiven =
+        row.is_controlled ||
+        row.requires_witness ||
+        target.requiresObservation ||
+        isLate ||
+        !isToday;
 
     const quickGiven = () => {
         // Same endpoint + pipeline as the wizard; a client_request_uuid makes a
@@ -146,7 +163,9 @@ export function DoseContextMenu({
                           : 'Opens the recording flow',
                 kbd: 'G',
                 tone: 'primary',
-                onClick: needsWizardForGiven ? () => onRecordFull(row) : quickGiven,
+                onClick: needsWizardForGiven
+                    ? () => onRecordFull(row)
+                    : quickGiven,
             },
             {
                 icon: <Hand className="h-3.5 w-3.5" />,

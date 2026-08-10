@@ -167,6 +167,7 @@ class ControlledDrugsTest extends TestCase
                 'quantity_lost' => 2,
                 'unit' => 'tablets',
                 'circumstances' => 'Vial dropped and broke during the count.',
+                'immediate_action_taken' => 'The area was isolated, remaining stock was secured, and the client was checked.',
                 'accountable_officer_name' => 'Jane CDAO',
                 'reported_to_regulator' => true,
                 'regulator_name' => 'Medsafe',
@@ -180,9 +181,50 @@ class ControlledDrugsTest extends TestCase
         $this->assertSame('Medsafe', $report->regulator_name);
         $this->assertSame('MS-123', $report->regulator_reference);
         $this->assertNotNull($report->regulator_notified_at);
+        $this->assertSame(
+            'The area was isolated, remaining stock was secured, and the client was checked.',
+            $report->immediate_action_taken,
+        );
     }
 
     public function test_balance_check_mismatch_links_incident_to_discrepancy(): void
+    {
+        ['user' => $user, 'witness' => $witness, 'client' => $client] = $this->setupCd();
+
+        $response = $this->actingAs($user)
+            ->from('/emar/controlled')
+            ->post('/emar/controlled/balance-check', [
+                'client_id' => $client->id,
+                'medication_name' => 'Morphine sulfate',
+                'expected_balance' => 10,
+                'actual_balance' => 8,
+                'witnessed_by' => $witness->id,
+                'discrepancy_notes' => 'Two tablets unaccounted for.',
+                'immediate_action_taken' => 'Remaining stock was secured and the client was checked while a recount began.',
+            ]);
+
+        $response
+            ->assertRedirect('/emar/controlled')
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+
+        $discrepancy = ClientControlledDrugDiscrepancy::first();
+        $this->assertNotNull($discrepancy);
+        $this->assertNotNull($discrepancy->incident_id, 'Balance-check discrepancy should link the auto-created incident.');
+        $this->assertDatabaseHas('client_incidents', [
+            'id' => $discrepancy->incident_id,
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'status' => 'submitted',
+            'immediate_action_taken' => 'Remaining stock was secured and the client was checked while a recount began.',
+        ]);
+        $this->assertSame(
+            'Remaining stock was secured and the client was checked while a recount began.',
+            $discrepancy->immediate_action_taken,
+        );
+    }
+
+    public function test_balance_check_mismatch_requires_a_truthful_immediate_action_before_any_write(): void
     {
         ['user' => $user, 'witness' => $witness, 'client' => $client] = $this->setupCd();
 
@@ -196,11 +238,30 @@ class ControlledDrugsTest extends TestCase
                 'witnessed_by' => $witness->id,
                 'discrepancy_notes' => 'Two tablets unaccounted for.',
             ])
-            ->assertSessionHasNoErrors();
+            ->assertSessionHasErrors('immediate_action_taken');
 
-        $discrepancy = ClientControlledDrugDiscrepancy::first();
-        $this->assertNotNull($discrepancy);
-        $this->assertNotNull($discrepancy->incident_id, 'Balance-check discrepancy should link the auto-created incident.');
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertDatabaseCount('client_controlled_drug_discrepancies', 0);
+        $this->assertDatabaseCount('client_incidents', 0);
+    }
+
+    public function test_controlled_loss_requires_a_truthful_immediate_action_before_any_write(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->setupCd();
+
+        $this->actingAs($user)
+            ->from('/emar/controlled')
+            ->post('/emar/controlled/loss-reports', [
+                'client_id' => $client->id,
+                'medication_name' => 'Morphine sulfate',
+                'quantity_lost' => 2,
+                'unit' => 'tablets',
+                'circumstances' => 'Two tablets were missing at handover.',
+            ])
+            ->assertSessionHasErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('controlled_drug_loss_reports', 0);
+        $this->assertDatabaseCount('client_incidents', 0);
     }
 
     public function test_overdue_cd_check_command_raises_then_balance_check_resolves_alert(): void

@@ -9,7 +9,12 @@ import { useEffect, useState, type CSSProperties } from 'react';
 
 import { cn } from '@/lib/utils';
 
-import { nzd, STATUS_META, type AssetHero, type AssetStatus } from './asset-parts';
+import {
+    nzd,
+    STATUS_META,
+    type AssetHero,
+    type AssetStatus,
+} from './asset-parts';
 
 const HERO_STYLE: CSSProperties = {
     ['--hr-amber' as string]: 'oklch(0.86 0.13 90)',

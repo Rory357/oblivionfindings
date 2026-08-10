@@ -68,7 +68,9 @@ export function statusTone(status: string): StatusTone {
 }
 
 function humanise(status: string): string {
-    return status.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return status
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**

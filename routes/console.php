@@ -6,7 +6,6 @@ use App\Domain\Finance\Jobs\GenerateRecurringJournalsJob;
 use App\Domain\Finance\Jobs\PostLeaveProvisionJob;
 use App\Domain\Finance\Jobs\PostSiteRentJob;
 use App\Domain\Finance\Jobs\PostSiteUtilitiesJob;
-use App\Domain\Finance\Jobs\ProcessRecurringChargesJob;
 use App\Domain\Finance\Jobs\PruneFinanceAuditExportsJob;
 use App\Domain\Finance\Jobs\ReconcileUnpostedClientFundJournalsJob;
 use App\Domain\Finance\Jobs\RunDepreciationJob;
@@ -23,6 +22,7 @@ use App\Domain\Hr\Jobs\EscalateLeaveApprovalsJob;
 use App\Domain\Hr\Jobs\EvaluateComplianceMatrixJob;
 use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
 use App\Domain\Hr\Jobs\PublishDueAnnouncementsJob;
+use App\Domain\Hr\Jobs\RecoverComplianceReminderDeliveriesJob;
 use App\Domain\Hr\Jobs\RunHrScheduledReportsJob;
 use App\Domain\Hr\Jobs\SendAssetRemindersJob;
 use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
@@ -30,10 +30,18 @@ use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
 use App\Domain\Hr\Jobs\SendOfferExpiryRemindersJob;
 use App\Domain\Hr\Jobs\SendPipRemindersJob;
 use App\Domain\Hr\Jobs\SendWellbeingRemindersJob;
+use App\Domain\It\Services\ItAutomationScheduleCatalog;
+use App\Domain\Monitoring\Jobs\DownsampleMetrics;
+use App\Domain\Monitoring\Jobs\EnforceMonitoringRetention;
+use App\Domain\Monitoring\Jobs\EvaluateCollectorHealth;
+use App\Domain\Monitoring\Jobs\ScheduleDueMonitors;
+use App\Domain\Monitoring\Jobs\ScheduleProviderCapabilities;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
 use App\Domain\Roadmap\Jobs\SendRoadmapDigestJob;
+use App\Domain\SecurityDevices\Credentials\Jobs\ReconcileCredentialLeases;
+use App\Domain\SecurityDevices\Management\Jobs\RecoverCollectorCommands;
 use App\Jobs\AutoEscalateControlRoomQueues;
 use App\Jobs\CheckControlRoomSlaBreaches;
 use App\Jobs\ChecklistDueJob;
@@ -41,27 +49,27 @@ use App\Jobs\CheckLoneWorkerOverdueJob;
 use App\Jobs\CheckOverdueCorrectiveActionsJob;
 use App\Jobs\CheckOverdueInvestigationsJob;
 use App\Jobs\CheckRiskAssessmentReviewsJob;
-use App\Jobs\DetectCrDeviceOfflineJob;
 use App\Jobs\DetectFleetOfflineDevices;
 use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\EscalateUnresolvedEligibilityJob;
+use App\Jobs\ExpireQueclinkGovernedCommands;
 use App\Jobs\FleetAutoAlertJob;
 use App\Jobs\Governance\RecoverIncidentGovernanceEscalationsJob;
 use App\Jobs\HazardOverdueJob;
 use App\Jobs\InspectionDueJob;
 use App\Jobs\Notifications\RecoverControlRoomAlertNotificationsJob;
-use App\Jobs\PollItMailboxJob;
+use App\Jobs\Operations\ProcessRecurringChargesJob;
 use App\Jobs\PrivacyDeadlineRemindersJob;
 use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
 use App\Jobs\PruneFleetTelemetry;
+use App\Jobs\PrunePersonalTrackingTelemetry;
 use App\Jobs\RecalculateFutureShiftEligibility;
 use App\Jobs\ReconcileTimesheetsJob;
 use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Jobs\ShiftTaskDueJob;
 use App\Jobs\SyncResourceCalendarsJob;
-use App\Models\RecurringCharge;
 use App\Services\MedicationAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
@@ -71,10 +79,111 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
+// Schedule lightweight monitor orchestration only. Protocol checks and remote
+// collector configuration are routed to their isolated runtime workloads.
+app(Schedule::class)
+    ->job(new ScheduleDueMonitors)
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Provider adapters expose only verified typed collection contracts. The
+// scheduler delegates each declared capability to the same signed runtime.
+app(Schedule::class)
+    ->job(new ScheduleProviderCapabilities)
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+app(Schedule::class)
+    ->job(new EvaluateCollectorHealth)
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Each isolated runtime queue consumes its own canary. This proves worker
+// availability without asking web requests to probe runtime processes.
+app(Schedule::class)
+    ->command('monitoring:dispatch-runtime-heartbeats')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// This scheduler-direct dead-man heartbeat deliberately bypasses Redis queues.
+// It is sent only after every isolated worker and UDP listener proves current;
+// scheduler, application, database, Redis, worker, or listener loss withholds it.
+app(Schedule::class)
+    ->command('monitoring:send-external-heartbeat')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Revoke completed or compromised runtime credential leases, retry provider
+// revocation while leases remain live, and erase lease identifiers at expiry.
+app(Schedule::class)
+    ->job(new ReconcileCredentialLeases)
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Close collector command attempts after their immutable delivery window. An
+// unissued attempt expires; an issued configuration becomes uncertain and is
+// never repeated without fresh reconciliation and a new governed request.
+app(Schedule::class)
+    ->job(new RecoverCollectorCommands)
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Queclink native commands remain accepted/running until the paired tracker
+// returns a fresh privacy-governed observation. Close expired requests without
+// repeating the Device action and recover any pending reconciliation work.
+app(Schedule::class)
+    ->job(new ExpireQueclinkGovernedCommands)
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// The Device document row is the durable storage intent. Finish verified
+// staged uploads, reasoned quarantine removals and interrupted private-blob
+// cleanup without relying on the original web request or a queue worker.
+app(Schedule::class)
+    ->command('security-devices:reconcile-document-storage --limit=100')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
+app(Schedule::class)
+    ->job(new DownsampleMetrics)
+    ->hourlyAt(10)
+    ->onOneServer()
+    ->withoutOverlapping();
+
+app(Schedule::class)
+    ->job(new EnforceMonitoringRetention)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('02:30')
+    ->onOneServer()
+    ->withoutOverlapping();
+
+// Durable monitoring outbox and replay intents recover after queue outages or
+// a process crash between database commit and queue acceptance.
+app(Schedule::class)
+    ->command('monitoring:recover-delivery')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // Recover Control Room alert notification outbox rows that were committed
 // before a transient queue/worker failure could deliver them.
 app(Schedule::class)
     ->job(new RecoverControlRoomAlertNotificationsJob)
+    ->everyMinute()
+    ->withoutOverlapping();
+
+// HR compliance reminders are staged as durable delivery intents. Recover any
+// row committed while the queue was unavailable or after a worker failure.
+app(Schedule::class)
+    ->job(new RecoverComplianceReminderDeliveriesJob)
     ->everyMinute()
     ->withoutOverlapping();
 
@@ -91,26 +200,9 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
-// IT helpdesk: tickets resolved 7+ days ago auto-close (the requester's
-// reopen window has passed): 07:10 NZ daily.
-app(Schedule::class)
-    ->command('it:close-resolved')
-    ->timezone('Pacific/Auckland')
-    ->dailyAt('07:10');
-
-// IT helpdesk SLA watchdog: hourly at-risk/breach transitions plus the
-// unassigned-urgent escalation (idempotent — one notification per transition).
-app(Schedule::class)
-    ->command('it:check-sla')
-    ->timezone('Pacific/Auckland')
-    ->hourly();
-
-// IT helpdesk email-in: poll the connected support mailbox(es) for unread
-// mail → tickets/replies via InboundEmailIngestor. Inert until an
-// ItMailboxConnection is connected (E4/E6).
-app(Schedule::class)
-    ->job(new PollItMailboxJob)
-    ->hourly();
+// IT service operations owns these three definitions so the scheduler and
+// the HTTP health view consume one canonical cadence and name catalogue.
+app(ItAutomationScheduleCatalog::class)->register();
 
 // Overdue follow-up reminders: every day 09:00 NZ
 app(Schedule::class)
@@ -201,11 +293,12 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->everyFiveMinutes();
 
-// Control Room device offline detection (non-fleet: bed sensors, cameras, alarm panels, etc.)
+// Personal tracking retention is assignment-specific and runs before the
+// broader Fleet and Asset retention windows.
 app(Schedule::class)
-    ->job(new DetectCrDeviceOfflineJob)
+    ->job(new PrunePersonalTrackingTelemetry)
     ->timezone('Pacific/Auckland')
-    ->everyFiveMinutes();
+    ->dailyAt('01:45');
 
 // Fleet telemetry retention cleanup
 app(Schedule::class)
@@ -492,17 +585,9 @@ app(Schedule::class)
     ->everyFiveMinutes()
     ->withoutOverlapping();
 
-// Recurring charges: generate billing entries for due recurring charges, per org.
+// Recurring charges: generate billing entries for all due application charges.
 app(Schedule::class)
-    ->call(function () {
-        RecurringCharge::query()
-            ->where('is_active', true)
-            ->whereDate('next_charge_at', '<=', now()->toDateString())
-            ->whereNotNull('organization_id')
-            ->distinct()
-            ->pluck('organization_id')
-            ->each(fn ($orgId) => ProcessRecurringChargesJob::dispatch((int) $orgId));
-    })
+    ->job(new ProcessRecurringChargesJob)
     ->name('finance:process-recurring-charges')
     ->timezone('Pacific/Auckland')
     ->dailyAt('02:45')
@@ -528,7 +613,6 @@ app(Schedule::class)
         FinAccountingIntegration::query()
             ->active()
             ->forProvider('xero')
-            ->whereNotNull('tenant_id')
             ->pluck('id')
             ->each(fn (int $integrationId) => SyncAccountingIntegrationJob::dispatch($integrationId));
     })

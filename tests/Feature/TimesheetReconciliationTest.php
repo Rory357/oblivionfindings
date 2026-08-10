@@ -13,6 +13,8 @@ use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Operations\TimesheetReconciliationService;
+use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -34,7 +36,7 @@ class TimesheetReconciliationTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -74,7 +76,6 @@ class TimesheetReconciliationTest extends TestCase
 
         foreach ([$this->admin, $this->staff] as $user) {
             HrEmployeeProfile::query()->create([
-                'tenant_id' => 1,
                 'user_id' => $user->id,
                 'employee_number' => 'EMP-REC-'.$user->id,
                 'work_email' => $user->email,
@@ -264,9 +265,9 @@ class TimesheetReconciliationTest extends TestCase
         ]);
 
         $session = HrAttendanceSession::query()->create([
-            'tenant_id' => $this->staff->tenant_id,
             'user_id' => $this->staff->id,
             'shift_id' => $shift->id,
+            'site_id' => $shift->site_id,
             'clock_in_at' => now()->setTime(9, 0),
             'status' => 'open',
             'source' => 'manual',
@@ -296,10 +297,11 @@ class TimesheetReconciliationTest extends TestCase
     /**
      * @return array{0: Shift, 1: HrAttendanceSession}
      */
-    protected function makeShiftWithAttendance(?\Carbon\Carbon $clockIn, ?\Carbon\Carbon $clockOut, string $shiftStatus): array
+    protected function makeShiftWithAttendance(?Carbon $clockIn, ?Carbon $clockOut, string $shiftStatus): array
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => $this->staff->id,
             'starts_at' => now()->setTime(9, 0),
@@ -311,9 +313,9 @@ class TimesheetReconciliationTest extends TestCase
         ]);
 
         $attendance = HrAttendanceSession::query()->create([
-            'tenant_id' => $this->staff->tenant_id,
             'user_id' => $this->staff->id,
             'shift_id' => $shift->id,
+            'site_id' => $shift->site_id,
             'clock_in_at' => $clockIn,
             'clock_out_at' => $clockOut,
             'break_minutes' => 0,

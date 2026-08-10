@@ -29,7 +29,9 @@ function fallbackStrength(): StrengthResult {
 
 export const emptyPasswordStrength: StrengthResult = fallbackStrength();
 
-export async function checkPasswordStrength(password: string): Promise<StrengthResult> {
+export async function checkPasswordStrength(
+    password: string,
+): Promise<StrengthResult> {
     if (!password) {
         return fallbackStrength();
     }
@@ -66,7 +68,10 @@ function estimatePasswordStrength(password: string): {
         'oblivion',
     ].some((word) => lower.includes(word));
     const hasLongRepeat = /(.)\1{2,}/.test(password);
-    const hasSimpleSequence = /(?:0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf)/i.test(password);
+    const hasSimpleSequence =
+        /(?:0123|1234|2345|3456|4567|5678|6789|abcd|bcde|cdef|qwer|asdf)/i.test(
+            password,
+        );
 
     let points = 0;
     if (length >= 8) points += 1;

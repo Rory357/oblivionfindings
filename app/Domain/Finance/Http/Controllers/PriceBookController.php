@@ -19,7 +19,6 @@ class PriceBookController extends Controller
         ]);
 
         $priceBooks = PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->withCount('items')
             ->when(isset($data['active']), fn ($q) => $q->where('is_active', $data['active']))
             ->orderByDesc('updated_at')
@@ -39,7 +38,6 @@ class PriceBookController extends Controller
         abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
         $priceBook = PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['items' => fn ($q) => $q->orderBy('name')])
             ->findOrFail($priceBook);
 
@@ -65,7 +63,6 @@ class PriceBookController extends Controller
         ]);
 
         $priceBook = PriceBook::create([
-            'organization_id' => $auth->organization_id,
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'effective_from' => $data['effective_from'] ?? null,
@@ -81,9 +78,7 @@ class PriceBookController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $priceBook = PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($priceBook);
+        $priceBook = PriceBook::query()->findOrFail($priceBook);
 
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -103,9 +98,7 @@ class PriceBookController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        $priceBook = PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($priceBook);
+        $priceBook = PriceBook::query()->findOrFail($priceBook);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -115,7 +108,13 @@ class PriceBookController extends Controller
             'description' => ['nullable', 'string'],
         ]);
 
-        $priceBook->items()->create($data);
+        $priceBook->items()->create([
+            'name' => $data['name'],
+            'service_code' => $data['code'] ?? null,
+            'rate' => $data['unit_price'],
+            'unit' => $data['unit'] ?? 'hour',
+            'description' => $data['description'] ?? null,
+        ]);
 
         return redirect()->back()->with('success', 'Item added.');
     }
@@ -125,9 +124,7 @@ class PriceBookController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($priceBook);
+        PriceBook::query()->findOrFail($priceBook);
 
         $priceBookItem = PriceBookItem::where('price_book_id', $priceBook)->findOrFail($item);
 
@@ -139,7 +136,13 @@ class PriceBookController extends Controller
             'description' => ['nullable', 'string'],
         ]);
 
-        $priceBookItem->update($data);
+        $priceBookItem->update([
+            ...(array_key_exists('name', $data) ? ['name' => $data['name']] : []),
+            ...(array_key_exists('code', $data) ? ['service_code' => $data['code']] : []),
+            ...(array_key_exists('unit_price', $data) ? ['rate' => $data['unit_price']] : []),
+            ...(array_key_exists('unit', $data) ? ['unit' => $data['unit'] ?? 'hour'] : []),
+            ...(array_key_exists('description', $data) ? ['description' => $data['description']] : []),
+        ]);
 
         return redirect()->back()->with('success', 'Item updated.');
     }
@@ -149,9 +152,7 @@ class PriceBookController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        PriceBook::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($priceBook);
+        PriceBook::query()->findOrFail($priceBook);
 
         $priceBookItem = PriceBookItem::where('price_book_id', $priceBook)->findOrFail($item);
         $priceBookItem->delete();

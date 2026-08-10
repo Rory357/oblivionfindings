@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrOnboardingEmail;
 use App\Domain\Hr\Models\HrOnboardingEmailLog;
 use App\Domain\Hr\Services\OnboardingEmailService;
 use App\Mail\Hr\OnboardingTemplateMail;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Mail;
@@ -15,15 +16,17 @@ use Illuminate\Support\Facades\Mail;
 function makeOnboardingProfile(array $overrides = []): HrEmployeeProfile
 {
     $user = User::factory()->create(['name' => 'Aroha Ngata']);
+    $site = Site::factory()->create();
 
     return HrEmployeeProfile::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
         'start_date' => now()->addDays(7)->toDateString(),
         'is_active' => true,
     ], $overrides));
@@ -34,7 +37,6 @@ test('the email service sends a merged email and records a sent-log row', functi
 
     $profile = makeOnboardingProfile();
     $email = HrOnboardingEmail::query()->create([
-        'tenant_id' => 1,
         'template_name' => 'Welcome',
         'subject' => 'Welcome {{employee_name}} to {{company_name}}',
         'body' => '<p>Hi {{employee_name}}, see you on {{start_date}}.</p>',
@@ -66,7 +68,6 @@ test('inactive templates and recipients without an email are skipped', function 
 
     $profile = makeOnboardingProfile();
     $inactive = HrOnboardingEmail::query()->create([
-        'tenant_id' => 1,
         'template_name' => 'Inactive',
         'subject' => 'x',
         'body' => 'y',
@@ -84,14 +85,12 @@ test('the scheduler dispatches a job when an email is due today and is idempoten
     // start_date in 7 days, template offset 7 → due today.
     $profile = makeOnboardingProfile(['start_date' => now()->addDays(7)->toDateString()]);
     HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'pending',
         'started_at' => now(),
     ]);
     $email = HrOnboardingEmail::query()->create([
-        'tenant_id' => 1,
         'template_name' => 'Welcome',
         'subject' => 'Welcome',
         'body' => 'body',
@@ -122,14 +121,12 @@ test('the scheduler does not dispatch when the due date is not today', function 
     // start_date in 30 days, offset 7 → due in 23 days, not today.
     $profile = makeOnboardingProfile(['start_date' => now()->addDays(30)->toDateString()]);
     HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'pending',
         'started_at' => now(),
     ]);
     HrOnboardingEmail::query()->create([
-        'tenant_id' => 1,
         'template_name' => 'Welcome',
         'subject' => 'Welcome',
         'body' => 'body',

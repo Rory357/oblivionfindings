@@ -1,15 +1,21 @@
-import AppLayout from '@/layouts/app-layout';
+import DictateButton from '@/components/dictate-button';
+import DraftResumePrompt from '@/components/draft-resume-prompt';
+import DraftSavedIndicator from '@/components/draft-saved-indicator';
+import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import DictateButton from '@/components/dictate-button';
-import RespiteSubnav from '@/components/respite-subnav';
-import DraftSavedIndicator from '@/components/draft-saved-indicator';
-import DraftResumePrompt from '@/components/draft-resume-prompt';
 import { useFormAutosave } from '@/hooks/use-form-autosave';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
@@ -29,7 +35,11 @@ type HandoverDraft = {
 const hasDraftContent = (d: HandoverDraft): boolean =>
     !!(d.notes?.trim() || (d.handover_type && d.stay_id));
 
-export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Props) {
+export default function HandoverNoteCreate({
+    stays,
+    stayId,
+    handoverTypes,
+}: Props) {
     const page = usePage().props as { auth?: { user?: { id?: number } } };
     const userId = page.auth?.user?.id ?? 0;
 
@@ -42,7 +52,10 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
 
     const draftKey = `oblivion:respite-handover-note:v1:u${userId}`;
     const [bootstrapped, setBootstrapped] = useState(false);
-    const [resumePayload, setResumePayload] = useState<{ data: HandoverDraft; savedAt: number } | null>(null);
+    const [resumePayload, setResumePayload] = useState<{
+        data: HandoverDraft;
+        savedAt: number;
+    } | null>(null);
 
     const { savedAt, load, clear } = useFormAutosave<HandoverDraft>(
         data,
@@ -53,7 +66,10 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
     useEffect(() => {
         const existing = load();
         if (existing && hasDraftContent(existing.data as HandoverDraft)) {
-            setResumePayload({ data: existing.data as HandoverDraft, savedAt: existing.savedAt });
+            setResumePayload({
+                data: existing.data as HandoverDraft,
+                savedAt: existing.savedAt,
+            });
         } else {
             setBootstrapped(true);
         }
@@ -62,9 +78,11 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
 
     const resumeDraft = () => {
         if (!resumePayload) return;
-        (Object.keys(resumePayload.data) as Array<keyof HandoverDraft>).forEach((k) => {
-            setData(k, resumePayload.data[k] as never);
-        });
+        (Object.keys(resumePayload.data) as Array<keyof HandoverDraft>).forEach(
+            (k) => {
+                setData(k, resumePayload.data[k] as never);
+            },
+        );
         setResumePayload(null);
         setBootstrapped(true);
     };
@@ -76,7 +94,13 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Handover Notes', href: '/respite/handover-notes' }, { title: 'New', href: '/respite/handover-notes/create' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Handover Notes', href: '/respite/handover-notes' },
+                { title: 'New', href: '/respite/handover-notes/create' },
+            ]}
+        >
             <Head title="New Handover Note" />
 
             <PageLayout
@@ -112,35 +136,71 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                 >
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Handover Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Handover Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label>Stay *</Label>
-                                    <Select value={data.stay_id} onValueChange={(v) => setData('stay_id', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select stay" /></SelectTrigger>
+                                    <Select
+                                        value={data.stay_id}
+                                        onValueChange={(v) =>
+                                            setData('stay_id', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select stay" />
+                                        </SelectTrigger>
                                         <SelectContent>
                                             {stays.map((s: any) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
-                                                    {s.client?.first_name} {s.client?.last_name} — Stay #{s.id}
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
+                                                    {s.client?.first_name}{' '}
+                                                    {s.client?.last_name} — Stay
+                                                    #{s.id}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
+                                    {errors.stay_id && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.stay_id}
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Handover Type *</Label>
-                                    <Select value={data.handover_type} onValueChange={(v) => setData('handover_type', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                                    <Select
+                                        value={data.handover_type}
+                                        onValueChange={(v) =>
+                                            setData('handover_type', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
                                         <SelectContent>
-                                            {Object.entries(handoverTypes).map(([value, label]) => (
-                                                <SelectItem key={value} value={value}>{label}</SelectItem>
-                                            ))}
+                                            {Object.entries(handoverTypes).map(
+                                                ([value, label]) => (
+                                                    <SelectItem
+                                                        key={value}
+                                                        value={value}
+                                                    >
+                                                        {label}
+                                                    </SelectItem>
+                                                ),
+                                            )}
                                         </SelectContent>
                                     </Select>
-                                    {errors.handover_type && <div className="mt-1 text-xs text-status-critical">{errors.handover_type}</div>}
+                                    {errors.handover_type && (
+                                        <div className="mt-1 text-xs text-status-critical">
+                                            {errors.handover_type}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -149,26 +209,61 @@ export default function HandoverNoteCreate({ stays, stayId, handoverTypes }: Pro
                                     <Label>Notes *</Label>
                                     <DictateButton
                                         value={data.notes}
-                                        onChange={(next) => setData('notes', next)}
+                                        onChange={(next) =>
+                                            setData('notes', next)
+                                        }
                                         fieldLabel="Handover notes"
                                     />
                                 </div>
-                                <Textarea rows={6} value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Enter handover notes..." />
-                                {errors.notes && <div className="mt-1 text-xs text-status-critical">{errors.notes}</div>}
+                                <Textarea
+                                    rows={6}
+                                    value={data.notes}
+                                    onChange={(e) =>
+                                        setData('notes', e.target.value)
+                                    }
+                                    placeholder="Enter handover notes..."
+                                />
+                                {errors.notes && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.notes}
+                                    </div>
+                                )}
                             </div>
 
                             <label className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" checked={data.sensitive_flag} onChange={(e) => setData('sensitive_flag', e.target.checked)} />
+                                <input
+                                    type="checkbox"
+                                    checked={data.sensitive_flag}
+                                    onChange={(e) =>
+                                        setData(
+                                            'sensitive_flag',
+                                            e.target.checked,
+                                        )
+                                    }
+                                />
                                 Mark as sensitive
                             </label>
                         </CardContent>
                     </Card>
 
                     <div className="flex items-center justify-between gap-2">
-                        <DraftSavedIndicator savedAt={savedAt} className="sm:hidden" />
+                        <DraftSavedIndicator
+                            savedAt={savedAt}
+                            className="sm:hidden"
+                        />
                         <div className="ml-auto flex gap-2">
-                            <Button type="button" variant="outline" onClick={() => window.history.back()}>Cancel</Button>
-                            <Button type="submit" disabled={processing}>{processing ? 'Saving...' : 'Create Handover Note'}</Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => window.history.back()}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={processing}>
+                                {processing
+                                    ? 'Saving...'
+                                    : 'Create Handover Note'}
+                            </Button>
                         </div>
                     </div>
                 </form>

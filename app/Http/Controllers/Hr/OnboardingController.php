@@ -3,43 +3,53 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Jobs\SendOnboardingEmailJob;
+use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingEmail;
+use App\Domain\Hr\Models\HrOnboardingEmailLog;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Domain\Hr\Notifications\OnboardingOwnerReassignedNotification;
+use App\Domain\Hr\Notifications\OnboardingTaskDueNotification;
 use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Domain\Hr\Services\EmployeeIntakeService;
+use App\Domain\Hr\Services\HrLifecycleAccessService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\CompleteOnboardingTaskRequest;
+use App\Http\Requests\Hr\ProvisionOnboardingAssetRequest;
 use App\Http\Requests\Hr\StoreOnboardingChecklistRequest;
 use App\Http\Requests\Hr\StoreOnboardingTaskRequest;
 use App\Http\Requests\Hr\StoreOnboardingTemplateRequest;
 use App\Http\Requests\Hr\UpdateOnboardingTaskRequest;
+use App\Models\Asset;
 use App\Models\AssetAssignment;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OnboardingController extends Controller
 {
-    use ResolvesHrTenant;
-
     /** Terminal statuses that should not appear as "active" work. */
     private const TERMINAL = ['completed', 'cancelled', 'archived'];
 
     public function __construct(
         private readonly OnboardingService $onboardingService,
+        private readonly HrLifecycleAccessService $lifecycleAccess,
     ) {}
 
     /* ================================================================== */
-    /*  Hub                                                                */
+    /*  Hub */
     /* ================================================================== */
 
     public function index(Request $request)
@@ -47,12 +57,10 @@ class OnboardingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $status = $request->query('status');
         $search = trim((string) $request->query('q', ''));
 
-        $checklists = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $checklists = $this->lifecycleAccess->visibleOnboardingChecklists($user)
             ->with([
                 'employeeProfile.user:id,name,email',
                 'employeeProfile.primarySite:id,name,type',
@@ -66,8 +74,7 @@ class OnboardingController extends Controller
                 ->whereNotIn('status', self::TERMINAL)
                 ->whereDate('due_date', '<', now()->toDateString()))
             ->when($status && $status !== 'overdue', fn ($query) => $query->where('status', $status))
-            ->when($search !== '', fn ($query) => $query->whereHas('employeeProfile.user', fn ($users) =>
-                $users->where('name', 'like', "%{$search}%")
+            ->when($search !== '', fn ($query) => $query->whereHas('employeeProfile.user', fn ($users) => $users->where('name', 'like', "%{$search}%")
             ))
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -79,22 +86,22 @@ class OnboardingController extends Controller
         // reload with ?drawer={id}), so the hub stays light on first paint.
         $drawerId = $request->query('drawer');
         $drawerChecklist = $drawerId
-            ? $this->drawerPayload($tenantId, (int) $drawerId)
+            ? $this->drawerPayload($user, (int) $drawerId)
             : null;
 
         return Inertia::render('hr/onboarding/index', [
             'checklists' => $checklists,
             'drawerChecklist' => $drawerChecklist,
-            'summary' => $this->buildSummary($tenantId),
-            'overview' => $this->overviewData($tenantId),
-            'templates' => $this->templatePayload($tenantId),
-            'emails' => $this->emailPayload($tenantId),
-            'employees' => $this->eligibleEmployees($tenantId),
-            'emailTemplates' => $this->emailTemplateOptions($tenantId),
-            'owners' => $this->tenantUserOptions($tenantId),
-            'newHireOptions' => $this->newHireOptions($tenantId),
+            'summary' => $this->buildSummary($user),
+            'overview' => $this->overviewData($user),
+            'templates' => $this->templatePayload(),
+            'emails' => $this->emailPayload($user),
+            'employees' => $this->eligibleEmployees($user),
+            'emailTemplates' => $this->emailTemplateOptions(),
+            'owners' => $this->currentUserOptions($user),
+            'newHireOptions' => $this->newHireOptions($user),
             'templateRoleOptions' => $this->roleOptions(),
-            'courseOptions' => $this->courseOptions($tenantId),
+            'courseOptions' => $this->courseOptions(),
             'siteTypeOptions' => ['all', 'head_office', 'house', 'facility', 'residential'],
             'filters' => [
                 'status' => $status,
@@ -106,14 +113,11 @@ class OnboardingController extends Controller
         ]);
     }
 
-    public function export(Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function export(Request $request): StreamedResponse
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $rows = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $rows = $this->lifecycleAccess->visibleOnboardingChecklists($user)
             ->with(['employeeProfile.user:id,name', 'employeeProfile.primarySite:id,name', 'creator:id,name'])
             ->withCount([
                 'tasks',
@@ -148,8 +152,7 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist);
 
         $checklist->load([
             'employeeProfile.user:id,name,email',
@@ -216,8 +219,8 @@ class OnboardingController extends Controller
                 'tasks' => $tasks,
             ],
             'progress' => $this->onboardingService->getProgress($checklist),
-            'owners' => $this->tenantUserOptions($tenantId),
-            'provisionableAssets' => $this->provisionableAssets(),
+            'owners' => $this->currentUserOptions($user),
+            'provisionableAssets' => $this->provisionableAssets($user),
             'can' => [
                 'manage' => $user->canDo('hr.onboarding.manage'),
             ],
@@ -225,11 +228,13 @@ class OnboardingController extends Controller
     }
 
     /** Active company assets not currently issued — the IT-provisioning picks. */
-    private function provisionableAssets(): \Illuminate\Support\Collection
+    private function provisionableAssets(User $viewer): Collection
     {
         $assignedIds = AssetAssignment::query()->whereNull('released_at')->pluck('asset_id');
+        $assetIds = $this->lifecycleAccess->authorizedAssetIds($viewer);
 
-        return \App\Models\Asset::query()
+        return Asset::query()
+            ->whereIn('id', $assetIds)
             ->where('status', 'active')
             ->whereNotIn('id', $assignedIds)
             ->orderBy('name')
@@ -246,16 +251,22 @@ class OnboardingController extends Controller
     }
 
     /* ================================================================== */
-    /*  Start onboarding (existing employee + new hire — one path)         */
+    /*  Start onboarding (existing employee + new hire — one path) */
     /* ================================================================== */
 
     public function store(StoreOnboardingChecklistRequest $request, EmployeeIntakeService $intake)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $validated = $request->validated();
 
         if (($validated['hire_mode'] ?? 'existing') === 'new') {
+            $siteId = (int) $validated['primary_site_id'];
+            abort_unless(in_array($siteId, $this->lifecycleAccess->accessibleSiteIds($user), true), 404);
+            if (! empty($validated['manager_user_id'])) {
+                $manager = $this->lifecycleAccess->currentUser($user, (int) $validated['manager_user_id']);
+                abort_unless($this->lifecycleAccess->canAccessEverySite($manager, [$siteId]), 404);
+            }
+
             // Converged new-hire path: create the person via the single intake
             // door (no onboarding yet — we generate it explicitly below so the
             // chosen template / compliance / welcome-email options are honoured).
@@ -274,7 +285,6 @@ class OnboardingController extends Controller
                         'start_date' => $validated['start_date'] ?? now()->toDateString(),
                     ],
                     actorId: $user->id,
-                    tenantId: $tenantId,
                     startOnboarding: false,
                     sendInvite: false,
                     source: 'onboarding_wizard',
@@ -284,8 +294,16 @@ class OnboardingController extends Controller
                 return redirect()->back()->with('error', $e->getMessage());
             }
         } else {
-            $profile = HrEmployeeProfile::query()->findOrFail((int) $validated['employee_profile_id']);
-            $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
+            $profile = $this->lifecycleAccess->onboardingProfile(
+                $user,
+                (int) $validated['employee_profile_id'],
+            );
+        }
+
+        if (($validated['send_welcome_email'] ?? false) && ! empty($validated['welcome_email_id'])) {
+            HrOnboardingEmail::query()
+                ->where('is_active', true)
+                ->findOrFail((int) $validated['welcome_email_id']);
         }
 
         $existing = HrOnboardingChecklist::query()
@@ -321,16 +339,19 @@ class OnboardingController extends Controller
     }
 
     /* ================================================================== */
-    /*  Task lifecycle                                                     */
+    /*  Task lifecycle */
     /* ================================================================== */
 
     public function completeTask(CompleteOnboardingTaskRequest $request, HrOnboardingTask $task)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $checklist = $this->taskChecklist($task, $tenantId);
+        $task = $this->lifecycleAccess->visibleOnboardingTask($user, $task);
 
         $validated = $request->validated();
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $task->checklist_id);
+        if (! empty($validated['signed_off_by'])) {
+            $this->authorizedChecklistUser($user, (int) $validated['signed_off_by'], $checklist);
+        }
 
         if ($task->sign_off_required && empty($validated['signed_off_by'])) {
             return redirect()->back()->with('error', 'This task requires sign-off. Please specify the sign-off user.');
@@ -363,7 +384,7 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $this->taskChecklist($task, $this->resolveHrTenantIdForUser($user));
+        $task = $this->lifecycleAccess->visibleOnboardingTask($user, $task);
 
         $this->onboardingService->uncompleteTask($task);
 
@@ -373,9 +394,15 @@ class OnboardingController extends Controller
     public function updateTask(UpdateOnboardingTaskRequest $request, HrOnboardingTask $task)
     {
         $user = $request->user();
-        $this->taskChecklist($task, $this->resolveHrTenantIdForUser($user));
+        $task = $this->lifecycleAccess->visibleOnboardingTask($user, $task);
 
-        $this->onboardingService->editTask($task, $request->validated());
+        $validated = $request->validated();
+        if (! empty($validated['assigned_to_user_id'])) {
+            $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $task->checklist_id);
+            $this->authorizedChecklistUser($user, (int) $validated['assigned_to_user_id'], $checklist);
+        }
+
+        $this->onboardingService->editTask($task, $validated);
 
         return redirect()->back()->with('success', 'Task updated.');
     }
@@ -383,28 +410,37 @@ class OnboardingController extends Controller
     public function storeTask(StoreOnboardingTaskRequest $request, HrOnboardingChecklist $checklist)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist);
 
-        $this->onboardingService->addTask($checklist, $request->validated());
+        $validated = $request->validated();
+        if (! empty($validated['assigned_to_user_id'])) {
+            $this->authorizedChecklistUser($user, (int) $validated['assigned_to_user_id'], $checklist);
+        }
+
+        $this->onboardingService->addTask($checklist, $validated);
 
         return redirect()->back()->with('success', 'Task added.');
     }
 
-    public function provisionAsset(\App\Http\Requests\Hr\ProvisionOnboardingAssetRequest $request, HrOnboardingTask $task)
+    public function provisionAsset(ProvisionOnboardingAssetRequest $request, HrOnboardingTask $task)
     {
         $user = $request->user();
-        $this->taskChecklist($task, $this->resolveHrTenantIdForUser($user));
+        $task = $this->lifecycleAccess->visibleOnboardingTask($user, $task);
 
         $validated = $request->validated();
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $task->checklist_id);
+        if (! empty($validated['signed_off_by'])) {
+            $this->authorizedChecklistUser($user, (int) $validated['signed_off_by'], $checklist);
+        }
 
         if ($task->sign_off_required && empty($validated['signed_off_by'])) {
             return redirect()->back()->with('error', 'This task requires sign-off. Please specify the sign-off user.');
         }
 
+        $assetIds = $this->lifecycleAccess->authorizedAssetIds($user);
         $asset = ! empty($validated['asset_id'])
-            ? \App\Models\Asset::findOrFail((int) $validated['asset_id'])
-            : $this->onboardingService->autoPickAvailableAsset($validated['category'] ?? null);
+            ? Asset::query()->whereIn('id', $assetIds)->findOrFail((int) $validated['asset_id'])
+            : $this->onboardingService->autoPickAvailableAsset($validated['category'] ?? null, $assetIds);
 
         if (! $asset) {
             return redirect()->back()->with('error', 'No available asset to auto-assign — add one or pick a specific asset.');
@@ -429,7 +465,7 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $this->taskChecklist($task, $this->resolveHrTenantIdForUser($user));
+        $task = $this->lifecycleAccess->visibleOnboardingTask($user, $task);
 
         $this->onboardingService->deleteTask($task);
 
@@ -440,8 +476,7 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist);
 
         $validated = $request->validate([
             'task_ids' => ['required', 'array', 'min:1'],
@@ -454,15 +489,14 @@ class OnboardingController extends Controller
     }
 
     /* ================================================================== */
-    /*  Checklist lifecycle                                                */
+    /*  Checklist lifecycle */
     /* ================================================================== */
 
     public function completeChecklist(Request $request, HrOnboardingChecklist $checklist)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist);
 
         $this->onboardingService->markChecklistComplete($checklist);
 
@@ -473,8 +507,7 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist);
 
         $validated = $request->validate([
             'status' => ['required', 'in:pending,in_progress,completed,cancelled,archived'],
@@ -489,10 +522,9 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist);
 
-        $count = $this->sendChecklistReminders($checklist);
+        $count = $this->sendChecklistReminders($user, $checklist);
 
         return redirect()->back()->with('success', $count > 0
             ? "Reminder sent to {$count} assignee(s)."
@@ -503,7 +535,6 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'action' => ['required', 'in:remind,complete,archive'],
@@ -511,14 +542,18 @@ class OnboardingController extends Controller
             'checklist_ids.*' => ['integer'],
         ]);
 
-        $checklists = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $requestedIds = collect($validated['checklist_ids'])
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+        $checklists = $this->lifecycleAccess->visibleOnboardingChecklists($user)
             ->whereIn('id', $validated['checklist_ids'])
             ->get();
+        abort_unless($checklists->count() === $requestedIds->count(), 404);
 
         foreach ($checklists as $checklist) {
             match ($validated['action']) {
-                'remind' => $this->sendChecklistReminders($checklist),
+                'remind' => $this->sendChecklistReminders($user, $checklist),
                 'complete' => $this->onboardingService->markChecklistComplete($checklist),
                 'archive' => $this->onboardingService->setChecklistStatus($checklist, 'archived'),
             };
@@ -530,7 +565,7 @@ class OnboardingController extends Controller
     }
 
     /** Notify the assignees of every incomplete task on a checklist. */
-    private function sendChecklistReminders(HrOnboardingChecklist $checklist): int
+    private function sendChecklistReminders(User $viewer, HrOnboardingChecklist $checklist): int
     {
         $today = now()->startOfDay();
         $sent = 0;
@@ -543,7 +578,7 @@ class OnboardingController extends Controller
 
         foreach ($tasks as $task) {
             $assignee = $task->assignedTo;
-            if (! $assignee) {
+            if (! $assignee || ! $this->isAuthorizedChecklistUser($viewer, $assignee, $checklist)) {
                 continue;
             }
 
@@ -552,7 +587,7 @@ class OnboardingController extends Controller
                 : 'due_soon';
 
             try {
-                $assignee->notify(new \App\Domain\Hr\Notifications\OnboardingTaskDueNotification($task, $reason));
+                $assignee->notify(new OnboardingTaskDueNotification($task, $reason));
                 $sent++;
             } catch (\Throwable $exception) {
                 // best-effort
@@ -566,30 +601,35 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist);
 
         $validated = $request->validate([
-            'owner_id' => ['required', 'integer', 'exists:users,id'],
+            'owner_id' => ['required', 'integer'],
         ]);
 
-        $previousOwnerId = $checklist->created_by;
-        $checklist->update(['created_by' => $validated['owner_id']]);
+        $newOwner = $this->lifecycleAccess->currentUser($user, (int) $validated['owner_id']);
+        abort_unless($this->ownerCanAccessChecklist($newOwner, $checklist), 404);
+
+        [$previousOwnerId, $checklist] = DB::transaction(function () use ($user, $checklist, $newOwner): array {
+            $locked = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist, true);
+            abort_unless($this->ownerCanAccessChecklist($newOwner, $locked), 404);
+            $previousOwnerId = $locked->created_by;
+            $locked->update(['created_by' => $newOwner->id]);
+
+            return [$previousOwnerId, $locked->fresh()];
+        });
 
         // The new owner inherits responsibility for driving the checklist —
         // tell them, unless they reassigned it to themselves.
         if ($validated['owner_id'] !== $user->id && $validated['owner_id'] !== $previousOwnerId) {
-            $newOwner = User::find($validated['owner_id']);
-            if ($newOwner) {
-                try {
-                    $newOwner->notify(new OnboardingOwnerReassignedNotification($checklist->fresh()->loadMissing('employeeProfile.user')));
-                } catch (\Throwable $exception) {
-                    Log::warning('Failed to send onboarding owner-reassigned notification', [
-                        'checklist_id' => $checklist->id,
-                        'owner_id' => $validated['owner_id'],
-                        'error' => $exception->getMessage(),
-                    ]);
-                }
+            try {
+                $newOwner->notify(new OnboardingOwnerReassignedNotification($checklist->fresh()->loadMissing('employeeProfile.user')));
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send onboarding owner-reassigned notification', [
+                    'checklist_id' => $checklist->id,
+                    'owner_id' => $validated['owner_id'],
+                    'error' => $exception->getMessage(),
+                ]);
             }
         }
 
@@ -600,8 +640,7 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklist($user, $checklist);
 
         $this->onboardingService->setChecklistStatus($checklist, 'archived');
 
@@ -609,70 +648,80 @@ class OnboardingController extends Controller
     }
 
     /* ================================================================== */
-    /*  Templates                                                          */
+    /*  Templates */
     /* ================================================================== */
 
     public function updateTemplates(StoreOnboardingTemplateRequest $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $validated = $request->validated();
 
         $siteType = trim((string) ($validated['site_type'] ?? ''));
         $siteType = $siteType !== '' ? $siteType : 'all';
 
-        if (! empty($validated['template_id'])) {
-            $template = HrOnboardingTemplate::query()->findOrFail($validated['template_id']);
-            $this->assertHrTenantAccess($tenantId, $template->tenant_id);
+        $updated = ! empty($validated['template_id']);
+        DB::transaction(function () use ($validated, $siteType, $user, $updated): void {
+            $template = $updated
+                ? HrOnboardingTemplate::query()->lockForUpdate()->findOrFail((int) $validated['template_id'])
+                : null;
+            $collision = HrOnboardingTemplate::query()
+                ->where('role', $validated['role'])
+                ->where('site_type', $siteType)
+                ->when($template, fn ($query) => $query->where('id', '!=', $template->id))
+                ->lockForUpdate()
+                ->exists();
+            if ($collision) {
+                throw ValidationException::withMessages([
+                    'site_type' => 'A template already exists for this role and Site type.',
+                ]);
+            }
 
-            $template->update([
+            $attributes = [
                 'role' => $validated['role'],
                 'site_type' => $siteType,
                 'tasks' => $validated['tasks'],
-                'is_active' => $validated['is_active'] ?? $template->is_active,
-                'updated_by' => $user->id,
-            ]);
+                'is_active' => $validated['is_active'] ?? ($template?->is_active ?? true),
+            ];
+            if ($template) {
+                $template->update($attributes + ['updated_by' => $user->id]);
+            } else {
+                HrOnboardingTemplate::create($attributes + ['created_by' => $user->id]);
+            }
+        });
 
-            return redirect()->back()->with('success', 'Onboarding template updated.');
-        }
-
-        HrOnboardingTemplate::create([
-            'tenant_id' => $tenantId,
-            'role' => $validated['role'],
-            'site_type' => $siteType,
-            'tasks' => $validated['tasks'],
-            'is_active' => $validated['is_active'] ?? true,
-            'created_by' => $user->id,
-        ]);
-
-        return redirect()->back()->with('success', 'Onboarding template created.');
+        return redirect()->back()->with('success', $updated
+            ? 'Onboarding template updated.'
+            : 'Onboarding template created.');
     }
 
     public function duplicateTemplate(Request $request, HrOnboardingTemplate $template)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
 
-        // Site-type is part of the unique key, so a copy needs a distinct one.
-        $siteType = $template->site_type === 'all' ? 'copy' : 'all';
-        $suffix = 0;
-        while (HrOnboardingTemplate::where('tenant_id', $tenantId)
-            ->where('role', $template->role)
-            ->where('site_type', $suffix ? "{$siteType}-{$suffix}" : $siteType)
-            ->exists()) {
-            $suffix++;
-        }
+        $template = DB::transaction(function () use ($template, $user): HrOnboardingTemplate {
+            $locked = HrOnboardingTemplate::query()->lockForUpdate()->findOrFail($template->getKey());
+            // Site-type is part of the unique key, so a copy needs a distinct one.
+            $siteType = $locked->site_type === 'all' ? 'copy' : 'all';
+            $used = HrOnboardingTemplate::query()
+                ->where('role', $locked->role)
+                ->lockForUpdate()
+                ->pluck('site_type');
+            $suffix = 0;
+            while ($used->contains($suffix ? "{$siteType}-{$suffix}" : $siteType)) {
+                $suffix++;
+            }
 
-        HrOnboardingTemplate::create([
-            'tenant_id' => $tenantId,
-            'role' => $template->role,
-            'site_type' => $suffix ? "{$siteType}-{$suffix}" : $siteType,
-            'tasks' => $template->tasks,
-            'is_active' => false,
-            'created_by' => $user->id,
-        ]);
+            HrOnboardingTemplate::create([
+                'role' => $locked->role,
+                'site_type' => $suffix ? "{$siteType}-{$suffix}" : $siteType,
+                'tasks' => $locked->tasks,
+                'is_active' => false,
+                'created_by' => $user->id,
+            ]);
+
+            return $locked;
+        });
 
         return redirect()->back()->with('success', "Duplicated \"{$template->role}\" template.");
     }
@@ -681,11 +730,12 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
 
         $validated = $request->validate(['is_active' => ['required', 'boolean']]);
-        $template->update(['is_active' => $validated['is_active'], 'updated_by' => $user->id]);
+        DB::transaction(function () use ($template, $validated, $user): void {
+            $locked = HrOnboardingTemplate::query()->lockForUpdate()->findOrFail($template->getKey());
+            $locked->update(['is_active' => $validated['is_active'], 'updated_by' => $user->id]);
+        });
 
         return redirect()->back()->with('success', $validated['is_active'] ? 'Template activated.' : 'Template deactivated.');
     }
@@ -694,32 +744,67 @@ class OnboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
 
-        $template->delete();
+        DB::transaction(function () use ($template): void {
+            HrOnboardingTemplate::query()->lockForUpdate()->findOrFail($template->getKey())->delete();
+        });
 
         return redirect()->back()->with('success', 'Template deleted.');
     }
 
     /* ================================================================== */
-    /*  Internal helpers                                                   */
+    /*  Internal helpers */
     /* ================================================================== */
 
-    private function taskChecklist(HrOnboardingTask $task, int $tenantId): HrOnboardingChecklist
-    {
-        $checklist = $task->checklist;
-        abort_unless($checklist, 404);
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+    private function authorizedChecklistUser(
+        User $viewer,
+        int $candidateId,
+        HrOnboardingChecklist $checklist,
+    ): User {
+        $candidate = $this->lifecycleAccess->currentUser($viewer, $candidateId);
+        abort_unless($this->ownerCanAccessChecklist($candidate, $checklist), 404);
 
-        return $checklist;
+        return $candidate;
+    }
+
+    private function isAuthorizedChecklistUser(
+        User $viewer,
+        User $candidate,
+        HrOnboardingChecklist $checklist,
+    ): bool {
+        try {
+            $this->lifecycleAccess->currentUser($viewer, (int) $candidate->id);
+        } catch (ModelNotFoundException) {
+            return false;
+        }
+
+        return $this->ownerCanAccessChecklist($candidate, $checklist);
+    }
+
+    private function ownerCanAccessChecklist(User $owner, HrOnboardingChecklist $checklist): bool
+    {
+        $profile = $checklist->employeeProfile()->first();
+        if (! $profile || ! $profile->is_active) {
+            return false;
+        }
+
+        $siteIds = collect([
+            $profile->primary_site_id,
+            ...($profile->secondary_site_ids ?? []),
+        ])
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $this->lifecycleAccess->canAccessEverySite($owner, $siteIds);
     }
 
     /** Tasks + header for the quick-peek drawer of one checklist. */
-    private function drawerPayload(int $tenantId, int $checklistId): ?array
+    private function drawerPayload(User $viewer, int $checklistId): ?array
     {
-        $checklist = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $checklist = $this->lifecycleAccess->visibleOnboardingChecklists($viewer)
             ->where('id', $checklistId)
             ->with([
                 'employeeProfile.user:id,name',
@@ -788,9 +873,9 @@ class OnboardingController extends Controller
     }
 
     /** Server-side aggregates over ALL rows (not the current page). */
-    private function buildSummary(int $tenantId): array
+    private function buildSummary(User $viewer): array
     {
-        $base = fn () => HrOnboardingChecklist::query()->where('tenant_id', $tenantId);
+        $base = fn () => $this->lifecycleAccess->visibleOnboardingChecklists($viewer);
         $today = now()->toDateString();
 
         $statusCounts = $base()
@@ -845,12 +930,11 @@ class OnboardingController extends Controller
     }
 
     /** Overview dashboard lanes, starters strip, and recent activity. */
-    private function overviewData(int $tenantId): array
+    private function overviewData(User $viewer): array
     {
         $today = now()->startOfDay();
 
-        $checklistIds = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $checklistIds = $this->lifecycleAccess->visibleOnboardingChecklists($viewer)
             ->whereNotIn('status', self::TERMINAL)
             ->pluck('id');
 
@@ -892,8 +976,7 @@ class OnboardingController extends Controller
             ])
             ->values();
 
-        $starters = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $starters = $this->lifecycleAccess->visibleOnboardingChecklists($viewer)
             ->whereNotIn('status', self::TERMINAL)
             ->with(['employeeProfile.user:id,name', 'employeeProfile:id,user_id,position_title,start_date'])
             ->withCount([
@@ -919,15 +1002,14 @@ class OnboardingController extends Controller
             'overdue_tasks' => $overdueLane,
             'signoff_tasks' => $signoffLane,
             'starters' => $starters,
-            'activity' => $this->activityFeed($tenantId),
+            'activity' => $this->activityFeed($viewer),
         ];
     }
 
     /** Recent activity derived from real task completions + checklist creations. */
-    private function activityFeed(int $tenantId): array
+    private function activityFeed(User $viewer): array
     {
-        $checklistIds = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $checklistIds = $this->lifecycleAccess->visibleOnboardingChecklists($viewer)
             ->pluck('id');
 
         $completions = HrOnboardingTask::query()
@@ -947,8 +1029,7 @@ class OnboardingController extends Controller
                 'tone' => 'success',
             ]);
 
-        $created = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $created = $this->lifecycleAccess->visibleOnboardingChecklists($viewer)
             ->with(['creator:id,name', 'employeeProfile.user:id,name'])
             ->orderByDesc('created_at')
             ->limit(5)
@@ -969,10 +1050,9 @@ class OnboardingController extends Controller
             ->all();
     }
 
-    private function templatePayload(int $tenantId): \Illuminate\Support\Collection
+    private function templatePayload(): Collection
     {
         return HrOnboardingTemplate::query()
-            ->where('tenant_id', $tenantId)
             ->orderBy('role')
             ->orderBy('site_type')
             ->get()
@@ -1009,10 +1089,9 @@ class OnboardingController extends Controller
             ->values();
     }
 
-    private function emailPayload(int $tenantId): array
+    private function emailPayload(User $viewer): array
     {
         $templates = HrOnboardingEmail::query()
-            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
             ->orderBy('send_days_before_start')
             ->get()
             ->map(fn (HrOnboardingEmail $email) => [
@@ -1025,8 +1104,8 @@ class OnboardingController extends Controller
             ])
             ->values();
 
-        $log = \App\Domain\Hr\Models\HrOnboardingEmailLog::query()
-            ->whereHas('employeeProfile', fn ($q) => $q->where('tenant_id', $tenantId))
+        $log = HrOnboardingEmailLog::query()
+            ->whereIn('employee_profile_id', $this->lifecycleAccess->onboardingProfiles($viewer)->select('id'))
             ->with([
                 'onboardingEmail:id,template_name',
                 'employeeProfile.user:id,name',
@@ -1050,17 +1129,14 @@ class OnboardingController extends Controller
     }
 
     /** Active employee profiles without an in-flight checklist (wizard picks). */
-    private function eligibleEmployees(int $tenantId): \Illuminate\Support\Collection
+    private function eligibleEmployees(User $viewer): Collection
     {
-        $existingProfileIds = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
+        $existingProfileIds = $this->lifecycleAccess->visibleOnboardingChecklists($viewer)
             ->whereIn('status', ['pending', 'in_progress'])
             ->pluck('employee_profile_id');
 
-        return HrEmployeeProfile::query()
+        return $this->lifecycleAccess->onboardingProfiles($viewer)
             ->with(['user:id,name,email', 'primarySite:id,name,type'])
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
             ->whereNotIn('id', $existingProfileIds)
             ->get()
             ->map(fn (HrEmployeeProfile $profile) => [
@@ -1076,11 +1152,10 @@ class OnboardingController extends Controller
             ->values();
     }
 
-    private function emailTemplateOptions(int $tenantId): \Illuminate\Support\Collection
+    private function emailTemplateOptions(): Collection
     {
         return HrOnboardingEmail::query()
             ->where('is_active', true)
-            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
             ->orderBy('send_days_before_start')
             ->get(['id', 'template_name', 'send_days_before_start'])
             ->map(fn (HrOnboardingEmail $email) => [
@@ -1091,17 +1166,15 @@ class OnboardingController extends Controller
             ->values();
     }
 
-    /** Users in the tenant for owner / reassign pickers. */
-    private function tenantUserOptions(int $tenantId): \Illuminate\Support\Collection
+    /** Current users visible to the viewer for owner / reassign pickers. */
+    private function currentUserOptions(User $viewer): Collection
     {
-        return HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->with('user:id,name')
-            ->get()
-            ->map(fn (HrEmployeeProfile $p) => [
-                'id' => $p->user_id,
-                'name' => $p->user?->name,
+        return $this->lifecycleAccess->currentUsers($viewer)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
             ])
             ->filter(fn ($u) => $u['id'] && $u['name'])
             ->unique('id')
@@ -1110,9 +1183,10 @@ class OnboardingController extends Controller
     }
 
     /** Site + manager options for the wizard's "+ New hire" branch. */
-    private function newHireOptions(int $tenantId): array
+    private function newHireOptions(User $viewer): array
     {
-        $sites = \App\Models\Site::query()
+        $sites = Site::query()
+            ->whereIn('id', $this->lifecycleAccess->accessibleSiteIds($viewer))
             ->orderBy('name')
             ->get(['id', 'name', 'type'])
             ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'type' => $s->type])
@@ -1120,7 +1194,7 @@ class OnboardingController extends Controller
 
         return [
             'sites' => $sites->all(),
-            'managers' => $this->tenantUserOptions($tenantId)->all(),
+            'managers' => $this->currentUserOptions($viewer)->all(),
             'roles' => $this->roleOptions(),
             'employment_types' => ['full_time', 'part_time', 'casual', 'fixed_term'],
         ];
@@ -1130,14 +1204,13 @@ class OnboardingController extends Controller
      * Active training courses (code + title) for the template editor's per-task
      * course picker — the code is what enrolInductionCourses() matches on.
      */
-    private function courseOptions(int $tenantId): \Illuminate\Support\Collection
+    private function courseOptions(): Collection
     {
-        if (! \Illuminate\Support\Facades\Schema::hasTable('hr_courses')) {
+        if (! Schema::hasTable('hr_courses')) {
             return collect();
         }
 
-        return \App\Domain\Hr\Models\HrCourse::query()
-            ->forTenant($tenantId)
+        return HrCourse::query()
             ->active()
             ->whereNotNull('code')
             ->orderBy('title')

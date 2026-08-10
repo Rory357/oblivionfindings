@@ -2,8 +2,8 @@
 
 namespace App\Domain\Hr\Services;
 
-use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
@@ -15,6 +15,7 @@ use App\Domain\Hr\Models\HrReportSubscription;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrWellbeingIndicator;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
 class HrReportingService
@@ -43,7 +44,7 @@ class HrReportingService
     /**
      * @return array{report_type: string, report_title: string, date_from: string, date_to: string, data: array<string, mixed>}
      */
-    public function generate(string $reportType, ?int $tenantId, ?string $dateFrom = null, ?string $dateTo = null): array
+    public function generate(string $reportType, ?string $dateFrom = null, ?string $dateTo = null): array
     {
         $reportTypes = $this->reportTypes();
         if (! isset($reportTypes[$reportType])) {
@@ -54,18 +55,18 @@ class HrReportingService
         $resolvedTo = $dateTo ?: now()->toDateString();
 
         $data = match ($reportType) {
-            'headcount' => $this->generateHeadcount($tenantId),
-            'turnover' => $this->generateTurnover($tenantId, $resolvedFrom, $resolvedTo),
-            'leave_summary' => $this->generateLeaveSummary($tenantId, $resolvedFrom, $resolvedTo),
-            'performance' => $this->generatePerformanceReport($tenantId, $resolvedFrom, $resolvedTo),
-            'supervision' => $this->generateSupervisionReport($tenantId, $resolvedFrom, $resolvedTo),
-            'cases' => $this->generateCasesReport($tenantId, $resolvedFrom, $resolvedTo),
-            'wellbeing' => $this->generateWellbeingReport($tenantId),
-            'compliance' => $this->generateComplianceReport($tenantId),
-            'recruitment_funnel' => $this->generateRecruitmentFunnel($tenantId, $resolvedFrom, $resolvedTo),
-            'payroll_overview' => $this->generatePayrollOverview($tenantId, $resolvedFrom, $resolvedTo),
-            'leave_sla' => $this->generateLeaveSlaReport($tenantId, $resolvedFrom, $resolvedTo),
-            'onboarding_completion' => $this->generateOnboardingCompletionReport($tenantId, $resolvedFrom, $resolvedTo),
+            'headcount' => $this->generateHeadcount(),
+            'turnover' => $this->generateTurnover($resolvedFrom, $resolvedTo),
+            'leave_summary' => $this->generateLeaveSummary($resolvedFrom, $resolvedTo),
+            'performance' => $this->generatePerformanceReport($resolvedFrom, $resolvedTo),
+            'supervision' => $this->generateSupervisionReport($resolvedFrom, $resolvedTo),
+            'cases' => $this->generateCasesReport($resolvedFrom, $resolvedTo),
+            'wellbeing' => $this->generateWellbeingReport(),
+            'compliance' => $this->generateComplianceReport(),
+            'recruitment_funnel' => $this->generateRecruitmentFunnel($resolvedFrom, $resolvedTo),
+            'payroll_overview' => $this->generatePayrollOverview($resolvedFrom, $resolvedTo),
+            'leave_sla' => $this->generateLeaveSlaReport($resolvedFrom, $resolvedTo),
+            'onboarding_completion' => $this->generateOnboardingCompletionReport($resolvedFrom, $resolvedTo),
             default => [],
         };
 
@@ -84,35 +85,61 @@ class HrReportingService
         $lines[] = 'Metric,Value';
 
         foreach ($reportData as $key => $value) {
-            if (is_array($value) || $value instanceof \Illuminate\Support\Collection) {
+            if (is_array($value) || $value instanceof Collection) {
                 $collection = collect($value);
                 foreach ($collection as $subKey => $subValue) {
                     $displayValue = is_array($subValue)
                         ? json_encode($subValue)
                         : (string) $subValue;
-                    $lines[] = '"' . str_replace('"', '""', $key . '.' . $subKey) . '","' . str_replace('"', '""', $displayValue) . '"';
+                    $lines[] = $this->csvRow([(string) $key.'.'.$subKey, $displayValue]);
                 }
             } else {
-                $lines[] = '"' . str_replace('"', '""', (string) $key) . '","' . str_replace('"', '""', (string) ($value ?? '')) . '"';
+                $lines[] = $this->csvRow([(string) $key, (string) ($value ?? '')]);
             }
         }
 
-        return implode("\n", $lines) . "\n";
+        return implode("\n", $lines)."\n";
+    }
+
+    /** @param array<int, string> $values */
+    private function csvRow(array $values): string
+    {
+        return collect($values)
+            ->map(fn (string $value): string => '"'.str_replace('"', '""', $this->sanitizeCsvCell($value)).'"')
+            ->implode(',');
+    }
+
+    private function sanitizeCsvCell(string $value): string
+    {
+        if ($value === '') {
+            return $value;
+        }
+
+        $trimmed = ltrim($value, " \v\f");
+        $firstMeaningful = $trimmed[0] ?? '';
+
+        if (in_array($firstMeaningful, ["\t", "\r"], true)) {
+            return "'".$value;
+        }
+
+        if (! is_numeric($trimmed) && in_array($firstMeaningful, ['=', '+', '-', '@'], true)) {
+            return "'".$value;
+        }
+
+        return $value;
     }
 
     /**
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      */
     public function createExport(
         string $reportType,
-        ?int $tenantId,
         array $filters = [],
         ?int $generatedBy = null,
         ?HrReportSubscription $subscription = null
     ): HrReportExport {
         $report = $this->generate(
             reportType: $reportType,
-            tenantId: $tenantId,
             dateFrom: isset($filters['date_from']) ? (string) $filters['date_from'] : null,
             dateTo: isset($filters['date_to']) ? (string) $filters['date_to'] : null,
         );
@@ -129,7 +156,6 @@ class HrReportingService
         $rowCount = is_array($report['data']) ? count($report['data']) : 0;
 
         return HrReportExport::query()->create([
-            'tenant_id' => $tenantId,
             'subscription_id' => $subscription?->id,
             'report_type' => $reportType,
             'period_start' => $report['date_from'],
@@ -156,6 +182,7 @@ class HrReportingService
             if ($target->lessThanOrEqualTo($base->copy()->timezone($timezone))) {
                 $target->addDay();
             }
+
             return $target->timezone(config('app.timezone'));
         }
 
@@ -164,6 +191,7 @@ class HrReportingService
             while ((int) $target->dayOfWeek !== $weekday || $target->lessThanOrEqualTo($base->copy()->timezone($timezone))) {
                 $target->addDay();
             }
+
             return $target->timezone(config('app.timezone'));
         }
 
@@ -179,11 +207,10 @@ class HrReportingService
         return $target->timezone(config('app.timezone'));
     }
 
-    private function generateHeadcount(?int $tenantId): array
+    private function generateHeadcount(): array
     {
         $profiles = HrEmployeeProfile::query()
             ->where('is_active', true)
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->get();
 
         return [
@@ -193,21 +220,18 @@ class HrReportingService
         ];
     }
 
-    private function generateTurnover(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generateTurnover(string $dateFrom, string $dateTo): array
     {
         $leavers = HrEmployeeProfile::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereNotNull('end_date')
             ->whereBetween('end_date', [$dateFrom, $dateTo])
             ->get();
 
         $starters = HrEmployeeProfile::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('start_date', [$dateFrom, $dateTo])
             ->get();
 
         $totalActive = HrEmployeeProfile::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->where('is_active', true)
             ->count();
 
@@ -219,10 +243,9 @@ class HrReportingService
         ];
     }
 
-    private function generateLeaveSummary(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generateLeaveSummary(string $dateFrom, string $dateTo): array
     {
         $requests = HrLeaveRequest::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('starts_at', [$dateFrom, $dateTo])
             ->get();
 
@@ -237,10 +260,9 @@ class HrReportingService
         ];
     }
 
-    private function generatePerformanceReport(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generatePerformanceReport(string $dateFrom, string $dateTo): array
     {
         $reviews = HrPerformanceReview::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('created_at', [$dateFrom, $dateTo])
             ->get();
 
@@ -253,10 +275,9 @@ class HrReportingService
         ];
     }
 
-    private function generateSupervisionReport(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generateSupervisionReport(string $dateFrom, string $dateTo): array
     {
         $notes = HrSupervisionNote::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('session_date', [$dateFrom, $dateTo])
             ->get();
 
@@ -269,10 +290,9 @@ class HrReportingService
         ];
     }
 
-    private function generateCasesReport(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generateCasesReport(string $dateFrom, string $dateTo): array
     {
         $cases = HrCase::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('opened_at', [$dateFrom, $dateTo])
             ->get();
 
@@ -285,10 +305,9 @@ class HrReportingService
         ];
     }
 
-    private function generateWellbeingReport(?int $tenantId): array
+    private function generateWellbeingReport(): array
     {
         $indicators = HrWellbeingIndicator::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->orderByDesc('calculated_at')
             ->limit(500)
             ->get();
@@ -301,10 +320,9 @@ class HrReportingService
         ];
     }
 
-    private function generateComplianceReport(?int $tenantId): array
+    private function generateComplianceReport(): array
     {
         $profiles = HrEmployeeProfile::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->where('is_active', true)
             ->count();
 
@@ -314,10 +332,9 @@ class HrReportingService
         ];
     }
 
-    private function generateRecruitmentFunnel(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generateRecruitmentFunnel(string $dateFrom, string $dateTo): array
     {
         $candidates = HrCandidate::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('created_at', [$dateFrom, Carbon::parse($dateTo)->endOfDay()])
             ->get();
 
@@ -336,10 +353,9 @@ class HrReportingService
         ];
     }
 
-    private function generatePayrollOverview(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generatePayrollOverview(string $dateFrom, string $dateTo): array
     {
         $runs = HrPayrollRun::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereDate('period_start', '>=', $dateFrom)
             ->whereDate('period_end', '<=', $dateTo)
             ->get();
@@ -358,10 +374,9 @@ class HrReportingService
         ];
     }
 
-    private function generateLeaveSlaReport(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generateLeaveSlaReport(string $dateFrom, string $dateTo): array
     {
         $requests = HrLeaveRequest::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('submitted_at', [$dateFrom, Carbon::parse($dateTo)->endOfDay()])
             ->get();
 
@@ -392,15 +407,13 @@ class HrReportingService
         ];
     }
 
-    private function generateOnboardingCompletionReport(?int $tenantId, string $dateFrom, string $dateTo): array
+    private function generateOnboardingCompletionReport(string $dateFrom, string $dateTo): array
     {
         $onboarding = HrOnboardingChecklist::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('started_at', [$dateFrom, Carbon::parse($dateTo)->endOfDay()])
             ->get();
 
         $offboarding = HrOffboardingChecklist::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereBetween('started_at', [$dateFrom, Carbon::parse($dateTo)->endOfDay()])
             ->get();
 

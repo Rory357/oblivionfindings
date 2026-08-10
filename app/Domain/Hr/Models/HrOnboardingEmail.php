@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrOnboardingEmail extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $table = 'hr_onboarding_emails';
 
@@ -31,7 +32,7 @@ class HrOnboardingEmail extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function creator(): BelongsTo
@@ -45,7 +46,7 @@ class HrOnboardingEmail extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeActive($query)

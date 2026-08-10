@@ -92,7 +92,9 @@ const initials = (name: string) =>
 
 /** Flash error carried by an Inertia redirect — `back()->with('error')` fires
  *  onSuccess, not onError (see reference_inertia_flash_error). */
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
@@ -103,9 +105,24 @@ function pageFlashError(page: { props: Record<string, unknown> }): string | null
 
 const SCHEDULE_STEPS: readonly WizardStep[] = [
     { key: 'report', label: 'Report', blurb: 'What to send', icon: BarChart3 },
-    { key: 'schedule', label: 'Schedule', blurb: 'Cadence & time', icon: CalendarClock },
-    { key: 'recipients', label: 'Recipients', blurb: 'Who receives it', icon: Users },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+    {
+        key: 'schedule',
+        label: 'Schedule',
+        blurb: 'Cadence & time',
+        icon: CalendarClock,
+    },
+    {
+        key: 'recipients',
+        label: 'Recipients',
+        blurb: 'Who receives it',
+        icon: Users,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: CheckCircle2,
+    },
 ];
 
 export function ScheduleReportWizard({
@@ -128,19 +145,27 @@ export function ScheduleReportWizard({
     const [search, setSearch] = useState('');
 
     const form = useForm({
-        report_type: subscription?.report_type ?? reports[0]?.key ?? 'headcount',
-        cadence: (subscription?.cadence ?? 'weekly') as 'daily' | 'weekly' | 'monthly',
+        report_type:
+            subscription?.report_type ?? reports[0]?.key ?? 'headcount',
+        cadence: (subscription?.cadence ?? 'weekly') as
+            | 'daily'
+            | 'weekly'
+            | 'monthly',
         day_of_week: String(subscription?.day_of_week ?? 1),
         day_of_month: String(subscription?.day_of_month ?? 1),
         run_at: (subscription?.run_at ?? '08:00').slice(0, 5),
         timezone: subscription?.timezone || 'Pacific/Auckland',
-        date_from: subscription?.filters.date_from ?? defaultFilters.date_from ?? '',
+        date_from:
+            subscription?.filters.date_from ?? defaultFilters.date_from ?? '',
         date_to: subscription?.filters.date_to ?? defaultFilters.date_to ?? '',
-        recipient_user_ids: (subscription?.recipient_user_ids ?? []).map(String),
+        recipient_user_ids: (subscription?.recipient_user_ids ?? []).map(
+            String,
+        ),
     });
     const serverErrors = form.errors as Record<string, string | undefined>;
 
-    const pickedReport = reports.find((r) => r.key === form.data.report_type) ?? null;
+    const pickedReport =
+        reports.find((r) => r.key === form.data.report_type) ?? null;
     const pickedRecipients = recipients.filter((r) =>
         form.data.recipient_user_ids.includes(String(r.id)),
     );
@@ -164,26 +189,36 @@ export function ScheduleReportWizard({
     };
 
     const scheduleLabel = useMemo(() => {
-        if (form.data.cadence === 'daily') return `Daily at ${form.data.run_at}`;
+        if (form.data.cadence === 'daily')
+            return `Daily at ${form.data.run_at}`;
         if (form.data.cadence === 'weekly') {
-            const day = WEEKDAY_LABELS[Number(form.data.day_of_week)] ?? 'Monday';
+            const day =
+                WEEKDAY_LABELS[Number(form.data.day_of_week)] ?? 'Monday';
             return `Every ${day} at ${form.data.run_at}`;
         }
         return `Day ${form.data.day_of_month} of each month at ${form.data.run_at}`;
-    }, [form.data.cadence, form.data.day_of_week, form.data.day_of_month, form.data.run_at]);
+    }, [
+        form.data.cadence,
+        form.data.day_of_week,
+        form.data.day_of_month,
+        form.data.run_at,
+    ]);
 
     const scheduleValid =
         /^\d{2}:\d{2}$/.test(form.data.run_at) &&
         form.data.timezone.trim() !== '' &&
         (form.data.cadence !== 'monthly' ||
-            (Number(form.data.day_of_month) >= 1 && Number(form.data.day_of_month) <= 28));
+            (Number(form.data.day_of_month) >= 1 &&
+                Number(form.data.day_of_month) <= 28));
 
     const submit = () => {
         form.transform((data) => ({
             report_type: data.report_type,
             cadence: data.cadence,
-            day_of_week: data.cadence === 'weekly' ? Number(data.day_of_week) : null,
-            day_of_month: data.cadence === 'monthly' ? Number(data.day_of_month) : null,
+            day_of_week:
+                data.cadence === 'weekly' ? Number(data.day_of_week) : null,
+            day_of_month:
+                data.cadence === 'monthly' ? Number(data.day_of_month) : null,
             run_at: data.run_at,
             timezone: data.timezone.trim() || 'Pacific/Auckland',
             date_from: data.date_from || null,
@@ -231,8 +266,9 @@ export function ScheduleReportWizard({
                         title={isEdit ? 'Schedule updated' : 'Report scheduled'}
                         blurb={
                             <>
-                                “{pickedReport?.title ?? form.data.report_type}” will run{' '}
-                                {scheduleLabel.toLowerCase()} ({form.data.timezone}).
+                                “{pickedReport?.title ?? form.data.report_type}”
+                                will run {scheduleLabel.toLowerCase()} (
+                                {form.data.timezone}).
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -254,7 +290,11 @@ export function ScheduleReportWizard({
                     {wizard.isLast ? (
                         <Button
                             onClick={submit}
-                            disabled={form.processing || !form.data.report_type || !scheduleValid}
+                            disabled={
+                                form.processing ||
+                                !form.data.report_type ||
+                                !scheduleValid
+                            }
                         >
                             {form.processing
                                 ? 'Saving…'
@@ -266,7 +306,8 @@ export function ScheduleReportWizard({
                         <Button
                             onClick={wizard.next}
                             disabled={
-                                (wizard.index === 0 && !form.data.report_type) ||
+                                (wizard.index === 0 &&
+                                    !form.data.report_type) ||
                                 (wizard.index === 1 && !scheduleValid)
                             }
                         >
@@ -302,7 +343,9 @@ export function ScheduleReportWizard({
                             <Input
                                 type="date"
                                 value={form.data.date_from}
-                                onChange={(e) => form.setData('date_from', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('date_from', e.target.value)
+                                }
                             />
                         </Field>
                         <Field
@@ -313,7 +356,9 @@ export function ScheduleReportWizard({
                             <Input
                                 type="date"
                                 value={form.data.date_to}
-                                onChange={(e) => form.setData('date_to', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('date_to', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
@@ -340,14 +385,22 @@ export function ScheduleReportWizard({
                     </Field>
                     <div className="mt-4 grid gap-3.5 sm:grid-cols-2">
                         {form.data.cadence === 'weekly' && (
-                            <Field label="Weekday" required error={serverErrors.day_of_week}>
+                            <Field
+                                label="Weekday"
+                                required
+                                error={serverErrors.day_of_week}
+                            >
                                 <Segmented
                                     value={form.data.day_of_week}
-                                    onChange={(v) => form.setData('day_of_week', v)}
-                                    options={WEEKDAY_LABELS.map((day, index) => ({
-                                        value: String(index),
-                                        label: day.slice(0, 3),
-                                    }))}
+                                    onChange={(v) =>
+                                        form.setData('day_of_week', v)
+                                    }
+                                    options={WEEKDAY_LABELS.map(
+                                        (day, index) => ({
+                                            value: String(index),
+                                            label: day.slice(0, 3),
+                                        }),
+                                    )}
                                 />
                             </Field>
                         )}
@@ -363,15 +416,26 @@ export function ScheduleReportWizard({
                                     min={1}
                                     max={28}
                                     value={form.data.day_of_month}
-                                    onChange={(e) => form.setData('day_of_month', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'day_of_month',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </Field>
                         )}
-                        <Field label="Run at" required error={serverErrors.run_at}>
+                        <Field
+                            label="Run at"
+                            required
+                            error={serverErrors.run_at}
+                        >
                             <Input
                                 type="time"
                                 value={form.data.run_at}
-                                onChange={(e) => form.setData('run_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('run_at', e.target.value)
+                                }
                             />
                         </Field>
                         <Field
@@ -381,12 +445,16 @@ export function ScheduleReportWizard({
                         >
                             <Input
                                 value={form.data.timezone}
-                                onChange={(e) => form.setData('timezone', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('timezone', e.target.value)
+                                }
                                 placeholder="Pacific/Auckland"
                             />
                         </Field>
                     </div>
-                    <p className="mt-3 text-[12.5px] text-muted-foreground">{scheduleLabel}.</p>
+                    <p className="mt-3 text-[12.5px] text-muted-foreground">
+                        {scheduleLabel}.
+                    </p>
                 </WizardStepPane>
             )}
 
@@ -408,7 +476,10 @@ export function ScheduleReportWizard({
                     </div>
                     <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
                         {filteredRecipients.map((r) => {
-                            const active = form.data.recipient_user_ids.includes(String(r.id));
+                            const active =
+                                form.data.recipient_user_ids.includes(
+                                    String(r.id),
+                                );
                             return (
                                 // eslint-disable-next-line no-restricted-syntax -- selector card (whole-row toggle), matches the AssignWizard staff picker
                                 <button
@@ -421,7 +492,9 @@ export function ScheduleReportWizard({
                                         {initials(r.name)}
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <div className="text-[13.5px] font-bold">{r.name}</div>
+                                        <div className="text-[13.5px] font-bold">
+                                            {r.name}
+                                        </div>
                                         <div className="truncate text-[11.5px] text-muted-foreground">
                                             {r.email}
                                         </div>
@@ -450,8 +523,15 @@ export function ScheduleReportWizard({
                         blurb="Check the details, then save."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={BarChart3} title="Report" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Report" value={pickedReport?.title} />
+                        <ReviewCard
+                            icon={BarChart3}
+                            title="Report"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Report"
+                                value={pickedReport?.title}
+                            />
                             <ReviewRow
                                 label="Default window"
                                 value={
@@ -467,14 +547,24 @@ export function ScheduleReportWizard({
                             onEdit={() => wizard.goTo(1)}
                         >
                             <ReviewRow label="Runs" value={scheduleLabel} />
-                            <ReviewRow label="Timezone" value={form.data.timezone} />
+                            <ReviewRow
+                                label="Timezone"
+                                value={form.data.timezone}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Users} title="Recipients" onEdit={() => wizard.goTo(2)} span>
+                        <ReviewCard
+                            icon={Users}
+                            title="Recipients"
+                            onEdit={() => wizard.goTo(2)}
+                            span
+                        >
                             <ReviewRow
                                 label="Delivered to"
                                 value={
                                     pickedRecipients.length > 0
-                                        ? pickedRecipients.map((r) => r.name).join(', ')
+                                        ? pickedRecipients
+                                              .map((r) => r.name)
+                                              .join(', ')
                                         : 'You (current user)'
                                 }
                             />
@@ -482,8 +572,8 @@ export function ScheduleReportWizard({
                     </div>
                     {form.hasErrors ? (
                         <FieldErr>
-                            Some fields need attention — use Edit to jump back to the
-                            highlighted step.
+                            Some fields need attention — use Edit to jump back
+                            to the highlighted step.
                         </FieldErr>
                     ) : null}
                 </WizardStepPane>

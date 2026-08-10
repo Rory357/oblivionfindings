@@ -1,22 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm, router } from '@inertiajs/react';
-import { PageHero, PageLayout } from '@/components/page';
 import { formatMoney, ReceivablesTabsFooter } from '@/components/finance';
 import { chartColor } from '@/components/finance/chart-palette';
+import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import {
     Dialog,
     DialogContent,
@@ -26,10 +13,29 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { DollarSign, Clock, FileText, TrendingUp, ArrowUpFromLine } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
+import {
+    ArrowUpFromLine,
+    Clock,
+    DollarSign,
+    FileText,
+    TrendingUp,
+} from 'lucide-react';
 import { useState } from 'react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 type InvoiceRow = {
     id: number;
@@ -60,7 +66,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Receivables', href: '/finance/receivables' },
 ];
 
-function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () => void }) {
+function PaymentDialog({
+    invoice,
+    onClose,
+}: {
+    invoice: InvoiceRow;
+    onClose: () => void;
+}) {
     const form = useForm({
         invoice_id: invoice.id,
         amount: invoice.amount_due.toFixed(2),
@@ -81,7 +93,8 @@ function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () 
             <div className="space-y-1">
                 <Label>Invoice</Label>
                 <p className="text-sm text-muted-foreground">
-                    {invoice.invoice_number} — {invoice.client_name} — Outstanding: {formatMoney(invoice.amount_due)}
+                    {invoice.invoice_number} — {invoice.client_name} —
+                    Outstanding: {formatMoney(invoice.amount_due)}
                 </p>
             </div>
 
@@ -97,7 +110,9 @@ function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () 
                     onChange={(e) => form.setData('amount', e.target.value)}
                 />
                 {form.errors.amount && (
-                    <p className="text-sm text-destructive">{form.errors.amount}</p>
+                    <p className="text-sm text-destructive">
+                        {form.errors.amount}
+                    </p>
                 )}
             </div>
 
@@ -107,10 +122,14 @@ function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () 
                     id="payment_date"
                     type="date"
                     value={form.data.payment_date}
-                    onChange={(e) => form.setData('payment_date', e.target.value)}
+                    onChange={(e) =>
+                        form.setData('payment_date', e.target.value)
+                    }
                 />
                 {form.errors.payment_date && (
-                    <p className="text-sm text-destructive">{form.errors.payment_date}</p>
+                    <p className="text-sm text-destructive">
+                        {form.errors.payment_date}
+                    </p>
                 )}
             </div>
 
@@ -138,11 +157,16 @@ function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () 
 }
 
 export default function ReceivablesIndex({ summary, invoices }: PageProps) {
-    const [paymentInvoice, setPaymentInvoice] = useState<InvoiceRow | null>(null);
+    const [paymentInvoice, setPaymentInvoice] = useState<InvoiceRow | null>(
+        null,
+    );
 
     const currentNotOverdue = summary.total_outstanding - summary.total_overdue;
     const pieData = [
-        { name: 'Outstanding (Current)', value: currentNotOverdue > 0 ? currentNotOverdue : 0 },
+        {
+            name: 'Outstanding (Current)',
+            value: currentNotOverdue > 0 ? currentNotOverdue : 0,
+        },
         { name: 'Overdue', value: summary.total_overdue },
     ].filter((d) => d.value > 0);
 
@@ -151,25 +175,43 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
             <Head title="Receivables" />
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={ArrowUpFromLine}
                         title="Receivables"
                         description="Accounts receivable dashboard for outstanding invoices and payments."
                         stats={[
-                            { label: 'Outstanding', value: formatMoney(summary.total_outstanding) },
-                            { label: 'Overdue', value: formatMoney(summary.total_overdue) },
-                            { label: 'Unpaid invoices', value: summary.unpaid_count },
+                            {
+                                label: 'Outstanding',
+                                value: formatMoney(summary.total_outstanding),
+                            },
+                            {
+                                label: 'Overdue',
+                                value: formatMoney(summary.total_overdue),
+                            },
+                            {
+                                label: 'Unpaid invoices',
+                                value: summary.unpaid_count,
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap items-center gap-2">
                                 <Link href="/finance/receivables/aging">
-                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
                                         <TrendingUp className="mr-1.5 h-4 w-4" />
                                         Aging Report
                                     </Button>
                                 </Link>
                                 <Link href="/finance/receivables/statements">
-                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
                                         <FileText className="mr-1.5 h-4 w-4" />
                                         Statements
                                     </Button>
@@ -218,7 +260,9 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                             <FileText className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{summary.unpaid_count}</div>
+                            <div className="text-2xl font-bold">
+                                {summary.unpaid_count}
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -244,20 +288,36 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                             nameKey="name"
                                         >
                                             {pieData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={chartColor(index)} />
+                                                <Cell
+                                                    key={`cell-${index}`}
+                                                    fill={chartColor(index)}
+                                                />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={((value: number) => formatMoney(value)) as any} />
+                                        <Tooltip
+                                            formatter={
+                                                ((value: number) =>
+                                                    formatMoney(value)) as any
+                                            }
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                                 <div className="flex justify-center gap-3 text-xs">
                                     {pieData.map((entry, index) => (
-                                        <div key={entry.name} className="flex items-center gap-1">
+                                        <div
+                                            key={entry.name}
+                                            className="flex items-center gap-1"
+                                        >
                                             <div
                                                 className="h-2 w-2 rounded-full"
-                                                style={{ backgroundColor: chartColor(index) }}
+                                                style={{
+                                                    backgroundColor:
+                                                        chartColor(index),
+                                                }}
                                             />
-                                            <span className="text-muted-foreground">{entry.name}</span>
+                                            <span className="text-muted-foreground">
+                                                {entry.name}
+                                            </span>
                                         </div>
                                     ))}
                                 </div>
@@ -269,7 +329,9 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                 {/* Outstanding Invoices Table */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Outstanding Invoices</CardTitle>
+                        <CardTitle className="text-base">
+                            Outstanding Invoices
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {invoices.length === 0 ? (
@@ -284,11 +346,19 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                         <TableHead>Client</TableHead>
                                         <TableHead>Issue Date</TableHead>
                                         <TableHead>Due Date</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
-                                        <TableHead className="text-right">Paid</TableHead>
-                                        <TableHead className="text-right">Due</TableHead>
+                                        <TableHead className="text-right">
+                                            Total
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Paid
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Due
+                                        </TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -306,32 +376,53 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                             <TableCell className="font-medium">
                                                 {invoice.invoice_number}
                                             </TableCell>
-                                            <TableCell>{invoice.client_name}</TableCell>
-                                            <TableCell>{invoice.issue_date}</TableCell>
-                                            <TableCell>{invoice.due_date}</TableCell>
-                                            <TableCell className="text-right">
-                                                {formatMoney(invoice.total_amount)}
+                                            <TableCell>
+                                                {invoice.client_name}
+                                            </TableCell>
+                                            <TableCell>
+                                                {invoice.issue_date}
+                                            </TableCell>
+                                            <TableCell>
+                                                {invoice.due_date}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                {formatMoney(invoice.amount_paid)}
+                                                {formatMoney(
+                                                    invoice.total_amount,
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                {formatMoney(
+                                                    invoice.amount_paid,
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right font-medium">
-                                                {formatMoney(invoice.amount_due)}
+                                                {formatMoney(
+                                                    invoice.amount_due,
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 {invoice.is_overdue ? (
                                                     <Badge variant="destructive">
-                                                        {invoice.days_overdue}d overdue
+                                                        {invoice.days_overdue}d
+                                                        overdue
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="secondary">Current</Badge>
+                                                    <Badge variant="secondary">
+                                                        Current
+                                                    </Badge>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <Dialog
-                                                    open={paymentInvoice?.id === invoice.id}
+                                                    open={
+                                                        paymentInvoice?.id ===
+                                                        invoice.id
+                                                    }
                                                     onOpenChange={(open) => {
-                                                        if (!open) setPaymentInvoice(null);
+                                                        if (!open)
+                                                            setPaymentInvoice(
+                                                                null,
+                                                            );
                                                     }}
                                                 >
                                                     <DialogTrigger asChild>
@@ -339,7 +430,9 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                                             size="sm"
                                                             variant="outline"
                                                             onClick={() =>
-                                                                setPaymentInvoice(invoice)
+                                                                setPaymentInvoice(
+                                                                    invoice,
+                                                                )
                                                             }
                                                         >
                                                             Record Payment
@@ -347,16 +440,25 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                                     </DialogTrigger>
                                                     <DialogContent>
                                                         <DialogHeader>
-                                                            <DialogTitle>Record Payment</DialogTitle>
+                                                            <DialogTitle>
+                                                                Record Payment
+                                                            </DialogTitle>
                                                             <DialogDescription>
-                                                                Allocate a payment against this invoice.
+                                                                Allocate a
+                                                                payment against
+                                                                this invoice.
                                                             </DialogDescription>
                                                         </DialogHeader>
-                                                        {paymentInvoice?.id === invoice.id && (
+                                                        {paymentInvoice?.id ===
+                                                            invoice.id && (
                                                             <PaymentDialog
-                                                                invoice={invoice}
+                                                                invoice={
+                                                                    invoice
+                                                                }
                                                                 onClose={() =>
-                                                                    setPaymentInvoice(null)
+                                                                    setPaymentInvoice(
+                                                                        null,
+                                                                    )
                                                                 }
                                                             />
                                                         )}

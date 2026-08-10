@@ -11,9 +11,9 @@ import {
     X,
 } from 'lucide-react';
 
-import type { StatusTab, ViewMode } from './shared';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import type { StatusTab, ViewMode } from './shared';
 
 type TabCounts = {
     total: number;
@@ -29,7 +29,13 @@ const TABS: {
     icon: RosterTabItem['icon'];
     tone: RosterTabItem['tone'];
 }[] = [
-    { id: 'all', label: 'All', key: 'total', icon: ListChecks, tone: 'primary' },
+    {
+        id: 'all',
+        label: 'All',
+        key: 'total',
+        icon: ListChecks,
+        tone: 'primary',
+    },
     { id: 'draft', label: 'Drafts', key: 'draft', icon: Pencil, tone: 'info' },
     {
         id: 'submitted',
@@ -93,7 +99,8 @@ export function Toolbar({
 
             <div className="ml-auto flex flex-wrap items-center gap-3">
                 {hasFilters ? (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={onClearFilters}
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -105,7 +112,8 @@ export function Toolbar({
                 <span className="text-[12.5px] text-muted-foreground tabular-nums">
                     {shown} of {total} shown
                 </span>
-                <GuardrailCard unstyled
+                <GuardrailCard
+                    unstyled
                     className="flex items-center gap-1 rounded-xl border border-border bg-card p-1"
                     role="tablist"
                     aria-label="View mode"
@@ -113,7 +121,8 @@ export function Toolbar({
                     {VIEWS.map((v) => {
                         const Icon = v.icon;
                         return (
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 key={v.id}
                                 type="button"
                                 role="tab"

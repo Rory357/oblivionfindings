@@ -4,33 +4,32 @@
  * StatusBadge; all other colours are semantic design tokens. */
 import { Head, router } from '@inertiajs/react';
 import {
+    ArrowRight,
     Award,
+    Bell,
     Check,
     Download,
     FileText,
-    GitBranch,
     Gauge,
+    GitBranch,
     MessageSquare,
     MoreVertical,
+    Pencil,
+    Pin,
     Plus,
     Rows3,
     Search,
+    Send,
     Sparkles,
     Sprout,
     Star,
     Target,
+    Trash2,
     TrendingUp,
     UserCheck,
-    ArrowRight,
-    Pencil,
-    Bell,
     XCircle,
-    Send,
-    Trash2,
-    Pin,
-    type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
@@ -42,10 +41,10 @@ import {
 } from '@/components/hr/performance/performance-hero';
 import {
     PerformanceWizards,
+    type Opt,
     type WizardKind,
     type WizardState,
     type WizardSupport,
-    type Opt,
 } from '@/components/hr/performance/performance-wizards';
 import PageShell from '@/components/page-shell';
 import {
@@ -61,12 +60,66 @@ import { cn } from '@/lib/utils';
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type ReviewRow = { id: number; employee: string; role: string; type: string; period: string; rating: number | null; status: string };
-type SupRow = { id: number; employee: string; role: string; last: string; next: string; status: string };
-type GoalRow = { id: number; title: string; owner: string; type: string; kr: number; progress: number; due: string; status: string };
-type DevRow = { id: number; employee: string; role: string; area: string; cur: number; tgt: number; progress: number; course: string; status: string };
-type FeedbackRow = { id: number; ids: number[]; subject: string; subject_user_id: number; role: string; type: string; reviewers: number; responded: number; due: string; status: string };
-type PipRow = { id: number; employee: string; role: string; reason: string; milestones: string; progress: number; review: string; status: string };
+type ReviewRow = {
+    id: number;
+    employee: string;
+    role: string;
+    type: string;
+    period: string;
+    rating: number | null;
+    status: string;
+};
+type SupRow = {
+    id: number;
+    employee: string;
+    role: string;
+    last: string;
+    next: string;
+    status: string;
+};
+type GoalRow = {
+    id: number;
+    title: string;
+    owner: string;
+    type: string;
+    kr: number;
+    progress: number;
+    due: string;
+    status: string;
+};
+type DevRow = {
+    id: number;
+    employee: string;
+    role: string;
+    area: string;
+    cur: number;
+    tgt: number;
+    progress: number;
+    course: string;
+    status: string;
+};
+type FeedbackRow = {
+    id: number;
+    ids: number[];
+    subject: string;
+    subject_user_id: number;
+    role: string;
+    type: string;
+    reviewers: number;
+    responded: number;
+    due: string;
+    status: string;
+};
+type PipRow = {
+    id: number;
+    employee: string;
+    role: string;
+    reason: string;
+    milestones: string;
+    progress: number;
+    review: string;
+    status: string;
+};
 
 type Supervision = {
     rows: SupRow[];
@@ -77,14 +130,30 @@ type Supervision = {
     spark: number[];
 };
 type Competencies = {
-    matrix: { staff: { profile_id: number; name: string }[]; competencies: { id: number; name: string }[]; levels: Record<string, number> };
-    coverage: { id: number; name: string; category: string; covered: number; total: number }[];
+    matrix: {
+        staff: { profile_id: number; name: string }[];
+        competencies: { id: number; name: string }[];
+        levels: Record<string, number>;
+    };
+    coverage: {
+        id: number;
+        name: string;
+        category: string;
+        covered: number;
+        total: number;
+    }[];
     skills: { id: number; name: string; count: number }[];
 };
 type Succession = {
     box: Record<string, string[]>;
     readiness: { label: string; count: number; tone: string }[];
-    critical_roles: { id: number; role: string; risk: string; cover: string; uncovered: boolean }[];
+    critical_roles: {
+        id: number;
+        role: string;
+        risk: string;
+        cover: string;
+        uncovered: boolean;
+    }[];
 };
 
 type Props = {
@@ -99,7 +168,6 @@ type Props = {
     succession: Succession;
     staff: Opt[];
     sessionTypes: Opt[];
-    successionEmployees: Opt[];
     competencyOptions: Opt[];
     can: { manage: boolean };
 };
@@ -109,20 +177,50 @@ type Props = {
 /* ------------------------------------------------------------------ */
 
 const VAR: Record<string, StatusVariant> = {
-    draft: 'neutral', cancelled: 'neutral', archived: 'neutral', inactive: 'neutral',
-    active: 'success', approved: 'success', signed_off: 'success', acknowledged: 'success', on_track: 'success', met: 'success', ready_now: 'success', low: 'success',
-    completed: 'info', in_progress: 'info', scheduled: 'info', open: 'info',
-    pending: 'warning', monitoring: 'warning', at_risk: 'warning', due_soon: 'warning', developing: 'warning', medium: 'warning', probation: 'warning',
-    overdue: 'critical', rejected: 'critical', declined: 'critical', expired: 'critical', off_track: 'critical', high: 'critical', critical: 'critical', uncovered: 'critical',
+    draft: 'neutral',
+    cancelled: 'neutral',
+    archived: 'neutral',
+    inactive: 'neutral',
+    active: 'success',
+    approved: 'success',
+    signed_off: 'success',
+    acknowledged: 'success',
+    on_track: 'success',
+    met: 'success',
+    ready_now: 'success',
+    low: 'success',
+    completed: 'info',
+    in_progress: 'info',
+    scheduled: 'info',
+    open: 'info',
+    pending: 'warning',
+    monitoring: 'warning',
+    at_risk: 'warning',
+    due_soon: 'warning',
+    developing: 'warning',
+    medium: 'warning',
+    probation: 'warning',
+    overdue: 'critical',
+    rejected: 'critical',
+    declined: 'critical',
+    expired: 'critical',
+    off_track: 'critical',
+    high: 'critical',
+    critical: 'critical',
+    uncovered: 'critical',
 };
 const variantOf = (s: string): StatusVariant => VAR[s] ?? 'neutral';
-const pretty = (s: string) => s.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const pretty = (s: string) =>
+    s.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 // Static class strings so Tailwind keeps them (no dynamic concatenation).
 const CHIP_ON: Record<StatusVariant, string> = {
-    success: 'border-status-success/40 bg-status-success-bg text-status-success',
-    warning: 'border-status-warning/40 bg-status-warning-bg text-status-warning',
-    critical: 'border-status-critical/40 bg-status-critical-bg text-status-critical',
+    success:
+        'border-status-success/40 bg-status-success-bg text-status-success',
+    warning:
+        'border-status-warning/40 bg-status-warning-bg text-status-warning',
+    critical:
+        'border-status-critical/40 bg-status-critical-bg text-status-critical',
     info: 'border-status-info/40 bg-status-info-bg text-status-info',
     neutral: 'border-primary bg-primary/10 text-primary',
 };
@@ -133,24 +231,54 @@ const CHIP_ON: Record<StatusVariant, string> = {
 
 const TAB_ITEMS: HrTabItem[] = [
     { id: 'reviews', label: 'Reviews', icon: Award, tone: 'info' },
-    { id: 'supervision', label: 'Supervision', icon: UserCheck, tone: 'primary' },
+    {
+        id: 'supervision',
+        label: 'Supervision',
+        icon: UserCheck,
+        tone: 'primary',
+    },
     { id: 'goals', label: 'Goals & OKRs', icon: Target, tone: 'success' },
     { id: 'development', label: 'Development', icon: Sprout, tone: 'info' },
-    { id: 'competencies', label: 'Competencies & Skills', icon: Gauge, tone: 'violet' },
-    { id: 'feedback', label: '360 Feedback', icon: MessageSquare, tone: 'warning' },
+    {
+        id: 'competencies',
+        label: 'Competencies & Skills',
+        icon: Gauge,
+        tone: 'violet',
+    },
+    {
+        id: 'feedback',
+        label: '360 Feedback',
+        icon: MessageSquare,
+        tone: 'warning',
+    },
     { id: 'pips', label: 'PIPs', icon: TrendingUp, tone: 'critical' },
     { id: 'succession', label: 'Succession', icon: GitBranch, tone: 'info' },
 ];
 
 const PRIMARY_NEW: Record<string, WizardKind> = {
-    reviews: 'review', supervision: 'supervision', goals: 'goal', development: 'development',
-    competencies: 'assess', feedback: 'feedback', pips: 'pip', succession: 'succession',
+    reviews: 'review',
+    supervision: 'supervision',
+    goals: 'goal',
+    development: 'development',
+    competencies: 'assess',
+    feedback: 'feedback',
+    pips: 'pip',
 };
 
-const initials = (n: string) => n.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+const initials = (n: string) =>
+    n
+        .split(' ')
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
 
 /** Build a prefilled development-expense claim URL from a dev-goal / PIP row. */
-const claimExpenseUrl = (sourceType: string, sourceId: number, description: string) => {
+const claimExpenseUrl = (
+    sourceType: string,
+    sourceId: number,
+    description: string,
+) => {
     const params = new URLSearchParams({
         category: 'development',
         source_type: sourceType,
@@ -169,10 +297,14 @@ export default function PerformanceHub(props: Props) {
     const [tab, setTab] = useHrTab('reviews', { param: 'tab', syncUrl: true });
     const [search, setSearch] = useState('');
     const [sortKey, setSortKey] = useState('');
-    const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
+    const [density, setDensity] = useState<'comfortable' | 'compact'>(
+        'comfortable',
+    );
     const [statusFilter, setStatusFilter] = useState('all');
     const [selected, setSelected] = useState<number[]>([]);
-    const [compSub, setCompSub] = useState<'matrix' | 'competencies' | 'skills'>('matrix');
+    const [compSub, setCompSub] = useState<
+        'matrix' | 'competencies' | 'skills'
+    >('matrix');
     const [wizard, setWizard] = useState<WizardState | null>(null);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [defaultTab, setDefaultTab] = useState('reviews');
@@ -186,7 +318,9 @@ export default function PerformanceHub(props: Props) {
                 setDefaultTab(def);
                 if (!window.location.search.includes('tab=')) setTab(def);
             }
-            setPinned(JSON.parse(window.localStorage.getItem('perfhub:pins') || '[]'));
+            setPinned(
+                JSON.parse(window.localStorage.getItem('perfhub:pins') || '[]'),
+            );
         } catch {
             /* ignore */
         }
@@ -203,7 +337,6 @@ export default function PerformanceHub(props: Props) {
             { value: 'ad_hoc', label: 'Ad hoc' },
         ],
         competencyOptions: props.competencyOptions,
-        successionEmployees: props.successionEmployees,
     };
 
     const goTab = (next: string, status?: string) => {
@@ -223,6 +356,14 @@ export default function PerformanceHub(props: Props) {
         setWizard({ kind, context });
     };
 
+    const openSuccession = () => {
+        if (!can.manage) {
+            toast.error('You do not have permission to do that.');
+            return;
+        }
+        router.get('/hr/succession', { new: 1 });
+    };
+
     const post = (url: string, data: Record<string, unknown>, msg: string) => {
         router.post(url, data as Record<string, never>, {
             preserveScroll: true,
@@ -232,15 +373,24 @@ export default function PerformanceHub(props: Props) {
         });
     };
     const del = (url: string, msg: string) => {
-        router.delete(url, { preserveScroll: true, preserveState: true, onSuccess: () => toast.success(msg), onError: () => toast.error('Action failed.') });
-    };
-    const putStatus = (url: string, status: string, msg: string) => {
-        router.put(url, { status }, {
+        router.delete(url, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => toast.success(msg),
             onError: () => toast.error('Action failed.'),
         });
+    };
+    const putStatus = (url: string, status: string, msg: string) => {
+        router.put(
+            url,
+            { status },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => toast.success(msg),
+                onError: () => toast.error('Action failed.'),
+            },
+        );
     };
 
     // Hero handlers ------------------------------------------------------
@@ -264,8 +414,12 @@ export default function PerformanceHub(props: Props) {
                 e.preventDefault();
                 document.getElementById('ph-search')?.focus();
             } else if (e.key === 'n' && !wizard) {
-                const k = PRIMARY_NEW[tab];
-                if (k) openWiz(k);
+                if (tab === 'succession') {
+                    openSuccession();
+                } else {
+                    const k = PRIMARY_NEW[tab];
+                    if (k) openWiz(k);
+                }
             } else if (e.key === 'Escape') {
                 setCtx(null);
             }
@@ -276,16 +430,28 @@ export default function PerformanceHub(props: Props) {
     }, [tab, wizard]);
 
     /* ---- filtering ---- */
-    function filterRows<T extends { status: string }>(rows: T[], fields: (keyof T)[]): T[] {
+    function filterRows<T extends { status: string }>(
+        rows: T[],
+        fields: (keyof T)[],
+    ): T[] {
         const q = search.trim().toLowerCase();
         let out = rows.filter((r) => {
-            if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+            if (statusFilter !== 'all' && r.status !== statusFilter)
+                return false;
             if (!q) return true;
-            return fields.some((f) => String(r[f] ?? '').toLowerCase().includes(q));
+            return fields.some((f) =>
+                String(r[f] ?? '')
+                    .toLowerCase()
+                    .includes(q),
+            );
         });
         if (sortKey) {
             out = [...out].sort((a, b) =>
-                String(a[sortKey as keyof T]).localeCompare(String(b[sortKey as keyof T]), undefined, { numeric: true }),
+                String(a[sortKey as keyof T]).localeCompare(
+                    String(b[sortKey as keyof T]),
+                    undefined,
+                    { numeric: true },
+                ),
             );
         }
         return out;
@@ -293,17 +459,47 @@ export default function PerformanceHub(props: Props) {
 
     const currentRows = (): { id: number }[] => {
         switch (tab) {
-            case 'reviews': return filterRows(props.reviews, ['employee', 'type', 'status']);
-            case 'supervision': return filterRows(props.supervision.rows, ['employee', 'status']);
-            case 'goals': return filterRows(props.goals, ['title', 'owner', 'status']);
-            case 'development': return filterRows(props.development, ['employee', 'area', 'status']);
-            case 'feedback': return filterRows(props.feedback, ['subject', 'type', 'status']);
-            case 'pips': return filterRows(props.pips, ['employee', 'reason', 'status']);
-            default: return [];
+            case 'reviews':
+                return filterRows(props.reviews, [
+                    'employee',
+                    'type',
+                    'status',
+                ]);
+            case 'supervision':
+                return filterRows(props.supervision.rows, [
+                    'employee',
+                    'status',
+                ]);
+            case 'goals':
+                return filterRows(props.goals, ['title', 'owner', 'status']);
+            case 'development':
+                return filterRows(props.development, [
+                    'employee',
+                    'area',
+                    'status',
+                ]);
+            case 'feedback':
+                return filterRows(props.feedback, [
+                    'subject',
+                    'type',
+                    'status',
+                ]);
+            case 'pips':
+                return filterRows(props.pips, ['employee', 'reason', 'status']);
+            default:
+                return [];
         }
     };
 
-    const SERVER_EXPORT = new Set(['reviews', 'supervision', 'goals', 'development', 'feedback', 'pips', 'competencies']);
+    const SERVER_EXPORT = new Set([
+        'reviews',
+        'supervision',
+        'goals',
+        'development',
+        'feedback',
+        'pips',
+        'competencies',
+    ]);
     const exportPdf = () => {
         if (!SERVER_EXPORT.has(tab)) {
             toast.error('PDF export is not available for this tab.');
@@ -325,7 +521,16 @@ export default function PerformanceHub(props: Props) {
             return;
         }
         const keys = Object.keys(rows[0]).filter((k) => k !== 'ids');
-        const csv = [keys.join(','), ...rows.map((r) => keys.map((k) => JSON.stringify((r as Record<string, unknown>)[k] ?? '')).join(','))].join('\n');
+        const csv = [
+            keys.join(','),
+            ...rows.map((r) =>
+                keys
+                    .map((k) =>
+                        JSON.stringify((r as Record<string, unknown>)[k] ?? ''),
+                    )
+                    .join(','),
+            ),
+        ].join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -336,62 +541,243 @@ export default function PerformanceHub(props: Props) {
     };
 
     /* ---- context menus ---- */
-    const openRowCtx = (e: MouseEvent, tag: string, meta: string, items: ShiftCtxItem[]) => {
+    const openRowCtx = (
+        e: MouseEvent,
+        tag: string,
+        meta: string,
+        items: ShiftCtxItem[],
+    ) => {
         e.preventDefault();
         e.stopPropagation();
         setCtx({ x: e.clientX, y: e.clientY, tag, meta, items });
     };
 
-    const rowMenu = (kind: string, row: Record<string, unknown>): ShiftCtxItem[] => {
+    const rowMenu = (
+        kind: string,
+        row: Record<string, unknown>,
+    ): ShiftCtxItem[] => {
         const id = row.id as number;
-        const open = (url: string): ShiftCtxItem => ({ icon: <ArrowRight className="h-4 w-4" />, label: 'Open', onClick: () => router.visit(url) });
+        const open = (url: string): ShiftCtxItem => ({
+            icon: <ArrowRight className="h-4 w-4" />,
+            label: 'Open',
+            onClick: () => router.visit(url),
+        });
         switch (kind) {
             case 'reviews':
                 return [
                     open(`/hr/performance/reviews/${id}`),
-                    { icon: <Pencil className="h-4 w-4" />, label: 'Edit', onClick: () => router.visit(`/hr/performance/reviews/${id}`) },
-                    { icon: <Send className="h-4 w-4" />, label: 'Submit', onClick: () => post(`/hr/performance/reviews/${id}/submit`, {}, 'Review submitted') },
-                    { icon: <Check className="h-4 w-4" />, label: 'Sign off…', tone: 'primary', onClick: () => openWiz('signoff', { reviewId: id }) },
-                    { icon: <TrendingUp className="h-4 w-4" />, label: 'Start PIP from review', onClick: () => openWiz('pip', { reviewId: id }) },
+                    {
+                        icon: <Pencil className="h-4 w-4" />,
+                        label: 'Edit',
+                        onClick: () =>
+                            router.visit(`/hr/performance/reviews/${id}`),
+                    },
+                    {
+                        icon: <Send className="h-4 w-4" />,
+                        label: 'Submit',
+                        onClick: () =>
+                            post(
+                                `/hr/performance/reviews/${id}/submit`,
+                                {},
+                                'Review submitted',
+                            ),
+                    },
+                    {
+                        icon: <Check className="h-4 w-4" />,
+                        label: 'Sign off…',
+                        tone: 'primary',
+                        onClick: () => openWiz('signoff', { reviewId: id }),
+                    },
+                    {
+                        icon: <TrendingUp className="h-4 w-4" />,
+                        label: 'Start PIP from review',
+                        onClick: () => openWiz('pip', { reviewId: id }),
+                    },
                     { sep: true },
-                    { icon: <Check className="h-4 w-4" />, label: 'Acknowledge', onClick: () => post(`/hr/performance/reviews/${id}/acknowledge`, {}, 'Review acknowledged') },
+                    {
+                        icon: <Check className="h-4 w-4" />,
+                        label: 'Acknowledge',
+                        onClick: () =>
+                            post(
+                                `/hr/performance/reviews/${id}/acknowledge`,
+                                {},
+                                'Review acknowledged',
+                            ),
+                    },
                 ];
             case 'supervision':
                 return [
                     open(`/hr/performance/supervision/${id}`),
-                    { icon: <Check className="h-4 w-4" />, label: 'Acknowledge', onClick: () => post(`/hr/performance/supervision/${id}/acknowledge`, {}, 'Note acknowledged') },
-                    { icon: <UserCheck className="h-4 w-4" />, label: 'Schedule next', onClick: () => openWiz('supervision') },
+                    {
+                        icon: <Check className="h-4 w-4" />,
+                        label: 'Acknowledge',
+                        onClick: () =>
+                            post(
+                                `/hr/performance/supervision/${id}/acknowledge`,
+                                {},
+                                'Note acknowledged',
+                            ),
+                    },
+                    {
+                        icon: <UserCheck className="h-4 w-4" />,
+                        label: 'Schedule next',
+                        onClick: () => openWiz('supervision'),
+                    },
                 ];
             case 'goals':
                 return [
                     open(`/hr/goals/${id}`),
-                    { icon: <Pencil className="h-4 w-4" />, label: 'Edit', onClick: () => router.visit(`/hr/goals/${id}`) },
-                    { icon: <Check className="h-4 w-4" />, label: 'Activate', onClick: () => putStatus(`/hr/goals/${id}`, 'active', 'Goal activated') },
-                    { icon: <Check className="h-4 w-4" />, label: 'Complete', onClick: () => putStatus(`/hr/goals/${id}`, 'completed', 'Goal completed') },
+                    {
+                        icon: <Pencil className="h-4 w-4" />,
+                        label: 'Edit',
+                        onClick: () => router.visit(`/hr/goals/${id}`),
+                    },
+                    {
+                        icon: <Check className="h-4 w-4" />,
+                        label: 'Activate',
+                        onClick: () =>
+                            putStatus(
+                                `/hr/goals/${id}`,
+                                'active',
+                                'Goal activated',
+                            ),
+                    },
+                    {
+                        icon: <Check className="h-4 w-4" />,
+                        label: 'Complete',
+                        onClick: () =>
+                            putStatus(
+                                `/hr/goals/${id}`,
+                                'completed',
+                                'Goal completed',
+                            ),
+                    },
                     { sep: true },
-                    { icon: <XCircle className="h-4 w-4" />, label: 'Cancel', tone: 'critical', onClick: () => putStatus(`/hr/goals/${id}`, 'cancelled', 'Goal cancelled') },
+                    {
+                        icon: <XCircle className="h-4 w-4" />,
+                        label: 'Cancel',
+                        tone: 'critical',
+                        onClick: () =>
+                            putStatus(
+                                `/hr/goals/${id}`,
+                                'cancelled',
+                                'Goal cancelled',
+                            ),
+                    },
                 ];
             case 'development':
                 return [
-                    { icon: <ArrowRight className="h-4 w-4" />, label: 'Open development', onClick: () => router.visit('/hr/goals/development') },
-                    { icon: <Download className="h-4 w-4" />, label: 'Claim expense', onClick: () => router.visit(claimExpenseUrl('development_goal', id, String(row.area ?? ''))) },
+                    {
+                        icon: <ArrowRight className="h-4 w-4" />,
+                        label: 'Open development',
+                        onClick: () => router.visit('/hr/goals/development'),
+                    },
+                    {
+                        icon: <Download className="h-4 w-4" />,
+                        label: 'Claim expense',
+                        onClick: () =>
+                            router.visit(
+                                claimExpenseUrl(
+                                    'development_goal',
+                                    id,
+                                    String(row.area ?? ''),
+                                ),
+                            ),
+                    },
                 ];
             case 'feedback':
                 return [
-                    { icon: <MessageSquare className="h-4 w-4" />, label: 'View summary', onClick: () => router.visit(`/hr/feedback/summary/${row.subject_user_id}`) },
-                    { icon: <Bell className="h-4 w-4" />, label: 'Remind reviewers', onClick: () => (row.ids as number[]).forEach((rid) => post(`/hr/feedback/${rid}/remind`, {}, 'Reminder sent')) },
+                    {
+                        icon: <MessageSquare className="h-4 w-4" />,
+                        label: 'View summary',
+                        onClick: () =>
+                            router.visit(
+                                `/hr/feedback/summary/${row.subject_user_id}`,
+                            ),
+                    },
+                    {
+                        icon: <Bell className="h-4 w-4" />,
+                        label: 'Remind reviewers',
+                        onClick: () =>
+                            (row.ids as number[]).forEach((rid) =>
+                                post(
+                                    `/hr/feedback/${rid}/remind`,
+                                    {},
+                                    'Reminder sent',
+                                ),
+                            ),
+                    },
                     { sep: true },
-                    { icon: <XCircle className="h-4 w-4" />, label: 'Decline', tone: 'critical', onClick: () => (row.ids as number[]).forEach((rid) => post(`/hr/feedback/${rid}/decline`, {}, 'Request declined')) },
-                    { icon: <Trash2 className="h-4 w-4" />, label: 'Cancel cycle', tone: 'critical', onClick: () => (row.ids as number[]).forEach((rid) => post(`/hr/feedback/${rid}/cancel`, {}, 'Request cancelled')) },
+                    {
+                        icon: <XCircle className="h-4 w-4" />,
+                        label: 'Decline',
+                        tone: 'critical',
+                        onClick: () =>
+                            (row.ids as number[]).forEach((rid) =>
+                                post(
+                                    `/hr/feedback/${rid}/decline`,
+                                    {},
+                                    'Request declined',
+                                ),
+                            ),
+                    },
+                    {
+                        icon: <Trash2 className="h-4 w-4" />,
+                        label: 'Cancel cycle',
+                        tone: 'critical',
+                        onClick: () =>
+                            (row.ids as number[]).forEach((rid) =>
+                                post(
+                                    `/hr/feedback/${rid}/cancel`,
+                                    {},
+                                    'Request cancelled',
+                                ),
+                            ),
+                    },
                 ];
             case 'pips':
                 return [
                     open(`/hr/performance/pips/${id}`),
-                    { icon: <Pencil className="h-4 w-4" />, label: 'Open & edit', onClick: () => router.visit(`/hr/performance/pips/${id}`) },
-                    { icon: <Check className="h-4 w-4" />, label: 'Acknowledge', onClick: () => post(`/hr/performance/pips/${id}/acknowledge`, {}, 'Plan acknowledged') },
-                    { icon: <Download className="h-4 w-4" />, label: 'Claim expense', onClick: () => router.visit(claimExpenseUrl('pip', id, String(row.reason ?? ''))) },
+                    {
+                        icon: <Pencil className="h-4 w-4" />,
+                        label: 'Open & edit',
+                        onClick: () =>
+                            router.visit(`/hr/performance/pips/${id}`),
+                    },
+                    {
+                        icon: <Check className="h-4 w-4" />,
+                        label: 'Acknowledge',
+                        onClick: () =>
+                            post(
+                                `/hr/performance/pips/${id}/acknowledge`,
+                                {},
+                                'Plan acknowledged',
+                            ),
+                    },
+                    {
+                        icon: <Download className="h-4 w-4" />,
+                        label: 'Claim expense',
+                        onClick: () =>
+                            router.visit(
+                                claimExpenseUrl(
+                                    'pip',
+                                    id,
+                                    String(row.reason ?? ''),
+                                ),
+                            ),
+                    },
                     { sep: true },
-                    { icon: <XCircle className="h-4 w-4" />, label: 'Cancel', tone: 'critical', onClick: () => post(`/hr/performance/pips/${id}/cancel`, {}, 'Plan cancelled') },
+                    {
+                        icon: <XCircle className="h-4 w-4" />,
+                        label: 'Cancel',
+                        tone: 'critical',
+                        onClick: () =>
+                            post(
+                                `/hr/performance/pips/${id}/cancel`,
+                                {},
+                                'Plan cancelled',
+                            ),
+                    },
                 ];
             default:
                 return [open('#')];
@@ -399,13 +785,21 @@ export default function PerformanceHub(props: Props) {
     };
 
     const tabMenu = (id: string): ShiftCtxItem[] => [
-        { icon: <ArrowRight className="h-4 w-4" />, label: 'Open', onClick: () => goTab(id) },
+        {
+            icon: <ArrowRight className="h-4 w-4" />,
+            label: 'Open',
+            onClick: () => goTab(id),
+        },
         {
             icon: <Star className="h-4 w-4" />,
             label: defaultTab === id ? 'Default view ✓' : 'Set as default view',
             onClick: () => {
                 setDefaultTab(id);
-                try { window.localStorage.setItem('perfhub:def', id); } catch { /* ignore */ }
+                try {
+                    window.localStorage.setItem('perfhub:def', id);
+                } catch {
+                    /* ignore */
+                }
                 toast.success('Default view set');
             },
         },
@@ -413,9 +807,18 @@ export default function PerformanceHub(props: Props) {
             icon: <Pin className="h-4 w-4" />,
             label: pinned.includes(id) ? 'Unpin tab' : 'Pin tab',
             onClick: () => {
-                const next = pinned.includes(id) ? pinned.filter((x) => x !== id) : [...pinned, id];
+                const next = pinned.includes(id)
+                    ? pinned.filter((x) => x !== id)
+                    : [...pinned, id];
                 setPinned(next);
-                try { window.localStorage.setItem('perfhub:pins', JSON.stringify(next)); } catch { /* ignore */ }
+                try {
+                    window.localStorage.setItem(
+                        'perfhub:pins',
+                        JSON.stringify(next),
+                    );
+                } catch {
+                    /* ignore */
+                }
             },
         },
     ];
@@ -424,11 +827,21 @@ export default function PerformanceHub(props: Props) {
     const subtitle = `People & Culture · ${props.staff.length} staff`;
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'HR', href: '/hr' }, { title: 'Performance', href: '/hr/performance' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'HR', href: '/hr' },
+                { title: 'Performance', href: '/hr/performance' },
+            ]}
+        >
             <Head title="Performance & Development" />
             <PageShell>
                 <div className="flex flex-col gap-5">
-                    <PerformanceHero hero={props.hero} subtitle={subtitle} canManage={can.manage} handlers={heroHandlers} />
+                    <PerformanceHero
+                        hero={props.hero}
+                        subtitle={subtitle}
+                        canManage={can.manage}
+                        handlers={heroHandlers}
+                    />
 
                     <HrTabs
                         value={tab}
@@ -436,20 +849,39 @@ export default function PerformanceHub(props: Props) {
                         items={TAB_ITEMS}
                         onItemContextMenu={(id, e) => {
                             const t = TAB_ITEMS.find((x) => x.id === id);
-                            openRowCtx(e, t?.label ?? 'Tab', 'Tab options', tabMenu(id));
+                            openRowCtx(
+                                e,
+                                t?.label ?? 'Tab',
+                                'Tab options',
+                                tabMenu(id),
+                            );
                         }}
                         decorations={Object.fromEntries(
-                            TAB_ITEMS.filter((t) => pinned.includes(t.id) || defaultTab === t.id).map((t) => [
+                            TAB_ITEMS.filter(
+                                (t) =>
+                                    pinned.includes(t.id) ||
+                                    defaultTab === t.id,
+                            ).map((t) => [
                                 t.id,
-                                <span key={t.id} className="inline-flex items-center gap-0.5">
-                                    {pinned.includes(t.id) ? <Pin className="h-3 w-3" /> : null}
-                                    {defaultTab === t.id ? <Star className="h-3 w-3 text-amber-500" /> : null}
+                                <span
+                                    key={t.id}
+                                    className="inline-flex items-center gap-0.5"
+                                >
+                                    {pinned.includes(t.id) ? (
+                                        <Pin className="h-3 w-3" />
+                                    ) : null}
+                                    {defaultTab === t.id ? (
+                                        <Star className="h-3 w-3 text-amber-500" />
+                                    ) : null}
                                 </span>,
                             ]),
                         )}
                     />
 
-                    <div key={tab} className="motion-safe:animate-in motion-safe:fade-in-0">
+                    <div
+                        key={tab}
+                        className="motion-safe:animate-in motion-safe:fade-in-0"
+                    >
                         <Body
                             tab={tab}
                             props={props}
@@ -468,6 +900,7 @@ export default function PerformanceHub(props: Props) {
                             canManage={can.manage}
                             filterRows={filterRows}
                             openWiz={openWiz}
+                            openSuccession={openSuccession}
                             openRowCtx={openRowCtx}
                             rowMenu={rowMenu}
                             exportCsv={exportCsv}
@@ -480,8 +913,16 @@ export default function PerformanceHub(props: Props) {
                 </div>
             </PageShell>
 
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
-            {wizard ? <PerformanceWizards state={wizard} support={support} onClose={() => setWizard(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
+            {wizard ? (
+                <PerformanceWizards
+                    state={wizard}
+                    support={support}
+                    onClose={() => setWizard(null)}
+                />
+            ) : null}
         </AppLayout>
     );
 }
@@ -506,9 +947,18 @@ type BodyProps = {
     selected: number[];
     setSelected: (s: number[]) => void;
     canManage: boolean;
-    filterRows: <T extends { status: string }>(rows: T[], fields: (keyof T)[]) => T[];
+    filterRows: <T extends { status: string }>(
+        rows: T[],
+        fields: (keyof T)[],
+    ) => T[];
     openWiz: (k: WizardKind, ctx?: WizardState['context']) => void;
-    openRowCtx: (e: MouseEvent, tag: string, meta: string, items: ShiftCtxItem[]) => void;
+    openSuccession: () => void;
+    openRowCtx: (
+        e: MouseEvent,
+        tag: string,
+        meta: string,
+        items: ShiftCtxItem[],
+    ) => void;
     rowMenu: (kind: string, row: Record<string, unknown>) => ShiftCtxItem[];
     exportCsv: () => void;
     exportPdf: () => void;
@@ -525,14 +975,46 @@ function Body(b: BodyProps) {
     if (tab === 'succession') return <SuccessionBody {...b} />;
 
     // Generic table tabs ------------------------------------------------
-    const configs: Record<string, { title: string; sub: string; newKey: WizardKind; newLabel: string; placeholder: string; statuses: string[]; sort: [string, string][]; cols: Col[]; rows: Record<string, unknown>[] }> = {
+    const configs: Record<
+        string,
+        {
+            title: string;
+            sub: string;
+            newKey: WizardKind;
+            newLabel: string;
+            placeholder: string;
+            statuses: string[];
+            sort: [string, string][];
+            cols: Col[];
+            rows: Record<string, unknown>[];
+        }
+    > = {
         reviews: {
-            title: 'Reviews', sub: 'Performance reviews across all sites — submit, sign off and lock.',
-            newKey: 'review', newLabel: 'New review', placeholder: 'Search reviews…',
-            statuses: ['draft', 'pending', 'in_progress', 'completed', 'signed_off', 'overdue'],
-            sort: [['employee', 'Employee'], ['type', 'Type'], ['status', 'Status']],
+            title: 'Reviews',
+            sub: 'Performance reviews across all sites — submit, sign off and lock.',
+            newKey: 'review',
+            newLabel: 'New review',
+            placeholder: 'Search reviews…',
+            statuses: [
+                'draft',
+                'pending',
+                'in_progress',
+                'completed',
+                'signed_off',
+                'overdue',
+            ],
+            sort: [
+                ['employee', 'Employee'],
+                ['type', 'Type'],
+                ['status', 'Status'],
+            ],
             cols: [
-                { key: 'employee', label: 'Employee', kind: 'person', sub: 'role' },
+                {
+                    key: 'employee',
+                    label: 'Employee',
+                    kind: 'person',
+                    sub: 'role',
+                },
                 { key: 'type', label: 'Type', kind: 'strong' },
                 { key: 'period', label: 'Period', kind: 'muted' },
                 { key: 'rating', label: 'Rating', kind: 'rating' },
@@ -541,10 +1023,17 @@ function Body(b: BodyProps) {
             rows: b.filterRows(props.reviews, ['employee', 'type', 'status']),
         },
         goals: {
-            title: 'Goals & OKRs', sub: 'Objectives & key results with check-in history and cascade.',
-            newKey: 'goal', newLabel: 'New goal', placeholder: 'Search goals & OKRs…',
+            title: 'Goals & OKRs',
+            sub: 'Objectives & key results with check-in history and cascade.',
+            newKey: 'goal',
+            newLabel: 'New goal',
+            placeholder: 'Search goals & OKRs…',
             statuses: ['on_track', 'at_risk', 'completed', 'draft'],
-            sort: [['title', 'Objective'], ['progress', 'Progress'], ['status', 'Status']],
+            sort: [
+                ['title', 'Objective'],
+                ['progress', 'Progress'],
+                ['status', 'Status'],
+            ],
             cols: [
                 { key: 'title', label: 'Objective', kind: 'title' },
                 { key: 'type', label: 'Type', kind: 'muted' },
@@ -555,26 +1044,52 @@ function Body(b: BodyProps) {
             rows: b.filterRows(props.goals, ['title', 'owner', 'status']),
         },
         development: {
-            title: 'Development', sub: 'Individual growth plans linked to competencies and courses.',
-            newKey: 'development', newLabel: 'New dev goal', placeholder: 'Search development goals…',
+            title: 'Development',
+            sub: 'Individual growth plans linked to competencies and courses.',
+            newKey: 'development',
+            newLabel: 'New dev goal',
+            placeholder: 'Search development goals…',
             statuses: ['active', 'at_risk', 'completed'],
-            sort: [['employee', 'Employee'], ['progress', 'Progress']],
+            sort: [
+                ['employee', 'Employee'],
+                ['progress', 'Progress'],
+            ],
             cols: [
-                { key: 'employee', label: 'Employee', kind: 'person', sub: 'role' },
+                {
+                    key: 'employee',
+                    label: 'Employee',
+                    kind: 'person',
+                    sub: 'role',
+                },
                 { key: 'area', label: 'Focus area', kind: 'strong' },
                 { key: 'level', label: 'Level', kind: 'level' },
                 { key: 'progress', label: 'Progress', kind: 'progress' },
                 { key: 'status', label: 'Status', kind: 'badge' },
             ],
-            rows: b.filterRows(props.development, ['employee', 'area', 'status']),
+            rows: b.filterRows(props.development, [
+                'employee',
+                'area',
+                'status',
+            ]),
         },
         feedback: {
-            title: '360 Feedback', sub: '360-degree feedback cycles — request, remind, decline, summarise.',
-            newKey: 'feedback', newLabel: 'Request 360', placeholder: 'Search 360 requests…',
+            title: '360 Feedback',
+            sub: '360-degree feedback cycles — request, remind, decline, summarise.',
+            newKey: 'feedback',
+            newLabel: 'Request 360',
+            placeholder: 'Search 360 requests…',
             statuses: ['in_progress', 'completed', 'declined', 'expired'],
-            sort: [['subject', 'Subject'], ['status', 'Status']],
+            sort: [
+                ['subject', 'Subject'],
+                ['status', 'Status'],
+            ],
             cols: [
-                { key: 'subject', label: 'Subject', kind: 'person', sub: 'role' },
+                {
+                    key: 'subject',
+                    label: 'Subject',
+                    kind: 'person',
+                    sub: 'role',
+                },
                 { key: 'type', label: 'Type', kind: 'strong' },
                 { key: 'reviewers', label: 'Responses', kind: 'reviewers' },
                 { key: 'due', label: 'Due', kind: 'muted' },
@@ -583,12 +1098,23 @@ function Body(b: BodyProps) {
             rows: b.filterRows(props.feedback, ['subject', 'type', 'status']),
         },
         pips: {
-            title: 'PIPs', sub: 'Performance improvement plans with milestones and outcomes.',
-            newKey: 'pip', newLabel: 'Start PIP', placeholder: 'Search PIPs…',
+            title: 'PIPs',
+            sub: 'Performance improvement plans with milestones and outcomes.',
+            newKey: 'pip',
+            newLabel: 'Start PIP',
+            placeholder: 'Search PIPs…',
             statuses: ['active', 'monitoring', 'completed', 'cancelled'],
-            sort: [['employee', 'Employee'], ['status', 'Status']],
+            sort: [
+                ['employee', 'Employee'],
+                ['status', 'Status'],
+            ],
             cols: [
-                { key: 'employee', label: 'Employee', kind: 'person', sub: 'role' },
+                {
+                    key: 'employee',
+                    label: 'Employee',
+                    kind: 'person',
+                    sub: 'role',
+                },
                 { key: 'reason', label: 'Reason', kind: 'strong' },
                 { key: 'milestones', label: 'Milestones', kind: 'muted' },
                 { key: 'progress', label: 'Progress', kind: 'progress' },
@@ -605,7 +1131,14 @@ function Body(b: BodyProps) {
     return (
         <div>
             <SectionHead title={cfg.title} sub={cfg.sub} />
-            <CommandBar b={b} placeholder={cfg.placeholder} statuses={cfg.statuses} sort={cfg.sort} newKey={cfg.newKey} newLabel={cfg.newLabel} />
+            <CommandBar
+                b={b}
+                placeholder={cfg.placeholder}
+                statuses={cfg.statuses}
+                sort={cfg.sort}
+                newKey={cfg.newKey}
+                newLabel={cfg.newLabel}
+            />
             <DataTable b={b} kind={tab} cols={cfg.cols} rows={cfg.rows} />
         </div>
     );
@@ -615,12 +1148,24 @@ function Body(b: BodyProps) {
 /*  Shared pieces                                                      */
 /* ------------------------------------------------------------------ */
 
-function SectionHead({ title, sub, right }: { title: string; sub?: string; right?: ReactNode }) {
+function SectionHead({
+    title,
+    sub,
+    right,
+}: {
+    title: string;
+    sub?: string;
+    right?: ReactNode;
+}) {
     return (
         <div className="mb-3.5 flex items-end justify-between gap-3">
             <div>
                 <h2 className="text-lg font-bold tracking-tight">{title}</h2>
-                {sub ? <p className="mt-0.5 text-[13px] text-muted-foreground">{sub}</p> : null}
+                {sub ? (
+                    <p className="mt-0.5 text-[13px] text-muted-foreground">
+                        {sub}
+                    </p>
+                ) : null}
             </div>
             {right}
         </div>
@@ -647,13 +1192,13 @@ function CommandBar({
         <div className="mb-3.5 flex flex-col gap-2.5">
             <div className="flex flex-wrap items-center gap-2.5">
                 <div className="relative max-w-[380px] flex-1 basis-[260px]">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-muted-foreground" />
+                    <Search className="pointer-events-none absolute top-1/2 left-3 h-[15px] w-[15px] -translate-y-1/2 text-muted-foreground" />
                     <input
                         id="ph-search"
                         value={b.search}
                         placeholder={placeholder}
                         onChange={(e) => b.setSearch(e.target.value)}
-                        className="w-full rounded-[10px] border border-border bg-card py-2 pl-9 pr-3 text-[13px] outline-none focus:border-ring"
+                        className="w-full rounded-[10px] border border-border bg-card py-2 pr-3 pl-9 text-[13px] outline-none focus:border-ring"
                     />
                 </div>
                 <select
@@ -672,10 +1217,18 @@ function CommandBar({
                 <button
                     type="button"
                     title="Toggle density"
-                    onClick={() => b.setDensity(b.density === 'comfortable' ? 'compact' : 'comfortable')}
+                    onClick={() =>
+                        b.setDensity(
+                            b.density === 'comfortable'
+                                ? 'compact'
+                                : 'comfortable',
+                        )
+                    }
                     className={cn(
                         'grid h-9 w-9 place-items-center rounded-[10px] border border-border bg-card',
-                        b.density === 'compact' ? 'text-primary' : 'text-muted-foreground',
+                        b.density === 'compact'
+                            ? 'text-primary'
+                            : 'text-muted-foreground',
                     )}
                 >
                     <Rows3 className="h-[15px] w-[15px]" />
@@ -732,10 +1285,24 @@ function CommandBar({
 
             {b.selected.length ? (
                 <div className="flex items-center gap-3 rounded-[10px] border border-primary/30 bg-primary/[0.08] px-3 py-2 motion-safe:animate-in motion-safe:fade-in-0">
-                    <span className="text-[13px] font-bold text-primary">{b.selected.length} selected</span>
+                    <span className="text-[13px] font-bold text-primary">
+                        {b.selected.length} selected
+                    </span>
                     <BulkActions b={b} />
-                    <button type="button" onClick={b.exportCsv} className="text-[13px] font-semibold text-primary">Export</button>
-                    <button type="button" onClick={() => b.setSelected([])} className="ml-auto text-[13px] font-semibold text-muted-foreground">Clear</button>
+                    <button
+                        type="button"
+                        onClick={b.exportCsv}
+                        className="text-[13px] font-semibold text-primary"
+                    >
+                        Export
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => b.setSelected([])}
+                        className="ml-auto text-[13px] font-semibold text-muted-foreground"
+                    >
+                        Clear
+                    </button>
                 </div>
             ) : null}
         </div>
@@ -749,15 +1316,25 @@ function BulkActions({ b }: { b: BodyProps }) {
     const link = 'text-[13px] font-semibold text-primary';
 
     if (b.tab === 'reviews') {
-        const targets = b.props.reviews.filter((r) => sel.has(r.id) && ['draft', 'in_progress'].includes(r.status));
+        const targets = b.props.reviews.filter(
+            (r) => sel.has(r.id) && ['draft', 'in_progress'].includes(r.status),
+        );
         if (!targets.length) return null;
         return (
             <button
                 type="button"
                 className={link}
                 onClick={() => {
-                    targets.forEach((r) => b.post(`/hr/performance/reviews/${r.id}/submit`, {}, 'Submitted'));
-                    toast.success(`Submitting ${targets.length} ${targets.length === 1 ? 'review' : 'reviews'}…`);
+                    targets.forEach((r) =>
+                        b.post(
+                            `/hr/performance/reviews/${r.id}/submit`,
+                            {},
+                            'Submitted',
+                        ),
+                    );
+                    toast.success(
+                        `Submitting ${targets.length} ${targets.length === 1 ? 'review' : 'reviews'}…`,
+                    );
                     b.setSelected([]);
                 }}
             >
@@ -767,15 +1344,27 @@ function BulkActions({ b }: { b: BodyProps }) {
     }
 
     if (b.tab === 'feedback') {
-        const targets = b.props.feedback.filter((r) => sel.has(r.id) && r.status === 'in_progress');
+        const targets = b.props.feedback.filter(
+            (r) => sel.has(r.id) && r.status === 'in_progress',
+        );
         if (!targets.length) return null;
         return (
             <button
                 type="button"
                 className={link}
                 onClick={() => {
-                    targets.forEach((row) => row.ids.forEach((rid) => b.post(`/hr/feedback/${rid}/remind`, {}, 'Reminder sent')));
-                    toast.success(`Reminding reviewers on ${targets.length} ${targets.length === 1 ? 'cycle' : 'cycles'}…`);
+                    targets.forEach((row) =>
+                        row.ids.forEach((rid) =>
+                            b.post(
+                                `/hr/feedback/${rid}/remind`,
+                                {},
+                                'Reminder sent',
+                            ),
+                        ),
+                    );
+                    toast.success(
+                        `Reminding reviewers on ${targets.length} ${targets.length === 1 ? 'cycle' : 'cycles'}…`,
+                    );
                     b.setSelected([]);
                 }}
             >
@@ -785,15 +1374,26 @@ function BulkActions({ b }: { b: BodyProps }) {
     }
 
     if (b.tab === 'goals') {
-        const targets = b.props.goals.filter((r) => sel.has(r.id) && !['completed', 'cancelled'].includes(r.status));
+        const targets = b.props.goals.filter(
+            (r) =>
+                sel.has(r.id) && !['completed', 'cancelled'].includes(r.status),
+        );
         if (!targets.length) return null;
         return (
             <button
                 type="button"
                 className={link}
                 onClick={() => {
-                    targets.forEach((r) => b.putStatus(`/hr/goals/${r.id}`, 'completed', 'Completed'));
-                    toast.success(`Completing ${targets.length} ${targets.length === 1 ? 'goal' : 'goals'}…`);
+                    targets.forEach((r) =>
+                        b.putStatus(
+                            `/hr/goals/${r.id}`,
+                            'completed',
+                            'Completed',
+                        ),
+                    );
+                    toast.success(
+                        `Completing ${targets.length} ${targets.length === 1 ? 'goal' : 'goals'}…`,
+                    );
                     b.setSelected([]);
                 }}
             >
@@ -806,30 +1406,79 @@ function BulkActions({ b }: { b: BodyProps }) {
     return null;
 }
 
-type Col = { key: string; label: string; kind: 'person' | 'badge' | 'rating' | 'progress' | 'level' | 'reviewers' | 'muted' | 'strong' | 'title'; sub?: string; align?: 'left' | 'right' };
+type Col = {
+    key: string;
+    label: string;
+    kind:
+        | 'person'
+        | 'badge'
+        | 'rating'
+        | 'progress'
+        | 'level'
+        | 'reviewers'
+        | 'muted'
+        | 'strong'
+        | 'title';
+    sub?: string;
+    align?: 'left' | 'right';
+};
 
-function DataTable({ b, kind, cols, rows }: { b: BodyProps; kind: string; cols: Col[]; rows: Record<string, unknown>[] }) {
+function DataTable({
+    b,
+    kind,
+    cols,
+    rows,
+}: {
+    b: BodyProps;
+    kind: string;
+    cols: Col[];
+    rows: Record<string, unknown>[];
+}) {
     const compact = b.density === 'compact';
     const pad = compact ? 'px-3.5 py-2' : 'px-3.5 py-3';
-    if (!rows.length) return <EmptyState onClear={() => { b.setSearch(''); b.setStatusFilter('all'); }} />;
+    if (!rows.length)
+        return (
+            <EmptyState
+                onClear={() => {
+                    b.setSearch('');
+                    b.setStatusFilter('all');
+                }}
+            />
+        );
 
     const allChecked = b.selected.length === rows.length && rows.length > 0;
 
     return (
         <div className="overflow-hidden rounded-[14px] border border-border bg-card shadow-sm">
-            <table className="w-full border-collapse" style={{ fontSize: compact ? 12.5 : 13 }}>
+            <table
+                className="w-full border-collapse"
+                style={{ fontSize: compact ? 12.5 : 13 }}
+            >
                 <thead>
                     <tr className="border-b border-border bg-muted/40">
                         <th className={cn('w-10', pad)}>
                             <input
                                 type="checkbox"
                                 checked={allChecked}
-                                onChange={(e) => b.setSelected(e.target.checked ? rows.map((r) => r.id as number) : [])}
+                                onChange={(e) =>
+                                    b.setSelected(
+                                        e.target.checked
+                                            ? rows.map((r) => r.id as number)
+                                            : [],
+                                    )
+                                }
                                 className="h-3.5 w-3.5 accent-[var(--primary)]"
                             />
                         </th>
                         {cols.map((c) => (
-                            <th key={c.key} className={cn('text-left text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground', pad, c.align === 'right' && 'text-right')}>
+                            <th
+                                key={c.key}
+                                className={cn(
+                                    'text-left text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase',
+                                    pad,
+                                    c.align === 'right' && 'text-right',
+                                )}
+                            >
                                 {c.label}
                             </th>
                         ))}
@@ -839,27 +1488,70 @@ function DataTable({ b, kind, cols, rows }: { b: BodyProps; kind: string; cols: 
                 <tbody>
                     {rows.map((r, ri) => {
                         const checked = b.selected.includes(r.id as number);
-                        const tagName = String(r.employee ?? r.subject ?? r.title ?? 'Item');
+                        const tagName = String(
+                            r.employee ?? r.subject ?? r.title ?? 'Item',
+                        );
                         return (
                             <tr
                                 key={r.id as number}
-                                onContextMenu={(e) => b.openRowCtx(e, kind, tagName, b.rowMenu(kind, r))}
-                                className={cn('cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-muted/50', checked && 'bg-primary/[0.05]')}
+                                onContextMenu={(e) =>
+                                    b.openRowCtx(
+                                        e,
+                                        kind,
+                                        tagName,
+                                        b.rowMenu(kind, r),
+                                    )
+                                }
+                                className={cn(
+                                    'cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-muted/50',
+                                    checked && 'bg-primary/[0.05]',
+                                )}
                             >
-                                <td className={pad} onClick={(e) => e.stopPropagation()}>
+                                <td
+                                    className={pad}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     <input
                                         type="checkbox"
                                         checked={checked}
-                                        onChange={(e) => b.setSelected(e.target.checked ? [...b.selected, r.id as number] : b.selected.filter((x) => x !== r.id))}
+                                        onChange={(e) =>
+                                            b.setSelected(
+                                                e.target.checked
+                                                    ? [
+                                                          ...b.selected,
+                                                          r.id as number,
+                                                      ]
+                                                    : b.selected.filter(
+                                                          (x) => x !== r.id,
+                                                      ),
+                                            )
+                                        }
                                         className="h-3.5 w-3.5 accent-[var(--primary)]"
                                     />
                                 </td>
                                 {cols.map((c) => (
-                                    <td key={c.key} className={cn(pad, c.align === 'right' && 'text-right')}>
+                                    <td
+                                        key={c.key}
+                                        className={cn(
+                                            pad,
+                                            c.align === 'right' && 'text-right',
+                                        )}
+                                    >
                                         <Cell col={c} row={r} />
                                     </td>
                                 ))}
-                                <td className={cn(pad, 'text-right')} onClick={(e) => { e.stopPropagation(); b.openRowCtx(e, kind, tagName, b.rowMenu(kind, r)); }}>
+                                <td
+                                    className={cn(pad, 'text-right')}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        b.openRowCtx(
+                                            e,
+                                            kind,
+                                            tagName,
+                                            b.rowMenu(kind, r),
+                                        );
+                                    }}
+                                >
                                     <MoreVertical className="inline h-4 w-4 text-muted-foreground" />
                                 </td>
                             </tr>
@@ -882,12 +1574,23 @@ function Cell({ col, row }: { col: Col; row: Record<string, unknown> }) {
                 </span>
                 <div className="min-w-0">
                     <div className="font-semibold text-foreground">{name}</div>
-                    {col.sub ? <div className="text-[11.5px] text-muted-foreground">{String(row[col.sub] ?? '')}</div> : null}
+                    {col.sub ? (
+                        <div className="text-[11.5px] text-muted-foreground">
+                            {String(row[col.sub] ?? '')}
+                        </div>
+                    ) : null}
                 </div>
             </div>
         );
     }
-    if (col.kind === 'badge') return <StatusBadge variant={variantOf(String(v))} label={pretty(String(v))} size="sm" />;
+    if (col.kind === 'badge')
+        return (
+            <StatusBadge
+                variant={variantOf(String(v))}
+                label={pretty(String(v))}
+                size="sm"
+            />
+        );
     if (col.kind === 'rating')
         return v == null ? (
             <span className="text-muted-foreground">—</span>
@@ -895,7 +1598,9 @@ function Cell({ col, row }: { col: Col; row: Record<string, unknown> }) {
             <span className="inline-flex items-center gap-1 font-bold">
                 <Star className="h-3.5 w-3.5 text-amber-500" />
                 {Number(v).toFixed(1)}
-                <span className="text-[11px] font-medium text-muted-foreground">/5</span>
+                <span className="text-[11px] font-medium text-muted-foreground">
+                    /5
+                </span>
             </span>
         );
     if (col.kind === 'progress') {
@@ -904,26 +1609,40 @@ function Cell({ col, row }: { col: Col; row: Record<string, unknown> }) {
             <div className="flex min-w-[130px] items-center gap-2.5">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                     <div
-                        className={cn('h-full rounded-full', p >= 100 ? 'bg-status-success' : p < 35 ? 'bg-status-warning' : 'bg-primary')}
+                        className={cn(
+                            'h-full rounded-full',
+                            p >= 100
+                                ? 'bg-status-success'
+                                : p < 35
+                                  ? 'bg-status-warning'
+                                  : 'bg-primary',
+                        )}
                         style={{ width: `${p}%` }}
                     />
                 </div>
-                <span className="w-8 text-right text-[11.5px] font-bold text-muted-foreground">{p}%</span>
+                <span className="w-8 text-right text-[11.5px] font-bold text-muted-foreground">
+                    {p}%
+                </span>
             </div>
         );
     }
     if (col.kind === 'level')
         return (
             <span className="inline-flex items-center gap-1.5 font-semibold">
-                L{String(row.cur)} <ArrowRight className="h-3 w-3" /> <span className="text-primary">L{String(row.tgt)}</span>
+                L{String(row.cur)} <ArrowRight className="h-3 w-3" />{' '}
+                <span className="text-primary">L{String(row.tgt)}</span>
             </span>
         );
     if (col.kind === 'reviewers')
         return (
             <span className="inline-flex items-center gap-1.5">
                 <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-semibold">{String(row.responded)} / {String(row.reviewers)}</span>
-                <span className="text-[11px] text-muted-foreground">responded</span>
+                <span className="font-semibold">
+                    {String(row.responded)} / {String(row.reviewers)}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                    responded
+                </span>
             </span>
         );
     if (col.kind === 'title')
@@ -936,8 +1655,14 @@ function Cell({ col, row }: { col: Col; row: Record<string, unknown> }) {
                 </div>
             </div>
         );
-    if (col.kind === 'muted') return <span className="text-muted-foreground">{v ? String(v) : '—'}</span>;
-    if (col.kind === 'strong') return <span className="font-semibold text-foreground">{String(v)}</span>;
+    if (col.kind === 'muted')
+        return (
+            <span className="text-muted-foreground">{v ? String(v) : '—'}</span>
+        );
+    if (col.kind === 'strong')
+        return (
+            <span className="font-semibold text-foreground">{String(v)}</span>
+        );
     return <span>{v == null ? '—' : String(v)}</span>;
 }
 
@@ -947,9 +1672,17 @@ function EmptyState({ onClear }: { onClear: () => void }) {
             <div className="mx-auto mb-3.5 grid h-12 w-12 place-items-center rounded-[14px] bg-muted text-muted-foreground">
                 <Search className="h-6 w-6" />
             </div>
-            <div className="text-[15px] font-bold">Nothing matches your filters</div>
-            <p className="mt-1 text-[13px] text-muted-foreground">Try clearing the search or status filter.</p>
-            <button type="button" onClick={onClear} className="mt-4 rounded-[10px] border border-border bg-card px-3 py-2 text-[13px] font-semibold">
+            <div className="text-[15px] font-bold">
+                Nothing matches your filters
+            </div>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+                Try clearing the search or status filter.
+            </p>
+            <button
+                type="button"
+                onClick={onClear}
+                className="mt-4 rounded-[10px] border border-border bg-card px-3 py-2 text-[13px] font-semibold"
+            >
                 Clear filters
             </button>
         </div>
@@ -965,22 +1698,36 @@ function SupervisionBody(b: BodyProps) {
     const max = Math.max(1, ...s.spark);
     return (
         <div>
-            <SectionHead title="Supervision" sub="1:1 supervision cadence, acknowledgements and trends." />
+            <SectionHead
+                title="Supervision"
+                sub="1:1 supervision cadence, acknowledgements and trends."
+            />
             <div className="mb-4 grid grid-cols-1 gap-3.5 md:grid-cols-3">
                 <MiniCard>
                     <div className="flex items-start justify-between">
                         <div>
-                            <div className="text-xs font-semibold text-muted-foreground">Sessions logged</div>
-                            <div className="text-[11px] text-muted-foreground/80">this quarter</div>
+                            <div className="text-xs font-semibold text-muted-foreground">
+                                Sessions logged
+                            </div>
+                            <div className="text-[11px] text-muted-foreground/80">
+                                this quarter
+                            </div>
                         </div>
                     </div>
                     <div className="mt-2.5 flex items-end gap-3">
-                        <div className="text-3xl font-bold leading-none tracking-tight">{s.sessions_quarter}</div>
+                        <div className="text-3xl leading-none font-bold tracking-tight">
+                            {s.sessions_quarter}
+                        </div>
                         <div className="flex h-10 flex-1 items-end gap-0.5">
                             {s.spark.map((d, i) => (
                                 <div
                                     key={i}
-                                    className={cn('flex-1 rounded-sm', i === s.spark.length - 1 ? 'bg-primary' : 'bg-primary/30')}
+                                    className={cn(
+                                        'flex-1 rounded-sm',
+                                        i === s.spark.length - 1
+                                            ? 'bg-primary'
+                                            : 'bg-primary/30',
+                                    )}
                                     style={{ height: `${(d / max) * 100}%` }}
                                 />
                             ))}
@@ -988,23 +1735,50 @@ function SupervisionBody(b: BodyProps) {
                     </div>
                 </MiniCard>
                 <MiniCard>
-                    <div className="text-xs font-semibold text-muted-foreground">1:1 acknowledgement SLA</div>
+                    <div className="text-xs font-semibold text-muted-foreground">
+                        1:1 acknowledgement SLA
+                    </div>
                     <div className="mt-2 flex items-center gap-3.5">
                         <Gauge45 pct={s.sla_pct} />
-                        <div className="text-xs text-muted-foreground">target 95%</div>
+                        <div className="text-xs text-muted-foreground">
+                            target 95%
+                        </div>
                     </div>
                 </MiniCard>
                 <MiniCard>
-                    <div className="text-xs font-semibold text-muted-foreground">Overdue 1:1s</div>
-                    <div className={cn('mt-2 text-3xl font-bold tracking-tight', s.overdue_count > 0 ? 'text-status-warning' : 'text-foreground')}>{s.overdue_count}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{s.due_soon_count} due in 7 days</div>
+                    <div className="text-xs font-semibold text-muted-foreground">
+                        Overdue 1:1s
+                    </div>
+                    <div
+                        className={cn(
+                            'mt-2 text-3xl font-bold tracking-tight',
+                            s.overdue_count > 0
+                                ? 'text-status-warning'
+                                : 'text-foreground',
+                        )}
+                    >
+                        {s.overdue_count}
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                        {s.due_soon_count} due in 7 days
+                    </div>
                 </MiniCard>
             </div>
             <CommandBar
                 b={b}
                 placeholder="Search supervision notes…"
-                statuses={['scheduled', 'pending', 'acknowledged', 'overdue', 'draft']}
-                sort={[['employee', 'Employee'], ['next', 'Next due'], ['status', 'Status']]}
+                statuses={[
+                    'scheduled',
+                    'pending',
+                    'acknowledged',
+                    'overdue',
+                    'draft',
+                ]}
+                sort={[
+                    ['employee', 'Employee'],
+                    ['next', 'Next due'],
+                    ['status', 'Status'],
+                ]}
                 newKey="supervision"
                 newLabel="Log supervision"
             />
@@ -1012,7 +1786,12 @@ function SupervisionBody(b: BodyProps) {
                 b={b}
                 kind="supervision"
                 cols={[
-                    { key: 'employee', label: 'Employee', kind: 'person', sub: 'role' },
+                    {
+                        key: 'employee',
+                        label: 'Employee',
+                        kind: 'person',
+                        sub: 'role',
+                    },
                     { key: 'last', label: 'Last session', kind: 'muted' },
                     { key: 'next', label: 'Next due', kind: 'strong' },
                     { key: 'status', label: 'Status', kind: 'badge' },
@@ -1024,7 +1803,11 @@ function SupervisionBody(b: BodyProps) {
 }
 
 function MiniCard({ children }: { children: ReactNode }) {
-    return <div className="rounded-[14px] border border-border bg-card p-4 shadow-sm">{children}</div>;
+    return (
+        <div className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
+            {children}
+        </div>
+    );
 }
 
 function Gauge45({ pct }: { pct: number }) {
@@ -1033,20 +1816,33 @@ function Gauge45({ pct }: { pct: number }) {
     return (
         <div className="relative h-16 w-16">
             <svg width={64} height={64} className="-rotate-90">
-                <circle cx={32} cy={32} r={r} fill="none" stroke="var(--muted)" strokeWidth={7} />
                 <circle
                     cx={32}
                     cy={32}
                     r={r}
                     fill="none"
-                    stroke={pct >= 90 ? 'var(--status-success)' : 'var(--status-warning)'}
+                    stroke="var(--muted)"
+                    strokeWidth={7}
+                />
+                <circle
+                    cx={32}
+                    cy={32}
+                    r={r}
+                    fill="none"
+                    stroke={
+                        pct >= 90
+                            ? 'var(--status-success)'
+                            : 'var(--status-warning)'
+                    }
                     strokeWidth={7}
                     strokeLinecap="round"
                     strokeDasharray={c}
                     strokeDashoffset={c * (1 - pct / 100)}
                 />
             </svg>
-            <span className="absolute inset-0 grid place-items-center text-[15px] font-bold">{pct}%</span>
+            <span className="absolute inset-0 grid place-items-center text-[15px] font-bold">
+                {pct}%
+            </span>
         </div>
     );
 }
@@ -1062,7 +1858,14 @@ function CompetenciesBody(b: BodyProps) {
         ['competencies', 'Competencies'],
         ['skills', 'Skills'],
     ];
-    const colors = ['bg-muted text-muted-foreground', 'bg-status-critical-bg text-status-critical', 'bg-status-warning-bg text-status-warning', 'bg-status-info-bg text-status-info', 'bg-status-success-bg text-status-success', 'bg-status-success-bg text-status-success'];
+    const colors = [
+        'bg-muted text-muted-foreground',
+        'bg-status-critical-bg text-status-critical',
+        'bg-status-warning-bg text-status-warning',
+        'bg-status-info-bg text-status-info',
+        'bg-status-success-bg text-status-success',
+        'bg-status-success-bg text-status-success',
+    ];
 
     return (
         <div>
@@ -1071,7 +1874,11 @@ function CompetenciesBody(b: BodyProps) {
                 sub="Capability matrix, sign-off and skills coverage."
                 right={
                     b.canManage ? (
-                        <button type="button" onClick={() => b.openWiz('assess')} className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm">
+                        <button
+                            type="button"
+                            onClick={() => b.openWiz('assess')}
+                            className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm"
+                        >
                             <Plus className="h-[15px] w-[15px]" />
                             Assess
                         </button>
@@ -1084,7 +1891,12 @@ function CompetenciesBody(b: BodyProps) {
                         key={k}
                         type="button"
                         onClick={() => b.setCompSub(k)}
-                        className={cn('rounded-lg px-3.5 py-1.5 text-[13px] font-semibold', b.compSub === k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground')}
+                        className={cn(
+                            'rounded-lg px-3.5 py-1.5 text-[13px] font-semibold',
+                            b.compSub === k
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground',
+                        )}
                     >
                         {label}
                     </button>
@@ -1092,36 +1904,70 @@ function CompetenciesBody(b: BodyProps) {
             </div>
 
             {b.compSub === 'matrix' ? (
-                c.matrix.staff.length === 0 || c.matrix.competencies.length === 0 ? (
+                c.matrix.staff.length === 0 ||
+                c.matrix.competencies.length === 0 ? (
                     <div className="rounded-[14px] border border-dashed border-border bg-card px-6 py-14 text-center text-[13px] text-muted-foreground">
-                        No competency assessments yet. Use <span className="font-semibold text-foreground">Assess</span> to record the first.
+                        No competency assessments yet. Use{' '}
+                        <span className="font-semibold text-foreground">
+                            Assess
+                        </span>{' '}
+                        to record the first.
                     </div>
                 ) : (
                     <div className="overflow-auto rounded-[14px] border border-border bg-card shadow-sm">
                         <table className="w-full border-collapse text-[12.5px]">
                             <thead>
                                 <tr>
-                                    <th className="sticky left-0 z-10 border-b border-border bg-card px-3.5 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">Staff</th>
+                                    <th className="sticky left-0 z-10 border-b border-border bg-card px-3.5 py-3 text-left text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                                        Staff
+                                    </th>
                                     {c.matrix.competencies.map((comp) => (
-                                        <th key={comp.id} className="min-w-[78px] border-b border-border px-2 py-3 text-[10.5px] font-bold text-muted-foreground">{comp.name}</th>
+                                        <th
+                                            key={comp.id}
+                                            className="min-w-[78px] border-b border-border px-2 py-3 text-[10.5px] font-bold text-muted-foreground"
+                                        >
+                                            {comp.name}
+                                        </th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
                                 {c.matrix.staff.map((st, si) => (
-                                    <tr key={st.profile_id} className={cn(si < c.matrix.staff.length - 1 && 'border-b border-border')}>
+                                    <tr
+                                        key={st.profile_id}
+                                        className={cn(
+                                            si < c.matrix.staff.length - 1 &&
+                                                'border-b border-border',
+                                        )}
+                                    >
                                         <td className="sticky left-0 z-10 border-r border-border bg-card px-3.5 py-2.5 font-semibold whitespace-nowrap">
                                             <span className="inline-flex items-center gap-2">
-                                                <span className="grid h-6 w-6 place-items-center rounded-lg bg-accent text-[10px] font-bold text-accent-foreground">{initials(st.name)}</span>
+                                                <span className="grid h-6 w-6 place-items-center rounded-lg bg-accent text-[10px] font-bold text-accent-foreground">
+                                                    {initials(st.name)}
+                                                </span>
                                                 {st.name}
                                             </span>
                                         </td>
                                         {c.matrix.competencies.map((comp) => {
-                                            const lvl = c.matrix.levels[`${st.profile_id}-${comp.id}`] ?? 0;
+                                            const lvl =
+                                                c.matrix.levels[
+                                                    `${st.profile_id}-${comp.id}`
+                                                ] ?? 0;
                                             return (
-                                                <td key={comp.id} className="p-1.5 text-center">
-                                                    <div className={cn('grid h-[34px] place-items-center rounded-lg border border-border text-[12px] font-bold', colors[lvl] ?? colors[0])}>
-                                                        {lvl === 0 ? '—' : `L${lvl}`}
+                                                <td
+                                                    key={comp.id}
+                                                    className="p-1.5 text-center"
+                                                >
+                                                    <div
+                                                        className={cn(
+                                                            'grid h-[34px] place-items-center rounded-lg border border-border text-[12px] font-bold',
+                                                            colors[lvl] ??
+                                                                colors[0],
+                                                        )}
+                                                    >
+                                                        {lvl === 0
+                                                            ? '—'
+                                                            : `L${lvl}`}
                                                     </div>
                                                 </td>
                                             );
@@ -1131,32 +1977,82 @@ function CompetenciesBody(b: BodyProps) {
                             </tbody>
                         </table>
                         <div className="flex flex-wrap items-center gap-3.5 border-t border-border px-3.5 py-2.5 text-[11px] text-muted-foreground">
-                            {[['L1', 'bg-status-critical'], ['L2', 'bg-status-warning'], ['L3', 'bg-status-info'], ['L4', 'bg-status-success']].map(([l, bg]) => (
-                                <span key={l} className="inline-flex items-center gap-1.5">
-                                    <span className={cn('h-2.5 w-2.5 rounded-sm', bg)} />
+                            {[
+                                ['L1', 'bg-status-critical'],
+                                ['L2', 'bg-status-warning'],
+                                ['L3', 'bg-status-info'],
+                                ['L4', 'bg-status-success'],
+                            ].map(([l, bg]) => (
+                                <span
+                                    key={l}
+                                    className="inline-flex items-center gap-1.5"
+                                >
+                                    <span
+                                        className={cn(
+                                            'h-2.5 w-2.5 rounded-sm',
+                                            bg,
+                                        )}
+                                    />
                                     {l}
                                 </span>
                             ))}
-                            <span className="ml-auto">Right-click a row to assess or sign off</span>
+                            <span className="ml-auto">
+                                Right-click a row to assess or sign off
+                            </span>
                         </div>
                     </div>
                 )
             ) : b.compSub === 'competencies' ? (
                 c.coverage.length === 0 ? (
-                    <div className="rounded-[14px] border border-dashed border-border bg-card px-6 py-14 text-center text-[13px] text-muted-foreground">No competencies defined yet.</div>
+                    <div className="rounded-[14px] border border-dashed border-border bg-card px-6 py-14 text-center text-[13px] text-muted-foreground">
+                        No competencies defined yet.
+                    </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {c.coverage.map((d) => {
-                            const pct = d.total ? Math.round((d.covered / d.total) * 100) : 0;
+                            const pct = d.total
+                                ? Math.round((d.covered / d.total) * 100)
+                                : 0;
                             return (
                                 <MiniCard key={d.id}>
                                     <div className="flex items-start justify-between gap-2">
-                                        <div className="font-bold">{d.name}</div>
-                                        <StatusBadge variant={pct >= 90 ? 'success' : pct >= 60 ? 'warning' : 'critical'} label={pct >= 90 ? 'Met' : pct >= 60 ? 'Developing' : 'Gap'} size="sm" />
+                                        <div className="font-bold">
+                                            {d.name}
+                                        </div>
+                                        <StatusBadge
+                                            variant={
+                                                pct >= 90
+                                                    ? 'success'
+                                                    : pct >= 60
+                                                      ? 'warning'
+                                                      : 'critical'
+                                            }
+                                            label={
+                                                pct >= 90
+                                                    ? 'Met'
+                                                    : pct >= 60
+                                                      ? 'Developing'
+                                                      : 'Gap'
+                                            }
+                                            size="sm"
+                                        />
                                     </div>
-                                    <div className="mb-3 mt-1 text-[11.5px] text-muted-foreground">{d.category} · {d.covered} of {d.total} staff competent</div>
+                                    <div className="mt-1 mb-3 text-[11.5px] text-muted-foreground">
+                                        {d.category} · {d.covered} of {d.total}{' '}
+                                        staff competent
+                                    </div>
                                     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                                        <div className={cn('h-full rounded-full', pct >= 90 ? 'bg-status-success' : pct >= 60 ? 'bg-primary' : 'bg-status-warning')} style={{ width: `${pct}%` }} />
+                                        <div
+                                            className={cn(
+                                                'h-full rounded-full',
+                                                pct >= 90
+                                                    ? 'bg-status-success'
+                                                    : pct >= 60
+                                                      ? 'bg-primary'
+                                                      : 'bg-status-warning',
+                                            )}
+                                            style={{ width: `${pct}%` }}
+                                        />
                                     </div>
                                 </MiniCard>
                             );
@@ -1164,7 +2060,9 @@ function CompetenciesBody(b: BodyProps) {
                     </div>
                 )
             ) : c.skills.length === 0 ? (
-                <div className="rounded-[14px] border border-dashed border-border bg-card px-6 py-14 text-center text-[13px] text-muted-foreground">No skills recorded yet.</div>
+                <div className="rounded-[14px] border border-dashed border-border bg-card px-6 py-14 text-center text-[13px] text-muted-foreground">
+                    No skills recorded yet.
+                </div>
             ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {c.skills.map((sk) => (
@@ -1174,8 +2072,12 @@ function CompetenciesBody(b: BodyProps) {
                                     <Sparkles className="h-[18px] w-[18px]" />
                                 </span>
                                 <div>
-                                    <div className="text-[13px] font-bold">{sk.name}</div>
-                                    <div className="text-[11.5px] text-muted-foreground">{sk.count} staff hold this</div>
+                                    <div className="text-[13px] font-bold">
+                                        {sk.name}
+                                    </div>
+                                    <div className="text-[11.5px] text-muted-foreground">
+                                        {sk.count} staff hold this
+                                    </div>
                                 </div>
                             </div>
                         </MiniCard>
@@ -1195,9 +2097,20 @@ function SuccessionBody(b: BodyProps) {
     const xLab = ['Low', 'Medium', 'High'];
     const cellTone = (x: number, y: number) => {
         const sum = x + y;
-        return sum >= 3 ? 'bg-status-success-bg' : sum >= 2 ? 'bg-status-info-bg' : sum >= 1 ? 'bg-status-warning-bg' : 'bg-muted';
+        return sum >= 3
+            ? 'bg-status-success-bg'
+            : sum >= 2
+              ? 'bg-status-info-bg'
+              : sum >= 1
+                ? 'bg-status-warning-bg'
+                : 'bg-muted';
     };
-    const readinessBar: Record<string, string> = { success: 'bg-status-success', info: 'bg-status-info', warning: 'bg-status-warning', neutral: 'bg-muted-foreground' };
+    const readinessBar: Record<string, string> = {
+        success: 'bg-status-success',
+        info: 'bg-status-info',
+        warning: 'bg-status-warning',
+        neutral: 'bg-muted-foreground',
+    };
     const maxReady = Math.max(1, ...s.readiness.map((r) => r.count));
 
     return (
@@ -1207,7 +2120,11 @@ function SuccessionBody(b: BodyProps) {
                 sub="9-box talent grid, readiness pipeline and critical-role cover."
                 right={
                     b.canManage ? (
-                        <button type="button" onClick={() => b.openWiz('succession')} className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm">
+                        <button
+                            type="button"
+                            onClick={b.openSuccession}
+                            className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground shadow-sm"
+                        >
                             <Plus className="h-[15px] w-[15px]" />
                             New plan
                         </button>
@@ -1216,9 +2133,13 @@ function SuccessionBody(b: BodyProps) {
             />
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.5fr_1fr]">
                 <MiniCard>
-                    <div className="mb-3 text-[13px] font-bold">Performance × Potential</div>
+                    <div className="mb-3 text-[13px] font-bold">
+                        Performance × Potential
+                    </div>
                     <div className="flex gap-2">
-                        <div className="grid place-items-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground [writing-mode:vertical-rl] [transform:rotate(180deg)]">Potential</div>
+                        <div className="grid [transform:rotate(180deg)] place-items-center text-[10px] font-bold tracking-wide text-muted-foreground uppercase [writing-mode:vertical-rl]">
+                            Potential
+                        </div>
                         <div className="flex-1">
                             <div className="grid grid-cols-3 gap-1.5">
                                 {[2, 1, 0].map((y) =>
@@ -1227,11 +2148,35 @@ function SuccessionBody(b: BodyProps) {
                                         return (
                                             <div
                                                 key={`${x}-${y}`}
-                                                onContextMenu={(e) => b.openRowCtx(e, 'Succession', `Performance ${xLab[x]} · Potential ${xLab[y]}`, [{ icon: <Plus className="h-4 w-4" />, label: 'New plan', onClick: () => b.openWiz('succession') }])}
-                                                className={cn('flex min-h-[74px] flex-col gap-1 rounded-[10px] border border-border p-1.5', cellTone(x, y))}
+                                                onContextMenu={(e) =>
+                                                    b.openRowCtx(
+                                                        e,
+                                                        'Succession',
+                                                        `Performance ${xLab[x]} · Potential ${xLab[y]}`,
+                                                        [
+                                                            {
+                                                                icon: (
+                                                                    <Plus className="h-4 w-4" />
+                                                                ),
+                                                                label: 'New plan',
+                                                                onClick:
+                                                                    b.openSuccession,
+                                                            },
+                                                        ],
+                                                    )
+                                                }
+                                                className={cn(
+                                                    'flex min-h-[74px] flex-col gap-1 rounded-[10px] border border-border p-1.5',
+                                                    cellTone(x, y),
+                                                )}
                                             >
                                                 {people.map((p, i) => (
-                                                    <span key={`${p}-${i}`} className="rounded-md bg-card px-1.5 py-1 text-[11px] font-semibold shadow-sm">{p}</span>
+                                                    <span
+                                                        key={`${p}-${i}`}
+                                                        className="rounded-md bg-card px-1.5 py-1 text-[11px] font-semibold shadow-sm"
+                                                    >
+                                                        {p}
+                                                    </span>
                                                 ))}
                                             </div>
                                         );
@@ -1239,44 +2184,105 @@ function SuccessionBody(b: BodyProps) {
                                 )}
                             </div>
                             <div className="mt-1.5 grid grid-cols-3 text-center text-[10px] font-bold text-muted-foreground">
-                                {xLab.map((l) => <span key={l}>{l}</span>)}
+                                {xLab.map((l) => (
+                                    <span key={l}>{l}</span>
+                                ))}
                             </div>
-                            <div className="mt-1 text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Performance</div>
+                            <div className="mt-1 text-center text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
+                                Performance
+                            </div>
                         </div>
                     </div>
                 </MiniCard>
 
                 <div className="flex flex-col gap-4">
                     <MiniCard>
-                        <div className="mb-3 text-[13px] font-bold">Readiness pipeline</div>
+                        <div className="mb-3 text-[13px] font-bold">
+                            Readiness pipeline
+                        </div>
                         {s.readiness.map((r) => (
-                            <div key={r.label} className="mb-2.5 flex items-center gap-2.5">
-                                <span className="w-[90px] text-xs font-semibold text-muted-foreground">{r.label}</span>
+                            <div
+                                key={r.label}
+                                className="mb-2.5 flex items-center gap-2.5"
+                            >
+                                <span className="w-[90px] text-xs font-semibold text-muted-foreground">
+                                    {r.label}
+                                </span>
                                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                                    <div className={cn('h-full rounded-full', readinessBar[r.tone] ?? 'bg-muted-foreground')} style={{ width: `${(r.count / maxReady) * 100}%` }} />
+                                    <div
+                                        className={cn(
+                                            'h-full rounded-full',
+                                            readinessBar[r.tone] ??
+                                                'bg-muted-foreground',
+                                        )}
+                                        style={{
+                                            width: `${(r.count / maxReady) * 100}%`,
+                                        }}
+                                    />
                                 </div>
-                                <span className="w-5 text-right text-xs font-bold">{r.count}</span>
+                                <span className="w-5 text-right text-xs font-bold">
+                                    {r.count}
+                                </span>
                             </div>
                         ))}
                     </MiniCard>
                     <MiniCard>
-                        <div className="mb-2.5 text-[13px] font-bold">Critical roles</div>
+                        <div className="mb-2.5 text-[13px] font-bold">
+                            Critical roles
+                        </div>
                         {s.critical_roles.length === 0 ? (
-                            <div className="py-3 text-[13px] text-muted-foreground">No succession plans yet.</div>
+                            <div className="py-3 text-[13px] text-muted-foreground">
+                                No succession plans yet.
+                            </div>
                         ) : (
                             s.critical_roles.map((r) => (
                                 <div
                                     key={r.id}
-                                    onContextMenu={(e) => b.openRowCtx(e, r.role, `Cover: ${r.cover}`, [
-                                        { icon: <ArrowRight className="h-4 w-4" />, label: 'Open plan', onClick: () => router.visit(`/hr/succession/${r.id}`) },
-                                        { icon: <Trash2 className="h-4 w-4" />, label: 'Delete plan', tone: 'critical', onClick: () => b.del(`/hr/succession/${r.id}`, 'Plan deleted') },
-                                    ])}
+                                    onContextMenu={(e) =>
+                                        b.openRowCtx(
+                                            e,
+                                            r.role,
+                                            `Cover: ${r.cover}`,
+                                            [
+                                                {
+                                                    icon: (
+                                                        <ArrowRight className="h-4 w-4" />
+                                                    ),
+                                                    label: 'Open plan',
+                                                    onClick: () =>
+                                                        router.visit(
+                                                            `/hr/succession/${r.id}`,
+                                                        ),
+                                                },
+                                                {
+                                                    icon: (
+                                                        <Trash2 className="h-4 w-4" />
+                                                    ),
+                                                    label: 'Delete plan',
+                                                    tone: 'critical',
+                                                    onClick: () =>
+                                                        b.del(
+                                                            `/hr/succession/${r.id}`,
+                                                            'Plan deleted',
+                                                        ),
+                                                },
+                                            ],
+                                        )
+                                    }
                                     className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-0"
                                 >
-                                    <span className="text-[12.5px] font-semibold">{r.role}</span>
+                                    <span className="text-[12.5px] font-semibold">
+                                        {r.role}
+                                    </span>
                                     <span className="inline-flex items-center gap-2">
-                                        <span className="text-[11.5px] text-muted-foreground">{r.cover}</span>
-                                        <StatusBadge variant={variantOf(r.risk)} label={pretty(r.risk)} size="sm" />
+                                        <span className="text-[11.5px] text-muted-foreground">
+                                            {r.cover}
+                                        </span>
+                                        <StatusBadge
+                                            variant={variantOf(r.risk)}
+                                            label={pretty(r.risk)}
+                                            size="sm"
+                                        />
                                     </span>
                                 </div>
                             ))

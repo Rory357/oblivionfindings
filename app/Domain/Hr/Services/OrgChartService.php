@@ -8,14 +8,25 @@ use Illuminate\Support\Facades\Storage;
 
 class OrgChartService
 {
-    public function getHierarchy(?int $tenantId): array
+    /**
+     * Build the hierarchy from the already-authorized current staff collection.
+     * Site visibility belongs to the calling boundary, while this service owns
+     * only the presentation tree.
+     *
+     * @param  Collection<int, HrEmployeeProfile>  $employees
+     */
+    public function getHierarchy(Collection $employees): array
     {
-        $employees = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
-            ->with('user:id,name,email', 'position:id,title,code', 'primarySite:id,name')
-            ->get();
+        $employees->loadMissing(
+            'user:id,name,email',
+            'position:id,title,code',
+            'primarySite:id,name',
+            'departmentRelation:id,name',
+        );
 
-        $roots = $employees->whereNull('manager_user_id');
+        $visibleUserIds = $employees->pluck('user_id')->filter()->map(fn ($id) => (int) $id);
+        $roots = $employees->filter(fn (HrEmployeeProfile $employee) => $employee->manager_user_id === null
+            || ! $visibleUserIds->contains((int) $employee->manager_user_id));
 
         return $roots->map(fn ($emp) => $this->buildNode($emp, $employees))->values()->all();
     }
@@ -37,7 +48,9 @@ class OrgChartService
             $manager = HrEmployeeProfile::where('user_id', $profile->manager_user_id)
                 ->with('user:id,name,email')
                 ->first();
-            if (!$manager) break;
+            if (! $manager) {
+                break;
+            }
             $chain[] = [
                 'id' => $manager->id,
                 'name' => $manager->user?->name ?? 'Unknown',

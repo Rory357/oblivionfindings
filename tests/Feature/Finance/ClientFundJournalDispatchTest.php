@@ -7,6 +7,7 @@ use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\Client;
 use App\Models\ClientFund;
+use App\Models\Site;
 use App\Observers\ClientFundTransactionObserver;
 use Database\Seeders\FinanceSeeder;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
@@ -17,16 +18,16 @@ class ClientFundJournalDispatchTest extends TestCase
 {
     use RefreshDatabase;
 
-    private int $orgId = 1;
+    private int $storageContextId = 1;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        app(FinanceSeeder::class)->run($this->orgId);
+        app(FinanceSeeder::class)->run($this->storageContextId);
 
         FinFiscalPeriod::create([
-            'organization_id' => $this->orgId,
+            'organization_id' => $this->storageContextId,
             'name' => 'FY2026',
             'start_date' => now()->startOfYear()->toDateString(),
             'end_date' => now()->endOfYear()->toDateString(),
@@ -41,9 +42,9 @@ class ClientFundJournalDispatchTest extends TestCase
             new ClientFundTransactionObserver,
         );
 
-        $client = Client::factory()->create(['organization_id' => $this->orgId]);
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $fund = ClientFund::create([
-            'organization_id' => $this->orgId,
             'client_id' => $client->id,
             'fund_name' => 'Resident Trust',
             'fund_type' => 'trust',
@@ -52,7 +53,6 @@ class ClientFundJournalDispatchTest extends TestCase
         ]);
 
         $credit = $fund->transactions()->create([
-            'organization_id' => $this->orgId,
             'transaction_type' => 'credit',
             'amount' => 100,
             'running_balance' => 100,
@@ -80,7 +80,6 @@ class ClientFundJournalDispatchTest extends TestCase
         ));
 
         $debit = $fund->transactions()->create([
-            'organization_id' => $this->orgId,
             'transaction_type' => 'debit',
             'amount' => 40,
             'running_balance' => 60,

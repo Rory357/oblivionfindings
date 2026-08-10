@@ -2,6 +2,8 @@
 
 namespace App\Policies;
 
+use App\Domain\It\Services\ItTicketMergeService;
+use App\Domain\It\Services\ItWorkAccessService;
 use App\Models\ItTicket;
 use App\Models\User;
 
@@ -12,16 +14,21 @@ use App\Models\User;
  */
 class ItTicketPolicy
 {
+    public function __construct(
+        private readonly ItWorkAccessService $access,
+        private readonly ItTicketMergeService $mergeService,
+    ) {}
+
     /** Raise a ticket (self-service or agent log-and-triage). */
     public function create(User $user): bool
     {
         return $user->canDo('it.request') || $user->canDo('it.manage');
     }
 
-    /** Agents see every ticket; requesters see their own. */
+    /** Participants and explicitly scoped staff may view a ticket. */
     public function view(User $user, ItTicket $ticket): bool
     {
-        return $user->canDo('it.view') || $this->owns($user, $ticket);
+        return $this->access->canView($user, $ticket);
     }
 
     /**
@@ -38,7 +45,7 @@ class ItTicketPolicy
     public function reopen(User $user, ItTicket $ticket): bool
     {
         if ($user->canDo('it.manage')) {
-            return true;
+            return $this->access->canWork($user, $ticket);
         }
 
         return $this->owns($user, $ticket)
@@ -49,34 +56,35 @@ class ItTicketPolicy
     /** Triage mutations (status, priority, assignee, …) are agent work. */
     public function update(User $user, ItTicket $ticket): bool
     {
-        return $user->canDo('it.manage');
+        return $this->access->canWork($user, $ticket);
     }
 
     public function resolve(User $user, ItTicket $ticket): bool
     {
-        return $user->canDo('it.manage');
+        return $this->access->canWork($user, $ticket);
     }
 
     public function close(User $user, ItTicket $ticket): bool
     {
-        return $user->canDo('it.manage');
+        return $this->access->canWork($user, $ticket);
     }
 
     /**
      * Merge a duplicate SOURCE ticket into a TARGET survivor. Agent work; a
      * ticket can't merge into itself, an already-merged source can't be merged
-     * again, and both ends must be live (not closed, not already merged) in the
-     * same tenant.
+     * again, both ends must be live (not closed, not already merged), and both
+     * ends must pass the same canonical work boundary.
      */
     public function merge(User $user, ItTicket $ticket, ItTicket $target): bool
     {
-        return $user->canDo('it.manage')
+        return $this->access->canWork($user, $ticket)
+            && $this->access->canWork($user, $target)
             && $ticket->id !== $target->id
-            && (int) $ticket->tenant_id === (int) $target->tenant_id
             && $ticket->merged_into_ticket_id === null
             && $target->merged_into_ticket_id === null
             && $ticket->status !== 'closed'
-            && $target->status !== 'closed';
+            && $target->status !== 'closed'
+            && $this->mergeService->sharesConversationAudience($ticket, $target);
     }
 
     /**
@@ -85,7 +93,7 @@ class ItTicketPolicy
      */
     public function requestApproval(User $user, ItTicket $ticket): bool
     {
-        return $user->canDo('it.manage')
+        return $this->access->canWork($user, $ticket)
             && $ticket->requires_approval
             && ! $ticket->approvals()->whereIn('status', ['pending', 'approved'])->exists();
     }
@@ -103,7 +111,7 @@ class ItTicketPolicy
     /** Destructive — admins only. */
     public function delete(User $user, ItTicket $ticket): bool
     {
-        return $user->canDo('it.manage') && $user->hasRole('admin');
+        return $user->hasRole('admin') && $this->access->canWork($user, $ticket);
     }
 
     private function owns(User $user, ItTicket $ticket): bool

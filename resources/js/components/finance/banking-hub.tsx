@@ -48,14 +48,70 @@ const bankManage = (c: CanTree) => !!c?.finance?.bank?.manage;
 const pettyCashView = (c: CanTree) => !!c?.finance?.pettyCash?.view;
 
 export const BANKING_TABS: BankingTabDef[] = [
-    { id: 'accounts', label: 'Accounts', icon: Landmark, tone: 'primary', href: '/finance/bank-accounts', requires: bankView },
-    { id: 'transactions', label: 'Transactions', icon: ArrowLeftRight, tone: 'info', href: '/finance/bank-transactions', requires: bankView },
-    { id: 'reconciliation', label: 'Reconciliation', icon: CheckCircle2, tone: 'success', href: '/finance/bank-reconciliation', requires: bankView },
-    { id: 'matching', label: 'Matching', icon: Link2, tone: 'violet', href: '/finance/payment-matching', requires: bankView },
-    { id: 'feeds', label: 'Feeds', icon: Radio, tone: 'warning', href: '/finance/bank-feeds', requires: bankManage },
-    { id: 'eftpos', label: 'EFTPOS', icon: CreditCard, tone: 'info', href: '/finance/eftpos/terminals', requires: bankManage },
-    { id: 'petty-cash', label: 'Petty cash', icon: Banknote, tone: 'primary', href: '/finance/petty-cash', requires: pettyCashView },
-    { id: 'match-rules', label: 'Match rules', icon: SlidersHorizontal, tone: 'violet', href: '/finance/match-rules', requires: bankManage },
+    {
+        id: 'accounts',
+        label: 'Accounts',
+        icon: Landmark,
+        tone: 'primary',
+        href: '/finance/bank-accounts',
+        requires: bankView,
+    },
+    {
+        id: 'transactions',
+        label: 'Transactions',
+        icon: ArrowLeftRight,
+        tone: 'info',
+        href: '/finance/bank-transactions',
+        requires: bankView,
+    },
+    {
+        id: 'reconciliation',
+        label: 'Reconciliation',
+        icon: CheckCircle2,
+        tone: 'success',
+        href: '/finance/bank-reconciliation',
+        requires: bankView,
+    },
+    {
+        id: 'matching',
+        label: 'Matching',
+        icon: Link2,
+        tone: 'violet',
+        href: '/finance/payment-matching',
+        requires: bankView,
+    },
+    {
+        id: 'feeds',
+        label: 'Feeds',
+        icon: Radio,
+        tone: 'warning',
+        href: '/finance/bank-feeds',
+        requires: bankManage,
+    },
+    {
+        id: 'eftpos',
+        label: 'EFTPOS',
+        icon: CreditCard,
+        tone: 'info',
+        href: '/finance/eftpos/terminals',
+        requires: bankManage,
+    },
+    {
+        id: 'petty-cash',
+        label: 'Petty cash',
+        icon: Banknote,
+        tone: 'primary',
+        href: '/finance/petty-cash',
+        requires: pettyCashView,
+    },
+    {
+        id: 'match-rules',
+        label: 'Match rules',
+        icon: SlidersHorizontal,
+        tone: 'violet',
+        href: '/finance/match-rules',
+        requires: bankManage,
+    },
 ];
 
 /**
@@ -73,7 +129,9 @@ export function BankingTabsFooter({ active }: { active: BankingTabId }) {
         (page.props as { financeHubCounts?: FinanceHubCounts | null })
             .financeHubCounts?.['banking'] ?? {};
 
-    const visible = BANKING_TABS.filter((t) => t.id === active || t.requires(can));
+    const visible = BANKING_TABS.filter(
+        (t) => t.id === active || t.requires(can),
+    );
 
     const handleTab = (id: string) => {
         if (id === active) return;

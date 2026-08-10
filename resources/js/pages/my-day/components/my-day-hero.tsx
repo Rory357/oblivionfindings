@@ -283,15 +283,10 @@ export function MyDayHero({
         },
     ];
 
-    // Single-resident shifts get resident-scoped care/notes links so the worker
-    // lands directly on the right record (clients.viewAssigned grants those
-    // endpoints). Multi-resident shifts drop the resident-specific shortcuts
-    // entirely because the org-wide care_plans / clients-list destinations are
-    // gated behind manager permissions a support worker doesn't have.
-    // Both Care Note and Care Plan deep-link into the client profile's
-    // existing tabs (the `clients/{id}/daily-notes` endpoint is JSON-only,
-    // not an Inertia page). Using `?tab=` lands the worker on the profile
-    // with the right tab already open.
+    // Single-resident shifts get resident-scoped profile/notes links so the
+    // worker lands on the right canonical record. Do not deep-link a frontline
+    // worker into the Care & Support Plan tab: that tab has its own
+    // care_plans.viewAny boundary and is not implied by clients.viewAssigned.
     //
     // Vitals & obs is its own flow: VitalsRecordFlow renders a resident
     // picker (multi-resident shifts) or skips straight to the record sheet
@@ -301,8 +296,8 @@ export function MyDayHero({
     const careNoteHref = singleResident
         ? `/clients/${singleResident.id}?tab=progress_notes`
         : '/clients';
-    const carePlanHref = singleResident
-        ? `/clients/${singleResident.id}?tab=care_plans`
+    const clientProfileHref = singleResident
+        ? `/clients/${singleResident.id}`
         : null;
     const vitalsFallbackHref =
         !onOpenVitals && singleResident
@@ -358,12 +353,13 @@ export function MyDayHero({
                   },
               ]
             : []),
-        ...(carePlanHref
+        ...(clientProfileHref
             ? [
                   {
-                      icon: ShieldCheck,
-                      label: t('qa_care_plan'),
-                      href: carePlanHref,
+                      icon: Heart,
+                      label: t('res_open_profile'),
+                      href: clientProfileHref,
+                      'data-test': 'my-day-shift-care-action',
                   },
               ]
             : []),
@@ -560,6 +556,9 @@ export function MyDayHero({
                         variant="default"
                         size="sm"
                         onClick={onClockToggle}
+                        data-test={
+                            clockedIn ? 'clock-out-button' : 'clock-in-button'
+                        }
                         className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                     >
                         {clockedIn ? (

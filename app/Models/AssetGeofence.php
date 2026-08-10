@@ -45,20 +45,15 @@ class AssetGeofence extends Model
             ->withTimestamps();
     }
 
-    public function scopeForOrganization(Builder $query, ?int $organizationId): Builder
+    public function scopeEligibleForClientSite(Builder $query, ?int $siteId): Builder
     {
-        if ($organizationId === null) {
-            return $query;
+        if ($siteId === null) {
+            return $query->whereRaw('1 = 0');
         }
 
-        return $query->where(function (Builder $query) use ($organizationId) {
-            $query->whereHas(
-                'site',
-                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
-            )->orWhereHas(
-                'asset.site',
-                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
-            );
-        });
+        return $query
+            ->where('site_id', $siteId)
+            ->where('is_active', true)
+            ->whereIn('scope', ['house', 'resident']);
     }
 }

@@ -2,11 +2,15 @@
 
 namespace App\Services\HealthSafety;
 
+use App\Models\Client;
 use App\Models\HazardousSubstance;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
+use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
 use App\Models\SubstanceStorageLocation;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Provides H&S summary data for module context pages
@@ -17,6 +21,10 @@ use App\Models\SubstanceStorageLocation;
  */
 class HsModuleSummaryService
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /** Maximum recent events returned in each summary. */
     private const RECENT_EVENTS_LIMIT = 5;
 
@@ -24,7 +32,7 @@ class HsModuleSummaryService
     private const RECENT_EVENT_COLUMNS = ['id', 'reference_number', 'event_category', 'severity', 'status', 'reported_at'];
 
     /* ------------------------------------------------------------------ */
-    /*  Site context                                                        */
+    /*  Site context */
     /* ------------------------------------------------------------------ */
 
     public function forSite(int $siteId): array
@@ -38,15 +46,15 @@ class HsModuleSummaryService
             'overdue_corrective_actions' => HsCorrectiveAction::overdue()
                 ->whereHas('hsEvent', fn ($q) => $q->where('site_id', $siteId))
                 ->count(),
-            'active_risk_assessments' => HsRiskAssessment::active()
-                ->forAssessable('App\\Models\\Site', $siteId)
+            'active_risk_assessments' => $this->riskAssessmentsForSite($siteId)
+                ->active()
                 ->count(),
-            'high_extreme_risks' => HsRiskAssessment::active()
-                ->forAssessable('App\\Models\\Site', $siteId)
+            'high_extreme_risks' => $this->riskAssessmentsForSite($siteId)
+                ->active()
                 ->highOrExtreme()
                 ->count(),
-            'risk_assessments_due_review' => HsRiskAssessment::dueForReview()
-                ->forAssessable('App\\Models\\Site', $siteId)
+            'risk_assessments_due_review' => $this->riskAssessmentsForSite($siteId)
+                ->dueForReview()
                 ->count(),
             'recent_events' => HsEvent::forSite($siteId)
                 ->orderByDesc('reported_at')
@@ -108,7 +116,7 @@ class HsModuleSummaryService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Client context                                                     */
+    /*  Client context */
     /* ------------------------------------------------------------------ */
 
     public function forClient(int $clientId): array
@@ -120,8 +128,9 @@ class HsModuleSummaryService
             'open_corrective_actions' => HsCorrectiveAction::open()
                 ->whereHas('hsEvent', fn ($q) => $q->where('client_id', $clientId))
                 ->count(),
-            'active_risk_assessments' => HsRiskAssessment::active()
-                ->forAssessable('App\\Models\\Client', $clientId)
+            'active_risk_assessments' => HsRiskAssessment::query()
+                ->active()
+                ->forAssessable(Client::class, $clientId)
                 ->count(),
             'recent_events' => HsEvent::forClient($clientId)
                 ->orderByDesc('reported_at')
@@ -132,7 +141,7 @@ class HsModuleSummaryService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Fleet / Asset context                                              */
+    /*  Fleet / Asset context */
     /* ------------------------------------------------------------------ */
 
     public function forAsset(int $assetId): array
@@ -143,7 +152,8 @@ class HsModuleSummaryService
             'open_corrective_actions' => HsCorrectiveAction::open()
                 ->whereHas('hsEvent', fn ($q) => $q->where('asset_id', $assetId))
                 ->count(),
-            'active_risk_assessments' => HsRiskAssessment::active()
+            'active_risk_assessments' => HsRiskAssessment::query()
+                ->active()
                 ->forAssessable('App\\Models\\Asset', $assetId)
                 ->count(),
             'recent_events' => HsEvent::where('asset_id', $assetId)
@@ -155,7 +165,7 @@ class HsModuleSummaryService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Staff context                                                       */
+    /*  Staff context */
     /* ------------------------------------------------------------------ */
 
     public function forStaff(int $userId): array
@@ -165,8 +175,16 @@ class HsModuleSummaryService
             'open_events' => HsEvent::where('staff_id', $userId)->open()->count(),
             'assigned_corrective_actions' => HsCorrectiveAction::forAssignee($userId)->open()->count(),
             'overdue_corrective_actions' => HsCorrectiveAction::forAssignee($userId)->overdue()->count(),
-            'led_investigations' => \App\Models\HsInvestigation::forInvestigator($userId)->count(),
-            'active_investigations' => \App\Models\HsInvestigation::forInvestigator($userId)->active()->count(),
+            'led_investigations' => HsInvestigation::forInvestigator($userId)->count(),
+            'active_investigations' => HsInvestigation::forInvestigator($userId)->active()->count(),
         ];
+    }
+
+    private function riskAssessmentsForSite(int $siteId): Builder
+    {
+        return $this->siteAccess->applyHsRiskAssessmentSiteScopeForSiteIds(
+            HsRiskAssessment::query(),
+            [$siteId],
+        );
     }
 }

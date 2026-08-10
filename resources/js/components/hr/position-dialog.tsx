@@ -45,7 +45,12 @@ export interface PositionRow {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'role', label: 'Role', blurb: 'Title, code & type', icon: Briefcase },
+    {
+        key: 'role',
+        label: 'Role',
+        blurb: 'Title, code & type',
+        icon: Briefcase,
+    },
     {
         key: 'jd',
         label: 'Job description',
@@ -441,15 +446,15 @@ export function PositionDialog({
                                 <label className="flex cursor-pointer items-center justify-between gap-4">
                                     <span className="min-w-0">
                                         <span className="block text-sm font-semibold text-foreground">
-                                            Open a job requisition for{' '}
-                                            {budgetN}{' '}
+                                            Open a job requisition for {budgetN}{' '}
                                             {budgetN === 1
                                                 ? 'vacancy'
                                                 : 'vacancies'}
                                         </span>
                                         <span className="block text-xs text-muted-foreground">
-                                            Creates a draft requisition prefilled
-                                            from this position, ready to publish.
+                                            Creates a draft requisition
+                                            prefilled from this position, ready
+                                            to publish.
                                         </span>
                                     </span>
                                     <Switch

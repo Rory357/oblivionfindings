@@ -3,15 +3,15 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrPayrollExportProfile extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'tenant_id',
@@ -34,11 +34,6 @@ class HrPayrollExportProfile extends Model
         'mappings' => 'array',
     ];
 
-    public function scopeForTenant(Builder $query, int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
-
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -49,4 +44,3 @@ class HrPayrollExportProfile extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 }
-

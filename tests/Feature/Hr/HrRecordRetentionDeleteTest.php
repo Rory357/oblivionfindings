@@ -12,18 +12,15 @@ use Illuminate\Database\QueryException;
 test('users with statutory hr records must be deactivated instead of hard deleted', function () {
     $actor = User::factory()->create([
         'role' => 'hr',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
     $user = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
     $profile = HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'RET-001',
         'work_email' => "retention-{$user->id}@example.test",
@@ -32,7 +29,6 @@ test('users with statutory hr records must be deactivated instead of hard delete
     ]);
 
     $leaveRequest = HrLeaveRequest::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'leave_type' => 'annual',
         'status' => 'approved',
@@ -40,7 +36,6 @@ test('users with statutory hr records must be deactivated instead of hard delete
     ]);
 
     $payrollRun = HrPayrollRun::factory()->create([
-        'tenant_id' => 1,
         'period_start' => now()->subWeek()->toDateString(),
         'period_end' => now()->toDateString(),
         'status' => 'draft',
@@ -56,7 +51,6 @@ test('users with statutory hr records must be deactivated instead of hard delete
     ]);
 
     $payslip = HrPayslip::query()->create([
-        'tenant_id' => 1,
         'payroll_run_id' => $payrollRun->id,
         'employee_profile_id' => $profile->id,
         'user_id' => $user->id,
@@ -69,7 +63,6 @@ test('users with statutory hr records must be deactivated instead of hard delete
     ]);
 
     $case = HrCase::query()->create([
-        'tenant_id' => 1,
         'case_number' => 'RET-CASE-001',
         'user_id' => $user->id,
         'case_type' => 'disciplinary',

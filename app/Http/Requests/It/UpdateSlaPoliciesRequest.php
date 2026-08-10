@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * The SLA target grid: one pair of minutes per priority, all four required
- * (§N7 — the editor writes the whole grid, tenant rows override the §G
+ * (§N7 — the editor writes the whole grid, application rows override the §G
  * defaults). Admin-only on top of it.manage: retuning the helpdesk's
  * promises is an over-the-queue decision.
  */
@@ -38,7 +38,7 @@ class UpdateSlaPoliciesRequest extends FormRequest
             ];
         }
 
-        // Optional tenant-wide business-hours calendar (v1: a single daily
+        // Optional application-wide business-hours calendar (v1: a single daily
         // window across the chosen working days). Off → the 24/7 clock,
         // unchanged. The controller applies it to every priority row.
         $rules['business_hours_enabled'] = ['boolean'];

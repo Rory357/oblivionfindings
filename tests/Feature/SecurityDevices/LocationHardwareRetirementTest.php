@@ -5,6 +5,9 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
+use App\Models\LocationHardware;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -23,6 +26,8 @@ class LocationHardwareRetirementTest extends TestCase
 
     private User $admin;
 
+    private Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -30,15 +35,20 @@ class LocationHardwareRetirementTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(SecurityDevicesPermissionsSeeder::class);
 
-        $this->admin = User::factory()->create(['role' => 'admin']);
+        $this->admin = User::factory()->create([
+            'role' => 'admin',
+
+        ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+
+        $this->site = Site::factory()->create([]);
     }
 
     // ── Sites hardware now reads from canonical devices ───────────
 
     public function test_site_hardware_page_reads_from_canonical_devices(): void
     {
-        $site = Site::factory()->create();
+        $site = $this->site;
 
         $device = Device::factory()->create(['name' => 'Canonical Camera']);
         DeviceAssignment::create([
@@ -65,14 +75,23 @@ class LocationHardwareRetirementTest extends TestCase
 
     public function test_client_profile_tracker_reads_from_canonical_devices(): void
     {
-        $client = Client::factory()->create();
+        $client = Client::factory()->create([
 
-        $device = Device::factory()->tracking()->create(['name' => 'Client GPS']);
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
+        $consent = $this->createFleetTrackingConsent($client);
+        $this->createActiveTrackingConsent($client, 'Asset Location Tracking (Safety)');
+
+        $device = Device::factory()->tracking()->create([
+            'name' => 'Client GPS',
+        ]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $client->id,
             'assigned_at' => now(),
+            'consent_id' => $consent->id,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -110,14 +129,22 @@ class LocationHardwareRetirementTest extends TestCase
 
     public function test_resident_tracking_reads_from_canonical_devices(): void
     {
-        $client = Client::factory()->create(['status' => 'active']);
+        $client = Client::factory()->create([
 
-        $device = Device::factory()->tracking()->create(['name' => 'Resident Pendant']);
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
+        $consent = $this->createFleetTrackingConsent($client);
+
+        $device = Device::factory()->tracking()->create([
+            'name' => 'Resident Pendant',
+        ]);
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $client->id,
             'assigned_at' => now(),
+            'consent_id' => $consent->id,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -145,8 +172,10 @@ class LocationHardwareRetirementTest extends TestCase
         $response->assertInertia(function ($page) {
             $devices = $page->toArray()['props']['syncedDevices'];
             $this->assertCount(1, $devices);
-            $this->assertArrayHasKey('device_uid', $devices[0]);
-            $this->assertArrayHasKey('detail_url', $devices[0]);
+            $this->assertArrayNotHasKey('device_uid', $devices[0]);
+            foreach (['id', 'name', 'status', 'health_status', 'detail_url'] as $field) {
+                $this->assertArrayHasKey($field, $devices[0]);
+            }
         });
     }
 
@@ -169,10 +198,41 @@ class LocationHardwareRetirementTest extends TestCase
 
     public function test_location_hardware_model_has_deprecation_annotation(): void
     {
-        $reflection = new \ReflectionClass(\App\Models\LocationHardware::class);
+        $reflection = new \ReflectionClass(LocationHardware::class);
         $docComment = $reflection->getDocComment();
 
         $this->assertNotFalse($docComment);
         $this->assertStringContainsString('@deprecated', $docComment);
+    }
+
+    private function createFleetTrackingConsent(Client $client): ClientConsent
+    {
+        return $this->createActiveTrackingConsent($client, 'Fleet Tracking');
+    }
+
+    private function createActiveTrackingConsent(Client $client, string $typeName): ClientConsent
+    {
+        $type = ConsentType::firstOrCreate(
+            ['name' => $typeName],
+            [
+                'category' => 'operational',
+                'description' => 'Vehicle / tracker GPS consent',
+                'purpose' => 'Tracker location collection',
+                'legal_basis' => 'consent',
+                'active' => true,
+            ],
+        );
+
+        return ClientConsent::create([
+            'client_id' => $client->id,
+            'consent_type_id' => $type->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'expires_at' => now()->addMonth(),
+            'given_by_user_id' => $this->admin->id,
+            'given_method' => 'electronic',
+            'created_by' => $this->admin->id,
+            'updated_by' => $this->admin->id,
+        ]);
     }
 }

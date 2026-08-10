@@ -13,7 +13,6 @@ class UserInvitation extends Model
         'email',
         'name',
         'user_type',
-        'staff_id',
         'client_id',
         'next_of_kin_id',
         'token',
@@ -48,7 +47,8 @@ class UserInvitation extends Model
     }
 
     /**
-     * Associated staff record
+     * Read-only compatibility for invitation rows awaiting a governed move
+     * from the legacy staff foreign key to canonical employee provenance.
      */
     public function staff()
     {

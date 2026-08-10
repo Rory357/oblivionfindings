@@ -7,11 +7,11 @@ use App\Models\CredentialType;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
-use App\Models\SiteVendor;
 use App\Services\Sites\SiteCredentialEncryptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -23,7 +23,7 @@ class SiteCredentialController extends Controller
 
     public function index(Request $request, Site $site)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
 
         // The per-site credentials index has been retired in favour of the
         // unified Vendor Directory & Access Vault (sites.vendors.global). The
@@ -37,12 +37,17 @@ class SiteCredentialController extends Controller
 
     public function store(Request $request, Site $site)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.manage') || abort(403);
 
         $validated = $request->validate([
             'label' => 'required|string|max:255',
-            'credential_type' => 'required|string|max:30',
+            'credential_type' => [
+                'required',
+                'string',
+                'max:30',
+                Rule::in(CredentialType::pickerOptions()->pluck('key')->all()),
+            ],
             'value' => 'required|string',
             'username' => 'nullable|string|max:255',
             'url' => ['nullable', 'string', 'max:2048', $this->credentialHttpUrlRule()],
@@ -57,87 +62,79 @@ class SiteCredentialController extends Controller
             // Operator pastes an existing TOTP secret (Base32) from the
             // external service. Oblivion becomes the authenticator app
             // for that secret; we never generate one ourselves.
-            'totp_secret' => 'nullable|string|max:512',
+            'totp_secret' => ['nullable', 'string', 'max:128', $this->credentialTotpSecretRule()],
         ]);
 
         $encrypted = $this->encryptionService->encrypt($validated['value']);
         $totpSecret = $this->normalizeTotpSecret($validated['totp_secret'] ?? null);
 
-        $credential = SiteCredential::create([
-            'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
-            'vendor_id' => $validated['vendor_id'] ?? null,
-            'label' => $validated['label'],
-            'username' => $validated['username'] ?? null,
-            'url' => $validated['url'] ?? null,
-            'credential_type' => $validated['credential_type'],
-            'encrypted_value' => $encrypted['value'],
-            'iv' => null,
-            'notes' => $validated['notes'] ?? null,
-            'requires_reauth' => $validated['requires_reauth'] ?? false,
-            'is_shareable' => $validated['is_shareable'] ?? false,
-            'password_strength' => $validated['password_strength'] ?? null,
-            'totp_secret_encrypted' => $totpSecret
-                ? Crypt::encryptString($totpSecret)
-                : null,
-            'totp_issuer' => $totpSecret ? $site->name : null,
-            'totp_account' => $totpSecret
-                ? ($validated['username'] ?? $validated['label'])
-                : null,
-            'last_rotated_at' => now(),
-            'last_rotated_by_user_id' => $request->user()->id,
-        ]);
+        DB::transaction(function () use ($encrypted, $request, $site, $totpSecret, $validated): void {
+            $credential = SiteCredential::query()->create([
+                'site_id' => $site->id,
+                'vendor_id' => $validated['vendor_id'] ?? null,
+                'label' => $validated['label'],
+                'username' => $validated['username'] ?? null,
+                'url' => $validated['url'] ?? null,
+                'credential_type' => $validated['credential_type'],
+                'encrypted_value' => $encrypted['value'],
+                'iv' => null,
+                'notes' => $validated['notes'] ?? null,
+                'requires_reauth' => $validated['requires_reauth'] ?? false,
+                'is_shareable' => $validated['is_shareable'] ?? false,
+                'password_strength' => $validated['password_strength'] ?? null,
+                'totp_secret_encrypted' => $totpSecret
+                    ? Crypt::encryptString($totpSecret)
+                    : null,
+                'totp_issuer' => $totpSecret ? $site->name : null,
+                'totp_account' => $totpSecret
+                    ? ($validated['username'] ?? $validated['label'])
+                    : null,
+                'last_rotated_at' => now(),
+                'last_rotated_by_user_id' => $request->user()->id,
+            ]);
 
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'create',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
+            $this->recordCredentialAudit($request, $site, $credential, 'create');
+        }, attempts: 1);
 
         return back(303)->with('success', 'Credential added successfully.');
     }
 
     public function reveal(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.reveal') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
-        if ($reauthResponse = $this->ensureCredentialReauth($request, $site, $credential)) {
-            return $reauthResponse;
-        }
+        return DB::transaction(function () use ($credential, $request, $site) {
+            $locked = $this->lockedCredential($site, (int) $credential->id);
+            if ($reauthResponse = $this->ensureCredentialReauth($request, $site, $locked)) {
+                return $reauthResponse;
+            }
 
-        // Audit log
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'reveal',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
+            $value = $this->encryptionService->decrypt($locked->encrypted_value);
+            $this->recordCredentialAudit($request, $site, $locked, 'reveal');
 
-        $value = $this->encryptionService->decrypt($credential->encrypted_value);
-
-        return response()->json([
-            'value' => $value,
-        ]);
+            return response()->json(['value' => $value]);
+        }, attempts: 1);
     }
 
     public function update(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.manage') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
         $validated = $request->validate([
             'label' => 'required|string|max:255',
-            'credential_type' => 'required|string|max:30',
+            'credential_type' => [
+                'required',
+                'string',
+                'max:30',
+                Rule::in(array_values(array_unique([
+                    ...CredentialType::pickerOptions()->pluck('key')->all(),
+                    $credential->credential_type,
+                ]))),
+            ],
             'value' => 'nullable|string',
             'username' => 'nullable|string|max:255',
             'url' => ['nullable', 'string', 'max:2048', $this->credentialHttpUrlRule()],
@@ -151,7 +148,7 @@ class SiteCredentialController extends Controller
             'password_strength' => 'nullable|integer|min:0|max:4',
             // Blank = keep existing TOTP secret; non-blank = replace.
             // Removal is via the dedicated DELETE /totp endpoint.
-            'totp_secret' => 'nullable|string|max:512',
+            'totp_secret' => ['nullable', 'string', 'max:128', $this->credentialTotpSecretRule()],
         ]);
 
         $updateData = [
@@ -178,61 +175,37 @@ class SiteCredentialController extends Controller
                 ?? ($validated['username'] ?? $validated['label']);
         }
 
-        // If value provided, re-encrypt
-        if (!empty($validated['value'])) {
+        $auditAction = 'edit';
+        if (! empty($validated['value'])) {
             $encrypted = $this->encryptionService->encrypt($validated['value']);
             $updateData['encrypted_value'] = $encrypted['value'];
             $updateData['iv'] = null;
             $updateData['last_rotated_at'] = now();
             $updateData['last_rotated_by_user_id'] = $request->user()->id;
             $updateData['password_strength'] = $validated['password_strength'] ?? null;
-
-            // Audit rotation
-            SiteCredentialAuditLog::create([
-                'credential_id' => $credential->id,
-                'tenant_id' => $site->tenant_id,
-                'user_id' => $request->user()->id,
-                'action' => 'rotate',
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'created_at' => now(),
-            ]);
-        } else {
-            // Audit edit
-            SiteCredentialAuditLog::create([
-                'credential_id' => $credential->id,
-                'tenant_id' => $site->tenant_id,
-                'user_id' => $request->user()->id,
-                'action' => 'edit',
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'created_at' => now(),
-            ]);
+            $auditAction = 'rotate';
         }
 
-        $credential->update($updateData);
+        DB::transaction(function () use ($auditAction, $credential, $request, $site, $updateData): void {
+            $locked = $this->lockedCredential($site, (int) $credential->id);
+            $locked->update($updateData);
+            $this->recordCredentialAudit($request, $site, $locked->refresh(), $auditAction);
+        }, attempts: 1);
 
         return back(303)->with('success', 'Credential updated successfully.');
     }
 
     public function destroy(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.manage') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
-        // Audit deletion
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'delete',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
-
-        $credential->delete();
+        DB::transaction(function () use ($credential, $request, $site): void {
+            $locked = $this->lockedCredential($site, (int) $credential->id);
+            $this->recordCredentialAudit($request, $site, $locked, 'delete');
+            $locked->delete();
+        }, attempts: 1);
 
         return back(303)->with('success', 'Credential deleted successfully.');
     }
@@ -244,24 +217,18 @@ class SiteCredentialController extends Controller
      */
     public function rotate(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.manage') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
-        $credential->update([
-            'last_rotated_at' => now(),
-            'last_rotated_by_user_id' => $request->user()->id,
-        ]);
-
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'rotate',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
+        DB::transaction(function () use ($credential, $request, $site): void {
+            $locked = $this->lockedCredential($site, (int) $credential->id);
+            $locked->update([
+                'last_rotated_at' => now(),
+                'last_rotated_by_user_id' => $request->user()->id,
+            ]);
+            $this->recordCredentialAudit($request, $site, $locked->refresh(), 'rotate');
+        }, attempts: 1);
 
         return back(303)->with('success', 'Marked as rotated today.');
     }
@@ -272,7 +239,7 @@ class SiteCredentialController extends Controller
      */
     public function toggleReauth(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.manage') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
@@ -280,17 +247,11 @@ class SiteCredentialController extends Controller
             'requires_reauth' => 'required|boolean',
         ]);
 
-        $credential->update(['requires_reauth' => $validated['requires_reauth']]);
-
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'edit',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
+        DB::transaction(function () use ($credential, $request, $site, $validated): void {
+            $locked = $this->lockedCredential($site, (int) $credential->id);
+            $locked->update(['requires_reauth' => $validated['requires_reauth']]);
+            $this->recordCredentialAudit($request, $site, $locked->refresh(), 'edit');
+        }, attempts: 1);
 
         return back(303)->with(
             'success',
@@ -300,63 +261,51 @@ class SiteCredentialController extends Controller
 
     public function totpCode(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.reveal') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
-        if (empty($credential->totp_secret_encrypted)) {
-            abort(404, 'No authenticator configured for this credential.');
-        }
+        return DB::transaction(function () use ($credential, $request, $site) {
+            $locked = $this->lockedCredential($site, (int) $credential->id);
+            if (empty($locked->totp_secret_encrypted)) {
+                abort(404, 'No authenticator configured for this credential.');
+            }
 
-        if ($reauthResponse = $this->ensureCredentialReauth($request, $site, $credential)) {
-            return $reauthResponse;
-        }
+            if ($reauthResponse = $this->ensureCredentialReauth($request, $site, $locked)) {
+                return $reauthResponse;
+            }
 
-        $secret = Crypt::decryptString($credential->totp_secret_encrypted);
-        $google2fa = new Google2FA();
-        $code = $google2fa->getCurrentOtp($secret);
+            $secret = Crypt::decryptString($locked->totp_secret_encrypted);
+            $google2fa = new Google2FA;
+            $code = $google2fa->getCurrentOtp($secret);
+            $window = 30;
+            $secondsRemaining = $window - (now()->timestamp % $window);
 
-        $window = 30;
-        $secondsRemaining = $window - (now()->timestamp % $window);
+            $this->recordCredentialAudit($request, $site, $locked, 'totp_code');
 
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'totp_code',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
-
-        return response()->json([
-            'code' => $code,
-            'seconds_remaining' => $secondsRemaining,
-            'period' => $window,
-        ]);
+            return response()->json([
+                'code' => $code,
+                'seconds_remaining' => $secondsRemaining,
+                'period' => $window,
+            ]);
+        }, attempts: 1);
     }
 
     public function removeTotp(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.manage') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
-        $credential->update([
-            'totp_secret_encrypted' => null,
-            'totp_issuer' => null,
-            'totp_account' => null,
-        ]);
-
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'totp_remove',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
+        DB::transaction(function () use ($credential, $request, $site): void {
+            $locked = $this->lockedCredential($site, (int) $credential->id);
+            $locked->update([
+                'totp_secret_encrypted' => null,
+                'totp_issuer' => null,
+                'totp_account' => null,
+            ]);
+            $this->recordCredentialAudit($request, $site, $locked->refresh(), 'totp_remove');
+        }, attempts: 1);
 
         return back(303)->with('success', 'Authenticator removed.');
     }
@@ -372,6 +321,7 @@ class SiteCredentialController extends Controller
         }
 
         $clean = strtoupper(preg_replace('/\s+/', '', $raw));
+
         return $clean === '' ? null : $clean;
     }
 
@@ -389,6 +339,22 @@ class SiteCredentialController extends Controller
                 || ! in_array(strtolower((string) $scheme), ['http', 'https'], true)
             ) {
                 $fail('The :attribute must be a valid http or https URL.');
+            }
+        };
+    }
+
+    private function credentialTotpSecretRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            $normalized = is_string($value)
+                ? strtoupper((string) preg_replace('/\s+/', '', $value))
+                : '';
+            if (strlen($normalized) < 16 || preg_match('/^[A-Z2-7]+$/', $normalized) !== 1) {
+                $fail('The :attribute must be a valid Base32 authenticator secret.');
             }
         };
     }
@@ -434,15 +400,7 @@ class SiteCredentialController extends Controller
     private function recordCredentialAuditSafely(Request $request, Site $site, SiteCredential $credential, string $action): void
     {
         try {
-            SiteCredentialAuditLog::create([
-                'credential_id' => $credential->id,
-                'tenant_id' => $site->tenant_id,
-                'user_id' => $request->user()->id,
-                'action' => $action,
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'created_at' => now(),
-            ]);
+            $this->recordCredentialAudit($request, $site, $credential, $action);
         } catch (\Throwable $e) {
             report($e);
         }
@@ -450,10 +408,13 @@ class SiteCredentialController extends Controller
 
     public function auditLog(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
+        $request->user()->canDo('credentials.reveal') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
-        $logs = SiteCredentialAuditLog::where('credential_id', $credential->id)
+        $logs = SiteCredentialAuditLog::query()
+            ->where('site_id', $site->id)
+            ->where('credential_id', $credential->id)
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->paginate(50);
@@ -473,19 +434,14 @@ class SiteCredentialController extends Controller
 
     public function copy(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('view', $site);
+        $this->concealSite($request, $site);
         $request->user()->canDo('credentials.reveal') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
-        SiteCredentialAuditLog::create([
-            'credential_id' => $credential->id,
-            'tenant_id' => $site->tenant_id,
-            'user_id' => $request->user()->id,
-            'action' => 'copy',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'created_at' => now(),
-        ]);
+        DB::transaction(function () use ($credential, $request, $site): void {
+            $locked = $this->lockedCredential($site, (int) $credential->id);
+            $this->recordCredentialAudit($request, $site, $locked, 'copy');
+        }, attempts: 1);
 
         return response()->json(['ok' => true]);
     }
@@ -495,5 +451,37 @@ class SiteCredentialController extends Controller
         if ($credential->site_id !== $site->id) {
             abort(404);
         }
+    }
+
+    private function concealSite(Request $request, Site $site): void
+    {
+        abort_unless($request->user()?->can('view', $site) === true, 404);
+    }
+
+    private function lockedCredential(Site $site, int $credentialId): SiteCredential
+    {
+        return SiteCredential::query()
+            ->where('site_id', $site->id)
+            ->lockForUpdate()
+            ->findOrFail($credentialId);
+    }
+
+    private function recordCredentialAudit(
+        Request $request,
+        Site $site,
+        SiteCredential $credential,
+        string $action,
+    ): SiteCredentialAuditLog {
+        return SiteCredentialAuditLog::query()->create([
+            'credential_id' => $credential->id,
+            'site_id' => $site->id,
+            'credential_label' => $credential->label,
+            'credential_type' => $credential->credential_type,
+            'user_id' => $request->user()->id,
+            'action' => $action,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
     }
 }

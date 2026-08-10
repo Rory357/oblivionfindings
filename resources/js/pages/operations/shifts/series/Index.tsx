@@ -1,8 +1,8 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 
@@ -79,7 +79,8 @@ export default function ShiftSeriesIndex({ series, canManageAny }: Props) {
         >
             <Head title="Recurring series" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    variant="compact"
                     title="Recurring series"
                     description="Review recurring roster patterns, open occurrences, and recurring shifts that need attention."
                     actions={

@@ -4,7 +4,10 @@
 import { router } from '@inertiajs/react';
 import { Car, ClipboardCheck, Download, Plus, ShieldCheck } from 'lucide-react';
 
-import { ComplianceTabs, type ComplianceTab } from '@/components/hr/compliance-tabs';
+import {
+    ComplianceTabs,
+    type ComplianceTab,
+} from '@/components/hr/compliance-tabs';
 import { ComplianceHubHero, type HeroChip } from './compliance-hero';
 import type { WizardType } from './compliance-wizards';
 
@@ -52,38 +55,109 @@ export function ComplianceHubHeader({
     onWizard: (type: WizardType) => void;
 }) {
     const s = hero.summary;
-    const pct = s.total_staff > 0 ? Math.round((s.fully_compliant / s.total_staff) * 100) : 0;
+    const pct =
+        s.total_staff > 0
+            ? Math.round((s.fully_compliant / s.total_staff) * 100)
+            : 0;
 
     const stats = [
-        { label: 'Staff tracked', value: s.total_staff, onClick: () => go('/hr/compliance') },
-        { label: 'Fully compliant', value: `${pct}%`, onClick: () => applyOverviewStatus('fully_compliant') },
-        { label: 'Expiring ≤30d', value: s.expiring_total, amber: true, onClick: () => go('/hr/compliance/calendar') },
-        { label: 'Expired', value: s.expired_total, amber: true, onClick: () => applyOverviewStatus('has_expired') },
-        { label: 'Hard-stops', value: s.hard_stops, amber: true, onClick: () => applyOverviewStatus('has_expired') },
-        { label: 'Shifts affected', value: s.shifts_affected, onClick: () => go('/hr/compliance/calendar') },
+        {
+            label: 'Staff tracked',
+            value: s.total_staff,
+            onClick: () => go('/hr/compliance'),
+        },
+        {
+            label: 'Fully compliant',
+            value: `${pct}%`,
+            onClick: () => applyOverviewStatus('fully_compliant'),
+        },
+        {
+            label: 'Expiring ≤30d',
+            value: s.expiring_total,
+            amber: true,
+            onClick: () => go('/hr/compliance/calendar'),
+        },
+        {
+            label: 'Expired',
+            value: s.expired_total,
+            amber: true,
+            onClick: () => applyOverviewStatus('has_expired'),
+        },
+        {
+            label: 'Hard-stops',
+            value: s.hard_stops,
+            amber: true,
+            onClick: () => applyOverviewStatus('hard_stop'),
+        },
+        {
+            label: 'Shifts affected',
+            value: s.shifts_affected,
+            onClick: () => go('/hr/compliance/calendar'),
+        },
     ];
 
     const actions = [
         ...(can.manage
             ? [
-                  { icon: ClipboardCheck, label: 'Record compliance', onClick: () => onWizard('record') },
-                  { icon: Plus, label: 'Add requirement', onClick: () => onWizard('requirement') },
+                  {
+                      icon: ClipboardCheck,
+                      label: 'Record compliance',
+                      onClick: () => onWizard('record'),
+                  },
+                  {
+                      icon: Plus,
+                      label: 'Add requirement',
+                      onClick: () => onWizard('requirement'),
+                  },
               ]
             : []),
-        ...(can.vetting ? [{ icon: ShieldCheck, label: 'Add vetting check', onClick: () => onWizard('vetting') }] : []),
-        ...(can.driver ? [{ icon: Car, label: 'Add driver', onClick: () => onWizard('driver') }] : []),
-        { icon: Download, label: 'Export', onClick: () => go('/hr/compliance/export?dataset=staff') },
+        ...(can.vetting
+            ? [
+                  {
+                      icon: ShieldCheck,
+                      label: 'Add vetting check',
+                      onClick: () => onWizard('vetting'),
+                  },
+              ]
+            : []),
+        ...(can.driver
+            ? [
+                  {
+                      icon: Car,
+                      label: 'Add driver',
+                      onClick: () => onWizard('driver'),
+                  },
+              ]
+            : []),
+        {
+            icon: Download,
+            label: 'Export',
+            onClick: () => go('/hr/compliance/export?dataset=staff'),
+        },
     ];
 
     const needs = hero.needs.map((n) => ({
         key: n.key,
         label: n.label,
-        onClick: () => (n.status ? applyOverviewStatus(n.status) : go(`/hr/compliance/${n.tab === 'calendar' ? 'calendar' : ''}`)),
+        onClick: () =>
+            n.status
+                ? applyOverviewStatus(n.status)
+                : go(
+                      `/hr/compliance/${n.tab === 'calendar' ? 'calendar' : ''}`,
+                  ),
     }));
 
     return (
         <>
-            <ComplianceHubHero today={todayLabel} role={hero.role} site={hero.site} chips={hero.chips} stats={stats} actions={actions} needs={needs} />
+            <ComplianceHubHero
+                today={todayLabel}
+                role={hero.role}
+                site={hero.site}
+                chips={hero.chips}
+                stats={stats}
+                actions={actions}
+                needs={needs}
+            />
             <ComplianceTabs active={active} counts={counts} />
         </>
     );

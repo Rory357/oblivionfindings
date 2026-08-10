@@ -96,7 +96,9 @@ describe('job board audit fixes', () => {
             />,
         );
 
-        expect(screen.getByText('Pending').parentElement).toHaveTextContent('2');
+        expect(screen.getByText('Pending').parentElement).toHaveTextContent(
+            '2',
+        );
     });
 
     it('shows the combined week number and date range in the picker button', () => {

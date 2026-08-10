@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\Log;
  */
 class HouseLedgerEntryObserver
 {
+    /** Finance storage still requires one inert single-application value. */
+    private const FINANCE_APPLICATION_CONTEXT = 1;
+
     public function created(HouseLedgerEntry $entry): void
     {
         if ($entry->entry_type === 'transfer') {
@@ -40,11 +43,6 @@ class HouseLedgerEntryObserver
                 return;
             }
 
-            $orgId = $entry->tenant_id ?? $ledger->tenant_id;
-            if (! $orgId) {
-                return;
-            }
-
             $siteId = $ledger->site_id;
             $amount = (string) abs((float) $entry->amount);
 
@@ -55,12 +53,12 @@ class HouseLedgerEntryObserver
             }
 
             ProcessFinancialEventJob::dispatch([
-                'organization_id' => $orgId,
+                'organization_id' => self::FINANCE_APPLICATION_CONTEXT,
                 'source_type' => HouseLedgerEntry::class,
                 'source_id' => $entry->id,
                 'event_type' => $eventType,
                 'description' => "House ledger [{$entry->entry_type}]: {$entry->description}"
-                    . " ({$entry->category})",
+                    ." ({$entry->category})",
                 'amount' => $amount,
                 'event_date' => $entry->entry_date->toDateString(),
                 'debit_account_code' => $debitCode,

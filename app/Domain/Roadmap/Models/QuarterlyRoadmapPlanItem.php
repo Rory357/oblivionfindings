@@ -3,6 +3,7 @@
 namespace App\Domain\Roadmap\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -11,11 +12,11 @@ class QuarterlyRoadmapPlanItem extends Model
 {
     use AuditableChanges;
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_quarterly_plan_items';
 
     protected $fillable = [
-        'tenant_id',
         'quarterly_plan_id',
         'initiative_id',
         'rank',

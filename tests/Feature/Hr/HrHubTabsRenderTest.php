@@ -2,6 +2,7 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -9,11 +10,11 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'HR Hub Render Site']);
 
     // hr role holds ALL hr.* permissions (SeedHrPermissionsSeeder), so it can
     // reach every page in every hub.
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -25,12 +26,13 @@ beforeEach(function () {
     // my/documents firstOrFail()s on it), so the self-service user needs one —
     // the realistic case for an employee viewing their own My HR pages.
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->hr->id,
         'employee_number' => 'EMP-HUB-'.$this->hr->id,
         'work_email' => 'hub'.$this->hr->id.'@example.test',
         'position_title' => 'HR Administrator',
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,

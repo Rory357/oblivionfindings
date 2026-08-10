@@ -9,14 +9,27 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import {
     HealthClinicalShell,
     type HealthClinicalKpis,
 } from '@/pages/health-clinical/components/health-clinical-shell';
-import { TrendChartsGrid, type TrendSetsMap } from '@/pages/health-clinical/components/trend-charts';
-import { cn } from '@/lib/utils';
+import {
+    TrendChartsGrid,
+    type TrendSetsMap,
+} from '@/pages/health-clinical/components/trend-charts';
 import { Link, router } from '@inertiajs/react';
-import { ArrowUpRight, Filter, LineChart, Link2, type LucideIcon, Pill, Scale, ShieldAlert, TrendingUp } from 'lucide-react';
+import {
+    ArrowUpRight,
+    Filter,
+    LineChart,
+    Link2,
+    Pill,
+    Scale,
+    ShieldAlert,
+    TrendingUp,
+    type LucideIcon,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type ClientRef = { id: number; first_name: string; last_name: string };
@@ -54,7 +67,10 @@ const SIGNAL_ICON: Record<string, LucideIcon> = {
     falls_hs: ShieldAlert,
 };
 
-const SIGNAL_TONE: Record<TrendSignal['tone'], { wrap: string; chip: string; icon: string }> = {
+const SIGNAL_TONE: Record<
+    TrendSignal['tone'],
+    { wrap: string; chip: string; icon: string }
+> = {
     crit: {
         wrap: 'border-status-critical/40 bg-status-critical-bg',
         chip: 'bg-status-critical/10 text-status-critical',
@@ -77,14 +93,26 @@ function SignalCard({ signal }: { signal: TrendSignal }) {
     const tone = SIGNAL_TONE[signal.tone] ?? SIGNAL_TONE.info;
 
     return (
-        <div className={cn('flex flex-col gap-3 rounded-xl border p-4', tone.wrap)}>
+        <div
+            className={cn(
+                'flex flex-col gap-3 rounded-xl border p-4',
+                tone.wrap,
+            )}
+        >
             <div className="flex items-start gap-3">
-                <span className={cn('mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg', tone.chip)}>
+                <span
+                    className={cn(
+                        'mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg',
+                        tone.chip,
+                    )}
+                >
                     <Icon className={cn('h-4 w-4', tone.icon)} />
                 </span>
                 <div className="min-w-0">
                     <h3 className="text-sm font-semibold">{signal.title}</h3>
-                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{signal.body}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        {signal.body}
+                    </p>
                 </div>
             </div>
             {signal.metrics.length > 0 ? (
@@ -94,8 +122,12 @@ function SignalCard({ signal }: { signal: TrendSignal }) {
                             key={m.label}
                             className="inline-flex items-baseline gap-1.5 rounded-md bg-background/60 px-2 py-1 text-xs"
                         >
-                            <span className="font-semibold tabular-nums">{m.value}</span>
-                            <span className="text-muted-foreground">{m.label}</span>
+                            <span className="font-semibold tabular-nums">
+                                {m.value}
+                            </span>
+                            <span className="text-muted-foreground">
+                                {m.label}
+                            </span>
                         </span>
                     ))}
                 </div>
@@ -111,8 +143,20 @@ function SignalCard({ signal }: { signal: TrendSignal }) {
     );
 }
 
-export default function Trends({ clients, selected_client, filters, trend_sets, trend_signals, kpis, tab_counts }: Props) {
-    const [local, setLocal] = useState<{ client_id: string; date_from: string; date_to: string }>({
+export default function Trends({
+    clients,
+    selected_client,
+    filters,
+    trend_sets,
+    trend_signals,
+    kpis,
+    tab_counts,
+}: Props) {
+    const [local, setLocal] = useState<{
+        client_id: string;
+        date_from: string;
+        date_to: string;
+    }>({
         client_id: filters.client_id ? String(filters.client_id) : '',
         date_from: filters.date_from,
         date_to: filters.date_to,
@@ -124,7 +168,10 @@ export default function Trends({ clients, selected_client, filters, trend_sets, 
         if (next.client_id) params.client_id = next.client_id;
         if (next.date_from) params.date_from = next.date_from;
         if (next.date_to) params.date_to = next.date_to;
-        router.get('/health-clinical/trends', params, { preserveState: true, replace: true });
+        router.get('/health-clinical/trends', params, {
+            preserveState: true,
+            replace: true,
+        });
     };
 
     const onClientChange = (value: string) => {
@@ -133,10 +180,16 @@ export default function Trends({ clients, selected_client, filters, trend_sets, 
         apply({ client_id });
     };
 
-    const clientName = selected_client ? `${selected_client.first_name} ${selected_client.last_name}` : null;
+    const clientName = selected_client
+        ? `${selected_client.first_name} ${selected_client.last_name}`
+        : null;
 
     return (
-        <HealthClinicalShell activeTab="trends" kpis={kpis} tabCounts={tab_counts}>
+        <HealthClinicalShell
+            activeTab="trends"
+            kpis={kpis}
+            tabCounts={tab_counts}
+        >
             <Card>
                 <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-sm">
@@ -147,14 +200,22 @@ export default function Trends({ clients, selected_client, filters, trend_sets, 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="lg:col-span-2">
                             <Label className="text-xs">Client</Label>
-                            <Select value={local.client_id || NONE_SENTINEL} onValueChange={onClientChange}>
+                            <Select
+                                value={local.client_id || NONE_SENTINEL}
+                                onValueChange={onClientChange}
+                            >
                                 <SelectTrigger className="h-8 text-xs">
                                     <SelectValue placeholder="Select a client" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value={NONE_SENTINEL}>Select a client…</SelectItem>
+                                    <SelectItem value={NONE_SENTINEL}>
+                                        Select a client…
+                                    </SelectItem>
                                     {clients.map((c) => (
-                                        <SelectItem key={c.id} value={String(c.id)}>
+                                        <SelectItem
+                                            key={c.id}
+                                            value={String(c.id)}
+                                        >
                                             {c.first_name} {c.last_name}
                                         </SelectItem>
                                     ))}
@@ -167,7 +228,12 @@ export default function Trends({ clients, selected_client, filters, trend_sets, 
                                 type="date"
                                 className="h-8 text-xs"
                                 value={local.date_from}
-                                onChange={(e) => setLocal((c) => ({ ...c, date_from: e.target.value }))}
+                                onChange={(e) =>
+                                    setLocal((c) => ({
+                                        ...c,
+                                        date_from: e.target.value,
+                                    }))
+                                }
                             />
                         </div>
                         <div>
@@ -176,22 +242,40 @@ export default function Trends({ clients, selected_client, filters, trend_sets, 
                                 type="date"
                                 className="h-8 text-xs"
                                 value={local.date_to}
-                                onChange={(e) => setLocal((c) => ({ ...c, date_to: e.target.value }))}
+                                onChange={(e) =>
+                                    setLocal((c) => ({
+                                        ...c,
+                                        date_to: e.target.value,
+                                    }))
+                                }
                             />
                         </div>
                     </div>
                     <div className="mt-3 flex items-center gap-2">
-                        <Button size="sm" onClick={() => apply()} disabled={!local.client_id}>
+                        <Button
+                            size="sm"
+                            onClick={() => apply()}
+                            disabled={!local.client_id}
+                        >
                             Apply range
                         </Button>
                         {clientName ? (
                             <>
-                                <Link href={`/health-clinical/clients/${selected_client!.id}/trends`}>
-                                    <Button size="sm" variant="outline" className="gap-1.5">
-                                        Full client trends <ArrowUpRight className="h-3.5 w-3.5" />
+                                <Link
+                                    href={`/health-clinical/clients/${selected_client!.id}/trends`}
+                                >
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="gap-1.5"
+                                    >
+                                        Full client trends{' '}
+                                        <ArrowUpRight className="h-3.5 w-3.5" />
                                     </Button>
                                 </Link>
-                                <Link href={`/health-clinical/observations?client_id=${selected_client!.id}`}>
+                                <Link
+                                    href={`/health-clinical/observations?client_id=${selected_client!.id}`}
+                                >
                                     <Button size="sm" variant="ghost">
                                         Observation register
                                     </Button>
@@ -206,10 +290,13 @@ export default function Trends({ clients, selected_client, filters, trend_sets, 
                 <Card>
                     <CardContent className="flex h-[260px] flex-col items-center justify-center gap-2 text-center">
                         <LineChart className="h-10 w-10 text-muted-foreground/40" />
-                        <h2 className="text-lg font-semibold">Pick a client to chart their trends</h2>
+                        <h2 className="text-lg font-semibold">
+                            Pick a client to chart their trends
+                        </h2>
                         <p className="max-w-lg text-sm text-muted-foreground">
-                            Choose a client above to see their NEWS2 early-warning score, vitals, weight, pain and fluid-intake
-                            trends over the selected window.
+                            Choose a client above to see their NEWS2
+                            early-warning score, vitals, weight, pain and
+                            fluid-intake trends over the selected window.
                         </p>
                     </CardContent>
                 </Card>
@@ -218,7 +305,8 @@ export default function Trends({ clients, selected_client, filters, trend_sets, 
                     <div className="flex flex-wrap items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-primary" />
                         <h2 className="text-sm font-semibold">
-                            {clientName} · {filters.date_from} to {filters.date_to}
+                            {clientName} · {filters.date_from} to{' '}
+                            {filters.date_to}
                         </h2>
                     </div>
                     {trend_signals && trend_signals.length > 0 ? (

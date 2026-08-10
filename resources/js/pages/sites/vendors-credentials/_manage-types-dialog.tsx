@@ -1,5 +1,5 @@
 /**
- * Manage credential types — a full-window dialog over the tenant's credential
+ * Manage credential types — a full-window dialog over the application's credential
  * type registry (the taxonomy that powers the Add-credential tile picker).
  * Reads/writes `/credential-types`. Opened from the hero ⋯ menu.
  */
@@ -14,7 +14,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { router } from '@inertiajs/react';
 import {
@@ -27,7 +26,11 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { type FilterOption, FilterSelect, resolveCredentialIcon } from '../_dialog-shared';
+import {
+    type FilterOption,
+    FilterSelect,
+    resolveCredentialIcon,
+} from '../_dialog-shared';
 
 type TypeRow = {
     key: string;
@@ -45,7 +48,9 @@ function humanizeIcon(key: string): string {
 }
 
 function xsrf(): string {
-    return decodeURIComponent(document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '');
+    return decodeURIComponent(
+        document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
+    );
 }
 
 export function ManageCredentialTypesDialog({
@@ -60,7 +65,11 @@ export function ManageCredentialTypesDialog({
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
-    const [adding, setAdding] = useState<{ label: string; icon: string; description: string }>({
+    const [adding, setAdding] = useState<{
+        label: string;
+        icon: string;
+        description: string;
+    }>({
         label: '',
         icon: 'lock',
         description: '',
@@ -73,22 +82,37 @@ export function ManageCredentialTypesDialog({
         setAdding({ label: '', icon: 'lock', description: '' });
         fetch('/credential-types', {
             credentials: 'include',
-            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
         })
             .then(async (res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = (await res.json()) as { types: TypeRow[]; icons: string[] };
+                const data = (await res.json()) as {
+                    types: TypeRow[];
+                    icons: string[];
+                };
                 setRows(data.types ?? []);
                 setIcons(data.icons ?? []);
             })
-            .catch((e) => setError(e instanceof Error ? e.message : 'Could not load credential types.'))
+            .catch((e) =>
+                setError(
+                    e instanceof Error
+                        ? e.message
+                        : 'Could not load credential types.',
+                ),
+            )
             .finally(() => setLoading(false));
     }, [isOpen]);
 
     const update = (key: string, patch: Partial<TypeRow>) =>
-        setRows((list) => list.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+        setRows((list) =>
+            list.map((r) => (r.key === key ? { ...r, ...patch } : r)),
+        );
 
-    const remove = (key: string) => setRows((list) => list.filter((r) => r.key !== key));
+    const remove = (key: string) =>
+        setRows((list) => list.filter((r) => r.key !== key));
 
     const move = (index: number, delta: number) =>
         setRows((list) => {
@@ -102,7 +126,10 @@ export function ManageCredentialTypesDialog({
     const addType = () => {
         const label = adding.label.trim();
         if (!label) return;
-        const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        const key = label
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '');
         if (!key) return;
         if (rows.some((r) => r.key === key)) {
             toast.error('A type with that name already exists.');
@@ -153,7 +180,13 @@ export function ManageCredentialTypesDialog({
                 router.reload({ only: ['credentialTypeOptions'] });
                 onClose();
             })
-            .catch((e) => toast.error(e instanceof Error ? e.message : 'Could not save credential types.'))
+            .catch((e) =>
+                toast.error(
+                    e instanceof Error
+                        ? e.message
+                        : 'Could not save credential types.',
+                ),
+            )
             .finally(() => setSaving(false));
     };
 
@@ -167,7 +200,10 @@ export function ManageCredentialTypesDialog({
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className="max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
             >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
@@ -175,8 +211,9 @@ export function ManageCredentialTypesDialog({
                         Manage credential types
                     </DialogTitle>
                     <DialogDescription>
-                        Define the categories shown in the type picker when adding a credential.
-                        Types in use can be hidden but not deleted.
+                        Define the categories shown in the type picker when
+                        adding a credential. Types in use can be hidden but not
+                        deleted.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -186,7 +223,9 @@ export function ManageCredentialTypesDialog({
                         Loading types…
                     </div>
                 ) : error ? (
-                    <div className="py-12 text-center text-status-critical">{error}</div>
+                    <div className="py-12 text-center text-status-critical">
+                        {error}
+                    </div>
                 ) : (
                     <>
                         <div className="mt-2 space-y-2">
@@ -197,7 +236,9 @@ export function ManageCredentialTypesDialog({
                                     <div
                                         key={row.key}
                                         className={`flex items-center gap-2 rounded-xl border p-2.5 ${
-                                            row.active ? 'border-border bg-card/40' : 'border-border bg-muted/40 opacity-70'
+                                            row.active
+                                                ? 'border-border bg-card/40'
+                                                : 'border-border bg-muted/40 opacity-70'
                                         }`}
                                     >
                                         <div className="flex flex-col">
@@ -218,7 +259,9 @@ export function ManageCredentialTypesDialog({
                                                 size="icon"
                                                 className="h-5 w-6"
                                                 aria-label="Move down"
-                                                disabled={index === rows.length - 1}
+                                                disabled={
+                                                    index === rows.length - 1
+                                                }
                                                 onClick={() => move(index, 1)}
                                             >
                                                 <ArrowDown className="h-3.5 w-3.5" />
@@ -230,13 +273,22 @@ export function ManageCredentialTypesDialog({
                                         <div className="grid min-w-0 flex-1 gap-1 sm:grid-cols-2">
                                             <Input
                                                 value={row.label}
-                                                onChange={(e) => update(row.key, { label: e.target.value })}
+                                                onChange={(e) =>
+                                                    update(row.key, {
+                                                        label: e.target.value,
+                                                    })
+                                                }
                                                 aria-label={`${row.key} name`}
                                                 className="h-8"
                                             />
                                             <Input
                                                 value={row.description ?? ''}
-                                                onChange={(e) => update(row.key, { description: e.target.value })}
+                                                onChange={(e) =>
+                                                    update(row.key, {
+                                                        description:
+                                                            e.target.value,
+                                                    })
+                                                }
                                                 placeholder="Short description"
                                                 aria-label={`${row.key} description`}
                                                 className="h-8"
@@ -244,11 +296,17 @@ export function ManageCredentialTypesDialog({
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1.5">
                                             {row.count > 0 ? (
-                                                <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-border bg-muted text-muted-foreground"
+                                                >
                                                     {row.count} in use
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="outline" className="border-border text-muted-foreground">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="border-border text-muted-foreground"
+                                                >
                                                     Unused
                                                 </Badge>
                                             )}
@@ -262,9 +320,17 @@ export function ManageCredentialTypesDialog({
                                             )}
                                             <Switch
                                                 checked={row.active}
-                                                onCheckedChange={(v) => update(row.key, { active: !!v })}
+                                                onCheckedChange={(v) =>
+                                                    update(row.key, {
+                                                        active: !!v,
+                                                    })
+                                                }
                                                 disabled={row.system}
-                                                aria-label={row.active ? 'Visible' : 'Hidden'}
+                                                aria-label={
+                                                    row.active
+                                                        ? 'Visible'
+                                                        : 'Hidden'
+                                                }
                                             />
                                             <Button
                                                 type="button"
@@ -291,14 +357,21 @@ export function ManageCredentialTypesDialog({
                             <div className="flex flex-wrap items-center gap-2">
                                 <FilterSelect
                                     value={adding.icon}
-                                    onChange={(v) => setAdding((a) => ({ ...a, icon: v }))}
+                                    onChange={(v) =>
+                                        setAdding((a) => ({ ...a, icon: v }))
+                                    }
                                     options={iconOptions}
                                     widthClass="w-28"
                                     aria-label="Icon"
                                 />
                                 <Input
                                     value={adding.label}
-                                    onChange={(e) => setAdding((a) => ({ ...a, label: e.target.value }))}
+                                    onChange={(e) =>
+                                        setAdding((a) => ({
+                                            ...a,
+                                            label: e.target.value,
+                                        }))
+                                    }
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
@@ -311,7 +384,12 @@ export function ManageCredentialTypesDialog({
                                 />
                                 <Input
                                     value={adding.description}
-                                    onChange={(e) => setAdding((a) => ({ ...a, description: e.target.value }))}
+                                    onChange={(e) =>
+                                        setAdding((a) => ({
+                                            ...a,
+                                            description: e.target.value,
+                                        }))
+                                    }
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
@@ -322,7 +400,12 @@ export function ManageCredentialTypesDialog({
                                     aria-label="New type description"
                                     className="min-w-[140px] flex-1"
                                 />
-                                <Button type="button" variant="outline" onClick={addType} disabled={!adding.label.trim()}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={addType}
+                                    disabled={!adding.label.trim()}
+                                >
                                     <Plus className="mr-1 h-4 w-4" />
                                     Add
                                 </Button>
@@ -335,8 +418,14 @@ export function ManageCredentialTypesDialog({
                     <Button type="button" variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button type="button" onClick={save} disabled={saving || loading || !!error}>
-                        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button
+                        type="button"
+                        onClick={save}
+                        disabled={saving || loading || !!error}
+                    >
+                        {saving && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
                         Save changes
                     </Button>
                 </DialogFooter>

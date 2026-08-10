@@ -2,6 +2,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Sheet,
@@ -12,15 +13,14 @@ import {
 } from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, Link, router } from '@inertiajs/react';
 import {
     DndContext,
-    type DragEndEvent,
     KeyboardSensor,
     PointerSensor,
     closestCenter,
     useSensor,
     useSensors,
+    type DragEndEvent,
 } from '@dnd-kit/core';
 import {
     SortableContext,
@@ -30,6 +30,7 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Head, router } from '@inertiajs/react';
 import {
     BedDouble,
     GripVertical,
@@ -50,6 +51,8 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ConfirmAction } from '../_confirm-action';
+import { AssignAssetDialog, type AssetForPicker } from './_asset-dialogs';
 import {
     AddRoomDialog,
     AssignClientToRoomDialog,
@@ -59,12 +62,6 @@ import {
     type ClientForPicker,
     type RoomRecord,
 } from './_dialogs';
-import { ConfirmAction } from '../_confirm-action';
-import {
-    AssignAssetDialog,
-    type AssetForPicker,
-} from './_asset-dialogs';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ── Types (match SiteRoomController::index payload) ──────────────────────
 
@@ -181,7 +178,10 @@ function occupantName(c: {
         : full;
 }
 
-function initials(c: { first_name?: string | null; last_name?: string | null }) {
+function initials(c: {
+    first_name?: string | null;
+    last_name?: string | null;
+}) {
     return (
         ((c.first_name?.[0] ?? '') + (c.last_name?.[0] ?? '')).toUpperCase() ||
         '?'
@@ -224,7 +224,7 @@ export default function FullBedroomManagement({
 
     const [drawerRoomId, setDrawerRoomId] = useState<number | null>(null);
     const drawerRoom = drawerRoomId
-        ? orderedRooms.find((r) => r.id === drawerRoomId) ?? null
+        ? (orderedRooms.find((r) => r.id === drawerRoomId) ?? null)
         : null;
 
     const filtered = useMemo(() => {
@@ -233,9 +233,7 @@ export default function FullBedroomManagement({
             if (!showInactive && !r.is_active) return false;
             if (q) {
                 const hay = `${r.name} ${r.notes ?? ''} ${
-                    r.assigned_client
-                        ? occupantName(r.assigned_client)
-                        : ''
+                    r.assigned_client ? occupantName(r.assigned_client) : ''
                 }`.toLowerCase();
                 if (!hay.includes(q)) return false;
             }
@@ -345,7 +343,7 @@ export default function FullBedroomManagement({
                 <div className="flex flex-col gap-3 rounded-2xl border bg-card/40 p-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-1 items-center gap-2">
                         <div className="relative w-full md:max-w-sm">
-                            <Search className="pointer-events-none absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Search className="pointer-events-none absolute top-2.5 left-2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -603,7 +601,12 @@ function BedroomsHero({
             description="Track who lives where, attach the assets that belong in each room, surface safeguarding flags and print door cards for night shift."
             meta={
                 metaParts.length > 0
-                    ? [{ label: `${site.name} · ${metaParts.join(' · ')}`, href: `/sites/${site.id}` }]
+                    ? [
+                          {
+                              label: `${site.name} · ${metaParts.join(' · ')}`,
+                              href: `/sites/${site.id}`,
+                          },
+                      ]
                     : [{ label: site.name, href: `/sites/${site.id}` }]
             }
             badges={[
@@ -645,7 +648,12 @@ function BedroomsHero({
             ]}
             actions={
                 <>
-                    <Button type="button" size="sm" variant="outline" onClick={onAdd}>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={onAdd}
+                    >
                         <Plus className="mr-1 h-4 w-4" />
                         Add room
                     </Button>
@@ -706,7 +714,10 @@ function RoomSection({
                 </h4>
             </div>
             {count === 0 ? (
-                <GuardrailCard unstyled className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center">
+                <GuardrailCard
+                    unstyled
+                    className="flex flex-col items-center justify-center rounded-xl border border-dashed bg-background/40 py-8 text-center"
+                >
                     <Icon className={cn('h-5 w-5', iconCls, 'opacity-60')} />
                     <p className="mt-2 max-w-xs text-[11px] text-muted-foreground">
                         {emptyHint}
@@ -774,7 +785,8 @@ function SortableRoomCard({
                 >
                     <GripVertical className="h-4 w-4" />
                 </button>
-                <Button unstyled
+                <Button
+                    unstyled
                     type="button"
                     onClick={onOpen}
                     className="min-w-0 flex-1 text-left"
@@ -845,7 +857,8 @@ function SortableRoomCard({
             </div>
 
             {isAssignable && occupant && (
-                <Button unstyled
+                <Button
+                    unstyled
                     type="button"
                     onClick={onOpen}
                     className="flex items-center gap-2 rounded-lg border bg-background/40 px-2 py-1.5 text-left"
@@ -868,20 +881,26 @@ function SortableRoomCard({
                         <p className="truncate text-[10px] text-muted-foreground">
                             {occupant.key_worker?.name
                                 ? `Key worker: ${occupant.key_worker.name}`
-                                : occupant.status ?? 'Occupant'}
+                                : (occupant.status ?? 'Occupant')}
                         </p>
                     </div>
                 </Button>
             )}
 
             {isAssignable && !occupant && (
-                <GuardrailCard unstyled className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-[11px] text-muted-foreground">
+                <GuardrailCard
+                    unstyled
+                    className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-[11px] text-muted-foreground"
+                >
                     No occupant
                 </GuardrailCard>
             )}
 
             {!isAssignable && (
-                <GuardrailCard unstyled className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-[11px] text-muted-foreground">
+                <GuardrailCard
+                    unstyled
+                    className="rounded-lg border border-dashed bg-background/20 px-2 py-2 text-center text-[11px] text-muted-foreground"
+                >
                     Shared space — no client occupant
                 </GuardrailCard>
             )}
@@ -947,10 +966,10 @@ function RoomDrawer({
 }) {
     const detachAsset = (assetId: number) => {
         if (!room) return;
-        router.delete(
-            `/sites/${site.id}/rooms/${room.id}/assets/${assetId}`,
-            { preserveScroll: true, preserveState: true },
-        );
+        router.delete(`/sites/${site.id}/rooms/${room.id}/assets/${assetId}`, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     };
 
     return (
@@ -1038,23 +1057,25 @@ function RoomDrawer({
                                             : 'Assign client'}
                                     </Button>
                                 )}
-                                {room.is_assignable &&
-                                    room.assigned_client && (
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={onUnassignClient}
-                                        >
-                                            <UserX className="mr-1 h-3.5 w-3.5" />
-                                            Unassign
-                                        </Button>
-                                    )}
+                                {room.is_assignable && room.assigned_client && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={onUnassignClient}
+                                    >
+                                        <UserX className="mr-1 h-3.5 w-3.5" />
+                                        Unassign
+                                    </Button>
+                                )}
                             </div>
 
                             {room.assigned_client ? (
                                 <DrawerSection title="Occupant">
-                                    <GuardrailCard unstyled className="flex items-center gap-3 rounded-xl border bg-card/40 p-3">
+                                    <GuardrailCard
+                                        unstyled
+                                        className="flex items-center gap-3 rounded-xl border bg-card/40 p-3"
+                                    >
                                         <Avatar className="size-10">
                                             {room.assigned_client
                                                 .profile_photo_url && (
@@ -1069,9 +1090,7 @@ function RoomDrawer({
                                                 />
                                             )}
                                             <AvatarFallback>
-                                                {initials(
-                                                    room.assigned_client,
-                                                )}
+                                                {initials(room.assigned_client)}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="min-w-0 flex-1">
@@ -1123,7 +1142,7 @@ function RoomDrawer({
 
                             {room.notes && (
                                 <DrawerSection title="Notes">
-                                    <p className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm">
+                                    <p className="rounded-lg border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
                                         {room.notes}
                                     </p>
                                 </DrawerSection>
@@ -1166,8 +1185,7 @@ function RoomDrawer({
                                                             a.status,
                                                         ]
                                                             .filter(Boolean)
-                                                            .join(' · ') ||
-                                                            '—'}
+                                                            .join(' · ') || '—'}
                                                     </p>
                                                 </div>
                                                 <ConfirmAction
@@ -1206,7 +1224,8 @@ function RoomDrawer({
                                         {room.personal_assets.map((p) => {
                                             const ownerName = p.client
                                                 ? (() => {
-                                                      const full = `${p.client.first_name ?? ''} ${p.client.last_name ?? ''}`.trim();
+                                                      const full =
+                                                          `${p.client.first_name ?? ''} ${p.client.last_name ?? ''}`.trim();
                                                       return p.client
                                                           .preferred_name &&
                                                           p.client
@@ -1234,7 +1253,9 @@ function RoomDrawer({
                                                                         href={`/clients/${p.client_id}`}
                                                                         className="text-primary hover:underline"
                                                                     >
-                                                                        {ownerName}
+                                                                        {
+                                                                            ownerName
+                                                                        }
                                                                     </a>
                                                                     {' · '}
                                                                 </>
@@ -1339,7 +1360,7 @@ function DrawerSection({
     return (
         <section className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                     {title}
                 </h3>
                 {action}

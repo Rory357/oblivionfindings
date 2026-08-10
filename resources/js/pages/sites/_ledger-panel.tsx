@@ -299,8 +299,8 @@ export default function SiteLedgerPanel({ site, ledgerData }: Props) {
                         <div>
                             <p className="font-medium">No house ledger</p>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                House ledger entries are available for house
-                                and residential sites.
+                                House ledger entries are available for house and
+                                residential sites.
                             </p>
                         </div>
                     </CardContent>
@@ -464,15 +464,13 @@ export default function SiteLedgerPanel({ site, ledgerData }: Props) {
                                                         variant="outline"
                                                         className={
                                                             entryTypeClasses[
-                                                                entry
-                                                                    .entry_type
+                                                                entry.entry_type
                                                             ]
                                                         }
                                                     >
                                                         {
                                                             entryTypeLabels[
-                                                                entry
-                                                                    .entry_type
+                                                                entry.entry_type
                                                             ]
                                                         }
                                                     </Badge>
@@ -516,7 +514,8 @@ export default function SiteLedgerPanel({ site, ledgerData }: Props) {
                                                         '-'}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {entry.attachments?.length ? (
+                                                    {entry.attachments
+                                                        ?.length ? (
                                                         <Button
                                                             asChild
                                                             size="sm"
@@ -775,7 +774,9 @@ export default function SiteLedgerPanel({ site, ledgerData }: Props) {
                                     type="button"
                                     variant="outline"
                                     className="w-full justify-center border-dashed"
-                                    onClick={() => fileInputRef.current?.click()}
+                                    onClick={() =>
+                                        fileInputRef.current?.click()
+                                    }
                                 >
                                     <Upload className="h-4 w-4" />
                                     Upload receipt or invoice

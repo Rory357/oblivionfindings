@@ -3,15 +3,15 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\Audit\AuditLogViewService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AuditController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(private readonly AuditLogViewService $auditLogs) {}
 
     /**
      * Audit log viewer with filters.
@@ -19,53 +19,34 @@ class AuditController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
+        abort_unless($user && $user->canDo('audit.viewAny'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $logs = AuditLog::forOrganization($tenantId)
-            ->with('user:id,name,email')
-            ->when($request->query('user_id'), fn ($q, $userId) => $q->where('user_id', $userId))
-            ->when($request->query('action'), fn ($q, $action) => $q->where('action', $action))
-            ->when($request->query('model_type'), fn ($q, $type) => $q->where('auditable_type', $type))
-            ->when($request->query('date_from'), fn ($q, $from) => $q->where('created_at', '>=', $from))
-            ->when($request->query('date_to'), fn ($q, $to) => $q->where('created_at', '<=', $to.' 23:59:59'))
-            ->orderByDesc('created_at')
+        $filters = [
+            'module' => 'hr',
+            'user_id' => $request->integer('user_id') ?: null,
+            'action' => $request->string('action')->trim()->value() ?: null,
+            'date_from' => $request->string('date_from')->trim()->value() ?: null,
+            'date_to' => $request->string('date_to')->trim()->value() ?: null,
+        ];
+        $modelType = $request->string('model_type')->trim()->value() ?: null;
+        $logs = $this->auditLogs->query($filters)
+            ->when($modelType, fn ($query) => $query->where('auditable_type', $modelType))
             ->paginate(30)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (AuditLog $log): array => $this->legacyPageShape(
+                $this->auditLogs->present($log),
+            ));
 
-        $logs->through(function (AuditLog $log): array {
-            $meta = $log->meta ?? [];
-            $oldValues = $meta['old_values'] ?? $meta['old'] ?? null;
-            $newValues = $meta['new_values'] ?? $meta['new'] ?? null;
-
-            return [
-                'id' => $log->id,
-                'organization_id' => $log->organization_id,
-                'user_id' => $log->user_id,
-                'action' => $log->action,
-                'auditable_type' => $log->auditable_type,
-                'auditable_id' => $log->auditable_id,
-                'old_values' => $oldValues,
-                'new_values' => $newValues ?? ($oldValues === null ? $meta : null),
-                'ip_address' => $log->ip_address,
-                'user_agent' => $log->user_agent,
-                'created_at' => $log->created_at,
-                'user' => $log->user,
-            ];
-        });
-
-        // Get unique model types for the filter dropdown
-        $modelTypes = AuditLog::forOrganization($tenantId)
+        $hrLogs = $this->auditLogs->query(['module' => 'hr'])->reorder();
+        $modelTypes = (clone $hrLogs)
             ->select('auditable_type')
             ->whereNotNull('auditable_type')
             ->distinct()
             ->pluck('auditable_type')
             ->values();
 
-        // Get users who have audit entries for the filter dropdown
         $auditUsers = User::whereIn('id',
-            AuditLog::forOrganization($tenantId)
+            (clone $hrLogs)
                 ->select('user_id')
                 ->distinct()
                 ->whereNotNull('user_id')
@@ -76,7 +57,7 @@ class AuditController extends Controller
 
         return Inertia::render('hr/settings/audit-log', [
             'logs' => $logs,
-            'actions' => AuditLog::forOrganization($tenantId)
+            'actions' => (clone $hrLogs)
                 ->select('action')
                 ->distinct()
                 ->orderBy('action')
@@ -100,21 +81,34 @@ class AuditController extends Controller
     public function show(Request $request, string $type, int $id)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.settings.manage'), 403);
+        abort_unless($user && $user->canDo('audit.viewAny'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $logs = AuditLog::forOrganization($tenantId)
+        $logs = $this->auditLogs->query(['module' => 'hr'])
             ->where('auditable_type', $type)
             ->where('auditable_id', $id)
-            ->with('user:id,name,email')
-            ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(fn (AuditLog $log): array => $this->auditLogs->present($log));
 
         return response()->json([
             'auditable_type' => $type,
             'auditable_id' => $id,
             'entries' => $logs,
         ]);
+    }
+
+    /** @param array<string, mixed> $event */
+    private function legacyPageShape(array $event): array
+    {
+        return [
+            'id' => $event['id'],
+            'user_id' => $event['actor']['id'] ?? null,
+            'action' => $event['action'],
+            'auditable_type' => $event['subject_type'],
+            'auditable_id' => $event['subject_id'],
+            'old_values' => $event['properties']['before'],
+            'new_values' => $event['properties']['after'],
+            'created_at' => $event['created_at'],
+            'user' => $event['actor'],
+        ];
     }
 }

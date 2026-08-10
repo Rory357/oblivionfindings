@@ -1,19 +1,52 @@
 import AttentionBar from '@/components/emar/mar/attention-bar';
 import ClinicalRail from '@/components/emar/mar/clinical-rail';
-import DoseContextMenu, { type DoseCtxTarget } from '@/components/emar/mar/dose-context-menu';
+import DoseContextMenu, {
+    type DoseCtxTarget,
+} from '@/components/emar/mar/dose-context-menu';
 import MarGrid, { type MarGridMed } from '@/components/emar/mar/mar-grid';
 import PrnCard from '@/components/emar/mar/prn-card';
-import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat } from '@/components/page';
-import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
+import {
+    addDays,
+    DayPickerChip,
+    toYmd,
+} from '@/components/meds/day-picker-chip';
+import {
+    PageHero,
+    type PageHeroBadge,
+    type PageHeroMetaItem,
+    type PageHeroStat,
+} from '@/components/page';
+import {
+    EntityFilter,
+    TabStrip,
+    type RosterTabItem,
+} from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { addDays, DayPickerChip, toYmd } from '@/components/meds/day-picker-chip';
+import MarGovernanceDialogs, {
+    type MarModal,
+    type PendingCorrection,
+} from '@/pages/emar/components/mar-governance-dialogs';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
-import type { ClientInfo, NotGivenReasonOption, PrnMedication, ScheduleRow, WitnessOption } from '@/pages/meds/today/types';
-import MarGovernanceDialogs, { type MarModal, type PendingCorrection } from '@/pages/emar/components/mar-governance-dialogs';
+import type {
+    ClientInfo,
+    NotGivenReasonOption,
+    PrnMedication,
+    ScheduleRow,
+    WitnessOption,
+} from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
-import { CalendarDays, FileDown, HeartPulse, Home, Pill, Plus, Shield, User } from 'lucide-react';
+import {
+    CalendarDays,
+    FileDown,
+    HeartPulse,
+    Home,
+    Pill,
+    Plus,
+    Shield,
+    User,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 type Client = { id: number; first_name: string; last_name: string };
@@ -32,7 +65,13 @@ type MarData = {
         admin_rules?: { required_observations?: string[] | null } | null;
         dose_times: string[];
     }>;
-    attention_alerts?: Array<{ id: number; type: string; title: string; detail?: string | null; prompt_on_open: boolean }>;
+    attention_alerts?: Array<{
+        id: number;
+        type: string;
+        title: string;
+        detail?: string | null;
+        prompt_on_open: boolean;
+    }>;
     inr_records?: Array<{
         id: number;
         medication_name?: string | null;
@@ -44,7 +83,13 @@ type MarData = {
         medication_dose?: string | null;
         disabled_at?: string | null;
     }>;
-    syringe_drivers?: Array<{ id: number; status: string; rate?: string | null; rate_unit?: string | null; site_of_insertion?: string | null }>;
+    syringe_drivers?: Array<{
+        id: number;
+        status: string;
+        rate?: string | null;
+        rate_unit?: string | null;
+        site_of_insertion?: string | null;
+    }>;
     awaiting_verification?: Array<{ id: number; name: string; dosage: string }>;
     settings?: {
         care_level?: string | null;
@@ -56,7 +101,11 @@ type MarData = {
 
 type Props = {
     clients: Client[];
-    selectedClient: { id: number; first_name: string; last_name: string } | null;
+    selectedClient: {
+        id: number;
+        first_name: string;
+        last_name: string;
+    } | null;
     selected_client_info: ClientInfo | null;
     marData: MarData;
     date: string;
@@ -64,13 +113,31 @@ type Props = {
     prn_medications: PrnMedication[];
     witnesses: WitnessOption[];
     not_given_reasons: NotGivenReasonOption[];
-    board_user: { name: string; role_label: string | null; med_competent: boolean; cd_witness: boolean };
+    board_user: {
+        name: string;
+        role_label: string | null;
+        med_competent: boolean;
+        cd_witness: boolean;
+    };
     site_brand_colour: string | null;
-    allergies: Array<{ id: number; allergen: string; severity?: string | null }>;
+    allergies: Array<{
+        id: number;
+        allergen: string;
+        severity?: string | null;
+    }>;
     clientContext: {
         profile: { gp_name?: string | null } | null;
-        conditions: Array<{ id: number; label: string; severity?: string | null }>;
-        emergency_contacts: Array<{ id: number; name: string; relationship?: string | null; phone?: string | null }>;
+        conditions: Array<{
+            id: number;
+            label: string;
+            severity?: string | null;
+        }>;
+        emergency_contacts: Array<{
+            id: number;
+            name: string;
+            relationship?: string | null;
+            phone?: string | null;
+        }>;
     } | null;
     pendingCorrections: PendingCorrection[];
     can: {
@@ -120,7 +187,10 @@ export default function MarCharts(props: Props) {
 
     const [activeTab, setActiveTab] = useState('schedule');
     const [search, setSearch] = useState('');
-    const [recordTarget, setRecordTarget] = useState<{ row: ScheduleRow; outcome: 'given' | 'refused' | 'withheld' } | null>(null);
+    const [recordTarget, setRecordTarget] = useState<{
+        row: ScheduleRow;
+        outcome: 'given' | 'refused' | 'withheld';
+    } | null>(null);
     const [ctxTarget, setCtxTarget] = useState<DoseCtxTarget | null>(null);
     const [prnMedId, setPrnMedId] = useState<number | null>(null);
     const [modal, setModal] = useState<MarModal>(null);
@@ -130,12 +200,20 @@ export default function MarCharts(props: Props) {
 
     const goDate = (next: string) => {
         if (!info) return;
-        router.get('/emar/mar', { client_id: info.id, date: next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/emar/mar',
+            { client_id: info.id, date: next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const switchClient = (clientId: number | null) => {
         if (!clientId) return;
-        router.get('/emar/mar', { client_id: clientId, date }, { preserveState: true });
+        router.get(
+            '/emar/mar',
+            { client_id: clientId, date },
+            { preserveState: true },
+        );
     };
 
     // Chart-warnings prompt-on-open (1CHART "prompt when viewing patient"): when
@@ -143,7 +221,9 @@ export default function MarCharts(props: Props) {
     // the warnings dialog automatically — once per chart open per session (keyed
     // by client + date so revisiting the same chart doesn't nag).
     const infoId = info?.id ?? null;
-    const promptOnOpenCount = (marData.attention_alerts ?? []).filter((a) => a.prompt_on_open).length;
+    const promptOnOpenCount = (marData.attention_alerts ?? []).filter(
+        (a) => a.prompt_on_open,
+    ).length;
     useEffect(() => {
         if (infoId === null || promptOnOpenCount === 0) return;
         const key = `emar.mar.warned.${infoId}.${date}`;
@@ -168,26 +248,36 @@ export default function MarCharts(props: Props) {
                 high_risk: med.high_risk,
                 witness_required: med.witness_required,
                 is_inr: /warfarin/i.test(med.name),
-                requires_observation: (med.admin_rules?.required_observations?.length ?? 0) > 0,
+                requires_observation:
+                    (med.admin_rules?.required_observations?.length ?? 0) > 0,
                 dose_times: med.dose_times ?? [],
             })),
         [marData.scheduled],
     );
 
     const searched = useMemo(
-        () => (search ? gridMeds.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())) : gridMeds),
+        () =>
+            search
+                ? gridMeds.filter((m) =>
+                      m.name.toLowerCase().includes(search.toLowerCase()),
+                  )
+                : gridMeds,
         [gridMeds, search],
     );
 
     const dueMedIds = useMemo(() => {
         const ids = new Set<number>();
         for (const row of schedule) {
-            if (row.status === 'due' || row.status === 'overdue') ids.add(row.medication_id);
+            if (row.status === 'due' || row.status === 'overdue')
+                ids.add(row.medication_id);
         }
         return ids;
     }, [schedule]);
 
-    const visibleMeds = activeTab === 'due' ? searched.filter((m) => dueMedIds.has(m.id)) : searched;
+    const visibleMeds =
+        activeTab === 'due'
+            ? searched.filter((m) => dueMedIds.has(m.id))
+            : searched;
 
     // Live counts from the flat schedule.
     const counts = useMemo(() => {
@@ -199,7 +289,11 @@ export default function MarCharts(props: Props) {
             if (row.recorded) recorded += 1;
             if (row.status === 'due') due += 1;
             if (row.status === 'overdue') overdue += 1;
-            if ((row.status === 'due' || row.status === 'overdue') && row.is_controlled) cdDue += 1;
+            if (
+                (row.status === 'due' || row.status === 'overdue') &&
+                row.is_controlled
+            )
+                cdDue += 1;
         }
         const total = schedule.length;
         return {
@@ -213,17 +307,26 @@ export default function MarCharts(props: Props) {
         };
     }, [schedule, prn]);
 
-    const latestInr = (marData.inr_records ?? []).find((r) => !r.disabled_at) ?? (marData.inr_records ?? [])[0] ?? null;
+    const latestInr =
+        (marData.inr_records ?? []).find((r) => !r.disabled_at) ??
+        (marData.inr_records ?? [])[0] ??
+        null;
     const awaitingCount = marData.awaiting_verification?.length ?? 0;
 
-    const onRecord = (row: ScheduleRow) => setRecordTarget({ row, outcome: 'given' });
+    const onRecord = (row: ScheduleRow) =>
+        setRecordTarget({ row, outcome: 'given' });
     const onGivePrn = (med: PrnMedication) => setPrnMedId(med.id);
 
     // ── No viewable resident with active meds: the server defaults onto a chart
     // whenever one exists, so this is the genuinely-empty state (not a picker).
     if (!info) {
         return (
-            <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'MAR Charts', href: '/emar/mar' }]}>
+            <AppLayout
+                breadcrumbs={[
+                    { title: 'eMAR', href: '/emar' },
+                    { title: 'MAR Charts', href: '/emar/mar' },
+                ]}
+            >
                 <Head title="MAR Charts" />
                 <div className="flex flex-col gap-6 p-6">
                     <PageHero
@@ -234,7 +337,9 @@ export default function MarCharts(props: Props) {
                         description="No residents with active medications to chart yet."
                     />
                     <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
-                        Once a resident has active medication orders, their medication administration record opens here automatically.
+                        Once a resident has active medication orders, their
+                        medication administration record opens here
+                        automatically.
                     </div>
                 </div>
             </AppLayout>
@@ -243,25 +348,56 @@ export default function MarCharts(props: Props) {
 
     const heroMeta: PageHeroMetaItem[] = [
         info.nhi ? { icon: User, label: `NHI ${info.nhi}` } : null,
-        info.dob ? { icon: CalendarDays, label: `${info.dob}${info.age != null ? ` (${info.age})` : ''}` } : null,
-        clientContext?.profile?.gp_name ? { icon: HeartPulse, label: clientContext.profile.gp_name } : null,
+        info.dob
+            ? {
+                  icon: CalendarDays,
+                  label: `${info.dob}${info.age != null ? ` (${info.age})` : ''}`,
+              }
+            : null,
+        clientContext?.profile?.gp_name
+            ? { icon: HeartPulse, label: clientContext.profile.gp_name }
+            : null,
         info.site_name ? { icon: Home, label: info.site_name } : null,
-        marData.settings?.care_level ? { icon: Shield, label: marData.settings.care_level } : null,
+        marData.settings?.care_level
+            ? { icon: Shield, label: marData.settings.care_level }
+            : null,
     ].filter(Boolean) as PageHeroMetaItem[];
 
     const heroBadges: PageHeroBadge[] = [
-        counts.overdue > 0 ? { tone: 'critical' as const, label: `${counts.overdue} overdue` } : null,
-        counts.cdDue > 0 ? { tone: 'warning' as const, label: `${counts.cdDue} controlled · witness` } : null,
-        latestInr ? { tone: 'info' as const, label: `Warfarin · INR ${latestInr.inr_value}` } : null,
-        (marData.attention_alerts ?? []).some((a) => a.type === 'paper_prescription')
+        counts.overdue > 0
+            ? { tone: 'critical' as const, label: `${counts.overdue} overdue` }
+            : null,
+        counts.cdDue > 0
+            ? {
+                  tone: 'warning' as const,
+                  label: `${counts.cdDue} controlled · witness`,
+              }
+            : null,
+        latestInr
+            ? {
+                  tone: 'info' as const,
+                  label: `Warfarin · INR ${latestInr.inr_value}`,
+              }
+            : null,
+        (marData.attention_alerts ?? []).some(
+            (a) => a.type === 'paper_prescription',
+        )
             ? { label: 'Paper prescription on file' }
             : null,
     ].filter(Boolean) as PageHeroBadge[];
 
     const heroStats: PageHeroStat[] = [
         { label: 'Recorded', value: `${counts.pct}%` },
-        { label: 'Due now', value: counts.due, tone: counts.due > 0 ? 'warning' : 'neutral' },
-        { label: 'Overdue', value: counts.overdue, tone: counts.overdue > 0 ? 'critical' : 'neutral' },
+        {
+            label: 'Due now',
+            value: counts.due,
+            tone: counts.due > 0 ? 'warning' : 'neutral',
+        },
+        {
+            label: 'Overdue',
+            value: counts.overdue,
+            tone: counts.overdue > 0 ? 'critical' : 'neutral',
+        },
         { label: 'PRN today', value: counts.prnGiven },
     ];
 
@@ -302,12 +438,15 @@ export default function MarCharts(props: Props) {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search medication…"
-                    className="h-9 w-44 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-3 text-sm text-primary-foreground placeholder:text-primary-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary-foreground/40"
+                    className="h-9 w-44 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-3 text-sm text-primary-foreground placeholder:text-primary-foreground/60 focus:ring-2 focus:ring-primary-foreground/40 focus:outline-none"
                 />
                 <EntityFilter
                     label="Resident"
                     allLabel="All residents"
-                    items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))}
+                    items={clients.map((c) => ({
+                        id: c.id,
+                        name: `${c.first_name} ${c.last_name}`,
+                    }))}
                     value={info.id}
                     onChange={switchClient}
                     onDark
@@ -317,7 +456,12 @@ export default function MarCharts(props: Props) {
     );
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'MAR Charts', href: '/emar/mar' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'eMAR', href: '/emar' },
+                { title: 'MAR Charts', href: '/emar/mar' },
+            ]}
+        >
             <Head title={`MAR · ${info.name}`} />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
@@ -327,24 +471,33 @@ export default function MarCharts(props: Props) {
                     avatar={{ fallback: initials(info.name) }}
                     title={
                         <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
                                 {isToday ? (
-                                    <span aria-hidden className="relative inline-flex h-2 w-2">
+                                    <span
+                                        aria-hidden
+                                        className="relative inline-flex h-2 w-2"
+                                    >
                                         <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
                                         <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
                                     </span>
                                 ) : (
                                     <CalendarDays className="h-3 w-3" />
                                 )}
-                                {isToday ? 'Live medication chart' : 'Medication chart'}
+                                {isToday
+                                    ? 'Live medication chart'
+                                    : 'Medication chart'}
                             </span>
-                            <span className="mt-1 block text-[28px] font-bold leading-tight">{info.name}</span>
+                            <span className="mt-1 block text-[28px] leading-tight font-bold">
+                                {info.name}
+                            </span>
                         </span>
                     }
                     description={
                         <span>
                             Medication administration record for{' '}
-                            <span className="border-b-2 border-primary-foreground/40 font-medium">{date}</span>
+                            <span className="border-b-2 border-primary-foreground/40 font-medium">
+                                {date}
+                            </span>
                         </span>
                     }
                     meta={heroMeta}
@@ -352,8 +505,13 @@ export default function MarCharts(props: Props) {
                     stats={heroStats}
                     actions={
                         <>
-                            <Button asChild className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-                                <a href="/emar/rounds">Start medication round</a>
+                            <Button
+                                asChild
+                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                            >
+                                <a href="/emar/rounds">
+                                    Start medication round
+                                </a>
                             </Button>
                             {can.record && (
                                 <Button
@@ -371,7 +529,11 @@ export default function MarCharts(props: Props) {
                                     variant="outline"
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                 >
-                                    <a href={`/emar/pdf/mar-chart?client_id=${info.id}&date_from=${date}&date_to=${date}`} target="_blank" rel="noreferrer">
+                                    <a
+                                        href={`/emar/pdf/mar-chart?client_id=${info.id}&date_from=${date}&date_to=${date}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
                                         <FileDown className="h-4 w-4" />
                                         PDF
                                     </a>
@@ -389,14 +551,23 @@ export default function MarCharts(props: Props) {
                     canManage={!!can.manage_settings}
                 />
 
-                <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="MAR chart views" />
+                <TabStrip
+                    value={activeTab}
+                    onChange={setActiveTab}
+                    items={TABS}
+                    ariaLabel="MAR chart views"
+                />
 
                 <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_372px]">
                     <div className="flex min-w-0 flex-col gap-6">
                         {activeTab === 'history' ? (
                             <HistoryList schedule={schedule} />
                         ) : activeTab === 'prn' ? (
-                            <PrnCard prn={prn} canRecord={can.record} onGive={onGivePrn} />
+                            <PrnCard
+                                prn={prn}
+                                canRecord={can.record}
+                                onGive={onGivePrn}
+                            />
                         ) : (
                             <>
                                 <MarGrid
@@ -410,11 +581,20 @@ export default function MarCharts(props: Props) {
                                             y: e.clientY,
                                             row,
                                             requiresObservation:
-                                                gridMeds.find((m) => m.id === row.medication_id)?.requires_observation ?? false,
+                                                gridMeds.find(
+                                                    (m) =>
+                                                        m.id ===
+                                                        row.medication_id,
+                                                )?.requires_observation ??
+                                                false,
                                         });
                                     }}
                                 />
-                                <PrnCard prn={prn} canRecord={can.record} onGive={onGivePrn} />
+                                <PrnCard
+                                    prn={prn}
+                                    canRecord={can.record}
+                                    onGive={onGivePrn}
+                                />
                             </>
                         )}
                     </div>
@@ -424,10 +604,14 @@ export default function MarCharts(props: Props) {
                         syringeDrivers={marData.syringe_drivers ?? []}
                         awaitingVerification={awaitingCount}
                         pendingCorrections={pendingCorrections.length}
-                        chartReviewDate={marData.settings?.next_chart_review_date ?? null}
+                        chartReviewDate={
+                            marData.settings?.next_chart_review_date ?? null
+                        }
                         allergies={allergies}
                         conditions={clientContext?.conditions ?? []}
-                        emergencyContacts={clientContext?.emergency_contacts ?? []}
+                        emergencyContacts={
+                            clientContext?.emergency_contacts ?? []
+                        }
                         can={{
                             manageInr: !!can.manage_inr,
                             manageSyringeDrivers: !!can.manage_syringe_drivers,
@@ -496,8 +680,10 @@ export default function MarCharts(props: Props) {
                 corrections={pendingCorrections}
                 witnesses={witnesses}
                 suppression={{
-                    suppressed: marData.settings?.suppress_med_admin_alerts ?? false,
-                    reason: marData.settings?.med_alerts_suppressed_reason ?? null,
+                    suppressed:
+                        marData.settings?.suppress_med_admin_alerts ?? false,
+                    reason:
+                        marData.settings?.med_alerts_suppressed_reason ?? null,
                 }}
             />
         </AppLayout>
@@ -508,20 +694,37 @@ function HistoryList({ schedule }: { schedule: ScheduleRow[] }) {
     const recorded = schedule.filter((r) => r.recorded);
     return (
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-            <div className="border-b px-5 py-4 text-[15px] font-bold">Today&apos;s recorded administrations</div>
+            <div className="border-b px-5 py-4 text-[15px] font-bold">
+                Today&apos;s recorded administrations
+            </div>
             {recorded.length === 0 ? (
-                <div className="px-5 py-10 text-center text-sm text-muted-foreground">Nothing recorded yet.</div>
+                <div className="px-5 py-10 text-center text-sm text-muted-foreground">
+                    Nothing recorded yet.
+                </div>
             ) : (
                 <ul className="divide-y">
                     {recorded.map((row) => (
-                        <li key={row.key} className="flex items-center justify-between px-5 py-3 text-sm">
+                        <li
+                            key={row.key}
+                            className="flex items-center justify-between px-5 py-3 text-sm"
+                        >
                             <div>
-                                <span className="font-medium">{row.medication_name}</span>
-                                <span className="ml-2 text-xs text-muted-foreground">{row.time}</span>
+                                <span className="font-medium">
+                                    {row.medication_name}
+                                </span>
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                    {row.time}
+                                </span>
                             </div>
                             <div className="flex items-center gap-3 text-xs">
-                                <span className="font-medium capitalize">{row.recorded?.status}</span>
-                                {row.recorded?.by && <span className="text-muted-foreground">{row.recorded.by}</span>}
+                                <span className="font-medium capitalize">
+                                    {row.recorded?.status}
+                                </span>
+                                {row.recorded?.by && (
+                                    <span className="text-muted-foreground">
+                                        {row.recorded.by}
+                                    </span>
+                                )}
                             </div>
                         </li>
                     ))}

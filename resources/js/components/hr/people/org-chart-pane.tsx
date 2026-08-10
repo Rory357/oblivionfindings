@@ -10,8 +10,8 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { OrgChartBuilderDialog } from '@/components/hr/people/org-chart-builder-dialog';
 import { PeoplePicker, type PersonOption } from '@/components/hr/people-picker';
+import { OrgChartBuilderDialog } from '@/components/hr/people/org-chart-builder-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -65,7 +65,8 @@ const BAR_COLORS = [
 function deptBar(dept: string | null): string {
     if (!dept) return 'bg-muted text-muted-foreground';
     let h = 0;
-    for (let i = 0; i < dept.length; i++) h = (h * 31 + dept.charCodeAt(i)) >>> 0;
+    for (let i = 0; i < dept.length; i++)
+        h = (h * 31 + dept.charCodeAt(i)) >>> 0;
     return BAR_COLORS[h % BAR_COLORS.length];
 }
 
@@ -265,7 +266,11 @@ function OrgNodeCard({
                         type="button"
                         variant="outline"
                         size="icon"
-                        aria-label={collapsed ? 'Expand subordinates' : 'Collapse subordinates'}
+                        aria-label={
+                            collapsed
+                                ? 'Expand subordinates'
+                                : 'Collapse subordinates'
+                        }
                         onClick={() => setCollapsed((c) => !c)}
                         className="absolute -bottom-3 left-1/2 z-10 h-6 w-6 -translate-x-1/2 rounded-full text-muted-foreground shadow-sm"
                     >

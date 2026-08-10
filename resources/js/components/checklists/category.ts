@@ -12,7 +12,15 @@ import {
 
 import type { ChecklistRun } from './types';
 
-const CATEGORY_TONES = ['ops', 'hr', 'compliance', 'incidents', 'governance', 'sites', 'fleet'];
+const CATEGORY_TONES = [
+    'ops',
+    'hr',
+    'compliance',
+    'incidents',
+    'governance',
+    'sites',
+    'fleet',
+];
 
 export function catColorVar(tone?: string | null): string {
     if (!tone) return 'var(--muted-foreground)';
@@ -54,7 +62,9 @@ export function fmtDate(s?: string | null): string {
 export function relDay(s: string | null | undefined, today: string): string {
     if (!s) return '—';
     const d = Math.round(
-        (new Date(`${s}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000,
+        (new Date(`${s}T00:00:00`).getTime() -
+            new Date(`${today}T00:00:00`).getTime()) /
+            86_400_000,
     );
     if (d === 0) return 'Today';
     if (d === -1) return 'Yesterday';
@@ -63,7 +73,12 @@ export function relDay(s: string | null | undefined, today: string): string {
     return `in ${d}d`;
 }
 
-export type StatusTone = 'success' | 'critical' | 'warning' | 'info' | 'neutral';
+export type StatusTone =
+    | 'success'
+    | 'critical'
+    | 'warning'
+    | 'info'
+    | 'neutral';
 
 export interface RunStatusMeta {
     tone: StatusTone;

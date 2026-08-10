@@ -1,7 +1,7 @@
 import { Check, Hand, Sparkles } from 'lucide-react';
 
-import type { JobPost } from './types';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import type { JobPost } from './types';
 
 interface SmartMatchesStripProps {
     jobs: JobPost[];
@@ -39,7 +39,8 @@ export function SmartMatchesStrip({
                     </span>
                 </div>
                 {onSeeAll && totalMatches > jobs.length ? (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         className="text-xs font-semibold text-primary hover:underline"
                         onClick={onSeeAll}
@@ -53,14 +54,15 @@ export function SmartMatchesStrip({
                     const total = job.required_skills.length;
                     const location = job.location?.split(' · ')[0] ?? '';
                     return (
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             key={job.id}
                             type="button"
                             data-test="job-board-quick-claim"
                             onClick={() => onQuickClaim(job)}
                             className="flex flex-col items-start gap-1 rounded-xl border border-[color-mix(in_oklch,var(--primary)_15%,transparent)] bg-gradient-to-b from-accent to-card p-3 text-left transition-all hover:-translate-y-px hover:border-[color-mix(in_oklch,var(--primary)_30%,transparent)] hover:shadow-md"
                         >
-                            <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--brand-deep,var(--primary))]">
+                            <div className="text-[11px] font-bold tracking-wider text-[var(--brand-deep,var(--primary))] uppercase">
                                 {formatChipDate(job.date)} · {job.start_time}–
                                 {job.end_time}
                             </div>
@@ -95,7 +97,10 @@ export function SmartMatchesStrip({
                                 </li>
                             </ul>
                             <span className="mt-1 inline-flex items-center gap-1 self-start rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
-                                <Hand className="h-2.5 w-2.5" strokeWidth={2.5} />
+                                <Hand
+                                    className="h-2.5 w-2.5"
+                                    strokeWidth={2.5}
+                                />
                                 Quick claim
                             </span>
                         </GuardrailButton>

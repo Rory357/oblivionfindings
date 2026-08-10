@@ -18,7 +18,11 @@ import {
     CommandList,
 } from '@/components/ui/command';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import {
     Building2,
@@ -46,7 +50,7 @@ import {
     Wifi,
     type LucideIcon,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 // ── Site-type metadata (shared with the directory tables/filters) ──────────
 
@@ -64,12 +68,14 @@ export const SITE_TYPE_META: Record<
     house: {
         label: 'House',
         icon: Home,
-        badgeClass: 'border-status-success/30 bg-status-success-bg text-status-success',
+        badgeClass:
+            'border-status-success/30 bg-status-success-bg text-status-success',
     },
     facility: {
         label: 'Facility',
         icon: Warehouse,
-        badgeClass: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+        badgeClass:
+            'border-status-warning/30 bg-status-warning-bg text-status-warning',
     },
     residential: {
         label: 'Residential',
@@ -96,11 +102,23 @@ export const CREDENTIAL_TYPE_META: Record<
     string,
     { label: string; icon: LucideIcon; description: string }
 > = {
-    password: { label: 'Password', icon: Lock, description: 'Username + secret' },
+    password: {
+        label: 'Password',
+        icon: Lock,
+        description: 'Username + secret',
+    },
     api_key: { label: 'API Key', icon: KeyRound, description: 'Machine token' },
     ssh_key: { label: 'SSH Key', icon: FileKey, description: 'Key pair' },
-    pin: { label: 'PIN / Code', icon: Fingerprint, description: 'Door, alarm, panel' },
-    certificate: { label: 'Certificate', icon: FileBadge, description: 'TLS / signing' },
+    pin: {
+        label: 'PIN / Code',
+        icon: Fingerprint,
+        description: 'Door, alarm, panel',
+    },
+    certificate: {
+        label: 'Certificate',
+        icon: FileBadge,
+        description: 'TLS / signing',
+    },
     oauth: { label: 'OAuth', icon: Link2, description: 'Delegated access' },
     other: { label: 'Other', icon: Shield, description: 'Anything else' },
 };
@@ -143,7 +161,7 @@ export function credentialTypeIcon(type: string): LucideIcon {
     return CREDENTIAL_TYPE_META[type]?.icon ?? Lock;
 }
 
-/** A credential-type option from the tenant registry (icon as a string key). */
+/** A credential-type option from the application catalogue (icon as a string key). */
 export type CredentialPickerOption = {
     key: string;
     label: string;
@@ -177,10 +195,20 @@ export function daysSince(iso?: string | null): number | null {
 export function rotationStatus(lastRotatedAt?: string | null): RotationStatus {
     const days = daysSince(lastRotatedAt);
     if (days === null) {
-        return { key: 'unknown', label: 'Never rotated', tone: 'warning', days: null };
+        return {
+            key: 'unknown',
+            label: 'Never rotated',
+            tone: 'warning',
+            days: null,
+        };
     }
     if (days >= ROTATION_DUE_DAYS + 60) {
-        return { key: 'overdue', label: 'Rotation overdue', tone: 'critical', days };
+        return {
+            key: 'overdue',
+            label: 'Rotation overdue',
+            tone: 'critical',
+            days,
+        };
     }
     if (days >= ROTATION_DUE_DAYS) {
         return { key: 'due', label: 'Rotation due', tone: 'warning', days };
@@ -189,9 +217,12 @@ export function rotationStatus(lastRotatedAt?: string | null): RotationStatus {
 }
 
 export const ROTATION_TONE_BADGE: Record<RotationTone, string> = {
-    success: 'border-status-success/30 bg-status-success-bg text-status-success',
-    warning: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    critical: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    success:
+        'border-status-success/30 bg-status-success-bg text-status-success',
+    warning:
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    critical:
+        'border-status-critical/30 bg-status-critical-bg text-status-critical',
 };
 
 export function relativeTime(iso?: string | null): string {
@@ -262,10 +293,17 @@ export function TilePicker({
                         )}
                     >
                         <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
-                            <Icon className={cn('h-4 w-4', active ? 'text-primary' : option.accent)} />
+                            <Icon
+                                className={cn(
+                                    'h-4 w-4',
+                                    active ? 'text-primary' : option.accent,
+                                )}
+                            />
                         </span>
                         <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium">{option.label}</span>
+                            <span className="block truncate text-sm font-medium">
+                                {option.label}
+                            </span>
                             {option.description ? (
                                 <span className="block text-xs text-muted-foreground">
                                     {option.description}
@@ -327,7 +365,9 @@ export function SitePickerField({
 }) {
     const [open, setOpen] = useState(false);
     const selected = sites.find((s) => s.id === value);
-    const SelectedIcon = selected ? SITE_TYPE_META[selected.type]?.icon ?? MapPin : MapPin;
+    const SelectedIcon = selected
+        ? (SITE_TYPE_META[selected.type]?.icon ?? MapPin)
+        : MapPin;
 
     return (
         <div>
@@ -362,7 +402,9 @@ export function SitePickerField({
                             <CommandEmpty>No sites found.</CommandEmpty>
                             <CommandGroup>
                                 {sites.map((site) => {
-                                    const Icon = SITE_TYPE_META[site.type]?.icon ?? MapPin;
+                                    const Icon =
+                                        SITE_TYPE_META[site.type]?.icon ??
+                                        MapPin;
                                     return (
                                         <CommandItem
                                             key={site.id}
@@ -373,7 +415,9 @@ export function SitePickerField({
                                             }}
                                         >
                                             <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                                            <span className="flex-1 truncate">{site.name}</span>
+                                            <span className="flex-1 truncate">
+                                                {site.name}
+                                            </span>
                                             <Check
                                                 className={cn(
                                                     'ml-2 h-4 w-4',
@@ -390,8 +434,12 @@ export function SitePickerField({
                     </Command>
                 </PopoverContent>
             </Popover>
-            {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
-            {error ? <p className="mt-1 text-xs text-status-critical">{error}</p> : null}
+            {hint ? (
+                <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+            ) : null}
+            {error ? (
+                <p className="mt-1 text-xs text-status-critical">{error}</p>
+            ) : null}
         </div>
     );
 }
@@ -422,7 +470,9 @@ export function DetailIconHeader({
                 <Icon className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-                <div className="text-base font-semibold leading-tight">{title}</div>
+                <div className="text-base leading-tight font-semibold">
+                    {title}
+                </div>
                 {subtitle ? (
                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
                         {subtitle}
@@ -443,7 +493,8 @@ export function RotationBadge({
     className?: string;
 }) {
     const rot = rotationStatus(lastRotatedAt);
-    const label = rot.key === 'ok' ? `Rotated ${relativeTime(lastRotatedAt)}` : rot.label;
+    const label =
+        rot.key === 'ok' ? `Rotated ${relativeTime(lastRotatedAt)}` : rot.label;
     return (
         <Badge
             variant="outline"
@@ -509,7 +560,9 @@ export function FilterSelect({
                         {!isDefault && variant === 'dark' ? (
                             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary-foreground" />
                         ) : null}
-                        {CurrentIcon ? <CurrentIcon className="h-3.5 w-3.5 shrink-0 opacity-80" /> : null}
+                        {CurrentIcon ? (
+                            <CurrentIcon className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                        ) : null}
                         <span className="truncate">{current?.label}</span>
                     </span>
                     <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
@@ -535,11 +588,15 @@ export function FilterSelect({
                                         {Icon ? (
                                             <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
                                         ) : null}
-                                        <span className="flex-1 truncate">{option.label}</span>
+                                        <span className="flex-1 truncate">
+                                            {option.label}
+                                        </span>
                                         <Check
                                             className={cn(
                                                 'ml-2 h-4 w-4',
-                                                option.value === value ? 'opacity-100' : 'opacity-0',
+                                                option.value === value
+                                                    ? 'opacity-100'
+                                                    : 'opacity-0',
                                             )}
                                         />
                                     </CommandItem>

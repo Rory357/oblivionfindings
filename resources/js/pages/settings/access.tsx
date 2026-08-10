@@ -469,9 +469,7 @@ function PermissionOverridesTab({
                                 </div>
                             </div>
                             <Button variant="ghost" size="sm" asChild>
-                                <Link
-                                    href={`/system/users/${selectedUser.id}`}
-                                >
+                                <Link href={`/system/users/${selectedUser.id}`}>
                                     Edit in User Profile
                                     <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                                 </Link>

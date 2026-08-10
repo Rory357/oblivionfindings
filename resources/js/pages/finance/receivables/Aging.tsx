@@ -1,6 +1,4 @@
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { formatMoney } from '@/components/finance/money';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,8 +11,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
+import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Clock } from 'lucide-react';
-import { formatMoney } from '@/components/finance/money';
 
 type ClientAging = {
     client_id: number;
@@ -65,7 +65,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 function AmountCell({ amount, bucket }: { amount: number; bucket: string }) {
     if (amount === 0) {
-        return <TableCell className="text-right text-muted-foreground">-</TableCell>;
+        return (
+            <TableCell className="text-right text-muted-foreground">
+                -
+            </TableCell>
+        );
     }
     return (
         <TableCell className={`text-right ${bucketColors[bucket] ?? ''}`}>
@@ -80,19 +84,37 @@ export default function AgingReport({ clients, totals }: PageProps) {
             <Head title="Aged Receivables" />
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Clock}
                         title="Aged Receivables"
                         description="Outstanding receivables grouped by client and aging bucket."
                         stats={[
-                            { label: 'Total', value: formatMoney(totals.total) },
-                            { label: 'Current', value: formatMoney(totals.current) },
-                            { label: '31-90', value: formatMoney(totals['31_60'] + totals['61_90']) },
-                            { label: '90+', value: formatMoney(totals['90_plus']) },
+                            {
+                                label: 'Total',
+                                value: formatMoney(totals.total),
+                            },
+                            {
+                                label: 'Current',
+                                value: formatMoney(totals.current),
+                            },
+                            {
+                                label: '31-90',
+                                value: formatMoney(
+                                    totals['31_60'] + totals['61_90'],
+                                ),
+                            },
+                            {
+                                label: '90+',
+                                value: formatMoney(totals['90_plus']),
+                            },
                         ]}
                         actions={
                             <Link href="/finance/receivables">
-                                <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                <Button
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
                                     <ArrowLeft className="mr-2 h-4 w-4" />
                                     Back to Receivables
                                 </Button>
@@ -113,7 +135,11 @@ export default function AgingReport({ clients, totals }: PageProps) {
                     ].map((bucket) => (
                         <Card
                             key={bucket.key}
-                            className={bucket.key !== 'total' ? bucketBgColors[bucket.key] : ''}
+                            className={
+                                bucket.key !== 'total'
+                                    ? bucketBgColors[bucket.key]
+                                    : ''
+                            }
                         >
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-xs font-medium text-muted-foreground">
@@ -129,7 +155,7 @@ export default function AgingReport({ clients, totals }: PageProps) {
                                     }`}
                                 >
                                     {formatMoney(
-                                        totals[bucket.key as keyof Totals]
+                                        totals[bucket.key as keyof Totals],
                                     )}
                                 </div>
                             </CardContent>
@@ -140,7 +166,9 @@ export default function AgingReport({ clients, totals }: PageProps) {
                 {/* Aging Table */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Aging by Client</CardTitle>
+                        <CardTitle className="text-base">
+                            Aging by Client
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {clients.length === 0 ? (
@@ -152,12 +180,24 @@ export default function AgingReport({ clients, totals }: PageProps) {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Client</TableHead>
-                                        <TableHead className="text-right">Current</TableHead>
-                                        <TableHead className="text-right">1-30 Days</TableHead>
-                                        <TableHead className="text-right">31-60 Days</TableHead>
-                                        <TableHead className="text-right">61-90 Days</TableHead>
-                                        <TableHead className="text-right">90+ Days</TableHead>
-                                        <TableHead className="text-right">Total</TableHead>
+                                        <TableHead className="text-right">
+                                            Current
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            1-30 Days
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            31-60 Days
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            61-90 Days
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            90+ Days
+                                        </TableHead>
+                                        <TableHead className="text-right">
+                                            Total
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -195,19 +235,29 @@ export default function AgingReport({ clients, totals }: PageProps) {
                                 <TableFooter>
                                     <TableRow className="font-bold">
                                         <TableCell>Grand Total</TableCell>
-                                        <TableCell className={`text-right ${bucketColors.current}`}>
+                                        <TableCell
+                                            className={`text-right ${bucketColors.current}`}
+                                        >
                                             {formatMoney(totals.current)}
                                         </TableCell>
-                                        <TableCell className={`text-right ${bucketColors['1_30']}`}>
+                                        <TableCell
+                                            className={`text-right ${bucketColors['1_30']}`}
+                                        >
                                             {formatMoney(totals['1_30'])}
                                         </TableCell>
-                                        <TableCell className={`text-right ${bucketColors['31_60']}`}>
+                                        <TableCell
+                                            className={`text-right ${bucketColors['31_60']}`}
+                                        >
                                             {formatMoney(totals['31_60'])}
                                         </TableCell>
-                                        <TableCell className={`text-right ${bucketColors['61_90']}`}>
+                                        <TableCell
+                                            className={`text-right ${bucketColors['61_90']}`}
+                                        >
                                             {formatMoney(totals['61_90'])}
                                         </TableCell>
-                                        <TableCell className={`text-right ${bucketColors['90_plus']}`}>
+                                        <TableCell
+                                            className={`text-right ${bucketColors['90_plus']}`}
+                                        >
                                             {formatMoney(totals['90_plus'])}
                                         </TableCell>
                                         <TableCell className="text-right">

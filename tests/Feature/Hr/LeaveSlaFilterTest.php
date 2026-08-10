@@ -4,9 +4,10 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Role;
 use App\Models\User;
 use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
     Carbon::setTestNow(Carbon::parse('2026-02-18 10:00:00'));
 
     $this->hr = User::factory()->create([
@@ -18,13 +19,13 @@ beforeEach(function () {
     if ($role) {
         $this->hr->roles()->syncWithoutDetaching([$role->id]);
     }
-    $this->hr->setAttribute('tenant_id', 1);
+    $this->site = ensureCanonicalHrStaffProfile($this->hr);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
-    $this->staff->setAttribute('tenant_id', 1);
+    ensureCanonicalHrStaffProfile($this->staff, $this->site);
 });
 
 afterEach(function () {
@@ -33,7 +34,6 @@ afterEach(function () {
 
 test('leave dashboard sla filter returns only overdue pending requests', function () {
     $overdue = HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'annual',
         'starts_at' => now()->addDays(5)->toDateString(),
@@ -45,7 +45,6 @@ test('leave dashboard sla filter returns only overdue pending requests', functio
     ]);
 
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'sick',
         'starts_at' => now()->addDays(2)->toDateString(),
@@ -57,7 +56,6 @@ test('leave dashboard sla filter returns only overdue pending requests', functio
     ]);
 
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'annual',
         'starts_at' => now()->addDays(8)->toDateString(),

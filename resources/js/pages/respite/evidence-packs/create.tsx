@@ -1,11 +1,17 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 
 type Props = {
@@ -21,11 +27,13 @@ export default function EvidencePackCreate({ stays, stayId }: Props) {
     });
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'Evidence Packs', href: '/respite/evidence-packs' },
-            { title: 'New Pack', href: '/respite/evidence-packs/create' },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Evidence Packs', href: '/respite/evidence-packs' },
+                { title: 'New Pack', href: '/respite/evidence-packs/create' },
+            ]}
+        >
             <Head title="New Evidence Pack" />
 
             <PageLayout
@@ -47,40 +55,67 @@ export default function EvidencePackCreate({ stays, stayId }: Props) {
                 >
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Pack Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Pack Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
                                 <Label>Stay</Label>
-                                <Select value={data.stay_id} onValueChange={(v) => setData('stay_id', v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select a stay" /></SelectTrigger>
+                                <Select
+                                    value={data.stay_id}
+                                    onValueChange={(v) => setData('stay_id', v)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a stay" />
+                                    </SelectTrigger>
                                     <SelectContent>
                                         {stays.map((s: any) => (
-                                            <SelectItem key={s.id} value={String(s.id)}>
-                                                {s.client?.first_name} {s.client?.last_name}
+                                            <SelectItem
+                                                key={s.id}
+                                                value={String(s.id)}
+                                            >
+                                                {s.client?.first_name}{' '}
+                                                {s.client?.last_name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.stay_id && <div className="mt-1 text-xs text-status-critical">{errors.stay_id}</div>}
+                                {errors.stay_id && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.stay_id}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <Label>Title</Label>
                                 <Input
                                     value={data.title}
-                                    onChange={(e) => setData('title', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('title', e.target.value)
+                                    }
                                     placeholder="Evidence pack title"
                                 />
-                                {errors.title && <div className="mt-1 text-xs text-status-critical">{errors.title}</div>}
+                                {errors.title && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.title}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <Label>Description</Label>
                                 <Textarea
                                     value={data.description}
-                                    onChange={(e) => setData('description', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('description', e.target.value)
+                                    }
                                     rows={4}
                                 />
-                                {errors.description && <div className="mt-1 text-xs text-status-critical">{errors.description}</div>}
+                                {errors.description && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.description}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

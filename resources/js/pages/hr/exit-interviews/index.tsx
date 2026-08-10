@@ -148,7 +148,10 @@ export default function ExitInterviewsIndex({
                         description="Track departure feedback and identify retention insights."
                         stats={[
                             { label: 'Total recorded', value: stats.total },
-                            { label: 'Last 90 days', value: stats.last_90_days },
+                            {
+                                label: 'Last 90 days',
+                                value: stats.last_90_days,
+                            },
                             {
                                 label: 'Avg satisfaction',
                                 value:

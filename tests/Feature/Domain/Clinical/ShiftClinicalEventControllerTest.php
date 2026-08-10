@@ -5,6 +5,7 @@ namespace Tests\Feature\Domain\Clinical;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -16,7 +17,11 @@ class ShiftClinicalEventControllerTest extends TestCase
     use RefreshDatabase;
 
     protected Client $client;
+
+    protected Site $site;
+
     protected Shift $shift;
+
     protected User $staffUser;
 
     protected function setUp(): void
@@ -25,11 +30,13 @@ class ShiftClinicalEventControllerTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
 
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create();
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
         $this->staffUser = $this->createUserWithRole('coordinator');
 
         $this->shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staffUser->id,
             'starts_at' => now(),
             'ends_at' => now()->addHours(8),
@@ -98,12 +105,29 @@ class ShiftClinicalEventControllerTest extends TestCase
         ]);
     }
 
+    public function test_shift_hs_linked_event_requires_immediate_action(): void
+    {
+        $this->actingAs($this->staffUser)
+            ->postJson("/shifts/{$this->shift->id}/clinical/events", [
+                'event_type' => 'fall',
+                'severity' => 'medium',
+                'occurred_at' => now()->toDateTimeString(),
+                'description' => 'Client fell while transferring.',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('immediate_action_taken');
+
+        $this->assertDatabaseCount('clinical_events', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+    }
+
     public function test_assigned_support_worker_can_record_shift_event(): void
     {
         $worker = $this->createUserWithRole('support_worker');
 
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $worker->id,
             'starts_at' => now(),
             'ends_at' => now()->addHours(8),

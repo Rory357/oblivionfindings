@@ -1,3 +1,6 @@
+import { ReportsTabs } from '@/components/hr';
+import { PageHero, PageLayout } from '@/components/page';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,11 +23,17 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero, PageLayout } from '@/components/page';
-import { ReportsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { BarChart3, Download, Play, Plus, Trash2 } from 'lucide-react';
+import {
+    AlertTriangle,
+    BarChart3,
+    CalendarClock,
+    Download,
+    Play,
+    Plus,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type SavedReport = {
@@ -33,7 +42,6 @@ type SavedReport = {
     description: string | null;
     report_type: string;
     fields: string[];
-    is_scheduled: boolean;
     last_run_at: string | null;
     created_by: string;
     created_at: string;
@@ -51,6 +59,7 @@ type PaginatedReports = {
 type Props = {
     reports: PaginatedReports;
     sources: Record<string, { label: string; fields: string[] }>;
+    canExport: boolean;
 };
 
 const breadcrumbs = [
@@ -65,15 +74,23 @@ const typeColors: Record<string, string> = {
     compliance:
         'border-status-success/30 text-status-success bg-status-success-bg',
     time: 'border-primary/30 text-primary bg-primary/10',
-    training: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
+    training:
+        'border-status-warning/30 text-status-warning bg-status-warning-bg',
 };
 
-export default function SavedReports({ reports, sources }: Props) {
+export default function SavedReports({ reports, sources, canExport }: Props) {
     const [runningId, setRunningId] = useState<number | null>(null);
     const [runData, setRunData] = useState<{
         data: Record<string, string>[];
         fields: string[];
     } | null>(null);
+    const [runError, setRunError] = useState<string | null>(null);
+    const [lastRunAt, setLastRunAt] = useState<Record<number, string | null>>(
+        () =>
+            Object.fromEntries(
+                reports.data.map((report) => [report.id, report.last_run_at]),
+            ),
+    );
     const [deleteReport, setDeleteReport] = useState<{
         id: number;
         name: string;
@@ -82,6 +99,7 @@ export default function SavedReports({ reports, sources }: Props) {
     const handleRun = async (report: SavedReport) => {
         setRunningId(report.id);
         setRunData(null);
+        setRunError(null);
 
         try {
             const response = await fetch(`/hr/reports/saved/${report.id}/run`, {
@@ -97,12 +115,26 @@ export default function SavedReports({ reports, sources }: Props) {
             });
 
             const result = await response.json();
+            if (!response.ok) {
+                throw new Error(
+                    result.message ||
+                        'This saved report could not be run. Review its fields and try again.',
+                );
+            }
             setRunData({
                 data: result.data || [],
                 fields: result.fields || [],
             });
-        } catch {
-            // Handle error silently
+            setLastRunAt((current) => ({
+                ...current,
+                [report.id]: result.report?.last_run_at || null,
+            }));
+        } catch (error) {
+            setRunError(
+                error instanceof Error
+                    ? error.message
+                    : 'This saved report could not be run. Please try again.',
+            );
         } finally {
             setRunningId(null);
         }
@@ -130,25 +162,40 @@ export default function SavedReports({ reports, sources }: Props) {
             <Head title="Saved Reports" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={BarChart3}
                         title="Saved Reports"
-                        description="Run, export, and manage saved HR reports."
-                        stats={[
-                            { label: 'Reports', value: reports.total },
-                        ]}
+                        description="Run and manage your reusable HR report definitions. Results always follow your current Site and data permissions."
+                        stats={[{ label: 'Reports', value: reports.total }]}
                         actions={
-                            <Button asChild>
-                                <Link href="/hr/reports/builder">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    New Report
-                                </Link>
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" asChild>
+                                    <Link href="/hr/reports">
+                                        <CalendarClock className="mr-2 h-4 w-4" />
+                                        Scheduled Reports
+                                    </Link>
+                                </Button>
+                                <Button asChild>
+                                    <Link href="/hr/reports/builder">
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        New Report
+                                    </Link>
+                                </Button>
+                            </div>
                         }
                     />
                 }
             >
                 <ReportsTabs active="saved" />
+
+                {runError && (
+                    <Alert variant="destructive">
+                        <AlertTriangle />
+                        <AlertTitle>Report could not be run</AlertTitle>
+                        <AlertDescription>{runError}</AlertDescription>
+                    </Alert>
+                )}
 
                 <Card>
                     <CardContent className="p-0">
@@ -198,7 +245,7 @@ export default function SavedReports({ reports, sources }: Props) {
                                             {report.fields.length} fields
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">
-                                            {report.last_run_at || 'Never'}
+                                            {lastRunAt[report.id] || 'Never'}
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">
                                             {report.created_by}
@@ -220,16 +267,20 @@ export default function SavedReports({ reports, sources }: Props) {
                                                         ? 'Running...'
                                                         : 'Run'}
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        handleExport(report.id)
-                                                    }
-                                                >
-                                                    <Download className="mr-1 h-3 w-3" />
-                                                    Export CSV
-                                                </Button>
+                                                {canExport && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            handleExport(
+                                                                report.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Download className="mr-1 h-3 w-3" />
+                                                        Export CSV
+                                                    </Button>
+                                                )}
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"

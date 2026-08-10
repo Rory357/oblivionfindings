@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\PayrollExportService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -14,15 +15,15 @@ beforeEach(function () {
 
     $this->seed(RbacSeeder::class);
 
+    $this->site = Site::factory()->create(['name' => 'Manual time entry Site']);
+
     $this->hr = User::factory()->create([
         'role' => 'hr',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
@@ -35,11 +36,28 @@ beforeEach(function () {
     }
 
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
+        'user_id' => $this->hr->id,
+        'employee_number' => 'EMP-MANUAL-HR',
+        'position_role' => 'hr',
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $this->hr->id,
+        'updated_by' => $this->hr->id,
+    ]);
+
+    HrEmployeeProfile::factory()->create([
         'user_id' => $this->staff->id,
         'employee_number' => 'EMP-MANUAL-001',
         'work_email' => "manual-worker-{$this->staff->id}@example.test",
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
         'hourly_rate' => '30.00',
         'created_by' => $this->hr->id,
         'updated_by' => $this->hr->id,
@@ -84,7 +102,6 @@ test('manual HR time entries store worker local input in UTC and create payroll-
     ])->save();
 
     $run = app(PayrollExportService::class)->createRun(
-        1,
         now()->parse('2026-06-10')->startOfDay(),
         now()->parse('2026-06-20')->endOfDay(),
         $this->hr->id,

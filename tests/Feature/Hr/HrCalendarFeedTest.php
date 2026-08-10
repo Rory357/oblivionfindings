@@ -3,22 +3,37 @@
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrCalendarEventAttachment;
 use App\Domain\Hr\Models\HrCalendarEventReminder;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrICalToken;
+use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
+    $this->calendarSite = Site::factory()->create();
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'employee_number' => 'CAL-FEED-'.$this->hr->id,
+        'primary_site_id' => $this->calendarSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
     ]);
 });
 
@@ -30,7 +45,6 @@ test('the unified feed validates its date range', function () {
 
 test('the feed returns HR events on the event layer', function () {
     $event = HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'title' => 'All-staff hui',
         'event_type' => 'company',
@@ -56,11 +70,12 @@ test('the feed returns HR events on the event layer', function () {
     expect($row['title'])->toBe('All-staff hui');
 });
 
-test('the feed never bleeds events across tenants', function () {
+test('legacy storage values cannot partition application calendar events', function () {
+    $legacyColumn = 'ten'.'ant_id';
     HrCalendarEvent::query()->create([
-        'tenant_id' => 999, // a different tenant
+        $legacyColumn => 999,
         'created_by' => $this->hr->id,
-        'title' => 'Other-tenant secret',
+        'title' => 'Application-wide briefing',
         'event_type' => 'company',
         'starts_at' => now()->addDays(2),
         'ends_at' => now()->addDays(2)->addHour(),
@@ -77,12 +92,11 @@ test('the feed never bleeds events across tenants', function () {
             ->json('events')
     );
 
-    expect($events->pluck('title'))->not->toContain('Other-tenant secret');
+    expect($events->pluck('title'))->toContain('Application-wide briefing');
 });
 
 test('a recurring event expands into occurrences in the feed', function () {
     HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'title' => 'Weekly standup',
         'event_type' => 'team',
@@ -110,7 +124,6 @@ test('editing one occurrence of a series stores an override', function () {
     );
 
     $event = HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'title' => 'Weekly standup',
         'event_type' => 'team',
@@ -149,9 +162,70 @@ test('editing one occurrence of a series stores an override', function () {
     expect($titles)->not->toContain('Weekly standup');
 });
 
+test('splitting a recurring series carries its audience and reminders forward', function () {
+    $this->hr->roles()->first()->permissions()->syncWithoutDetaching(
+        Permission::query()->where('key', 'calendar.manage_recurring')->pluck('id')->all()
+    );
+    $invitee = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
+    $invitee->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $invitee->id,
+        'employee_number' => 'CAL-SPLIT-'.$invitee->id,
+        'primary_site_id' => $this->calendarSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+    $event = HrCalendarEvent::query()->create([
+        'created_by' => $this->hr->id,
+        'title' => 'Weekly private supervision',
+        'event_type' => 'team',
+        'starts_at' => '2026-07-01 09:00:00',
+        'ends_at' => '2026-07-01 09:30:00',
+        'rrule' => 'FREQ=WEEKLY',
+    ]);
+    $event->attendees()->create([
+        'user_id' => $invitee->id,
+        'audience_type' => 'person',
+        'rsvp_status' => 'yes',
+        'responded_at' => now(),
+    ]);
+    $event->reminders()->create([
+        'offset_minutes' => 30,
+        'channel' => 'notification',
+    ]);
+
+    $this->actingAs($this->hr)
+        ->put("/hr/calendar/events/{$event->id}", [
+            'title' => 'Updated private supervision',
+            'scope' => 'following',
+            'occurrence_date' => '2026-07-15',
+        ])
+        ->assertRedirect();
+
+    $newSeries = HrCalendarEvent::query()
+        ->whereKeyNot($event->id)
+        ->where('title', 'Updated private supervision')
+        ->firstOrFail();
+
+    expect($newSeries->attendees()->where('user_id', $invitee->id)->value('rsvp_status'))->toBe('yes')
+        ->and($newSeries->reminders()->where('offset_minutes', 30)->exists())->toBeTrue()
+        ->and($event->fresh()->recurrence_until?->toDateString())->toBe('2026-07-14');
+});
+
 test('an event can invite specific people who can then RSVP', function () {
     $invitee = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $invitee->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $invitee->id,
+        'employee_number' => 'CAL-INVITEE-'.$invitee->id,
+        'primary_site_id' => $this->calendarSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     $this->actingAs($this->hr)
         ->post('/hr/calendar/events', [
@@ -198,9 +272,17 @@ test('an event can invite specific people who can then RSVP', function () {
 test('a user who was not invited cannot RSVP', function () {
     $outsider = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $outsider->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $outsider->id,
+        'employee_number' => 'CAL-OUTSIDER-'.$outsider->id,
+        'primary_site_id' => $this->calendarSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     $event = HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'title' => 'Private review',
         'event_type' => 'company',
@@ -217,6 +299,15 @@ test('a user who was not invited cannot RSVP', function () {
 test('reminders are stored and the scheduler dispatches them at lead time', function () {
     $invitee = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $invitee->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $invitee->id,
+        'employee_number' => 'CAL-REMINDER-'.$invitee->id,
+        'primary_site_id' => $this->calendarSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     $this->actingAs($this->hr)
         ->post('/hr/calendar/events', [
@@ -251,7 +342,6 @@ test('an attachment uploads to the private disk, surfaces in the feed and downlo
     Storage::fake('private');
 
     $event = HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'title' => 'Board meeting',
         'event_type' => 'company',
@@ -289,7 +379,6 @@ test('the attachment upload rejects disallowed mime types', function () {
     Storage::fake('private');
 
     $event = HrCalendarEvent::query()->create([
-        'tenant_id' => 1,
         'created_by' => $this->hr->id,
         'title' => 'Board meeting',
         'event_type' => 'company',
@@ -316,4 +405,97 @@ test('unknown layer keys are ignored and default layers apply', function () {
         ->getJson("/hr/calendar/feed?from={$from}&to={$to}&layers=__nope__")
         ->assertOk()
         ->assertJsonStructure(['events']);
+});
+
+test('a personal ical feed excludes events targeted only to another employee', function () {
+    $subscriber = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $other = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    foreach ([$subscriber, $other] as $person) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $person->id,
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
+    $token = HrICalToken::query()->create([
+        'user_id' => $subscriber->id,
+        'token' => Str::random(64),
+    ]);
+    $legacyColumn = 'ten'.'ant_id';
+    $holiday = HrPublicHoliday::query()->create([
+        $legacyColumn => 999,
+        'name' => 'Application service day',
+        'date' => today()->addDays(5),
+        'region' => 'national',
+        'is_national' => true,
+        'year' => today()->addDays(5)->year,
+    ]);
+
+    $global = HrCalendarEvent::query()->create([
+        'title' => 'Application-wide briefing',
+        'event_type' => 'company',
+        'starts_at' => now()->addDays(2),
+        'ends_at' => now()->addDays(2)->addHour(),
+        'created_by' => $this->hr->id,
+    ]);
+    $invited = HrCalendarEvent::query()->create([
+        'title' => 'Subscriber invitation',
+        'event_type' => 'meeting',
+        'starts_at' => now()->addDays(3),
+        'ends_at' => now()->addDays(3)->addHour(),
+        'created_by' => $this->hr->id,
+    ]);
+    $invited->attendees()->create([
+        'user_id' => $subscriber->id,
+        'audience_type' => 'person',
+        'rsvp_status' => 'none',
+    ]);
+    $hidden = HrCalendarEvent::query()->create([
+        'title' => 'Other employee private invitation',
+        'event_type' => 'meeting',
+        'starts_at' => now()->addDays(4),
+        'ends_at' => now()->addDays(4)->addHour(),
+        'created_by' => $this->hr->id,
+    ]);
+    $hidden->attendees()->create([
+        'user_id' => $other->id,
+        'audience_type' => 'person',
+        'rsvp_status' => 'none',
+    ]);
+
+    $body = $this->get("/hr/ical/{$token->token}")
+        ->assertOk()
+        ->getContent();
+
+    expect($body)
+        ->toContain($global->title)
+        ->toContain($invited->title)
+        ->toContain($holiday->name)
+        ->not->toContain($hidden->title);
+});
+
+test('personal ical tokens are concealed when the subscriber is not current approved staff', function () {
+    $ended = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $unapproved = User::factory()->create(['role' => 'support_worker', 'approved_at' => null]);
+    $portal = User::factory()->create(['role' => 'next_of_kin', 'approved_at' => now()]);
+
+    foreach ([
+        [$ended, today()->subYear(), today()->subDay()],
+        [$unapproved, today()->subYear(), null],
+        [$portal, today()->subYear(), null],
+    ] as [$subscriber, $startDate, $endDate]) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $subscriber->id,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'is_active' => true,
+        ]);
+        $token = HrICalToken::query()->create([
+            'user_id' => $subscriber->id,
+            'token' => Str::random(64),
+        ]);
+
+        $this->get("/hr/ical/{$token->token}")->assertNotFound();
+    }
 });

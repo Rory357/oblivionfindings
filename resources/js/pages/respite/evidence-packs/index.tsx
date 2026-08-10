@@ -1,15 +1,21 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import RespiteSubnav from '@/components/respite-subnav';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
 import { Files, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 type Props = {
     packs: { data: any[]; links: any[] };
@@ -25,14 +31,19 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
     const applyFilter = (key: string, value: string) => {
         const updated = { ...localFilters, [key]: value };
         setLocalFilters(updated);
-        router.get('/respite/evidence-packs', updated, { preserveState: true, preserveScroll: true });
+        router.get('/respite/evidence-packs', updated, {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'Evidence Packs', href: '/respite/evidence-packs' },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Evidence Packs', href: '/respite/evidence-packs' },
+            ]}
+        >
             <Head title="Evidence Packs" />
 
             <PageLayout
@@ -43,12 +54,26 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                         description="Bundled evidence collections for respite stays."
                         stats={[
                             { label: 'Total', value: packs.data.length },
-                            { label: 'Sealed', value: packs.data.filter((p: any) => p.sealed_at).length },
-                            { label: 'Draft', value: packs.data.filter((p: any) => p.status === 'draft').length },
+                            {
+                                label: 'Sealed',
+                                value: packs.data.filter(
+                                    (p: any) => p.sealed_at,
+                                ).length,
+                            },
+                            {
+                                label: 'Draft',
+                                value: packs.data.filter(
+                                    (p: any) => p.status === 'draft',
+                                ).length,
+                            },
                         ]}
                         actions={
                             <Link href="/respite/evidence-packs/create">
-                                <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New Pack
                                 </Button>
@@ -67,12 +92,26 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                         <div className="grid gap-4 sm:grid-cols-3">
                             <div>
                                 <Label>Status</Label>
-                                <Select value={localFilters.status || ANY} onValueChange={(v) => applyFilter('status', v === ANY ? '' : v)}>
-                                    <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
+                                <Select
+                                    value={localFilters.status || ANY}
+                                    onValueChange={(v) =>
+                                        applyFilter(
+                                            'status',
+                                            v === ANY ? '' : v,
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All statuses" />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={ANY}>All statuses</SelectItem>
+                                        <SelectItem value={ANY}>
+                                            All statuses
+                                        </SelectItem>
                                         {statuses.map((s) => (
-                                            <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>
+                                            <SelectItem key={s} value={s}>
+                                                {s.replace(/_/g, ' ')}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -88,24 +127,49 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                                 <CardTitle className="text-base">
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
-                                            <div className="font-semibold">{pack.title || `Evidence Pack #${pack.id}`}</div>
+                                            <div className="font-semibold">
+                                                {pack.title ||
+                                                    `Evidence Pack #${pack.id}`}
+                                            </div>
                                             {pack.description && (
                                                 <div className="mt-1 text-xs font-normal text-muted-foreground">
-                                                    {pack.description.length > 100 ? `${pack.description.substring(0, 100)}...` : pack.description}
+                                                    {pack.description.length >
+                                                    100
+                                                        ? `${pack.description.substring(0, 100)}...`
+                                                        : pack.description}
                                                 </div>
                                             )}
                                             <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge variant="outline">{pack.status?.replace(/_/g, ' ')}</Badge>
+                                                <Badge variant="outline">
+                                                    {pack.status?.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
                                                 {pack.items_count != null && (
-                                                    <Badge variant="outline">{pack.items_count} item{pack.items_count !== 1 ? 's' : ''}</Badge>
+                                                    <Badge variant="outline">
+                                                        {pack.items_count} item
+                                                        {pack.items_count !== 1
+                                                            ? 's'
+                                                            : ''}
+                                                    </Badge>
                                                 )}
-                                                {pack.sealed_at && <Badge variant="outline">Sealed</Badge>}
+                                                {pack.sealed_at && (
+                                                    <Badge variant="outline">
+                                                        Sealed
+                                                    </Badge>
+                                                )}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTimeLong(pack.created_at)}
+                                                {formatDateTimeLong(
+                                                    pack.created_at,
+                                                )}
                                             </div>
                                         </div>
-                                        <Link href={`/respite/evidence-packs/${pack.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link
+                                            href={`/respite/evidence-packs/${pack.id}`}
+                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                        >
                                             View
                                         </Link>
                                     </div>
@@ -129,7 +193,17 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                                 size="sm"
                                 disabled={!l.url}
                                 className={l.active ? 'bg-muted' : ''}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

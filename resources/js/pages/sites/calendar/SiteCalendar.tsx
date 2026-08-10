@@ -15,6 +15,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -138,7 +139,6 @@ import {
     type Density,
     type SourceDef,
 } from './_parts';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 type SiteLite = { id: number; name: string; type: string };
 export type Person = { id: number; name: string };
@@ -569,9 +569,9 @@ export default function SiteCalendar({
     const canManageIntegrations = Boolean(
         (
             page.props.auth as
-                | { can?: { integrations?: { manageTenantSecrets?: boolean } } }
+                | { can?: { integrations?: { manageSecrets?: boolean } } }
                 | undefined
-        )?.can?.integrations?.manageTenantSecrets,
+        )?.can?.integrations?.manageSecrets,
     );
     // Ticks every minute so the rail's NOW marker + "happening now / up next"
     // advance live without a manual reload.
@@ -895,7 +895,9 @@ export default function SiteCalendar({
     useEffect(() => {
         if (!canCreateHere || typeof window === 'undefined') return;
 
-        const action = new URLSearchParams(window.location.search).get('action');
+        const action = new URLSearchParams(window.location.search).get(
+            'action',
+        );
         if (action === 'create' || action === 'add') openCreate();
     }, [canCreateHere, openCreate]);
 
@@ -986,7 +988,10 @@ export default function SiteCalendar({
     );
 
     const toolbar = (
-        <GuardrailCard unstyled className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2">
+        <GuardrailCard
+            unstyled
+            className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-2"
+        >
             <div className="flex items-center gap-1">
                 <Button
                     variant="outline"
@@ -1041,13 +1046,15 @@ export default function SiteCalendar({
                     </select>
                 )}
 
-                <GuardrailCard unstyled
+                <GuardrailCard
+                    unstyled
                     role="tablist"
                     aria-label="Calendar view"
                     className="flex items-center rounded-md border bg-background p-0.5"
                 >
                     {VIEWS.map((v) => (
-                        <Button unstyled
+                        <Button
+                            unstyled
                             key={v.key}
                             role="tab"
                             aria-selected={view === v.key}
@@ -1115,7 +1122,8 @@ export default function SiteCalendar({
             {sources.map((s) => {
                 const on = enabledSources.has(s.key);
                 return (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={s.key}
                         onClick={() => toggleSource(s.key)}
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity ${on ? '' : 'opacity-40'}`}
@@ -1371,7 +1379,8 @@ export default function SiteCalendar({
                         <div className="grid grid-cols-3 gap-1">
                             {(['source', 'status', 'owner'] as ColorBy[]).map(
                                 (c) => (
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         key={c}
                                         onClick={() => setColorBy(c)}
                                         className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${colorBy === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
@@ -1389,7 +1398,8 @@ export default function SiteCalendar({
                         <div className="grid grid-cols-2 gap-1">
                             {(['comfortable', 'compact'] as Density[]).map(
                                 (d) => (
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         key={d}
                                         onClick={() => setDensity(d)}
                                         className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${density === d ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
@@ -1405,7 +1415,8 @@ export default function SiteCalendar({
                             <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                                 Sources
                             </p>
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 onClick={() =>
                                     setEnabledSources(
                                         allSourcesOn
@@ -1424,7 +1435,8 @@ export default function SiteCalendar({
                             {sources.map((s) => {
                                 const on = enabledSources.has(s.key);
                                 return (
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         key={s.key}
                                         onClick={() => toggleSource(s.key)}
                                         className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[13px] transition-colors hover:bg-accent/50"
@@ -1835,7 +1847,8 @@ function HouseSelector({
                     </div>
                 </div>
                 <div className="max-h-[320px] overflow-y-auto p-1.5">
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={() => go('/calendar')}
                         className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${currentId === 'all' ? 'bg-primary/10' : 'hover:bg-accent/60'}`}
@@ -1860,7 +1873,8 @@ function HouseSelector({
                     {list.map((s) => {
                         const active = s.id === currentId;
                         return (
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 key={s.id}
                                 type="button"
                                 onClick={() => go(`/sites/${s.id}/calendar`)}
@@ -2539,7 +2553,8 @@ function CreateEventDialog({
                                             const active =
                                                 form.data.event_type === t.key;
                                             return (
-                                                <Button unstyled
+                                                <Button
+                                                    unstyled
                                                     type="button"
                                                     key={t.key}
                                                     onClick={() =>
@@ -2967,14 +2982,18 @@ function CreateEventDialog({
                                         <Label className="mb-1.5 block">
                                             Attendees
                                         </Label>
-                                        <GuardrailCard unstyled className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-input bg-background/40 p-2">
+                                        <GuardrailCard
+                                            unstyled
+                                            className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-input bg-background/40 p-2"
+                                        >
                                             {people.map((p) => {
                                                 const on =
                                                     form.data.attendee_user_ids.includes(
                                                         p.id,
                                                     );
                                                 return (
-                                                    <Button unstyled
+                                                    <Button
+                                                        unstyled
                                                         key={p.id}
                                                         type="button"
                                                         onClick={() =>
@@ -3017,7 +3036,8 @@ function CreateEventDialog({
                                                     r.minutes,
                                                 );
                                             return (
-                                                <Button unstyled
+                                                <Button
+                                                    unstyled
                                                     key={r.minutes}
                                                     type="button"
                                                     onClick={() =>
@@ -3380,7 +3400,8 @@ function QuickAddMenu({
             <ul className="max-h-[260px] space-y-px overflow-y-auto">
                 {eventTypes.map((t) => (
                     <li key={t.key}>
-                        <Button unstyled
+                        <Button
+                            unstyled
                             role="menuitem"
                             data-menuitem
                             tabIndex={-1}
@@ -3413,7 +3434,8 @@ function QuickAddMenu({
                 ))}
             </ul>
             <div className="my-1 h-px bg-border/60" />
-            <Button unstyled
+            <Button
+                unstyled
                 role="menuitem"
                 data-menuitem
                 tabIndex={-1}
@@ -3591,7 +3613,8 @@ function ApprovalsPanel({
                                   ev.eventType)
                                 : null;
                             return (
-                                <GuardrailCard unstyled
+                                <GuardrailCard
+                                    unstyled
                                     key={`${ev.id}-${ev.start}`}
                                     className="flex items-center gap-3 rounded-lg border bg-card/40 p-2.5"
                                 >
@@ -3602,7 +3625,8 @@ function ApprovalsPanel({
                                             background: `var(--src-${ev.source})`,
                                         }}
                                     />
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         onClick={() => onOpenEvent(ev)}
                                         className="min-w-0 flex-1 text-left"
                                     >

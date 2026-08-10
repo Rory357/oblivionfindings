@@ -31,7 +31,10 @@ export function MiniSparkline({
         }));
 
         const line = points
-            .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+            .map(
+                (p, i) =>
+                    `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`,
+            )
             .join(' ');
 
         const fill =

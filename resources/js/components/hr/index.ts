@@ -1,9 +1,7 @@
 // Shared HR design-spine primitives. Import from '@/components/hr'.
 export * from './add-employee-dialog';
-export * from './my-hr-around-modal';
-export * from './my-hr-shoutout-spotlight';
-export * from './compensation-tabs';
 export * from './compensation-hero';
+export * from './compensation-tabs';
 export * from './compliance-tabs';
 export * from './department-dialog';
 export * from './department-view-dialog';
@@ -20,12 +18,14 @@ export * from './leave-hub-hero';
 export * from './leave-hub-parts';
 export * from './leave-hub-tabs';
 export * from './leave-request-dialog';
+export * from './my-hr-around-modal';
 export * from './my-hr-calendar';
 export * from './my-hr-clock-card';
 export * from './my-hr-esign-dialog';
 export * from './my-hr-hero';
 export * from './my-hr-one-modal';
 export * from './my-hr-shell';
+export * from './my-hr-shoutout-spotlight';
 export * from './my-hr-tabs';
 export * from './my-hr-types';
 export * from './my-hr-utils';

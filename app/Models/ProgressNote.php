@@ -4,18 +4,16 @@ namespace App\Models;
 
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProgressNote extends Model implements EmitsToTimeline
 {
-    use AuditableChanges;
-    use HasFactory;
-    use SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'client_id',
         'shift_id',
         'care_plan_goal_id',

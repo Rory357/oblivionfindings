@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -7,11 +10,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
     Select,
     SelectContent,
@@ -19,10 +19,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
 import { TabsContent } from '@/components/ui/tabs';
-import { router, useForm } from '@inertiajs/react';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { router, useForm } from '@inertiajs/react';
 import {
     AlertOctagon,
     BookOpen,
@@ -41,8 +41,8 @@ import {
     Users,
     type LucideIcon,
 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { AttachmentsPanel, type Attachment } from './_attachments';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 // ── Report type tile picker (Send-Kudos style) ────────────────────────────
 
@@ -146,7 +146,8 @@ function ReportTypePicker({
                 const Icon = t.icon;
                 const active = value === t.key;
                 return (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={t.key}
                         type="button"
                         onClick={() => onChange(t.key)}
@@ -163,8 +164,12 @@ function ReportTypePicker({
                             <Icon className={cn('h-4 w-4', t.accent)} />
                         </span>
                         <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium">{t.label}</span>
-                            <span className="block text-xs text-muted-foreground">{t.description}</span>
+                            <span className="block truncate text-sm font-medium">
+                                {t.label}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t.description}
+                            </span>
                         </span>
                     </Button>
                 );
@@ -193,16 +198,23 @@ function DecisionsSoughtEditor({
         <div className="space-y-3">
             {rows.length === 0 && (
                 <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
-                    No decisions for the board this period. Add one if you need a vote.
+                    No decisions for the board this period. Add one if you need
+                    a vote.
                 </div>
             )}
             {rows.map((row, i) => (
-                <GuardrailCard unstyled key={i} className="space-y-2 rounded-lg border border-border bg-card/40 p-3">
+                <GuardrailCard
+                    unstyled
+                    key={i}
+                    className="space-y-2 rounded-lg border border-border bg-card/40 p-3"
+                >
                     <div className="flex items-start justify-between gap-2">
                         <Input
                             placeholder="Decision title (e.g. Approve FY27 budget)"
                             value={row.title}
-                            onChange={(e) => update(i, { title: e.target.value })}
+                            onChange={(e) =>
+                                update(i, { title: e.target.value })
+                            }
                             className="font-medium"
                         />
                         <Button
@@ -225,7 +237,9 @@ function DecisionsSoughtEditor({
                         rows={2}
                         placeholder="CEO recommendation to the board."
                         value={row.recommendation}
-                        onChange={(e) => update(i, { recommendation: e.target.value })}
+                        onChange={(e) =>
+                            update(i, { recommendation: e.target.value })
+                        }
                     />
                 </GuardrailCard>
             ))}
@@ -259,21 +273,32 @@ function MattersArisingEditor({
                 </div>
             )}
             {rows.map((row, i) => (
-                <GuardrailCard unstyled key={i} className="space-y-2 rounded-lg border border-border bg-card/40 p-3">
+                <GuardrailCard
+                    unstyled
+                    key={i}
+                    className="space-y-2 rounded-lg border border-border bg-card/40 p-3"
+                >
                     <div className="flex items-start gap-2">
                         <Input
                             placeholder="Matter title (from previous report)"
                             value={row.title}
-                            onChange={(e) => update(i, { title: e.target.value })}
+                            onChange={(e) =>
+                                update(i, { title: e.target.value })
+                            }
                             className="font-medium"
                         />
-                        <Select value={row.status} onValueChange={(v) => update(i, { status: v })}>
+                        <Select
+                            value={row.status}
+                            onValueChange={(v) => update(i, { status: v })}
+                        >
                             <SelectTrigger className="w-36 shrink-0">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="open">Open</SelectItem>
-                                <SelectItem value="in_progress">In progress</SelectItem>
+                                <SelectItem value="in_progress">
+                                    In progress
+                                </SelectItem>
                                 <SelectItem value="done">Done</SelectItem>
                             </SelectContent>
                         </Select>
@@ -305,7 +330,11 @@ function MattersArisingEditor({
 
 // ── Initial defaults from a meeting ───────────────────────────────────────
 
-function defaultsFromMeeting(meeting: MeetingOption | null): { period_start: string; period_end: string; deadline: string } {
+function defaultsFromMeeting(meeting: MeetingOption | null): {
+    period_start: string;
+    period_end: string;
+    deadline: string;
+} {
     if (!meeting?.scheduled_at) {
         return { period_start: '', period_end: '', deadline: '' };
     }
@@ -354,7 +383,10 @@ export function CeoReportDialog({
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className="max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 1100px)', width: 'min(92vw, 1100px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 1100px)',
+                    width: 'min(92vw, 1100px)',
+                }}
             >
                 {isOpen && (
                     <CeoReportBody
@@ -392,12 +424,15 @@ function CeoReportBody({
         () => new Map(meetings.map((m) => [String(m.id), m])),
         [meetings],
     );
-    const initialMeetingId = String(initial?.governance_meeting_id ?? meetingId ?? '');
+    const initialMeetingId = String(
+        initial?.governance_meeting_id ?? meetingId ?? '',
+    );
     const initialMeeting = meetingMap.get(initialMeetingId) ?? null;
     const meetingDefaults = defaultsFromMeeting(initialMeeting);
 
     const form = useForm<CeoReportFormValues>({
-        report_type: (initial?.report_type as ReportTypeKey | undefined) ?? 'monthly',
+        report_type:
+            (initial?.report_type as ReportTypeKey | undefined) ?? 'monthly',
         governance_meeting_id: initialMeetingId,
         period_start: initial?.period_start ?? meetingDefaults.period_start,
         period_end: initial?.period_end ?? meetingDefaults.period_end,
@@ -420,16 +455,20 @@ function CeoReportBody({
     // Sync period defaults when a different meeting is picked (only in create mode).
     useEffect(() => {
         if (isEdit) return;
-        const selected = meetingMap.get(form.data.governance_meeting_id) ?? null;
+        const selected =
+            meetingMap.get(form.data.governance_meeting_id) ?? null;
         if (!selected) return;
         const d = defaultsFromMeeting(selected);
-        if (!form.data.period_start) form.setData('period_start', d.period_start);
+        if (!form.data.period_start)
+            form.setData('period_start', d.period_start);
         if (!form.data.period_end) form.setData('period_end', d.period_end);
         if (!form.data.deadline) form.setData('deadline', d.deadline);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [form.data.governance_meeting_id]);
 
-    const lockedMeeting = lockMeeting ? meetingMap.get(String(meetingId ?? '')) ?? null : null;
+    const lockedMeeting = lockMeeting
+        ? (meetingMap.get(String(meetingId ?? '')) ?? null)
+        : null;
 
     const handleSave = (submitToBoard: boolean) => {
         form.setData('submit_immediately', submitToBoard);
@@ -445,10 +484,14 @@ function CeoReportBody({
                 preserveState: true,
                 onSuccess: () => {
                     if (submitToBoard) {
-                        router.post(`/governance/ceo-reports/${initial.id}/submit`, undefined, {
-                            preserveScroll: true,
-                            onSuccess,
-                        });
+                        router.post(
+                            `/governance/ceo-reports/${initial.id}/submit`,
+                            undefined,
+                            {
+                                preserveScroll: true,
+                                onSuccess,
+                            },
+                        );
                     } else {
                         onSuccess();
                     }
@@ -471,12 +514,26 @@ function CeoReportBody({
         { value: 'workforce', label: 'Workforce', icon: Users },
         { value: 'strategy', label: 'Strategy', icon: BookOpen },
         { value: 'decisions', label: 'Decisions', icon: Gavel },
-        { value: 'matters', label: 'Matters arising', icon: MessageCircleQuestion },
-        { value: 'attachments', label: `Attachments (${initial?.attachments?.length ?? 0})`, icon: Paperclip, overflowable: true },
+        {
+            value: 'matters',
+            label: 'Matters arising',
+            icon: MessageCircleQuestion,
+        },
+        {
+            value: 'attachments',
+            label: `Attachments (${initial?.attachments?.length ?? 0})`,
+            icon: Paperclip,
+            overflowable: true,
+        },
     ];
 
     return (
-        <form onSubmit={(e) => { e.preventDefault(); handleSave(false); }}>
+        <form
+            onSubmit={(e) => {
+                e.preventDefault();
+                handleSave(false);
+            }}
+        >
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-primary" />
@@ -493,7 +550,8 @@ function CeoReportBody({
                 {!isEdit && (
                     <div>
                         <Label className="mb-2 block">
-                            Report type <span className="text-status-critical">*</span>
+                            Report type{' '}
+                            <span className="text-status-critical">*</span>
                         </Label>
                         <ReportTypePicker
                             value={form.data.report_type}
@@ -506,7 +564,8 @@ function CeoReportBody({
                 <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                         <Label htmlFor="ceo-meeting">
-                            Board meeting <span className="text-status-critical">*</span>
+                            Board meeting{' '}
+                            <span className="text-status-critical">*</span>
                         </Label>
                         {lockedMeeting ? (
                             <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
@@ -518,7 +577,10 @@ function CeoReportBody({
                                         <span className="truncate text-sm font-medium">
                                             {lockedMeeting.title}
                                         </span>
-                                        <Badge variant="outline" className="text-[10px]">
+                                        <Badge
+                                            variant="outline"
+                                            className="text-[10px]"
+                                        >
                                             From meeting
                                         </Badge>
                                     </div>
@@ -529,8 +591,12 @@ function CeoReportBody({
                             </div>
                         ) : (
                             <Select
-                                value={form.data.governance_meeting_id || undefined}
-                                onValueChange={(v) => form.setData('governance_meeting_id', v)}
+                                value={
+                                    form.data.governance_meeting_id || undefined
+                                }
+                                onValueChange={(v) =>
+                                    form.setData('governance_meeting_id', v)
+                                }
                                 disabled={isEdit}
                             >
                                 <SelectTrigger id="ceo-meeting">
@@ -538,11 +604,20 @@ function CeoReportBody({
                                 </SelectTrigger>
                                 <SelectContent>
                                     {meetings.map((m) => (
-                                        <SelectItem key={m.id} value={String(m.id)}>
+                                        <SelectItem
+                                            key={m.id}
+                                            value={String(m.id)}
+                                        >
                                             {m.title}
                                             {m.scheduled_at && (
                                                 <span className="ml-2 text-xs text-muted-foreground">
-                                                    ({new Date(m.scheduled_at).toLocaleDateString('en-NZ')})
+                                                    (
+                                                    {new Date(
+                                                        m.scheduled_at,
+                                                    ).toLocaleDateString(
+                                                        'en-NZ',
+                                                    )}
+                                                    )
                                                 </span>
                                             )}
                                         </SelectItem>
@@ -550,7 +625,9 @@ function CeoReportBody({
                                 </SelectContent>
                             </Select>
                         )}
-                        <FieldError message={form.errors.governance_meeting_id} />
+                        <FieldError
+                            message={form.errors.governance_meeting_id}
+                        />
                     </div>
 
                     <div>
@@ -559,7 +636,9 @@ function CeoReportBody({
                             id="ceo-deadline"
                             type="datetime-local"
                             value={form.data.deadline}
-                            onChange={(e) => form.setData('deadline', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('deadline', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.deadline} />
                     </div>
@@ -570,7 +649,9 @@ function CeoReportBody({
                             id="ceo-period-start"
                             type="date"
                             value={form.data.period_start}
-                            onChange={(e) => form.setData('period_start', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('period_start', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.period_start} />
                     </div>
@@ -581,21 +662,29 @@ function CeoReportBody({
                             id="ceo-period-end"
                             type="date"
                             value={form.data.period_end}
-                            onChange={(e) => form.setData('period_end', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('period_end', e.target.value)
+                            }
                         />
                         <FieldError message={form.errors.period_end} />
                     </div>
                 </div>
 
                 {/* Section tabs */}
-                <PageTabs value={activeTab} onValueChange={setActiveTab} items={tabs}>
+                <PageTabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    items={tabs}
+                >
                     <TabsContent value="overview" className="space-y-3">
                         <SectionTextarea
                             label="Executive summary"
                             hint="3-paragraph top-line for the board. Headline outcomes only."
                             value={form.data.executive_summary}
                             error={form.errors.executive_summary}
-                            onChange={(v) => form.setData('executive_summary', v)}
+                            onChange={(v) =>
+                                form.setData('executive_summary', v)
+                            }
                             rows={6}
                         />
                     </TabsContent>
@@ -606,7 +695,9 @@ function CeoReportBody({
                             hint="Service utilisation, occupancy, throughput. Use plain numbers."
                             value={form.data.operational_summary}
                             error={form.errors.operational_summary}
-                            onChange={(v) => form.setData('operational_summary', v)}
+                            onChange={(v) =>
+                                form.setData('operational_summary', v)
+                            }
                             rows={5}
                         />
                         <SectionTextarea
@@ -614,7 +705,9 @@ function CeoReportBody({
                             hint="Wins for the period the board should know about."
                             value={form.data.key_achievements}
                             error={form.errors.key_achievements}
-                            onChange={(v) => form.setData('key_achievements', v)}
+                            onChange={(v) =>
+                                form.setData('key_achievements', v)
+                            }
                             rows={4}
                         />
                     </TabsContent>
@@ -625,7 +718,9 @@ function CeoReportBody({
                             hint="Budget vs actual, key revenue / expense items, any variance > 5%."
                             value={form.data.financial_summary}
                             error={form.errors.financial_summary}
-                            onChange={(v) => form.setData('financial_summary', v)}
+                            onChange={(v) =>
+                                form.setData('financial_summary', v)
+                            }
                             rows={6}
                         />
                     </TabsContent>
@@ -636,7 +731,9 @@ function CeoReportBody({
                             hint="Risks above appetite, notifiable incidents, regulator engagement."
                             value={form.data.challenges_and_risks}
                             error={form.errors.challenges_and_risks}
-                            onChange={(v) => form.setData('challenges_and_risks', v)}
+                            onChange={(v) =>
+                                form.setData('challenges_and_risks', v)
+                            }
                             rows={5}
                         />
                         <SectionTextarea
@@ -644,7 +741,9 @@ function CeoReportBody({
                             hint="Audits closed, evidence gaps, regulatory deadlines."
                             value={form.data.compliance_status}
                             error={form.errors.compliance_status}
-                            onChange={(v) => form.setData('compliance_status', v)}
+                            onChange={(v) =>
+                                form.setData('compliance_status', v)
+                            }
                             rows={4}
                         />
                     </TabsContent>
@@ -673,27 +772,33 @@ function CeoReportBody({
 
                     <TabsContent value="decisions" className="space-y-3">
                         <p className="text-xs text-muted-foreground">
-                            List anything that needs the board to vote or sign off this period.
+                            List anything that needs the board to vote or sign
+                            off this period.
                         </p>
                         <DecisionsSoughtEditor
                             rows={form.data.decisions_sought}
-                            onChange={(rows) => form.setData('decisions_sought', rows)}
+                            onChange={(rows) =>
+                                form.setData('decisions_sought', rows)
+                            }
                         />
                     </TabsContent>
 
                     <TabsContent value="matters" className="space-y-3">
                         <p className="text-xs text-muted-foreground">
-                            Update the board on items carried forward from the previous meeting.
+                            Update the board on items carried forward from the
+                            previous meeting.
                         </p>
                         <MattersArisingEditor
                             rows={form.data.matters_arising}
-                            onChange={(rows) => form.setData('matters_arising', rows)}
+                            onChange={(rows) =>
+                                form.setData('matters_arising', rows)
+                            }
                         />
                     </TabsContent>
 
                     <TabsContent value="attachments">
                         <AttachmentsPanel
-                            reportId={isEdit ? initial?.id ?? null : null}
+                            reportId={isEdit ? (initial?.id ?? null) : null}
                             attachments={initial?.attachments ?? []}
                             canManage
                         />
@@ -748,7 +853,9 @@ function SectionTextarea({
     return (
         <div>
             <Label>{label}</Label>
-            {hint && <p className="mb-1 text-[11px] text-muted-foreground">{hint}</p>}
+            {hint && (
+                <p className="mb-1 text-[11px] text-muted-foreground">{hint}</p>
+            )}
             <Textarea
                 rows={rows}
                 value={value}

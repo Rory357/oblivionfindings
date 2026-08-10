@@ -1,5 +1,5 @@
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -50,7 +50,10 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
+                {
+                    title: labels?.['client.plural'] ?? 'Clients',
+                    href: '/clients',
+                },
                 // remove the show breadcrumb until you actually use /clients/{id}
                 {
                     title: 'Assignments',
@@ -78,7 +81,9 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                 )}
 
                 <div className="m-4 rounded-xl border p-4">
-                    <div className="text-sm text-muted-foreground">{labels?.['client.singular'] ?? 'Client'}</div>
+                    <div className="text-sm text-muted-foreground">
+                        {labels?.['client.singular'] ?? 'Client'}
+                    </div>
                     <div className="text-lg font-semibold">
                         {client.first_name} {client.last_name}
                     </div>
@@ -94,7 +99,11 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                                 Assigned support workers
                             </div>
                             <div className="text-sm text-muted-foreground">
-                                Tick workers to assign them to this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
+                                Tick workers to assign them to this{' '}
+                                {(
+                                    labels?.['client.singular'] ?? 'Client'
+                                ).toLowerCase()}
+                                .
                             </div>
                         </div>
 

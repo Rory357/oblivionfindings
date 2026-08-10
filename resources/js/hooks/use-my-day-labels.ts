@@ -208,8 +208,7 @@ const FALLBACKS: Record<MyDayLabelKey, string> = {
     reason_to_end_anyway: 'Reason to end anyway',
     brief_reason: 'Brief reason',
     optional_notes: 'Optional notes',
-    optional_notes_placeholder:
-        'Anything payroll or your manager should know.',
+    optional_notes_placeholder: 'Anything payroll or your manager should know.',
     override_audit_title: 'Override will be audit logged',
     override_audit_subtitle:
         'You can end the shift now if needed, but the reason and outstanding items will be recorded.',
@@ -344,7 +343,10 @@ const FALLBACKS: Record<MyDayLabelKey, string> = {
         "Couldn't record this dose. Open the eMAR to complete it.",
 };
 
-function interpolate(template: string, params?: Record<string, string | number>) {
+function interpolate(
+    template: string,
+    params?: Record<string, string | number>,
+) {
     if (!params) return template;
     return template.replace(/:([a-zA-Z_]+)/g, (match, key: string) =>
         Object.prototype.hasOwnProperty.call(params, key)

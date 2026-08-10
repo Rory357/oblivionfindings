@@ -1,27 +1,38 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
         'approved_at' => now(),
     ]);
-    $this->hr->setAttribute('tenant_id', 1);
-
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $this->hr->roles()->syncWithoutDetaching([$hrRole->id]);
     }
 
     $this->site = Site::factory()->create([
-        'tenant_id' => 1,
         'type' => 'house',
+        'is_active' => true,
+        'archived' => false,
+        'archived_at' => null,
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
     ]);
 });
 
@@ -69,7 +80,6 @@ test('hr can sync and unpublish external posting channels for published jobs', f
 
 test('sync posting requires job to be published', function () {
     $job = HrJobRequisition::query()->create([
-        'tenant_id' => 1,
         'title' => 'Draft Job',
         'slug' => 'draft-job',
         'position_role' => 'support_worker',

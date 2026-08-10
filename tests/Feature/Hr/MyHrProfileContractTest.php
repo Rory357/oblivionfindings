@@ -10,9 +10,8 @@ test('my hr profile page exposes flattened personal and emergency contact fields
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
-        'employee_number' => 'EMP-' . $user->id,
+        'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
@@ -44,9 +43,8 @@ test('my hr profile update accepts ui phone and emergency contact fields', funct
     ]);
 
     $profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
-        'employee_number' => 'EMP-' . $user->id,
+        'employee_number' => 'EMP-'.$user->id,
         'work_email' => $user->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',

@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\MarScheduleService;
 use App\Services\ShiftHandoverService;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -56,7 +57,6 @@ class AttendanceService
             }
 
             $session = HrAttendanceSession::create([
-                'tenant_id' => $data['tenant_id'] ?? $user->tenant_id ?? $user->organization_id ?? null,
                 'user_id' => $user->id,
                 'shift_id' => $shift?->id,
                 'site_id' => $siteId,
@@ -157,7 +157,8 @@ class AttendanceService
 
             $session = $session->fresh([
                 'shift.tasks',
-                'shift.outgoingHandovers',
+                'shift.outgoingHandovers' => fn ($query) => app(UserSiteAccessService::class)
+                    ->applyHandoverIntegrityScope($query->getQuery()),
             ]) ?? $session;
 
             $blockers = $this->getEndOfShiftBlockers($session);
@@ -491,7 +492,7 @@ class AttendanceService
         return Shift::query()
             ->with('client:id,site_id')
             ->where('user_id', $user->id)
-            ->visibleToFrontline($user->organization_id)
+            ->visibleToFrontline()
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->where('starts_at', '<=', $clockInAt->copy()->addHours(self::AUTO_MATCH_GRACE_HOURS))
             ->where('ends_at', '>=', $clockInAt->copy()->subHours(self::AUTO_MATCH_GRACE_HOURS))
@@ -506,7 +507,8 @@ class AttendanceService
     {
         $session->loadMissing([
             'shift.tasks',
-            'shift.outgoingHandovers',
+            'shift.outgoingHandovers' => fn ($query) => app(UserSiteAccessService::class)
+                ->applyHandoverIntegrityScope($query->getQuery()),
         ]);
 
         $shift = $session->shift;
@@ -820,6 +822,7 @@ class AttendanceService
         }
 
         $alreadySubmitted = ShiftHandover::query()
+            ->tap(fn ($query) => app(UserSiteAccessService::class)->applyHandoverIntegrityScope($query))
             ->where('outgoing_shift_id', $shift->id)
             ->whereIn('status', [
                 ShiftHandoverService::STATUS_SUBMITTED,

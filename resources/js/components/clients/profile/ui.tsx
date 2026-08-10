@@ -119,7 +119,9 @@ export function FilterChips<T extends string>({
                             <span
                                 className={cn(
                                     'rounded-full px-1.5 text-[10px] font-bold',
-                                    active ? 'bg-primary-foreground/20' : 'bg-card',
+                                    active
+                                        ? 'bg-primary-foreground/20'
+                                        : 'bg-card',
                                 )}
                             >
                                 {o.count}

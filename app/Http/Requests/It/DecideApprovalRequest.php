@@ -2,20 +2,23 @@
 
 namespace App\Http\Requests\It;
 
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use App\Models\ItTicketApproval;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Approve or reject a pending sign-off request (§P-S3). Authorised by
- * ItTicketApprovalPolicy@decide — a different agent, pending only.
+ * The request first conceals an inaccessible parent ticket; the locked approval
+ * lifecycle then revalidates pending state and separation of duties.
  */
 class DecideApprovalRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
-        $approval = $this->route('approval');
+        $approval = $this->workableApprovalOrNotFound();
 
-        return (bool) ($approval instanceof ItTicketApproval && $this->user()?->can('decide', $approval));
+        return (bool) ($approval instanceof ItTicketApproval && $this->user()?->canDo('it.manage'));
     }
 
     /**
@@ -25,7 +28,7 @@ class DecideApprovalRequest extends FormRequest
     {
         return [
             'decision' => ['required', 'in:approve,reject'],
-            'reason' => ['nullable', 'string', 'max:1000'],
+            'reason' => ['required_if:decision,reject', 'nullable', 'string', 'max:1000'],
         ];
     }
 }

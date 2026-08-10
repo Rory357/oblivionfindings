@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrExitInterview;
 use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Notifications\ExitInterviewScheduledNotification;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -21,7 +22,6 @@ class ExitInterviewService
             $task = $this->resolveOffboardingTask($data);
 
             $interview = HrExitInterview::create([
-                'tenant_id' => $data['tenant_id'],
                 'employee_profile_id' => $data['employee_profile_id'],
                 'interviewer_user_id' => $data['interviewer_user_id'],
                 'interview_date' => $data['interview_date'],
@@ -63,22 +63,30 @@ class ExitInterviewService
      */
     public function rescheduleInterview(HrExitInterview $interview, array $data): HrExitInterview
     {
-        $nextInterviewer = (int) $data['interviewer_user_id'];
-        $nextDate = (string) $data['interview_date'];
-        $materiallyChanged = $interview->interviewer_user_id !== $nextInterviewer
-            || $interview->interview_date?->toDateString() !== $nextDate;
+        $materiallyChanged = false;
+        $interview = DB::transaction(function () use ($interview, $data, &$materiallyChanged): HrExitInterview {
+            $lockedInterview = HrExitInterview::query()
+                ->lockForUpdate()
+                ->findOrFail($interview->getKey());
+            $nextInterviewer = (int) $data['interviewer_user_id'];
+            $nextDate = (string) $data['interview_date'];
+            $materiallyChanged = $lockedInterview->interviewer_user_id !== $nextInterviewer
+                || $lockedInterview->interview_date?->toDateString() !== $nextDate;
 
-        if (! $materiallyChanged) {
-            return $interview;
+            if (! $materiallyChanged) {
+                return $lockedInterview;
+            }
+
+            $lockedInterview->update([
+                'interviewer_user_id' => $nextInterviewer,
+                'interview_date' => $nextDate,
+            ]);
+
+            return $lockedInterview->fresh(['employeeProfile.user']);
+        });
+        if ($materiallyChanged) {
+            $this->notifyScheduledInterviewer($interview);
         }
-
-        $interview->update([
-            'interviewer_user_id' => $nextInterviewer,
-            'interview_date' => $nextDate,
-        ]);
-
-        $interview = $interview->fresh(['employeeProfile.user']);
-        $this->notifyScheduledInterviewer($interview);
 
         return $interview;
     }
@@ -93,7 +101,6 @@ class ExitInterviewService
             ->whereNull('exit_interview_id')
             ->where('status', '!=', 'completed')
             ->whereHas('checklist', fn ($checklists) => $checklists
-                ->where('tenant_id', $data['tenant_id'])
                 ->where('employee_profile_id', $data['employee_profile_id'])
                 ->whereIn('status', ['pending', 'in_progress']));
 
@@ -154,32 +161,33 @@ class ExitInterviewService
     public function appendAddendum(HrExitInterview $exitInterview, string $note, User $actor): HrExitInterview
     {
         return DB::transaction(function () use ($exitInterview, $note, $actor) {
-            $submittedComments = trim((string) $exitInterview->additional_comments);
+            $lockedInterview = HrExitInterview::query()
+                ->lockForUpdate()
+                ->findOrFail($exitInterview->getKey());
+            $submittedComments = trim((string) $lockedInterview->additional_comments);
             $recordedAt = now()
                 ->timezone(config('app.worker_timezone', 'Pacific/Auckland'))
                 ->format('d M Y H:i');
             $addendum = "[Addendum — {$recordedAt} — {$actor->name}]\n".trim($note);
 
-            $exitInterview->update([
+            $lockedInterview->update([
                 'additional_comments' => $submittedComments === ''
                     ? $addendum
                     : $submittedComments."\n\n".$addendum,
             ]);
 
-            return $exitInterview->refresh();
+            return $lockedInterview->refresh();
         });
     }
 
     /**
-     * Get aggregated exit trends for a tenant.
+     * Get aggregated exit trends from an already-authorized interview query.
      *
      * Returns departure reason counts and average satisfaction scores
      * over a configurable period.
      */
-    public function getExitTrends(?int $tenantId, ?string $fromDate = null, ?string $toDate = null): array
+    public function getExitTrends(Builder $query, ?string $fromDate = null, ?string $toDate = null): array
     {
-        $query = HrExitInterview::forTenant($tenantId);
-
         if ($fromDate) {
             $query->where('interview_date', '>=', $fromDate);
         }

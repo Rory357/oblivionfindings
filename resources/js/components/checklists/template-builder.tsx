@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -23,7 +24,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -37,11 +37,11 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+import { Card as GuardrailCard } from '@/components/ui/card';
 import { catColorVar } from './category';
 import { useChecklistConfig } from './context';
 import { categoryIcon } from './icons';
 import type { ResponseType, TemplateDetail } from './types';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 interface ItemDraft {
     id?: number;
@@ -77,7 +77,15 @@ const RESPONSE_TYPES: { value: ResponseType; label: string }[] = [
     { value: 'photo', label: 'Photo evidence' },
 ];
 
-const FREQUENCIES = ['once', 'daily', 'weekly', 'fortnightly', 'monthly', 'quarterly', 'annual'];
+const FREQUENCIES = [
+    'once',
+    'daily',
+    'weekly',
+    'fortnightly',
+    'monthly',
+    'quarterly',
+    'annual',
+];
 const APPLIES_TO = ['all', 'house', 'head_office', 'facility'];
 
 const DEFAULTS: BuilderForm = {
@@ -129,8 +137,14 @@ function detailToForm(detail: TemplateDetail): BuilderForm {
             question: it.question,
             response_type: it.response_type,
             response_config: {
-                min: it.response_config?.min != null ? String(it.response_config.min) : '',
-                max: it.response_config?.max != null ? String(it.response_config.max) : '',
+                min:
+                    it.response_config?.min != null
+                        ? String(it.response_config.min)
+                        : '',
+                max:
+                    it.response_config?.max != null
+                        ? String(it.response_config.max)
+                        : '',
                 unit: it.response_config?.unit ?? '',
             },
             is_required: it.is_required,
@@ -152,15 +166,28 @@ function FieldError({ message }: { message?: string }) {
  * mounts the body with the resolved initial values so useForm is seeded once —
  * controlled <Select>s reflect the value from first render.
  */
-export function TemplateBuilderModal({ target, onClose }: { target: 'new' | number; onClose: () => void }) {
+export function TemplateBuilderModal({
+    target,
+    onClose,
+}: {
+    target: 'new' | number;
+    onClose: () => void;
+}) {
     const page = usePage();
-    const detail = (page.props as { templateDetail?: TemplateDetail | null }).templateDetail ?? null;
+    const detail =
+        (page.props as { templateDetail?: TemplateDetail | null })
+            .templateDetail ?? null;
     const isEdit = target !== 'new';
     const ready = !isEdit || (detail !== null && detail.id === target);
 
     useEffect(() => {
         if (isEdit) {
-            router.reload({ only: ['templateDetail'], data: { template: target }, preserveState: true, preserveScroll: true });
+            router.reload({
+                only: ['templateDetail'],
+                data: { template: target },
+                preserveState: true,
+                preserveScroll: true,
+            });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [target]);
@@ -169,7 +196,10 @@ export function TemplateBuilderModal({ target, onClose }: { target: 'new' | numb
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className="max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 1100px)', width: 'min(92vw, 1100px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 1100px)',
+                    width: 'min(92vw, 1100px)',
+                }}
             >
                 {!ready ? (
                     <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -180,8 +210,12 @@ export function TemplateBuilderModal({ target, onClose }: { target: 'new' | numb
                     <TemplateBuilderBody
                         key={isEdit ? `edit-${target}` : 'new'}
                         templateId={isEdit ? (target as number) : null}
-                        initial={isEdit && detail ? detailToForm(detail) : DEFAULTS}
-                        assignmentsCount={isEdit && detail ? detail.assignments_count : 0}
+                        initial={
+                            isEdit && detail ? detailToForm(detail) : DEFAULTS
+                        }
+                        assignmentsCount={
+                            isEdit && detail ? detail.assignments_count : 0
+                        }
                         onClose={onClose}
                     />
                 )}
@@ -210,7 +244,9 @@ function TemplateBuilderBody({
     const items = form.data.items;
     const setItems = (next: ItemDraft[]) => form.setData('items', next);
     const updateItem = (i: number, patch: Partial<ItemDraft>) =>
-        setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+        setItems(
+            items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)),
+        );
     const moveItem = (i: number, dir: -1 | 1) => {
         const j = i + dir;
         if (j < 0 || j >= items.length) return;
@@ -238,8 +274,14 @@ function TemplateBuilderBody({
                 response_config:
                     it.response_type === 'numeric'
                         ? {
-                              min: it.response_config.min === '' ? null : it.response_config.min,
-                              max: it.response_config.max === '' ? null : it.response_config.max,
+                              min:
+                                  it.response_config.min === ''
+                                      ? null
+                                      : it.response_config.min,
+                              max:
+                                  it.response_config.max === ''
+                                      ? null
+                                      : it.response_config.max,
                               unit: it.response_config.unit || null,
                           }
                         : null,
@@ -249,7 +291,11 @@ function TemplateBuilderBody({
                 failure_creates_damage: it.failure_creates_damage,
             })),
         }));
-        const opts = { preserveScroll: true, preserveState: true, onSuccess: onClose };
+        const opts = {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: onClose,
+        };
         if (isEdit) {
             form.put(`/sites/checklists/templates/${templateId}`, opts);
         } else {
@@ -258,10 +304,15 @@ function TemplateBuilderBody({
     };
 
     const remove = () => {
-        router.delete(`/sites/checklists/templates/${templateId}`, { preserveScroll: true, onSuccess: onClose });
+        router.delete(`/sites/checklists/templates/${templateId}`, {
+            preserveScroll: true,
+            onSuccess: onClose,
+        });
     };
 
-    const itemError = Object.keys(form.errors).find((k) => k.startsWith('items.'));
+    const itemError = Object.keys(form.errors).find((k) =>
+        k.startsWith('items.'),
+    );
     const canDelete = isEdit && assignmentsCount === 0;
 
     return (
@@ -269,10 +320,13 @@ function TemplateBuilderBody({
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                     <ClipboardCheck className="h-4 w-4 text-primary" />
-                    {isEdit ? 'Edit checklist template' : 'New checklist template'}
+                    {isEdit
+                        ? 'Edit checklist template'
+                        : 'New checklist template'}
                 </DialogTitle>
                 <DialogDescription>
-                    Define the checklist and the items support workers complete on each run.
+                    Define the checklist and the items support workers complete
+                    on each run.
                 </DialogDescription>
             </DialogHeader>
 
@@ -304,7 +358,9 @@ function TemplateBuilderBody({
                             disabled={isEdit}
                         />
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                            {isEdit ? 'The key is fixed once created.' : 'Unique identifier — lowercase, no spaces.'}
+                            {isEdit
+                                ? 'The key is fixed once created.'
+                                : 'Unique identifier — lowercase, no spaces.'}
                         </p>
                         <FieldError message={form.errors.key} />
                     </div>
@@ -312,7 +368,9 @@ function TemplateBuilderBody({
                         <Label>Description</Label>
                         <Textarea
                             value={form.data.description}
-                            onChange={(e) => form.setData('description', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('description', e.target.value)
+                            }
                             rows={2}
                             placeholder="What this checklist is for and when it should be used"
                         />
@@ -327,32 +385,48 @@ function TemplateBuilderBody({
                             const Icon = categoryIcon(c.icon);
                             const active = form.data.category === c.key;
                             return (
-                                <Button unstyled
+                                <Button
+                                    unstyled
                                     key={c.key}
                                     type="button"
-                                    onClick={() => form.setData('category', active ? '' : c.key)}
+                                    onClick={() =>
+                                        form.setData(
+                                            'category',
+                                            active ? '' : c.key,
+                                        )
+                                    }
                                     aria-pressed={active}
                                     className={cn(
                                         'group flex items-start gap-2 rounded-xl border bg-card/40 p-3 text-left transition-all hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                                        active ? 'border-primary bg-primary/10 ring-1 ring-primary/40' : 'border-border',
+                                        active
+                                            ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                            : 'border-border',
                                     )}
                                 >
                                     <span
                                         className="mt-0.5 shrink-0 rounded-lg p-1.5"
-                                        style={{ background: `color-mix(in oklch, ${catColorVar(c.tone)} 15%, transparent)`, color: catColorVar(c.tone) }}
+                                        style={{
+                                            background: `color-mix(in oklch, ${catColorVar(c.tone)} 15%, transparent)`,
+                                            color: catColorVar(c.tone),
+                                        }}
                                     >
                                         <Icon className="h-4 w-4" />
                                     </span>
                                     <span className="min-w-0">
-                                        <span className="block truncate text-sm font-medium">{c.label}</span>
-                                        <span className="block text-xs text-muted-foreground">{c.blurb}</span>
+                                        <span className="block truncate text-sm font-medium">
+                                            {c.label}
+                                        </span>
+                                        <span className="block text-xs text-muted-foreground">
+                                            {c.blurb}
+                                        </span>
                                     </span>
                                 </Button>
                             );
                         })}
                     </div>
                     <p className="mt-1.5 text-[11px] text-muted-foreground">
-                        Templates with no category appear under “Uncategorised” in the Library.
+                        Templates with no category appear under “Uncategorised”
+                        in the Library.
                     </p>
                 </div>
 
@@ -360,7 +434,12 @@ function TemplateBuilderBody({
                 <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                         <Label>Applies to</Label>
-                        <Select value={form.data.applicable_to_type} onValueChange={(v) => form.setData('applicable_to_type', v)}>
+                        <Select
+                            value={form.data.applicable_to_type}
+                            onValueChange={(v) =>
+                                form.setData('applicable_to_type', v)
+                            }
+                        >
                             <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
@@ -375,7 +454,10 @@ function TemplateBuilderBody({
                     </div>
                     <div>
                         <Label>Default frequency</Label>
-                        <Select value={form.data.frequency} onValueChange={(v) => form.setData('frequency', v)}>
+                        <Select
+                            value={form.data.frequency}
+                            onValueChange={(v) => form.setData('frequency', v)}
+                        >
                             <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
@@ -417,19 +499,33 @@ function TemplateBuilderBody({
                         <div>
                             <h3 className="text-sm font-semibold">Items</h3>
                             <p className="text-xs text-muted-foreground">
-                                {items.length} {items.length === 1 ? 'item' : 'items'} on this checklist
+                                {items.length}{' '}
+                                {items.length === 1 ? 'item' : 'items'} on this
+                                checklist
                             </p>
                         </div>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setItems([...items, blankItem()])}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setItems([...items, blankItem()])}
+                        >
                             <Plus className="h-3.5 w-3.5" />
                             Add item
                         </Button>
                     </div>
-                    <FieldError message={itemError ? 'Each item needs a question and a response type.' : undefined} />
+                    <FieldError
+                        message={
+                            itemError
+                                ? 'Each item needs a question and a response type.'
+                                : undefined
+                        }
+                    />
 
                     {items.length === 0 ? (
                         <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                            No items yet. Add the checks support workers will complete.
+                            No items yet. Add the checks support workers will
+                            complete.
                         </div>
                     ) : (
                         <div className="space-y-2.5">
@@ -441,7 +537,11 @@ function TemplateBuilderBody({
                                     total={items.length}
                                     onChange={(patch) => updateItem(i, patch)}
                                     onMove={(dir) => moveItem(i, dir)}
-                                    onRemove={() => setItems(items.filter((_, idx) => idx !== i))}
+                                    onRemove={() =>
+                                        setItems(
+                                            items.filter((_, idx) => idx !== i),
+                                        )
+                                    }
                                 />
                             ))}
                         </div>
@@ -454,11 +554,23 @@ function TemplateBuilderBody({
                     {isEdit ? (
                         confirmDelete ? (
                             <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Delete this template?</span>
-                                <Button type="button" variant="destructive" size="sm" onClick={remove}>
+                                <span className="text-xs text-muted-foreground">
+                                    Delete this template?
+                                </span>
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={remove}
+                                >
                                     Confirm delete
                                 </Button>
-                                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setConfirmDelete(false)}
+                                >
                                     Cancel
                                 </Button>
                             </div>
@@ -469,7 +581,11 @@ function TemplateBuilderBody({
                                 size="sm"
                                 className="text-status-critical hover:text-status-critical"
                                 disabled={!canDelete}
-                                title={canDelete ? undefined : 'Remove active site assignments before deleting.'}
+                                title={
+                                    canDelete
+                                        ? undefined
+                                        : 'Remove active site assignments before deleting.'
+                                }
                                 onClick={() => setConfirmDelete(true)}
                             >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -483,7 +599,9 @@ function TemplateBuilderBody({
                         Cancel
                     </Button>
                     <Button type="submit" disabled={form.processing}>
-                        {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {form.processing && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
                         {isEdit ? 'Save template' : 'Create template'}
                     </Button>
                 </div>
@@ -509,9 +627,15 @@ function ToggleField({
         <label className="flex cursor-pointer items-center gap-2">
             <Switch checked={checked} onCheckedChange={onChange} />
             <span className="flex items-center gap-1.5 text-sm">
-                {Icon ? <Icon className="h-3.5 w-3.5 text-muted-foreground" /> : null}
+                {Icon ? (
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : null}
                 <span className="font-medium">{label}</span>
-                {hint ? <span className="text-xs text-muted-foreground">· {hint}</span> : null}
+                {hint ? (
+                    <span className="text-xs text-muted-foreground">
+                        · {hint}
+                    </span>
+                ) : null}
             </span>
         </label>
     );
@@ -534,11 +658,16 @@ function ItemRow({
 }) {
     const locked = item.has_responses === true;
     return (
-        <GuardrailCard unstyled className="rounded-lg border border-border bg-card p-3">
+        <GuardrailCard
+            unstyled
+            className="rounded-lg border border-border bg-card p-3"
+        >
             <div className="flex items-start gap-2">
                 <div className="flex flex-col items-center gap-0.5 pt-1">
                     <GripVertical className="h-4 w-4 text-muted-foreground/40" />
-                    <span className="text-[10px] font-semibold text-muted-foreground">{index + 1}</span>
+                    <span className="text-[10px] font-semibold text-muted-foreground">
+                        {index + 1}
+                    </span>
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
                     <Input
@@ -547,7 +676,12 @@ function ItemRow({
                         placeholder="e.g. Smoke alarms tested and sounding"
                     />
                     <div className="flex flex-wrap items-center gap-2">
-                        <Select value={item.response_type} onValueChange={(v) => onChange({ response_type: v as ResponseType })}>
+                        <Select
+                            value={item.response_type}
+                            onValueChange={(v) =>
+                                onChange({ response_type: v as ResponseType })
+                            }
+                        >
                             <SelectTrigger className="h-9 w-48">
                                 <SelectValue />
                             </SelectTrigger>
@@ -564,22 +698,45 @@ function ItemRow({
                             <div className="flex items-center gap-1.5">
                                 <Input
                                     value={item.response_config.min}
-                                    onChange={(e) => onChange({ response_config: { ...item.response_config, min: e.target.value } })}
+                                    onChange={(e) =>
+                                        onChange({
+                                            response_config: {
+                                                ...item.response_config,
+                                                min: e.target.value,
+                                            },
+                                        })
+                                    }
                                     placeholder="min"
                                     type="number"
                                     className="h-9 w-20"
                                 />
-                                <span className="text-xs text-muted-foreground">–</span>
+                                <span className="text-xs text-muted-foreground">
+                                    –
+                                </span>
                                 <Input
                                     value={item.response_config.max}
-                                    onChange={(e) => onChange({ response_config: { ...item.response_config, max: e.target.value } })}
+                                    onChange={(e) =>
+                                        onChange({
+                                            response_config: {
+                                                ...item.response_config,
+                                                max: e.target.value,
+                                            },
+                                        })
+                                    }
                                     placeholder="max"
                                     type="number"
                                     className="h-9 w-20"
                                 />
                                 <Input
                                     value={item.response_config.unit}
-                                    onChange={(e) => onChange({ response_config: { ...item.response_config, unit: e.target.value } })}
+                                    onChange={(e) =>
+                                        onChange({
+                                            response_config: {
+                                                ...item.response_config,
+                                                unit: e.target.value,
+                                            },
+                                        })
+                                    }
                                     placeholder="unit"
                                     className="h-9 w-20"
                                 />
@@ -587,13 +744,20 @@ function ItemRow({
                         ) : null}
 
                         <label className="flex cursor-pointer items-center gap-1.5 text-xs">
-                            <Switch checked={item.is_required} onCheckedChange={(v) => onChange({ is_required: v })} />
+                            <Switch
+                                checked={item.is_required}
+                                onCheckedChange={(v) =>
+                                    onChange({ is_required: v })
+                                }
+                            />
                             Required
                         </label>
                         <label className="flex cursor-pointer items-center gap-1.5 text-xs">
                             <Switch
                                 checked={item.failure_creates_hazard}
-                                onCheckedChange={(v) => onChange({ failure_creates_hazard: v })}
+                                onCheckedChange={(v) =>
+                                    onChange({ failure_creates_hazard: v })
+                                }
                             />
                             <span className="flex items-center gap-1">
                                 <TriangleAlert className="h-3 w-3 text-status-critical" />
@@ -603,7 +767,9 @@ function ItemRow({
                         <label className="flex cursor-pointer items-center gap-1.5 text-xs">
                             <Switch
                                 checked={item.failure_creates_damage}
-                                onCheckedChange={(v) => onChange({ failure_creates_damage: v })}
+                                onCheckedChange={(v) =>
+                                    onChange({ failure_creates_damage: v })
+                                }
                             />
                             <span className="flex items-center gap-1">
                                 <Wrench className="h-3 w-3 text-status-warning" />
@@ -642,7 +808,10 @@ function ItemRow({
                         <ArrowDown className="h-3.5 w-3.5" />
                     </Button>
                     {locked ? (
-                        <span title="Has run responses — can't be removed" className="flex h-7 w-7 items-center justify-center text-muted-foreground/50">
+                        <span
+                            title="Has run responses — can't be removed"
+                            className="flex h-7 w-7 items-center justify-center text-muted-foreground/50"
+                        >
                             <Lock className="h-3.5 w-3.5" />
                         </span>
                     ) : (

@@ -24,7 +24,13 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, Plus, ShieldAlert, XCircle } from 'lucide-react';
+import {
+    AlertTriangle,
+    CheckCircle,
+    Plus,
+    ShieldAlert,
+    XCircle,
+} from 'lucide-react';
 import { Cell, Pie, PieChart, Tooltip } from 'recharts';
 
 interface Pip {
@@ -125,9 +131,19 @@ export default function PipIndex({ pips, stats, filters, can }: Props) {
                         stats={
                             stats
                                 ? [
-                                      { label: 'Active', value: stats.active, amber: stats.active > 0 },
-                                      { label: 'Completed', value: stats.completed },
-                                      { label: 'Cancelled', value: stats.cancelled },
+                                      {
+                                          label: 'Active',
+                                          value: stats.active,
+                                          amber: stats.active > 0,
+                                      },
+                                      {
+                                          label: 'Completed',
+                                          value: stats.completed,
+                                      },
+                                      {
+                                          label: 'Cancelled',
+                                          value: stats.cancelled,
+                                      },
                                       { label: 'Total', value: stats.total },
                                   ]
                                 : []

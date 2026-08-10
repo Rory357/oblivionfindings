@@ -58,7 +58,9 @@ export function DoorSymbol({
             : 'transparent';
     const outlineDash = detached || (pending && !selected) ? '6 4' : undefined;
     const showOutline = selected || pending || detached;
-    const cursorStyle: React.CSSProperties = { cursor: selected ? 'grab' : 'move' };
+    const cursorStyle: React.CSSProperties = {
+        cursor: selected ? 'grab' : 'move',
+    };
 
     return (
         <g>
@@ -100,7 +102,12 @@ export function DoorSymbol({
  * region (which can extend deep into the room) don't accidentally select
  * the door.
  */
-function clickShieldBox(w: number): { minX: number; maxX: number; minY: number; maxY: number } {
+function clickShieldBox(w: number): {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+} {
     const margin = Math.max(10, w * 0.3);
     return { minX: -2, maxX: w + 2, minY: -margin, maxY: margin };
 }
@@ -119,7 +126,17 @@ function swingKey(door: NormalisedDoor): SwingKey {
     return `${door.swing_side}-${door.swing_direction}` as SwingKey;
 }
 
-function SymbolPaths({ door, x, y, w }: { door: NormalisedDoor; x: number; y: number; w: number }): ReactNode {
+function SymbolPaths({
+    door,
+    x,
+    y,
+    w,
+}: {
+    door: NormalisedDoor;
+    x: number;
+    y: number;
+    w: number;
+}): ReactNode {
     // pointer-events: none so clicks on the visible door (panel / arc / hinge
     // dot) fall through to the click-shield underneath. Without this the
     // symbol parts catch the click but have no handler, making the door feel
@@ -133,7 +150,12 @@ function SymbolPaths({ door, x, y, w }: { door: NormalisedDoor; x: number; y: nu
     );
 }
 
-function symbolFor(door: NormalisedDoor, x: number, y: number, w: number): ReactNode {
+function symbolFor(
+    door: NormalisedDoor,
+    x: number,
+    y: number,
+    w: number,
+): ReactNode {
     switch (door.subkind) {
         case 'single_swing':
             return <SingleSwing door={door} x={x} y={y} w={w} />;
@@ -161,19 +183,46 @@ function symbolFor(door: NormalisedDoor, x: number, y: number, w: number): React
  * behind it, so the door reads as a solid opening rather than transparent.
  */
 function OpeningClear({ x, y, w }: { x: number; y: number; w: number }) {
-    return <rect x={x} y={y - 5} width={w} height={10} fill="#ffffff" pointerEvents="none" />;
+    return (
+        <rect
+            x={x}
+            y={y - 5}
+            width={w}
+            height={10}
+            fill="#ffffff"
+            pointerEvents="none"
+        />
+    );
 }
 
 function WallStops({ x, y, w }: { x: number; y: number; w: number }) {
     return (
         <>
-            <path d={`M ${x},${y - 3} L ${x},${y + 3}`} stroke={STROKE} strokeWidth={2} />
-            <path d={`M ${x + w},${y - 3} L ${x + w},${y + 3}`} stroke={STROKE} strokeWidth={2} />
+            <path
+                d={`M ${x},${y - 3} L ${x},${y + 3}`}
+                stroke={STROKE}
+                strokeWidth={2}
+            />
+            <path
+                d={`M ${x + w},${y - 3} L ${x + w},${y + 3}`}
+                stroke={STROKE}
+                strokeWidth={2}
+            />
         </>
     );
 }
 
-function SingleSwing({ door, x, y, w }: { door: NormalisedDoor; x: number; y: number; w: number }) {
+function SingleSwing({
+    door,
+    x,
+    y,
+    w,
+}: {
+    door: NormalisedDoor;
+    x: number;
+    y: number;
+    w: number;
+}) {
     const key = swingKey(door);
     const config = SWING_PATHS[key];
     const hinge = { x: x + config.hinge[0] * w, y: y + config.hinge[1] * w };
@@ -197,7 +246,7 @@ function SingleSwing({ door, x, y, w }: { door: NormalisedDoor; x: number; y: nu
                 transform={`rotate(${angleDeg} ${hinge.x} ${hinge.y})`}
             />
             <path
-                d={`M ${x + (config.end[0] * w)},${y + (config.end[1] * w)} A ${w},${w} 0 0 ${config.arcSweep} ${
+                d={`M ${x + config.end[0] * w},${y + config.end[1] * w} A ${w},${w} 0 0 ${config.arcSweep} ${
                     config.swing_side === 'right' ? x : x + w
                 },${y}`}
                 stroke={STROKE}
@@ -217,15 +266,45 @@ function SingleSwing({ door, x, y, w }: { door: NormalisedDoor; x: number; y: nu
  */
 const SWING_PATHS: Record<
     SwingKey,
-    { hinge: [number, number]; end: [number, number]; arcSweep: 0 | 1; swing_side: 'left' | 'right' }
+    {
+        hinge: [number, number];
+        end: [number, number];
+        arcSweep: 0 | 1;
+        swing_side: 'left' | 'right';
+    }
 > = {
-    'right-in': { hinge: [1, 0], end: [1, 1], arcSweep: 1, swing_side: 'right' },
-    'right-out': { hinge: [1, 0], end: [1, -1], arcSweep: 0, swing_side: 'right' },
+    'right-in': {
+        hinge: [1, 0],
+        end: [1, 1],
+        arcSweep: 1,
+        swing_side: 'right',
+    },
+    'right-out': {
+        hinge: [1, 0],
+        end: [1, -1],
+        arcSweep: 0,
+        swing_side: 'right',
+    },
     'left-in': { hinge: [0, 0], end: [0, 1], arcSweep: 0, swing_side: 'left' },
-    'left-out': { hinge: [0, 0], end: [0, -1], arcSweep: 1, swing_side: 'left' },
+    'left-out': {
+        hinge: [0, 0],
+        end: [0, -1],
+        arcSweep: 1,
+        swing_side: 'left',
+    },
 };
 
-function DoubleSwing({ door, x, y, w }: { door: NormalisedDoor; x: number; y: number; w: number }) {
+function DoubleSwing({
+    door,
+    x,
+    y,
+    w,
+}: {
+    door: NormalisedDoor;
+    x: number;
+    y: number;
+    w: number;
+}) {
     const out = door.swing_direction === 'out';
     const half = w / 2;
     const leafEndY = out ? y - half : y + half;
@@ -277,9 +356,19 @@ function DoubleSwing({ door, x, y, w }: { door: NormalisedDoor; x: number; y: nu
 function Sliding({ x, y, w }: { x: number; y: number; w: number }) {
     return (
         <>
-            <path d={`M ${x},${y - 2} L ${x + w},${y - 2}`} stroke={STROKE} strokeWidth={1} />
+            <path
+                d={`M ${x},${y - 2} L ${x + w},${y - 2}`}
+                stroke={STROKE}
+                strokeWidth={1}
+            />
             <rect x={x} y={y - 1} width={w * 0.55} height={3} fill={STROKE} />
-            <rect x={x + w * 0.45} y={y + 3} width={w * 0.55} height={3} fill={STROKE} />
+            <rect
+                x={x + w * 0.45}
+                y={y + 3}
+                width={w * 0.55}
+                height={3}
+                fill={STROKE}
+            />
             <path
                 d={`M ${x + w - 6},${y + 4.5} L ${x + w - 2},${y + 4.5} M ${x + w - 4},${y + 3} L ${x + w - 2},${y + 4.5} L ${x + w - 4},${y + 6}`}
                 stroke={STROKE}
@@ -290,14 +379,28 @@ function Sliding({ x, y, w }: { x: number; y: number; w: number }) {
     );
 }
 
-function Pocket({ door, x, y, w }: { door: NormalisedDoor; x: number; y: number; w: number }) {
+function Pocket({
+    door,
+    x,
+    y,
+    w,
+}: {
+    door: NormalisedDoor;
+    x: number;
+    y: number;
+    w: number;
+}) {
     // Pocket extends behind the wall on the hinge side. For 'left' the pocket is on the left, otherwise right.
     const pocketLeft = door.swing_side === 'left';
     const pocketX = pocketLeft ? x - w * 0.9 : x + w;
     const stubX = pocketLeft ? x + w : x; // the visible-opening jamb (the side opposite the pocket)
     return (
         <>
-            <path d={`M ${stubX},${y - 3} L ${stubX},${y + 3}`} stroke={STROKE} strokeWidth={2} />
+            <path
+                d={`M ${stubX},${y - 3} L ${stubX},${y + 3}`}
+                stroke={STROKE}
+                strokeWidth={2}
+            />
             <rect
                 x={pocketX}
                 y={y - 4}
@@ -348,7 +451,13 @@ function Folding({ x, y, w }: { x: number; y: number; w: number }) {
     return (
         <>
             <WallStops x={x} y={y} w={w} />
-            <path d={points} stroke={STROKE} strokeWidth={2} fill="none" strokeLinecap="round" />
+            <path
+                d={points}
+                stroke={STROKE}
+                strokeWidth={2}
+                fill="none"
+                strokeLinecap="round"
+            />
             <circle cx={x} cy={y} r={2} fill={STROKE} />
             <circle cx={x + w} cy={y} r={2} fill={STROKE} />
         </>
@@ -360,11 +469,29 @@ function Garage({ x, y, w }: { x: number; y: number; w: number }) {
     const lines: ReactNode[] = [];
     for (let i = 1; i < panels; i += 1) {
         const lx = x + (w * i) / panels;
-        lines.push(<line key={`g-${i}`} x1={lx} y1={y - 1} x2={lx} y2={y + 5} stroke="#ffffff" strokeWidth={1} />);
+        lines.push(
+            <line
+                key={`g-${i}`}
+                x1={lx}
+                y1={y - 1}
+                x2={lx}
+                y2={y + 5}
+                stroke="#ffffff"
+                strokeWidth={1}
+            />,
+        );
     }
     return (
         <>
-            <rect x={x} y={y - 1} width={w} height={6} fill={STROKE} stroke={STROKE} strokeWidth={1} />
+            <rect
+                x={x}
+                y={y - 1}
+                width={w}
+                height={6}
+                fill={STROKE}
+                stroke={STROKE}
+                strokeWidth={1}
+            />
             {lines}
         </>
     );
@@ -376,9 +503,24 @@ function Revolving({ x, y, w }: { x: number; y: number; w: number }) {
     const r = w / 2;
     return (
         <>
-            <circle cx={cx} cy={cy} r={r} fill="none" stroke={STROKE} strokeWidth={1.5} />
-            <path d={`M ${cx - r},${cy} L ${cx + r},${cy}`} stroke={STROKE} strokeWidth={1.5} />
-            <path d={`M ${cx},${cy - r} L ${cx},${cy + r}`} stroke={STROKE} strokeWidth={1.5} />
+            <circle
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill="none"
+                stroke={STROKE}
+                strokeWidth={1.5}
+            />
+            <path
+                d={`M ${cx - r},${cy} L ${cx + r},${cy}`}
+                stroke={STROKE}
+                strokeWidth={1.5}
+            />
+            <path
+                d={`M ${cx},${cy - r} L ${cx},${cy + r}`}
+                stroke={STROKE}
+                strokeWidth={1.5}
+            />
         </>
     );
 }
@@ -387,7 +529,10 @@ function Revolving({ x, y, w }: { x: number; y: number; w: number }) {
  * Bounding box of the rendered symbol in local SVG units, relative to the
  * opening's top-left (so caller adds `x, y` themselves).
  */
-function symbolBoundingBox(door: NormalisedDoor, w: number): { minX: number; maxX: number; minY: number; maxY: number } {
+function symbolBoundingBox(
+    door: NormalisedDoor,
+    w: number,
+): { minX: number; maxX: number; minY: number; maxY: number } {
     switch (door.subkind) {
         case 'single_swing': {
             const out = door.swing_direction === 'out';

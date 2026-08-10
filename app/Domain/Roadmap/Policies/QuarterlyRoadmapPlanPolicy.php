@@ -14,7 +14,7 @@ class QuarterlyRoadmapPlanPolicy
 
     public function view(User $user, QuarterlyRoadmapPlan $plan): bool
     {
-        return $user->canDo('roadmap.view') && $this->sameTenant($user, $plan->tenant_id);
+        return $user->canDo('roadmap.view');
     }
 
     public function create(User $user): bool
@@ -28,20 +28,11 @@ class QuarterlyRoadmapPlanPolicy
             return false;
         }
 
-        return $user->canDo('roadmap.manage') && $this->sameTenant($user, $plan->tenant_id);
+        return $user->canDo('roadmap.manage');
     }
 
     public function publish(User $user, QuarterlyRoadmapPlan $plan): bool
     {
-        return $user->canDo('roadmap.approve') && $this->sameTenant($user, $plan->tenant_id);
-    }
-
-    protected function sameTenant(User $user, ?int $tenantId): bool
-    {
-        if ($tenantId === null || $user->organization_id === null) {
-            return false;
-        }
-
-        return (int) $user->organization_id === (int) $tenantId;
+        return $user->canDo('roadmap.approve');
     }
 }

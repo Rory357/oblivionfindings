@@ -3,7 +3,12 @@
 
 export type StaffOption = { id: number; name: string };
 export type SiteOption = { id: number; name: string };
-export type IncidentOption = { id: number; label: string; title: string; occurred_at: string | null };
+export type IncidentOption = {
+    id: number;
+    label: string;
+    title: string;
+    occurred_at: string | null;
+};
 
 export type Person = { id: number; name: string } | null;
 
@@ -135,5 +140,18 @@ export type InjuryDetail = {
     can: { manage: boolean };
 };
 
-export type InjurySectionKey = 'overview' | 'rtw' | 'capacity' | 'evidence' | 'history';
-export type InjuryActionKey = 'start_treatment' | 'begin_rtw' | 'mark_recovered' | 'close' | 'acc' | 'add_rtw' | 'add_capacity' | 'edit';
+export type InjurySectionKey =
+    | 'overview'
+    | 'rtw'
+    | 'capacity'
+    | 'evidence'
+    | 'history';
+export type InjuryActionKey =
+    | 'start_treatment'
+    | 'begin_rtw'
+    | 'mark_recovered'
+    | 'close'
+    | 'acc'
+    | 'add_rtw'
+    | 'add_capacity'
+    | 'edit';

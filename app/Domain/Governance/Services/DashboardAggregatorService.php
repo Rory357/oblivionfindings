@@ -2,28 +2,48 @@
 
 namespace App\Domain\Governance\Services;
 
+use App\Domain\Finance\Services\BudgetVarianceService;
+use App\Domain\Governance\Models\Budget;
+use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Models\DashboardSnapshot;
+use App\Domain\Governance\Models\Resolution;
+use App\Domain\Governance\Models\RiskRegisterEntry;
+use App\Domain\Governance\Models\SpendApproval;
 use App\Domain\Roadmap\Services\RoadmapDashboardService;
 use App\Models\ClientIncident;
+use App\Models\ClientRisk;
 use App\Models\ControlRoomAlert;
 use App\Models\DataBreachLog;
+use App\Models\DataSubjectRequest;
+use App\Models\PrivacyImpactAssessment;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Timesheet;
+use App\Models\User;
 use App\Services\HealthSafety\HsGovernanceService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class DashboardAggregatorService
 {
     public function __construct(
+        protected HsGovernanceService $hsGovernanceService,
         protected ?RoadmapDashboardService $roadmapDashboardService = null,
-        protected ?HsGovernanceService $hsGovernanceService = null,
     ) {}
 
-    public function captureSnapshot(string $periodType, ?Carbon $start = null, ?Carbon $end = null): DashboardSnapshot
-    {
+    public function captureSnapshot(
+        string $periodType,
+        ?Carbon $start = null,
+        ?Carbon $end = null,
+        ?User $viewer = null,
+    ): DashboardSnapshot {
+        $viewer ??= auth()->user();
+        if (! $viewer instanceof User || ! $viewer->exists || $viewer->approved_at === null) {
+            throw new \LogicException('Dashboard snapshots require an approved authorized viewer.');
+        }
+
         $range = $this->getDateRange($periodType, $start, $end);
 
         $widgets = [];
@@ -44,14 +64,14 @@ class DashboardAggregatorService
             'control_room' => fn () => $this->getControlRoomMetrics($range),
             'incidents' => fn () => $this->getIncidentMetrics($range),
             'safeguarding' => fn () => $this->getSafeguardingMetrics($range),
-            'hs_backbone' => fn () => $this->getHsBackboneMetrics($range),
+            'hs_backbone' => fn () => $this->getHsBackboneMetrics($range, $viewer),
         ];
 
         foreach ($widgetMethods as $key => $callback) {
             try {
                 $widgets[$key] = $callback();
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Dashboard widget '{$key}' failed: ".$e->getMessage());
+                Log::warning("Dashboard widget '{$key}' failed: ".$e->getMessage());
                 $widgets[$key] = ['status' => 'unavailable', 'error' => $e->getMessage()];
             }
         }
@@ -73,7 +93,7 @@ class DashboardAggregatorService
             'period_end' => $range['end'],
             'checksum' => DashboardSnapshot::generateChecksum($data),
             'captured_at' => now(),
-            'captured_by' => auth()->id() ?? 1,
+            'captured_by' => $viewer->id,
             'data_freshness' => $this->getDataFreshness(),
         ]);
     }
@@ -95,7 +115,7 @@ class DashboardAggregatorService
 
     public function getTopRisks(int $limit = 10): array
     {
-        $risks = \App\Domain\Governance\Models\RiskRegisterEntry::active()
+        $risks = RiskRegisterEntry::active()
             ->orderByDesc('residual_score')
             ->limit($limit)
             ->get();
@@ -120,11 +140,11 @@ class DashboardAggregatorService
 
     public function getRiskChanges(array $range): array
     {
-        $new = \App\Domain\Governance\Models\RiskRegisterEntry::whereBetween('identified_at', [$range['start'], $range['end']])->count();
-        $escalated = \App\Domain\Governance\Models\RiskRegisterEntry::whereBetween('updated_at', [$range['start'], $range['end']])
+        $new = RiskRegisterEntry::whereBetween('identified_at', [$range['start'], $range['end']])->count();
+        $escalated = RiskRegisterEntry::whereBetween('updated_at', [$range['start'], $range['end']])
             ->whereColumn('residual_score', '>', 'inherent_score')
             ->count();
-        $closed = \App\Domain\Governance\Models\RiskRegisterEntry::whereBetween('closed_at', [$range['start'], $range['end']])->count();
+        $closed = RiskRegisterEntry::whereBetween('closed_at', [$range['start'], $range['end']])->count();
 
         return [
             'new' => $new,
@@ -136,7 +156,7 @@ class DashboardAggregatorService
 
     public function getClientSafetyMetrics(array $range): array
     {
-        $highRiskCount = \App\Models\ClientRisk::where('active', true)
+        $highRiskCount = ClientRisk::where('active', true)
             ->where('severity', 'high')
             ->count();
 
@@ -158,11 +178,11 @@ class DashboardAggregatorService
 
     public function getOperationalSafetyMetrics(array $range): array
     {
-        $nearMisses = \App\Models\ClientIncident::whereBetween('occurred_at', [$range['start'], $range['end']])
+        $nearMisses = ClientIncident::whereBetween('occurred_at', [$range['start'], $range['end']])
             ->where('type', 'near_miss')
             ->count();
 
-        $injuries = \App\Models\ClientIncident::whereBetween('occurred_at', [$range['start'], $range['end']])
+        $injuries = ClientIncident::whereBetween('occurred_at', [$range['start'], $range['end']])
             ->where('type', 'injury')
             ->count();
 
@@ -185,15 +205,15 @@ class DashboardAggregatorService
         $openDpiAs = 0;
         if (Schema::hasTable('privacy_impact_assessments')) {
             $openDpiAs = Schema::hasColumn('privacy_impact_assessments', 'status')
-                ? \App\Models\PrivacyImpactAssessment::where('status', '!=', 'approved')->count()
-                : \App\Models\PrivacyImpactAssessment::count();
+                ? PrivacyImpactAssessment::where('status', '!=', 'approved')->count()
+                : PrivacyImpactAssessment::count();
         }
 
         $backlogRequests = 0;
         if (Schema::hasTable('data_subject_requests')) {
             $backlogRequests = Schema::hasColumn('data_subject_requests', 'status')
-                ? \App\Models\DataSubjectRequest::where('status', '!=', 'completed')->count()
-                : \App\Models\DataSubjectRequest::count();
+                ? DataSubjectRequest::where('status', '!=', 'completed')->count()
+                : DataSubjectRequest::count();
         }
 
         return [
@@ -242,7 +262,7 @@ class DashboardAggregatorService
 
     public function getFinancialMetrics(array $range): array
     {
-        $currentBudget = \App\Domain\Governance\Models\Budget::approved()
+        $currentBudget = Budget::approved()
             ->latest('approved_by_board_at')
             ->first();
 
@@ -257,7 +277,7 @@ class DashboardAggregatorService
                 ? $currentBudget->getTotalActual() / $currentBudget->total_budget * 100
                 : 0;
             $variance = $currentBudget->getVariancePercentage();
-            $roadmapWidget = $this->roadmapDashboardService?->governanceWidget(null) ?? [];
+            $roadmapWidget = $this->roadmapDashboardService?->governanceWidget() ?? [];
             $governanceBudget = $roadmapWidget['governance_budget'] ?? null;
 
             $base = [
@@ -275,7 +295,7 @@ class DashboardAggregatorService
 
         // Pending spend approvals (waiting on board / finance committee).
         if (Schema::hasTable('spend_approvals')) {
-            $pendingApprovals = \App\Domain\Governance\Models\SpendApproval::query()
+            $pendingApprovals = SpendApproval::query()
                 ->whereIn('status', ['draft', 'submitted'])
                 ->get();
             $base['pending_spend_count'] = $pendingApprovals->count();
@@ -288,7 +308,7 @@ class DashboardAggregatorService
         // Sites over budget — pulled via Finance's BudgetVarianceService (source of truth).
         if (Schema::hasTable('site_budget_lines') && Schema::hasTable('fin_cost_allocations')) {
             try {
-                $varianceService = app(\App\Domain\Finance\Services\BudgetVarianceService::class);
+                $varianceService = app(BudgetVarianceService::class);
                 $period = now()->format('Y-m');
                 $org = $varianceService->organisationVariance(null, $period, $period);
                 $overBudgetSites = collect($org['sites'] ?? [])
@@ -348,7 +368,7 @@ class DashboardAggregatorService
 
     public function getComplianceCalendar(int $days = 90): array
     {
-        $obligations = \App\Domain\Governance\Models\ComplianceObligation::where('due_date', '<=', now()->addDays($days))
+        $obligations = ComplianceObligation::where('due_date', '<=', now()->addDays($days))
             ->where('status', '!=', 'complete')
             ->orderBy('due_date')
             ->limit(10)
@@ -367,14 +387,14 @@ class DashboardAggregatorService
 
     public function getDecisionsRequired(): array
     {
-        $resolutions = \App\Domain\Governance\Models\Resolution::where('status', 'open')
+        $resolutions = Resolution::where('status', 'open')
             ->orderBy('deadline')
             ->limit(10)
             ->get();
 
         $roadmap = ['count' => 0, 'overdue' => 0, 'items' => []];
         if (Schema::hasTable('roadmap_decision_requests') && $this->roadmapDashboardService !== null) {
-            $roadmap = $this->roadmapDashboardService->decisionsRequired(null, 10);
+            $roadmap = $this->roadmapDashboardService->decisionsRequired(10);
         }
 
         $resolutionItems = $resolutions->map(fn ($r) => [
@@ -421,7 +441,7 @@ class DashboardAggregatorService
             ];
         }
 
-        return $this->roadmapDashboardService->governanceWidget(null);
+        return $this->roadmapDashboardService->governanceWidget();
     }
 
     public function getControlRoomMetrics(array $range): array
@@ -498,7 +518,7 @@ class DashboardAggregatorService
 
     public function getVoidedRisks(array $range): array
     {
-        $voided = \App\Domain\Governance\Models\RiskRegisterEntry::where('status', 'voided')
+        $voided = RiskRegisterEntry::where('status', 'voided')
             ->whereBetween('closed_at', [$range['start'], $range['end']])
             ->orderByDesc('closed_at')
             ->limit(10)
@@ -566,13 +586,17 @@ class DashboardAggregatorService
         ];
     }
 
-    public function getHsBackboneMetrics(array $range): array
+    public function getHsBackboneMetrics(array $range, ?User $viewer = null): array
     {
-        if (! $this->hsGovernanceService) {
-            return ['status' => 'unavailable', 'reason' => 'HsGovernanceService not injected'];
+        if (! $viewer) {
+            return [
+                'status' => 'unavailable',
+                'reason_code' => 'authorized_viewer_required',
+                'reason' => 'Health and safety metrics require an authorized Site-scoped viewer.',
+            ];
         }
 
-        return $this->hsGovernanceService->getWidgetData($range);
+        return $this->hsGovernanceService->getWidgetData($range, $viewer);
     }
 
     protected function determineStatus(int $value, array $thresholds): string

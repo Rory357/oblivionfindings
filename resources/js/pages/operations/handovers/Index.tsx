@@ -170,7 +170,8 @@ export default function HandoversIndex({
             {},
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Draft submitted to incoming worker'),
+                onSuccess: () =>
+                    toast.success('Draft submitted to incoming worker'),
             },
         );
 
@@ -219,7 +220,9 @@ export default function HandoversIndex({
                         view={view}
                         onView={setView}
                         counts={counts}
-                        shown={(view === 'board' ? baseFiltered : filtered).length}
+                        shown={
+                            (view === 'board' ? baseFiltered : filtered).length
+                        }
                         total={counts.total}
                         hasFilters={hasFilters}
                         onClearFilters={() => {
@@ -268,7 +271,11 @@ export default function HandoversIndex({
                 onAcknowledge={acknowledgeHandover}
                 // Same live MAR lens the eMAR handover view shows, so the ops
                 // side isn't blind to "5 meds overdue" on the same shift.
-                medicationSnapshotUrl={can.view_medications ? '/emar/handovers/shift-medications' : undefined}
+                medicationSnapshotUrl={
+                    can.view_medications
+                        ? '/emar/handovers/shift-medications'
+                        : undefined
+                }
             />
 
             {wizardOpen ? (

@@ -165,7 +165,9 @@ describe('transport medication wizard family', () => {
         );
 
         for (const source of [showSource, indexSource]) {
-            expect(source).toContain("from './components/transport-medication-dialogs'");
+            expect(source).toContain(
+                "from './components/transport-medication-dialogs'",
+            );
             expect(source).not.toMatch(/<DialogContent(?:\s|>)/);
         }
     });

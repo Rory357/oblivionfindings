@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientCondition;
@@ -15,6 +16,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Support\EmarUrl;
@@ -43,6 +45,8 @@ class MedicationControllerTest extends TestCase
 
     protected Client $client;
 
+    protected Site $site;
+
     protected ServiceContext $serviceContext;
 
     protected function setUp(): void
@@ -50,6 +54,7 @@ class MedicationControllerTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        $this->site = Site::factory()->create();
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -72,6 +77,18 @@ class MedicationControllerTest extends TestCase
         $this->auditor = User::factory()->create(['role' => 'auditor', 'approved_at' => now()]);
         $this->auditor->roles()->attach(Role::where('name', 'auditor')->first());
 
+        foreach ([
+            $this->admin,
+            $this->providerManager,
+            $this->coordinator,
+            $this->supportWorker,
+            $this->financeUser,
+            $this->hrUser,
+            $this->auditor,
+        ] as $staff) {
+            $this->assignCurrentSite($staff);
+        }
+
         $this->serviceContext = ServiceContext::factory()->create([
             'name' => 'Test Residential',
             'type' => 'residential',
@@ -80,6 +97,7 @@ class MedicationControllerTest extends TestCase
 
         $this->client = Client::factory()->create([
             'service_context_id' => $this->serviceContext->id,
+            'site_id' => $this->site->id,
         ]);
 
         // Assign support worker to client
@@ -99,6 +117,18 @@ class MedicationControllerTest extends TestCase
         return $mock;
     }
 
+    protected function assignCurrentSite(User $user): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
+
     /**
      * Create a second support worker that can witness controlled drugs.
      */
@@ -106,6 +136,7 @@ class MedicationControllerTest extends TestCase
     {
         $witness = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $witness->roles()->attach(Role::where('name', 'support_worker')->first());
+        $this->assignCurrentSite($witness);
         $this->client->supportWorkers()->attach($witness->id);
 
         return $witness;
@@ -204,7 +235,7 @@ class MedicationControllerTest extends TestCase
         // an active medication so the assigned-only scoping (not the has-meds
         // filter) is what excludes the unassigned client.
         $this->createMedication();
-        $unassignedClient = Client::factory()->create();
+        $unassignedClient = Client::factory()->create(['site_id' => $this->site->id]);
         $this->createMedication(['client_id' => $unassignedClient->id]);
 
         $this->actingAs($this->supportWorker)
@@ -220,7 +251,7 @@ class MedicationControllerTest extends TestCase
     public function test_admin_sees_all_clients_in_medications_index(): void
     {
         $this->createMedication();
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $this->createMedication(['client_id' => $otherClient->id]);
 
         $this->actingAs($this->admin)
@@ -404,6 +435,7 @@ class MedicationControllerTest extends TestCase
     {
         $unassignedWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $unassignedWorker->roles()->attach(Role::where('name', 'support_worker')->first());
+        $this->assignCurrentSite($unassignedWorker);
 
         $this->actingAs($unassignedWorker)
             ->get("/clients/{$this->client->id}/medical")
@@ -708,7 +740,7 @@ class MedicationControllerTest extends TestCase
 
     public function test_update_medication_returns_404_for_mismatched_client(): void
     {
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $med = ClientMedication::create([
             'client_id' => $otherClient->id,
             'name' => 'Other Med',
@@ -760,7 +792,7 @@ class MedicationControllerTest extends TestCase
 
     public function test_destroy_medication_returns_404_for_mismatched_client(): void
     {
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $med = ClientMedication::create([
             'client_id' => $otherClient->id,
             'name' => 'Other',
@@ -1205,7 +1237,7 @@ class MedicationControllerTest extends TestCase
 
     public function test_update_stock_returns_404_for_mismatched_client(): void
     {
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $med = ClientMedication::create([
             'client_id' => $otherClient->id,
             'name' => 'Other',
@@ -1330,6 +1362,7 @@ class MedicationControllerTest extends TestCase
                 'on_hand' => 8,
                 'witnessed_by' => $witness->id,
                 'reason' => 'Two missing after shift change',
+                'immediate_action_taken' => 'Secured the remaining stock and escalated the discrepancy.',
                 'unit' => 'tablets',
             ])
             ->assertRedirect()
@@ -1344,6 +1377,7 @@ class MedicationControllerTest extends TestCase
             'status' => 'open',
             'reported_by' => $this->admin->id,
             'witnessed_by' => $witness->id,
+            'immediate_action_taken' => 'Secured the remaining stock and escalated the discrepancy.',
         ]);
     }
 
@@ -1386,6 +1420,7 @@ class MedicationControllerTest extends TestCase
                 'on_hand' => 8,
                 'witnessed_by' => $this->hrUser->id,
                 'reason' => 'Check',
+                'immediate_action_taken' => 'Secured the stock pending an authorised witness review.',
             ])
             ->assertRedirect()
             ->assertSessionHas('error');
@@ -1560,6 +1595,7 @@ class MedicationControllerTest extends TestCase
         // Create another support worker not assigned to the client
         $otherWorker = User::factory()->create(['role' => 'provider_manager', 'approved_at' => now()]);
         $otherWorker->roles()->attach(Role::where('name', 'provider_manager')->first());
+        $this->assignCurrentSite($otherWorker);
 
         // Without break-glass, verify they can access (provider_manager has clients.viewAny)
         $this->actingAs($otherWorker)
@@ -1661,7 +1697,7 @@ class MedicationControllerTest extends TestCase
 
     public function test_break_glass_destroy_returns_404_for_mismatched_client(): void
     {
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $access = ClientBreakGlassAccess::create([
             'client_id' => $otherClient->id,
             'user_id' => $this->providerManager->id,
@@ -1813,7 +1849,7 @@ class MedicationControllerTest extends TestCase
 
     public function test_correction_returns_404_for_mismatched_client(): void
     {
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $med = ClientMedication::create([
             'client_id' => $otherClient->id,
             'name' => 'Other Med',
@@ -1922,7 +1958,7 @@ class MedicationControllerTest extends TestCase
 
     public function test_update_condition_returns_404_for_mismatched_client(): void
     {
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $condition = ClientCondition::create([
             'client_id' => $otherClient->id,
             'label' => 'Other Condition',
@@ -2043,7 +2079,7 @@ class MedicationControllerTest extends TestCase
 
     public function test_update_emergency_contact_returns_404_for_mismatched_client(): void
     {
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $contact = ClientEmergencyContact::create([
             'client_id' => $otherClient->id,
             'name' => 'Other Contact',
@@ -2086,7 +2122,7 @@ class MedicationControllerTest extends TestCase
 
     public function test_destroy_emergency_contact_returns_404_for_mismatched_client(): void
     {
-        $otherClient = Client::factory()->create();
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
         $contact = ClientEmergencyContact::create([
             'client_id' => $otherClient->id,
             'name' => 'Other Contact',
@@ -2124,6 +2160,7 @@ class MedicationControllerTest extends TestCase
     {
         $unassignedWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $unassignedWorker->roles()->attach(Role::where('name', 'support_worker')->first());
+        $this->assignCurrentSite($unassignedWorker);
 
         $this->actingAs($unassignedWorker)
             ->get("/clients/{$this->client->id}/mar")
@@ -2162,6 +2199,7 @@ class MedicationControllerTest extends TestCase
         // Create unassigned coordinator-like user who relies on break-glass
         $unassignedWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $unassignedWorker->roles()->attach(Role::where('name', 'support_worker')->first());
+        $this->assignCurrentSite($unassignedWorker);
 
         // Create expired break-glass access
         ClientBreakGlassAccess::create([
@@ -2238,6 +2276,7 @@ class MedicationControllerTest extends TestCase
 
         $otherContext = ServiceContext::factory()->create(['name' => 'Home Support']);
         $shift = Shift::factory()->create([
+            'site_id' => $this->site->id,
             'client_id' => $this->client->id,
             'user_id' => $this->supportWorker->id,
             'service_context_id' => $otherContext->id,
@@ -2429,6 +2468,7 @@ class MedicationControllerTest extends TestCase
                 'on_hand' => 9,
                 'witnessed_by' => $witness->id,
                 'reason' => 'Override check',
+                'immediate_action_taken' => 'Secured the stock and escalated the new discrepancy.',
                 'unit' => 'tablets',
             ])
             ->assertRedirect()
@@ -2688,6 +2728,7 @@ class MedicationControllerTest extends TestCase
         // We need to give a support worker breakglass permission
         $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
         $worker->roles()->attach(Role::where('name', 'support_worker')->first());
+        $this->assignCurrentSite($worker);
 
         // Give them breakglass permission manually
         $bgPerm = Permission::where('key', 'medications.breakglass')->first();

@@ -3,30 +3,49 @@
 namespace App\Http\Controllers\It;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Data\ItTransitionInput;
+use App\Domain\It\Enums\ItWorkflowState;
 use App\Domain\It\ItStaffDirectory;
+use App\Domain\It\Presenters\ItTicketActivityPresenter;
+use App\Domain\It\Presenters\ItTicketContextPresenter;
+use App\Domain\It\Presenters\ItTicketRoutingPresenter;
+use App\Domain\It\Services\ItEmailDeliveryService;
+use App\Domain\It\Services\ItLinkedContextOptions;
+use App\Domain\It\Services\ItTicketApprovalService;
+use App\Domain\It\Services\ItTicketDeviceContextService;
+use App\Domain\It\Services\ItTicketInteractionService;
+use App\Domain\It\Services\ItTicketMergeService;
+use App\Domain\It\Services\ItTicketTriageService;
+use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\It\Services\ItWorkTransitionService;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Controllers\It\Concerns\BuildsItOptions;
-use App\Http\Controllers\It\Concerns\StoresItAttachments;
 use App\Http\Requests\It\BulkTicketActionRequest;
+use App\Http\Requests\It\CloseTicketRequest;
 use App\Http\Requests\It\DecideApprovalRequest;
+use App\Http\Requests\It\LinkTicketDeviceRequest;
 use App\Http\Requests\It\MergeTicketRequest;
+use App\Http\Requests\It\ReopenTicketRequest;
 use App\Http\Requests\It\RequestApprovalRequest;
 use App\Http\Requests\It\StoreTicketCommentRequest;
 use App\Http\Requests\It\SubmitCsatRequest;
+use App\Http\Requests\It\TransitionItWorkRequest;
 use App\Models\ItAttachment;
 use App\Models\ItTicket;
 use App\Models\ItTicketApproval;
 use App\Models\ItTicketComment;
-use App\Models\ItTicketEvent;
 use App\Models\User;
 use App\Notifications\It\TicketApprovalNotification;
-use App\Notifications\It\TicketAssignedNotification;
+use App\Notifications\It\TicketReopenedNotification;
 use App\Notifications\It\TicketRepliedNotification;
+use App\Services\UserSiteAccessService;
+use DomainException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Notification as NotificationFacade;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 
 /**
@@ -37,7 +56,22 @@ use Inertia\Inertia;
  */
 class ItTicketController extends Controller
 {
-    use BuildsItOptions, ResolvesHrTenant, ServesPrivateAttachments, StoresItAttachments;
+    use BuildsItOptions, ServesPrivateAttachments;
+
+    public function __construct(
+        private readonly ItTicketActivityPresenter $activityPresenter,
+        private readonly ItTicketContextPresenter $contextPresenter,
+        private readonly ItTicketRoutingPresenter $routingPresenter,
+        private readonly ItWorkTransitionService $transitionService,
+        private readonly ItTicketApprovalService $approvalService,
+        private readonly ItTicketInteractionService $interactionService,
+        private readonly ItTicketMergeService $mergeService,
+        private readonly ItTicketTriageService $triageService,
+        private readonly ItTicketDeviceContextService $deviceContext,
+        private readonly ItEmailDeliveryService $emailDeliveries,
+        private readonly ItWorkAccessService $workAccess,
+        private readonly ItLinkedContextOptions $linkedContextOptions,
+    ) {}
 
     public function show(Request $request, ItTicket $ticket)
     {
@@ -53,23 +87,71 @@ class ItTicketController extends Controller
         return Inertia::render('it/tickets/show', $payload);
     }
 
+    public function linkDevice(LinkTicketDeviceRequest $request, ItTicket $ticket)
+    {
+        try {
+            $changed = $this->deviceContext->add(
+                $ticket,
+                (int) $request->validated('device_id'),
+                $request->user(),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with(
+            'success',
+            $changed ? 'Device linked to ticket.' : 'Device is already linked to this ticket.',
+        );
+    }
+
+    public function unlinkDevice(Request $request, ItTicket $ticket, Device $device)
+    {
+        abort_unless($this->workAccess->canWork($request->user(), $ticket), 404);
+        $this->authorize('update', $ticket);
+
+        try {
+            $changed = $this->deviceContext->remove($ticket, $device, $request->user());
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with(
+            'success',
+            $changed ? 'Device link removed.' : 'Device was already unlinked.',
+        );
+    }
+
     /** @return array<string, mixed> */
     private function showPayload(Request $request, ItTicket $ticket): array
     {
         $user = $request->user();
+        abort_unless($this->workAccess->canView($user, $ticket), 404);
         $this->authorize('view', $ticket);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
-        $isAgent = $user->canDo('it.view');
-        $canManage = $user->canDo('it.manage');
+        $isAgent = $user->canDo('it.view') || $user->canDo('it.manage');
+        $canManage = $this->workAccess->canWork($user, $ticket);
+        $canLinkDevices = $canManage && $user->canDo('securityDevices.devices.view');
         $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
+        $canComment = ! $ticket->isMerged() && in_array($ticket->status, ItTicket::OPEN_STATUSES, true);
+        $replyUnavailableReason = match (true) {
+            $canComment => null,
+            $ticket->isMerged() => $ticket->mergedInto?->reference
+                ? "Continue the conversation on {$ticket->mergedInto->reference}."
+                : 'Continue the conversation on the surviving ticket.',
+            default => 'Reopen this ticket before adding another reply.',
+        };
 
         $ticket->load([
             'requester:id,name',
             'assignee:id,name',
+            'owner:id,name',
+            'team:id,name',
+            'queue:id,name',
             'watchers:id,name',
             'asset:id,name,asset_tag',
+            'site:id,name,type,is_active,archived,archived_at',
+            'service:id,name,is_active',
             'provisioningRequest:id,item,status',
             'attachments',
         ]);
@@ -84,6 +166,18 @@ class ItTicketController extends Controller
         $requesterProfile = HrEmployeeProfile::query()
             ->where('user_id', $ticket->requester_user_id)
             ->first();
+        $staffProfileHrefs = $this->staffProfileHrefs($user, collect([
+            $ticket->requester_user_id,
+            $ticket->assigned_to_user_id,
+            ...$ticket->watchers->pluck('id')->all(),
+        ])->all());
+        $assetHref = $ticket->asset
+            && app(SecurityDevicesAccessService::class)->assignableAsset($user, (int) $ticket->asset->id)
+                ? "/fleet-assets/assets/{$ticket->asset->id}"
+                : null;
+        $siteHref = $ticket->site && Gate::forUser($user)->allows('view', $ticket->site)
+            ? "/sites/{$ticket->site->id}"
+            : null;
 
         $comments = $ticket->comments()
             ->with(['author:id,name', 'attachments'])
@@ -106,21 +200,6 @@ class ItTicketController extends Controller
             ->values()
             ->all();
 
-        $events = $ticket->events()
-            ->with('actor:id,name')
-            ->orderBy('created_at')
-            ->get()
-            ->map(fn (ItTicketEvent $e) => [
-                'id' => $e->id,
-                'type' => $e->type,
-                'payload' => $e->payload,
-                'actor' => $e->actor?->name,
-                'at' => $e->created_at?->toIso8601String(),
-                'at_human' => $e->created_at?->diffForHumans(short: true),
-            ])
-            ->values()
-            ->all();
-
         // §P-S3 approval state for the rail — the latest request + who can act.
         $latestApproval = $ticket->requires_approval
             ? $ticket->approvals()->with('requester:id,name', 'approver:id,name')->first()
@@ -133,10 +212,16 @@ class ItTicketController extends Controller
                 'reference' => $ticket->reference,
                 'title' => $ticket->title,
                 'description' => $ticket->description,
+                'work_type' => $ticket->work_type,
+                'service' => $ticket->service
+                    ? ['id' => $ticket->service->id, 'name' => $ticket->service->name]
+                    : null,
                 'category' => $ticket->category,
                 'subcategory' => $ticket->subcategory,
                 'priority' => $ticket->priority,
                 'status' => $ticket->status,
+                'workflow_state' => $ticket->workflow_state,
+                'waiting' => $this->waitingPayload($ticket, $canManage),
                 'source' => $ticket->source,
                 'sla_state' => $ticket->sla_state,
                 'first_response_due_at' => $ticket->first_response_due_at?->toIso8601String(),
@@ -146,17 +231,36 @@ class ItTicketController extends Controller
                     'id' => $ticket->requester?->id,
                     'name' => $ticket->requester?->name ?? 'Unknown',
                     'role' => $requesterProfile?->position_title ?? $requesterProfile?->position_role,
+                    'href' => $staffProfileHrefs[(int) $ticket->requester_user_id] ?? null,
                 ],
                 'assignee' => $ticket->assignee
-                    ? ['id' => $ticket->assignee->id, 'name' => $ticket->assignee->name]
+                    ? [
+                        'id' => $ticket->assignee->id,
+                        'name' => $ticket->assignee->name,
+                        'href' => $staffProfileHrefs[(int) $ticket->assignee->id] ?? null,
+                    ]
                     : null,
+                ...($isAgent ? ['routing' => $this->routingPresenter->present($ticket)] : []),
                 'watchers' => $ticket->watchers
-                    ->map(fn ($w) => ['id' => $w->id, 'name' => $w->name])
+                    ->map(fn ($w) => [
+                        'id' => $w->id,
+                        'name' => $w->name,
+                        'href' => $staffProfileHrefs[(int) $w->id] ?? null,
+                    ])
                     ->values()
                     ->all(),
                 'asset' => $ticket->asset
-                    ? ['id' => $ticket->asset->id, 'name' => $ticket->asset->name, 'tag' => $ticket->asset->asset_tag]
+                    ? [
+                        'id' => $ticket->asset->id,
+                        'name' => $ticket->asset->name,
+                        'tag' => $ticket->asset->asset_tag,
+                        'href' => $assetHref,
+                    ]
                     : null,
+                'site' => $ticket->site
+                    ? ['id' => $ticket->site->id, 'name' => $ticket->site->name, 'href' => $siteHref]
+                    : null,
+                'is_organisation_wide' => (bool) $ticket->is_organisation_wide,
                 'provisioning_request' => $ticket->provisioningRequest
                     ? [
                         'id' => $ticket->provisioningRequest->id,
@@ -177,6 +281,7 @@ class ItTicketController extends Controller
                 'created_human' => $ticket->created_at?->diffForHumans(short: true),
                 'updated_at' => $ticket->updated_at?->toIso8601String(),
                 'resolved_at' => $ticket->resolved_at?->toIso8601String(),
+                'monitoring_recovered_at' => $ticket->monitoring_recovered_at?->toIso8601String(),
                 'closed_at' => $ticket->closed_at?->toIso8601String(),
                 // §P-S2: the survivor this ticket was folded into, for the banner.
                 'merged_into' => $ticket->mergedInto
@@ -199,26 +304,55 @@ class ItTicketController extends Controller
                 ] : null,
             ],
             'comments' => $comments,
-            'events' => $events,
-            'assignees' => $canManage ? $this->tenantUserOptions($tenantId) : [],
+            'events' => $this->activityPresenter->present($ticket, $user),
+            'linked_context' => $this->contextPresenter->present($ticket, $user),
+            'assignees' => $canManage ? $this->staffUserOptions($user, $ticket) : [],
             // Rail picker over the canonical (fleet-)assets register — never
             // a parallel IT register. Agents only.
-            'assetOptions' => $canManage ? $this->assetOptions() : [],
+            'assetOptions' => $canManage ? $this->assetOptions($user, $ticket) : [],
+            'deviceOptions' => $canLinkDevices
+                ? $this->linkedContextOptions->devices($user, $ticket)
+                : [],
+            'siteOptions' => $canManage
+                ? collect($this->linkedContextOptions->sites($user))
+                    ->when(
+                        $ticket->site,
+                        fn ($options) => $options->contains('id', $ticket->site->id)
+                            ? $options
+                            : $options->push(['id' => $ticket->site->id, 'name' => $ticket->site->name]),
+                    )
+                    ->sortBy('name')
+                    ->values()
+                    ->all()
+                : [],
+            'serviceOptions' => $canManage ? $this->linkedContextOptions->services() : [],
+            'teamOptions' => $canManage ? $this->linkedContextOptions->teams() : [],
             // §I composer deflection: published articles an agent can reference
             // as they type a reply. Agents (it.view) only — requesters already
             // met the KB at raise time and their payload stays lean.
-            'kbSuggestions' => $isAgent ? $this->kbSuggestions($tenantId) : [],
+            'kbSuggestions' => $isAgent ? $this->kbSuggestions() : [],
             // §P-S2 merge picker: recent live tickets an agent can fold this one
             // into. Agents only; excludes self and already-merged tickets.
             'mergeTargets' => $canManage
-                ? ItTicket::query()
-                    ->forTenant($tenantId)
+                ? $this->workAccess->applyViewScope(ItTicket::query(), $user)
                     ->whereIn('status', ItTicket::OPEN_STATUSES)
                     ->whereNull('merged_into_ticket_id')
                     ->where('id', '!=', $ticket->id)
+                    ->where('requester_user_id', $ticket->requester_user_id)
                     ->latest('id')
-                    ->limit(50)
-                    ->get(['id', 'reference', 'title', 'priority', 'status'])
+                    ->limit(100)
+                    ->get([
+                        'id',
+                        'reference',
+                        'title',
+                        'priority',
+                        'status',
+                        'requester_user_id',
+                        'requested_for_user_id',
+                    ])
+                    ->filter(fn (ItTicket $candidate) => $this->workAccess->canWork($user, $candidate)
+                        && $this->mergeService->sharesConversationAudience($ticket, $candidate))
+                    ->take(50)
                     ->map(fn (ItTicket $t) => [
                         'id' => $t->id,
                         'reference' => $t->reference,
@@ -230,8 +364,12 @@ class ItTicketController extends Controller
                 : [],
             'can' => [
                 'manage' => $canManage,
+                'linkDevices' => $canLinkDevices,
+                'assignApplicationWide' => $canManage
+                    && $this->workAccess->canAssignScope($user, null, true),
                 'view' => $isAgent,
                 'internal' => $canManage,
+                'comment' => $canComment,
                 'reopen' => $user->can('reopen', $ticket),
                 'watching' => $ticket->watchers->contains('id', $user->id),
                 // The requester may rate their own resolved ticket (§K).
@@ -242,46 +380,91 @@ class ItTicketController extends Controller
                 'requestApproval' => (bool) $user->can('requestApproval', $ticket),
                 'decideApproval' => $pendingApproval !== null && (bool) $user->can('decide', $pendingApproval),
             ],
+            'replyUnavailableReason' => $replyUnavailableReason,
         ];
+    }
+
+    /**
+     * Resolve only current staff profiles that the viewer can actually open.
+     * The ticket remains the source of names; this map grants no extra HR data.
+     *
+     * @param  array<int, mixed>  $userIds
+     * @return array<int, string>
+     */
+    private function staffProfileHrefs(User $viewer, array $userIds): array
+    {
+        if (! $viewer->canDo('hr.employees.viewAny')) {
+            return [];
+        }
+
+        $userIds = collect($userIds)
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        if ($userIds === []) {
+            return [];
+        }
+
+        $visibleUsers = User::query()->whereKey($userIds)->select('users.id');
+        app(UserSiteAccessService::class)->applyStaffScope($visibleUsers, $viewer);
+
+        return HrEmployeeProfile::query()
+            ->whereIn('user_id', $visibleUsers)
+            ->pluck('id', 'user_id')
+            ->mapWithKeys(fn (mixed $profileId, mixed $userId): array => [
+                (int) $userId => "/hr/people/{$profileId}",
+            ])
+            ->all();
+    }
+
+    /** @return array<string, mixed>|null */
+    private function waitingPayload(ItTicket $ticket, bool $canManage): ?array
+    {
+        if ($ticket->status !== 'waiting') {
+            return null;
+        }
+
+        $payload = [
+            'party' => $canManage
+                ? ($ticket->waiting_party ?: 'other')
+                : ($ticket->waiting_party === 'requester' ? 'requester' : 'other'),
+            'since' => $ticket->waiting_since?->toIso8601String(),
+            'since_human' => $ticket->waiting_since?->diffForHumans(short: true),
+        ];
+
+        if ($canManage) {
+            $payload['reason'] = $ticket->waiting_reason;
+            $payload['next_action'] = $ticket->next_action;
+        }
+
+        return $payload;
     }
 
     public function storeComment(StoreTicketCommentRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
+        abort_unless($this->workAccess->canView($user, $ticket), 404);
+        abort_unless($user->can('comment', $ticket), 403);
+        if ($request->boolean('is_internal')) {
+            abort_unless($this->workAccess->canWork($user, $ticket), 403);
+        }
         $isInternal = $request->boolean('is_internal');
-        $isAgentSide = $user->canDo('it.manage');
-        $isRequester = (int) $ticket->requester_user_id === (int) $user->id;
-
-        $comment = $ticket->comments()->create([
-            'tenant_id' => $ticket->tenant_id,
-            'author_user_id' => $user->id,
-            'body' => $request->validated('body'),
-            'is_internal' => $isInternal,
-        ]);
-
-        $this->storeItAttachments($comment, $request->file('attachments'), $user);
-
-        // First PUBLIC agent reply stops the response clock.
-        if ($isAgentSide && ! $isInternal && ! $ticket->first_responded_at) {
-            $ticket->first_responded_at = now();
+        try {
+            $result = $this->interactionService->addComment(
+                $ticket,
+                $user,
+                (string) $request->validated('body'),
+                $isInternal,
+                array_values(array_filter((array) $request->file('attachments'))),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
-
-        // The ball comes back from the requester: resume the resolution
-        // clock and put the ticket back in the working pile.
-        if ($isRequester && $ticket->status === 'waiting') {
-            $from = $ticket->status;
-            $ticket->stopWaiting();
-            ItTicketEvent::record($ticket, 'status_changed', $user->id, [
-                'from' => $from,
-                'to' => $ticket->status,
-                'via' => 'requester_reply',
-            ]);
-        }
-
-        $ticket->save();
+        $ticket = $result['ticket'];
+        $comment = $result['comment'];
+        $isRequester = $result['is_requester'];
 
         // Public replies notify the other side of the conversation; internal
         // notes notify nobody (they do not exist for requesters).
@@ -291,9 +474,15 @@ class ItTicketController extends Controller
                     ->when($ticket->assignee, fn ($c) => $c->push($ticket->assignee))
                     ->unique('id')
                     ->reject(fn ($u) => $u->id === $user->id);
-                NotificationFacade::send($recipients, new TicketRepliedNotification($ticket, 'agent_side'));
+                $this->emailDeliveries->send(
+                    $recipients,
+                    new TicketRepliedNotification($ticket, 'agent_side', $comment->id),
+                );
             } elseif ($ticket->requester && $ticket->requester_user_id !== $user->id) {
-                $ticket->requester->notify(new TicketRepliedNotification($ticket, 'requester'));
+                $this->emailDeliveries->send(
+                    $ticket->requester,
+                    new TicketRepliedNotification($ticket, 'requester', $comment->id),
+                );
             }
         }
 
@@ -308,17 +497,16 @@ class ItTicketController extends Controller
     public function downloadAttachment(Request $request, ItAttachment $attachment)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, (int) $attachment->tenant_id);
-
         $parent = $attachment->attachable;
 
         if ($parent instanceof ItTicketComment) {
+            abort_unless($this->workAccess->canView($user, $parent->ticket), 404);
             $this->authorize('view', $parent->ticket);
             if ($parent->is_internal) {
-                abort_unless($user->canDo('it.manage'), 403);
+                abort_unless($this->workAccess->canWork($user, $parent->ticket), 404);
             }
         } elseif ($parent instanceof ItTicket) {
+            abort_unless($this->workAccess->canView($user, $parent), 404);
             $this->authorize('view', $parent);
         } else {
             // KB attachments arrive with the Knowledge tab; orphans 404.
@@ -333,26 +521,48 @@ class ItTicketController extends Controller
         );
     }
 
-    /** Close a settled (or abandoned) ticket — terminal until reopened. */
-    public function close(Request $request, ItTicket $ticket)
+    public function transition(TransitionItWorkRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        abort_unless($user && $user->can('close', $ticket), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+        abort_unless($this->workAccess->canWork($user, $ticket), 404);
+        abort_unless($user->can('update', $ticket), 403);
+        $validated = $request->validated();
 
-        if ($ticket->status === 'closed') {
-            return redirect()->back()->with('error', 'This ticket is already closed.');
+        try {
+            $this->transitionService->transition(
+                $ticket,
+                new ItTransitionInput(
+                    actor: $user,
+                    to: ItWorkflowState::from((string) $validated['workflow_state']),
+                    reason: $validated['reason'] ?? null,
+                    waitingParty: $validated['waiting_party'] ?? null,
+                    nextAction: $validated['next_action'] ?? null,
+                    resolutionCode: $validated['resolution_code'] ?? null,
+                    resolutionSummary: $validated['resolution_summary'] ?? null,
+                    source: 'workspace',
+                ),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
 
-        if ($ticket->status === 'waiting') {
-            $ticket->stopWaiting('closed');
-        }
-        $ticket->status = 'closed';
-        $ticket->closed_at = now();
-        $ticket->save();
+        return redirect()->back()->with('success', "Updated {$ticket->reference}.");
+    }
 
-        ItTicketEvent::record($ticket, 'closed', $user->id);
+    /** Close a settled (or abandoned) ticket — terminal until reopened. */
+    public function close(CloseTicketRequest $request, ItTicket $ticket)
+    {
+        $user = $request->user();
+
+        try {
+            $this->triageService->close(
+                $ticket,
+                $user,
+                (string) $request->validated('reason'),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
 
         return redirect()->back()->with('success', "Closed {$ticket->reference}.");
     }
@@ -361,35 +571,26 @@ class ItTicketController extends Controller
      * Bring a settled ticket back: agents anytime, the requester within
      * 7 days of resolution (ItTicketPolicy::reopen).
      */
-    public function reopen(Request $request, ItTicket $ticket)
+    public function reopen(ReopenTicketRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        $this->authorize('reopen', $ticket);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
 
-        if ($ticket->isMerged()) {
-            return redirect()->back()->with('error', 'This ticket was merged into another — reopen the survivor instead.');
+        try {
+            $result = $this->interactionService->reopenWithReason(
+                $ticket,
+                $user,
+                (string) $request->validated('reason'),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
         }
+        $ticket = $result['ticket'];
 
-        if (! in_array($ticket->status, ['resolved', 'closed'], true)) {
-            return redirect()->back()->with('error', 'Only resolved or closed tickets can be reopened.');
-        }
-
-        $ticket->status = 'open';
-        $ticket->resolved_at = null;
-        $ticket->closed_at = null;
-        $ticket->reopened_count = (int) $ticket->reopened_count + 1;
-        // The clock runs again — a previously met/breached verdict no longer
-        // describes an open ticket; the SLA engine re-evaluates from here.
-        $ticket->sla_state = 'ok';
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'reopened', $user->id);
-
-        if ($ticket->assignee && $ticket->assigned_to_user_id !== $user->id) {
-            $ticket->assignee->notify(new \App\Notifications\It\TicketReopenedNotification($ticket));
-        }
+        $recipients = $ticket->watchers
+            ->when($ticket->assignee, fn ($collection) => $collection->push($ticket->assignee))
+            ->unique('id')
+            ->reject(fn ($recipient) => (int) $recipient->id === (int) $user->id);
+        $this->emailDeliveries->send($recipients, new TicketReopenedNotification($ticket));
 
         return redirect()->back()->with('success', "Reopened {$ticket->reference}.");
     }
@@ -397,49 +598,29 @@ class ItTicketController extends Controller
     /**
      * Fold a duplicate SOURCE ticket into a TARGET survivor: the conversation
      * and watchers move across, the source closes as merged, and both
-     * timelines get a `merged` marker. Audit events stay put — merging never
-     * rewrites a ticket's own history. Guarded by ItTicketPolicy@merge.
+     * timelines get a `merged` marker. The locked lifecycle keeps the same
+     * requester audience private and preserves each ticket's own history.
      */
     public function merge(MergeTicketRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
         $target = $request->targetTicket();
         abort_unless($target instanceof ItTicket, 404);
-
-        DB::transaction(function () use ($ticket, $target, $user) {
-            // The conversation continues on the survivor.
-            $ticket->comments()->update(['ticket_id' => $target->id]);
-
-            // Watchers follow, de-duplicated against the survivor's list.
-            $watcherIds = $ticket->watchers()->pluck('users.id')->all();
-            if ($watcherIds !== []) {
-                $target->watchers()->syncWithoutDetaching($watcherIds);
-                $ticket->watchers()->detach();
-            }
-
-            // Close the source as merged — kept, never deleted.
-            $ticket->forceFill([
-                'status' => 'closed',
-                'closed_at' => now(),
-                'merged_into_ticket_id' => $target->id,
-                'merged_at' => now(),
-            ])->save();
-
-            // A marker on each timeline; each ticket's own audit stays intact.
-            ItTicketEvent::record($ticket, 'merged', $user->id, [
-                'direction' => 'into',
-                'target_id' => $target->id,
-                'target_reference' => $target->reference,
-            ]);
-            ItTicketEvent::record($target, 'merged', $user->id, [
-                'direction' => 'from',
-                'source_id' => $ticket->id,
-                'source_reference' => $ticket->reference,
-            ]);
-        });
+        abort_unless(
+            $this->workAccess->canWork($user, $ticket)
+                && $this->workAccess->canWork($user, $target),
+            404,
+        );
+        try {
+            $target = $this->mergeService->merge(
+                $ticket,
+                $target,
+                $user,
+                $request->validated('reason'),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
 
         return redirect()
             ->route('it.tickets.show', $target)
@@ -449,27 +630,29 @@ class ItTicketController extends Controller
     /**
      * Raise a sign-off request on a ticket whose category needs approval
      * (§P-S3). Notifies the other agents (never the requester) and logs it.
-     * Authorised by ItTicketPolicy@requestApproval (RequestApprovalRequest).
+     * Canonical access is concealed before the locked lifecycle revalidates it.
      */
     public function requestApproval(RequestApprovalRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
+        abort_unless($this->workAccess->canWork($user, $ticket), 404);
+        try {
+            $approval = $this->approvalService->request(
+                $ticket,
+                $user,
+                $request->validated('reason'),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
 
-        $approval = $ticket->approvals()->create([
-            'tenant_id' => $ticket->tenant_id,
-            'requested_by' => $user->id,
-            'status' => 'pending',
-            'reason' => $request->validated('reason'),
-        ]);
-
-        ItTicketEvent::record($ticket, 'approval_requested', $user->id, ['approval_id' => $approval->id]);
+        $ticket = $approval->ticket;
 
         // Every agent who could sign off, except the one who asked.
-        $approvers = ItStaffDirectory::agents($tenantId)->reject(fn (User $u) => $u->id === $user->id);
+        $approvers = ItStaffDirectory::agentsForTicket($ticket)
+            ->reject(fn (User $u) => $u->id === $user->id);
         if ($approvers->isNotEmpty()) {
-            NotificationFacade::send($approvers, new TicketApprovalNotification($ticket, 'requested'));
+            $this->emailDeliveries->send($approvers, new TicketApprovalNotification($ticket, 'requested'));
         }
 
         return redirect()->back()->with('success', "Approval requested for {$ticket->reference}.");
@@ -477,30 +660,33 @@ class ItTicketController extends Controller
 
     /**
      * Record a manager's verdict on a pending request (§P-S3) and tell the
-     * agent who asked. Authorised by ItTicketApprovalPolicy@decide
-     * (DecideApprovalRequest) — a different agent, pending only.
+     * agent who asked. The locked lifecycle revalidates pending state and
+     * separation of duties before writing the decision.
      */
     public function decideApproval(DecideApprovalRequest $request, ItTicketApproval $approval)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $approval->tenant_id);
+        $ticket = $approval->ticket;
+        abort_unless($ticket && $this->workAccess->canWork($user, $ticket), 404);
+        abort_if((int) $approval->requested_by === (int) $user->id, 403);
 
-        $status = $request->validated('decision') === 'approve' ? 'approved' : 'rejected';
-
-        $approval->forceFill([
-            'status' => $status,
-            'approver_id' => $user->id,
-            'reason' => $request->validated('reason') ?? $approval->reason,
-            'decided_at' => now(),
-        ])->save();
+        try {
+            $approval = $this->approvalService->decide(
+                $approval,
+                $user,
+                $request->validated('decision'),
+                $request->validated('reason'),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
 
         $ticket = $approval->ticket;
-        ItTicketEvent::record($ticket, 'approval_'.$status, $user->id, ['approval_id' => $approval->id]);
+        $status = $approval->status;
 
         $requester = User::find($approval->requested_by);
         if ($requester) {
-            $requester->notify(new TicketApprovalNotification($ticket, $status));
+            $this->emailDeliveries->send($requester, new TicketApprovalNotification($ticket, $status));
         }
 
         return redirect()->back()->with('success', "Approval {$status} for {$ticket->reference}.");
@@ -508,28 +694,20 @@ class ItTicketController extends Controller
 
     /**
      * CSAT (§K): the requester rates the resolution 1–5 (+ optional comment).
-     * One-shot in spirit — the `csat_submitted` event and stamp land on the
-     * FIRST submission — but editable while the ticket is still resolved, so a
-     * re-rate silently updates the score. Authorisation is the FormRequest's.
+     * The first submission receives the immutable stamp; later edits retain it
+     * and receive their own explicit change trail.
      */
     public function csat(SubmitCsatRequest $request, ItTicket $ticket)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
-        $firstTime = $ticket->csat_submitted_at === null;
-        $ticket->csat_score = (int) $request->validated('score');
-        $ticket->csat_comment = $request->validated('comment') ?: null;
-        if ($firstTime) {
-            $ticket->csat_submitted_at = now();
-        }
-        $ticket->save();
-
-        // One trail entry — the first rating. Edits change the score quietly.
-        if ($firstTime) {
-            ItTicketEvent::record($ticket, 'csat_submitted', $user->id, ['score' => $ticket->csat_score]);
-        }
+        abort_unless($this->workAccess->canView($user, $ticket), 404);
+        abort_unless($user->can('csat', $ticket), 403);
+        $this->interactionService->submitCsat(
+            $ticket,
+            $user,
+            (int) $request->validated('score'),
+            $request->validated('comment') ?: null,
+        );
 
         return redirect()->back()->with('success', 'Thanks — your feedback helps IT improve.');
     }
@@ -537,14 +715,8 @@ class ItTicketController extends Controller
     public function watch(Request $request, ItTicket $ticket)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
-        $attached = $ticket->watchers()->syncWithoutDetaching([$user->id]);
-        if (! empty($attached['attached'])) {
-            ItTicketEvent::record($ticket, 'watcher_added', $user->id, ['user_id' => $user->id]);
-        }
+        abort_unless($user, 403);
+        $this->interactionService->watch($ticket, $user);
 
         return redirect()->back()->with('success', "Watching {$ticket->reference}.");
     }
@@ -552,13 +724,8 @@ class ItTicketController extends Controller
     public function unwatch(Request $request, ItTicket $ticket)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $ticket->tenant_id);
-
-        if ($ticket->watchers()->detach($user->id)) {
-            ItTicketEvent::record($ticket, 'watcher_removed', $user->id, ['user_id' => $user->id]);
-        }
+        abort_unless($user, 403);
+        $this->interactionService->unwatch($ticket, $user);
 
         return redirect()->back()->with('success', "Stopped watching {$ticket->reference}.");
     }
@@ -570,47 +737,52 @@ class ItTicketController extends Controller
     /**
      * One action over many tickets: assign, set priority (restamps the SLA
      * clock), set a working status (waiting transitions bank the pause), or
-     * close. Foreign-tenant ids silently drop out of the tenant-scoped
-     * fetch; settled tickets are skipped rather than mutated — the flash
+     * close. Inaccessible IDs silently drop out of the canonical work-access
+     * query; settled tickets are skipped rather than mutated — the flash
      * reports both as "unchanged". One event row per actual change, same
      * payload shape as the single-ticket routes.
      */
     public function bulk(BulkTicketActionRequest $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $validated = $request->validated();
         $action = (string) $validated['action'];
 
         $assignee = null;
         if ($action === 'assign' && ! empty($validated['assigned_to_user_id'])) {
             $assignee = User::query()->find((int) $validated['assigned_to_user_id']);
-            // Same foreign-tenant guard as every other assignment here: reject a
-            // recipient whose HR profile sits in a different organisation.
-            $inOtherTenant = $assignee && HrEmployeeProfile::query()
-                ->where('user_id', $assignee->id)
-                ->whereNotNull('tenant_id')
-                ->where('tenant_id', '!=', $tenantId)
-                ->exists();
-            if ($inOtherTenant) {
-                return redirect()->back()->with('error', 'That colleague is in a different organisation.');
+            if (! $assignee || ! ItStaffDirectory::agents()->contains('id', $assignee->id)) {
+                return redirect()->back()->with('error', 'Choose a current IT technician.');
             }
         }
 
-        $tickets = ItTicket::query()
-            ->forTenant($tenantId)
+        $tickets = $this->workAccess->applyViewScope(ItTicket::query(), $user)
             ->whereIn('id', $validated['ids'])
-            ->get();
+            ->get()
+            ->filter(fn (ItTicket $ticket) => $this->workAccess->canWork($user, $ticket));
 
         $updated = 0;
         $skipped = count($validated['ids']) - $tickets->count();
 
         foreach ($tickets as $ticket) {
             $changed = match ($action) {
-                'assign' => $this->bulkAssign($ticket, $assignee, $user),
-                'priority' => $this->bulkPriority($ticket, (string) $validated['priority'], $user),
-                'status' => $this->bulkStatus($ticket, (string) $validated['status'], $user),
-                'close' => $this->bulkClose($ticket, $user),
+                'assign' => $this->triageService->bulkUpdate($ticket, $user, [
+                    'assigned_to_user_id' => $assignee?->id,
+                ], 'bulk'),
+                'priority' => $this->triageService->bulkUpdate($ticket, $user, [
+                    'priority' => (string) $validated['priority'],
+                ], 'bulk'),
+                'status' => $this->triageService->bulkUpdate($ticket, $user, [
+                    'status' => (string) $validated['status'],
+                    ...Arr::only($validated, ['waiting_party', 'waiting_reason', 'next_action']),
+                ], 'bulk'),
+                'close' => $this->triageService->close(
+                    $ticket,
+                    $user,
+                    (string) $validated['reason'],
+                    source: 'bulk_close',
+                    staleIsUnchanged: true,
+                ),
                 default => false,
             };
             $changed ? $updated++ : $skipped++;
@@ -622,98 +794,5 @@ class ItTicketController extends Controller
             'success',
             "{$updated} ticket(s) {$label}".($skipped > 0 ? " · {$skipped} unchanged" : '').'.',
         );
-    }
-
-    private function bulkAssign(ItTicket $ticket, ?User $assignee, User $actor): bool
-    {
-        if (! in_array($ticket->status, ItTicket::OPEN_STATUSES, true)) {
-            return false; // settled tickets keep their history
-        }
-        $newId = $assignee?->id;
-        if ((int) $ticket->assigned_to_user_id === (int) $newId) {
-            return false;
-        }
-
-        $from = $ticket->assigned_to_user_id;
-        $ticket->assigned_to_user_id = $newId;
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'assigned', $actor->id, [
-            'from' => $from,
-            'to' => $newId,
-            'via' => 'bulk',
-        ]);
-        if ($assignee && $assignee->id !== $actor->id) {
-            $assignee->notify(new TicketAssignedNotification($ticket));
-        }
-
-        return true;
-    }
-
-    private function bulkPriority(ItTicket $ticket, string $priority, User $actor): bool
-    {
-        if (! in_array($ticket->status, ItTicket::OPEN_STATUSES, true) || $ticket->priority === $priority) {
-            return false;
-        }
-
-        $from = $ticket->priority;
-        $ticket->priority = $priority;
-        // Re-target the SLA clock for the new priority (same creation anchor).
-        $ticket->stampSlaDueDates();
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'priority_changed', $actor->id, [
-            'from' => $from,
-            'to' => $priority,
-            'via' => 'bulk',
-        ]);
-
-        return true;
-    }
-
-    private function bulkStatus(ItTicket $ticket, string $status, User $actor): bool
-    {
-        // Working states only (the FormRequest enforces the target; this
-        // guards the source) — bulk never un-resolves or un-closes.
-        if (! in_array($ticket->status, ItTicket::OPEN_STATUSES, true) || $ticket->status === $status) {
-            return false;
-        }
-
-        $from = $ticket->status;
-        if ($status === 'waiting') {
-            $ticket->startWaiting();
-        } elseif ($ticket->status === 'waiting') {
-            $ticket->stopWaiting($status);
-        } else {
-            $ticket->status = $status;
-        }
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'status_changed', $actor->id, [
-            'from' => $from,
-            'to' => $ticket->status,
-            'via' => 'bulk',
-        ]);
-
-        return true;
-    }
-
-    private function bulkClose(ItTicket $ticket, User $actor): bool
-    {
-        if ($ticket->status === 'closed') {
-            return false;
-        }
-
-        if ($ticket->status === 'waiting') {
-            $ticket->stopWaiting('closed');
-        } else {
-            $ticket->status = 'closed';
-        }
-        $ticket->closed_at = now();
-        $ticket->save();
-
-        ItTicketEvent::record($ticket, 'closed', $actor->id, ['via' => 'bulk']);
-
-        return true;
     }
 }

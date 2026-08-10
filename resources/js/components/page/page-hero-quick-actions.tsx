@@ -1,7 +1,12 @@
 import { Link } from '@inertiajs/react';
 import { type ComponentType } from 'react';
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 export type PageHeroQuickAction = {
@@ -12,6 +17,7 @@ export type PageHeroQuickAction = {
     /** Count badge in the top-right corner. */
     badge?: number;
     'aria-label'?: string;
+    'data-test'?: string;
 };
 
 interface PageHeroQuickActionsProps {
@@ -40,7 +46,7 @@ export function PageHeroQuickActions({
                 className,
             )}
         >
-            <div className="w-full px-1 pb-1 pt-0.5 text-[10px] font-bold uppercase tracking-[0.10em] text-primary-foreground/70">
+            <div className="w-full px-1 pt-0.5 pb-1 text-[10px] font-bold tracking-[0.10em] text-primary-foreground/70 uppercase">
                 {heading}
             </div>
             <TooltipProvider delayDuration={200}>
@@ -65,7 +71,7 @@ function QuickActionButton({ action }: { action: PageHeroQuickAction }) {
         >
             <Icon className="h-[15px] w-[15px]" />
             {action.badge != null ? (
-                <span className="absolute right-0.5 top-0.5 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary-foreground px-1 text-[9px] font-bold text-primary">
+                <span className="absolute top-0.5 right-0.5 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary-foreground px-1 text-[9px] font-bold text-primary">
                     {action.badge}
                 </span>
             ) : null}
@@ -73,11 +79,20 @@ function QuickActionButton({ action }: { action: PageHeroQuickAction }) {
     );
 
     const triggerNode = action.href ? (
-        <Link href={action.href} aria-label={label}>
+        <Link
+            href={action.href}
+            aria-label={label}
+            data-test={action['data-test']}
+        >
             {inner}
         </Link>
     ) : (
-        <button type="button" onClick={action.onClick} aria-label={label}>
+        <button
+            type="button"
+            onClick={action.onClick}
+            aria-label={label}
+            data-test={action['data-test']}
+        >
             {inner}
         </button>
     );

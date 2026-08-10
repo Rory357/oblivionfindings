@@ -90,6 +90,7 @@ class ShiftController extends Controller
             ])
             ->withExists([
                 'openPositions as cover_requested' => fn ($openPositions) => $openPositions
+                    ->tap(fn ($query) => $this->siteAccess()->applyShiftOpenPositionIntegrityScope($query))
                     ->whereIn('status', ['open', 'claimed'])
                     ->where(function ($query) {
                         $query->whereNull('expires_at')
@@ -159,7 +160,7 @@ class ShiftController extends Controller
             // Assigned-only access: only their own shifts
             $query
                 ->where('user_id', $auth->id)
-                ->visibleToFrontline($auth->organization_id);
+                ->visibleToFrontline();
         }
 
         // Week-bounded — show all shifts in range rather than paginating, but cap defensively.
@@ -285,7 +286,7 @@ class ShiftController extends Controller
             abort_unless(
                 Shift::query()
                     ->whereKey($shift->id)
-                    ->visibleToFrontline($auth->organization_id)
+                    ->visibleToFrontline()
                     ->exists(),
                 404,
             );
@@ -313,6 +314,7 @@ class ShiftController extends Controller
             || $auth->canDo('custom_forms.submit');
         $canSubmitForms = $auth->canDo('custom_forms.submit');
         $latestReplacement = $shift->replacementRequests()
+            ->tap(fn ($query) => $this->siteAccess()->applyShiftReplacementIntegrityScope($query))
             ->with([
                 'requester:id,name',
                 'currentStaff:id,name',
@@ -334,6 +336,7 @@ class ShiftController extends Controller
             ->get();
 
         $handover = ShiftHandover::query()
+            ->tap(fn ($query) => $this->siteAccess()->applyHandoverIntegrityScope($query))
             ->where(function ($query) use ($shift) {
                 $query->where('outgoing_shift_id', $shift->id)
                     ->orWhere('incoming_shift_id', $shift->id)
@@ -374,7 +377,6 @@ class ShiftController extends Controller
 
         if ($canViewForms) {
             $availableForms = CustomForm::query()
-                ->when($auth->organization_id, fn ($query) => $query->where('organization_id', $auth->organization_id))
                 ->active()
                 ->whereIn('form_type', ['general', 'shift', 'care_delivery', 'handover'])
                 ->orderBy('name')
@@ -651,6 +653,7 @@ class ShiftController extends Controller
                 }
 
                 $h = ShiftHandover::where('outgoing_shift_id', $shift->id)
+                    ->tap(fn ($query) => $this->siteAccess()->applyHandoverIntegrityScope($query))
                     ->select($columns)
                     ->with(['incomingStaff:id,name'])
                     ->latest()
@@ -828,7 +831,7 @@ class ShiftController extends Controller
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
-            'site_id' => ['nullable', 'integer'],
+            'site_id' => ['required', 'integer', 'exists:sites,id'],
             'shift_type' => ['nullable', 'string'],
             'coverage_roles' => ['nullable', 'array'],
             'required_licence_class' => ['nullable', 'string', Rule::in(HrDriverEligibility::LICENCE_CLASSES)],
@@ -837,14 +840,25 @@ class ShiftController extends Controller
             'shift_id' => ['nullable', 'integer'],
         ]);
 
+        if (! empty($data['shift_id'])) {
+            $existingShift = Shift::query()->findOrFail((int) $data['shift_id']);
+            $this->assertCanAccessShift($auth, $existingShift);
+        }
+
+        $this->siteAccess()->assertCanAccessSiteId(
+            $auth,
+            (int) $data['site_id'],
+            $this->shiftBypassPermissions(),
+            'You are not authorized to assess shifts for that site.',
+        );
         $assignee = User::findOrFail($data['user_id']);
         $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
+        $this->assertStaffEligibleForShiftSite((int) $data['user_id'], (int) $data['site_id']);
         $tempShift = new Shift([
-            'organization_id' => $auth->organization_id ?: 1,
             'user_id' => $data['user_id'],
             'starts_at' => $data['starts_at'],
             'ends_at' => $data['ends_at'],
-            'site_id' => $data['site_id'] ?? null,
+            'site_id' => $data['site_id'],
             'shift_type' => $data['shift_type'] ?? 'standard',
             'coverage_roles' => $data['coverage_roles'] ?? [],
             'required_licence_class' => $data['required_licence_class'] ?? null,
@@ -896,6 +910,12 @@ class ShiftController extends Controller
         ]);
 
         $data = $this->normalizeShiftData($data);
+        $this->siteAccess()->assertCanAccessClientId(
+            $auth,
+            (int) $data['client_id'],
+            $this->shiftBypassPermissions(),
+            'You are not authorized to create shifts for that client.',
+        );
         $data['site_id'] = $this->resolveSiteIdForPayload($data);
         $this->siteAccess()->assertCanAccessSiteId(
             $auth,
@@ -933,10 +953,10 @@ class ShiftController extends Controller
         // Covers conflicts, compliance, fatigue, availability, leave, site, and driver checks.
         if (! empty($data['user_id'])) {
             $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
+            $this->assertStaffEligibleForShiftSite((int) $data['user_id'], (int) $data['site_id']);
             try {
                 $assignee = User::findOrFail($data['user_id']);
                 $tempShift = new Shift(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
-                $tempShift->organization_id = $auth->organization_id ?: 1;
                 $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($tempShift, $assignee);
 
                 if ($eligibility->hasBlocks()) {
@@ -1074,7 +1094,6 @@ class ShiftController extends Controller
         $copy = DB::transaction(function () use ($auth, $shift, $targetStart, $targetEnd) {
             $copy = new Shift;
             $copy->forceFill([
-                'organization_id' => $shift->organization_id,
                 'roster_period_id' => $shift->roster_period_id,
                 'shift_series_id' => null,
                 'client_id' => $shift->client_id,
@@ -2167,6 +2186,7 @@ class ShiftController extends Controller
         $this->assertCanAccessShift($auth, $shift);
 
         $replacement = $shift->replacementRequests()
+            ->tap(fn ($query) => $this->siteAccess()->applyShiftReplacementScope($query, $auth, ['reports.viewAny']))
             ->active()
             ->latest('requested_at')
             ->firstOrFail();
@@ -2475,6 +2495,18 @@ class ShiftController extends Controller
             403,
             'You are not authorized to assign that staff member to this shift.',
         );
+    }
+
+    protected function assertStaffEligibleForShiftSite(int $userId, int $siteId): void
+    {
+        $query = User::query()->whereKey($userId);
+        $this->siteAccess()->applyFleetRecipientEligibility($query, $siteId);
+
+        if (! $query->exists()) {
+            throw ValidationException::withMessages([
+                'user_id' => 'This staff member is not currently assigned to the shift site.',
+            ]);
+        }
     }
 
     protected function assertCanAccessShift(User $auth, Shift $shift): void

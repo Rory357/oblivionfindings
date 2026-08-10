@@ -3,23 +3,28 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrDriverEligibility;
-use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\StaffBackgroundCheck;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Server-side, uncapped CSV export for the Compliance hub tabs. Streams rows so a
- * large register doesn't buffer in memory. Tenant-scoped, gated per dataset.
+ * large register doesn't buffer in memory. Access is gated per dataset.
  */
 class ComplianceExportController extends Controller
 {
-    use ResolvesHrTenant;
-
     private const DATASETS = ['staff', 'vetting', 'drivers', 'renewals'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly ComplianceMatrixService $complianceMatrix,
+    ) {}
 
     public function export(Request $request): StreamedResponse
     {
@@ -41,17 +46,16 @@ class ComplianceExportController extends Controller
         };
         abort_unless($user->canDo($perm), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $filename = "compliance-{$dataset}-" . date('Y-m-d') . '.csv';
+        $filename = "compliance-{$dataset}-".date('Y-m-d').'.csv';
 
-        return response()->streamDownload(function () use ($dataset, $tenantId) {
+        return response()->streamDownload(function () use ($dataset, $user) {
             $out = fopen('php://output', 'w');
 
             match ($dataset) {
-                'staff' => $this->streamStaff($out, $tenantId),
-                'vetting' => $this->streamVetting($out, $tenantId),
-                'drivers' => $this->streamDrivers($out, $tenantId),
-                'renewals' => $this->streamRenewals($out, $tenantId),
+                'staff' => $this->streamStaff($out, $user),
+                'vetting' => $this->streamVetting($out, $user),
+                'drivers' => $this->streamDrivers($out, $user),
+                'renewals' => $this->streamRenewals($out, $user),
             };
 
             fclose($out);
@@ -59,37 +63,47 @@ class ComplianceExportController extends Controller
     }
 
     /** @param resource $out */
-    private function streamStaff($out, ?int $tenantId): void
+    private function streamStaff($out, User $viewer): void
     {
         $this->putCsv($out, ['Staff member', 'Email', 'Requirement', 'Code', 'Status', 'Valid from', 'Expires', 'Exempted until', 'Notes']);
 
-        HrStaffComplianceStatus::where('tenant_id', $tenantId)
-            ->with(['user:id,name,email', 'requirement:id,code,name'])
-            ->orderBy('user_id')
-            ->chunk(500, function ($rows) use ($out) {
-                foreach ($rows as $r) {
-                    $this->putCsv($out, [
-                        $r->user?->name ?? '',
-                        $r->user?->email ?? '',
-                        $r->requirement?->name ?? '',
-                        $r->requirement?->code ?? '',
-                        $r->status,
-                        optional($r->valid_from)->toDateString(),
-                        optional($r->expires_at)->toDateString(),
-                        optional($r->exempted_until)->toDateString(),
-                        str_replace(["\n", "\r"], ' ', (string) $r->notes),
-                    ]);
+        $staff = User::query()
+            ->with([
+                'roles:id,name',
+                'hrEmployeeProfile:id,user_id,work_email',
+                'complianceStatuses',
+            ]);
+        $this->siteAccess->applyStaffScope($staff, $viewer);
+        $staff->orderBy('users.id')
+            ->chunkById(200, function ($users) use ($out): void {
+                $snapshots = $this->complianceMatrix->snapshotsForUsers($users);
+                foreach ($users as $user) {
+                    foreach ($snapshots->get((int) $user->id, collect()) as $snapshot) {
+                        $requirement = $snapshot['requirement'];
+                        $status = $snapshot['status_row'];
+                        $this->putCsv($out, [
+                            $user->name,
+                            $user->hrEmployeeProfile?->work_email ?? '',
+                            $requirement->name,
+                            $requirement->code,
+                            $snapshot['status'],
+                            optional($status?->valid_from)->toDateString(),
+                            optional($status?->expires_at)->toDateString(),
+                            optional($status?->exempted_until)->toDateString(),
+                            str_replace(["\n", "\r"], ' ', (string) ($status?->notes ?? '')),
+                        ]);
+                    }
                 }
-            });
+            }, 'users.id', 'id');
     }
 
     /** @param resource $out */
-    private function streamVetting($out, ?int $tenantId): void
+    private function streamVetting($out, User $viewer): void
     {
         $this->putCsv($out, ['Staff member', 'Check type', 'Provider', 'Reference', 'Status', 'Check date', 'Expires']);
 
         StaffBackgroundCheck::query()
-            ->whereHas('user.hrEmployeeProfile', fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('user_id', $this->visibleCurrentStaffIds($viewer))
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->chunk(500, function ($rows) use ($out) {
@@ -108,11 +122,12 @@ class ComplianceExportController extends Controller
     }
 
     /** @param resource $out */
-    private function streamDrivers($out, ?int $tenantId): void
+    private function streamDrivers($out, User $viewer): void
     {
         $this->putCsv($out, ['Driver', 'Licence class', 'Licence number', 'Endorsements', 'Status', 'Can drive clients', 'Expires']);
 
-        HrDriverEligibility::where('tenant_id', $tenantId)
+        HrDriverEligibility::query()
+            ->whereIn('user_id', $this->visibleCurrentStaffIds($viewer))
             ->with('user:id,name')
             ->orderByDesc('created_at')
             ->chunk(500, function ($rows) use ($out) {
@@ -131,28 +146,68 @@ class ComplianceExportController extends Controller
     }
 
     /** @param resource $out */
-    private function streamRenewals($out, ?int $tenantId): void
+    private function streamRenewals($out, User $viewer): void
     {
         $this->putCsv($out, ['Type', 'Staff member', 'Item', 'Due date', 'Status']);
 
-        HrStaffComplianceStatus::where('tenant_id', $tenantId)
+        $staff = User::query()
+            ->with(['roles:id,name', 'complianceStatuses']);
+        $this->siteAccess->applyStaffScope($staff, $viewer);
+        $staff->orderBy('users.id')
+            ->chunkById(200, function ($users) use ($out): void {
+                $snapshots = $this->complianceMatrix->snapshotsForUsers($users);
+                foreach ($users as $user) {
+                    foreach ($snapshots->get((int) $user->id, collect()) as $snapshot) {
+                        $status = $snapshot['status_row'];
+                        if (! $status?->expires_at) {
+                            continue;
+                        }
+                        $this->putCsv($out, [
+                            'Compliance',
+                            $user->name,
+                            $snapshot['requirement']->name,
+                            $status->expires_at->toDateString(),
+                            $snapshot['status'],
+                        ]);
+                    }
+                }
+            }, 'users.id', 'id');
+
+        StaffBackgroundCheck::query()
+            ->whereIn('user_id', $this->visibleCurrentStaffIds($viewer))
             ->whereNotNull('expires_at')
-            ->with(['user:id,name', 'requirement:id,name'])
+            ->with('user:id,name')
             ->orderBy('expires_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    $this->putCsv($out, ['Compliance', $r->user?->name ?? '', $r->requirement?->name ?? '', optional($r->expires_at)->toDateString(), $r->status]);
+                    $this->putCsv($out, [
+                        'Vetting',
+                        $r->user?->name ?? '',
+                        ucfirst(str_replace('_', ' ', (string) $r->check_type)),
+                        optional($r->expires_at)->toDateString(),
+                        $r->status,
+                    ]);
                 }
             });
 
-        HrDriverEligibility::where('tenant_id', $tenantId)
+        HrDriverEligibility::query()
+            ->whereIn('user_id', $this->visibleCurrentStaffIds($viewer))
             ->whereNotNull('licence_expires_at')
             ->with('user:id,name')
             ->orderBy('licence_expires_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $r) {
-                    $this->putCsv($out, ['Driver', $r->user?->name ?? '', 'Class ' . $r->licence_class . ' licence', optional($r->licence_expires_at)->toDateString(), $r->status]);
+                    $this->putCsv($out, ['Driver', $r->user?->name ?? '', 'Class '.$r->licence_class.' licence', optional($r->licence_expires_at)->toDateString(), $r->status]);
                 }
             });
+    }
+
+    /** @return Builder<User> */
+    private function visibleCurrentStaffIds(User $viewer): Builder
+    {
+        $query = User::query()->select('id');
+        $this->siteAccess->applyStaffScope($query, $viewer);
+
+        return $query;
     }
 }

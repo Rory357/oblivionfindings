@@ -2,9 +2,13 @@
 
 namespace App\Console\Commands\Hr;
 
+use App\Domain\Hr\Models\HrComplianceRenewalSnooze;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Notifications\WorkerComplianceExpiryNotification;
+use App\Domain\Hr\Services\HrComplianceRenewalSnoozePruner;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\StaffBackgroundCheck;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -17,39 +21,63 @@ class SendWorkerComplianceExpiryRemindersCommand extends Command
     public function handle(): int
     {
         $days = max(0, (int) $this->option('days'));
-        $sent = $this->sendBackgroundCheckReminders($days)
-            + $this->sendDriverLicenceReminders($days);
+        $currentStaff = app(HrCurrentStaffService::class);
+        $currentUserIds = $currentStaff->currentUserIds();
+        $pruned = app(HrComplianceRenewalSnoozePruner::class)->prune();
+        $sent = $this->sendBackgroundCheckReminders($days, $currentStaff, $currentUserIds)
+            + $this->sendDriverLicenceReminders($days, $currentStaff, $currentUserIds);
 
         $this->info("Worker compliance expiry reminders sent: {$sent}");
+        $this->line("Expired or orphaned renewal snoozes pruned: {$pruned}");
 
         return self::SUCCESS;
     }
 
-    private function sendBackgroundCheckReminders(int $days): int
-    {
+    /** @param array<int, int> $currentUserIds */
+    private function sendBackgroundCheckReminders(
+        int $days,
+        HrCurrentStaffService $currentStaff,
+        array $currentUserIds,
+    ): int {
         $sent = 0;
         $ids = StaffBackgroundCheck::query()
+            ->whereIn('user_id', $currentUserIds)
             ->whereNull('renewal_reminder_sent_at')
+            ->whereNotIn('id', HrComplianceRenewalSnooze::query()
+                ->select('entity_id')
+                ->forEntityType(HrComplianceRenewalSnooze::TYPE_VETTING)
+                ->active())
             ->whereNotNull('expires_at')
             ->whereDate('expires_at', '>=', today())
             ->whereDate('expires_at', '<=', today()->addDays($days))
             ->pluck('id');
 
         foreach ($ids as $id) {
-            $check = DB::transaction(function () use ($id): ?StaffBackgroundCheck {
+            $check = DB::transaction(function () use ($id, $currentStaff): ?StaffBackgroundCheck {
                 $check = StaffBackgroundCheck::query()
                     ->with('user:id,name,email')
                     ->lockForUpdate()
                     ->find($id);
 
-                if (! $check || $check->renewal_reminder_sent_at || ! $check->user) {
+                if (! $check
+                    || $check->renewal_reminder_sent_at
+                    || ! $check->user
+                    || ! $currentStaff->isCurrent((int) $check->user_id)
+                    || $this->isActivelySnoozed(HrComplianceRenewalSnooze::TYPE_VETTING, (int) $check->id)
+                ) {
+                    return null;
+                }
+
+                if ($this->hasExistingReminder($check->user, 'background_check', (int) $check->id)) {
+                    $check->update(['renewal_reminder_sent_at' => now()]);
+
                     return null;
                 }
 
                 $check->update(['renewal_reminder_sent_at' => now()]);
 
                 return $check;
-            });
+            }, 3);
 
             if (! $check) {
                 continue;
@@ -64,7 +92,9 @@ class SendWorkerComplianceExpiryRemindersCommand extends Command
                 ]));
                 $sent++;
             } catch (\Throwable $exception) {
-                $check->update(['renewal_reminder_sent_at' => null]);
+                StaffBackgroundCheck::query()
+                    ->whereKey($check->id)
+                    ->update(['renewal_reminder_sent_at' => null]);
                 $this->warn("Background-check reminder {$check->id} failed: {$exception->getMessage()}");
             }
         }
@@ -72,31 +102,51 @@ class SendWorkerComplianceExpiryRemindersCommand extends Command
         return $sent;
     }
 
-    private function sendDriverLicenceReminders(int $days): int
-    {
+    /** @param array<int, int> $currentUserIds */
+    private function sendDriverLicenceReminders(
+        int $days,
+        HrCurrentStaffService $currentStaff,
+        array $currentUserIds,
+    ): int {
         $sent = 0;
         $ids = HrDriverEligibility::query()
+            ->whereIn('user_id', $currentUserIds)
             ->whereNull('licence_expiry_reminder_sent_at')
+            ->whereNotIn('id', HrComplianceRenewalSnooze::query()
+                ->select('entity_id')
+                ->forEntityType(HrComplianceRenewalSnooze::TYPE_DRIVER)
+                ->active())
             ->whereNotNull('licence_expires_at')
             ->whereDate('licence_expires_at', '>=', today())
             ->whereDate('licence_expires_at', '<=', today()->addDays($days))
             ->pluck('id');
 
         foreach ($ids as $id) {
-            $eligibility = DB::transaction(function () use ($id): ?HrDriverEligibility {
+            $eligibility = DB::transaction(function () use ($id, $currentStaff): ?HrDriverEligibility {
                 $eligibility = HrDriverEligibility::query()
                     ->with('user:id,name,email')
                     ->lockForUpdate()
                     ->find($id);
 
-                if (! $eligibility || $eligibility->licence_expiry_reminder_sent_at || ! $eligibility->user) {
+                if (! $eligibility
+                    || $eligibility->licence_expiry_reminder_sent_at
+                    || ! $eligibility->user
+                    || ! $currentStaff->isCurrent((int) $eligibility->user_id)
+                    || $this->isActivelySnoozed(HrComplianceRenewalSnooze::TYPE_DRIVER, (int) $eligibility->id)
+                ) {
+                    return null;
+                }
+
+                if ($this->hasExistingReminder($eligibility->user, 'driver_licence', (int) $eligibility->id)) {
+                    $eligibility->update(['licence_expiry_reminder_sent_at' => now()]);
+
                     return null;
                 }
 
                 $eligibility->update(['licence_expiry_reminder_sent_at' => now()]);
 
                 return $eligibility;
-            });
+            }, 3);
 
             if (! $eligibility) {
                 continue;
@@ -111,12 +161,32 @@ class SendWorkerComplianceExpiryRemindersCommand extends Command
                 ]));
                 $sent++;
             } catch (\Throwable $exception) {
-                $eligibility->update(['licence_expiry_reminder_sent_at' => null]);
+                HrDriverEligibility::query()
+                    ->whereKey($eligibility->id)
+                    ->update(['licence_expiry_reminder_sent_at' => null]);
                 $this->warn("Driver-licence reminder {$eligibility->id} failed: {$exception->getMessage()}");
             }
         }
 
         return $sent;
+    }
+
+    private function isActivelySnoozed(string $entityType, int $entityId): bool
+    {
+        return HrComplianceRenewalSnooze::query()
+            ->forEntity($entityType, $entityId)
+            ->active()
+            ->lockForUpdate()
+            ->exists();
+    }
+
+    private function hasExistingReminder(User $user, string $sourceType, int $sourceId): bool
+    {
+        return $user->notifications()
+            ->where('type', WorkerComplianceExpiryNotification::class)
+            ->where('data->source_type', $sourceType)
+            ->where('data->source_id', $sourceId)
+            ->exists();
     }
 
     private function backgroundCheckTitle(string $type): string

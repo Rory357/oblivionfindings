@@ -11,10 +11,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrSavedReport extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
-        'tenant_id',
         'name',
         'description',
         'report_type',
@@ -23,9 +22,6 @@ class HrSavedReport extends Model
         'group_by',
         'sort_by',
         'sort_direction',
-        'is_scheduled',
-        'schedule_frequency',
-        'schedule_recipients',
         'last_run_at',
         'created_by',
     ];
@@ -33,13 +29,11 @@ class HrSavedReport extends Model
     protected $casts = [
         'fields' => 'array',
         'filters' => 'array',
-        'schedule_recipients' => 'array',
-        'is_scheduled' => 'boolean',
         'last_run_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function creator(): BelongsTo
@@ -48,13 +42,8 @@ class HrSavedReport extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeOfType(Builder $query, string $reportType): Builder
     {

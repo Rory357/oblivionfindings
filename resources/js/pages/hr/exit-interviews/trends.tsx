@@ -1,9 +1,9 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeft, Star, ThumbsUp, TrendingUp, Users } from 'lucide-react';
@@ -105,18 +105,25 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
             <Head title="Exit Interview Trends" />
 
             <PageShell>
-                <PageHero category="hr"
+                <PageHero
+                    category="hr"
                     icon={TrendingUp}
                     title="Exit Interview Trends"
                     description="Aggregate analysis of departure feedback."
                     stats={[
-                        { label: 'Interviews', value: trends.overall.total_interviews },
+                        {
+                            label: 'Interviews',
+                            value: trends.overall.total_interviews,
+                        },
                         {
                             label: 'Avg satisfaction',
                             value: trends.overall.avg_satisfaction || '-',
                         },
                         { label: 'Would recommend', value: `${recommendPct}%` },
-                        { label: 'Unique reasons', value: trends.departure_reasons.length },
+                        {
+                            label: 'Unique reasons',
+                            value: trends.departure_reasons.length,
+                        },
                     ]}
                     actions={
                         <Button

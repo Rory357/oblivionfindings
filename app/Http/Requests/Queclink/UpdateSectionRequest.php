@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Queclink;
 
+use App\Domain\SecurityDevices\Services\QueclinkIntegrationAccessService;
+use App\Models\Queclink\QueclinkDevice;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,7 +11,17 @@ class UpdateSectionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->canDo('securityDevices.integrations.manage');
+        $user = $this->user();
+        if (! $user?->canDo('securityDevices.integrations.manage')) {
+            return false;
+        }
+
+        $device = $this->route('queclinkDevice');
+        if ($device instanceof QueclinkDevice) {
+            app(QueclinkIntegrationAccessService::class)->assertDevice($user, $device);
+        }
+
+        return true;
     }
 
     /** @return array<string, mixed> */

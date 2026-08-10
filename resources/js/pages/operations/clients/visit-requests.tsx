@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { Head, router } from '@inertiajs/react';
 import {
     Calendar,
@@ -128,13 +128,15 @@ export default function VisitRequests({
                         description={`Manage visit requests for ${name}`}
                         stats={[
                             { label: 'Pending', value: stats.pending },
-                            { label: 'Approved this month', value: stats.approved_this_month },
+                            {
+                                label: 'Approved this month',
+                                value: stats.approved_this_month,
+                            },
                             { label: 'Total', value: stats.total },
                         ]}
                     />
                 }
             >
-
                 {/* Filter tabs */}
                 <div className="overflow-x-auto border-b">
                     <div className="flex w-max items-center gap-1">

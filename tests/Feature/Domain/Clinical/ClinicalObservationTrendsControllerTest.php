@@ -4,8 +4,10 @@ namespace Tests\Feature\Domain\Clinical;
 
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -17,11 +19,14 @@ class ClinicalObservationTrendsControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
+        $this->site = Site::factory()->create();
     }
 
     public function test_client_trends_page_behaviour_and_access_control(): void
@@ -30,7 +35,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
         $supportWorker = $this->createUserWithRole('support_worker');
         $unassignedSupportWorker = $this->createUserWithRole('support_worker');
         $unauthorizedUser = User::factory()->create(['approved_at' => now()]);
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         $client->supportWorkers()->attach($supportWorker->id);
 
         ClinicalObservation::factory()->weight()->create([
@@ -118,7 +123,7 @@ class ClinicalObservationTrendsControllerTest extends TestCase
     {
         $user = $this->createUserWithRole('clinical_lead');
         $unauthorizedUser = User::factory()->create(['approved_at' => now()]);
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->weight()->create([
             'client_id' => $client->id,
@@ -167,8 +172,8 @@ class ClinicalObservationTrendsControllerTest extends TestCase
         // the module Trends tab must apply the same per-client guard as the per-client page.
         $assigned = $this->createUserWithRole('support_worker');
         $unassigned = $this->createUserWithRole('support_worker');
-        $client = Client::factory()->create();
-        Client::factory()->create(); // another client this worker is NOT assigned to
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
+        Client::factory()->create(['site_id' => $this->site->id]); // another client this worker is NOT assigned to
         $client->supportWorkers()->attach($assigned->id);
 
         ClinicalObservation::factory()->weight()->create([
@@ -204,6 +209,16 @@ class ClinicalObservationTrendsControllerTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
 
         return $user;
     }

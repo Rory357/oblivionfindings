@@ -5,12 +5,13 @@ use App\Domain\Hr\Models\HrReportExport;
 use App\Domain\Hr\Models\HrReportSubscription;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('private');
 
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -28,7 +29,6 @@ beforeEach(function () {
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $employeeUser->id,
         'employee_number' => 'EMP95001',
         'work_email' => "worker-{$employeeUser->id}@example.test",

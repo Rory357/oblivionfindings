@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\FleetAssets;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -76,7 +79,23 @@ class FleetBoundedOptionsTest extends TestCase
     {
         $viewer = $this->makeUser(['fleet.viewAny']);
         $manager = $this->makeUser(['fleet.viewAny', 'fleet.manage']);
-        Device::factory()->tracking()->count(25)->create(['provider' => 'Searchable Provider']);
+        $site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $manager->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subMonth(),
+        ]);
+        $devices = Device::factory()->tracking()->count(25)->create(['provider' => 'Searchable Provider']);
+        foreach ($devices as $device) {
+            DeviceAssignment::query()->create([
+                'device_id' => $device->id,
+                'assignable_type' => DeviceAssignment::TARGET_SITE,
+                'assignable_id' => $site->id,
+                'assigned_at' => now(),
+            ]);
+        }
 
         $this->actingAs($viewer)
             ->getJson('/fleet-assets/devices/options/search?type=devices&q=Searchable')

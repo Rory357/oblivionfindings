@@ -2,22 +2,19 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Services\WorkforceAnalyticsService;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AnalyticsDashboardController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly WorkforceAnalyticsService $analyticsService,
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Index — workforce analytics dashboard                              */
+    /*  Index — workforce analytics dashboard */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -25,14 +22,12 @@ class AnalyticsDashboardController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.analytics.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $headcountTrend = $this->analyticsService->getHeadcountTrend($tenantId, 12);
-        $turnoverRate = $this->analyticsService->getTurnoverRate($tenantId, 'year');
-        $tenureBrackets = $this->analyticsService->getTenureBrackets($tenantId);
-        $complianceScore = $this->analyticsService->getComplianceScore($tenantId);
-        $leaveUtilization = $this->analyticsService->getLeaveUtilization($tenantId);
-        $departmentBreakdown = $this->analyticsService->getDepartmentBreakdown($tenantId);
+        $headcountTrend = $this->analyticsService->getHeadcountTrend(12);
+        $turnoverRate = $this->analyticsService->getTurnoverRate('year');
+        $tenureBrackets = $this->analyticsService->getTenureBrackets();
+        $complianceScore = $this->analyticsService->getComplianceScore();
+        $leaveUtilization = $this->analyticsService->getLeaveUtilization();
+        $departmentBreakdown = $this->analyticsService->getDepartmentBreakdown();
 
         $currentHeadcount = ! empty($headcountTrend)
             ? $headcountTrend[count($headcountTrend) - 1]['count']
@@ -80,6 +75,6 @@ class AnalyticsDashboardController extends Controller
 
         $avg = round($total / $count, 1);
 
-        return $avg . ' years';
+        return $avg.' years';
     }
 }

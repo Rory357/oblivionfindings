@@ -1,10 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { PageHero, PageLayout } from '@/components/page';
 import {
     Select,
     SelectContent,
@@ -12,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -122,8 +122,7 @@ export default function ReviewQueuePage({
             {},
             {
                 preserveScroll: true,
-                onSuccess: () =>
-                    router.reload({ only: ['items', 'stats'] }),
+                onSuccess: () => router.reload({ only: ['items', 'stats'] }),
             },
         );
     };

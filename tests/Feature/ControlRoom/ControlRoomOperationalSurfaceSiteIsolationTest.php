@@ -3,6 +3,8 @@
 namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Models\Device as CanonicalDevice;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\AssetAlert;
 use App\Models\AssetGeofence;
@@ -17,6 +19,7 @@ use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -29,6 +32,7 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        $this->seed(SecurityDevicesPermissionsSeeder::class);
     }
 
     public function test_escalation_board_and_mutations_are_limited_to_the_operators_sites(): void
@@ -270,9 +274,29 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
 
     public function test_live_map_limits_devices_sites_geofences_alerts_filters_and_counts_to_the_operators_sites(): void
     {
-        [$siteA, $siteB, $operator] = $this->sitePairAndOperator(['controlRoom.viewAny']);
+        [$siteA, $siteB, $operator] = $this->sitePairAndOperator([
+            'controlRoom.viewAny',
+            'securityDevices.devices.view',
+            'fleet.viewAny',
+        ]);
         $siteA->update(['latitude' => -36.8485, 'longitude' => 174.7633, 'is_active' => true]);
         $siteB->update(['latitude' => -41.2866, 'longitude' => 174.7756, 'is_active' => true]);
+        $visibleAsset = Asset::factory()->vehicle()->forSite($siteA)->create();
+        $hiddenAsset = Asset::factory()->vehicle()->forSite($siteB)->create();
+        $visibleCanonical = $this->canonicalMapTracker(
+            $operator,
+            $visibleAsset,
+            'Visible personal tracker',
+            -36.8485,
+            174.7633,
+        );
+        $hiddenCanonical = $this->canonicalMapTracker(
+            $operator,
+            $hiddenAsset,
+            'Hidden personal tracker',
+            -41.2866,
+            174.7756,
+        );
         $visibleDevice = Device::query()->create([
             'name' => 'Visible personal tracker',
             'type' => Device::TYPE_PERSONAL_TRACKER,
@@ -280,6 +304,7 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             'latitude' => -36.8485,
             'longitude' => 174.7633,
             'status' => 'online',
+            'canonical_device_id' => $visibleCanonical->id,
         ]);
         Device::query()->create([
             'name' => 'Hidden personal tracker',
@@ -288,6 +313,7 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             'latitude' => -41.2866,
             'longitude' => 174.7756,
             'status' => 'offline',
+            'canonical_device_id' => $hiddenCanonical->id,
         ]);
         $visibleGeofence = AssetGeofence::query()->create([
             'site_id' => $siteA->id,
@@ -318,7 +344,7 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('devices', 1)
-                ->where('devices.0.id', $visibleDevice->id)
+                ->where('devices.0.id', $visibleCanonical->id)
                 ->has('sites', 1)
                 ->where('sites.0.id', $siteA->id)
                 ->has('geofences', 1)
@@ -338,19 +364,27 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_live_map_uses_authoritative_device_and_geofence_site_precedence(): void
+    public function test_live_map_uses_canonical_device_truth_and_fails_closed_on_mixed_geofence_provenance(): void
     {
-        [$localSite, $foreignSite, $operator] = $this->sitePairAndOperator(['controlRoom.viewAny']);
+        [$localSite, $foreignSite, $operator] = $this->sitePairAndOperator([
+            'controlRoom.viewAny',
+            'securityDevices.devices.view',
+            'fleet.viewAny',
+        ]);
         $localClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $localSite->id,
         ]);
         $foreignClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $foreignSite->id,
         ]);
-        $localAsset = Asset::factory()->forSite($localSite)->create(['home_site_id' => $localSite->id]);
-        $foreignAsset = Asset::factory()->forSite($foreignSite)->create(['home_site_id' => $foreignSite->id]);
+        $localAsset = Asset::factory()->vehicle()->forSite($localSite)->create(['home_site_id' => $localSite->id]);
+        $foreignAsset = Asset::factory()->vehicle()->forSite($foreignSite)->create(['home_site_id' => $foreignSite->id]);
+
+        $canonicalLocalA = $this->canonicalMapTracker($operator, $localAsset, 'Canonical local A', -36.8010, 174.8010);
+        $canonicalForeignA = $this->canonicalMapTracker($operator, $foreignAsset, 'Canonical foreign A', -36.8020, 174.8020);
+        $canonicalLocalB = $this->canonicalMapTracker($operator, $localAsset, 'Canonical local B', -36.8030, 174.8030);
+        $canonicalForeignB = $this->canonicalMapTracker($operator, $foreignAsset, 'Canonical foreign B', -36.8040, 174.8040);
+        $canonicalLocalC = $this->canonicalMapTracker($operator, $localAsset, 'Canonical local C', -36.8050, 174.8050);
 
         $recordSiteWins = Device::query()->create([
             'name' => 'Local record site with foreign fallbacks',
@@ -361,6 +395,7 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             'latitude' => -36.8010,
             'longitude' => 174.8010,
             'status' => 'online',
+            'canonical_device_id' => $canonicalLocalA->id,
         ]);
         $foreignRecordCannotBeOverridden = Device::query()->create([
             'name' => 'Foreign record site with local fallbacks',
@@ -371,6 +406,7 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             'latitude' => -36.8020,
             'longitude' => 174.8020,
             'status' => 'online',
+            'canonical_device_id' => $canonicalForeignA->id,
         ]);
         $clientWins = Device::query()->create([
             'name' => 'Local client with foreign asset fallback',
@@ -381,6 +417,7 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             'latitude' => -36.8030,
             'longitude' => 174.8030,
             'status' => 'online',
+            'canonical_device_id' => $canonicalLocalB->id,
         ]);
         $foreignClientCannotBeOverridden = Device::query()->create([
             'name' => 'Foreign client with local asset fallback',
@@ -391,6 +428,7 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             'latitude' => -36.8040,
             'longitude' => 174.8040,
             'status' => 'online',
+            'canonical_device_id' => $canonicalForeignB->id,
         ]);
         $assetFallback = Device::query()->create([
             'name' => 'Local asset-only fallback',
@@ -401,6 +439,18 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             'latitude' => -36.8050,
             'longitude' => 174.8050,
             'status' => 'online',
+            'canonical_device_id' => $canonicalLocalC->id,
+        ]);
+
+        $siteOnlyFence = AssetGeofence::query()->create([
+            'site_id' => $localSite->id,
+            'asset_id' => null,
+            'name' => 'Local Site boundary',
+            'type' => 'circle',
+            'scope' => 'vehicle',
+            'shape' => ['center' => ['lat' => -36.79, 'lng' => 174.79], 'radius_m' => 100],
+            'breach_type' => 'both',
+            'is_active' => true,
         ]);
 
         $recordSiteFence = AssetGeofence::query()->create([
@@ -447,82 +497,93 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
                     ->pluck('id')
                     ->sort()
                     ->values()
-                    ->all() === collect([$recordSiteWins->id, $clientWins->id, $assetFallback->id])
+                    ->all() === collect([$canonicalLocalA->id, $canonicalLocalB->id, $canonicalLocalC->id])
                     ->sort()
                     ->values()
                     ->all())
                 ->where('devices', fn ($devices) => ! collect($devices)
                     ->pluck('id')
-                    ->contains($foreignRecordCannotBeOverridden->id))
+                    ->contains($canonicalForeignA->id))
                 ->where('devices', fn ($devices) => ! collect($devices)
                     ->pluck('id')
-                    ->contains($foreignClientCannotBeOverridden->id))
+                    ->contains($canonicalForeignB->id))
                 ->where('geofences', fn ($geofences) => collect($geofences)
                     ->pluck('id')
                     ->sort()
                     ->values()
-                    ->all() === collect([$recordSiteFence->id, $assetFallbackFence->id])
+                    ->all() === collect([$siteOnlyFence->id, $assetFallbackFence->id])
                     ->sort()
                     ->values()
                     ->all())
                 ->where('geofences', fn ($geofences) => ! collect($geofences)
                     ->pluck('id')
                     ->contains($foreignFenceCannotBeOverridden->id))
+                ->where('geofences', fn ($geofences) => ! collect($geofences)
+                    ->pluck('id')
+                    ->contains($recordSiteFence->id))
                 ->has('alerts', 1)
                 ->where('alerts.0.id', $localAlertWithForeignDevice->id)
                 ->where('alerts.0.device_id', null)
                 ->where('alerts.0.latitude', null)
                 ->where('alerts.0.longitude', null)
-                ->where('alerts.0.asset_name', null)
+                ->missing('alerts.0.asset_name')
                 ->where('stats.total_devices', 3)
             );
     }
 
-    public function test_live_map_report_bypass_remains_tenant_scoped(): void
+    public function test_live_map_report_bypass_uses_application_sites_and_intersects_source_permissions(): void
     {
         $localSite = Site::factory()->create([
-            'tenant_id' => 1,
             'latitude' => -36.8500,
             'longitude' => 174.7500,
         ]);
-        $outsideSite = Site::factory()->create([
-            'tenant_id' => 202,
+        $otherSite = Site::factory()->create([
             'latitude' => -41.2800,
             'longitude' => 174.7700,
         ]);
-        $operator = $this->siteBoundOperator($localSite, ['controlRoom.viewAny', 'reports.viewAny']);
-        $localAsset = Asset::factory()->forSite($localSite)->create(['home_site_id' => $localSite->id]);
-        $outsideAsset = Asset::factory()->forSite($outsideSite)->create(['home_site_id' => $outsideSite->id]);
+        $operator = $this->siteBoundOperator($localSite, [
+            'controlRoom.viewAny',
+            'reports.viewAny',
+            'securityDevices.devices.view',
+            'securityDevices.devices.viewAllSites',
+            'fleet.viewAny',
+        ]);
+        $localAsset = Asset::factory()->vehicle()->forSite($localSite)->create(['home_site_id' => $localSite->id]);
+        $otherAsset = Asset::factory()->vehicle()->forSite($otherSite)->create(['home_site_id' => $otherSite->id]);
+        $localCanonical = $this->canonicalMapTracker($operator, $localAsset, 'Local map tracker', -36.8500, 174.7500);
+        $otherCanonical = $this->canonicalMapTracker($operator, $otherAsset, 'Other Site map tracker', -41.2800, 174.7700);
         $localDevice = Device::query()->create([
-            'name' => 'Tenant map tracker',
-            'type' => Device::TYPE_PERSONAL_TRACKER,
+            'name' => 'Local signal projection',
+            'type' => Device::TYPE_VEHICLE_TRACKER,
             'site_id' => $localSite->id,
             'latitude' => -36.8500,
             'longitude' => 174.7500,
             'status' => 'online',
+            'canonical_device_id' => $localCanonical->id,
         ]);
-        $outsideDevice = Device::query()->create([
-            'name' => 'Outside tenant tracker',
-            'type' => Device::TYPE_PERSONAL_TRACKER,
-            'site_id' => $outsideSite->id,
+        $otherDevice = Device::query()->create([
+            'name' => 'Other Site signal projection',
+            'type' => Device::TYPE_VEHICLE_TRACKER,
+            'site_id' => $otherSite->id,
             'latitude' => -41.2800,
             'longitude' => 174.7700,
             'status' => 'online',
+            'canonical_device_id' => $otherCanonical->id,
         ]);
         $localFence = AssetGeofence::query()->create([
             'site_id' => null,
             'asset_id' => $localAsset->id,
-            'name' => 'Tenant fallback fence',
+            'name' => 'Local fallback fence',
             'type' => 'circle',
             'scope' => 'vehicle',
             'shape' => ['center' => ['lat' => -36.85, 'lng' => 174.75], 'radius_m' => 100],
             'breach_type' => 'both',
             'is_active' => true,
         ]);
-        $outsideFence = AssetGeofence::query()->create([
+        $otherFence = AssetGeofence::query()->create([
             'site_id' => null,
-            'asset_id' => $outsideAsset->id,
-            'name' => 'Outside tenant fallback fence',
+            'asset_id' => $otherAsset->id,
+            'name' => 'Other Site fallback fence',
             'type' => 'circle',
             'scope' => 'vehicle',
             'shape' => ['center' => ['lat' => -41.28, 'lng' => 174.77], 'radius_m' => 100],
@@ -534,17 +595,22 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
             ->get('/control-room/map')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('devices', fn ($devices) => collect($devices)->pluck('id')->all() === [$localDevice->id])
-                ->where('devices', fn ($devices) => ! collect($devices)->pluck('id')->contains($outsideDevice->id))
-                ->where('geofences', fn ($geofences) => collect($geofences)->pluck('id')->all() === [$localFence->id])
-                ->where('geofences', fn ($geofences) => ! collect($geofences)->pluck('id')->contains($outsideFence->id))
-                ->where('all_sites', fn ($sites) => collect($sites)->pluck('id')->all() === [$localSite->id])
-                ->where('stats.total_devices', 1)
+                ->where('devices', fn ($devices) => collect($devices)->pluck('id')->sort()->values()->all()
+                    === collect([$localCanonical->id, $otherCanonical->id])->sort()->values()->all())
+                ->where('geofences', fn ($geofences) => collect($geofences)->pluck('id')->sort()->values()->all()
+                    === collect([$localFence->id, $otherFence->id])->sort()->values()->all())
+                ->where('all_sites', fn ($sites) => collect($sites)->pluck('id')->sort()->values()->all()
+                    === collect([$localSite->id, $otherSite->id])->sort()->values()->all())
+                ->where('stats.total_devices', 2)
             );
 
         $this->actingAs($operator)
-            ->get('/control-room/map?site_id='.$outsideSite->id)
-            ->assertForbidden();
+            ->get('/control-room/map?site_id='.$otherSite->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('devices', 1)
+                ->where('devices.0.id', $otherCanonical->id)
+            );
     }
 
     public function test_sla_counts_and_breach_rows_are_limited_to_the_operators_sites(): void
@@ -680,5 +746,31 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
         ]);
 
         return $operator;
+    }
+
+    private function canonicalMapTracker(
+        User $operator,
+        Asset $asset,
+        string $name,
+        float $latitude,
+        float $longitude,
+    ): CanonicalDevice {
+        $device = CanonicalDevice::factory()->tracking()->create([
+            'name' => $name,
+            'category' => 'vehicle_tracker',
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+            'last_seen_at' => now()->subMinute(),
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
+            'assignable_id' => $asset->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $operator->id,
+        ]);
+
+        return $device;
     }
 }

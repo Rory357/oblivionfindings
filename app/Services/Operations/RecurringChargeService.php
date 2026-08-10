@@ -8,19 +8,30 @@ use Carbon\Carbon;
 
 class RecurringChargeService
 {
-    public function processDueCharges(int $organizationId): int
+    public function processDueCharges(): int
     {
         $today = now()->toDateString();
 
         // Columns are is_active / next_charge_at (the service previously queried
         // non-existent active / next_charge_date, so it matched zero rows). Skip
         // charges whose end date has passed.
-        $charges = RecurringCharge::where('organization_id', $organizationId)
-            ->where('is_active', true)
+        $charges = RecurringCharge::where('is_active', true)
+            ->whereHas('client', fn ($clientQuery) => $clientQuery
+                ->whereNotNull('site_id')
+                ->whereHas('site', fn ($siteQuery) => $siteQuery
+                    ->active()
+                    ->notArchived()
+                    ->whereNull('archived_at')))
+            ->where(function ($query): void {
+                $query->whereNull('service_agreement_id')
+                    ->orWhereHas('serviceAgreement', fn ($agreementQuery) => $agreementQuery
+                        ->whereColumn('service_agreements.client_id', 'recurring_charges.client_id'));
+            })
             ->whereDate('next_charge_at', '<=', $today)
             ->where(function ($q) use ($today) {
                 $q->whereNull('ends_at')->orWhereDate('ends_at', '>=', $today);
             })
+            ->with('client:id,site_id')
             ->get();
 
         $processed = 0;
@@ -29,8 +40,8 @@ class RecurringChargeService
             $chargeDate = $charge->next_charge_at->toDateString();
 
             BillingEntry::create([
-                'organization_id' => $charge->organization_id,
                 'client_id' => $charge->client_id,
+                'site_id' => $charge->client->site_id,
                 'service_agreement_id' => $charge->service_agreement_id,
                 // Automated charge — no delivering staff member (column now nullable).
                 'staff_id' => $charge->created_by,

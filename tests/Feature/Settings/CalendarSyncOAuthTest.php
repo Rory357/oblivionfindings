@@ -3,14 +3,16 @@
 use App\Models\CalendarSyncConnection;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function calSyncOauthAdmin(): User
@@ -23,7 +25,7 @@ function calSyncOauthAdmin(): User
 
 function fakeCalendarSocialite(string $provider, array $attributes): void
 {
-    $oauthUser = (new SocialiteUser())->map($attributes);
+    $oauthUser = (new SocialiteUser)->map($attributes);
     $oauthUser->setRaw($attributes);
     $oauthUser->setToken($provider.'-access');
     $oauthUser->setRefreshToken($provider.'-refresh');
@@ -55,7 +57,7 @@ test('the admin OAuth callback stores a connected connection with encrypted toke
         ->and($conn->getRefreshToken())->toBe('google-refresh');
 
     // Tokens are encrypted at rest (the raw column is not the plaintext).
-    $raw = \Illuminate\Support\Facades\DB::table('calendar_sync_connections')->value('access_token');
+    $raw = DB::table('calendar_sync_connections')->value('access_token');
     expect($raw)->not->toBe('google-access');
 });
 
@@ -72,10 +74,15 @@ test('the OAuth callback is gated by the manage-integrations permission', functi
 
 test('disconnect removes the connection', function () {
     CalendarSyncConnection::create([
-        'tenant_id' => 0,
         'provider' => 'microsoft',
         'status' => CalendarSyncConnection::STATUS_CONNECTED,
         'access_token' => 'tok',
+        'token_expires_at' => now()->addHour(),
+    ]);
+    CalendarSyncConnection::create([
+        'provider' => 'google',
+        'status' => CalendarSyncConnection::STATUS_CONNECTED,
+        'access_token' => 'google-token',
         'token_expires_at' => now()->addHour(),
     ]);
 
@@ -83,7 +90,33 @@ test('disconnect removes the connection', function () {
         ->delete(route('settings.calendar-sync.disconnect', ['provider' => 'microsoft']))
         ->assertRedirect(route('settings.calendar-sync'));
 
-    expect(CalendarSyncConnection::where('provider', 'microsoft')->count())->toBe(0);
+    expect(CalendarSyncConnection::where('provider', 'microsoft')->count())->toBe(0)
+        ->and(CalendarSyncConnection::where('provider', 'google')->count())->toBe(1);
+});
+
+test('the OAuth callback updates the one application connection for a provider', function () {
+    $connection = CalendarSyncConnection::create([
+        'provider' => 'google',
+        'status' => CalendarSyncConnection::STATUS_ERROR,
+        'access_token' => 'expired',
+        'last_error' => 'Token expired',
+    ]);
+
+    fakeCalendarSocialite('google', [
+        'id' => 'g-2',
+        'name' => 'Replacement Calendar Admin',
+        'email' => 'replacement@org.test',
+    ]);
+
+    $this->actingAs(calSyncOauthAdmin())
+        ->get(route('settings.calendar-sync.callback', ['provider' => 'google']))
+        ->assertRedirect(route('settings.calendar-sync'))
+        ->assertSessionHas('success');
+
+    expect(CalendarSyncConnection::query()->count())->toBe(1)
+        ->and($connection->fresh()->status)->toBe(CalendarSyncConnection::STATUS_CONNECTED)
+        ->and($connection->fresh()->account_email)->toBe('replacement@org.test')
+        ->and($connection->fresh()->last_error)->toBeNull();
 });
 
 test('connecting an unconfigured provider redirects back with an error', function () {

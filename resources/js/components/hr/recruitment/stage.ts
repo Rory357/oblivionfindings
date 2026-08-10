@@ -123,7 +123,8 @@ const AVATAR_HUES = [18, 52, 128, 150, 195, 220, 255, 277, 305, 340];
 
 export function avatarHue(seed: string): number {
     let h = 0;
-    for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+    for (let i = 0; i < seed.length; i++)
+        h = (h * 31 + seed.charCodeAt(i)) >>> 0;
     return AVATAR_HUES[h % AVATAR_HUES.length];
 }
 
@@ -155,9 +156,7 @@ export function initials(name: string): string {
 /* ------------------------------------------------------------------ */
 
 export function formatKey(key: string): string {
-    return key
-        .replace(/[_-]/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+    return key.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 const NZD = new Intl.NumberFormat('en-NZ', {

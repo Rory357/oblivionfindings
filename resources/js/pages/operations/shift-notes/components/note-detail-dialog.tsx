@@ -24,6 +24,8 @@ import {
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     HueAvatar,
     NOTE_TYPES,
@@ -38,8 +40,6 @@ import {
     shiftRole,
     typeMeta,
 } from './shared';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 type CurrentUser = { id: number; name: string; is_manager: boolean };
 
@@ -47,7 +47,8 @@ const DAY_MS = 86400000;
 
 function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             type="button"
             role="switch"
             aria-checked={on}
@@ -254,7 +255,8 @@ export function NoteDetailDialog({
                             {fmtClock(note.created_at)}
                         </div>
                     </div>
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         onClick={() => onOpenChange(false)}
                         aria-label="Close"
@@ -427,7 +429,8 @@ export function NoteDetailDialog({
                         <>
                             <div className="flex items-center gap-2">
                                 {!note.reviewed_at ? (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         type="button"
                                         onClick={() => onReview(note)}
                                         className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
@@ -436,7 +439,8 @@ export function NoteDetailDialog({
                                         Mark reviewed
                                     </GuardrailButton>
                                 ) : null}
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => onFlag(note)}
                                     className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
@@ -446,7 +450,8 @@ export function NoteDetailDialog({
                                 </GuardrailButton>
                             </div>
                             <div className="flex items-center gap-2">
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => onOpenChange(false)}
                                     className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
@@ -454,7 +459,8 @@ export function NoteDetailDialog({
                                     Close
                                 </GuardrailButton>
                                 {note.can_edit ? (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         type="button"
                                         onClick={() => setEditing(true)}
                                         className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
@@ -483,14 +489,16 @@ export function NoteDetailDialog({
                                     : `Editing as ${currentUser.name}`}
                             </div>
                             <div className="flex items-center gap-2">
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => setEditing(false)}
                                     className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                                 >
                                     Cancel
                                 </GuardrailButton>
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={save}
                                     disabled={saving || !draft.body.trim()}
@@ -529,7 +537,10 @@ function ToggleRow({
     onToggle: () => void;
 }) {
     return (
-        <GuardrailCard unstyled className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5">
+        <GuardrailCard
+            unstyled
+            className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5"
+        >
             <span className="inline-flex items-center gap-2 text-[13px] font-medium">
                 {icon}
                 {label}

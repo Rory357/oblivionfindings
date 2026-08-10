@@ -4,22 +4,21 @@ namespace Database\Seeders;
 
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrApplication;
+use App\Domain\Hr\Models\HrApprovalChain;
 use App\Domain\Hr\Models\HrAsset;
 use App\Domain\Hr\Models\HrAssetAssignment;
-use App\Domain\Hr\Models\HrApprovalChain;
 use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBenefitPlan;
 use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrCandidate;
-use App\Domain\Hr\Models\HrCompensationReview;
-use App\Domain\Hr\Models\HrDriverEligibility;
-use App\Domain\Hr\Models\HrSalaryBand;
-use App\Domain\Hr\Models\HrSavedReport;
-use App\Models\StaffBackgroundCheck;
 use App\Domain\Hr\Models\HrCase;
+use App\Domain\Hr\Models\HrCompensationReview;
 use App\Domain\Hr\Models\HrCourse;
+use App\Domain\Hr\Models\HrCourseAssignment;
 use App\Domain\Hr\Models\HrCourseEnrollment;
+use App\Domain\Hr\Models\HrCourseSession;
 use App\Domain\Hr\Models\HrDocument;
+use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrFeedPost;
@@ -27,9 +26,12 @@ use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Models\HrSalaryBand;
+use App\Domain\Hr\Models\HrSavedReport;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\FeedService;
+use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -134,9 +136,8 @@ class HrDemoSeeder extends Seeder
 
         foreach ($chains as $chainData) {
             $chain = HrApprovalChain::updateOrCreate(
-                ['tenant_id' => $tenantId, 'name' => $chainData['name']],
+                ['process_type' => $chainData['process_type'], 'name' => $chainData['name']],
                 [
-                    'process_type' => $chainData['process_type'],
                     'is_active' => true,
                     'created_by' => $admin->id,
                 ],
@@ -152,7 +153,7 @@ class HrDemoSeeder extends Seeder
             );
         }
 
-        // Saved reports (tenant_id null to match the controller's current scope).
+        // Creator-owned reusable report definitions.
         $reports = [
             ['name' => 'Active Staff', 'type' => 'employee', 'fields' => ['employee_number', 'name', 'position_title', 'department']],
             ['name' => 'Leave Register', 'type' => 'leave', 'fields' => ['employee_name', 'leave_type', 'start_date', 'end_date', 'status']],
@@ -160,12 +161,11 @@ class HrDemoSeeder extends Seeder
 
         foreach ($reports as $report) {
             HrSavedReport::updateOrCreate(
-                ['tenant_id' => null, 'name' => $report['name']],
+                ['created_by' => $admin->id, 'name' => $report['name']],
                 [
                     'report_type' => $report['type'],
                     'fields' => $report['fields'],
                     'sort_direction' => 'asc',
-                    'created_by' => $admin->id,
                 ],
             );
         }
@@ -328,7 +328,7 @@ class HrDemoSeeder extends Seeder
 
         // A handful of peer kudos (each also creates a kudos feed post).
         $feed = app(FeedService::class);
-        $givers = collect([$manager, $admin])->merge($workers)->values();
+        $givers = $workers;
         $kudos = [
             ['category' => 'teamwork', 'message' => 'Stepped in to cover a short-notice sleepover — huge help to the team.'],
             ['category' => 'going_above', 'message' => 'Stayed back to support a client through a tough evening. Above and beyond.'],
@@ -347,7 +347,7 @@ class HrDemoSeeder extends Seeder
                 continue; // not enough distinct users
             }
 
-            $feed->sendKudos($from, $to->id, $entry['category'], $entry['message'], $tenantId);
+            $feed->sendKudos($from, $to->id, $entry['category'], $entry['message']);
         }
     }
 
@@ -866,7 +866,7 @@ class HrDemoSeeder extends Seeder
 
         // Upcoming sessions for the in-person / blended courses.
         foreach (array_slice($createdCourses, 0, 2) as $offset => $course) {
-            \App\Domain\Hr\Models\HrCourseSession::updateOrCreate(
+            HrCourseSession::updateOrCreate(
                 ['tenant_id' => $tenantId, 'course_id' => $course->id, 'session_date' => Carbon::now()->addDays(7 + $offset * 7)->toDateString()],
                 [
                     'start_time' => '09:00',
@@ -883,7 +883,7 @@ class HrDemoSeeder extends Seeder
         foreach ($profiles as $i => $profile) {
             $course = $createdCourses[$i % count($createdCourses)];
             $overdue = $i % 3 === 0;
-            \App\Domain\Hr\Models\HrCourseAssignment::updateOrCreate(
+            HrCourseAssignment::updateOrCreate(
                 ['tenant_id' => $tenantId, 'user_id' => $profile->user_id, 'hr_course_id' => $course->id],
                 [
                     'source' => ['manual', 'role_rule', 'hs_requirement'][$i % 3],

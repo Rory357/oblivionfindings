@@ -22,7 +22,12 @@ import {
 export type ClientOption = { id: number; name: string; site_id: number | null };
 export type SiteOption = { id: number; name: string };
 export type StaffOption = { id: number; name: string };
-export type IncidentOption = { id: number; client_id: number | null; reference: string; label: string };
+export type IncidentOption = {
+    id: number;
+    client_id: number | null;
+    reference: string;
+    label: string;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Row + detail types (mirror RestraintController serializers)        */
@@ -102,8 +107,17 @@ export type EventDetail = {
     deviation_reason: string | null;
     staff_involved: EventStaff[];
     authorised_by: EntityRef | null;
-    plan: { id: number; reference: string; title: string; status: string } | null;
-    related_incident: { id: number; reference: string; type: string | null } | null;
+    plan: {
+        id: number;
+        reference: string;
+        title: string;
+        status: string;
+    } | null;
+    related_incident: {
+        id: number;
+        reference: string;
+        type: string | null;
+    } | null;
     reviewed_at: string | null;
     reviewed_by: EntityRef | null;
     review_notes: string | null;
@@ -163,14 +177,43 @@ export type RestraintFilters = {
 };
 
 export type RestraintHero = {
-    live: { events_30d: number; out_of_plan: number; injuries: number; critical: number };
-    attention: { unreviewed: number; plans_review_due: number; plans_under_review: number; clients_no_active_bsp: number };
-    badges: { unreviewed: number; plans_overdue: number; nga_paerewa_certified: boolean; reduction_trend_pct: number };
+    live: {
+        events_30d: number;
+        out_of_plan: number;
+        injuries: number;
+        critical: number;
+    };
+    attention: {
+        unreviewed: number;
+        plans_review_due: number;
+        plans_under_review: number;
+        clients_no_active_bsp: number;
+    };
+    badges: {
+        unreviewed: number;
+        plans_overdue: number;
+        nga_paerewa_certified: boolean;
+        reduction_trend_pct: number;
+    };
 };
 
 export type RestraintTabCounts = {
-    events: { all: number; unreviewed: number; out_of_plan: number; injury: number; critical: number; '30d': number };
-    plans: { all: number; active: number; draft: number; review_due: number; under_review: number; archived: number };
+    events: {
+        all: number;
+        unreviewed: number;
+        out_of_plan: number;
+        injury: number;
+        critical: number;
+        '30d': number;
+    };
+    plans: {
+        all: number;
+        active: number;
+        draft: number;
+        review_due: number;
+        under_review: number;
+        archived: number;
+    };
 };
 
 /* ------------------------------------------------------------------ */
@@ -205,19 +248,57 @@ export const ICON_TEXT: Record<ChipTone, string> = {
 
 /* ---- restraint / restrictive-practice type ---- */
 
-export type TypeMeta = { label: string; icon: LucideIcon; tone: ChipTone; blurb: string };
+export type TypeMeta = {
+    label: string;
+    icon: LucideIcon;
+    tone: ChipTone;
+    blurb: string;
+};
 
 export const RESTRAINT_TYPE_META: Record<string, TypeMeta> = {
-    physical: { label: 'Physical', icon: Hand, tone: 'critical', blurb: 'Bodily holding or restriction of movement' },
-    chemical: { label: 'Chemical', icon: Pill, tone: 'warning', blurb: 'Medication used to control behaviour' },
-    mechanical: { label: 'Mechanical', icon: Link2, tone: 'warning', blurb: 'Device or equipment restricting movement' },
-    seclusion: { label: 'Seclusion', icon: DoorClosed, tone: 'critical', blurb: 'Confinement alone in a room or area' },
-    environmental: { label: 'Environmental', icon: Fence, tone: 'info', blurb: 'Restricting access to space or items' },
+    physical: {
+        label: 'Physical',
+        icon: Hand,
+        tone: 'critical',
+        blurb: 'Bodily holding or restriction of movement',
+    },
+    chemical: {
+        label: 'Chemical',
+        icon: Pill,
+        tone: 'warning',
+        blurb: 'Medication used to control behaviour',
+    },
+    mechanical: {
+        label: 'Mechanical',
+        icon: Link2,
+        tone: 'warning',
+        blurb: 'Device or equipment restricting movement',
+    },
+    seclusion: {
+        label: 'Seclusion',
+        icon: DoorClosed,
+        tone: 'critical',
+        blurb: 'Confinement alone in a room or area',
+    },
+    environmental: {
+        label: 'Environmental',
+        icon: Fence,
+        tone: 'info',
+        blurb: 'Restricting access to space or items',
+    },
 };
 
 export function typeMeta(type: string | null | undefined): TypeMeta {
-    if (!type) return { label: '—', icon: ShieldAlert, tone: 'neutral', blurb: '' };
-    return RESTRAINT_TYPE_META[type] ?? { label: titleCase(type), icon: ShieldAlert, tone: 'neutral', blurb: '' };
+    if (!type)
+        return { label: '—', icon: ShieldAlert, tone: 'neutral', blurb: '' };
+    return (
+        RESTRAINT_TYPE_META[type] ?? {
+            label: titleCase(type),
+            icon: ShieldAlert,
+            tone: 'neutral',
+            blurb: '',
+        }
+    );
 }
 
 export const RESTRAINT_TYPE_OPTIONS = [
@@ -237,7 +318,10 @@ export const SEVERITY_TONE: Record<string, ChipTone> = {
     critical: 'critical',
 };
 
-export function severityMeta(s: string | null | undefined): { label: string; tone: ChipTone } {
+export function severityMeta(s: string | null | undefined): {
+    label: string;
+    tone: ChipTone;
+} {
     if (!s) return { label: '—', tone: 'neutral' };
     return { label: titleCase(s), tone: SEVERITY_TONE[s] ?? 'neutral' };
 }
@@ -262,10 +346,19 @@ export const PLAN_STATUS_META: Record<string, StatusMeta> = {
 
 export function planStatusMeta(status: string | null | undefined): StatusMeta {
     if (!status) return PLAN_STATUS_META.draft;
-    return PLAN_STATUS_META[status] ?? { label: titleCase(status), icon: FileEdit, tone: 'neutral' };
+    return (
+        PLAN_STATUS_META[status] ?? {
+            label: titleCase(status),
+            icon: FileEdit,
+            tone: 'neutral',
+        }
+    );
 }
 
-export const REVIEW_STATE_META: Record<string, { label: string; tone: ChipTone }> = {
+export const REVIEW_STATE_META: Record<
+    string,
+    { label: string; tone: ChipTone }
+> = {
     ok: { label: 'On track', tone: 'success' },
     due: { label: 'Review due', tone: 'warning' },
     overdue: { label: 'Review overdue', tone: 'critical' },
@@ -281,9 +374,10 @@ export const PLAN_REVIEW_OUTCOME_OPTIONS = [
     { value: 'escalated', label: 'Escalate for specialist review' },
 ];
 
-export const PLAN_REVIEW_OUTCOME_LABEL: Record<string, string> = Object.fromEntries(
-    PLAN_REVIEW_OUTCOME_OPTIONS.map((o) => [o.value, o.label]),
-);
+export const PLAN_REVIEW_OUTCOME_LABEL: Record<string, string> =
+    Object.fromEntries(
+        PLAN_REVIEW_OUTCOME_OPTIONS.map((o) => [o.value, o.label]),
+    );
 
 /* ---- attachment categories (premium evidence upload) ---- */
 
@@ -295,9 +389,10 @@ export const ATTACHMENT_CATEGORY_OPTIONS = [
     { value: 'other', label: 'Other' },
 ];
 
-export const ATTACHMENT_CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
-    ATTACHMENT_CATEGORY_OPTIONS.map((o) => [o.value, o.label]),
-);
+export const ATTACHMENT_CATEGORY_LABEL: Record<string, string> =
+    Object.fromEntries(
+        ATTACHMENT_CATEGORY_OPTIONS.map((o) => [o.value, o.label]),
+    );
 
 export const PERIOD_ITEMS = [
     { key: 'week', label: 'This week' },
@@ -316,17 +411,27 @@ export function titleCase(s: string): string {
 
 export function fmtDate(iso: string | null | undefined): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+    });
 }
 
 export function fmtDateFull(iso: string | null | undefined): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 export function fmtTime(iso: string | null | undefined): string {
     if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString('en-NZ', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 export function fmtDateTime(iso: string | null | undefined): string {

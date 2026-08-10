@@ -1,5 +1,8 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import GlobalNavSearch from '@/components/global-nav-search';
+import GlobalQueryBar from '@/components/global-query-bar';
 import { Icon } from '@/components/icon';
+import InboxMenus from '@/components/inbox-menus';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,9 +30,6 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { UserMenuContent } from '@/components/user-menu-content';
-import GlobalNavSearch from '@/components/global-nav-search';
-import GlobalQueryBar from '@/components/global-query-bar';
-import InboxMenus from '@/components/inbox-menus';
 import { useInitials } from '@/hooks/use-initials';
 import { cn, isSameUrl, resolveUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
@@ -60,8 +60,7 @@ const rightNavItems: NavItem[] = [
     },
 ];
 
-const activeItemStyles =
-    'text-foreground dark:bg-muted dark:text-foreground';
+const activeItemStyles = 'text-foreground dark:bg-muted dark:text-foreground';
 
 interface AppHeaderProps {
     breadcrumbs?: BreadcrumbItem[];

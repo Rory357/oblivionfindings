@@ -4,10 +4,13 @@ namespace App\Models\Integration;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
+use App\Models\ControlRoom\Alert;
 use App\Models\ControlRoomAlert;
 use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
+use Database\Factories\IntegrationEventFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,17 +18,19 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class IntegrationEvent extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
+    use WritesLegacyStorageContext;
 
     public const SEVERITY_INFO = 'info';
+
     public const SEVERITY_WARN = 'warn';
+
     public const SEVERITY_CRITICAL = 'critical';
 
     protected $table = 'integration_events';
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'room_id',
         'hardware_id',
@@ -104,21 +109,12 @@ class IntegrationEvent extends Model
         // Return a hasOne on the deprecated integration_alerts table.
         // This will return null for new events routed through the signal pipeline.
         // Use controlRoomAlert() for the canonical alert.
-        return $this->hasOne(\App\Models\ControlRoom\Alert::class, 'integration_event_id');
+        return $this->hasOne(Alert::class, 'integration_event_id');
     }
 
     /* ---------------------------------------------------------------
      * Scopes
      * ------------------------------------------------------------- */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeCritical($query)
     {
@@ -146,8 +142,8 @@ class IntegrationEvent extends Model
      * Required because the model namespace (App\Models\Integration) doesn't
      * match the default factory namespace convention.
      */
-    protected static function newFactory(): \Database\Factories\IntegrationEventFactory
+    protected static function newFactory(): IntegrationEventFactory
     {
-        return \Database\Factories\IntegrationEventFactory::new();
+        return IntegrationEventFactory::new();
     }
 }

@@ -3,7 +3,9 @@
 namespace Database\Seeders;
 
 use App\Models\Queclink\QueclinkPreset;
+use App\Services\Queclink\QueclinkConfigurationProfileService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Ships the built-in Queclink configuration presets. Idempotent — safe to run
@@ -16,20 +18,57 @@ use Illuminate\Database\Seeder;
  */
 class QueclinkPresetSeeder extends Seeder
 {
-    public function run(): void
+    public function run(QueclinkConfigurationProfileService $profiles): void
     {
         foreach ($this->systemPresets() as $preset) {
-            QueclinkPreset::query()->updateOrCreate(
-                ['slug' => $preset['slug'], 'is_system' => true],
-                [
+            DB::transaction(function () use ($preset, $profiles): void {
+                $wrapper = QueclinkPreset::query()
+                    ->where('slug', $preset['slug'])
+                    ->where('is_system', true)
+                    ->lockForUpdate()
+                    ->first();
+                $payload = $profiles->normaliseSections($preset['payload']);
+                $current = $wrapper?->configurationProfile()->first();
+                if ($current === null || ! hash_equals($current->payload_hash, $current::hashPayload($payload))) {
+                    $next = $profiles->createProfile(
+                        profileKey: QueclinkConfigurationProfileService::profileKey($preset['slug']),
+                        name: $preset['name'],
+                        description: $preset['description'],
+                        targetCategory: 'personal_tracker',
+                        sections: $payload,
+                        isSystem: true,
+                        createdByUserId: null,
+                    );
+                    $current?->retire();
+                    $current = $next;
+                }
+
+                if ($wrapper === null) {
+                    QueclinkPreset::query()->create([
+                        'device_configuration_profile_id' => $current->id,
+                        'tenant_id' => null,
+                        'name' => $preset['name'],
+                        'slug' => $preset['slug'],
+                        'description' => $preset['description'],
+                        'target_category' => 'personal_tracker',
+                        'payload' => [],
+                        'is_system' => true,
+                        'created_by_user_id' => null,
+                    ]);
+
+                    return;
+                }
+
+                $wrapper->forceFill([
+                    'device_configuration_profile_id' => $current->id,
                     'tenant_id' => null,
                     'name' => $preset['name'],
                     'description' => $preset['description'],
                     'target_category' => 'personal_tracker',
-                    'payload' => $preset['payload'],
+                    'payload' => [],
                     'created_by_user_id' => null,
-                ],
-            );
+                ])->save();
+            });
         }
     }
 

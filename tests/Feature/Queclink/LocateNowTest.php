@@ -3,9 +3,9 @@
 namespace Tests\Feature\Queclink;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Queclink\QueclinkDevice;
-use App\Models\Queclink\QueclinkPendingCommand;
-use App\Models\User;
+use App\Models\Site;
 use App\Services\Queclink\LocateNowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -14,15 +14,21 @@ class LocateNowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_locate_now_queues_gl30_request_location_command(): void
+    public function test_locate_now_hands_a_paired_tracker_to_the_governed_management_action(): void
     {
-        $user = User::factory()->create();
+        $site = Site::factory()->create();
         $device = Device::factory()->tracking()->create([
             'provider' => 'queclink',
             'imei' => '861106050000000',
             'device_uid' => '861106050000000',
         ]);
-        $queclinkDevice = QueclinkDevice::create([
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
+        QueclinkDevice::create([
             'imei' => '861106050000000',
             'device_id' => $device->id,
             'tenant_id' => 1,
@@ -30,12 +36,12 @@ class LocateNowTest extends TestCase
             'model_hint' => 'GL30MEU',
         ]);
 
-        $command = app(LocateNowService::class)->queueForDevice($device, $user);
+        $url = app(LocateNowService::class)->managementUrlForDevice($device);
 
-        $this->assertTrue($command->is($queclinkDevice->pendingCommands()->first()));
-        $this->assertSame(QueclinkPendingCommand::STATUS_QUEUED, $command->status);
-        $this->assertSame('GTRTO', $command->command_word);
-        $this->assertStringStartsWith('AT+GTRTO=gl30,1,', $command->raw_command);
-        $this->assertTrue($command->expires_at->isBetween(now()->addMinutes(4), now()->addMinutes(5)->addSecond()));
+        $this->assertSame(
+            "/security-devices/devices/{$device->id}?section=management&action=tracking.location_refresh",
+            $url,
+        );
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 }

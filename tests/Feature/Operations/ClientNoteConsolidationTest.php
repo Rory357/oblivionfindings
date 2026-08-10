@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
 use App\Models\CarePlanGoal;
 use App\Models\Client;
@@ -12,6 +13,7 @@ use App\Models\Permission;
 use App\Models\ProgressNote;
 use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -39,16 +41,37 @@ function grantClientNoteConsolidationPermissions(User $user, array $permissionKe
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
+function clientNoteConsolidationUserAtSite(
+    Site $site,
+    array $permissionKeys,
+    string $role = 'manager',
+): User {
+    $user = User::factory()->create([
+        'approved_at' => now(),
+        'role' => $role,
+    ]);
+    grantClientNoteConsolidationPermissions($user, $permissionKeys);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    return $user;
+}
+
 /**
  * @return array{0: User, 1: Client, 2: CarePlan, 3: CarePlanGoal}
  */
 function makeClientNoteConsolidationGoal(): array
 {
-    $user = User::factory()->create(['organization_id' => 1]);
-    grantClientNoteConsolidationPermissions($user, ['care_plans.update']);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $user = clientNoteConsolidationUserAtSite($site, ['care_plans.update']);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $plan = CarePlan::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Active support plan',
         'status' => 'active',
@@ -56,7 +79,6 @@ function makeClientNoteConsolidationGoal(): array
         'created_by' => $user->id,
     ]);
     $goal = CarePlanGoal::query()->create([
-        'organization_id' => 1,
         'care_plan_id' => $plan->id,
         'client_id' => $client->id,
         'title' => 'Build community confidence',
@@ -71,8 +93,8 @@ function makeClientNoteConsolidationGoal(): array
 it('maps every legacy field timestamp and soft delete to the canonical note', function () {
     [$author, $client, , $goal] = makeClientNoteConsolidationGoal();
     $shift = Shift::factory()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
+        'site_id' => $client->site_id,
         'user_id' => $author->id,
         'created_by' => $author->id,
     ]);
@@ -81,7 +103,6 @@ it('maps every legacy field timestamp and soft delete to the canonical note', fu
     $deletedAt = CarbonImmutable::parse('2025-02-05 06:07:08', 'UTC');
 
     $legacy = ProgressNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'shift_id' => $shift->id,
         'care_plan_goal_id' => $goal->id,
@@ -109,8 +130,7 @@ it('maps every legacy field timestamp and soft delete to the canonical note', fu
         ->where('legacy_progress_note_id', $legacy->id)
         ->firstOrFail();
 
-    expect($canonical->organization_id)->toBe(1)
-        ->and($canonical->client_id)->toBe($client->id)
+    expect($canonical->client_id)->toBe($client->id)
         ->and($canonical->shift_id)->toBe($shift->id)
         ->and($canonical->care_plan_goal_id)->toBe($goal->id)
         ->and($canonical->user_id)->toBe($author->id)
@@ -133,10 +153,10 @@ it('maps every legacy field timestamp and soft delete to the canonical note', fu
 });
 
 it('reruns the migration idempotently using the explicit legacy source id', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $author = User::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $legacy = ProgressNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'author_id' => $author->id,
         'note_type' => 'activity',
@@ -156,10 +176,10 @@ it('reruns the migration idempotently using the explicit legacy source id', func
 });
 
 it('adopts an earlier JSON marker migration instead of duplicating history', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $author = User::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $legacy = ProgressNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'author_id' => $author->id,
         'note_type' => 'communication',
@@ -181,7 +201,6 @@ it('adopts an earlier JSON marker migration instead of duplicating history', fun
         'created_by' => $author->id,
     ]);
     $earlierCanonical = ClientNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'user_id' => $author->id,
         'type' => 'daily_note',
@@ -217,10 +236,10 @@ it('adopts an earlier JSON marker migration instead of duplicating history', fun
 });
 
 it('rebinds the one existing timeline event to the canonical ClientNote', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $author = User::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $legacy = ProgressNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'author_id' => $author->id,
         'note_type' => 'general',
@@ -265,12 +284,12 @@ it('rebinds the one existing timeline event to the canonical ClientNote', functi
 });
 
 it('keeps the legacy POST compatible while writing only ClientNote', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    grantClientNoteConsolidationPermissions($author, [
+    $site = Site::factory()->create();
+    $author = clientNoteConsolidationUserAtSite($site, [
         'clients.viewAny',
         'progress_notes.create',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
 
     $this->actingAs($author)
         ->post('/operations/progress-notes', [
@@ -289,8 +308,7 @@ it('keeps the legacy POST compatible while writing only ClientNote', function ()
         ->where('body', 'Enjoyed music group and chose the closing song.')
         ->sole();
 
-    expect($canonical->organization_id)->toBe(1)
-        ->and($canonical->user_id)->toBe($author->id)
+    expect($canonical->user_id)->toBe($author->id)
         ->and($canonical->type)->toBe('progress_note')
         ->and($canonical->category)->toBe('activity')
         ->and($canonical->mood_rating)->toBe(8)
@@ -299,26 +317,22 @@ it('keeps the legacy POST compatible while writing only ClientNote', function ()
         ->and(ProgressNote::query()->count())->toBe(0);
 });
 
-it('forbids an unassigned support worker from mutating another same-organisation client notes through legacy routes', function () {
-    $worker = User::factory()->create([
-        'organization_id' => 1,
-        'role' => 'support_worker',
-    ]);
+it('forbids an unassigned support worker from mutating another client at the same Site through legacy routes', function () {
+    $site = Site::factory()->create();
+    $worker = clientNoteConsolidationUserAtSite($site, [
+        'clients.viewAssigned',
+        'progress_notes.create',
+        'progress_notes.update',
+        'progress_notes.delete',
+    ], 'support_worker');
     $supportWorkerRole = Role::query()->firstOrCreate(
         ['name' => 'support_worker'],
         ['label' => 'Support Worker', 'level' => 40, 'type' => 'system'],
     );
     $worker->roles()->syncWithoutDetaching([$supportWorkerRole->id]);
-    grantClientNoteConsolidationPermissions($worker, [
-        'clients.viewAssigned',
-        'progress_notes.create',
-        'progress_notes.update',
-        'progress_notes.delete',
-    ]);
 
-    $unassignedClient = Client::factory()->create(['organization_id' => 1]);
+    $unassignedClient = Client::factory()->create(['site_id' => $site->id]);
     $noteToUpdate = ClientNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $unassignedClient->id,
         'user_id' => $worker->id,
         'type' => 'progress_note',
@@ -326,7 +340,6 @@ it('forbids an unassigned support worker from mutating another same-organisation
         'visibility' => 'internal',
     ]);
     $noteToDelete = ClientNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $unassignedClient->id,
         'user_id' => $worker->id,
         'type' => 'progress_note',
@@ -337,7 +350,7 @@ it('forbids an unassigned support worker from mutating another same-organisation
     $this->actingAs($worker)
         ->post('/operations/progress-notes', [
             'client_id' => $unassignedClient->id,
-            'content' => 'Unauthorized same-organisation note',
+            'content' => 'Unauthorized unassigned-client note',
             'note_type' => 'general',
         ])
         ->assertForbidden();
@@ -354,29 +367,26 @@ it('forbids an unassigned support worker from mutating another same-organisation
 
     expect(ClientNote::query()
         ->where('client_id', $unassignedClient->id)
-        ->where('body', 'Unauthorized same-organisation note')
+        ->where('body', 'Unauthorized unassigned-client note')
         ->exists())->toBeFalse()
         ->and($noteToUpdate->fresh()->body)->toBe('Must not be changed')
         ->and($noteToDelete->fresh())->not->toBeNull();
 });
 
-it('preserves assigned-worker and organisation-wide manager access through legacy note routes', function () {
-    $assignedWorker = User::factory()->create([
-        'organization_id' => 1,
-        'role' => 'support_worker',
-    ]);
+it('preserves assigned-worker and Site-authorized manager access through legacy note routes', function () {
+    $site = Site::factory()->create();
+    $assignedWorker = clientNoteConsolidationUserAtSite($site, [
+        'clients.viewAssigned',
+        'progress_notes.create',
+        'progress_notes.update',
+        'progress_notes.delete',
+    ], 'support_worker');
     $supportWorkerRole = Role::query()->firstOrCreate(
         ['name' => 'support_worker'],
         ['label' => 'Support Worker', 'level' => 40, 'type' => 'system'],
     );
     $assignedWorker->roles()->syncWithoutDetaching([$supportWorkerRole->id]);
-    grantClientNoteConsolidationPermissions($assignedWorker, [
-        'clients.viewAssigned',
-        'progress_notes.create',
-        'progress_notes.update',
-        'progress_notes.delete',
-    ]);
-    $assignedClient = Client::factory()->create(['organization_id' => 1]);
+    $assignedClient = Client::factory()->create(['site_id' => $site->id]);
     $assignedClient->supportWorkers()->attach($assignedWorker->id);
 
     $this->actingAs($assignedWorker)
@@ -396,16 +406,14 @@ it('preserves assigned-worker and organisation-wide manager access through legac
         ])
         ->assertRedirect();
 
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientNoteConsolidationPermissions($manager, [
+    $manager = clientNoteConsolidationUserAtSite($site, [
         'clients.viewAny',
         'progress_notes.create',
         'progress_notes.update',
         'progress_notes.delete',
     ]);
-    $managerClient = Client::factory()->create(['organization_id' => 1]);
+    $managerClient = Client::factory()->create(['site_id' => $site->id]);
     $managerNote = ClientNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $managerClient->id,
         'user_id' => $manager->id,
         'type' => 'progress_note',
@@ -423,19 +431,18 @@ it('preserves assigned-worker and organisation-wide manager access through legac
 });
 
 it('resolves a legacy route id before a colliding canonical note id', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    grantClientNoteConsolidationPermissions($author, [
+    $site = Site::factory()->create();
+    $author = clientNoteConsolidationUserAtSite($site, [
         'clients.viewAny',
         'progress_notes.update',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $now = now();
 
     DB::table('client_notes')->insert([
         [
             'id' => 900001,
             'legacy_progress_note_id' => 900002,
-            'organization_id' => 1,
             'client_id' => $client->id,
             'user_id' => $author->id,
             'type' => 'progress_note',
@@ -447,7 +454,6 @@ it('resolves a legacy route id before a colliding canonical note id', function (
         [
             'id' => 900002,
             'legacy_progress_note_id' => null,
-            'organization_id' => 1,
             'client_id' => $client->id,
             'user_id' => $author->id,
             'type' => 'daily_note',
@@ -471,15 +477,14 @@ it('resolves a legacy route id before a colliding canonical note id', function (
 });
 
 it('does not let legacy progress note routes mutate another canonical note type', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    grantClientNoteConsolidationPermissions($author, [
+    $site = Site::factory()->create();
+    $author = clientNoteConsolidationUserAtSite($site, [
         'clients.viewAny',
         'progress_notes.update',
         'progress_notes.delete',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $dailyNote = ClientNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'user_id' => $author->id,
         'type' => 'daily_note',
@@ -543,18 +548,20 @@ it('writes and reads care plan hurdle and progress notes through ClientNote', fu
 });
 
 it('rejects shift and goal ids belonging to another client', function () {
-    $author = User::factory()->create(['organization_id' => 1]);
-    grantClientNoteConsolidationPermissions($author, ['progress_notes.create']);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $author = clientNoteConsolidationUserAtSite($site, [
+        'clients.viewAny',
+        'progress_notes.create',
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $otherClient = Client::factory()->create(['site_id' => $site->id]);
     $otherShift = Shift::factory()->create([
-        'organization_id' => 1,
         'client_id' => $otherClient->id,
+        'site_id' => $site->id,
         'user_id' => $author->id,
         'created_by' => $author->id,
     ]);
     $otherPlan = CarePlan::query()->create([
-        'organization_id' => 1,
         'client_id' => $otherClient->id,
         'title' => 'Other client plan',
         'status' => 'active',
@@ -562,7 +569,6 @@ it('rejects shift and goal ids belonging to another client', function () {
         'created_by' => $author->id,
     ]);
     $otherGoal = CarePlanGoal::query()->create([
-        'organization_id' => 1,
         'care_plan_id' => $otherPlan->id,
         'client_id' => $otherClient->id,
         'title' => 'Other client goal',
@@ -596,8 +602,19 @@ it('rejects shift and goal ids belonging to another client', function () {
 });
 
 it('builds family emotion summaries only from portal-visible nonprivate nondraft ClientNotes', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $portalUser = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $otherClient = Client::factory()->create(['site_id' => $site->id]);
+    $portalUser = User::factory()->create([
+        'role' => 'next_of_kin',
+        'approved_at' => now(),
+    ]);
+    $portalRole = Role::query()->firstOrCreate(
+        ['name' => 'next_of_kin'],
+        ['label' => 'Next of Kin', 'level' => 10, 'type' => 'system'],
+    );
+    $portalUser->roles()->attach($portalRole);
+    grantClientNoteConsolidationPermissions($portalUser, ['clients.viewPortal']);
     $client->portalUsers()->attach($portalUser->id, ['relation' => 'parent']);
     NextOfKin::query()->create([
         'client_id' => $client->id,
@@ -621,13 +638,11 @@ it('builds family emotion summaries only from portal-visible nonprivate nondraft
         'updated_by' => $portalUser->id,
     ]);
     FamilyPortalSetting::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'show_care_notes' => true,
     ]);
-    $author = User::factory()->create(['organization_id' => 1]);
+    $author = User::factory()->create();
     $base = [
-        'organization_id' => 1,
         'client_id' => $client->id,
         'user_id' => $author->id,
         'type' => 'progress_note',
@@ -659,7 +674,6 @@ it('builds family emotion summaries only from portal-visible nonprivate nondraft
         'behaviour_tags' => ['tired'],
     ]);
     ProgressNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'author_id' => $author->id,
         'note_type' => 'general',
@@ -679,6 +693,10 @@ it('builds family emotion summaries only from portal-visible nonprivate nondraft
             ->missing('emotionSummary.today.anxious')
             ->missing('emotionSummary.today.tired')
             ->missing('emotionSummary.today.legacy'));
+
+    $this->actingAs($portalUser)
+        ->get("/portal/clients/{$otherClient->id}/dashboard")
+        ->assertForbidden();
 });
 
 it('has no operational ProgressNote model or dual-source profile consumers', function () {

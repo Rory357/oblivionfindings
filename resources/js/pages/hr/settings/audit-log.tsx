@@ -1,3 +1,5 @@
+import { SettingsTabs } from '@/components/hr';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,8 +26,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero } from '@/components/page';
-import { SettingsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { ChevronDown, ChevronRight, FileSearch, History } from 'lucide-react';
@@ -41,10 +41,8 @@ interface AuditEntry {
     auditable_id: number | null;
     old_values: Record<string, any> | null;
     new_values: Record<string, any> | null;
-    ip_address: string | null;
-    user_agent: string | null;
     created_at: string;
-    user: { id: number; name: string; email: string } | null;
+    user: { id: number; name: string } | null;
 }
 
 interface Filters {
@@ -70,13 +68,16 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const actionColors: Record<string, string> = {
-    created: 'border-status-success/30 text-status-success bg-status-success-bg',
+    created:
+        'border-status-success/30 text-status-success bg-status-success-bg',
     updated: 'border-status-info/30 text-status-info bg-status-info-bg',
     deleted:
         'border-status-critical/30 text-status-critical bg-status-critical-bg',
     viewed: 'border-border/30 text-muted-foreground bg-muted-foreground/10',
-    approved: 'border-status-success/30 text-status-success bg-status-success-bg',
-    rejected: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
+    approved:
+        'border-status-success/30 text-status-success bg-status-success-bg',
+    rejected:
+        'border-status-warning/30 text-status-warning bg-status-warning-bg',
     signed: 'border-primary/30 text-primary bg-primary/10',
     exported: 'border-status-info/30 text-status-info bg-status-info-bg',
 };
@@ -180,7 +181,8 @@ export default function AuditLogIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Audit Log - HR Settings" />
             <PageShell>
-                <PageHero category="hr"
+                <PageHero
+                    category="hr"
                     icon={History}
                     title="Audit Log"
                     description="View all HR module activity and changes."
@@ -325,7 +327,6 @@ export default function AuditLogIndex({
                                         <TableHead>Action</TableHead>
                                         <TableHead>Record Type</TableHead>
                                         <TableHead>Record ID</TableHead>
-                                        <TableHead>IP Address</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -381,16 +382,12 @@ export default function AuditLogIndex({
                                                         <TableCell className="font-mono text-xs">
                                                             {entry.auditable_id}
                                                         </TableCell>
-                                                        <TableCell className="text-xs text-muted-foreground">
-                                                            {entry.ip_address ??
-                                                                '-'}
-                                                        </TableCell>
                                                     </TableRow>
                                                 </CollapsibleTrigger>
                                                 <CollapsibleContent asChild>
                                                     <TableRow>
                                                         <TableCell
-                                                            colSpan={7}
+                                                            colSpan={6}
                                                             className="bg-muted/30 p-4"
                                                         >
                                                             <div className="mb-2 text-sm font-medium">

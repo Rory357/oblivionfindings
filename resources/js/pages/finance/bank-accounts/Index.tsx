@@ -1,6 +1,3 @@
-import { Head, router } from '@inertiajs/react';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import {
     BankAccountDialog,
     BankingTabsFooter,
@@ -11,14 +8,27 @@ import {
     type RowCtxItem,
 } from '@/components/finance';
 import { chartColor } from '@/components/finance/chart-palette';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyList } from '@/components/ui/empty-state';
-import { Plus, Building2, AlertCircle, DollarSign, Landmark, Pencil, Star, Banknote, Eye } from 'lucide-react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
+import { Head, router } from '@inertiajs/react';
+import {
+    AlertCircle,
+    Banknote,
+    Building2,
+    DollarSign,
+    Eye,
+    Landmark,
+    Pencil,
+    Plus,
+    Star,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface BankAccount {
     id: number;
@@ -47,9 +57,15 @@ const accountTypeLabels: Record<string, string> = {
     credit_card: 'Credit Card',
 };
 
-export default function BankAccountsIndex({ bankAccounts, canManage = false, glAccounts = [] }: Props) {
+export default function BankAccountsIndex({
+    bankAccounts,
+    canManage = false,
+    glAccounts = [],
+}: Props) {
     const [createOpen, setCreateOpen] = useState(false);
-    const [editAccount, setEditAccount] = useState<EditableBankAccount | null>(null);
+    const [editAccount, setEditAccount] = useState<EditableBankAccount | null>(
+        null,
+    );
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
@@ -63,7 +79,8 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
             bank_name: account.bank_name,
             account_number: account.account_number,
             account_type: account.account_type,
-            gl_account_id: account.gl_account_id ?? account.gl_account?.id ?? null,
+            gl_account_id:
+                account.gl_account_id ?? account.gl_account?.id ?? null,
             is_primary: account.is_primary,
             is_active: account.is_active,
         });
@@ -72,16 +89,33 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
     const rowMenu = useRowContextMenu();
     const rowMenuItems = (account: BankAccount): RowCtxItem[] => {
         const items: RowCtxItem[] = [
-            { kind: 'item', label: 'Open', icon: Eye, onSelect: () => router.visit(`/finance/bank-accounts/${account.id}`) },
+            {
+                kind: 'item',
+                label: 'Open',
+                icon: Eye,
+                onSelect: () =>
+                    router.visit(`/finance/bank-accounts/${account.id}`),
+            },
         ];
         if (canManage) {
-            items.push({ kind: 'item', label: 'Edit', icon: Pencil, onSelect: () => openEdit(account) });
+            items.push({
+                kind: 'item',
+                label: 'Edit',
+                icon: Pencil,
+                onSelect: () => openEdit(account),
+            });
         }
         return items;
     };
 
-    const totalCash = useMemo(() => bankAccounts.reduce((sum, a) => sum + a.current_balance, 0), [bankAccounts]);
-    const primaryAccount = useMemo(() => bankAccounts.find((a) => a.is_primary), [bankAccounts]);
+    const totalCash = useMemo(
+        () => bankAccounts.reduce((sum, a) => sum + a.current_balance, 0),
+        [bankAccounts],
+    );
+    const primaryAccount = useMemo(
+        () => bankAccounts.find((a) => a.is_primary),
+        [bankAccounts],
+    );
     const pieData = useMemo(
         () =>
             bankAccounts
@@ -90,7 +124,10 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
         [bankAccounts],
     );
 
-    const activeCount = useMemo(() => bankAccounts.filter((a) => a.is_active).length, [bankAccounts]);
+    const activeCount = useMemo(
+        () => bankAccounts.filter((a) => a.is_active).length,
+        [bankAccounts],
+    );
     const unreconciledTotal = useMemo(
         () => bankAccounts.reduce((sum, a) => sum + a.unreconciled_count, 0),
         [bankAccounts],
@@ -102,7 +139,8 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Banknote}
                         title="Bank Accounts"
                         description="Manage your organisation's bank accounts and balances"
@@ -113,8 +151,11 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                         ]}
                         actions={
                             canManage && (
-                                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                                    <Plus className="w-4 h-4 mr-1.5" />
+                                <Button
+                                    size="sm"
+                                    onClick={() => setCreateOpen(true)}
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
                                     Add Bank Account
                                 </Button>
                             )
@@ -134,7 +175,10 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                 className="border-0"
                                 action={
                                     canManage ? (
-                                        <Button size="sm" onClick={() => setCreateOpen(true)}>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setCreateOpen(true)}
+                                        >
                                             Add bank account
                                         </Button>
                                     ) : undefined
@@ -145,7 +189,7 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                 ) : (
                     <>
                         {/* KPI Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                             <Card>
                                 <CardContent className="pt-6">
                                     <div className="flex items-center gap-3">
@@ -153,8 +197,12 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                             <DollarSign className="h-5 w-5 text-status-info" />
                                         </div>
                                         <div>
-                                            <p className="text-sm text-muted-foreground">Total Cash</p>
-                                            <p className={`text-2xl font-semibold font-mono tabular-nums ${totalCash >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
+                                            <p className="text-sm text-muted-foreground">
+                                                Total Cash
+                                            </p>
+                                            <p
+                                                className={`font-mono text-2xl font-semibold tabular-nums ${totalCash >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                            >
                                                 {formatMoney(totalCash)}
                                             </p>
                                         </div>
@@ -168,7 +216,9 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                             <Landmark className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
-                                            <p className="text-sm text-muted-foreground">Account Count</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                Account Count
+                                            </p>
                                             <p className="text-2xl font-semibold">
                                                 {bankAccounts.length}
                                             </p>
@@ -183,9 +233,17 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                             <Star className="h-5 w-5 text-status-warning" />
                                         </div>
                                         <div>
-                                            <p className="text-sm text-muted-foreground">Primary Account</p>
-                                            <p className={`text-2xl font-semibold font-mono tabular-nums ${(primaryAccount?.current_balance ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                {primaryAccount ? formatMoney(primaryAccount.current_balance) : 'N/A'}
+                                            <p className="text-sm text-muted-foreground">
+                                                Primary Account
+                                            </p>
+                                            <p
+                                                className={`font-mono text-2xl font-semibold tabular-nums ${(primaryAccount?.current_balance ?? 0) >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                            >
+                                                {primaryAccount
+                                                    ? formatMoney(
+                                                          primaryAccount.current_balance,
+                                                      )
+                                                    : 'N/A'}
                                             </p>
                                         </div>
                                     </div>
@@ -197,11 +255,16 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                         {pieData.length > 0 && (
                             <Card className="mb-6">
                                 <CardHeader>
-                                    <CardTitle className="text-base">Balance Distribution</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Balance Distribution
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="h-[280px]">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer
+                                            width="100%"
+                                            height="100%"
+                                        >
                                             <PieChart>
                                                 <Pie
                                                     data={pieData}
@@ -212,13 +275,32 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                                                     paddingAngle={2}
                                                     dataKey="value"
                                                     nameKey="name"
-                                                    label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+                                                    label={({
+                                                        name,
+                                                        percent,
+                                                    }) =>
+                                                        `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`
+                                                    }
                                                 >
-                                                    {pieData.map((_entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={chartColor(index)} />
-                                                    ))}
+                                                    {pieData.map(
+                                                        (_entry, index) => (
+                                                            <Cell
+                                                                key={`cell-${index}`}
+                                                                fill={chartColor(
+                                                                    index,
+                                                                )}
+                                                            />
+                                                        ),
+                                                    )}
                                                 </Pie>
-                                                <Tooltip formatter={(value?: number) => [formatMoney(value ?? 0), 'Balance']} />
+                                                <Tooltip
+                                                    formatter={(
+                                                        value?: number,
+                                                    ) => [
+                                                        formatMoney(value ?? 0),
+                                                        'Balance',
+                                                    ]}
+                                                />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -227,83 +309,127 @@ export default function BankAccountsIndex({ bankAccounts, canManage = false, glA
                         )}
 
                         {/* Account Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {bankAccounts.map((account) => (
                                 <Card
                                     key={account.id}
                                     role="link"
                                     tabIndex={0}
                                     aria-label={`Open ${account.name}`}
-                                    onClick={() => router.visit(`/finance/bank-accounts/${account.id}`)}
+                                    onClick={() =>
+                                        router.visit(
+                                            `/finance/bank-accounts/${account.id}`,
+                                        )
+                                    }
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter') router.visit(`/finance/bank-accounts/${account.id}`);
+                                        if (e.key === 'Enter')
+                                            router.visit(
+                                                `/finance/bank-accounts/${account.id}`,
+                                            );
                                     }}
-                                    onContextMenu={rowMenu.open(rowMenuItems(account))}
-                                    className="hover:shadow-md transition-shadow cursor-pointer h-full"
+                                    onContextMenu={rowMenu.open(
+                                        rowMenuItems(account),
+                                    )}
+                                    className="h-full cursor-pointer transition-shadow hover:shadow-md"
                                 >
-                                        <CardHeader className="pb-3">
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <CardTitle className="text-lg">{account.name}</CardTitle>
-                                                    <p className="text-sm text-muted-foreground mt-1">{account.bank_name}</p>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    {account.is_primary && (
-                                                        <Badge variant="default" className="bg-status-info-bg text-status-info border-status-info/30">Primary</Badge>
-                                                    )}
-                                                    {!account.is_active && (
-                                                        <Badge variant="secondary">Inactive</Badge>
-                                                    )}
-                                                    {canManage && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-7 w-7 p-0"
-                                                            aria-label={`Edit ${account.name}`}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                openEdit(account);
-                                                            }}
-                                                        >
-                                                            <Pencil className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    )}
-                                                </div>
+                                    <CardHeader className="pb-3">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <CardTitle className="text-lg">
+                                                    {account.name}
+                                                </CardTitle>
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    {account.bank_name}
+                                                </p>
                                             </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-sm text-muted-foreground">Type</span>
-                                                    <Badge variant="outline">
-                                                        {accountTypeLabels[account.account_type] || account.account_type}
+                                            <div className="flex items-center gap-1">
+                                                {account.is_primary && (
+                                                    <Badge
+                                                        variant="default"
+                                                        className="border-status-info/30 bg-status-info-bg text-status-info"
+                                                    >
+                                                        Primary
                                                     </Badge>
-                                                </div>
+                                                )}
+                                                {!account.is_active && (
+                                                    <Badge variant="secondary">
+                                                        Inactive
+                                                    </Badge>
+                                                )}
+                                                {canManage && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="h-7 w-7 p-0"
+                                                        aria-label={`Edit ${account.name}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            openEdit(account);
+                                                        }}
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-muted-foreground">
+                                                    Type
+                                                </span>
+                                                <Badge variant="outline">
+                                                    {accountTypeLabels[
+                                                        account.account_type
+                                                    ] || account.account_type}
+                                                </Badge>
+                                            </div>
 
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-sm text-muted-foreground">Current Balance</span>
-                                                    <span className={`text-lg font-semibold font-mono tabular-nums ${account.current_balance >= 0 ? 'text-status-success' : 'text-status-critical'}`}>
-                                                        {formatMoney(account.current_balance)}
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-muted-foreground">
+                                                    Current Balance
+                                                </span>
+                                                <span
+                                                    className={`font-mono text-lg font-semibold tabular-nums ${account.current_balance >= 0 ? 'text-status-success' : 'text-status-critical'}`}
+                                                >
+                                                    {formatMoney(
+                                                        account.current_balance,
+                                                    )}
+                                                </span>
+                                            </div>
+
+                                            {account.gl_account && (
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-sm text-muted-foreground">
+                                                        GL Account
+                                                    </span>
+                                                    <span className="font-mono text-sm">
+                                                        {
+                                                            account.gl_account
+                                                                .code
+                                                        }
                                                     </span>
                                                 </div>
+                                            )}
 
-                                                {account.gl_account && (
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-sm text-muted-foreground">GL Account</span>
-                                                        <span className="text-sm font-mono">{account.gl_account.code}</span>
-                                                    </div>
-                                                )}
-
-                                                {account.unreconciled_count > 0 && (
-                                                    <div className="flex items-center gap-2 text-status-warning bg-status-warning rounded-md px-3 py-2">
-                                                        <AlertCircle className="h-4 w-4 shrink-0" />
-                                                        <span className="text-sm font-medium">
-                                                            {account.unreconciled_count} unreconciled transaction{account.unreconciled_count !== 1 ? 's' : ''}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </CardContent>
+                                            {account.unreconciled_count > 0 && (
+                                                <div className="flex items-center gap-2 rounded-md bg-status-warning px-3 py-2 text-status-warning">
+                                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                                    <span className="text-sm font-medium">
+                                                        {
+                                                            account.unreconciled_count
+                                                        }{' '}
+                                                        unreconciled transaction
+                                                        {account.unreconciled_count !==
+                                                        1
+                                                            ? 's'
+                                                            : ''}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </CardContent>
                                 </Card>
                             ))}
                         </div>

@@ -99,7 +99,6 @@ class SiteProfilePayloadTest extends TestCase
     {
         SiteCoverageRequirement::query()->create([
             'site_id' => $this->site->id,
-            'organization_id' => $this->admin->organization_id,
             'name' => 'Overnight support',
             'coverage_type' => 'overnight',
             'day_of_week' => 'mon',

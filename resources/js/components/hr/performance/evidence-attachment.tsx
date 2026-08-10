@@ -38,7 +38,12 @@ export function EvidenceAttachment({
     };
 
     return (
-        <div className={cn('flex flex-wrap items-center gap-3 text-sm', className)}>
+        <div
+            className={cn(
+                'flex flex-wrap items-center gap-3 text-sm',
+                className,
+            )}
+        >
             {hasEvidence ? (
                 <a
                     href={viewUrl}
@@ -50,7 +55,9 @@ export function EvidenceAttachment({
                     View evidence
                 </a>
             ) : (
-                <span className="text-muted-foreground">No evidence attached</span>
+                <span className="text-muted-foreground">
+                    No evidence attached
+                </span>
             )}
             {canManage && !disabled && (
                 <>
@@ -61,7 +68,11 @@ export function EvidenceAttachment({
                         className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-semibold disabled:opacity-50"
                     >
                         <Paperclip className="h-3.5 w-3.5" />
-                        {uploading ? 'Uploading…' : hasEvidence ? 'Replace' : 'Attach evidence'}
+                        {uploading
+                            ? 'Uploading…'
+                            : hasEvidence
+                              ? 'Replace'
+                              : 'Attach evidence'}
                     </button>
                     <input
                         ref={inputRef}

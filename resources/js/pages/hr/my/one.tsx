@@ -4,7 +4,6 @@ import { router } from '@inertiajs/react';
 import {
     CalendarClock,
     Check,
-    CheckCircle2,
     ChevronRight,
     Eye,
     ListChecks,
@@ -70,7 +69,12 @@ function inferCadence(sessions: Session[]): string {
     return 'Monthly';
 }
 
-export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props) {
+export default function MyOneOnOnes({
+    myHr,
+    sessions,
+    openActions,
+    next,
+}: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [openId, setOpenId] = useState<number | null>(null);
 
@@ -131,7 +135,9 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                 {/* Header */}
                 <div className="flex items-center gap-3">
                     <div>
-                        <h2 className="text-[17px] font-bold">1:1s with {who}</h2>
+                        <h2 className="text-[17px] font-bold">
+                            1:1s with {who}
+                        </h2>
                         <p className="mt-0.5 text-[12.5px] text-muted-foreground">
                             Talking points, action items &amp; history
                         </p>
@@ -154,7 +160,8 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                         <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/20 px-2.5 py-1 text-[11.5px] font-bold">
                                 <span className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
-                                Next 1:1 · in {Math.max(0, next.days_until)} days
+                                Next 1:1 · in {Math.max(0, next.days_until)}{' '}
+                                days
                             </span>
                             <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-2.5 py-1 text-[11px] font-semibold">
                                 <Repeat className="h-3 w-3" /> {cadence}
@@ -182,9 +189,11 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                         </div>
                         {openActions.length > 0 ? (
                             <div className="mt-3.5 rounded-[12px] bg-primary-foreground/12 px-3.5 py-2.5 text-[12.5px]">
-                                <span className="font-bold">{openActions.length}</span> open
-                                action{openActions.length === 1 ? '' : 's'} to wrap up before
-                                then.
+                                <span className="font-bold">
+                                    {openActions.length}
+                                </span>{' '}
+                                open action{openActions.length === 1 ? '' : 's'}{' '}
+                                to wrap up before then.
                             </div>
                         ) : null}
                     </div>
@@ -204,7 +213,9 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                         tone="success"
                         value={openActions.length}
                         label="Open actions"
-                        sub={openActions.length === 0 ? 'all clear' : 'to close'}
+                        sub={
+                            openActions.length === 0 ? 'all clear' : 'to close'
+                        }
                     />
                     <StatCard
                         icon={Sparkles}
@@ -241,7 +252,8 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                                             {a.label}
                                         </div>
                                         <div className="text-[11px] text-muted-foreground">
-                                            from 1:1 with {a.from ?? 'your manager'} ·{' '}
+                                            from 1:1 with{' '}
+                                            {a.from ?? 'your manager'} ·{' '}
                                             {fmtDate(a.session_date)}
                                         </div>
                                     </div>
@@ -260,11 +272,13 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                     {sessions.length === 0 ? (
                         <Card className="flex flex-col items-center gap-2 px-6 py-12 text-center">
                             <MessagesSquare className="h-8 w-8 text-muted-foreground/40" />
-                            <div className="text-sm font-semibold">No 1:1s yet</div>
+                            <div className="text-sm font-semibold">
+                                No 1:1s yet
+                            </div>
                             <p className="max-w-sm text-[13px] text-muted-foreground">
-                                When your manager records a supervision session and shares
-                                it with you, it’ll appear here with its talking points and
-                                actions.
+                                When your manager records a supervision session
+                                and shares it with you, it’ll appear here with
+                                its talking points and actions.
                             </p>
                         </Card>
                     ) : (
@@ -297,7 +311,9 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                                             ) : null}
                                         </div>
                                         <div className="text-[11.5px] text-muted-foreground">
-                                            with {s.supervisor?.name ?? 'your manager'}
+                                            with{' '}
+                                            {s.supervisor?.name ??
+                                                'your manager'}
                                             {s.actions_agreed.length > 0
                                                 ? ` · ${s.actions_agreed.length} action${s.actions_agreed.length === 1 ? '' : 's'}`
                                                 : ''}
@@ -305,10 +321,14 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                                     </div>
                                     <StatusBadge
                                         variant={
-                                            s.employee_acknowledged ? 'success' : 'info'
+                                            s.employee_acknowledged
+                                                ? 'success'
+                                                : 'info'
                                         }
                                     >
-                                        {s.employee_acknowledged ? 'Reviewed' : 'Completed'}
+                                        {s.employee_acknowledged
+                                            ? 'Reviewed'
+                                            : 'Completed'}
                                     </StatusBadge>
                                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                 </button>
@@ -324,7 +344,9 @@ export default function MyOneOnOnes({ myHr, sessions, openActions, next }: Props
                 onClose={() => setOpenId(null)}
                 onAcknowledge={acknowledge}
             />
-            {ctx ? <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} /> : null}
+            {ctx ? (
+                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
         </MyHrShell>
     );
 }
@@ -358,9 +380,13 @@ function StatCard({
                 <Icon className="h-[18px] w-[18px]" />
             </span>
             <div className="min-w-0">
-                <div className="truncate text-lg font-bold leading-none">{value}</div>
+                <div className="truncate text-lg leading-none font-bold">
+                    {value}
+                </div>
                 <div className="text-xs font-semibold">{label}</div>
-                <div className="truncate text-[11px] text-muted-foreground">{sub}</div>
+                <div className="truncate text-[11px] text-muted-foreground">
+                    {sub}
+                </div>
             </div>
         </Card>
     );

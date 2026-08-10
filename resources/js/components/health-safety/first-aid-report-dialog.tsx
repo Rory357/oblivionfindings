@@ -11,8 +11,8 @@ import {
     Field,
     InfoCard,
     Ring,
-    SelectInput,
     Segmented,
+    SelectInput,
     StepHead,
 } from '@/components/wizard/primitives';
 import {
@@ -26,8 +26,8 @@ import {
 import {
     INJURY_TYPES,
     injuryLabel,
-    OUTCOMES,
     outcomeLabel,
+    OUTCOMES,
     PERSON_TYPES,
     personTypeLabel,
 } from '@/pages/health-safety/first-aid/options';
@@ -73,11 +73,36 @@ type FirstAidForm = {
 type StepKey = 'who' | 'injury' | 'treatment' | 'incident' | 'review';
 
 const STEPS: WizardStep[] = [
-    { key: 'who', label: 'Who & where', blurb: 'Site, person & first-aider', icon: MapPin },
-    { key: 'injury', label: 'Injury / illness', blurb: 'What happened', icon: Activity },
-    { key: 'treatment', label: 'Treatment & outcome', blurb: 'Care given', icon: Stethoscope },
-    { key: 'incident', label: 'Incident & notes', blurb: 'Link & follow-up', icon: Link2 },
-    { key: 'review', label: 'Review', blurb: 'Confirm & record', icon: ClipboardCheck },
+    {
+        key: 'who',
+        label: 'Who & where',
+        blurb: 'Site, person & first-aider',
+        icon: MapPin,
+    },
+    {
+        key: 'injury',
+        label: 'Injury / illness',
+        blurb: 'What happened',
+        icon: Activity,
+    },
+    {
+        key: 'treatment',
+        label: 'Treatment & outcome',
+        blurb: 'Care given',
+        icon: Stethoscope,
+    },
+    {
+        key: 'incident',
+        label: 'Incident & notes',
+        blurb: 'Link & follow-up',
+        icon: Link2,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & record',
+        icon: ClipboardCheck,
+    },
 ];
 
 function nowLocal(): string {
@@ -128,20 +153,25 @@ export function FirstAidReportDialog({
     incidents: IncidentOpt[];
     onOpenRecord?: (id: number) => void;
 }) {
-    const page = usePage<{ flash?: { created_first_aid_id?: number | null; error?: string } }>();
+    const page = usePage<{
+        flash?: { created_first_aid_id?: number | null; error?: string };
+    }>();
     const form = useForm<FirstAidForm>(initialForm());
     const d = form.data;
     const [stepIndex, setStepIndex] = useState(0);
     const [submitted, setSubmitted] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const opt = (xs: Opt[]) => xs.map((x) => ({ value: String(x.id), label: x.name }));
+    const opt = (xs: Opt[]) =>
+        xs.map((x) => ({ value: String(x.id), label: x.name }));
     const isClient = d.treated_person_type === 'client';
     const isStaff = d.treated_person_type === 'staff';
     const lastIndex = STEPS.length - 1;
     const stepKey = STEPS[stepIndex].key as StepKey;
 
-    const personChosen = isClient ? !!d.client_id : !!d.treated_person_name.trim();
+    const personChosen = isClient
+        ? !!d.client_id
+        : !!d.treated_person_name.trim();
 
     const pct = useMemo(() => {
         const checks = [
@@ -153,7 +183,9 @@ export function FirstAidReportDialog({
             !!d.treatment_given.trim(),
             !!d.treatment_outcome,
         ];
-        return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+        return Math.round(
+            (checks.filter(Boolean).length / checks.length) * 100,
+        );
     }, [d, personChosen]);
 
     const set = <K extends keyof FirstAidForm>(k: K, v: FirstAidForm[K]) =>
@@ -162,26 +194,34 @@ export function FirstAidReportDialog({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         form.setData(k, v as any);
 
-    const fieldError = (name: string) => errors[name] ?? (form.errors as Record<string, string>)[name];
+    const fieldError = (name: string) =>
+        errors[name] ?? (form.errors as Record<string, string>)[name];
 
     const validateStep = (key: StepKey): Record<string, string> => {
         const e: Record<string, string> = {};
         if (key === 'who') {
             if (!d.site_id) e.site_id = 'Choose a site';
-            if (isClient && !d.client_id) e.client_id = 'Choose the client treated';
-            if (!isClient && !d.treated_person_name.trim()) e.treated_person_name = 'Enter who was treated';
-            if (!d.first_aider_id) e.first_aider_id = 'Choose the first-aider who responded';
+            if (isClient && !d.client_id)
+                e.client_id = 'Choose the client treated';
+            if (!isClient && !d.treated_person_name.trim())
+                e.treated_person_name = 'Enter who was treated';
+            if (!d.first_aider_id)
+                e.first_aider_id = 'Choose the first-aider who responded';
         }
         if (key === 'injury') {
-            if (!d.injury_illness_type) e.injury_illness_type = 'Select the injury or illness';
-            if (!d.injury_illness_description.trim()) e.injury_illness_description = 'Describe what happened';
+            if (!d.injury_illness_type)
+                e.injury_illness_type = 'Select the injury or illness';
+            if (!d.injury_illness_description.trim())
+                e.injury_illness_description = 'Describe what happened';
         }
         if (key === 'treatment') {
-            if (!d.treatment_given.trim()) e.treatment_given = 'Describe the treatment given';
+            if (!d.treatment_given.trim())
+                e.treatment_given = 'Describe the treatment given';
             if (!d.treatment_outcome) e.treatment_outcome = 'Select an outcome';
         }
         if (key === 'incident') {
-            if (d.incident_mode === 'link' && !d.related_incident_id) e.related_incident_id = 'Pick the incident to link';
+            if (d.incident_mode === 'link' && !d.related_incident_id)
+                e.related_incident_id = 'Pick the incident to link';
         }
         return e;
     };
@@ -209,7 +249,8 @@ export function FirstAidReportDialog({
         for (const k of order) Object.assign(all, validateStep(k));
         if (Object.keys(all).length) {
             setErrors(all);
-            const firstBad = order.find((k) => Object.keys(validateStep(k)).length) ?? 'who';
+            const firstBad =
+                order.find((k) => Object.keys(validateStep(k)).length) ?? 'who';
             setStepIndex(STEPS.findIndex((s) => s.key === firstBad));
             return;
         }
@@ -218,7 +259,10 @@ export function FirstAidReportDialog({
         form.transform(() => ({
             site_id: d.site_id ? Number(d.site_id) : null,
             treated_person_type: d.treated_person_type,
-            treated_person_id: !isClient && d.treated_person_id ? Number(d.treated_person_id) : null,
+            treated_person_id:
+                !isClient && d.treated_person_id
+                    ? Number(d.treated_person_id)
+                    : null,
             client_id: isClient && d.client_id ? Number(d.client_id) : null,
             treated_person_name: d.treated_person_name,
             treatment_date: d.treatment_date,
@@ -230,7 +274,10 @@ export function FirstAidReportDialog({
             treatment_outcome: d.treatment_outcome,
             ambulance_called: d.ambulance_called,
             incident_reported: d.incident_mode !== 'none',
-            related_incident_id: d.incident_mode === 'link' && d.related_incident_id ? Number(d.related_incident_id) : null,
+            related_incident_id:
+                d.incident_mode === 'link' && d.related_incident_id
+                    ? Number(d.related_incident_id)
+                    : null,
             first_aider_notes: d.first_aider_notes || null,
             stay,
         }));
@@ -239,7 +286,8 @@ export function FirstAidReportDialog({
             preserveScroll: true,
             preserveState: true,
             onSuccess: (pg) => {
-                const flash = (pg.props as { flash?: { error?: string } }).flash;
+                const flash = (pg.props as { flash?: { error?: string } })
+                    .flash;
                 if (flash?.error) return;
                 if (stay) reset();
                 else setSubmitted(true);
@@ -272,8 +320,8 @@ export function FirstAidReportDialog({
             title="Treatment recorded"
             blurb={
                 <>
-                    The first-aid treatment is on the register. Add evidence (ACC45, photos) or follow-ups
-                    from the record at any time.
+                    The first-aid treatment is on the register. Add evidence
+                    (ACC45, photos) or follow-ups from the record at any time.
                 </>
             }
             actions={
@@ -321,12 +369,27 @@ export function FirstAidReportDialog({
                         </Button>
                         {stepKey === 'review' ? (
                             <>
-                                <Button variant="secondary" onClick={() => submit(true)} disabled={form.processing}>
-                                    {form.processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => submit(true)}
+                                    disabled={form.processing}
+                                >
+                                    {form.processing ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Plus className="h-4 w-4" />
+                                    )}
                                     Save &amp; add another
                                 </Button>
-                                <Button onClick={() => submit(false)} disabled={form.processing}>
-                                    {form.processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                                <Button
+                                    onClick={() => submit(false)}
+                                    disabled={form.processing}
+                                >
+                                    {form.processing ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <CheckCircle2 className="h-4 w-4" />
+                                    )}
                                     Record treatment
                                 </Button>
                             </>
@@ -343,69 +406,137 @@ export function FirstAidReportDialog({
             <WizardStepPane>
                 {stepKey === 'who' ? (
                     <div className="flex flex-col gap-5">
-                        <StepHead icon={MapPin} title="Who & where" blurb="Site, the person treated, and the first-aider who responded." />
+                        <StepHead
+                            icon={MapPin}
+                            title="Who & where"
+                            blurb="Site, the person treated, and the first-aider who responded."
+                        />
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Site" required error={fieldError('site_id')}>
-                                <SelectInput value={d.site_id} onChange={(v) => set('site_id', v)} placeholder="Select site" options={opt(sites)} />
+                            <Field
+                                label="Site"
+                                required
+                                error={fieldError('site_id')}
+                            >
+                                <SelectInput
+                                    value={d.site_id}
+                                    onChange={(v) => set('site_id', v)}
+                                    placeholder="Select site"
+                                    options={opt(sites)}
+                                />
                             </Field>
                             <Field label="Treatment date & time">
-                                <Input type="datetime-local" value={d.treatment_date} onChange={(e) => set('treatment_date', e.target.value)} />
+                                <Input
+                                    type="datetime-local"
+                                    value={d.treatment_date}
+                                    onChange={(e) =>
+                                        set('treatment_date', e.target.value)
+                                    }
+                                />
                             </Field>
                             <Field label="Person type" span>
                                 <Segmented
                                     value={d.treated_person_type}
                                     onChange={(v) => {
                                         // Switching person type clears the now-irrelevant link; keep the typed name.
-                                        if (v !== 'client') set('client_id', '');
-                                        if (v !== 'staff') set('treated_person_id', '');
+                                        if (v !== 'client')
+                                            set('client_id', '');
+                                        if (v !== 'staff')
+                                            set('treated_person_id', '');
                                         set('treated_person_type', v);
                                     }}
-                                    options={PERSON_TYPES.map((p) => ({ value: p.value, label: p.label }))}
+                                    options={PERSON_TYPES.map((p) => ({
+                                        value: p.value,
+                                        label: p.label,
+                                    }))}
                                 />
                             </Field>
                             {isClient ? (
-                                <Field label="Client treated" required span error={fieldError('client_id')} hint="links to their profile">
+                                <Field
+                                    label="Client treated"
+                                    required
+                                    span
+                                    error={fieldError('client_id')}
+                                    hint="links to their profile"
+                                >
                                     <SelectInput
                                         value={d.client_id}
                                         onChange={(v) => {
                                             set('client_id', v);
-                                            const c = clients.find((x) => String(x.id) === v);
-                                            if (c) set('treated_person_name', c.name);
+                                            const c = clients.find(
+                                                (x) => String(x.id) === v,
+                                            );
+                                            if (c)
+                                                set(
+                                                    'treated_person_name',
+                                                    c.name,
+                                                );
                                         }}
                                         placeholder="Select client"
                                         options={opt(clients)}
                                     />
                                 </Field>
                             ) : (
-                                <Field label="Person treated" required span error={fieldError('treated_person_name')}>
+                                <Field
+                                    label="Person treated"
+                                    required
+                                    span
+                                    error={fieldError('treated_person_name')}
+                                >
                                     <Input
                                         value={d.treated_person_name}
-                                        onChange={(e) => set('treated_person_name', e.target.value)}
+                                        onChange={(e) =>
+                                            set(
+                                                'treated_person_name',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Full name"
                                     />
                                 </Field>
                             )}
                             {isStaff ? (
-                                <Field label="Link to staff record" span hint="optional — links to their user profile">
+                                <Field
+                                    label="Link to staff record"
+                                    span
+                                    hint="optional — links to their user profile"
+                                >
                                     <SelectInput
                                         value={d.treated_person_id}
                                         onChange={(v) => {
                                             set('treated_person_id', v);
-                                            const u = staff.find((x) => String(x.id) === v);
-                                            if (u) set('treated_person_name', u.name);
+                                            const u = staff.find(
+                                                (x) => String(x.id) === v,
+                                            );
+                                            if (u)
+                                                set(
+                                                    'treated_person_name',
+                                                    u.name,
+                                                );
                                         }}
                                         placeholder="Unlinked — use the name above"
                                         options={opt(staff)}
                                     />
                                 </Field>
                             ) : null}
-                            <Field label="First-aider" required span error={fieldError('first_aider_id')} hint="staff flagged is_first_aider">
-                                <SelectInput value={d.first_aider_id} onChange={(v) => set('first_aider_id', v)} placeholder="Select first-aider" options={opt(firstAiders)} />
+                            <Field
+                                label="First-aider"
+                                required
+                                span
+                                error={fieldError('first_aider_id')}
+                                hint="staff flagged is_first_aider"
+                            >
+                                <SelectInput
+                                    value={d.first_aider_id}
+                                    onChange={(v) => set('first_aider_id', v)}
+                                    placeholder="Select first-aider"
+                                    options={opt(firstAiders)}
+                                />
                             </Field>
                         </div>
                         {isClient ? (
                             <InfoCard icon={HeartPulse}>
-                                This treatment links to the client&apos;s profile and appears on their read-only
+                                This treatment links to the client&apos;s
+                                profile and appears on their read-only
                                 <strong> First-aid treatments</strong> panel.
                             </InfoCard>
                         ) : null}
@@ -414,19 +545,50 @@ export function FirstAidReportDialog({
 
                 {stepKey === 'injury' ? (
                     <div className="flex flex-col gap-5">
-                        <StepHead icon={Activity} title="Injury / illness" blurb="What happened, where on the body, and how it presented." />
+                        <StepHead
+                            icon={Activity}
+                            title="Injury / illness"
+                            blurb="What happened, where on the body, and how it presented."
+                        />
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Injury / illness type" required error={fieldError('injury_illness_type')}>
-                                <SelectInput value={d.injury_illness_type} onChange={(v) => set('injury_illness_type', v)} placeholder="Select type" options={INJURY_TYPES} />
+                            <Field
+                                label="Injury / illness type"
+                                required
+                                error={fieldError('injury_illness_type')}
+                            >
+                                <SelectInput
+                                    value={d.injury_illness_type}
+                                    onChange={(v) =>
+                                        set('injury_illness_type', v)
+                                    }
+                                    placeholder="Select type"
+                                    options={INJURY_TYPES}
+                                />
                             </Field>
                             <Field label="Body part" hint="optional">
-                                <Input value={d.body_part} onChange={(e) => set('body_part', e.target.value)} placeholder="e.g. Left hand, Head" />
+                                <Input
+                                    value={d.body_part}
+                                    onChange={(e) =>
+                                        set('body_part', e.target.value)
+                                    }
+                                    placeholder="e.g. Left hand, Head"
+                                />
                             </Field>
-                            <Field label="Description" required span error={fieldError('injury_illness_description')}>
+                            <Field
+                                label="Description"
+                                required
+                                span
+                                error={fieldError('injury_illness_description')}
+                            >
                                 <Textarea
                                     rows={3}
                                     value={d.injury_illness_description}
-                                    onChange={(e) => set('injury_illness_description', e.target.value)}
+                                    onChange={(e) =>
+                                        set(
+                                            'injury_illness_description',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="How the injury or illness presented…"
                                 />
                             </Field>
@@ -436,32 +598,62 @@ export function FirstAidReportDialog({
 
                 {stepKey === 'treatment' ? (
                     <div className="flex flex-col gap-5">
-                        <StepHead icon={Stethoscope} title="Treatment & outcome" blurb="The care given and where the person went next." />
+                        <StepHead
+                            icon={Stethoscope}
+                            title="Treatment & outcome"
+                            blurb="The care given and where the person went next."
+                        />
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Treatment given" required span error={fieldError('treatment_given')}>
+                            <Field
+                                label="Treatment given"
+                                required
+                                span
+                                error={fieldError('treatment_given')}
+                            >
                                 <Textarea
                                     rows={3}
                                     value={d.treatment_given}
-                                    onChange={(e) => set('treatment_given', e.target.value)}
+                                    onChange={(e) =>
+                                        set('treatment_given', e.target.value)
+                                    }
                                     placeholder="What first aid was administered…"
                                 />
                             </Field>
-                            <Field label="Outcome" required error={fieldError('treatment_outcome')}>
-                                <SelectInput value={d.treatment_outcome} onChange={(v) => set('treatment_outcome', v)} placeholder="Select outcome" options={OUTCOMES} />
+                            <Field
+                                label="Outcome"
+                                required
+                                error={fieldError('treatment_outcome')}
+                            >
+                                <SelectInput
+                                    value={d.treatment_outcome}
+                                    onChange={(v) =>
+                                        set('treatment_outcome', v)
+                                    }
+                                    placeholder="Select outcome"
+                                    options={OUTCOMES}
+                                />
                             </Field>
                             <Field label="Ambulance called">
                                 <div className="flex h-10 items-center gap-2.5 rounded-md border border-border bg-card px-3">
-                                    <Switch checked={d.ambulance_called} onCheckedChange={(v) => set('ambulance_called', v)} />
+                                    <Switch
+                                        checked={d.ambulance_called}
+                                        onCheckedChange={(v) =>
+                                            set('ambulance_called', v)
+                                        }
+                                    />
                                     <span className="text-[13px] text-muted-foreground">
-                                        {d.ambulance_called ? '111 ambulance was called' : 'No ambulance called'}
+                                        {d.ambulance_called
+                                            ? '111 ambulance was called'
+                                            : 'No ambulance called'}
                                     </span>
                                 </div>
                             </Field>
                         </div>
                         {d.ambulance_called ? (
                             <InfoCard icon={Activity} tone="warn">
-                                Ambulance escalations are surfaced for WorkSafe review. Consider linking an incident on the
-                                next step.
+                                Ambulance escalations are surfaced for WorkSafe
+                                review. Consider linking an incident on the next
+                                step.
                             </InfoCard>
                         ) : null}
                     </div>
@@ -469,14 +661,30 @@ export function FirstAidReportDialog({
 
                 {stepKey === 'incident' ? (
                     <div className="flex flex-col gap-5">
-                        <StepHead icon={Link2} title="Incident link & notes" blurb="Connect this treatment to its incident and add any follow-up." />
+                        <StepHead
+                            icon={Link2}
+                            title="Incident link & notes"
+                            blurb="Connect this treatment to its incident and add any follow-up."
+                        />
                         <Field label="Incident linkage">
                             <div className="grid gap-2 sm:grid-cols-3">
                                 {(
                                     [
-                                        { key: 'none', label: 'No link', sub: 'First aid only' },
-                                        { key: 'link', label: 'Link incident', sub: 'Pick existing' },
-                                        { key: 'reported', label: 'Mark reportable', sub: 'Escalate later' },
+                                        {
+                                            key: 'none',
+                                            label: 'No link',
+                                            sub: 'First aid only',
+                                        },
+                                        {
+                                            key: 'link',
+                                            label: 'Link incident',
+                                            sub: 'Pick existing',
+                                        },
+                                        {
+                                            key: 'reported',
+                                            label: 'Mark reportable',
+                                            sub: 'Escalate later',
+                                        },
                                     ] as const
                                 ).map((o) => {
                                     const active = d.incident_mode === o.key;
@@ -485,25 +693,42 @@ export function FirstAidReportDialog({
                                             key={o.key}
                                             type="button"
                                             aria-pressed={active}
-                                            onClick={() => set('incident_mode', o.key)}
+                                            onClick={() =>
+                                                set('incident_mode', o.key)
+                                            }
                                             className={`flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-colors ${
-                                                active ? 'border-primary bg-primary/10 ring-1 ring-primary/40' : 'border-border bg-card/50 hover:border-primary/50'
+                                                active
+                                                    ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                                    : 'border-border bg-card/50 hover:border-primary/50'
                                             }`}
                                         >
-                                            <span className="text-sm font-semibold">{o.label}</span>
-                                            <span className="text-xs text-muted-foreground">{o.sub}</span>
+                                            <span className="text-sm font-semibold">
+                                                {o.label}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {o.sub}
+                                            </span>
                                         </button>
                                     );
                                 })}
                             </div>
                         </Field>
                         {d.incident_mode === 'link' ? (
-                            <Field label="Related incident" required error={fieldError('related_incident_id')}>
+                            <Field
+                                label="Related incident"
+                                required
+                                error={fieldError('related_incident_id')}
+                            >
                                 <SelectInput
                                     value={d.related_incident_id}
-                                    onChange={(v) => set('related_incident_id', v)}
+                                    onChange={(v) =>
+                                        set('related_incident_id', v)
+                                    }
                                     placeholder="Search recent incidents…"
-                                    options={incidents.map((i) => ({ value: String(i.id), label: i.label }))}
+                                    options={incidents.map((i) => ({
+                                        value: String(i.id),
+                                        label: i.label,
+                                    }))}
                                 />
                             </Field>
                         ) : null}
@@ -511,7 +736,9 @@ export function FirstAidReportDialog({
                             <Textarea
                                 rows={3}
                                 value={d.first_aider_notes}
-                                onChange={(e) => set('first_aider_notes', e.target.value)}
+                                onChange={(e) =>
+                                    set('first_aider_notes', e.target.value)
+                                }
                                 placeholder="Follow-up, whānau notified, ACC45 lodged…"
                             />
                         </Field>
@@ -520,30 +747,96 @@ export function FirstAidReportDialog({
 
                 {stepKey === 'review' ? (
                     <div className="flex flex-col gap-4">
-                        <StepHead icon={ClipboardCheck} title="Review & record" blurb="Confirm the treatment, then record — or record and add another." />
+                        <StepHead
+                            icon={ClipboardCheck}
+                            title="Review & record"
+                            blurb="Confirm the treatment, then record — or record and add another."
+                        />
                         <div className="grid gap-3 sm:grid-cols-2">
-                            <ReviewCard icon={MapPin} title="Who & where" onEdit={() => setStepIndex(0)}>
-                                <ReviewRow label="Site" value={sites.find((s) => String(s.id) === d.site_id)?.name} />
-                                <ReviewRow label="Person" value={`${d.treated_person_name || '—'} · ${personTypeLabel(d.treated_person_type)}`} />
-                                <ReviewRow label="First-aider" value={firstAiders.find((s) => String(s.id) === d.first_aider_id)?.name} />
+                            <ReviewCard
+                                icon={MapPin}
+                                title="Who & where"
+                                onEdit={() => setStepIndex(0)}
+                            >
+                                <ReviewRow
+                                    label="Site"
+                                    value={
+                                        sites.find(
+                                            (s) => String(s.id) === d.site_id,
+                                        )?.name
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Person"
+                                    value={`${d.treated_person_name || '—'} · ${personTypeLabel(d.treated_person_type)}`}
+                                />
+                                <ReviewRow
+                                    label="First-aider"
+                                    value={
+                                        firstAiders.find(
+                                            (s) =>
+                                                String(s.id) ===
+                                                d.first_aider_id,
+                                        )?.name
+                                    }
+                                />
                             </ReviewCard>
-                            <ReviewCard icon={Activity} title="Injury & outcome" onEdit={() => setStepIndex(1)}>
-                                <ReviewRow label="Injury" value={d.injury_illness_type ? injuryLabel(d.injury_illness_type) : undefined} />
-                                <ReviewRow label="Outcome" value={d.treatment_outcome ? outcomeLabel(d.treatment_outcome) : undefined} />
-                                <ReviewRow label="Ambulance" value={d.ambulance_called ? 'Yes — 111 called' : 'No'} />
+                            <ReviewCard
+                                icon={Activity}
+                                title="Injury & outcome"
+                                onEdit={() => setStepIndex(1)}
+                            >
+                                <ReviewRow
+                                    label="Injury"
+                                    value={
+                                        d.injury_illness_type
+                                            ? injuryLabel(d.injury_illness_type)
+                                            : undefined
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Outcome"
+                                    value={
+                                        d.treatment_outcome
+                                            ? outcomeLabel(d.treatment_outcome)
+                                            : undefined
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Ambulance"
+                                    value={
+                                        d.ambulance_called
+                                            ? 'Yes — 111 called'
+                                            : 'No'
+                                    }
+                                />
                             </ReviewCard>
-                            <ReviewCard icon={Link2} title="Incident & notes" span onEdit={() => setStepIndex(3)}>
+                            <ReviewCard
+                                icon={Link2}
+                                title="Incident & notes"
+                                span
+                                onEdit={() => setStepIndex(3)}
+                            >
                                 <ReviewRow
                                     label="Linkage"
                                     value={
                                         d.incident_mode === 'none'
                                             ? 'Not linked'
                                             : d.incident_mode === 'link'
-                                              ? (incidents.find((i) => String(i.id) === d.related_incident_id)?.reference ?? 'Linked')
+                                              ? (incidents.find(
+                                                    (i) =>
+                                                        String(i.id) ===
+                                                        d.related_incident_id,
+                                                )?.reference ?? 'Linked')
                                               : 'Marked reportable'
                                     }
                                 />
-                                {d.first_aider_notes.trim() ? <ReviewRow label="Notes" value={d.first_aider_notes} /> : null}
+                                {d.first_aider_notes.trim() ? (
+                                    <ReviewRow
+                                        label="Notes"
+                                        value={d.first_aider_notes}
+                                    />
+                                ) : null}
                             </ReviewCard>
                         </div>
                     </div>

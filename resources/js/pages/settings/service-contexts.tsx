@@ -951,7 +951,7 @@ function ContextCard({
                         ) : (
                             <Badge
                                 variant="secondary"
-                                className="bg-muted-foreground/20 border-0 text-[10px] text-muted-foreground"
+                                className="border-0 bg-muted-foreground/20 text-[10px] text-muted-foreground"
                             >
                                 Inactive
                             </Badge>

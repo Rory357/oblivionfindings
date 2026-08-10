@@ -5,11 +5,18 @@ namespace App\Domain\Finance\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\RecurringCharge;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class RecurringChargeController extends Controller
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function index(Request $request)
     {
         $auth = $this->authorizeFinance($request, 'finance.ar.view');
@@ -19,13 +26,14 @@ class RecurringChargeController extends Controller
             'status' => ['nullable', 'string', 'in:active,inactive'],
         ]);
 
-        $charges = RecurringCharge::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $baseQuery = $this->accessibleCharges($auth);
+
+        $charges = (clone $baseQuery)
             ->with(['client:id,first_name,last_name'])
             ->when(
-                !empty($filters['q']),
+                ! empty($filters['q']),
                 fn ($query) => $query->where(function ($innerQuery) use ($filters) {
-                    $search = '%' . $filters['q'] . '%';
+                    $search = '%'.$filters['q'].'%';
 
                     $innerQuery->where('name', 'like', $search)
                         ->orWhere('description', 'like', $search)
@@ -70,18 +78,15 @@ class RecurringChargeController extends Controller
             'filters' => $filters,
             'canManage' => $canManage,
             // Client options for the create/edit modal.
-            'clients' => $canManage ? $this->clientOptions($auth->organization_id) : [],
+            'clients' => $canManage ? $this->clientOptions($auth) : [],
             'stats' => [
-                'active' => RecurringCharge::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                'active' => (clone $baseQuery)
                     ->where('is_active', true)
                     ->count(),
-                'monthly_total' => (float) RecurringCharge::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                'monthly_total' => (float) (clone $baseQuery)
                     ->where('is_active', true)
                     ->sum('amount'),
-                'next_due' => RecurringCharge::query()
-                    ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                'next_due' => (clone $baseQuery)
                     ->where('is_active', true)
                     ->whereDate('next_charge_at', '<=', now()->addDays(7))
                     ->count(),
@@ -103,8 +108,13 @@ class RecurringChargeController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $this->siteAccess->assertCanAccessClientId(
+            $auth,
+            (int) $data['client_id'],
+            ['reports.viewAny'],
+        );
+
         RecurringCharge::create([
-            'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
             'name' => $data['description'],
             'description' => $data['description'],
@@ -127,9 +137,7 @@ class RecurringChargeController extends Controller
     {
         $auth = $this->authorizeFinance($request, 'finance.ar.manage');
 
-        $charge = RecurringCharge::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($charge);
+        $charge = $this->accessibleCharges($auth)->findOrFail($charge);
 
         $data = $request->validate([
             'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
@@ -140,6 +148,23 @@ class RecurringChargeController extends Controller
             'ends_at' => ['nullable', 'date'],
             'is_active' => ['nullable', 'boolean'],
         ]);
+
+        if (array_key_exists('client_id', $data)) {
+            $this->siteAccess->assertCanAccessClientId(
+                $auth,
+                (int) $data['client_id'],
+                ['reports.viewAny'],
+            );
+
+            if (
+                $charge->service_agreement_id
+                && ! $charge->serviceAgreement()->where('client_id', (int) $data['client_id'])->exists()
+            ) {
+                throw ValidationException::withMessages([
+                    'client_id' => 'The recurring charge Client must match its Service Agreement.',
+                ]);
+            }
+        }
 
         if (array_key_exists('description', $data)) {
             $data['name'] = $data['description'];
@@ -159,9 +184,7 @@ class RecurringChargeController extends Controller
     {
         $auth = $this->authorizeFinance($request, 'finance.ar.manage');
 
-        $charge = RecurringCharge::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->findOrFail($charge);
+        $charge = $this->accessibleCharges($auth)->findOrFail($charge);
 
         $charge->delete();
 
@@ -177,15 +200,30 @@ class RecurringChargeController extends Controller
         return $user;
     }
 
-    private function clientOptions(?int $orgId)
+    private function clientOptions(User $user)
     {
-        return Client::query()
-            ->when(
-                $orgId && Schema::hasColumn('clients', 'organization_id'),
-                fn ($query) => $query->where('organization_id', $orgId),
-            )
+        return $this->siteAccess->applyClientScope(
+            Client::query(),
+            $user,
+            ['reports.viewAny'],
+        )
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name']);
+    }
+
+    private function accessibleCharges(User $user): Builder
+    {
+        return RecurringCharge::query()
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $user,
+                ['reports.viewAny'],
+            ))
+            ->where(function (Builder $query): void {
+                $query->whereNull('service_agreement_id')
+                    ->orWhereHas('serviceAgreement', fn (Builder $agreementQuery) => $agreementQuery
+                        ->whereColumn('service_agreements.client_id', 'recurring_charges.client_id'));
+            });
     }
 }

@@ -10,7 +10,12 @@ type Props = {
     statuses: FilterOption[];
 };
 
-export default function DeviceEdit({ device, taxonomy, domains, statuses }: Props) {
+export default function DeviceEdit({
+    device,
+    taxonomy,
+    domains,
+    statuses,
+}: Props) {
     return (
         <DeviceForm
             taxonomy={taxonomy}

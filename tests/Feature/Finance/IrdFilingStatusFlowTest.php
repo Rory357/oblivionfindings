@@ -40,7 +40,7 @@ class IrdFilingStatusFlowTest extends TestCase
 
         $service = app(IrdFilingService::class);
 
-        $filing = $service->createGstFiling(1, $gstReturn, '49091850');
+        $filing = $service->createGstFiling($gstReturn, '49091850');
 
         $this->assertInstanceOf(FinIrdFiling::class, $filing);
         $this->assertSame('draft', $filing->status);
@@ -76,7 +76,7 @@ class IrdFilingStatusFlowTest extends TestCase
         ]);
 
         $service = app(IrdFilingService::class);
-        $filing = $service->createGstFiling(1, $gstReturn, '12345678');
+        $filing = $service->createGstFiling($gstReturn, '12345678');
 
         $errors = $service->validateFiling($filing);
 

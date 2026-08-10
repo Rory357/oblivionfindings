@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Services\PositionService;
 use Illuminate\Console\Command;
 
@@ -20,35 +19,23 @@ class CheckVacanciesCommand extends Command
 
     public function handle(PositionService $positions): int
     {
-        $tenantIds = HrPosition::query()->distinct()->pluck('tenant_id')->filter()->values();
-        if ($tenantIds->isEmpty()) {
-            $tenantIds = collect([1]);
-        }
+        $totalClosed = $positions->syncAllHeadcounts();
+        $understaffed = $positions->getUnderstaffed();
 
-        $totalUnderstaffed = 0;
-        $totalClosed = 0;
-
-        foreach ($tenantIds as $tenantId) {
-            $totalClosed += $positions->syncAllHeadcounts((int) $tenantId);
-
-            $understaffed = $positions->getUnderstaffed((int) $tenantId);
-            $totalUnderstaffed += $understaffed->count();
-
-            foreach ($understaffed as $position) {
-                $this->line(sprintf(
-                    'Understaffed: %s (%s) — %d to hire',
-                    $position->title,
-                    $position->code,
-                    $positions->actionableVacancies($position),
-                ));
-            }
+        foreach ($understaffed as $position) {
+            $this->line(sprintf(
+                'Understaffed: %s (%s) — %d to hire',
+                $position->title,
+                $position->code,
+                $positions->actionableVacancies($position),
+            ));
         }
 
         if ($totalClosed > 0) {
             $this->line("Auto-closed {$totalClosed} filled requisition(s).");
         }
 
-        $this->info("Vacancy check complete. {$totalUnderstaffed} understaffed position(s).");
+        $this->info("Vacancy check complete. {$understaffed->count()} understaffed position(s).");
 
         return self::SUCCESS;
     }

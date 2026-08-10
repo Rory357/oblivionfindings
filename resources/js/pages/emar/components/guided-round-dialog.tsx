@@ -1,14 +1,23 @@
 /* eslint-disable no-restricted-syntax -- dose/resident/summary panes are
    custom-layout bordered surfaces inside the wizard, not Card components; all
    colours are semantic tokens. */
-import { ClientAvatar } from '@/components/meds/board-bits';
-import RoundAuditTimeline, { itemsToAuditEntries, type RoundAuditMeta } from '@/components/emar/rounds/round-audit-timeline';
+import RoundAuditTimeline, {
+    itemsToAuditEntries,
+    type RoundAuditMeta,
+} from '@/components/emar/rounds/round-audit-timeline';
 import { DoseStatusBadge } from '@/components/emar/rounds/round-bits';
-import { doseStatusMeta, type GuidedRound, type RoundItem, type StaffOption } from '@/components/emar/rounds/types';
+import {
+    doseStatusMeta,
+    type GuidedRound,
+    type RoundItem,
+    type StaffOption,
+} from '@/components/emar/rounds/types';
+import { ClientAvatar } from '@/components/meds/board-bits';
 import { MedsWizardDialog } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, InfoCard, SelectInput } from '@/components/wizard/primitives';
+import { submitEmarMutation } from '@/lib/emar-offline';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -33,7 +42,11 @@ import type { ComponentType } from 'react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-type NotGivenReason = { value: string; label: string; requires_detail: boolean };
+type NotGivenReason = {
+    value: string;
+    label: string;
+    requires_detail: boolean;
+};
 
 type Props = {
     guided: GuidedRound;
@@ -56,10 +69,25 @@ function shortMed(name: string): string {
 function fmtWhen(iso: string | null): string {
     if (!iso) return 'just now';
     const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return Number.isNaN(d.getTime())
+        ? ''
+        : d.toLocaleString('en-NZ', {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+          });
 }
 
-export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, signer, canExport, onPrint, onClose }: Props) {
+export default function GuidedRoundDialog({
+    guided,
+    witnesses,
+    notGivenReasons,
+    signer,
+    canExport,
+    onPrint,
+    onClose,
+}: Props) {
     const { round, items, progress } = guided;
     const [stepIndex, setStepIndex] = useState(progress.next_index ?? 0);
     const [identity, setIdentity] = useState(false);
@@ -76,7 +104,8 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
 
     const isSummary = stepIndex >= items.length;
     const item: RoundItem | undefined = items[stepIndex];
-    const showRecorded = !!item?.administration && !reRecording[item.medication_id];
+    const showRecorded =
+        !!item?.administration && !reRecording[item.medication_id];
 
     const resetPanel = () => {
         setPending(null);
@@ -105,10 +134,25 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
         () => [
             ...items.map((it) => {
                 const status = it.administration?.status ?? null;
-                const icon = status === 'given' ? CheckCircle2 : status === 'refused' || status === 'withheld' ? Ban : Pill;
-                return { key: `${it.medication_id}-${it.scheduled_for}`, label: `${firstName(it.client_name)} · ${shortMed(it.medication_name)}`, blurb: it.dose ?? '', icon };
+                const icon =
+                    status === 'given'
+                        ? CheckCircle2
+                        : status === 'refused' || status === 'withheld'
+                          ? Ban
+                          : Pill;
+                return {
+                    key: `${it.medication_id}-${it.scheduled_for}`,
+                    label: `${firstName(it.client_name)} · ${shortMed(it.medication_name)}`,
+                    blurb: it.dose ?? '',
+                    icon,
+                };
             }),
-            { key: 'summary', label: 'Round summary', blurb: `${progress.percent}% complete`, icon: ClipboardCheck },
+            {
+                key: 'summary',
+                label: 'Round summary',
+                blurb: `${progress.percent}% complete`,
+                icon: ClipboardCheck,
+            },
         ],
         [items, progress.percent],
     );
@@ -128,36 +172,75 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
         return true;
     })();
 
-    const submit = () => {
+    const submit = async () => {
         if (!item || !pending) return;
         const medicationId = item.medication_id;
+        const payload = {
+            status: pending,
+            scheduled_for: item.scheduled_for,
+            reason: reason || null,
+            reason_code: pending === 'given' ? null : reasonCode || null,
+            witnessed_by:
+                pending === 'given' && witnessedBy ? Number(witnessedBy) : null,
+            witness_credential: witnessCredential || null,
+            quantity_administered:
+                pending === 'given' && quantityGiven
+                    ? Number(quantityGiven)
+                    : null,
+            blood_glucose_level:
+                pending === 'given' && bloodGlucose
+                    ? Number(bloodGlucose)
+                    : null,
+            pulse_bpm: pending === 'given' && pulse ? Number(pulse) : null,
+            client_request_uuid: crypto.randomUUID(),
+        };
+        const advance = () => {
+            setReRecording((prev) => {
+                const next = { ...prev };
+                delete next[medicationId];
+                return next;
+            });
+            const nextDue = items.findIndex(
+                (it, i) => i > stepIndex && !it.administration,
+            );
+            goTo(nextDue === -1 ? items.length : nextDue);
+        };
+
         setSaving(true);
+
+        if (!navigator.onLine) {
+            try {
+                const result = await submitEmarMutation(
+                    `/emar/rounds/${round.id}/guided/items/${medicationId}`,
+                    payload,
+                    {
+                        action: 'round_admin',
+                        queuedMessage:
+                            'Dose saved on this device and queued to sync when you reconnect.',
+                    },
+                );
+
+                if (result.status === 'queued') {
+                    advance();
+                }
+            } catch {
+                toast.error('Could not save this dose offline');
+            } finally {
+                setSaving(false);
+            }
+
+            return;
+        }
+
         router.post(
             `/emar/rounds/${round.id}/guided/items/${medicationId}`,
-            {
-                status: pending,
-                scheduled_for: item.scheduled_for,
-                reason: reason || null,
-                reason_code: pending === 'given' ? null : reasonCode || null,
-                witnessed_by: pending === 'given' && witnessedBy ? Number(witnessedBy) : null,
-                witness_credential: witnessCredential || null,
-                quantity_administered: pending === 'given' && quantityGiven ? Number(quantityGiven) : null,
-                blood_glucose_level: pending === 'given' && bloodGlucose ? Number(bloodGlucose) : null,
-                pulse_bpm: pending === 'given' && pulse ? Number(pulse) : null,
-                client_request_uuid: crypto.randomUUID(),
-            },
+            payload,
             {
                 preserveState: true,
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success(`Dose ${pending}`);
-                    setReRecording((prev) => {
-                        const next = { ...prev };
-                        delete next[medicationId];
-                        return next;
-                    });
-                    const nextDue = items.findIndex((it, i) => i > stepIndex && !it.administration);
-                    goTo(nextDue === -1 ? items.length : nextDue);
+                    advance();
                 },
                 onError: () => toast.error('Could not record this dose'),
                 onFinish: () => setSaving(false),
@@ -167,14 +250,18 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
 
     const finish = () => {
         setSaving(true);
-        router.post(`/emar/rounds/${round.id}/guided/complete`, {}, {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Round completed');
-                onClose();
+        router.post(
+            `/emar/rounds/${round.id}/guided/complete`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Round completed');
+                    onClose();
+                },
+                onFinish: () => setSaving(false),
             },
-            onFinish: () => setSaving(false),
-        });
+        );
     };
 
     const goToFirstDue = () => {
@@ -217,7 +304,11 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
         </>
     ) : (
         <>
-            <Button variant="ghost" onClick={() => goTo(Math.max(0, stepIndex - 1))} disabled={stepIndex === 0}>
+            <Button
+                variant="ghost"
+                onClick={() => goTo(Math.max(0, stepIndex - 1))}
+                disabled={stepIndex === 0}
+            >
                 Previous
             </Button>
             <Button variant="outline" onClick={() => goTo(stepIndex + 1)}>
@@ -235,17 +326,29 @@ export default function GuidedRoundDialog({ guided, witnesses, notGivenReasons, 
             railIcon={Pill}
             railTitle={round.name}
             railSubtitle={`${round.scheduled_time} · ±${round.window_minutes} min`}
-            railFooter={<span className="text-xs text-muted-foreground">Round progress {progress.percent}%</span>}
+            railFooter={
+                <span className="text-xs text-muted-foreground">
+                    Round progress {progress.percent}%
+                </span>
+            }
             steps={steps}
             stepIndex={stepIndex}
             onStepClick={(i) => goTo(i)}
             footer={footer}
         >
             {isSummary ? (
-                <SummaryPane round={round} progress={progress} entries={itemsToAuditEntries(items)} meta={summaryMeta(guided)} />
+                <SummaryPane
+                    round={round}
+                    progress={progress}
+                    entries={itemsToAuditEntries(items)}
+                    meta={summaryMeta(guided)}
+                />
             ) : item ? (
                 showRecorded ? (
-                    <RecordedPane item={item} onReRecord={() => startReRecord(item.medication_id)} />
+                    <RecordedPane
+                        item={item}
+                        onReRecord={() => startReRecord(item.medication_id)}
+                    />
                 ) : (
                     <DosePane
                         item={item}
@@ -291,9 +394,22 @@ function summaryMeta(guided: GuidedRound): RoundAuditMeta {
     };
 }
 
-function FlagPill({ icon: Icon, label, tone }: { icon: ComponentType<{ className?: string }>; label: string; tone: string }) {
+function FlagPill({
+    icon: Icon,
+    label,
+    tone,
+}: {
+    icon: ComponentType<{ className?: string }>;
+    label: string;
+    tone: string;
+}) {
     return (
-        <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', tone)}>
+        <span
+            className={cn(
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                tone,
+            )}
+        >
             <Icon className="h-3 w-3" />
             {label}
         </span>
@@ -302,21 +418,41 @@ function FlagPill({ icon: Icon, label, tone }: { icon: ComponentType<{ className
 
 function DoseCard({ item }: { item: RoundItem }) {
     const hasFlags =
-        item.is_controlled || item.requires_witness || item.is_high_risk || item.requires_blood_glucose || item.requires_pulse;
+        item.is_controlled ||
+        item.requires_witness ||
+        item.is_high_risk ||
+        item.requires_blood_glucose ||
+        item.requires_pulse;
     return (
         <div className="overflow-hidden rounded-xl border">
             <div className="flex items-center gap-3.5 border-b bg-muted/40 p-4">
-                <ClientAvatar name={item.client_name} clientId={item.client_id} className="h-13 w-13 text-base" />
+                <ClientAvatar
+                    name={item.client_name}
+                    clientId={item.client_id}
+                    className="h-13 w-13 text-base"
+                />
                 <div className="min-w-0 flex-1">
-                    <div className="text-[17px] font-bold">{item.client_name}</div>
-                    <div className="text-xs text-muted-foreground">{item.site_name ?? '—'}</div>
+                    <div className="text-[17px] font-bold">
+                        {item.client_name}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                        {item.site_name ?? '—'}
+                    </div>
                 </div>
-                {item.administration ? <DoseStatusBadge status={item.administration.status} /> : null}
+                {item.administration ? (
+                    <DoseStatusBadge status={item.administration.status} />
+                ) : null}
             </div>
             <div className="flex flex-col gap-2.5 p-4">
                 <div className="flex flex-wrap items-baseline gap-2">
-                    <span className="text-[19px] font-bold">{item.medication_name}</span>
-                    <span className="text-sm text-muted-foreground">{[item.dose, item.route, item.form].filter(Boolean).join(' · ')}</span>
+                    <span className="text-[19px] font-bold">
+                        {item.medication_name}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                        {[item.dose, item.route, item.form]
+                            .filter(Boolean)
+                            .join(' · ')}
+                    </span>
                 </div>
                 {item.instructions ? (
                     <InfoCard icon={AlertTriangle} tone="warn">
@@ -325,11 +461,41 @@ function DoseCard({ item }: { item: RoundItem }) {
                 ) : null}
                 {hasFlags ? (
                     <div className="flex flex-wrap gap-1.5">
-                        {item.is_controlled ? <FlagPill icon={ShieldAlert} label="Controlled drug" tone="bg-status-info-bg text-status-info" /> : null}
-                        {item.requires_witness ? <FlagPill icon={Users} label="Witness required" tone="bg-status-warning-bg text-status-warning" /> : null}
-                        {item.is_high_risk ? <FlagPill icon={AlertTriangle} label="High-risk" tone="bg-status-critical-bg text-status-critical" /> : null}
-                        {item.requires_blood_glucose ? <FlagPill icon={Droplet} label="Record blood glucose" tone="bg-status-info-bg text-status-info" /> : null}
-                        {item.requires_pulse ? <FlagPill icon={Heart} label="Check apical pulse" tone="bg-status-info-bg text-status-info" /> : null}
+                        {item.is_controlled ? (
+                            <FlagPill
+                                icon={ShieldAlert}
+                                label="Controlled drug"
+                                tone="bg-status-info-bg text-status-info"
+                            />
+                        ) : null}
+                        {item.requires_witness ? (
+                            <FlagPill
+                                icon={Users}
+                                label="Witness required"
+                                tone="bg-status-warning-bg text-status-warning"
+                            />
+                        ) : null}
+                        {item.is_high_risk ? (
+                            <FlagPill
+                                icon={AlertTriangle}
+                                label="High-risk"
+                                tone="bg-status-critical-bg text-status-critical"
+                            />
+                        ) : null}
+                        {item.requires_blood_glucose ? (
+                            <FlagPill
+                                icon={Droplet}
+                                label="Record blood glucose"
+                                tone="bg-status-info-bg text-status-info"
+                            />
+                        ) : null}
+                        {item.requires_pulse ? (
+                            <FlagPill
+                                icon={Heart}
+                                label="Check apical pulse"
+                                tone="bg-status-info-bg text-status-info"
+                            />
+                        ) : null}
                     </div>
                 ) : null}
             </div>
@@ -364,7 +530,8 @@ type DosePaneProps = {
 };
 
 function DosePane(props: DosePaneProps) {
-    const { item, identity, setIdentity, pending, setPending, canRecord } = props;
+    const { item, identity, setIdentity, pending, setPending, canRecord } =
+        props;
     return (
         <div className="flex flex-col gap-4">
             <DoseCard item={item} />
@@ -372,14 +539,24 @@ function DosePane(props: DosePaneProps) {
             <label
                 className={cn(
                     'flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3',
-                    identity ? 'border-status-success/40 bg-status-success-bg' : 'bg-card',
+                    identity
+                        ? 'border-status-success/40 bg-status-success-bg'
+                        : 'bg-card',
                 )}
             >
-                <input type="checkbox" checked={identity} onChange={(e) => setIdentity(e.target.checked)} className="mt-0.5 h-4 w-4" />
+                <input
+                    type="checkbox"
+                    checked={identity}
+                    onChange={(e) => setIdentity(e.target.checked)}
+                    className="mt-0.5 h-4 w-4"
+                />
                 <span>
-                    <span className="block text-sm font-semibold">Right resident, right medication</span>
+                    <span className="block text-sm font-semibold">
+                        Right resident, right medication
+                    </span>
                     <span className="mt-0.5 block text-[11.5px] text-muted-foreground">
-                        I have confirmed identity against the photo and NHI, and checked the medication, dose, route and time.
+                        I have confirmed identity against the photo and NHI, and
+                        checked the medication, dose, route and time.
                     </span>
                 </span>
             </label>
@@ -387,21 +564,38 @@ function DosePane(props: DosePaneProps) {
             {!pending ? (
                 <>
                     <div className="grid grid-cols-3 gap-2">
-                        <Button variant="outline" className="h-12 text-sm" disabled={!identity || !canRecord} onClick={() => setPending('given')}>
+                        <Button
+                            variant="outline"
+                            className="h-12 text-sm"
+                            disabled={!identity || !canRecord}
+                            onClick={() => setPending('given')}
+                        >
                             <Check className="h-4 w-4" />
                             Given
                         </Button>
-                        <Button variant="outline" className="h-12 text-sm" disabled={!identity || !canRecord} onClick={() => setPending('refused')}>
+                        <Button
+                            variant="outline"
+                            className="h-12 text-sm"
+                            disabled={!identity || !canRecord}
+                            onClick={() => setPending('refused')}
+                        >
                             <Ban className="h-4 w-4" />
                             Refused
                         </Button>
-                        <Button variant="outline" className="h-12 text-sm" disabled={!identity || !canRecord} onClick={() => setPending('held')}>
+                        <Button
+                            variant="outline"
+                            className="h-12 text-sm"
+                            disabled={!identity || !canRecord}
+                            onClick={() => setPending('held')}
+                        >
                             <Hand className="h-4 w-4" />
                             Held
                         </Button>
                     </div>
                     {!identity ? (
-                        <p className="text-center text-[11.5px] text-muted-foreground">Confirm identity above to enable recording.</p>
+                        <p className="text-center text-[11.5px] text-muted-foreground">
+                            Confirm identity above to enable recording.
+                        </p>
                     ) : null}
                 </>
             ) : (
@@ -413,13 +607,35 @@ function DosePane(props: DosePaneProps) {
 
 function ConfirmPanel(props: DosePaneProps) {
     const {
-        item, pending, reasonCode, setReasonCode, reason, setReason, reasonObj, notGivenReasons,
-        witnesses, witnessedBy, setWitnessedBy, witnessCredential, setWitnessCredential,
-        quantityGiven, setQuantityGiven, bloodGlucose, setBloodGlucose, pulse, setPulse,
+        item,
+        pending,
+        reasonCode,
+        setReasonCode,
+        reason,
+        setReason,
+        reasonObj,
+        notGivenReasons,
+        witnesses,
+        witnessedBy,
+        setWitnessedBy,
+        witnessCredential,
+        setWitnessCredential,
+        quantityGiven,
+        setQuantityGiven,
+        bloodGlucose,
+        setBloodGlucose,
+        pulse,
+        setPulse,
     } = props;
 
-    const title = pending === 'given' ? 'Confirm administration' : pending === 'refused' ? 'Record refusal' : 'Record withheld dose';
-    const tone = pending === 'given' ? 'text-status-success' : 'text-status-warning';
+    const title =
+        pending === 'given'
+            ? 'Confirm administration'
+            : pending === 'refused'
+              ? 'Record refusal'
+              : 'Record withheld dose';
+    const tone =
+        pending === 'given' ? 'text-status-success' : 'text-status-warning';
 
     return (
         <div className="flex flex-col gap-4 rounded-xl border bg-background p-4">
@@ -431,16 +647,30 @@ function ConfirmPanel(props: DosePaneProps) {
                             value={reasonCode}
                             onChange={setReasonCode}
                             placeholder="Select reason…"
-                            options={notGivenReasons.map((r) => ({ value: r.value, label: r.label }))}
+                            options={notGivenReasons.map((r) => ({
+                                value: r.value,
+                                label: r.label,
+                            }))}
                         />
                     </Field>
-                    <Field label="Reason detail" required={!!reasonObj?.requires_detail}>
-                        <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Add a note" />
+                    <Field
+                        label="Reason detail"
+                        required={!!reasonObj?.requires_detail}
+                    >
+                        <Input
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            placeholder="Add a note"
+                        />
                     </Field>
                 </>
             ) : null}
             {pending === 'given' && item.is_controlled ? (
-                <Field label="Units given" required hint="Removed from CD stock — the register entry uses this quantity.">
+                <Field
+                    label="Units given"
+                    required
+                    hint="Removed from CD stock — the register entry uses this quantity."
+                >
                     <Input
                         type="number"
                         min={0.25}
@@ -453,43 +683,102 @@ function ConfirmPanel(props: DosePaneProps) {
             ) : null}
             {pending === 'given' && item.requires_witness ? (
                 <>
-                    <Field label="Controlled-drug witness" required hint="Both signatures are written to the CD register.">
+                    <Field
+                        label="Controlled-drug witness"
+                        required
+                        hint="Both signatures are written to the CD register."
+                    >
                         <SelectInput
                             value={witnessedBy}
                             onChange={setWitnessedBy}
                             placeholder="Select a second signatory…"
-                            options={witnesses.map((w) => ({ value: String(w.id), label: w.name }))}
+                            options={witnesses.map((w) => ({
+                                value: String(w.id),
+                                label: w.name,
+                            }))}
                         />
                     </Field>
                     <Field label="Witness password / PIN">
-                        <Input type="password" value={witnessCredential} onChange={(e) => setWitnessCredential(e.target.value)} placeholder="Re-authenticate" />
+                        <Input
+                            type="password"
+                            value={witnessCredential}
+                            onChange={(e) =>
+                                setWitnessCredential(e.target.value)
+                            }
+                            placeholder="Re-authenticate"
+                        />
                     </Field>
                 </>
             ) : null}
             {pending === 'given' && item.requires_blood_glucose ? (
                 <Field label="Blood glucose (mmol/L)" required>
-                    <Input type="number" step="0.1" value={bloodGlucose} onChange={(e) => setBloodGlucose(e.target.value)} placeholder="e.g. 7.2" />
+                    <Input
+                        type="number"
+                        step="0.1"
+                        value={bloodGlucose}
+                        onChange={(e) => setBloodGlucose(e.target.value)}
+                        placeholder="e.g. 7.2"
+                    />
                 </Field>
             ) : null}
             {pending === 'given' && item.requires_pulse ? (
-                <Field label="Apical pulse (bpm)" required hint="Withhold and tell the nurse if under 60 bpm.">
-                    <Input type="number" value={pulse} onChange={(e) => setPulse(e.target.value)} placeholder="e.g. 72" />
+                <Field
+                    label="Apical pulse (bpm)"
+                    required
+                    hint="Withhold and tell the nurse if under 60 bpm."
+                >
+                    <Input
+                        type="number"
+                        value={pulse}
+                        onChange={(e) => setPulse(e.target.value)}
+                        placeholder="e.g. 72"
+                    />
                 </Field>
             ) : null}
         </div>
     );
 }
 
-function RecordedPane({ item, onReRecord }: { item: RoundItem; onReRecord: () => void }) {
+function RecordedPane({
+    item,
+    onReRecord,
+}: {
+    item: RoundItem;
+    onReRecord: () => void;
+}) {
     const a = item.administration!;
     const meta = doseStatusMeta(a.status);
-    const toneText = meta.tone === 'success' ? 'text-status-success' : meta.tone === 'critical' ? 'text-status-critical' : 'text-status-warning';
-    const toneBg = meta.tone === 'success' ? 'bg-status-success-bg' : meta.tone === 'critical' ? 'bg-status-critical-bg' : 'bg-status-warning-bg';
-    const dotBg = meta.tone === 'success' ? 'bg-status-success' : meta.tone === 'critical' ? 'bg-status-critical' : 'bg-status-warning';
-    const Icon = a.status === 'given' ? Check : a.status === 'refused' ? Ban : a.status === 'missed' ? AlertTriangle : Hand;
+    const toneText =
+        meta.tone === 'success'
+            ? 'text-status-success'
+            : meta.tone === 'critical'
+              ? 'text-status-critical'
+              : 'text-status-warning';
+    const toneBg =
+        meta.tone === 'success'
+            ? 'bg-status-success-bg'
+            : meta.tone === 'critical'
+              ? 'bg-status-critical-bg'
+              : 'bg-status-warning-bg';
+    const dotBg =
+        meta.tone === 'success'
+            ? 'bg-status-success'
+            : meta.tone === 'critical'
+              ? 'bg-status-critical'
+              : 'bg-status-warning';
+    const Icon =
+        a.status === 'given'
+            ? Check
+            : a.status === 'refused'
+              ? Ban
+              : a.status === 'missed'
+                ? AlertTriangle
+                : Hand;
     const chips = [
         a.witnessed_by ? `Witness: ${a.witnessed_by}` : null,
-        a.blood_glucose_level != null ? `BG ${a.blood_glucose_level} mmol/L` : null,
+        a.blood_glucose_level != null
+            ? `BG ${a.blood_glucose_level} mmol/L`
+            : null,
         a.pulse_bpm != null ? `Pulse ${a.pulse_bpm} bpm` : null,
     ].filter(Boolean) as string[];
 
@@ -498,26 +787,41 @@ function RecordedPane({ item, onReRecord }: { item: RoundItem; onReRecord: () =>
             <DoseCard item={item} />
             <div className={cn('rounded-xl border p-4', toneBg)}>
                 <div className="flex items-center gap-3">
-                    <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-full text-white', dotBg)}>
+                    <span
+                        className={cn(
+                            'grid h-8 w-8 shrink-0 place-items-center rounded-full text-white',
+                            dotBg,
+                        )}
+                    >
                         <Icon className="h-4 w-4" />
                     </span>
                     <div>
-                        <div className={cn('text-sm font-bold', toneText)}>Recorded as {meta.label}</div>
+                        <div className={cn('text-sm font-bold', toneText)}>
+                            Recorded as {meta.label}
+                        </div>
                         <div className="text-[11.5px] text-muted-foreground">
-                            {(a.administered_by ?? 'Staff')} · {fmtWhen(a.administered_at)}
+                            {a.administered_by ?? 'Staff'} ·{' '}
+                            {fmtWhen(a.administered_at)}
                         </div>
                     </div>
                 </div>
                 {chips.length > 0 ? (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                         {chips.map((c) => (
-                            <span key={c} className="rounded-md border bg-card px-2 py-0.5 text-[11.5px]">
+                            <span
+                                key={c}
+                                className="rounded-md border bg-card px-2 py-0.5 text-[11.5px]"
+                            >
                                 {c}
                             </span>
                         ))}
                     </div>
                 ) : null}
-                {a.reason ? <div className="mt-2 text-xs text-foreground italic">“{a.reason}”</div> : null}
+                {a.reason ? (
+                    <div className="mt-2 text-xs text-foreground italic">
+                        “{a.reason}”
+                    </div>
+                ) : null}
                 <div className="mt-3">
                     <Button variant="ghost" size="sm" onClick={onReRecord}>
                         <Pencil className="h-4 w-4" />
@@ -529,7 +833,17 @@ function RecordedPane({ item, onReRecord }: { item: RoundItem; onReRecord: () =>
     );
 }
 
-function SummaryStat({ label, value, tone, bg }: { label: string; value: number; tone: string; bg: string }) {
+function SummaryStat({
+    label,
+    value,
+    tone,
+    bg,
+}: {
+    label: string;
+    value: number;
+    tone: string;
+    bg: string;
+}) {
     return (
         <div className={cn('rounded-xl px-2 py-3 text-center', bg)}>
             <div className={cn('text-[19px] font-bold', tone)}>{value}</div>
@@ -556,13 +870,21 @@ function SummaryPane({
                 <span
                     className={cn(
                         'grid h-16 w-16 place-items-center rounded-full',
-                        done ? 'bg-status-success-bg text-status-success' : 'bg-status-warning-bg text-status-warning',
+                        done
+                            ? 'bg-status-success-bg text-status-success'
+                            : 'bg-status-warning-bg text-status-warning',
                     )}
                 >
-                    {done ? <Check className="h-8 w-8" /> : <Clock className="h-8 w-8" />}
+                    {done ? (
+                        <Check className="h-8 w-8" />
+                    ) : (
+                        <Clock className="h-8 w-8" />
+                    )}
                 </span>
                 <div>
-                    <h2 className="text-xl font-bold">{done ? 'Round complete' : 'Round summary'}</h2>
+                    <h2 className="text-xl font-bold">
+                        {done ? 'Round complete' : 'Round summary'}
+                    </h2>
                     <p className="mx-auto mt-1 max-w-[440px] text-[13px] leading-relaxed text-muted-foreground">
                         {done
                             ? `Every dose in ${round.name} has been recorded. Refusals and held doses are flagged for follow-up.`
@@ -572,10 +894,30 @@ function SummaryPane({
             </div>
 
             <div className="grid grid-cols-4 gap-2">
-                <SummaryStat label="Given" value={progress.given} tone="text-status-success" bg="bg-status-success-bg" />
-                <SummaryStat label="Refused" value={progress.refused} tone="text-status-warning" bg="bg-status-warning-bg" />
-                <SummaryStat label="Held" value={progress.held} tone="text-status-warning" bg="bg-status-warning-bg" />
-                <SummaryStat label="Due" value={progress.pending} tone="text-status-critical" bg="bg-status-critical-bg" />
+                <SummaryStat
+                    label="Given"
+                    value={progress.given}
+                    tone="text-status-success"
+                    bg="bg-status-success-bg"
+                />
+                <SummaryStat
+                    label="Refused"
+                    value={progress.refused}
+                    tone="text-status-warning"
+                    bg="bg-status-warning-bg"
+                />
+                <SummaryStat
+                    label="Held"
+                    value={progress.held}
+                    tone="text-status-warning"
+                    bg="bg-status-warning-bg"
+                />
+                <SummaryStat
+                    label="Due"
+                    value={progress.pending}
+                    tone="text-status-critical"
+                    bg="bg-status-critical-bg"
+                />
             </div>
 
             <div className="border-t pt-4">

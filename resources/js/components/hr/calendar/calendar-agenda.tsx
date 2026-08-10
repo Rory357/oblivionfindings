@@ -41,8 +41,13 @@ export function CalendarAgenda({
 }) {
     const t0 = dayStart(today);
     const upcoming = events
-        .filter((e) => dayStart(new Date(e.end || e.start)).getTime() >= t0.getTime())
-        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+        .filter(
+            (e) =>
+                dayStart(new Date(e.end || e.start)).getTime() >= t0.getTime(),
+        )
+        .sort(
+            (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),
+        );
 
     const byDay = new Map<string, CalendarLayerFeed[]>();
     for (const e of upcoming) {
@@ -93,11 +98,35 @@ export function CalendarAgenda({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {groups.map((grp) => (
                 <div key={grp.label}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 9 }}>
-                        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>{grp.label}</h3>
-                        <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>{fmtDayMon(grp.d)}</span>
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'baseline',
+                            gap: 10,
+                            marginBottom: 9,
+                        }}
+                    >
+                        <h3
+                            style={{ margin: 0, fontSize: 14, fontWeight: 700 }}
+                        >
+                            {grp.label}
+                        </h3>
+                        <span
+                            style={{
+                                fontSize: 12,
+                                color: 'var(--muted-foreground)',
+                            }}
+                        >
+                            {fmtDayMon(grp.d)}
+                        </span>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    <div
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 7,
+                        }}
+                    >
                         {grp.items.map((e) => {
                             const c = colorVar(e);
                             const ro = e.layer !== 'event';
@@ -107,15 +136,26 @@ export function CalendarAgenda({
                                 ? ''
                                 : `${Math.round((end.getTime() - start.getTime()) / 60000)} min`;
                             const sub = secondaryFor(e);
-                            const meta = layerLabel(e) + (sub ? ` · ${sub}` : '');
+                            const meta =
+                                layerLabel(e) + (sub ? ` · ${sub}` : '');
                             return (
                                 <button
                                     key={e.id}
                                     type="button"
-                                    onClick={(ev) => handlers.onEntryClick(e, ev.clientX, ev.clientY)}
+                                    onClick={(ev) =>
+                                        handlers.onEntryClick(
+                                            e,
+                                            ev.clientX,
+                                            ev.clientY,
+                                        )
+                                    }
                                     onContextMenu={(ev) => {
                                         ev.preventDefault();
-                                        handlers.onEntryCtx(e, ev.clientX, ev.clientY);
+                                        handlers.onEntryCtx(
+                                            e,
+                                            ev.clientX,
+                                            ev.clientY,
+                                        );
                                     }}
                                     className="hrcal-agenda-row"
                                     style={{
@@ -131,16 +171,60 @@ export function CalendarAgenda({
                                         boxShadow: '0 1px 2px rgba(0,0,0,.03)',
                                     }}
                                 >
-                                    <span style={{ height: 38, width: 4, flex: 'none', borderRadius: 9999, background: c }} />
+                                    <span
+                                        style={{
+                                            height: 38,
+                                            width: 4,
+                                            flex: 'none',
+                                            borderRadius: 9999,
+                                            background: c,
+                                        }}
+                                    />
                                     <span style={{ width: 64, flex: 'none' }}>
-                                        <span style={{ display: 'block', fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                                            {e.allDay ? 'All day' : fmtTime(start)}
+                                        <span
+                                            style={{
+                                                display: 'block',
+                                                fontSize: 13,
+                                                fontWeight: 700,
+                                                fontVariantNumeric:
+                                                    'tabular-nums',
+                                            }}
+                                        >
+                                            {e.allDay
+                                                ? 'All day'
+                                                : fmtTime(start)}
                                         </span>
-                                        <span style={{ display: 'block', fontSize: 11, color: 'var(--muted-foreground)' }}>{dur}</span>
+                                        <span
+                                            style={{
+                                                display: 'block',
+                                                fontSize: 11,
+                                                color: 'var(--muted-foreground)',
+                                            }}
+                                        >
+                                            {dur}
+                                        </span>
                                     </span>
                                     <span style={{ minWidth: 0, flex: 1 }}>
-                                        <span style={{ display: 'block', fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>{e.title}</span>
-                                        <span style={{ display: 'block', fontSize: 12, color: 'var(--muted-foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <span
+                                            style={{
+                                                display: 'block',
+                                                fontSize: 14,
+                                                fontWeight: 600,
+                                                lineHeight: 1.3,
+                                            }}
+                                        >
+                                            {e.title}
+                                        </span>
+                                        <span
+                                            style={{
+                                                display: 'block',
+                                                fontSize: 12,
+                                                color: 'var(--muted-foreground)',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                            }}
+                                        >
                                             {meta}
                                         </span>
                                     </span>
@@ -165,7 +249,9 @@ export function CalendarAgenda({
                                             tabIndex={-1}
                                             onClick={(ev) => {
                                                 ev.stopPropagation();
-                                                handlers.onDeepLink(e.deepLink!);
+                                                handlers.onDeepLink(
+                                                    e.deepLink!,
+                                                );
                                             }}
                                             style={{
                                                 display: 'inline-flex',
@@ -178,7 +264,16 @@ export function CalendarAgenda({
                                             }}
                                         >
                                             Open in {deepName(e)}
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <svg
+                                                width="13"
+                                                height="13"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                            >
                                                 <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                                             </svg>
                                         </span>

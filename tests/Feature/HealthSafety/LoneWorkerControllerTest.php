@@ -3,6 +3,7 @@
 namespace Tests\Feature\HealthSafety;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
@@ -12,6 +13,7 @@ use App\Models\Shift;
 use App\Models\ShiftGpsLog;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -32,21 +34,22 @@ class LoneWorkerControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
-            'organization_id' => 1,
             'role' => 'admin',
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
-        $this->site = Site::factory()->create(['tenant_id' => 1]);
+        $this->site = Site::factory()->create();
     }
 
     private function makeSession(array $overrides = []): LoneWorkerSession
     {
+        $worker = $this->sessionWorker();
+
         return LoneWorkerSession::create(array_merge([
-            'user_id' => User::factory()->create(['organization_id' => 1])->id,
+            'user_id' => $worker->id,
             'site_id' => $this->site->id,
             'started_at' => now()->subHour(),
             'expected_end_at' => now()->addHours(2),
@@ -79,21 +82,20 @@ class LoneWorkerControllerTest extends TestCase
 
     public function test_start_session_links_shift_and_prefills_gps(): void
     {
-        $worker = User::factory()->create(['organization_id' => 1]);
+        $worker = $this->supportWorker();
         $site = $this->site;
-        $client = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $site->id,
-        ]);
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $shift = Shift::factory()->create([
-            'organization_id' => 1,
             'user_id' => $worker->id,
             'site_id' => $site->id,
             'client_id' => $client->id,
+            'starts_at' => now()->subHour(),
             'ends_at' => now()->addHours(3),
+            'actual_starts_at' => now()->subHour(),
+            'started_by' => $worker->id,
+            'status' => 'in_progress',
         ]);
         ShiftGpsLog::create([
-            'organization_id' => 1,
             'shift_id' => $shift->id,
             'user_id' => $worker->id,
             'event_type' => 'ping',
@@ -138,8 +140,8 @@ class LoneWorkerControllerTest extends TestCase
         $this->assertSame('emergency', $session->status);
         $this->assertNotNull($session->emergency_triggered_at);
         $this->assertSame(1, $session->checkIns()->where('status', 'emergency')->count());
-        // Canonical alert raised via the signal pipeline.
-        $this->assertTrue(ControlRoomAlert::where('source', 'lone_worker')->exists());
+        $this->assertSame(0, $session->alerts()->count());
+        $this->assertSame(1, ControlRoomAlert::where('source', 'lone_worker')->count());
     }
 
     public function test_update_session_extends_and_clears_overdue(): void
@@ -314,7 +316,7 @@ class LoneWorkerControllerTest extends TestCase
     public function test_worker_cannot_check_into_another_workers_session(): void
     {
         $worker = $this->supportWorker();
-        $otherWorker = User::factory()->create(['organization_id' => 1]);
+        $otherWorker = $this->sessionWorker();
 
         $session = $this->makeSession(['user_id' => $otherWorker->id, 'status' => 'active']);
 
@@ -382,10 +384,33 @@ class LoneWorkerControllerTest extends TestCase
     private function supportWorker(): User
     {
         $worker = User::factory()->create([
-            'organization_id' => 1,
+            'role' => 'support_worker',
             'approved_at' => now(),
         ]);
         $worker->roles()->attach(Role::where('name', 'support_worker')->first());
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
+
+        return $worker;
+    }
+
+    private function sessionWorker(): User
+    {
+        $worker = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+        ]);
 
         return $worker;
     }
@@ -400,12 +425,8 @@ class LoneWorkerControllerTest extends TestCase
      */
     private function clockedInShift(User $worker): array
     {
-        $client = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $this->site->id,
-        ]);
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         $shift = Shift::factory()->create([
-            'organization_id' => 1,
             'user_id' => $worker->id,
             'client_id' => $client->id,
             'site_id' => $this->site->id,
@@ -436,23 +457,23 @@ class LoneWorkerControllerTest extends TestCase
         // and neither on-call — isolating the explicit flag as the only reason a
         // shift is treated as lone.
         $site = $this->site;
-        $client = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $site->id,
-        ]);
-        $mk = fn (bool $flagged) => Shift::create([
-            'organization_id' => 1,
-            'user_id' => User::factory()->create(['organization_id' => 1])->id,
-            'client_id' => $client->id,
-            'site_id' => $site->id,
-            'starts_at' => now()->subHour(),
-            'ends_at' => now()->addHours(2),
-            'actual_starts_at' => now()->subHour(),
-            'status' => 'in_progress',
-            'is_on_call' => false,
-            'is_lone_worker' => $flagged,
-            'created_by' => $this->admin->id,
-        ]);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $mk = function (bool $flagged) use ($client, $site): Shift {
+            $worker = $this->supportWorker();
+
+            return Shift::create([
+                'user_id' => $worker->id,
+                'client_id' => $client->id,
+                'site_id' => $site->id,
+                'starts_at' => now()->subHour(),
+                'ends_at' => now()->addHours(2),
+                'actual_starts_at' => now()->subHour(),
+                'status' => 'in_progress',
+                'is_on_call' => false,
+                'is_lone_worker' => $flagged,
+                'created_by' => $this->admin->id,
+            ]);
+        };
         $mk(true);   // flagged → lone
         $mk(false);  // co-worker at same site → not solo, not on-call, not flagged → not lone
 

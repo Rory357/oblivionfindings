@@ -1,6 +1,6 @@
-import { useEffect, useState, type ComponentType } from 'react';
-import { Check, CheckCircle2, RadioTower, Truck, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Check, CheckCircle2, RadioTower, Truck, X, Zap } from 'lucide-react';
+import { useEffect, useState, type ComponentType } from 'react';
 
 type Tone = 'info' | 'warning' | 'critical' | 'primary';
 
@@ -49,14 +49,43 @@ const STEPS: Step[] = [
     },
 ];
 
-const TONE: Record<Tone, { text: string; bg: string; ring: string; dot: string }> = {
-    info: { text: 'text-status-info', bg: 'bg-status-info-bg', ring: 'border-status-info/40', dot: 'bg-status-info' },
-    warning: { text: 'text-status-warning', bg: 'bg-status-warning-bg', ring: 'border-status-warning/40', dot: 'bg-status-warning' },
-    critical: { text: 'text-status-critical', bg: 'bg-status-critical-bg', ring: 'border-status-critical/40', dot: 'bg-status-critical' },
-    primary: { text: 'text-primary', bg: 'bg-primary/10', ring: 'border-primary/40', dot: 'bg-primary' },
+const TONE: Record<
+    Tone,
+    { text: string; bg: string; ring: string; dot: string }
+> = {
+    info: {
+        text: 'text-status-info',
+        bg: 'bg-status-info-bg',
+        ring: 'border-status-info/40',
+        dot: 'bg-status-info',
+    },
+    warning: {
+        text: 'text-status-warning',
+        bg: 'bg-status-warning-bg',
+        ring: 'border-status-warning/40',
+        dot: 'bg-status-warning',
+    },
+    critical: {
+        text: 'text-status-critical',
+        bg: 'bg-status-critical-bg',
+        ring: 'border-status-critical/40',
+        dot: 'bg-status-critical',
+    },
+    primary: {
+        text: 'text-primary',
+        bg: 'bg-primary/10',
+        ring: 'border-primary/40',
+        dot: 'bg-primary',
+    },
 };
 
-export function FleetTelematicsStoryboard({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function FleetTelematicsStoryboard({
+    open,
+    onClose,
+}: {
+    open: boolean;
+    onClose: () => void;
+}) {
     const [step, setStep] = useState(0);
 
     useEffect(() => {
@@ -79,18 +108,41 @@ export function FleetTelematicsStoryboard({ open, onClose }: { open: boolean; on
     const Icon = cur.icon;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label="Telematics crash-detection storyboard" onClick={onClose}>
-            <div className="my-4 w-full max-w-2xl rounded-2xl border border-border bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Telematics crash-detection storyboard"
+            onClick={onClose}
+        >
+            <div
+                className="my-4 w-full max-w-2xl rounded-2xl border border-border bg-card shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 border-b border-border p-5">
                     <div>
                         <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-bold text-foreground">Telematics crash-detection</h2>
-                            <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">Prep-later</span>
+                            <h2 className="text-lg font-bold text-foreground">
+                                Telematics crash-detection
+                            </h2>
+                            <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                Prep-later
+                            </span>
                         </div>
-                        <p className="mt-0.5 text-xs text-muted-foreground">Sensor → operator confirm → drafts a FleetIncident · wired when the telematics build-out lands. Mirrors the client-incident fall-detected flow.</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Sensor → operator confirm → drafts a FleetIncident ·
+                            wired when the telematics build-out lands. Mirrors
+                            the client-incident fall-detected flow.
+                        </p>
                     </div>
-                    <Button unstyled type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+                    <Button
+                        unstyled
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
                         <X className="h-5 w-5" />
                     </Button>
                 </div>
@@ -102,11 +154,24 @@ export function FleetTelematicsStoryboard({ open, onClose }: { open: boolean; on
                         const active = i === step;
                         const t = TONE[s.tone];
                         return (
-                            <div key={s.label} className="flex flex-1 items-center gap-2">
-                                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${done ? 'bg-status-success text-white' : active ? `${t.dot} text-white` : 'bg-muted text-muted-foreground'}`}>
-                                    {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+                            <div
+                                key={s.label}
+                                className="flex flex-1 items-center gap-2"
+                            >
+                                <span
+                                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${done ? 'bg-status-success text-white' : active ? `${t.dot} text-white` : 'bg-muted text-muted-foreground'}`}
+                                >
+                                    {done ? (
+                                        <Check className="h-3.5 w-3.5" />
+                                    ) : (
+                                        i + 1
+                                    )}
                                 </span>
-                                {i < last ? <span className={`h-0.5 flex-1 rounded-full ${i < step ? 'bg-status-success' : 'bg-muted'}`} /> : null}
+                                {i < last ? (
+                                    <span
+                                        className={`h-0.5 flex-1 rounded-full ${i < step ? 'bg-status-success' : 'bg-muted'}`}
+                                    />
+                                ) : null}
                             </div>
                         );
                     })}
@@ -114,15 +179,27 @@ export function FleetTelematicsStoryboard({ open, onClose }: { open: boolean; on
 
                 {/* Active step */}
                 <div className="p-5">
-                    <div className={`rounded-xl border ${tone.ring} ${tone.bg} p-5`}>
+                    <div
+                        className={`rounded-xl border ${tone.ring} ${tone.bg} p-5`}
+                    >
                         <div className="flex items-start gap-3">
-                            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-card ${tone.text}`}>
+                            <span
+                                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-card ${tone.text}`}
+                            >
                                 <Icon className="h-5 w-5" />
                             </span>
                             <div>
-                                <p className={`text-[11px] font-semibold tracking-wide uppercase ${tone.text}`}>{cur.label}</p>
-                                <h3 className="mt-0.5 text-base font-bold text-foreground">{cur.title}</h3>
-                                <p className="mt-1 text-sm text-foreground/80">{cur.body}</p>
+                                <p
+                                    className={`text-[11px] font-semibold tracking-wide uppercase ${tone.text}`}
+                                >
+                                    {cur.label}
+                                </p>
+                                <h3 className="mt-0.5 text-base font-bold text-foreground">
+                                    {cur.title}
+                                </h3>
+                                <p className="mt-1 text-sm text-foreground/80">
+                                    {cur.body}
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -135,12 +212,23 @@ export function FleetTelematicsStoryboard({ open, onClose }: { open: boolean; on
                     </span>
                     <div className="flex items-center gap-2">
                         {step > 0 ? (
-                            <Button variant="outline" size="sm" onClick={() => setStep((s) => Math.max(0, s - 1))}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    setStep((s) => Math.max(0, s - 1))
+                                }
+                            >
                                 Back
                             </Button>
                         ) : null}
                         {step < last ? (
-                            <Button size="sm" onClick={() => setStep((s) => Math.min(last, s + 1))}>
+                            <Button
+                                size="sm"
+                                onClick={() =>
+                                    setStep((s) => Math.min(last, s + 1))
+                                }
+                            >
                                 Next step
                             </Button>
                         ) : (

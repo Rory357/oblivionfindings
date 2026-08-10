@@ -34,11 +34,13 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+    FieldErr as FieldError,
+    StepHead,
+} from '@/components/wizard/primitives';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
-import { FieldErr as FieldError, StepHead } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
 
-import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
 import {
     type Catalogue,
     type CatalogueShift,
@@ -51,6 +53,7 @@ import {
     nextShiftIdAfter,
     shiftOptionLabel,
 } from './shared';
+import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
 
 const SELECT_CLASS =
     'h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60';
@@ -138,7 +141,9 @@ function initFromEditing(h: Handover): WizForm {
         followups: [...(h.follow_up_items ?? [])],
         tasks: [...(h.tasks_pending ?? [])],
         cd_result: h.cd_verification?.result ?? '',
-        cd_witness: h.cd_verification?.witness_id ? String(h.cd_verification.witness_id) : '',
+        cd_witness: h.cd_verification?.witness_id
+            ? String(h.cd_verification.witness_id)
+            : '',
         cd_notes: h.cd_verification?.notes ?? '',
     };
 }
@@ -218,7 +223,9 @@ function ListBuilder({
                                         dot,
                                     )}
                                 />
-                                <span className="flex-1 leading-snug">{it}</span>
+                                <span className="flex-1 leading-snug">
+                                    {it}
+                                </span>
                                 <button
                                     type="button"
                                     onClick={() =>
@@ -331,15 +338,24 @@ export function HandoverWizard({
         let cancelled = false;
         setSnapLoading(true);
         axios
-            .get(`${basePath}/shift-medications`, { params: { shift_id: Number(f.outgoing_shift) } })
+            .get(`${basePath}/shift-medications`, {
+                params: { shift_id: Number(f.outgoing_shift) },
+            })
             .then((res) => {
                 if (cancelled) return;
-                const snap: ShiftMedSnapshot | null = res.data?.snapshot ?? null;
+                const snap: ShiftMedSnapshot | null =
+                    res.data?.snapshot ?? null;
                 setSnapshot(snap);
                 if (snap && snap.due.length > 0) {
                     setF((p) =>
                         p.medications.length === 0
-                            ? { ...p, medications: snap.due.map((d) => `${d.name} — due ${d.time}${d.controlled ? ' (CD)' : ''}`) }
+                            ? {
+                                  ...p,
+                                  medications: snap.due.map(
+                                      (d) =>
+                                          `${d.name} — due ${d.time}${d.controlled ? ' (CD)' : ''}`,
+                                  ),
+                              }
                             : p,
                     );
                 }
@@ -365,7 +381,9 @@ export function HandoverWizard({
             .post(`${basePath}/${id}/lock`)
             .then((res) => {
                 if (res.data?.locked === false && res.data?.held_by) {
-                    toast.warning(`${res.data.held_by} is editing this handover — your changes may conflict on save.`);
+                    toast.warning(
+                        `${res.data.held_by} is editing this handover — your changes may conflict on save.`,
+                    );
                 }
             })
             .catch(() => {});
@@ -518,7 +536,9 @@ export function HandoverWizard({
             (s) => String(s.id) === f.outgoing_shift,
         );
         const targetWeek = startOfWeek(
-            targetShift?.starts_at ? new Date(targetShift.starts_at) : new Date(),
+            targetShift?.starts_at
+                ? new Date(targetShift.starts_at)
+                : new Date(),
         );
 
         setSubmitting(true);
@@ -538,12 +558,19 @@ export function HandoverWizard({
             onError: (errors: Record<string, string>) =>
                 // Surface the server's concurrency message (someone else saved this
                 // shared draft) rather than a generic error.
-                toast.error(errors?.handover ?? 'Could not save the handover. Please review and retry.'),
+                toast.error(
+                    errors?.handover ??
+                        'Could not save the handover. Please review and retry.',
+                ),
             onFinish: () => setSubmitting(false),
         };
 
         if (editing) {
-            router.put(`${basePath}/${editing.id}`, { ...payload, version: editing.version }, opts);
+            router.put(
+                `${basePath}/${editing.id}`,
+                { ...payload, version: editing.version },
+                opts,
+            );
         } else {
             router.post(
                 basePath,
@@ -614,7 +641,9 @@ export function HandoverWizard({
             railIcon={editing ? FileText : ArrowLeftRight}
             railTitle={editing ? 'Edit handover' : 'New handover'}
             railSub={
-                editing ? `${clientName(editing.client)} · update` : 'Shift → shift'
+                editing
+                    ? `${clientName(editing.client)} · update`
+                    : 'Shift → shift'
             }
             steps={WIZ_STEPS}
             stepIndex={stepIndex}
@@ -637,10 +666,7 @@ export function HandoverWizard({
                         <div className="space-y-1.5">
                             <label className="text-[13px] font-semibold">
                                 Client
-                                <span className="text-status-critical">
-                                    {' '}
-                                    *
-                                </span>
+                                <span className="text-status-critical"> *</span>
                             </label>
                             <select
                                 className={cn(
@@ -658,9 +684,7 @@ export function HandoverWizard({
                                     }))
                                 }
                             >
-                                <option value="">
-                                    Select a client…
-                                </option>
+                                <option value="">Select a client…</option>
                                 {catalogue.clients.map((c) => (
                                     <option key={c.id} value={c.id}>
                                         {clientName(c)}
@@ -671,9 +695,7 @@ export function HandoverWizard({
                                 ))}
                             </select>
                             {errors.client_id ? (
-                                <FieldError>
-                                    {errors.client_id}
-                                </FieldError>
+                                <FieldError>{errors.client_id}</FieldError>
                             ) : null}
                         </div>
 
@@ -689,8 +711,8 @@ export function HandoverWizard({
                                     >
                                         Add a client
                                     </button>{' '}
-                                    — they'll be created and selected
-                                    here without leaving this handover.
+                                    — they'll be created and selected here
+                                    without leaving this handover.
                                 </div>
                             </div>
                         ) : null}
@@ -699,8 +721,7 @@ export function HandoverWizard({
                             <div className="flex flex-wrap gap-2">
                                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium">
                                     <Home className="h-3 w-3" />
-                                    {siteName(client.site_id) ||
-                                        'No house'}
+                                    {siteName(client.site_id) || 'No house'}
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium">
                                     <MapPin className="h-3 w-3" />
@@ -709,7 +730,10 @@ export function HandoverWizard({
                             </div>
                         ) : null}
 
-                        <SubHead n={1} text="Outgoing shift — being handed over" />
+                        <SubHead
+                            n={1}
+                            text="Outgoing shift — being handed over"
+                        />
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-1.5">
                                 <label className="text-[13px] font-semibold">
@@ -741,9 +765,7 @@ export function HandoverWizard({
                                 <label className="text-[13px] font-semibold">
                                     Outgoing support worker
                                 </label>
-                                <DerivedWorker
-                                    muted={!outgoingWorkerName}
-                                >
+                                <DerivedWorker muted={!outgoingWorkerName}>
                                     {!f.outgoing_shift
                                         ? 'Select the outgoing shift first'
                                         : outgoingWorkerName
@@ -771,10 +793,7 @@ export function HandoverWizard({
                                     shifts={incomingShifts}
                                     value={f.incoming_shift}
                                     onChange={pickIncomingShift}
-                                    disabled={
-                                        f.leave_open ||
-                                        !f.outgoing_shift
-                                    }
+                                    disabled={f.leave_open || !f.outgoing_shift}
                                     bad={!!errors.incoming_shift}
                                     suggestId={suggestNextId}
                                     placeholder={
@@ -790,8 +809,7 @@ export function HandoverWizard({
                                         type="checkbox"
                                         checked={f.leave_open}
                                         onChange={(e) => {
-                                            const open =
-                                                e.target.checked;
+                                            const open = e.target.checked;
                                             const nextId = open
                                                 ? ''
                                                 : nextShiftIdAfter(
@@ -805,15 +823,12 @@ export function HandoverWizard({
                                                 incoming_shift: nextId,
                                                 incoming: open
                                                     ? ''
-                                                    : incomingWorkerFor(
-                                                          nextId,
-                                                      ),
+                                                    : incomingWorkerFor(nextId),
                                             }));
                                         }}
                                         className="h-4 w-4 accent-primary"
                                     />
-                                    Leave the new shift open (needs
-                                    cover)
+                                    Leave the new shift open (needs cover)
                                 </label>
                                 {errors.incoming_shift ? (
                                     <FieldError>
@@ -826,10 +841,7 @@ export function HandoverWizard({
                                     Incoming support worker
                                 </label>
                                 <DerivedWorker
-                                    muted={
-                                        !incomingWorkerName ||
-                                        f.leave_open
-                                    }
+                                    muted={!incomingWorkerName || f.leave_open}
                                 >
                                     {f.leave_open
                                         ? 'Open — needs cover'
@@ -856,17 +868,15 @@ export function HandoverWizard({
                         <div className="space-y-1.5">
                             <label className="flex flex-wrap items-center gap-2 text-[13px] font-semibold">
                                 Handover narrative
-                                <span className="text-status-critical">
-                                    *
-                                </span>
+                                <span className="text-status-critical">*</span>
                                 <span className="text-[11.5px] font-normal text-muted-foreground">
-                                    mood, sleep, meals, activities,
-                                    anything to watch
+                                    mood, sleep, meals, activities, anything to
+                                    watch
                                 </span>
                             </label>
                             <textarea
                                 className={cn(
-                                    'min-h-[180px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30',
+                                    'min-h-[180px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed focus:border-ring focus:ring-2 focus:ring-ring/30 focus:outline-none',
                                     errors.narrative && BAD_CLASS,
                                 )}
                                 placeholder="e.g. Settled day overall. Good appetite, joined the afternoon activity…"
@@ -877,13 +887,11 @@ export function HandoverWizard({
                             />
                             <div className="flex items-center justify-between">
                                 {errors.narrative ? (
-                                    <FieldError>
-                                        {errors.narrative}
-                                    </FieldError>
+                                    <FieldError>{errors.narrative}</FieldError>
                                 ) : (
                                     <span className="text-[12px] text-muted-foreground">
-                                        Be specific and factual — this
-                                        is a clinical record.
+                                        Be specific and factual — this is a
+                                        clinical record.
                                     </span>
                                 )}
                                 <span className="text-[12px] text-muted-foreground tabular-nums">
@@ -901,10 +909,7 @@ export function HandoverWizard({
                                         key={m}
                                         type="button"
                                         onClick={() =>
-                                            set(
-                                                'mood',
-                                                f.mood === m ? '' : m,
-                                            )
+                                            set('mood', f.mood === m ? '' : m)
                                         }
                                         className={cn(
                                             'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors',
@@ -941,13 +946,19 @@ export function HandoverWizard({
                                         loading={snapLoading}
                                         hasShift={!!f.outgoing_shift}
                                         noShiftHint="Select the outgoing shift to load its live medication picture."
-                                        note={snapshot && snapshot.due.length > 0 ? 'Due meds were pre-filled into the list below — edit or remove as needed.' : undefined}
+                                        note={
+                                            snapshot && snapshot.due.length > 0
+                                                ? 'Due meds were pre-filled into the list below — edit or remove as needed.'
+                                                : undefined
+                                        }
                                     />
                                 )}
                                 {medicationFocus && (
                                     <div className="rounded-xl border border-border bg-card p-3">
                                         <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
-                                            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical"><Pill className="h-3.5 w-3.5" /></span>
+                                            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical">
+                                                <Pill className="h-3.5 w-3.5" />
+                                            </span>
                                             Add from medication orders
                                         </div>
                                         <select
@@ -956,14 +967,37 @@ export function HandoverWizard({
                                             disabled={!client}
                                             onChange={(e) => {
                                                 const name = e.target.value;
-                                                if (name && !f.medications.includes(name)) set('medications', [...f.medications, name]);
+                                                if (
+                                                    name &&
+                                                    !f.medications.includes(
+                                                        name,
+                                                    )
+                                                )
+                                                    set('medications', [
+                                                        ...f.medications,
+                                                        name,
+                                                    ]);
                                             }}
                                         >
-                                            <option value="">{client ? 'Pulled from active medication orders…' : 'Select a client first'}</option>
+                                            <option value="">
+                                                {client
+                                                    ? 'Pulled from active medication orders…'
+                                                    : 'Select a client first'}
+                                            </option>
                                             {(client?.medications ?? [])
-                                                .filter((m) => !f.medications.includes(m.name))
+                                                .filter(
+                                                    (m) =>
+                                                        !f.medications.includes(
+                                                            m.name,
+                                                        ),
+                                                )
                                                 .map((m) => (
-                                                    <option key={m.id} value={m.name}>{m.name}</option>
+                                                    <option
+                                                        key={m.id}
+                                                        value={m.name}
+                                                    >
+                                                        {m.name}
+                                                    </option>
                                                 ))}
                                         </select>
                                     </div>
@@ -972,7 +1006,11 @@ export function HandoverWizard({
                                     icon={Pill}
                                     tone="critical"
                                     title="Medications due"
-                                    placeholder={medicationFocus ? 'Other / unscheduled medicine…' : 'e.g. Quetiapine 25mg — due 20:00'}
+                                    placeholder={
+                                        medicationFocus
+                                            ? 'Other / unscheduled medicine…'
+                                            : 'e.g. Quetiapine 25mg — due 20:00'
+                                    }
                                     items={f.medications}
                                     onChange={(v) => set('medications', v)}
                                 />
@@ -1008,7 +1046,9 @@ export function HandoverWizard({
                                 witness={f.cd_witness}
                                 notes={f.cd_notes}
                                 cdDue={snapshot?.counts.cd_due ?? 0}
-                                witnesses={catalogue.staff.filter((s) => String(s.id) !== f.outgoing)}
+                                witnesses={catalogue.staff.filter(
+                                    (s) => String(s.id) !== f.outgoing,
+                                )}
                                 onResult={(v) => set('cd_result', v)}
                                 onWitness={(v) => set('cd_witness', v)}
                                 onNotes={(v) => set('cd_notes', v)}
@@ -1101,26 +1141,40 @@ function CdVerificationSection({
                 <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical">
                     <Pill className="h-3.5 w-3.5" />
                 </span>
-                <span className="text-[13px] font-semibold">Controlled-drug count · two-person check</span>
+                <span className="text-[13px] font-semibold">
+                    Controlled-drug count · two-person check
+                </span>
                 {cdDue > 0 ? (
                     <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[11px] font-semibold text-status-warning">
                         {cdDue} CD{cdDue === 1 ? '' : 's'} due this shift
                     </span>
                 ) : null}
-                <a href="/emar/controlled" target="_blank" rel="noopener noreferrer" className="ml-auto text-[12px] font-semibold text-primary hover:underline">
+                <a
+                    href="/emar/controlled"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-auto text-[12px] font-semibold text-primary hover:underline"
+                >
                     Open CD register →
                 </a>
             </div>
-            <p className="mb-2.5 text-[12px] text-muted-foreground">Reconcile the controlled-drug register with the incoming worker at shift change.</p>
+            <p className="mb-2.5 text-[12px] text-muted-foreground">
+                Reconcile the controlled-drug register with the incoming worker
+                at shift change.
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                    <label className="text-[12.5px] font-semibold">Count result</label>
+                    <label className="text-[12.5px] font-semibold">
+                        Count result
+                    </label>
                     <div className="flex flex-wrap gap-2">
                         {options.map(([val, label, Icon]) => (
                             <button
                                 key={val}
                                 type="button"
-                                onClick={() => onResult(result === val ? '' : val)}
+                                onClick={() =>
+                                    onResult(result === val ? '' : val)
+                                }
                                 className={cn(
                                     'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12.5px] font-medium transition-colors',
                                     result === val
@@ -1137,9 +1191,20 @@ function CdVerificationSection({
                     </div>
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[12.5px] font-semibold">Witness (second checker)</label>
-                    <select className={SELECT_CLASS} value={witness} disabled={!result} onChange={(e) => onWitness(e.target.value)}>
-                        <option value="">{result ? 'Select the witnessing worker…' : 'Record a result first'}</option>
+                    <label className="text-[12.5px] font-semibold">
+                        Witness (second checker)
+                    </label>
+                    <select
+                        className={SELECT_CLASS}
+                        value={witness}
+                        disabled={!result}
+                        onChange={(e) => onWitness(e.target.value)}
+                    >
+                        <option value="">
+                            {result
+                                ? 'Select the witnessing worker…'
+                                : 'Record a result first'}
+                        </option>
                         {witnesses.map((w) => (
                             <option key={w.id} value={w.id}>
                                 {w.name}
@@ -1153,14 +1218,22 @@ function CdVerificationSection({
                     <label className="text-[12.5px] font-semibold">
                         Notes{' '}
                         {result === 'discrepancy' ? (
-                            <span className="text-status-critical">— describe the discrepancy</span>
+                            <span className="text-status-critical">
+                                — describe the discrepancy
+                            </span>
                         ) : (
-                            <span className="font-normal text-muted-foreground">(optional)</span>
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
                         )}
                     </label>
                     <input
                         className={cn(INPUT_CLASS, 'h-9')}
-                        placeholder={result === 'discrepancy' ? 'e.g. Diazepam register shows 1 fewer than counted — escalated' : 'e.g. All CD counts matched the register'}
+                        placeholder={
+                            result === 'discrepancy'
+                                ? 'e.g. Diazepam register shows 1 fewer than counted — escalated'
+                                : 'e.g. All CD counts matched the register'
+                        }
                         value={notes}
                         onChange={(e) => onNotes(e.target.value)}
                     />

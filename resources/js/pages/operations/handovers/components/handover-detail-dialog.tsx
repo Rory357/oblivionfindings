@@ -1,9 +1,5 @@
 /* Handover detail pop-up — full record with flow, lists, audit trail + actions. */
-import {
-    Dialog,
-    DialogContent,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import {
@@ -11,8 +7,8 @@ import {
     ArrowRight,
     Check,
     CheckCircle2,
-    Clock,
     ClipboardCheck,
+    Clock,
     FileText,
     Home,
     ListChecks,
@@ -28,7 +24,8 @@ import { type ComponentType, type ReactNode, useEffect, useState } from 'react';
 import { formatDate } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
-import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
+import { Button as GuardrailButton } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     type Handover,
     HueAvatar,
@@ -39,10 +36,8 @@ import {
     fmtTime,
     handoverDate,
     humanizeRole,
-    initials,
 } from './shared';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card as GuardrailCard } from '@/components/ui/card';
+import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
 
 function DetailList({
     icon: Icon,
@@ -69,7 +64,10 @@ function DetailList({
               ? 'bg-status-warning'
               : 'bg-primary';
     return (
-        <GuardrailCard unstyled className="rounded-xl border border-border bg-card">
+        <GuardrailCard
+            unstyled
+            className="rounded-xl border border-border bg-card"
+        >
             <div className="flex items-center gap-2 border-b border-border px-3.5 py-2.5">
                 <span
                     className={cn(
@@ -390,17 +388,22 @@ export function HandoverDetailDialog({
                         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground">
                             <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                             Same shift-handover record as{' '}
-                            <Link href="/operations/handovers" className="font-semibold text-primary hover:underline">
+                            <Link
+                                href="/operations/handovers"
+                                className="font-semibold text-primary hover:underline"
+                            >
                                 Operations handovers
                             </Link>{' '}
-                            — the eMAR view focuses on the medication slice; concurrent edits are version-locked.
+                            — the eMAR view focuses on the medication slice;
+                            concurrent edits are version-locked.
                         </div>
                     ) : null}
 
                     {h.edit_lock ? (
                         <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-status-warning/30 bg-status-warning-bg/60 px-3 py-2 text-[12px] font-medium text-status-warning">
                             <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
-                            Being edited by {h.edit_lock.held_by_name} — editing is disabled here to avoid a conflict.
+                            Being edited by {h.edit_lock.held_by_name} — editing
+                            is disabled here to avoid a conflict.
                         </div>
                     ) : null}
 
@@ -436,12 +439,14 @@ export function HandoverDetailDialog({
                                 <span
                                     className={cn(
                                         'flex h-6 w-6 items-center justify-center rounded-md',
-                                        h.cd_verification.result === 'discrepancy'
+                                        h.cd_verification.result ===
+                                            'discrepancy'
                                             ? 'bg-status-critical-bg text-status-critical'
                                             : 'bg-status-success-bg text-status-success',
                                     )}
                                 >
-                                    {h.cd_verification.result === 'discrepancy' ? (
+                                    {h.cd_verification.result ===
+                                    'discrepancy' ? (
                                         <ShieldAlert className="h-3.5 w-3.5" />
                                     ) : (
                                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -449,26 +454,46 @@ export function HandoverDetailDialog({
                                 </span>
                                 <span className="text-[13px] font-semibold">
                                     Controlled-drug count{' '}
-                                    {h.cd_verification.result === 'discrepancy' ? '— discrepancy found' : 'verified'}
+                                    {h.cd_verification.result === 'discrepancy'
+                                        ? '— discrepancy found'
+                                        : 'verified'}
                                 </span>
-                                <Link href="/emar/controlled" className="ml-auto text-[12px] font-semibold text-primary hover:underline">
+                                <Link
+                                    href="/emar/controlled"
+                                    className="ml-auto text-[12px] font-semibold text-primary hover:underline"
+                                >
                                     CD register
                                 </Link>
                             </div>
                             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
                                 {h.cd_verification.witness_name ? (
                                     <span>
-                                        Witness: <b className="text-foreground">{h.cd_verification.witness_name}</b>
+                                        Witness:{' '}
+                                        <b className="text-foreground">
+                                            {h.cd_verification.witness_name}
+                                        </b>
                                     </span>
                                 ) : null}
-                                {h.cd_verification.verified_by_name ? <span>Checked by {h.cd_verification.verified_by_name}</span> : null}
+                                {h.cd_verification.verified_by_name ? (
+                                    <span>
+                                        Checked by{' '}
+                                        {h.cd_verification.verified_by_name}
+                                    </span>
+                                ) : null}
                                 {h.cd_verification.verified_at ? (
                                     <span>
-                                        {formatDate(h.cd_verification.verified_at)} {fmtTime(h.cd_verification.verified_at)}
+                                        {formatDate(
+                                            h.cd_verification.verified_at,
+                                        )}{' '}
+                                        {fmtTime(h.cd_verification.verified_at)}
                                     </span>
                                 ) : null}
                             </div>
-                            {h.cd_verification.notes ? <p className="mt-1.5 text-[12.5px] leading-snug">{h.cd_verification.notes}</p> : null}
+                            {h.cd_verification.notes ? (
+                                <p className="mt-1.5 text-[12.5px] leading-snug">
+                                    {h.cd_verification.notes}
+                                </p>
+                            ) : null}
                         </div>
                     ) : null}
 
@@ -557,7 +582,10 @@ export function HandoverDetailDialog({
                             </OptionLink>
                         ) : null}
                         {out ? (
-                            <OptionLink href={`/staff/${out.id}`} icon={UserCheck}>
+                            <OptionLink
+                                href={`/staff/${out.id}`}
+                                icon={UserCheck}
+                            >
                                 {out.name.split(' ')[0]} · outgoing
                             </OptionLink>
                         ) : null}
@@ -576,78 +604,83 @@ export function HandoverDetailDialog({
                         ) : null}
                     </div>
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
-                        {note ? (
-                            <>
-                                <note.icon
-                                    className={cn(
-                                        'h-3.5 w-3.5',
-                                        note.critical && 'text-status-critical',
-                                    )}
-                                />
-                                {note.text}
-                            </>
-                        ) : null}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <GuardrailButton unstyled
-                            type="button"
-                            onClick={() => onOpenChange(false)}
-                            className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
-                        >
-                            Close
-                        </GuardrailButton>
-                        {h.status === 'draft' && h.can_submit ? (
-                            <GuardrailButton unstyled
+                        <div className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+                            {note ? (
+                                <>
+                                    <note.icon
+                                        className={cn(
+                                            'h-3.5 w-3.5',
+                                            note.critical &&
+                                                'text-status-critical',
+                                        )}
+                                    />
+                                    {note.text}
+                                </>
+                            ) : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <GuardrailButton
+                                unstyled
                                 type="button"
-                                onClick={() => onSubmit(h)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
+                                onClick={() => onOpenChange(false)}
+                                className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                             >
-                                <Send className="h-3.5 w-3.5" />
-                                Submit
+                                Close
                             </GuardrailButton>
-                        ) : null}
-                        {h.status === 'submitted' && h.can_acknowledge ? (
-                            <GuardrailButton unstyled
-                                type="button"
-                                onClick={() => onAcknowledge(h)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
-                            >
-                                <Check className="h-4 w-4" />
-                                Acknowledge
-                            </GuardrailButton>
-                        ) : null}
-                        {h.edit_lock ? (
-                            <button
-                                type="button"
-                                disabled
-                                title={`Being edited by ${h.edit_lock.held_by_name}`}
-                                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground"
-                            >
-                                <ShieldAlert className="h-3.5 w-3.5" />
-                                Being edited
-                            </button>
-                        ) : h.can_edit ? (
-                            <GuardrailButton unstyled
-                                type="button"
-                                onClick={() => onEdit(h)}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                            >
-                                <FileText className="h-3.5 w-3.5" />
-                                Edit handover
-                            </GuardrailButton>
-                        ) : (
-                            <button
-                                type="button"
-                                disabled
-                                title="Only managers can edit after the 7-day window"
-                                className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground"
-                            >
-                                <ShieldAlert className="h-3.5 w-3.5" />
-                                Edit locked
-                            </button>
-                        )}
-                    </div>
+                            {h.status === 'draft' && h.can_submit ? (
+                                <GuardrailButton
+                                    unstyled
+                                    type="button"
+                                    onClick={() => onSubmit(h)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
+                                >
+                                    <Send className="h-3.5 w-3.5" />
+                                    Submit
+                                </GuardrailButton>
+                            ) : null}
+                            {h.status === 'submitted' && h.can_acknowledge ? (
+                                <GuardrailButton
+                                    unstyled
+                                    type="button"
+                                    onClick={() => onAcknowledge(h)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
+                                >
+                                    <Check className="h-4 w-4" />
+                                    Acknowledge
+                                </GuardrailButton>
+                            ) : null}
+                            {h.edit_lock ? (
+                                <button
+                                    type="button"
+                                    disabled
+                                    title={`Being edited by ${h.edit_lock.held_by_name}`}
+                                    className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground"
+                                >
+                                    <ShieldAlert className="h-3.5 w-3.5" />
+                                    Being edited
+                                </button>
+                            ) : h.can_edit ? (
+                                <GuardrailButton
+                                    unstyled
+                                    type="button"
+                                    onClick={() => onEdit(h)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                                >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    Edit handover
+                                </GuardrailButton>
+                            ) : (
+                                <button
+                                    type="button"
+                                    disabled
+                                    title="Only managers can edit after the 7-day window"
+                                    className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground"
+                                >
+                                    <ShieldAlert className="h-3.5 w-3.5" />
+                                    Edit locked
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </DialogContent>

@@ -1,5 +1,4 @@
 import PageShell from '@/components/page-shell';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,9 +12,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    AlertTriangle,
     Battery,
     Bell,
     Clock,
@@ -24,7 +23,6 @@ import {
     MapPin,
     Moon,
     Save,
-    Shield,
     WifiOff,
     Zap,
 } from 'lucide-react';
@@ -61,13 +59,50 @@ type Props = {
 };
 
 const DEFAULT_CONFIG: AlertConfig = {
-    speed_limit: { enabled: false, threshold: 100, severity: 'medium', notify_control_room: false },
-    idle_timeout: { enabled: false, threshold: 15, severity: 'low', notify_control_room: false },
-    geofence_breach: { enabled: false, threshold: '', severity: 'high', notify_control_room: true },
-    battery_low: { enabled: false, threshold: 20, severity: 'medium', notify_control_room: false },
-    offline_timeout: { enabled: false, threshold: 4, severity: 'medium', notify_control_room: false },
-    harsh_braking: { enabled: false, threshold: 'medium', severity: 'medium', notify_control_room: false },
-    after_hours: { enabled: false, threshold: '', severity: 'high', notify_control_room: true, start_time: '18:00', end_time: '06:00' },
+    speed_limit: {
+        enabled: false,
+        threshold: 100,
+        severity: 'medium',
+        notify_control_room: false,
+    },
+    idle_timeout: {
+        enabled: false,
+        threshold: 15,
+        severity: 'low',
+        notify_control_room: false,
+    },
+    geofence_breach: {
+        enabled: false,
+        threshold: '',
+        severity: 'high',
+        notify_control_room: true,
+    },
+    battery_low: {
+        enabled: false,
+        threshold: 20,
+        severity: 'medium',
+        notify_control_room: false,
+    },
+    offline_timeout: {
+        enabled: false,
+        threshold: 4,
+        severity: 'medium',
+        notify_control_room: false,
+    },
+    harsh_braking: {
+        enabled: false,
+        threshold: 'medium',
+        severity: 'medium',
+        notify_control_room: false,
+    },
+    after_hours: {
+        enabled: false,
+        threshold: '',
+        severity: 'high',
+        notify_control_room: true,
+        start_time: '18:00',
+        end_time: '06:00',
+    },
 };
 
 const ALERT_TYPES = [
@@ -129,20 +164,32 @@ const ALERT_TYPES = [
     },
 ];
 
-export default function VehicleAlertsConfig({ asset, config: rawConfig, geofences, can }: Props) {
+export default function VehicleAlertsConfig({
+    asset,
+    config: rawConfig,
+    geofences,
+    can,
+}: Props) {
     const canManage = can.manage;
-    const [config, setConfig] = useState<AlertConfig>(() => ({
-        ...DEFAULT_CONFIG,
-        ...Object.fromEntries(
-            Object.entries(rawConfig ?? {}).map(([key, val]) => [
-                key,
-                { ...DEFAULT_CONFIG[key as keyof AlertConfig], ...val },
-            ]),
-        ),
-    } as AlertConfig));
+    const [config, setConfig] = useState<AlertConfig>(
+        () =>
+            ({
+                ...DEFAULT_CONFIG,
+                ...Object.fromEntries(
+                    Object.entries(rawConfig ?? {}).map(([key, val]) => [
+                        key,
+                        { ...DEFAULT_CONFIG[key as keyof AlertConfig], ...val },
+                    ]),
+                ),
+            }) as AlertConfig,
+    );
     const [processing, setProcessing] = useState(false);
 
-    const updateRule = <K extends keyof AlertConfig>(key: K, field: string, value: unknown) => {
+    const updateRule = <K extends keyof AlertConfig>(
+        key: K,
+        field: string,
+        value: unknown,
+    ) => {
         setConfig((prev) => ({
             ...prev,
             [key]: { ...prev[key], [field]: value },
@@ -155,9 +202,13 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
         }
 
         setProcessing(true);
-        router.post(`/fleet-assets/vehicles/${asset.id}/alerts-config`, { config } as any, {
-            onFinish: () => setProcessing(false),
-        });
+        router.post(
+            `/fleet-assets/vehicles/${asset.id}/alerts-config`,
+            { config } as any,
+            {
+                onFinish: () => setProcessing(false),
+            },
+        );
     };
 
     return (
@@ -165,7 +216,10 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
             breadcrumbs={[
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Vehicles', href: '/fleet-assets/vehicles' },
-                { title: asset.name, href: `/fleet-assets/vehicles/${asset.id}` },
+                {
+                    title: asset.name,
+                    href: `/fleet-assets/vehicles/${asset.id}`,
+                },
                 { title: 'Alert Config', href: '#' },
             ]}
         >
@@ -182,136 +236,304 @@ export default function VehicleAlertsConfig({ asset, config: rawConfig, geofence
                 </p>
 
                 <div className="space-y-4">
-                    {ALERT_TYPES.map(({ key, label, description, icon: Icon, thresholdLabel, thresholdType }) => {
-                        const rule = config[key] as AlertRule & { start_time?: string; end_time?: string };
-                        return (
-                            <Card key={key} className={rule.enabled ? '' : 'opacity-75'}>
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <Icon className="h-4 w-4" />
-                                            {label}
-                                        </CardTitle>
-                                        <div className="flex items-center gap-2">
-                                            <label className="relative inline-flex cursor-pointer items-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={rule.enabled}
-                                                    onChange={(e) => updateRule(key, 'enabled', e.target.checked)}
-                                                    disabled={!canManage}
-                                                    className="peer sr-only"
-                                                />
-                                                <div className="h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring dark:bg-muted" />
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">{description}</p>
-                                </CardHeader>
-                                {rule.enabled && (
-                                    <CardContent>
-                                        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                                            {/* Threshold */}
-                                            <div>
-                                                <Label>{thresholdLabel}</Label>
-                                                {thresholdType === 'number' && (
-                                                    <Input
-                                                        type="number"
-                                                        value={String(rule.threshold)}
-                                                        disabled={!canManage}
-                                                        onChange={(e) => updateRule(key, 'threshold', Number(e.target.value))}
-                                                    />
-                                                )}
-                                                {thresholdType === 'sensitivity' && (
-                                                    <Select value={String(rule.threshold)} onValueChange={(v) => updateRule(key, 'threshold', v)} disabled={!canManage}>
-                                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="low">Low</SelectItem>
-                                                            <SelectItem value="medium">Medium</SelectItem>
-                                                            <SelectItem value="high">High</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                )}
-                                                {thresholdType === 'select' && (
-                                                    <Select value={String(rule.threshold) || '__all__'} onValueChange={(v) => updateRule(key, 'threshold', v === '__all__' ? '' : v)} disabled={!canManage}>
-                                                        <SelectTrigger><SelectValue placeholder="Select geofence" /></SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="__all__">All geofences</SelectItem>
-                                                            {(geofences ?? []).map((g) => (
-                                                                <SelectItem key={g.id} value={String(g.id)}>
-                                                                    {g.name} {!g.is_active && '(inactive)'}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                )}
-                                                {thresholdType === 'time_range' && (
-                                                    <div className="flex items-center gap-2">
-                                                        <Input
-                                                            type="time"
-                                                            value={rule.start_time ?? '18:00'}
-                                                            disabled={!canManage}
-                                                            onChange={(e) => updateRule(key, 'start_time', e.target.value)}
-                                                            className="w-auto"
-                                                        />
-                                                        <span className="text-sm text-muted-foreground">to</span>
-                                                        <Input
-                                                            type="time"
-                                                            value={rule.end_time ?? '06:00'}
-                                                            disabled={!canManage}
-                                                            onChange={(e) => updateRule(key, 'end_time', e.target.value)}
-                                                            className="w-auto"
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Severity */}
-                                            <div>
-                                                <Label>Severity</Label>
-                                                <Select value={rule.severity} onValueChange={(v) => updateRule(key, 'severity', v)} disabled={!canManage}>
-                                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="low">Low</SelectItem>
-                                                        <SelectItem value="medium">Medium</SelectItem>
-                                                        <SelectItem value="high">High</SelectItem>
-                                                        <SelectItem value="critical">Critical</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            {/* Notify Control Room */}
-                                            <div className="flex items-end">
-                                                <label className="flex items-center gap-2 text-sm pb-2">
+                    {ALERT_TYPES.map(
+                        ({
+                            key,
+                            label,
+                            description,
+                            icon: Icon,
+                            thresholdLabel,
+                            thresholdType,
+                        }) => {
+                            const rule = config[key] as AlertRule & {
+                                start_time?: string;
+                                end_time?: string;
+                            };
+                            return (
+                                <Card
+                                    key={key}
+                                    className={rule.enabled ? '' : 'opacity-75'}
+                                >
+                                    <CardHeader className="pb-3">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="flex items-center gap-2 text-base">
+                                                <Icon className="h-4 w-4" />
+                                                {label}
+                                            </CardTitle>
+                                            <div className="flex items-center gap-2">
+                                                <label className="relative inline-flex cursor-pointer items-center">
                                                     <input
                                                         type="checkbox"
-                                                        checked={rule.notify_control_room}
+                                                        checked={rule.enabled}
+                                                        onChange={(e) =>
+                                                            updateRule(
+                                                                key,
+                                                                'enabled',
+                                                                e.target
+                                                                    .checked,
+                                                            )
+                                                        }
                                                         disabled={!canManage}
-                                                        onChange={(e) => updateRule(key, 'notify_control_room', e.target.checked)}
-                                                        className="h-4 w-4 rounded border-border"
+                                                        className="peer sr-only"
                                                     />
-                                                    <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    Notify Control Room
+                                                    <div className="h-6 w-11 rounded-full bg-muted peer-checked:bg-primary peer-focus:ring-2 peer-focus:ring-ring peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-muted" />
                                                 </label>
                                             </div>
                                         </div>
-                                    </CardContent>
-                                )}
-                            </Card>
-                        );
-                    })}
+                                        <p className="text-xs text-muted-foreground">
+                                            {description}
+                                        </p>
+                                    </CardHeader>
+                                    {rule.enabled && (
+                                        <CardContent>
+                                            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                                                {/* Threshold */}
+                                                <div>
+                                                    <Label>
+                                                        {thresholdLabel}
+                                                    </Label>
+                                                    {thresholdType ===
+                                                        'number' && (
+                                                        <Input
+                                                            type="number"
+                                                            value={String(
+                                                                rule.threshold,
+                                                            )}
+                                                            disabled={
+                                                                !canManage
+                                                            }
+                                                            onChange={(e) =>
+                                                                updateRule(
+                                                                    key,
+                                                                    'threshold',
+                                                                    Number(
+                                                                        e.target
+                                                                            .value,
+                                                                    ),
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                    {thresholdType ===
+                                                        'sensitivity' && (
+                                                        <Select
+                                                            value={String(
+                                                                rule.threshold,
+                                                            )}
+                                                            onValueChange={(
+                                                                v,
+                                                            ) =>
+                                                                updateRule(
+                                                                    key,
+                                                                    'threshold',
+                                                                    v,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                !canManage
+                                                            }
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="low">
+                                                                    Low
+                                                                </SelectItem>
+                                                                <SelectItem value="medium">
+                                                                    Medium
+                                                                </SelectItem>
+                                                                <SelectItem value="high">
+                                                                    High
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    )}
+                                                    {thresholdType ===
+                                                        'select' && (
+                                                        <Select
+                                                            value={
+                                                                String(
+                                                                    rule.threshold,
+                                                                ) || '__all__'
+                                                            }
+                                                            onValueChange={(
+                                                                v,
+                                                            ) =>
+                                                                updateRule(
+                                                                    key,
+                                                                    'threshold',
+                                                                    v ===
+                                                                        '__all__'
+                                                                        ? ''
+                                                                        : v,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                !canManage
+                                                            }
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select geofence" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="__all__">
+                                                                    All
+                                                                    geofences
+                                                                </SelectItem>
+                                                                {(
+                                                                    geofences ??
+                                                                    []
+                                                                ).map((g) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            g.id
+                                                                        }
+                                                                        value={String(
+                                                                            g.id,
+                                                                        )}
+                                                                    >
+                                                                        {g.name}{' '}
+                                                                        {!g.is_active &&
+                                                                            '(inactive)'}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    )}
+                                                    {thresholdType ===
+                                                        'time_range' && (
+                                                        <div className="flex items-center gap-2">
+                                                            <Input
+                                                                type="time"
+                                                                value={
+                                                                    rule.start_time ??
+                                                                    '18:00'
+                                                                }
+                                                                disabled={
+                                                                    !canManage
+                                                                }
+                                                                onChange={(e) =>
+                                                                    updateRule(
+                                                                        key,
+                                                                        'start_time',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className="w-auto"
+                                                            />
+                                                            <span className="text-sm text-muted-foreground">
+                                                                to
+                                                            </span>
+                                                            <Input
+                                                                type="time"
+                                                                value={
+                                                                    rule.end_time ??
+                                                                    '06:00'
+                                                                }
+                                                                disabled={
+                                                                    !canManage
+                                                                }
+                                                                onChange={(e) =>
+                                                                    updateRule(
+                                                                        key,
+                                                                        'end_time',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className="w-auto"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Severity */}
+                                                <div>
+                                                    <Label>Severity</Label>
+                                                    <Select
+                                                        value={rule.severity}
+                                                        onValueChange={(v) =>
+                                                            updateRule(
+                                                                key,
+                                                                'severity',
+                                                                v,
+                                                            )
+                                                        }
+                                                        disabled={!canManage}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="low">
+                                                                Low
+                                                            </SelectItem>
+                                                            <SelectItem value="medium">
+                                                                Medium
+                                                            </SelectItem>
+                                                            <SelectItem value="high">
+                                                                High
+                                                            </SelectItem>
+                                                            <SelectItem value="critical">
+                                                                Critical
+                                                            </SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                {/* Notify Control Room */}
+                                                <div className="flex items-end">
+                                                    <label className="flex items-center gap-2 pb-2 text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={
+                                                                rule.notify_control_room
+                                                            }
+                                                            disabled={
+                                                                !canManage
+                                                            }
+                                                            onChange={(e) =>
+                                                                updateRule(
+                                                                    key,
+                                                                    'notify_control_room',
+                                                                    e.target
+                                                                        .checked,
+                                                                )
+                                                            }
+                                                            className="h-4 w-4 rounded border-border"
+                                                        />
+                                                        <Bell className="h-3.5 w-3.5 text-muted-foreground" />
+                                                        Notify Control Room
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    )}
+                                </Card>
+                            );
+                        },
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2 pt-4">
                     {canManage ? (
                         <Button onClick={handleSave} disabled={processing}>
-                            {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            {processing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                            )}
                             Save Configuration
                         </Button>
                     ) : (
                         <Badge variant="secondary">View-only</Badge>
                     )}
                     <Button variant="outline" asChild>
-                        <Link href={`/fleet-assets/vehicles/${asset.id}`}>Cancel</Link>
+                        <Link href={`/fleet-assets/vehicles/${asset.id}`}>
+                            Cancel
+                        </Link>
                     </Button>
                 </div>
             </PageShell>

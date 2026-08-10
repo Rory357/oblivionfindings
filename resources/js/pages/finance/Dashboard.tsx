@@ -1,18 +1,4 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useState, type ComponentProps } from 'react';
-import {
-    AreaChart,
-    Area,
-    BarChart,
-    Bar,
-    CartesianGrid,
-    LabelList,
-    Legend,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
 import {
     ArrowDownRight,
     ArrowRight,
@@ -36,16 +22,21 @@ import {
     Wallet,
     type LucideIcon,
 } from 'lucide-react';
+import { useState, type ComponentProps } from 'react';
+import {
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    LabelList,
+    Legend,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
-import { type BreadcrumbItem, PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
-import { DonutCard } from '@/components/rostering/donut-card';
-import { type DonutSegment } from '@/components/rostering/donut';
 import {
     NewBillDialog,
     NewInvoiceDialog,
@@ -57,9 +48,28 @@ import {
     type StatusTone,
 } from '@/components/finance';
 import { FinanceHubsBar } from '@/components/finance/finance-hubs-bar';
-import { NeedsAttentionStrip, type AttentionItem } from '@/components/finance/needs-attention-strip';
+import {
+    NeedsAttentionStrip,
+    type AttentionItem,
+} from '@/components/finance/needs-attention-strip';
 import { OverviewTabsFooter } from '@/components/finance/overview-hub';
+import { PageHero, PageLayout } from '@/components/page';
+import { type DonutSegment } from '@/components/rostering/donut';
+import { DonutCard } from '@/components/rostering/donut-card';
+import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { PageProps, type BreadcrumbItem } from '@/types';
 
 interface MonthlyData {
     month: string;
@@ -115,7 +125,13 @@ interface Props extends PageProps {
     expensesByMonth: MonthlyData[];
     topExpenseCategories: ExpenseCategory[];
     revenueByFundingStream?: { name: string; amount: number }[];
-    fundingClaims?: { reference: string; funder: string; period: string; status: string; amount: number }[];
+    fundingClaims?: {
+        reference: string;
+        funder: string;
+        period: string;
+        status: string;
+        amount: number;
+    }[];
     fundingUtilisation?: {
         claimed_paid: number;
         awaiting_remittance: number;
@@ -141,7 +157,12 @@ interface Props extends PageProps {
     recentJournals: RecentJournal[];
     fundedResidents?: number;
     revenuePerResident?: number;
-    gstDue?: { due: string; amount: number | null; status: string; ref: string | null } | null;
+    gstDue?: {
+        due: string;
+        amount: number | null;
+        status: string;
+        ref: string | null;
+    } | null;
     openPeriodLabel?: string | null;
     siteCount?: number;
     regionCount?: number;
@@ -190,7 +211,11 @@ const KPI_TILE: Record<KpiTone, string> = {
 };
 
 const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+    new Date(date).toLocaleDateString('en-NZ', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
 
 // Funding-claim status → badge tone.
 const CLAIM_TONE: Record<string, StatusTone> = {
@@ -236,21 +261,36 @@ function KpiCard({
     return (
         <div className="rounded-[15px] border border-border bg-card p-4">
             <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-                <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', KPI_TILE[tone])}>
+                <span className="text-xs font-semibold text-muted-foreground">
+                    {label}
+                </span>
+                <span
+                    className={cn(
+                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg',
+                        KPI_TILE[tone],
+                    )}
+                >
                     <Icon className="h-4 w-4" />
                 </span>
             </div>
-            <div className="mt-2 text-2xl font-bold tracking-tight tabular-nums">{value}</div>
+            <div className="mt-2 text-2xl font-bold tracking-tight tabular-nums">
+                {value}
+            </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[11.5px]">
                 {delta ? (
                     <span
                         className={cn(
                             'inline-flex items-center gap-0.5 font-bold tabular-nums',
-                            delta.good ? 'text-status-success' : 'text-status-critical',
+                            delta.good
+                                ? 'text-status-success'
+                                : 'text-status-critical',
                         )}
                     >
-                        {delta.percent >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                        {delta.percent >= 0 ? (
+                            <ArrowUpRight className="h-3 w-3" />
+                        ) : (
+                            <ArrowDownRight className="h-3 w-3" />
+                        )}
                         {Math.abs(delta.percent).toFixed(1)}%
                     </span>
                 ) : null}
@@ -309,15 +349,37 @@ export default function FinanceDashboard({
 
     // Period / filter changes → real Inertia partial reload. `only` trims the
     // payload to the period-aware metric props (ref-data closures are skipped).
-    const reload = (next: { period?: Period; site?: number[]; funder?: number[] }) => {
+    const reload = (next: {
+        period?: Period;
+        site?: number[];
+        funder?: number[];
+    }) => {
         router.reload({
             only: [
-                'totalRevenue', 'totalExpenses', 'netProfit', 'cashBalance', 'accountsReceivable',
-                'accountsPayable', 'revenueByMonth', 'expensesByMonth', 'topExpenseCategories',
-                'revenueByFundingStream', 'fundingClaims', 'fundingUtilisation', 'arAging',
-                'upcomingBillsDue', 'apDueWithin7', 'cashRunwayDays',
-                'payrollAwaitingApproval', 'paydayFilingDue', 'fundedResidents', 'revenuePerResident', 'gstDue',
-                'recentJournals', 'period', 'periodLabel',
+                'totalRevenue',
+                'totalExpenses',
+                'netProfit',
+                'cashBalance',
+                'accountsReceivable',
+                'accountsPayable',
+                'revenueByMonth',
+                'expensesByMonth',
+                'topExpenseCategories',
+                'revenueByFundingStream',
+                'fundingClaims',
+                'fundingUtilisation',
+                'arAging',
+                'upcomingBillsDue',
+                'apDueWithin7',
+                'cashRunwayDays',
+                'payrollAwaitingApproval',
+                'paydayFilingDue',
+                'fundedResidents',
+                'revenuePerResident',
+                'gstDue',
+                'recentJournals',
+                'period',
+                'periodLabel',
             ],
             data: {
                 period: next.period ?? period,
@@ -342,8 +404,17 @@ export default function FinanceDashboard({
     };
 
     // §5 donut 1 — real revenue-by-funding-stream (dollars).
-    const REVENUE_COLORS = ['var(--chart-1)', 'var(--chart-5)', 'var(--chart-4)', 'var(--chart-2)', 'var(--chart-3)'];
-    const revenueStreamTotal = revenueByFundingStream.reduce((sum, s) => sum + s.amount, 0);
+    const REVENUE_COLORS = [
+        'var(--chart-1)',
+        'var(--chart-5)',
+        'var(--chart-4)',
+        'var(--chart-2)',
+        'var(--chart-3)',
+    ];
+    const revenueStreamTotal = revenueByFundingStream.reduce(
+        (sum, s) => sum + s.amount,
+        0,
+    );
     const revenueStreamSegments: DonutSegment[] = revenueByFundingStream.length
         ? revenueByFundingStream.map((s, i) => ({
               key: `fs-${i}`,
@@ -351,81 +422,172 @@ export default function FinanceDashboard({
               value: s.amount,
               color: REVENUE_COLORS[i % REVENUE_COLORS.length],
           }))
-        : [{ key: 'none', label: 'No revenue in period', value: 1, color: 'var(--border)' }];
+        : [
+              {
+                  key: 'none',
+                  label: 'No revenue in period',
+                  value: 1,
+                  color: 'var(--border)',
+              },
+          ];
 
     // §5 donut 3 — real AR aging (point-in-time, live FinInvoice via the AR service).
-    const arAgingSegments: DonutSegment[] = (
+    const arAgingSegments: DonutSegment[] =
         arAging && arAging.total > 0
             ? [
-                  { key: 'current', label: 'Current', value: arAging.current, color: 'var(--status-success)' },
-                  { key: 'd1_30', label: '1–30 days', value: arAging.d1_30, color: 'var(--chart-2)' },
-                  { key: 'd31_60', label: '31–60 days', value: arAging.d31_60, color: 'var(--chart-4)' },
-                  { key: 'd61_90', label: '61–90 days', value: arAging.d61_90, color: 'var(--chart-3)' },
-                  { key: 'd90_plus', label: '90+ days', value: arAging.d90_plus, color: 'var(--status-critical)' },
+                  {
+                      key: 'current',
+                      label: 'Current',
+                      value: arAging.current,
+                      color: 'var(--status-success)',
+                  },
+                  {
+                      key: 'd1_30',
+                      label: '1–30 days',
+                      value: arAging.d1_30,
+                      color: 'var(--chart-2)',
+                  },
+                  {
+                      key: 'd31_60',
+                      label: '31–60 days',
+                      value: arAging.d31_60,
+                      color: 'var(--chart-4)',
+                  },
+                  {
+                      key: 'd61_90',
+                      label: '61–90 days',
+                      value: arAging.d61_90,
+                      color: 'var(--chart-3)',
+                  },
+                  {
+                      key: 'd90_plus',
+                      label: '90+ days',
+                      value: arAging.d90_plus,
+                      color: 'var(--status-critical)',
+                  },
               ].filter((s) => s.value > 0)
-            : []
-    );
+            : [];
     const arAgingDonut: DonutSegment[] = arAgingSegments.length
         ? arAgingSegments
-        : [{ key: 'none', label: 'No outstanding receivables', value: 1, color: 'var(--border)' }];
+        : [
+              {
+                  key: 'none',
+                  label: 'No outstanding receivables',
+                  value: 1,
+                  color: 'var(--border)',
+              },
+          ];
 
     // §5 donut 2 — real funding-claim utilisation buckets.
     const utilSegmentsRaw: DonutSegment[] = fundingUtilisation
         ? [
-              { key: 'paid', label: 'Claimed & paid', value: fundingUtilisation.claimed_paid, color: 'var(--status-success)' },
-              { key: 'awaiting', label: 'Awaiting remittance', value: fundingUtilisation.awaiting_remittance, color: 'var(--chart-2)' },
-              { key: 'delivered', label: 'Delivered, not yet claimed', value: fundingUtilisation.delivered_unclaimed, color: 'var(--status-warning)' },
-              { key: 'writeoff', label: 'Unfunded / write-off risk', value: fundingUtilisation.write_off_risk, color: 'var(--status-critical)' },
+              {
+                  key: 'paid',
+                  label: 'Claimed & paid',
+                  value: fundingUtilisation.claimed_paid,
+                  color: 'var(--status-success)',
+              },
+              {
+                  key: 'awaiting',
+                  label: 'Awaiting remittance',
+                  value: fundingUtilisation.awaiting_remittance,
+                  color: 'var(--chart-2)',
+              },
+              {
+                  key: 'delivered',
+                  label: 'Delivered, not yet claimed',
+                  value: fundingUtilisation.delivered_unclaimed,
+                  color: 'var(--status-warning)',
+              },
+              {
+                  key: 'writeoff',
+                  label: 'Unfunded / write-off risk',
+                  value: fundingUtilisation.write_off_risk,
+                  color: 'var(--status-critical)',
+              },
           ].filter((s) => s.value > 0)
         : [];
     const utilDonut: DonutSegment[] = utilSegmentsRaw.length
         ? utilSegmentsRaw
-        : [{ key: 'none', label: 'No funding activity', value: 1, color: 'var(--border)' }];
+        : [
+              {
+                  key: 'none',
+                  label: 'No funding activity',
+                  value: 1,
+                  color: 'var(--border)',
+              },
+          ];
 
     // §3 Needs-attention — built from REAL data; an item only appears when its
     // metric is live. GST-due + funder-remittances are added in Phase F.
     const attentionItems: AttentionItem[] = [];
     if (arAging && arAging.d90_plus > 0) {
         attentionItems.push({
-            id: 'ar90', severity: 'critical', icon: FileText, title: 'AR overdue 90+ days',
+            id: 'ar90',
+            severity: 'critical',
+            icon: FileText,
+            title: 'AR overdue 90+ days',
             body: 'Receivables aged past 90 days need chasing.',
-            tag: `${formatMoneyCompact(arAging.d90_plus)} · 90+ days`, href: '/finance/reports/aged-receivables',
+            tag: `${formatMoneyCompact(arAging.d90_plus)} · 90+ days`,
+            href: '/finance/reports/aged-receivables',
         });
     }
     if (apDueWithin7 && apDueWithin7.count > 0) {
         attentionItems.push({
-            id: 'bills7', severity: 'warning', icon: CreditCard, title: 'Bills due within 7 days',
+            id: 'bills7',
+            severity: 'warning',
+            icon: CreditCard,
+            title: 'Bills due within 7 days',
             body: 'Approved bills falling due this week.',
-            tag: `${apDueWithin7.count} · ${formatMoneyCompact(apDueWithin7.total)}`, href: '/finance/bills',
+            tag: `${apDueWithin7.count} · ${formatMoneyCompact(apDueWithin7.total)}`,
+            href: '/finance/bills',
         });
     }
     if (payrollAwaitingApproval && payrollAwaitingApproval.count > 0) {
         attentionItems.push({
-            id: 'payroll', severity: 'info', icon: Clock, title: 'Payroll run awaiting approval',
+            id: 'payroll',
+            severity: 'info',
+            icon: Clock,
+            title: 'Payroll run awaiting approval',
             body: `${payrollAwaitingApproval.count} run(s) not yet posted to the ledger.`,
             tag: formatMoneyCompact(payrollAwaitingApproval.total_gross),
         });
     }
     if (paydayFilingDue && paydayFilingDue.count > 0) {
         attentionItems.push({
-            id: 'payday', severity: 'warning', icon: Percent, title: 'IRD payday filing due',
+            id: 'payday',
+            severity: 'warning',
+            icon: Percent,
+            title: 'IRD payday filing due',
             body: 'Posted payroll runs still owe an Employment Information filing.',
-            tag: `${paydayFilingDue.count} run(s)`, href: '/finance/ird-filings',
+            tag: `${paydayFilingDue.count} run(s)`,
+            href: '/finance/ird-filings',
         });
     }
     if (fundingUtilisation && fundingUtilisation.unclaimed_total > 0) {
         attentionItems.push({
-            id: 'unclaimed', severity: 'warning', icon: Coins, title: 'Delivered hours not yet claimed',
+            id: 'unclaimed',
+            severity: 'warning',
+            icon: Coins,
+            title: 'Delivered hours not yet claimed',
             body: 'Service delivered without a funding claim raised.',
-            tag: `${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`, href: '/finance/funding-streams',
+            tag: `${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`,
+            href: '/finance/funding-streams',
         });
     }
     if (gstDue) {
-        const dueLabel = new Date(gstDue.due).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short' });
+        const dueLabel = new Date(gstDue.due).toLocaleDateString('en-NZ', {
+            day: '2-digit',
+            month: 'short',
+        });
         attentionItems.push({
-            id: 'gst', severity: gstDue.status === 'overdue' ? 'critical' : 'warning', icon: Landmark,
-            title: 'GST return due', body: 'Period GST return filing deadline approaching.',
-            tag: `due ${dueLabel}`, href: '/finance/gst-returns',
+            id: 'gst',
+            severity: gstDue.status === 'overdue' ? 'critical' : 'warning',
+            icon: Landmark,
+            title: 'GST return due',
+            body: 'Period GST return filing deadline approaching.',
+            tag: `due ${dueLabel}`,
+            href: '/finance/gst-returns',
         });
     }
 
@@ -442,19 +604,41 @@ export default function FinanceDashboard({
     const revenueTrend = computeTrend(revenueByMonth);
     const expenseTrend = computeTrend(expensesByMonth);
     const profitTrend = computeTrend(
-        revenueByMonth.map((rev, i) => ({ month: rev.month, amount: rev.amount - (expensesByMonth[i]?.amount ?? 0) })),
+        revenueByMonth.map((rev, i) => ({
+            month: rev.month,
+            amount: rev.amount - (expensesByMonth[i]?.amount ?? 0),
+        })),
     );
-    const margin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 1000) / 10 : 0;
-    const billsDueTotal = upcomingBillsDue.reduce((sum, b) => sum + b.amount_due, 0);
+    const margin =
+        totalRevenue > 0
+            ? Math.round((netProfit / totalRevenue) * 1000) / 10
+            : 0;
+    const billsDueTotal = upcomingBillsDue.reduce(
+        (sum, b) => sum + b.amount_due,
+        0,
+    );
 
     // Chart helpers — match the design: short-month x labels + a value label on
     // the net-profit line's final point.
     const shortMonth = (m: string) => String(m).split(' ')[0];
     const lastProfitIdx = profitData.length - 1;
-    const renderLastProfitLabel = (props: { x?: number; y?: number; value?: number; index?: number }) => {
-        if (props.index !== lastProfitIdx || props.x == null || props.y == null) return null;
+    const renderLastProfitLabel = (props: {
+        x?: number;
+        y?: number;
+        value?: number;
+        index?: number;
+    }) => {
+        if (props.index !== lastProfitIdx || props.x == null || props.y == null)
+            return null;
         return (
-            <text x={props.x} y={props.y - 12} textAnchor="middle" fontSize={12} fontWeight={700} fill="var(--primary)">
+            <text
+                x={props.x}
+                y={props.y - 12}
+                textAnchor="middle"
+                fontSize={12}
+                fontWeight={700}
+                fill="var(--primary)"
+            >
                 {formatMoneyCompact(props.value ?? 0)}
             </text>
         );
@@ -472,9 +656,10 @@ export default function FinanceDashboard({
                         icon={LayoutDashboard}
                         title={
                             <span>
-                                <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/85 md:justify-start">
+                                <span className="mb-2 flex items-center justify-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/85 uppercase md:justify-start">
                                     <PulseDot />
-                                    Live ledger · {periodLabel ?? PERIOD_LABEL[period]}
+                                    Live ledger ·{' '}
+                                    {periodLabel ?? PERIOD_LABEL[period]}
                                 </span>
                                 <span className="block">Finance Dashboard</span>
                             </span>
@@ -482,31 +667,58 @@ export default function FinanceDashboard({
                         description={
                             <span>
                                 Live general ledger for{' '}
-                                <span className="font-semibold text-primary-foreground">{orgName}</span> across{' '}
                                 <span className="font-semibold text-primary-foreground">
-                                    {siteCount ?? 0} {siteCount === 1 ? 'site' : 'sites'}
+                                    {orgName}
+                                </span>{' '}
+                                across{' '}
+                                <span className="font-semibold text-primary-foreground">
+                                    {siteCount ?? 0}{' '}
+                                    {siteCount === 1 ? 'site' : 'sites'}
                                 </span>{' '}
                                 and{' '}
                                 <span className="font-semibold text-primary-foreground">
-                                    {fundingStreams.length} funding {fundingStreams.length === 1 ? 'stream' : 'streams'}
+                                    {fundingStreams.length} funding{' '}
+                                    {fundingStreams.length === 1
+                                        ? 'stream'
+                                        : 'streams'}
                                 </span>
                                 .
                             </span>
                         }
                         meta={[
-                            { icon: Calendar, label: openPeriodLabel ? `Open period ${openPeriodLabel}` : (periodLabel ?? PERIOD_LABEL[period]) },
-                            { icon: MapPin, label: `${siteCount ?? 0} sites · ${regionCount ?? 0} regions` },
-                            { icon: Users, label: `${fundedResidents ?? 0} residents funded` },
+                            {
+                                icon: Calendar,
+                                label: openPeriodLabel
+                                    ? `Open period ${openPeriodLabel}`
+                                    : (periodLabel ?? PERIOD_LABEL[period]),
+                            },
+                            {
+                                icon: MapPin,
+                                label: `${siteCount ?? 0} sites · ${regionCount ?? 0} regions`,
+                            },
+                            {
+                                icon: Users,
+                                label: `${fundedResidents ?? 0} residents funded`,
+                            },
                         ]}
                         stats={[
-                            { label: 'Revenue', value: formatMoneyCompact(totalRevenue) },
-                            { label: 'Expenses', value: formatMoneyCompact(totalExpenses) },
+                            {
+                                label: 'Revenue',
+                                value: formatMoneyCompact(totalRevenue),
+                            },
+                            {
+                                label: 'Expenses',
+                                value: formatMoneyCompact(totalExpenses),
+                            },
                             {
                                 label: 'Net profit',
                                 value: formatMoneyCompact(netProfit),
                                 tone: netProfit >= 0 ? 'success' : 'critical',
                             },
-                            { label: 'Cash', value: formatMoneyCompact(cashBalance) },
+                            {
+                                label: 'Cash',
+                                value: formatMoneyCompact(cashBalance),
+                            },
                         ]}
                         actions={
                             <div className="flex flex-wrap gap-2">
@@ -515,7 +727,8 @@ export default function FinanceDashboard({
                                     onClick={() => setModal('journal')}
                                     className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                                 >
-                                    <Plus className="mr-1 h-4 w-4" /> New Journal
+                                    <Plus className="mr-1 h-4 w-4" /> New
+                                    Journal
                                 </Button>
                                 <Button
                                     size="sm"
@@ -531,7 +744,8 @@ export default function FinanceDashboard({
                                     onClick={() => setModal('invoice')}
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
-                                    <FileText className="mr-1 h-4 w-4" /> New Invoice
+                                    <FileText className="mr-1 h-4 w-4" /> New
+                                    Invoice
                                 </Button>
                                 <Button
                                     size="sm"
@@ -539,7 +753,8 @@ export default function FinanceDashboard({
                                     onClick={() => setModal('receipt')}
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
-                                    <Receipt className="mr-1 h-4 w-4" /> Record Receipt
+                                    <Receipt className="mr-1 h-4 w-4" /> Record
+                                    Receipt
                                 </Button>
                             </div>
                         }
@@ -547,43 +762,45 @@ export default function FinanceDashboard({
                             <div className="flex flex-col gap-1">
                                 <OverviewTabsFooter active="summary" />
                                 <div className="flex flex-col items-stretch gap-2 pb-3 md:flex-row md:items-center md:justify-between">
-                                <div className="inline-flex w-fit rounded-[10px] bg-primary-foreground/15 p-[3px]">
-                                    {PERIODS.map((p) => (
-                                        // eslint-disable-next-line no-restricted-syntax -- segmented-control pill, not a shadcn Button
-                                        <button
-                                            key={p.key}
-                                            type="button"
-                                            onClick={() => changePeriod(p.key)}
-                                            className={cn(
-                                                'rounded-md px-3 py-1 text-[12.5px] font-semibold transition-colors',
-                                                period === p.key
-                                                    ? 'bg-primary-foreground text-primary'
-                                                    : 'text-primary-foreground/85 hover:text-primary-foreground',
-                                            )}
-                                        >
-                                            {p.label}
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="flex flex-wrap items-center justify-end gap-2">
-                                    <MultiEntityFilter
-                                        label="Site"
-                                        allLabel="All sites"
-                                        items={siteOptions}
-                                        value={siteFilter}
-                                        onChange={changeSite}
-                                        onDark
-                                    />
-                                    <MultiEntityFilter
-                                        label="Funding"
-                                        allLabel="All funding"
-                                        pluralLabel="funding streams"
-                                        items={funderOptions}
-                                        value={funderFilter}
-                                        onChange={changeFunder}
-                                        onDark
-                                    />
-                                </div>
+                                    <div className="inline-flex w-fit rounded-[10px] bg-primary-foreground/15 p-[3px]">
+                                        {PERIODS.map((p) => (
+                                            // eslint-disable-next-line no-restricted-syntax -- segmented-control pill, not a shadcn Button
+                                            <button
+                                                key={p.key}
+                                                type="button"
+                                                onClick={() =>
+                                                    changePeriod(p.key)
+                                                }
+                                                className={cn(
+                                                    'rounded-md px-3 py-1 text-[12.5px] font-semibold transition-colors',
+                                                    period === p.key
+                                                        ? 'bg-primary-foreground text-primary'
+                                                        : 'text-primary-foreground/85 hover:text-primary-foreground',
+                                                )}
+                                            >
+                                                {p.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <MultiEntityFilter
+                                            label="Site"
+                                            allLabel="All sites"
+                                            items={siteOptions}
+                                            value={siteFilter}
+                                            onChange={changeSite}
+                                            onDark
+                                        />
+                                        <MultiEntityFilter
+                                            label="Funding"
+                                            allLabel="All funding"
+                                            pluralLabel="funding streams"
+                                            items={funderOptions}
+                                            value={funderFilter}
+                                            onChange={changeFunder}
+                                            onDark
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         }
@@ -591,276 +808,576 @@ export default function FinanceDashboard({
                 }
             >
                 <div className="flex flex-col gap-[18px]">
-                {/* §2 Finance hubs quick-links */}
-                <FinanceHubsBar />
+                    {/* §2 Finance hubs quick-links */}
+                    <FinanceHubsBar />
 
-                {/* §3 Needs attention */}
-                <NeedsAttentionStrip
-                    items={attentionItems}
-                    subtitle={`${attentionItems.length} item${attentionItems.length === 1 ? '' : 's'} need attention · AR, bills, payroll & claims`}
-                    viewAllHref="/finance/reports"
-                />
+                    {/* §3 Needs attention */}
+                    <NeedsAttentionStrip
+                        items={attentionItems}
+                        subtitle={`${attentionItems.length} item${attentionItems.length === 1 ? '' : 's'} need attention · AR, bills, payroll & claims`}
+                        viewAllHref="/finance/reports"
+                    />
 
-                {/* §4 KPI cards */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <KpiCard
-                        label="Revenue"
-                        value={formatMoneyCompact(totalRevenue)}
-                        icon={TrendingUp}
-                        tone="success"
-                        delta={revenueTrend ? { percent: revenueTrend.percent, good: revenueTrend.percent >= 0 } : null}
-                        sub="vs prev period"
-                    />
-                    <KpiCard
-                        label="Net profit"
-                        value={formatMoneyCompact(netProfit)}
-                        icon={DollarSign}
-                        tone="primary"
-                        delta={profitTrend ? { percent: profitTrend.percent, good: profitTrend.percent >= 0 } : null}
-                        sub={`${margin}% margin`}
-                    />
-                    <KpiCard
-                        label="Cash position"
-                        value={formatMoneyCompact(cashBalance)}
-                        icon={Wallet}
-                        tone="info"
-                        sub={cashRunwayDays != null ? `${cashRunwayDays} days runway` : 'cash on hand'}
-                    />
-                    <KpiCard
-                        label="AR outstanding"
-                        value={formatMoneyCompact(accountsReceivable)}
-                        icon={FileText}
-                        tone="warning"
-                        sub={arAging ? `${formatMoneyCompact(arAging.over60)} >60d` : 'receivables outstanding'}
-                    />
-                    <KpiCard
-                        label="AP outstanding"
-                        value={formatMoneyCompact(accountsPayable)}
-                        icon={CreditCard}
-                        tone="critical"
-                        sub={`${apDueWithin7?.count ?? upcomingBillsDue.length} due ≤7d · ${formatMoneyCompact(apDueWithin7?.total ?? billsDueTotal)}`}
-                    />
-                    <KpiCard
-                        label="Expenses"
-                        value={formatMoneyCompact(totalExpenses)}
-                        icon={TrendingDown}
-                        tone="warning"
-                        delta={expenseTrend ? { percent: expenseTrend.percent, good: expenseTrend.percent < 0 } : null}
-                        sub="vs prev period"
-                    />
-                    <KpiCard
-                        label="Funding utilisation"
-                        value={fundingUtilisation ? `${fundingUtilisation.utilisation_pct}%` : '—'}
-                        icon={Gauge}
-                        tone="primary"
-                        sub={
-                            fundingUtilisation
-                                ? `target 90% · ${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`
-                                : 'claimed vs delivered'
-                        }
-                    />
-                    <KpiCard
-                        label="Revenue / resident"
-                        value={revenuePerResident != null ? formatMoneyCompact(revenuePerResident) : '—'}
-                        icon={Users}
-                        tone="success"
-                        sub={`${fundedResidents ?? 0} funded · benchmark $6.2k`}
-                    />
-                </div>
+                    {/* §4 KPI cards */}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <KpiCard
+                            label="Revenue"
+                            value={formatMoneyCompact(totalRevenue)}
+                            icon={TrendingUp}
+                            tone="success"
+                            delta={
+                                revenueTrend
+                                    ? {
+                                          percent: revenueTrend.percent,
+                                          good: revenueTrend.percent >= 0,
+                                      }
+                                    : null
+                            }
+                            sub="vs prev period"
+                        />
+                        <KpiCard
+                            label="Net profit"
+                            value={formatMoneyCompact(netProfit)}
+                            icon={DollarSign}
+                            tone="primary"
+                            delta={
+                                profitTrend
+                                    ? {
+                                          percent: profitTrend.percent,
+                                          good: profitTrend.percent >= 0,
+                                      }
+                                    : null
+                            }
+                            sub={`${margin}% margin`}
+                        />
+                        <KpiCard
+                            label="Cash position"
+                            value={formatMoneyCompact(cashBalance)}
+                            icon={Wallet}
+                            tone="info"
+                            sub={
+                                cashRunwayDays != null
+                                    ? `${cashRunwayDays} days runway`
+                                    : 'cash on hand'
+                            }
+                        />
+                        <KpiCard
+                            label="AR outstanding"
+                            value={formatMoneyCompact(accountsReceivable)}
+                            icon={FileText}
+                            tone="warning"
+                            sub={
+                                arAging
+                                    ? `${formatMoneyCompact(arAging.over60)} >60d`
+                                    : 'receivables outstanding'
+                            }
+                        />
+                        <KpiCard
+                            label="AP outstanding"
+                            value={formatMoneyCompact(accountsPayable)}
+                            icon={CreditCard}
+                            tone="critical"
+                            sub={`${apDueWithin7?.count ?? upcomingBillsDue.length} due ≤7d · ${formatMoneyCompact(apDueWithin7?.total ?? billsDueTotal)}`}
+                        />
+                        <KpiCard
+                            label="Expenses"
+                            value={formatMoneyCompact(totalExpenses)}
+                            icon={TrendingDown}
+                            tone="warning"
+                            delta={
+                                expenseTrend
+                                    ? {
+                                          percent: expenseTrend.percent,
+                                          good: expenseTrend.percent < 0,
+                                      }
+                                    : null
+                            }
+                            sub="vs prev period"
+                        />
+                        <KpiCard
+                            label="Funding utilisation"
+                            value={
+                                fundingUtilisation
+                                    ? `${fundingUtilisation.utilisation_pct}%`
+                                    : '—'
+                            }
+                            icon={Gauge}
+                            tone="primary"
+                            sub={
+                                fundingUtilisation
+                                    ? `target 90% · ${formatMoneyCompact(fundingUtilisation.unclaimed_total)} unclaimed`
+                                    : 'claimed vs delivered'
+                            }
+                        />
+                        <KpiCard
+                            label="Revenue / resident"
+                            value={
+                                revenuePerResident != null
+                                    ? formatMoneyCompact(revenuePerResident)
+                                    : '—'
+                            }
+                            icon={Users}
+                            tone="success"
+                            sub={`${fundedResidents ?? 0} funded · benchmark $6.2k`}
+                        />
+                    </div>
 
-                {/* §5 Donut row */}
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                    <DonutCard
-                        tone="primary"
-                        title="Revenue by funding stream"
-                        subtitle="Posted GL revenue this period"
-                        segments={revenueStreamSegments}
-                        centerValue={formatMoneyCompact(revenueStreamTotal)}
-                        centerLabel="revenue"
-                        accentKeys={[revenueStreamSegments[0]?.key ?? '']}
-                        active={false}
-                        cta="View funding streams"
-                        onClick={() => router.visit('/finance/funding-streams')}
-                        formatValue={(v) => formatMoneyCompact(v)}
-                        showPercent
-                    />
-                    <DonutCard
-                        tone="warning"
-                        title="Funding claim utilisation"
-                        subtitle="Delivered vs claimed vs paid"
-                        segments={utilDonut}
-                        centerValue={`${fundingUtilisation?.utilisation_pct ?? 0}%`}
-                        centerLabel="utilised"
-                        accentKeys={['paid']}
-                        active={false}
-                        cta="View funding claims"
-                        onClick={() => router.visit('/finance/funding-streams')}
-                        formatValue={(v) => formatMoneyCompact(v)}
-                        showPercent
-                    />
-                    <DonutCard
-                        tone="success"
-                        title="Receivables aging"
-                        subtitle="Outstanding by age bucket"
-                        segments={arAgingDonut}
-                        centerValue={formatMoneyCompact(arAging?.total ?? 0)}
-                        centerLabel="AR"
-                        accentKeys={['current']}
-                        active={false}
-                        cta="View aged receivables"
-                        onClick={() => router.visit('/finance/reports/aged-receivables')}
-                        formatValue={(v) => formatMoneyCompact(v)}
-                        showPercent
-                    />
-                </div>
+                    {/* §5 Donut row */}
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                        <DonutCard
+                            tone="primary"
+                            title="Revenue by funding stream"
+                            subtitle="Posted GL revenue this period"
+                            segments={revenueStreamSegments}
+                            centerValue={formatMoneyCompact(revenueStreamTotal)}
+                            centerLabel="revenue"
+                            accentKeys={[revenueStreamSegments[0]?.key ?? '']}
+                            active={false}
+                            cta="View funding streams"
+                            onClick={() =>
+                                router.visit('/finance/funding-streams')
+                            }
+                            formatValue={(v) => formatMoneyCompact(v)}
+                            showPercent
+                        />
+                        <DonutCard
+                            tone="warning"
+                            title="Funding claim utilisation"
+                            subtitle="Delivered vs claimed vs paid"
+                            segments={utilDonut}
+                            centerValue={`${fundingUtilisation?.utilisation_pct ?? 0}%`}
+                            centerLabel="utilised"
+                            accentKeys={['paid']}
+                            active={false}
+                            cta="View funding claims"
+                            onClick={() =>
+                                router.visit('/finance/funding-streams')
+                            }
+                            formatValue={(v) => formatMoneyCompact(v)}
+                            showPercent
+                        />
+                        <DonutCard
+                            tone="success"
+                            title="Receivables aging"
+                            subtitle="Outstanding by age bucket"
+                            segments={arAgingDonut}
+                            centerValue={formatMoneyCompact(
+                                arAging?.total ?? 0,
+                            )}
+                            centerLabel="AR"
+                            accentKeys={['current']}
+                            active={false}
+                            cta="View aged receivables"
+                            onClick={() =>
+                                router.visit(
+                                    '/finance/reports/aged-receivables',
+                                )
+                            }
+                            formatValue={(v) => formatMoneyCompact(v)}
+                            showPercent
+                        />
+                    </div>
 
-                {/* §6 Charts row */}
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.35fr_1fr]">
-                    <Card>
-                        <CardHeader className="flex flex-row items-start justify-between">
-                            <div>
-                                <CardTitle className="text-base">Net profit trend</CardTitle>
-                                <p className="mt-0.5 text-[11.8px] text-muted-foreground">Rolling 6 periods · NZD</p>
-                            </div>
-                            {profitTrend ? (
-                                <span
-                                    className={cn(
-                                        'rounded-full px-2 py-0.5 text-[11.5px] font-bold tabular-nums',
-                                        profitTrend.percent >= 0
-                                            ? 'bg-status-success-bg text-status-success'
-                                            : 'bg-status-critical-bg text-status-critical',
-                                    )}
-                                >
-                                    {profitTrend.percent >= 0 ? '+' : ''}
-                                    {profitTrend.percent.toFixed(1)}%
-                                </span>
-                            ) : null}
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={profitData} margin={{ top: 16, right: 16, bottom: 0, left: 0 }}>
-                                        <defs>
-                                            <linearGradient id="npGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.28} />
-                                                <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.01} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid vertical={false} className="stroke-border/60" />
-                                        <XAxis
-                                            dataKey="month"
-                                            tickFormatter={shortMonth}
-                                            tick={{ fontSize: 11 }}
-                                            className="fill-muted-foreground"
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <YAxis
-                                            tick={{ fontSize: 11 }}
-                                            className="fill-muted-foreground"
-                                            tickFormatter={(v: number) => formatMoneyCompact(v)}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            width={52}
-                                        />
-                                        <Tooltip formatter={(value?: number) => formatMoney(value ?? 0)} />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="profit"
-                                            stroke="var(--primary)"
-                                            strokeWidth={2.6}
-                                            fill="url(#npGradient)"
-                                            name="Net profit"
-                                            dot={{ r: 3.5, fill: 'var(--card)', stroke: 'var(--primary)', strokeWidth: 2 }}
-                                            activeDot={{ r: 5, fill: 'var(--primary)' }}
+                    {/* §6 Charts row */}
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.35fr_1fr]">
+                        <Card>
+                            <CardHeader className="flex flex-row items-start justify-between">
+                                <div>
+                                    <CardTitle className="text-base">
+                                        Net profit trend
+                                    </CardTitle>
+                                    <p className="mt-0.5 text-[11.8px] text-muted-foreground">
+                                        Rolling 6 periods · NZD
+                                    </p>
+                                </div>
+                                {profitTrend ? (
+                                    <span
+                                        className={cn(
+                                            'rounded-full px-2 py-0.5 text-[11.5px] font-bold tabular-nums',
+                                            profitTrend.percent >= 0
+                                                ? 'bg-status-success-bg text-status-success'
+                                                : 'bg-status-critical-bg text-status-critical',
+                                        )}
+                                    >
+                                        {profitTrend.percent >= 0 ? '+' : ''}
+                                        {profitTrend.percent.toFixed(1)}%
+                                    </span>
+                                ) : null}
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-64">
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
+                                        <AreaChart
+                                            data={profitData}
+                                            margin={{
+                                                top: 16,
+                                                right: 16,
+                                                bottom: 0,
+                                                left: 0,
+                                            }}
                                         >
-                                            <LabelList
-                                                dataKey="profit"
-                                                content={renderLastProfitLabel as ComponentProps<typeof LabelList>['content']}
+                                            <defs>
+                                                <linearGradient
+                                                    id="npGradient"
+                                                    x1="0"
+                                                    y1="0"
+                                                    x2="0"
+                                                    y2="1"
+                                                >
+                                                    <stop
+                                                        offset="0%"
+                                                        stopColor="var(--primary)"
+                                                        stopOpacity={0.28}
+                                                    />
+                                                    <stop
+                                                        offset="100%"
+                                                        stopColor="var(--primary)"
+                                                        stopOpacity={0.01}
+                                                    />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid
+                                                vertical={false}
+                                                className="stroke-border/60"
                                             />
-                                        </Area>
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                            <XAxis
+                                                dataKey="month"
+                                                tickFormatter={shortMonth}
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                                tickFormatter={(v: number) =>
+                                                    formatMoneyCompact(v)
+                                                }
+                                                axisLine={false}
+                                                tickLine={false}
+                                                width={52}
+                                            />
+                                            <Tooltip
+                                                formatter={(value?: number) =>
+                                                    formatMoney(value ?? 0)
+                                                }
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="profit"
+                                                stroke="var(--primary)"
+                                                strokeWidth={2.6}
+                                                fill="url(#npGradient)"
+                                                name="Net profit"
+                                                dot={{
+                                                    r: 3.5,
+                                                    fill: 'var(--card)',
+                                                    stroke: 'var(--primary)',
+                                                    strokeWidth: 2,
+                                                }}
+                                                activeDot={{
+                                                    r: 5,
+                                                    fill: 'var(--primary)',
+                                                }}
+                                            >
+                                                <LabelList
+                                                    dataKey="profit"
+                                                    content={
+                                                        renderLastProfitLabel as ComponentProps<
+                                                            typeof LabelList
+                                                        >['content']
+                                                    }
+                                                />
+                                            </Area>
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Revenue vs expenses</CardTitle>
-                            <p className="mt-0.5 text-[11.8px] text-muted-foreground">Last 6 periods</p>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
-                                        <CartesianGrid vertical={false} className="stroke-border/60" />
-                                        <XAxis
-                                            dataKey="month"
-                                            tickFormatter={shortMonth}
-                                            tick={{ fontSize: 11 }}
-                                            className="fill-muted-foreground"
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <YAxis
-                                            tick={{ fontSize: 11 }}
-                                            className="fill-muted-foreground"
-                                            tickFormatter={(v: number) => formatMoneyCompact(v)}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            width={52}
-                                        />
-                                        <Tooltip formatter={(value?: number) => formatMoney(value ?? 0)} cursor={{ fill: 'var(--accent)' }} />
-                                        <Legend verticalAlign="top" align="right" iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 12, paddingBottom: 8 }} />
-                                        <Bar dataKey="revenue" fill="var(--primary)" name="Revenue" radius={[3, 3, 0, 0]} maxBarSize={14} />
-                                        <Bar dataKey="expenses" fill="var(--status-warning)" name="Expenses" radius={[3, 3, 0, 0]} maxBarSize={14} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    Revenue vs expenses
+                                </CardTitle>
+                                <p className="mt-0.5 text-[11.8px] text-muted-foreground">
+                                    Last 6 periods
+                                </p>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-64">
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                    >
+                                        <BarChart
+                                            data={chartData}
+                                            margin={{
+                                                top: 8,
+                                                right: 16,
+                                                bottom: 0,
+                                                left: 0,
+                                            }}
+                                        >
+                                            <CartesianGrid
+                                                vertical={false}
+                                                className="stroke-border/60"
+                                            />
+                                            <XAxis
+                                                dataKey="month"
+                                                tickFormatter={shortMonth}
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                                tickFormatter={(v: number) =>
+                                                    formatMoneyCompact(v)
+                                                }
+                                                axisLine={false}
+                                                tickLine={false}
+                                                width={52}
+                                            />
+                                            <Tooltip
+                                                formatter={(value?: number) =>
+                                                    formatMoney(value ?? 0)
+                                                }
+                                                cursor={{
+                                                    fill: 'var(--accent)',
+                                                }}
+                                            />
+                                            <Legend
+                                                verticalAlign="top"
+                                                align="right"
+                                                iconType="circle"
+                                                iconSize={9}
+                                                wrapperStyle={{
+                                                    fontSize: 12,
+                                                    paddingBottom: 8,
+                                                }}
+                                            />
+                                            <Bar
+                                                dataKey="revenue"
+                                                fill="var(--primary)"
+                                                name="Revenue"
+                                                radius={[3, 3, 0, 0]}
+                                                maxBarSize={14}
+                                            />
+                                            <Bar
+                                                dataKey="expenses"
+                                                fill="var(--status-warning)"
+                                                name="Expenses"
+                                                radius={[3, 3, 0, 0]}
+                                                maxBarSize={14}
+                                            />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                {/* §7 Tables row */}
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    {/* §7 Tables row */}
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle>
+                                    Upcoming bills due · next 7 days
+                                </CardTitle>
+                                <Button asChild variant="ghost" size="sm">
+                                    <Link href="/finance/bills">
+                                        All bills{' '}
+                                        <ArrowRight className="ml-1 h-4 w-4" />
+                                    </Link>
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                {upcomingBillsDue.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No bills due in the next 7 days.
+                                    </p>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Bill #</TableHead>
+                                                <TableHead>Vendor</TableHead>
+                                                <TableHead>Due</TableHead>
+                                                <TableHead className="text-right">
+                                                    Amount
+                                                </TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {upcomingBillsDue.map((bill) => (
+                                                <TableRow key={bill.id}>
+                                                    <TableCell>
+                                                        <Link
+                                                            href={`/finance/bills/${bill.id}`}
+                                                            className="font-semibold text-primary hover:underline"
+                                                        >
+                                                            {bill.bill_number}
+                                                        </Link>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {bill.vendor_name}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {formatDate(
+                                                            bill.due_date,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-semibold tabular-nums">
+                                                        {formatMoney(
+                                                            bill.amount_due,
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="flex items-center gap-2">
+                                    Funding claims
+                                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10.5px] font-bold tracking-wide text-status-warning uppercase">
+                                        supported living
+                                    </span>
+                                </CardTitle>
+                                <Button asChild variant="ghost" size="sm">
+                                    <Link href="/finance/funding-streams">
+                                        All claims{' '}
+                                        <ArrowRight className="ml-1 h-4 w-4" />
+                                    </Link>
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                {fundingClaims.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No funding claims yet.
+                                    </p>
+                                ) : (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Ref</TableHead>
+                                                <TableHead>
+                                                    Funder · period
+                                                </TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">
+                                                    Amount
+                                                </TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {fundingClaims.map((claim) => (
+                                                <TableRow key={claim.reference}>
+                                                    <TableCell className="font-semibold text-primary">
+                                                        {claim.reference}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="block">
+                                                            {claim.funder}
+                                                        </span>
+                                                        <span className="block text-[11px] text-muted-foreground">
+                                                            {claim.period}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <StatusBadge
+                                                            status={
+                                                                claim.status
+                                                            }
+                                                            tone={
+                                                                CLAIM_TONE[
+                                                                    claim.status
+                                                                ] ?? 'neutral'
+                                                            }
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-semibold tabular-nums">
+                                                        {formatMoney(
+                                                            claim.amount,
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* §8 Recent journals */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>Upcoming bills due · next 7 days</CardTitle>
+                            <CardTitle>Recent journals</CardTitle>
                             <Button asChild variant="ghost" size="sm">
-                                <Link href="/finance/bills">
-                                    All bills <ArrowRight className="ml-1 h-4 w-4" />
+                                <Link href="/finance/journals">
+                                    All journals{' '}
+                                    <ArrowRight className="ml-1 h-4 w-4" />
                                 </Link>
                             </Button>
                         </CardHeader>
                         <CardContent>
-                            {upcomingBillsDue.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No bills due in the next 7 days.</p>
+                            {recentJournals.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    No journal entries yet.
+                                </p>
                             ) : (
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Bill #</TableHead>
-                                            <TableHead>Vendor</TableHead>
-                                            <TableHead>Due</TableHead>
-                                            <TableHead className="text-right">Amount</TableHead>
+                                            <TableHead>Journal #</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Description</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead className="text-right">
+                                                Amount
+                                            </TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {upcomingBillsDue.map((bill) => (
-                                            <TableRow key={bill.id}>
+                                        {recentJournals.map((journal) => (
+                                            <TableRow key={journal.id}>
                                                 <TableCell>
                                                     <Link
-                                                        href={`/finance/bills/${bill.id}`}
+                                                        href={`/finance/journals/${journal.id}`}
                                                         className="font-semibold text-primary hover:underline"
                                                     >
-                                                        {bill.bill_number}
+                                                        {journal.journal_number}
                                                     </Link>
                                                 </TableCell>
-                                                <TableCell>{bill.vendor_name}</TableCell>
-                                                <TableCell className="text-muted-foreground">{formatDate(bill.due_date)}</TableCell>
+                                                <TableCell className="text-muted-foreground">
+                                                    {formatDate(
+                                                        journal.journal_date,
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="max-w-[280px] truncate">
+                                                    {journal.description ?? '—'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-primary capitalize">
+                                                        {journal.type}
+                                                    </span>
+                                                </TableCell>
                                                 <TableCell className="text-right font-semibold tabular-nums">
-                                                    {formatMoney(bill.amount_due)}
+                                                    {formatMoney(
+                                                        journal.total_amount,
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -869,109 +1386,6 @@ export default function FinanceDashboard({
                             )}
                         </CardContent>
                     </Card>
-
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                Funding claims
-                                <span className="rounded-full bg-status-warning-bg px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-status-warning">
-                                    supported living
-                                </span>
-                            </CardTitle>
-                            <Button asChild variant="ghost" size="sm">
-                                <Link href="/finance/funding-streams">
-                                    All claims <ArrowRight className="ml-1 h-4 w-4" />
-                                </Link>
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            {fundingClaims.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No funding claims yet.</p>
-                            ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Ref</TableHead>
-                                            <TableHead>Funder · period</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Amount</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {fundingClaims.map((claim) => (
-                                            <TableRow key={claim.reference}>
-                                                <TableCell className="font-semibold text-primary">{claim.reference}</TableCell>
-                                                <TableCell>
-                                                    <span className="block">{claim.funder}</span>
-                                                    <span className="block text-[11px] text-muted-foreground">{claim.period}</span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <StatusBadge status={claim.status} tone={CLAIM_TONE[claim.status] ?? 'neutral'} />
-                                                </TableCell>
-                                                <TableCell className="text-right font-semibold tabular-nums">
-                                                    {formatMoney(claim.amount)}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* §8 Recent journals */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle>Recent journals</CardTitle>
-                        <Button asChild variant="ghost" size="sm">
-                            <Link href="/finance/journals">
-                                All journals <ArrowRight className="ml-1 h-4 w-4" />
-                            </Link>
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        {recentJournals.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No journal entries yet.</p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Journal #</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {recentJournals.map((journal) => (
-                                        <TableRow key={journal.id}>
-                                            <TableCell>
-                                                <Link
-                                                    href={`/finance/journals/${journal.id}`}
-                                                    className="font-semibold text-primary hover:underline"
-                                                >
-                                                    {journal.journal_number}
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">{formatDate(journal.journal_date)}</TableCell>
-                                            <TableCell className="max-w-[280px] truncate">{journal.description ?? '—'}</TableCell>
-                                            <TableCell>
-                                                <span className="rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold capitalize text-primary">
-                                                    {journal.type}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="text-right font-semibold tabular-nums">
-                                                {formatMoney(journal.total_amount)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
                 </div>
             </PageLayout>
 
@@ -983,9 +1397,23 @@ export default function FinanceDashboard({
                 costCentres={costCentres}
                 fundingStreams={fundingStreams}
             />
-            <NewBillDialog open={modal === 'bill'} onClose={() => setModal(null)} vendors={vendors} accounts={accounts} />
-            <NewInvoiceDialog open={modal === 'invoice'} onClose={() => setModal(null)} clients={clients} taxRates={taxRates} />
-            <RecordReceiptDialog open={modal === 'receipt'} onClose={() => setModal(null)} invoice={null} />
+            <NewBillDialog
+                open={modal === 'bill'}
+                onClose={() => setModal(null)}
+                vendors={vendors}
+                accounts={accounts}
+            />
+            <NewInvoiceDialog
+                open={modal === 'invoice'}
+                onClose={() => setModal(null)}
+                clients={clients}
+                taxRates={taxRates}
+            />
+            <RecordReceiptDialog
+                open={modal === 'receipt'}
+                onClose={() => setModal(null)}
+                invoice={null}
+            />
         </AppLayout>
     );
 }

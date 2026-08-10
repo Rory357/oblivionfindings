@@ -25,10 +25,10 @@ import { createPortal } from 'react-dom';
 
 import { cn } from '@/lib/utils';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import { initials } from './category';
 import { useChecklistConfig } from './context';
 import type { ChecklistRun } from './types';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 const MENU_W = 240;
 
@@ -131,7 +131,8 @@ function MenuItem({
     autoFocus?: boolean;
 }) {
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             type="button"
             role="menuitem"
             autoFocus={autoFocus}
@@ -152,7 +153,8 @@ function MenuItem({
 function SubHeader({ onBack, title }: { onBack: () => void; title: string }) {
     return (
         <div className="mb-1 flex items-center gap-2 px-1.5 py-1">
-            <GuardrailButton unstyled
+            <GuardrailButton
+                unstyled
                 type="button"
                 onClick={onBack}
                 className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -301,7 +303,8 @@ function RunContextMenu({
                         onChange={(e) => setDate(e.target.value)}
                         className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     />
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         disabled={busy || !date}
                         onClick={reschedule}
@@ -334,7 +337,8 @@ function RunContextMenu({
                         />
                     </div>
                     <div className="mt-1.5 max-h-52 overflow-y-auto">
-                        <GuardrailButton unstyled
+                        <GuardrailButton
+                            unstyled
                             type="button"
                             disabled={busy}
                             onClick={() => reassign(null)}
@@ -353,7 +357,8 @@ function RunContextMenu({
                             filtered.map((u) => {
                                 const active = run.assigned_to_id === u.id;
                                 return (
-                                    <GuardrailButton unstyled
+                                    <GuardrailButton
+                                        unstyled
                                         key={u.id}
                                         type="button"
                                         disabled={busy}
@@ -390,7 +395,8 @@ function RunContextMenu({
                         Mark this run as skipped for this cycle? It will stop
                         counting as due or overdue.
                     </p>
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         type="button"
                         disabled={busy}
                         onClick={skip}

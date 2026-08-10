@@ -1,5 +1,10 @@
 import { Button } from '@/components/ui/button';
-import { Field, InfoCard, SelectInput, StepHead } from '@/components/wizard/primitives';
+import {
+    Field,
+    InfoCard,
+    SelectInput,
+    StepHead,
+} from '@/components/wizard/primitives';
 import {
     ReviewCard,
     ReviewRow,
@@ -22,11 +27,26 @@ import {
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-type ObligationOption = { id: number; title: string; framework: string; due_date?: string | null };
+type ObligationOption = {
+    id: number;
+    title: string;
+    framework: string;
+    due_date?: string | null;
+};
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'obligation', label: 'Obligation', blurb: 'Which one is done', icon: ShieldCheck },
-    { key: 'confirm', label: 'Confirm', blurb: 'Mark complete', icon: CheckCircle2 },
+    {
+        key: 'obligation',
+        label: 'Obligation',
+        blurb: 'Which one is done',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'confirm',
+        label: 'Confirm',
+        blurb: 'Mark complete',
+        icon: CheckCircle2,
+    },
 ];
 
 export function CompleteObligationDialog({
@@ -57,7 +77,8 @@ export function CompleteObligationDialog({
         [obligations, obligationId],
     );
 
-    const goTo = (idx: number) => setStepIndex(Math.max(0, Math.min(idx, STEPS.length - 1)));
+    const goTo = (idx: number) =>
+        setStepIndex(Math.max(0, Math.min(idx, STEPS.length - 1)));
     const next = () => {
         if (!obligationId) {
             setError('Choose the obligation you have completed');
@@ -105,14 +126,16 @@ export function CompleteObligationDialog({
                         title="Obligation completed"
                         blurb={
                             <>
-                                <strong>{obligation?.title}</strong> is marked complete. If it
-                                recurs, the next occurrence has been scheduled automatically.
+                                <strong>{obligation?.title}</strong> is marked
+                                complete. If it recurs, the next occurrence has
+                                been scheduled automatically.
                             </>
                         }
                         actions={
                             <Button asChild>
                                 <a href="/governance/compliance">
-                                    <ShieldCheck className="h-4 w-4" /> Open register
+                                    <ShieldCheck className="h-4 w-4" /> Open
+                                    register
                                 </a>
                             </Button>
                         }
@@ -136,7 +159,11 @@ export function CompleteObligationDialog({
             onStepClick={goTo}
             footerStart={
                 stepIndex > 0 && !initialObligationId ? (
-                    <Button type="button" variant="ghost" onClick={() => goTo(stepIndex - 1)}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => goTo(stepIndex - 1)}
+                    >
                         <ChevronLeft className="h-4 w-4" /> Back
                     </Button>
                 ) : null
@@ -147,10 +174,15 @@ export function CompleteObligationDialog({
                         Cancel
                     </Button>
                     {isConfirm ? (
-                        <Button type="button" onClick={submit} disabled={processing}>
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing}
+                        >
                             {processing ? (
                                 <>
-                                    <Loader2 className="h-4 w-4 animate-spin" /> Completing…
+                                    <Loader2 className="h-4 w-4 animate-spin" />{' '}
+                                    Completing…
                                 </>
                             ) : (
                                 <>
@@ -173,7 +205,11 @@ export function CompleteObligationDialog({
                         title="Which obligation is complete?"
                         blurb="Completing records who and when, and schedules the next occurrence."
                     />
-                    <Field label="Obligation" required error={error ?? undefined}>
+                    <Field
+                        label="Obligation"
+                        required
+                        error={error ?? undefined}
+                    >
                         <SelectInput
                             value={obligationId}
                             onChange={(v) => {
@@ -197,16 +233,29 @@ export function CompleteObligationDialog({
                     />
                     <div className="grid gap-3">
                         <ReviewCard icon={ShieldCheck} title="Obligation">
-                            <ReviewRow label="Obligation" value={obligation?.title} />
-                            <ReviewRow label="Framework" value={obligation?.framework} />
-                            <ReviewRow label="Was due" value={obligation?.due_date} />
+                            <ReviewRow
+                                label="Obligation"
+                                value={obligation?.title}
+                            />
+                            <ReviewRow
+                                label="Framework"
+                                value={obligation?.framework}
+                            />
+                            <ReviewRow
+                                label="Was due"
+                                value={obligation?.due_date}
+                            />
                         </ReviewCard>
                         {obligation && onRecordEvidence ? (
                             <InfoCard icon={Paperclip}>
-                                Good practice: attach the evidence that satisfies this obligation.{' '}
-                                <Button unstyled
+                                Good practice: attach the evidence that
+                                satisfies this obligation.{' '}
+                                <Button
+                                    unstyled
                                     type="button"
-                                    onClick={() => onRecordEvidence(obligation.id)}
+                                    onClick={() =>
+                                        onRecordEvidence(obligation.id)
+                                    }
                                     className="font-semibold text-primary hover:underline"
                                 >
                                     Record evidence instead

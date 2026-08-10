@@ -1,4 +1,7 @@
-import { IncidentDetailDialog, type IncidentDetail } from '@/components/incidents/incident-detail-dialog';
+import {
+    IncidentDetailDialog,
+    type IncidentDetail,
+} from '@/components/incidents/incident-detail-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 
@@ -18,7 +21,11 @@ export default function IncidentShow({ detail }: { detail: IncidentDetail }) {
             ]}
         >
             <Head title={`Incident ${ref}`} />
-            <IncidentDetailDialog detail={detail} open onClose={() => router.visit('/incidents')} />
+            <IncidentDetailDialog
+                detail={detail}
+                open
+                onClose={() => router.visit('/incidents')}
+            />
         </AppLayout>
     );
 }

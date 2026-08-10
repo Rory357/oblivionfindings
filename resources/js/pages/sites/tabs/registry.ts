@@ -13,6 +13,7 @@ import {
     HandCoins,
     HardDrive,
     House,
+    Network,
     PackageCheck,
     PanelsTopLeft,
     ShieldCheck,
@@ -81,6 +82,7 @@ const literal = (label: string) => () => label;
 
 const SITE_PROFILE_TAB_ALIASES: Record<string, string> = {
     'meal-planner': 'meal_planner',
+    'type-plan': 'plan',
 };
 
 export function siteProfileTabQueryValue(tabId: string): string {
@@ -251,6 +253,15 @@ export const siteProfileTabs: SiteProfileTabDefinition[] = [
         dataProp: 'hardwareData',
         permission: 'siteHardware.view',
         warningSource: 'hardware',
+    },
+    {
+        id: 'technology',
+        group: 'operations',
+        label: literal('Technology'),
+        icon: Network,
+        dataProp: 'technology',
+        permission: 'viewTechnology',
+        warningSource: 'technology',
     },
     {
         id: 'plan',

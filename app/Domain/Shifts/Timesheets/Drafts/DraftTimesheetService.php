@@ -3,7 +3,6 @@
 namespace App\Domain\Shifts\Timesheets\Drafts;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\PublicHolidayCalendar;
 use App\Models\Shift;
@@ -27,17 +26,13 @@ class DraftTimesheetService
      * Whether the given worker-local work date is a public holiday for the
      * workplace (national always; regional anniversaries by site region).
      */
-    protected function isPublicHolidayFor(string $workDate, ?int $userId, ?int $siteId): bool
+    protected function isPublicHolidayFor(string $workDate, ?int $siteId): bool
     {
         $region = $siteId
             ? Site::query()->whereKey($siteId)->value('region')
             : null;
 
-        $tenantId = $userId
-            ? HrEmployeeProfile::query()->where('user_id', $userId)->value('tenant_id')
-            : null;
-
-        return $this->publicHolidays->isPublicHoliday($workDate, $tenantId !== null ? (int) $tenantId : null, $region);
+        return $this->publicHolidays->isPublicHoliday($workDate, $region);
     }
 
     /**
@@ -101,7 +96,6 @@ class DraftTimesheetService
             'on_call' => (bool) $shift->is_on_call,
             'public_holiday' => $this->isPublicHolidayFor(
                 $workDate,
-                (int) $shift->user_id,
                 $snapshot['site_id'] ?? $shift->client?->site_id,
             ),
             'shift_site_name_snapshot' => $snapshot['site_name'] ?? $timesheet->shift_site_name_snapshot,
@@ -191,7 +185,6 @@ class DraftTimesheetService
             'on_call' => (bool) ($session->shift?->is_on_call ?? false),
             'public_holiday' => $this->isPublicHolidayFor(
                 $workDate,
-                (int) $session->user_id,
                 $snapshot['site_id'] ?? $session->site_id,
             ),
             'shift_site_name_snapshot' => $snapshot['site_name'] ?? null,
@@ -296,7 +289,6 @@ class DraftTimesheetService
             'on_call' => (bool) $entry->is_on_call,
             'public_holiday' => (bool) $entry->is_public_holiday || $this->isPublicHolidayFor(
                 $workDate,
-                (int) $entry->user_id,
                 $entry->site_id ?? $snapshot['site_id'] ?? null,
             ),
             'notes' => $entry->notes,

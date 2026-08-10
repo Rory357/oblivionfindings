@@ -10,10 +10,28 @@ import { cn } from '@/lib/utils';
 /** Monday-first weekday header labels. */
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 const MONTHS_FULL = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
 ] as const;
-const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const WEEKDAY_SHORT = [
+    'Sun',
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+] as const;
 
 /** Local-safe `YYYY-MM-DD` for a y/m(0-based)/d triple — never touches UTC. */
 function toIso(y: number, m: number, d: number): string {
@@ -150,10 +168,9 @@ export function LeaveCalendarRange({
                         // pill (inner span), so the band fill skips them.
                         const bandStyle: CSSProperties | undefined = inRange
                             ? {
-                                  background:
-                                      endpoint
-                                          ? undefined
-                                          : 'color-mix(in oklch, var(--primary) 11%, transparent)',
+                                  background: endpoint
+                                      ? undefined
+                                      : 'color-mix(in oklch, var(--primary) 11%, transparent)',
                                   borderRadius:
                                       isStart && isEnd
                                           ? '11px'

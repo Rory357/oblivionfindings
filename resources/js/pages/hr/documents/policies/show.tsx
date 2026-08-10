@@ -130,7 +130,8 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
     const [attesting, setAttesting] = useState(false);
     const [attestBusy, setAttestBusy] = useState(false);
     const [versionWizard, setVersionWizard] = useState(false);
-    const [deletingVersion, setDeletingVersion] = useState<PolicyVersion | null>(null);
+    const [deletingVersion, setDeletingVersion] =
+        useState<PolicyVersion | null>(null);
     const [deleteBusy, setDeleteBusy] = useState(false);
 
     const nextVersion =
@@ -175,7 +176,8 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/documents/policies"
                         title={
@@ -217,8 +219,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                 )}
                                 {policy.current_version && (
                                     <Badge variant="outline">
-                                        v
-                                        {policy.current_version.version_number}
+                                        v{policy.current_version.version_number}
                                     </Badge>
                                 )}
                             </span>
@@ -252,7 +253,9 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            onClick={() => setVersionWizard(true)}
+                                            onClick={() =>
+                                                setVersionWizard(true)
+                                            }
                                         >
                                             <FilePlus2 className="mr-1.5 h-4 w-4" />
                                             New Version
@@ -267,16 +270,15 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                                         </Link>
                                     </>
                                 )}
-                                {can.attest &&
-                                    policy.requires_attestation && (
-                                        <Button
-                                            size="sm"
-                                            onClick={() => setAttesting(true)}
-                                        >
-                                            <ShieldCheck className="mr-1.5 h-4 w-4" />
-                                            I Attest
-                                        </Button>
-                                    )}
+                                {can.attest && policy.requires_attestation && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setAttesting(true)}
+                                    >
+                                        <ShieldCheck className="mr-1.5 h-4 w-4" />
+                                        I Attest
+                                    </Button>
+                                )}
                             </>
                         }
                     />
@@ -350,7 +352,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
                         <CardContent>
                             {/* Plain-text summary — rendered as text (not HTML) to
                                 avoid XSS; the authoritative policy is the PDF. */}
-                            <p className="whitespace-pre-wrap text-sm text-foreground">
+                            <p className="text-sm whitespace-pre-wrap text-foreground">
                                 {policy.current_version.content_summary}
                             </p>
                         </CardContent>

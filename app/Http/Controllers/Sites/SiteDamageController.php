@@ -13,6 +13,8 @@ use Inertia\Inertia;
 
 class SiteDamageController extends Controller
 {
+    private const FINANCE_APPLICATION_CONTEXT = 1;
+
     public function __construct(
         private AccountsPayableService $accountsPayable,
         private AccountsReceivableService $accountsReceivable,
@@ -20,6 +22,7 @@ class SiteDamageController extends Controller
 
     public function index(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         $this->authorize('viewAny', SiteDamage::class);
 
         $damages = $site->damages()
@@ -37,6 +40,7 @@ class SiteDamageController extends Controller
 
     public function store(Request $request, Site $site)
     {
+        $this->authorize('view', $site);
         $this->authorize('create', SiteDamage::class);
 
         $data = $request->validate([
@@ -52,13 +56,11 @@ class SiteDamageController extends Controller
             'photos' => ['nullable', 'array'],
         ]);
 
-        $data['tenant_id'] = $site->tenant_id;
-        $data['site_id'] = $site->id;
         $data['reported_by'] = $request->user()->id;
         $data['status'] = 'reported';
         $data['insurance_status'] = $data['insurance_status'] ?? 'not_applicable';
 
-        SiteDamage::create($data);
+        $site->damages()->create($data);
 
         return redirect()->back()->with('success', 'Damage report created.');
     }
@@ -66,6 +68,7 @@ class SiteDamageController extends Controller
     public function update(Request $request, Site $site, SiteDamage $damage)
     {
         abort_unless($damage->site_id === $site->id, 404);
+        $this->authorize('view', $site);
         $this->authorize('update', $damage);
 
         $data = $request->validate([
@@ -87,7 +90,7 @@ class SiteDamageController extends Controller
         }
 
         // If marking as repaired, set repaired_at and repaired_by
-        if (($data['status'] ?? null) === 'repaired' && !$damage->repaired_at) {
+        if (($data['status'] ?? null) === 'repaired' && ! $damage->repaired_at) {
             $data['repaired_at'] = now();
             $data['repaired_by'] = $request->user()->id;
         }
@@ -124,7 +127,7 @@ class SiteDamageController extends Controller
 
         try {
             $claimRef = $damage->insurance_claim_ref;
-            $this->accountsReceivable->captureOperationalInvoice($damage->tenant_id, [
+            $this->accountsReceivable->captureOperationalInvoice(self::FINANCE_APPLICATION_CONTEXT, [
                 'source_type' => SiteDamage::class,
                 'source_id' => $damage->id,
                 'client_name' => $claimRef ? "Insurance — claim {$claimRef}" : 'Insurance claim',
@@ -144,7 +147,7 @@ class SiteDamageController extends Controller
 
     /**
      * Post the repair cost of a repaired damage to accounts payable as a draft
-     * bill (against the org's Property Repairs vendor, GL 6420). The finance
+     * bill (against the application's Property Repairs vendor, GL 6420). The finance
      * service is idempotent on the "DAMAGE-{id}" reference, so this can run on
      * every update without duplicating.
      */
@@ -155,7 +158,7 @@ class SiteDamageController extends Controller
         }
 
         try {
-            $this->accountsPayable->captureOperationalBill($damage->tenant_id, [
+            $this->accountsPayable->captureOperationalBill(self::FINANCE_APPLICATION_CONTEXT, [
                 'reference' => "DAMAGE-{$damage->id}",
                 'vendor_name' => config('finance.capture.damage_repair_vendor', 'Property Repairs'),
                 'vendor_type' => 'contractor',
@@ -175,6 +178,7 @@ class SiteDamageController extends Controller
     public function destroy(Request $request, Site $site, SiteDamage $damage)
     {
         abort_unless($damage->site_id === $site->id, 404);
+        $this->authorize('view', $site);
         $this->authorize('delete', $damage);
 
         $damage->delete();

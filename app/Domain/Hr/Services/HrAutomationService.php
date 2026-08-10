@@ -5,9 +5,9 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrAutomationRule;
 use App\Domain\Hr\Models\HrAutomationRun;
 use App\Domain\Hr\Notifications\HrScheduledReportReadyNotification;
-use App\Domain\Hr\Services\HrReportingService;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use App\Services\NotificationService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
@@ -16,8 +16,11 @@ use Illuminate\Support\Str;
 class HrAutomationService
 {
     public const ACTION_NOTIFY_USERS = 'notify_users';
+
     public const ACTION_NOTIFY_ROLE_GROUP = 'notify_role_group';
+
     public const ACTION_QUEUE_REPORT_EXPORT = 'queue_report_export';
+
     public const ACTION_NOTIFY_TEAMS_WEBHOOK = 'notify_microsoft_teams';
 
     /**
@@ -34,16 +37,28 @@ class HrAutomationService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
-    public function handleEvent(?int $tenantId, string $eventType, array $payload): int
+    public function handleApplicationEvent(string $eventType, array $payload): int
     {
         $rules = HrAutomationRule::query()
-            ->forTenant($tenantId)
             ->active()
             ->where('event_type', $eventType)
             ->orderBy('id')
             ->get();
+
+        return $this->executeRules($rules, $eventType, $payload);
+    }
+
+    /**
+     * @param  Collection<int, HrAutomationRule>  $rules
+     * @param  array<string, mixed>  $payload
+     */
+    private function executeRules(
+        Collection $rules,
+        string $eventType,
+        array $payload,
+    ): int {
 
         if ($rules->isEmpty()) {
             return 0;
@@ -54,19 +69,20 @@ class HrAutomationService
         foreach ($rules as $rule) {
             try {
                 if (! $this->matchesConditions($payload, (array) ($rule->conditions ?? []))) {
-                    $this->recordRun($rule, $tenantId, $eventType, $payload, 'skipped', 'Conditions did not match.');
+                    $this->recordRun($rule, $eventType, $payload, 'skipped', 'Conditions did not match.');
+
                     continue;
                 }
 
-                $this->executeActions($rule, $tenantId, $eventType, $payload);
-                $this->recordRun($rule, $tenantId, $eventType, $payload, 'success', 'Rule executed successfully.');
+                $this->executeActions($rule, $eventType, $payload);
+                $this->recordRun($rule, $eventType, $payload, 'success', 'Rule executed successfully.');
                 $executed++;
 
                 if ($rule->stop_on_match) {
                     break;
                 }
             } catch (\Throwable $exception) {
-                $this->recordRun($rule, $tenantId, $eventType, $payload, 'failed', $exception->getMessage());
+                $this->recordRun($rule, $eventType, $payload, 'failed', $exception->getMessage());
             }
         }
 
@@ -74,8 +90,8 @@ class HrAutomationService
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $conditions
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $conditions
      */
     protected function matchesConditions(array $payload, array $conditions): bool
     {
@@ -116,8 +132,8 @@ class HrAutomationService
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $rule
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $rule
      */
     protected function evaluateConditionRule(array $payload, array $rule): bool
     {
@@ -154,7 +170,7 @@ class HrAutomationService
     }
 
     /**
-     * @param mixed $value
+     * @param  mixed  $value
      */
     protected function scalarValue($value): string
     {
@@ -177,7 +193,7 @@ class HrAutomationService
     }
 
     /**
-     * @param mixed $value
+     * @param  mixed  $value
      */
     protected function isMissingValue($value): bool
     {
@@ -197,8 +213,8 @@ class HrAutomationService
     }
 
     /**
-     * @param mixed $actual
-     * @param mixed $expected
+     * @param  mixed  $actual
+     * @param  mixed  $expected
      */
     protected function valueInList($actual, $expected): bool
     {
@@ -228,8 +244,8 @@ class HrAutomationService
     }
 
     /**
-     * @param mixed $actual
-     * @param mixed $expected
+     * @param  mixed  $actual
+     * @param  mixed  $expected
      */
     protected function compareValues($actual, $expected, string $operator): bool
     {
@@ -272,9 +288,9 @@ class HrAutomationService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
-    protected function executeActions(HrAutomationRule $rule, ?int $tenantId, string $eventType, array $payload): void
+    protected function executeActions(HrAutomationRule $rule, string $eventType, array $payload): void
     {
         $actions = collect((array) ($rule->actions ?? []));
 
@@ -286,20 +302,20 @@ class HrAutomationService
             $actionType = (string) ($action['type'] ?? '');
 
             match ($actionType) {
-                self::ACTION_NOTIFY_USERS => $this->actionNotifyUsers($tenantId, $eventType, $payload, $action),
+                self::ACTION_NOTIFY_USERS => $this->actionNotifyUsers($eventType, $payload, $action),
                 self::ACTION_NOTIFY_ROLE_GROUP => $this->actionNotifyRoleGroup($eventType, $payload, $action),
-                self::ACTION_QUEUE_REPORT_EXPORT => $this->actionQueueReportExport($tenantId, $action),
-                self::ACTION_NOTIFY_TEAMS_WEBHOOK => $this->actionNotifyTeamsWebhook($tenantId, $eventType, $payload, $action),
+                self::ACTION_QUEUE_REPORT_EXPORT => $this->actionQueueReportExport($action),
+                self::ACTION_NOTIFY_TEAMS_WEBHOOK => $this->actionNotifyTeamsWebhook($eventType, $payload, $action),
                 default => null,
             };
         }
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $action
      */
-    protected function actionNotifyUsers(?int $tenantId, string $eventType, array $payload, array $action): void
+    protected function actionNotifyUsers(string $eventType, array $payload, array $action): void
     {
         $userIds = collect($action['user_ids'] ?? [])
             ->filter(fn ($id) => is_numeric($id))
@@ -325,7 +341,6 @@ class HrAutomationService
             'body' => $body,
             'url' => $url,
             'event_type' => $eventType,
-            'tenant_id' => $tenantId,
             'data' => $payload,
         ]);
 
@@ -333,8 +348,8 @@ class HrAutomationService
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $action
      */
     protected function actionNotifyRoleGroup(string $eventType, array $payload, array $action): void
     {
@@ -343,7 +358,7 @@ class HrAutomationService
             return;
         }
 
-        $notificationService = app(\App\Services\NotificationService::class);
+        $notificationService = app(NotificationService::class);
         $userIds = $notificationService->resolveRoleGroupUserIds($roleGroup);
         if ($userIds->isEmpty()) {
             return;
@@ -368,9 +383,9 @@ class HrAutomationService
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      */
-    protected function actionQueueReportExport(?int $tenantId, array $action): void
+    protected function actionQueueReportExport(array $action): void
     {
         $reportType = (string) ($action['report_type'] ?? '');
         if ($reportType === '') {
@@ -382,7 +397,6 @@ class HrAutomationService
         $reportingService = app(HrReportingService::class);
         $export = $reportingService->createExport(
             reportType: $reportType,
-            tenantId: $tenantId,
             filters: $filters,
             generatedBy: null,
         );
@@ -399,18 +413,24 @@ class HrAutomationService
 
         User::query()
             ->whereIn('id', $recipientIds->all())
+            ->whereNotNull('approved_at')
+            ->with(['roles.permissions', 'permissionOverrides'])
             ->chunkById(100, function ($users) use ($export) {
                 foreach ($users as $user) {
+                    if (! $user->canDo('hr.reports.view')) {
+                        continue;
+                    }
+
                     $user->notify(new HrScheduledReportReadyNotification($export));
                 }
             });
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $action
      */
-    protected function actionNotifyTeamsWebhook(?int $tenantId, string $eventType, array $payload, array $action): void
+    protected function actionNotifyTeamsWebhook(string $eventType, array $payload, array $action): void
     {
         $webhookUrl = trim((string) ($action['webhook_url'] ?? ''));
         if ($webhookUrl === '') {
@@ -434,7 +454,6 @@ class HrAutomationService
             'title' => $title,
             'text' => $text,
             'event_type' => $eventType,
-            'tenant_id' => $tenantId,
             'occurred_at' => now()->toIso8601String(),
         ]);
 
@@ -444,11 +463,10 @@ class HrAutomationService
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     protected function recordRun(
         HrAutomationRule $rule,
-        ?int $tenantId,
         string $eventType,
         array $payload,
         string $status,
@@ -456,7 +474,6 @@ class HrAutomationService
     ): void {
         HrAutomationRun::query()->create([
             'rule_id' => $rule->id,
-            'tenant_id' => $tenantId,
             'event_type' => $eventType,
             'event_payload' => $payload,
             'status' => $status,

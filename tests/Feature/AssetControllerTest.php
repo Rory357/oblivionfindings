@@ -7,6 +7,8 @@ use App\Models\Client;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,15 +17,19 @@ class AssetControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $coordinator;
+
     protected User $supportWorker;
+
     protected Site $site;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
+        $this->seed(SecurityDevicesPermissionsSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -322,7 +328,7 @@ class AssetControllerTest extends TestCase
     // Delete
     // ──────────────────────────────────────
 
-    public function test_asset_delete_successful(): void
+    public function test_asset_delete_retires_and_retains_the_record(): void
     {
         $asset = Asset::factory()->forSite($this->site)->create();
 
@@ -330,7 +336,14 @@ class AssetControllerTest extends TestCase
             ->delete("/assets/{$asset->id}")
             ->assertRedirect(route('fleet-assets.assets.index'));
 
-        $this->assertDatabaseMissing('assets', ['id' => $asset->id]);
+        $this->assertDatabaseHas('assets', [
+            'id' => $asset->id,
+            'status' => 'retired',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'assets.retired',
+            'auditable_id' => $asset->id,
+        ]);
     }
 
     public function test_asset_delete_blocked_for_coordinator(): void

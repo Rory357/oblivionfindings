@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
 use App\Models\CarePlanGoal;
 use App\Models\CarePlanSignOff;
@@ -8,13 +9,18 @@ use App\Models\ClientNote;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceAgreement;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Timeline\TimelineEmitter;
 use Barryvdh\DomPDF\Facade\Pdf;
 
-function grantCpPerms(User $user, array $keys): void
+function grantCpPerms(User $user, array $keys, bool $applicationWide = true): void
 {
+    if ($applicationWide) {
+        $keys = array_values(array_unique([...$keys, 'clients.viewAny']));
+    }
+
     $role = Role::query()->firstOrCreate(
         ['name' => 'cp_test_'.$user->id],
         ['label' => 'CP Test', 'level' => 50, 'type' => 'custom'],
@@ -31,20 +37,22 @@ function grantCpPerms(User $user, array $keys): void
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
-function makeCpClient(User $user): Client
+function makeCpClient(?User $_user = null): Client
 {
-    return Client::factory()->create(['organization_id' => $user->organization_id]);
+    return Client::factory()->create([
+        'site_id' => Site::factory()->create()->id,
+    ]);
 }
 
 function makeCpPlan(User $user, Client $client, array $attrs = []): CarePlan
 {
     return CarePlan::query()->create(array_merge([
-        'organization_id' => $user->organization_id,
         'client_id' => $client->id,
         'title' => 'Active plan',
         'status' => 'active',
         'plan_type' => 'support_plan',
         'version' => 1,
+        'created_by' => $user->id,
     ], $attrs));
 }
 
@@ -117,7 +125,7 @@ it('blocks activating a plan with no goals or domains', function () {
 });
 
 it('blocks creating an active plan with no goals or structured domains', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
+    $user = User::factory()->create();
     grantCpPerms($user, ['care_plans.create']);
     $client = makeCpClient($user);
 
@@ -137,14 +145,13 @@ it('blocks creating an active plan with no goals or structured domains', functio
         ->exists())->toBeFalse();
 });
 
-it('does not reparent a care plan or its goals and notes to another same-organisation client', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
+it('does not reparent a care plan or its goals and notes to another client', function () {
+    $user = User::factory()->create();
     grantCpPerms($user, ['care_plans.update']);
     $originalClient = makeCpClient($user);
     $otherClient = makeCpClient($user);
     $plan = makeCpPlan($user, $originalClient, ['status' => 'draft']);
     $goal = CarePlanGoal::query()->create([
-        'organization_id' => 1,
         'care_plan_id' => $plan->id,
         'client_id' => $originalClient->id,
         'title' => 'Keep this goal with the original client',
@@ -153,7 +160,6 @@ it('does not reparent a care plan or its goals and notes to another same-organis
         'created_by' => $user->id,
     ]);
     $note = ClientNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $originalClient->id,
         'care_plan_goal_id' => $goal->id,
         'user_id' => $user->id,
@@ -174,18 +180,16 @@ it('does not reparent a care plan or its goals and notes to another same-organis
         ->and($note->fresh()->care_plan_goal_id)->toBe($goal->id);
 });
 
-it('binds care plan funding agreements to the plan client and organisation', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
+it('binds care plan funding agreements to the plan client', function () {
+    $user = User::factory()->create();
     grantCpPerms($user, ['care_plans.create', 'care_plans.update']);
     $client = makeCpClient($user);
     $otherClient = makeCpClient($user);
     $ownAgreement = ServiceAgreement::factory()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'title' => 'Own service agreement',
     ]);
     $otherAgreement = ServiceAgreement::factory()->create([
-        'organization_id' => 1,
         'client_id' => $otherClient->id,
         'title' => 'Other client service agreement',
     ]);
@@ -247,7 +251,7 @@ it('records and removes a sign-off', function () {
 });
 
 it('records repeated care plan sign-offs with each canonical sign-off as the timeline source', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
+    $user = User::factory()->create();
     grantCpPerms($user, ['care_plans.update']);
     $client = makeCpClient($user);
     $plan = makeCpPlan($user, $client);
@@ -282,7 +286,7 @@ it('records repeated care plan sign-offs with each canonical sign-off as the tim
 });
 
 it('rolls back a care plan sign-off when timeline emission fails', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
+    $user = User::factory()->create();
     grantCpPerms($user, ['care_plans.update']);
     $client = makeCpClient($user);
     $plan = makeCpPlan($user, $client);
@@ -342,7 +346,6 @@ it('exports a plan as a PDF', function () {
         ],
     ]);
     $plan->signOffs()->create([
-        'organization_id' => $user->organization_id,
         'party_role' => 'client',
         'party_name' => 'Tane',
         'agreed_on' => '2026-06-01',
@@ -355,12 +358,11 @@ it('exports a plan as a PDF', function () {
 });
 
 it('does not bind another clients service agreement into a legacy care plan PDF', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
+    $user = User::factory()->create();
     grantCpPerms($user, ['care_plans.viewAny']);
     $client = makeCpClient($user);
     $otherClient = makeCpClient($user);
     $otherAgreement = ServiceAgreement::factory()->create([
-        'organization_id' => 1,
         'client_id' => $otherClient->id,
         'title' => 'Private agreement for another client',
     ]);
@@ -390,6 +392,40 @@ it('forbids PDF export without view permission', function () {
     $plan = makeCpPlan($user, $client);
 
     $this->actingAs($user)->get("/operations/care-plans/{$plan->id}/pdf")->assertForbidden();
+});
+
+it('enforces canonical Client Site access and fails closed without a valid Site', function () {
+    $visibleSite = Site::factory()->create();
+    $outsideSite = Site::factory()->create();
+    $viewer = User::factory()->create(['approved_at' => now()]);
+    grantCpPerms($viewer, ['care_plans.viewAny'], applicationWide: false);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $viewer->id,
+        'primary_site_id' => $visibleSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
+    $outsideClient = Client::factory()->create(['site_id' => $outsideSite->id]);
+    $clientWithoutSite = Client::factory()->create(['site_id' => null]);
+    $visiblePlan = makeCpPlan($viewer, $visibleClient);
+    $outsidePlan = makeCpPlan($viewer, $outsideClient);
+    $planWithoutSite = makeCpPlan($viewer, $clientWithoutSite);
+
+    $this->actingAs($viewer)
+        ->get("/operations/care-plans/{$visiblePlan->id}")
+        ->assertOk();
+
+    $this->actingAs($viewer)
+        ->get("/operations/care-plans/{$outsidePlan->id}")
+        ->assertForbidden();
+
+    $this->actingAs($viewer)
+        ->get("/operations/care-plans/{$planWithoutSite->id}")
+        ->assertForbidden();
 });
 
 it('starts a review and stays on the profile tab', function () {

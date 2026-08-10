@@ -4,7 +4,10 @@ export type HoverRow = {
     time: string;
     site: string;
     detail: string;
-    tag?: { text: string; cls: 'critical' | 'warning' | 'success' | 'info' } | null;
+    tag?: {
+        text: string;
+        cls: 'critical' | 'warning' | 'success' | 'info';
+    } | null;
 };
 
 export type HoverPopoverContent = {

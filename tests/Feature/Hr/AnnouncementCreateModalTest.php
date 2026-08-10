@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -11,7 +12,6 @@ beforeEach(function () {
 
     // hr.announcements.* are in SeedHrPermissionsSeeder → the hr role gets them.
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -20,10 +20,12 @@ beforeEach(function () {
     ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
+    $site = Site::factory()->create();
+    ensureCanonicalHrStaffProfile($this->hr, $site);
+    ensureCanonicalHrStaffProfile($this->worker, $site);
 });
 
 test('an announcement can be published from the index modal endpoint', function () {
@@ -37,7 +39,6 @@ test('an announcement can be published from the index modal endpoint', function 
     ])->assertRedirect(route('hr.announcements.index'));
 
     $this->assertDatabaseHas('hr_announcements', [
-        'tenant_id' => 1,
         'title' => 'Office closed Friday',
         'priority' => 'high',
         'created_by' => $this->hr->id,

@@ -92,7 +92,9 @@ export function OverviewPane({
                                 <AlertTriangle className="h-[17px] w-[17px]" />
                             </span>
                             <div>
-                                <h2 className="text-[15px] font-bold">Exceptions</h2>
+                                <h2 className="text-[15px] font-bold">
+                                    Exceptions
+                                </h2>
                                 <p className="mt-px text-[12px] text-muted-foreground">
                                     {exceptions.length === 0
                                         ? 'All clear'
@@ -110,21 +112,27 @@ export function OverviewPane({
                             <span className="grid h-[50px] w-[50px] place-items-center rounded-[15px] bg-status-success-bg text-status-success">
                                 <CheckCircle2 className="h-7 w-7" />
                             </span>
-                            <div className="text-[14.5px] font-bold">No exceptions</div>
+                            <div className="text-[14.5px] font-bold">
+                                No exceptions
+                            </div>
                             <div className="max-w-[280px] text-[12.5px] text-muted-foreground">
-                                Everyone&apos;s accounted for. Breaks, clock-outs,
-                                overtime and loadings all check out for today.
+                                Everyone&apos;s accounted for. Breaks,
+                                clock-outs, overtime and loadings all check out
+                                for today.
                             </div>
                         </div>
                     ) : (
                         <div className="flex flex-col">
                             {exceptions.map((e) => {
-                                const Icon = EXCEPTION_ICON[e.kind] ?? AlertTriangle;
+                                const Icon =
+                                    EXCEPTION_ICON[e.kind] ?? AlertTriangle;
                                 const tone = SEVERITY_TONE[e.severity];
                                 return (
                                     <div
                                         key={e.id}
-                                        onContextMenu={(ev) => onExceptionContext(e, ev)}
+                                        onContextMenu={(ev) =>
+                                            onExceptionContext(e, ev)
+                                        }
                                         className="group relative flex items-center gap-3.5 border-b border-border px-[18px] py-[13px] transition-colors last:border-b-0 hover:bg-muted/60 hover:shadow-[inset_3px_0_0_var(--primary)]"
                                     >
                                         <span
@@ -175,9 +183,14 @@ export function OverviewPane({
                 {/* Weekly hours */}
                 <section className="rounded-2xl border border-border bg-card px-[18px] py-4">
                     <div className="mb-3.5 flex items-center justify-between">
-                        <h2 className="text-[15px] font-bold">Team hours · this week</h2>
+                        <h2 className="text-[15px] font-bold">
+                            Team hours · this week
+                        </h2>
                         <span className="text-[12px] font-semibold text-muted-foreground">
-                            <span className="text-foreground">{teamHoursWeek}h</span> logged
+                            <span className="text-foreground">
+                                {teamHoursWeek}h
+                            </span>{' '}
+                            logged
                         </span>
                     </div>
                     <div className="flex h-[130px] items-end gap-3.5">
@@ -227,7 +240,9 @@ export function OverviewPane({
                             onNow.map((p) => (
                                 <div
                                     key={p.id}
-                                    onContextMenu={(ev) => onPersonContext(p, ev)}
+                                    onContextMenu={(ev) =>
+                                        onPersonContext(p, ev)
+                                    }
                                     className="flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-muted/60 hover:shadow-[inset_3px_0_0_var(--primary)]"
                                 >
                                     <span
@@ -235,7 +250,7 @@ export function OverviewPane({
                                         style={avatarStyle(p.user_id)}
                                     >
                                         {p.initials}
-                                        <span className="absolute -bottom-px -right-px h-[9px] w-[9px] rounded-full bg-status-info ring-2 ring-card" />
+                                        <span className="absolute -right-px -bottom-px h-[9px] w-[9px] rounded-full bg-status-info ring-2 ring-card" />
                                     </span>
                                     <div className="min-w-0 flex-1">
                                         <div className="truncate text-[13px] font-semibold">
@@ -265,7 +280,9 @@ export function OverviewPane({
                 <section className="overflow-hidden rounded-2xl border border-border bg-card">
                     <div className="flex items-center gap-2 border-b border-border px-4 py-3.5">
                         <CalendarClock className="h-4 w-4 text-muted-foreground" />
-                        <h2 className="text-[15px] font-bold">Recent activity</h2>
+                        <h2 className="text-[15px] font-bold">
+                            Recent activity
+                        </h2>
                     </div>
                     <div className="flex flex-col py-1">
                         {recent.length === 0 ? (
@@ -289,7 +306,9 @@ export function OverviewPane({
                                         )}
                                     />
                                     <span className="min-w-0 flex-1 truncate text-[12.5px]">
-                                        <span className="font-semibold">{r.user_name}</span>{' '}
+                                        <span className="font-semibold">
+                                            {r.user_name}
+                                        </span>{' '}
                                         <span className="text-muted-foreground">
                                             {r.action}
                                         </span>
@@ -299,7 +318,7 @@ export function OverviewPane({
                                             </span>
                                         ) : null}
                                     </span>
-                                    <span className="flex-none text-[11.5px] tabular-nums text-muted-foreground">
+                                    <span className="flex-none text-[11.5px] text-muted-foreground tabular-nums">
                                         {r.time} ago
                                     </span>
                                 </button>

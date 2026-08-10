@@ -9,6 +9,7 @@ use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\LocationHardware;
+use App\Models\NextOfKin;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -30,6 +31,8 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
 
     private Client $client;
 
+    private ClientConsent $trackingConsent;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -40,22 +43,33 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
         $this->admin = User::factory()->create(['role' => 'admin']);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->portalUser = User::factory()->create();
+        $this->portalUser = User::factory()->create([
+            'role' => 'next_of_kin',
+            'approved_at' => now(),
+        ]);
+        $this->portalUser->roles()->attach(Role::where('name', 'next_of_kin')->firstOrFail());
         $this->site = Site::factory()->create();
-        // Note: `clients` has no tenant_id column — use `organization_id`.
+        // Client history is linked through the client's canonical Site relationship.
         $this->client = Client::factory()->create([
             'status' => 'active',
             'site_id' => $this->site->id,
         ]);
 
         $this->portalUser->portalClients()->attach($this->client->id, [
-            'relation' => 'family',
+            'relation' => 'next_of_kin',
+        ]);
+        NextOfKin::query()->create([
+            'user_id' => $this->portalUser->id,
+            'client_id' => $this->client->id,
+            'relationship' => 'guardian',
         ]);
 
         $trackingConsentType = ConsentType::factory()->create([
             'name' => 'Asset Location Tracking (Safety)',
+            'purpose' => 'Client personal safety tracking',
+            'active' => true,
         ]);
-        ClientConsent::query()->create([
+        $this->trackingConsent = ClientConsent::query()->create([
             'client_id' => $this->client->id,
             'consent_type_id' => $trackingConsentType->id,
             'status' => 'given',
@@ -156,7 +170,6 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
     public function test_client_location_history_keeps_narrow_fallback_for_unbackfilled_legacy_rows(): void
     {
         $hardware = LocationHardware::create([
-            'tenant_id' => 1,
             'site_id' => $this->site->id,
             'provider' => 'legacy_tracker',
             'category' => LocationHardware::CATEGORY_TRACKER,
@@ -194,16 +207,22 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
     private function assignTrackingDevice(array $overrides = []): Device
     {
         $device = Device::factory()->tracking()->create(array_merge([
-            'tenant_id' => 1,
             'provider' => 'legacy_tracker',
             'legacy_location_hardware_id' => null,
         ], $overrides));
 
         DeviceAssignment::create([
             'device_id' => $device->id,
-            'assignable_type' => 'client',
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
             'assignable_id' => $this->client->id,
             'assigned_at' => now(),
+            'assigned_by_user_id' => $this->admin->id,
+            'consent_id' => $this->trackingConsent->id,
+            'tracking_purpose' => 'Client personal safety tracking',
+            'authority_basis' => 'assignment_linked_client_consent',
+            'access_audience' => ['authorised_client_care', 'control_room', 'health_and_safety'],
+            'retention_days' => max(1, (int) config('fleet.retention.personal_location_days', 90)),
+            'collection_started_at' => now(),
         ]);
 
         return $device;
@@ -212,7 +231,6 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
     private function createIntegrationEvent(Device $device, array $overrides = []): IntegrationEvent
     {
         return IntegrationEvent::create(array_merge([
-            'tenant_id' => 1,
             'site_id' => $this->site->id,
             'room_id' => null,
             'hardware_id' => null,

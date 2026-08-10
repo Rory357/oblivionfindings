@@ -77,6 +77,10 @@ import {
 } from '@/pages/operations/clients/tabs/daily-notes';
 import { FirstAidTab } from '@/pages/operations/clients/tabs/first-aid-tab';
 import { HealthMonitoringTab } from '@/pages/operations/clients/tabs/health-monitoring';
+import {
+    ClientHealthcareDevicesTab,
+    type ClientHealthcareDevicesProjection,
+} from '@/pages/operations/clients/tabs/healthcare-devices';
 import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
 import {
     AssessmentsTab,
@@ -110,6 +114,7 @@ import {
     HeartPulse,
     Home,
     ListTodo,
+    MonitorCog,
     MessageSquare as MsgIcon,
     Navigation,
     Package,
@@ -126,7 +131,7 @@ import {
     Users,
     Utensils,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuditHistoryTab } from './tabs/audit-history';
 import { CareSupportPlanTab } from './tabs/care-support-plan';
 import { DocumentsTab } from './tabs/documents';
@@ -192,7 +197,7 @@ type PersonalAsset = {
     site_name?: string | null;
     room_id?: number | null;
     room_name?: string | null;
-    tracker_hardware_id?: number | null;
+    tracker_device_id?: number | null;
     tracker?: AssetTracker | null;
     photo_url?: string | null;
     acquired_at?: string | null;
@@ -302,6 +307,7 @@ type ClientProfileSectionAccess = Partial<
     Record<
         | 'medical'
         | 'health'
+        | 'healthcare_devices'
         | 'notes'
         | 'timeline'
         | 'care_plans'
@@ -459,6 +465,7 @@ type Props = {
         email?: string | null;
     }>;
     health_summary?: HealthSummary | null;
+    healthcare_devices?: ClientHealthcareDevicesProjection | null;
     onboarding?: {
         items: Array<{
             key: string;
@@ -507,6 +514,7 @@ type Props = {
         navigate_care_plans?: boolean;
         navigate_risks?: boolean;
         navigate_medical?: boolean;
+        view_healthcare_devices?: boolean;
         navigate_calendar?: boolean;
         navigate_workers?: boolean;
         navigate_family_portal?: boolean;
@@ -601,6 +609,7 @@ type TabKey =
     | 'communication_notes'
     | 'rhythms_routines'
     | 'health_monitoring'
+    | 'healthcare_devices'
     | 'actions_reviews'
     | 'risk_management'
     | 'incidents_accidents'
@@ -668,6 +677,10 @@ const CLIENT_PROFILE_RESTRICTED_TABS: Partial<
     health_monitoring: {
         section: 'health',
         propKeys: ['health_monitoring'],
+    },
+    healthcare_devices: {
+        section: 'healthcare_devices',
+        propKeys: ['healthcare_devices'],
     },
     finance: { section: 'finance', propKeys: ['client_finance'] },
     consents: { section: 'consents', propKeys: ['consents'] },
@@ -914,6 +927,10 @@ export default function ClientShow({
         pageProps,
         'health_monitoring',
     );
+    const hasHealthcareDevicesProp = Object.prototype.hasOwnProperty.call(
+        pageProps,
+        'healthcare_devices',
+    );
     const hasClientRoutinesProp = Object.prototype.hasOwnProperty.call(
         pageProps,
         'client_routines',
@@ -932,6 +949,10 @@ export default function ClientShow({
         [pageProps.communication_notes],
     );
     const healthMonitoring = pageProps.health_monitoring ?? {};
+    const healthcareDevices = pageProps.healthcare_devices as
+        | ClientHealthcareDevicesProjection
+        | null
+        | undefined;
     const clientRoutines = useMemo(
         () => pageProps.client_routines ?? [],
         [pageProps.client_routines],
@@ -1040,6 +1061,13 @@ export default function ClientShow({
                 label: 'Health Monitoring',
                 icon: Activity,
                 show: canShowProfileTab('health_monitoring'),
+            },
+            {
+                key: 'healthcare_devices',
+                label: 'Healthcare Devices',
+                icon: MonitorCog,
+                show: canShowProfileTab('healthcare_devices'),
+                count: healthcareDevices?.summary.total || undefined,
             },
             {
                 key: 'risk_management',
@@ -1219,6 +1247,7 @@ export default function ClientShow({
             personal_assets?.length,
             onboarding?.total,
             familyNotesOpenCount,
+            healthcareDevices?.summary.total,
             pageProps.first_aid_records,
             pageProps.client_incidents,
             pageProps.client_risks,
@@ -1368,6 +1397,11 @@ export default function ClientShow({
 
     // Lazy-load transport data when tab is first opened
     const [transportLoaded, setTransportLoaded] = useState(!!transport);
+    const healthcareDevicesRequested = useRef(hasHealthcareDevicesProp);
+    const [healthcareDevicesLoading, setHealthcareDevicesLoading] =
+        useState(false);
+    const [healthcareDevicesLoadFailed, setHealthcareDevicesLoadFailed] =
+        useState(false);
     const updateProfileQuery = useCallback(
         (
             values: Record<string, string | null>,
@@ -1384,6 +1418,34 @@ export default function ClientShow({
             updateProfileQuery({ tab: canonical }, 'replace');
         }
     }, [updateProfileQuery]);
+    useEffect(() => {
+        if (tab !== 'healthcare_devices') {
+            healthcareDevicesRequested.current = hasHealthcareDevicesProp;
+            setHealthcareDevicesLoadFailed(false);
+            return;
+        }
+        if (hasHealthcareDevicesProp || healthcareDevicesRequested.current) {
+            return;
+        }
+
+        healthcareDevicesRequested.current = true;
+        setHealthcareDevicesLoading(true);
+        setHealthcareDevicesLoadFailed(false);
+        const removeExceptionListener = router.on('exception', () => {
+            setHealthcareDevicesLoadFailed(true);
+            setHealthcareDevicesLoading(false);
+        });
+
+        router.reload({
+            only: ['healthcare_devices'],
+            preserveScroll: true,
+            preserveState: true,
+            onError: () => setHealthcareDevicesLoadFailed(true),
+            onFinish: () => setHealthcareDevicesLoading(false),
+        });
+
+        return removeExceptionListener;
+    }, [hasHealthcareDevicesProp, tab]);
     const handleTabChange = useCallback(
         (newTab: TabKey) => {
             setTab(newTab);
@@ -3773,6 +3835,18 @@ export default function ClientShow({
                             isLoading={!hasHealthMonitoringProp}
                         />
                     </div>
+                )}
+
+                {tab === 'healthcare_devices' && (
+                    <ClientHealthcareDevicesTab
+                        data={healthcareDevices}
+                        isLoading={
+                            healthcareDevicesLoading ||
+                            (!hasHealthcareDevicesProp &&
+                                !healthcareDevicesLoadFailed)
+                        }
+                        loadFailed={healthcareDevicesLoadFailed}
+                    />
                 )}
 
                 {tab === 'rhythms_routines' && (

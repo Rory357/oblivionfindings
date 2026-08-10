@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -60,6 +61,12 @@ class ShiftNoteAuthorizationTest extends TestCase
 
         $client = Client::factory()->create(['organization_id' => 1]);
         $serviceContext = ServiceContext::factory()->create();
+        $workerTimezone = config('app.worker_timezone') ?: config('app.timezone', 'UTC');
+        $shiftStartsAt = Carbon::now($workerTimezone)
+            ->startOfWeek(Carbon::MONDAY)
+            ->addDay()
+            ->setTime(9, 0)
+            ->utc();
         $this->shift = Shift::factory()->create([
             'organization_id' => 1,
             'client_id' => $client->id,
@@ -68,8 +75,8 @@ class ShiftNoteAuthorizationTest extends TestCase
             'created_by' => $this->admin->id,
             // Within the current ISO week so the note lands in the default
             // (current-week) view, which scopes by the shift's start date.
-            'starts_at' => now()->startOfWeek()->addDays(1)->setTime(9, 0),
-            'ends_at' => now()->startOfWeek()->addDays(1)->setTime(17, 0),
+            'starts_at' => $shiftStartsAt,
+            'ends_at' => $shiftStartsAt->copy()->addHours(8),
         ]);
 
         $this->note = ClientNote::query()->create([

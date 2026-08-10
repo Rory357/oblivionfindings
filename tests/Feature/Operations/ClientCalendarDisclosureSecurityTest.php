@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientAppointment;
 use App\Models\ClientMedication;
@@ -9,6 +10,7 @@ use App\Models\FamilyVisitRequest;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
 
@@ -35,6 +37,35 @@ function grantClientCalendarDisclosurePermissions(
         Permission::query()->whereIn('key', $permissionKeys)->pluck('id')->all(),
     );
     $user->roles()->attach($role->id);
+}
+
+function scopeClientCalendarDisclosureStaffToSite(User $user, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'position_role' => 'support_worker',
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
+
+/** @return array{client: Client, site: Site, viewer: User} */
+function clientCalendarDisclosureFixture(array $permissionKeys): array
+{
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $viewer = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    grantClientCalendarDisclosurePermissions($viewer, $permissionKeys);
+    scopeClientCalendarDisclosureStaffToSite($viewer, $site);
+    $client->supportWorkers()->attach($viewer->id);
+
+    return compact('client', 'site', 'viewer');
 }
 
 /** @return array<string, int> */
@@ -115,9 +146,9 @@ function clientCalendarDisclosureTypes(TestResponse $response): array
 }
 
 it('requires the staff calendar section on the direct client calendar JSON route', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientCalendarDisclosurePermissions($viewer, ['clients.viewAny']);
+    ['client' => $client, 'viewer' => $viewer] = clientCalendarDisclosureFixture([
+        'clients.viewAssigned',
+    ]);
 
     $this->actingAs($viewer)
         ->getJson(route('client.calendar.events', $client, false))
@@ -125,10 +156,8 @@ it('requires the staff calendar section on the direct client calendar JSON route
 });
 
 it('returns appointments but omits shift family and medication contributors without their section access', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientCalendarDisclosurePermissions($viewer, [
-        'clients.viewAny',
+    ['client' => $client, 'viewer' => $viewer] = clientCalendarDisclosureFixture([
+        'clients.viewAssigned',
         'calendar.view',
     ]);
     seedClientCalendarDisclosureEvents($client, $viewer);
@@ -145,10 +174,8 @@ it('returns appointments but omits shift family and medication contributors with
 });
 
 it('preserves every calendar contributor for a staff user with each canonical section capability', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientCalendarDisclosurePermissions($viewer, [
-        'clients.viewAny',
+    ['client' => $client, 'viewer' => $viewer] = clientCalendarDisclosureFixture([
+        'clients.viewAssigned',
         'calendar.view',
         'shifts.viewAny',
         'family_portal.viewAny',
@@ -175,10 +202,8 @@ it('preserves every calendar contributor for a staff user with each canonical se
 });
 
 it('validates orders and bounds the direct calendar event range to 93 days', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientCalendarDisclosurePermissions($viewer, [
-        'clients.viewAny',
+    ['client' => $client, 'viewer' => $viewer] = clientCalendarDisclosureFixture([
+        'clients.viewAssigned',
         'calendar.view',
     ]);
 
@@ -215,32 +240,45 @@ it('validates orders and bounds the direct calendar event range to 93 days', fun
         ->assertOk();
 });
 
-it('forbids cross-organization staff and linked portal identities on the staff calendar JSON route', function () {
-    $client = Client::factory()->create(['organization_id' => 2]);
-    $staff = User::factory()->create(['organization_id' => 1]);
+it('forbids cross-Site staff and linked portal identities on the staff calendar JSON route', function () {
+    $clientSite = Site::factory()->create();
+    $staffSite = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $clientSite->id]);
+    $staff = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
     grantClientCalendarDisclosurePermissions($staff, [
-        'clients.viewAny',
+        'clients.viewAssigned',
         'calendar.view',
         'shifts.viewAny',
         'family_portal.viewAny',
         'medications.view',
         'medications.audit.view',
     ]);
+    scopeClientCalendarDisclosureStaffToSite($staff, $staffSite);
+    $client->supportWorkers()->attach($staff->id);
 
     $this->actingAs($staff)
         ->getJson(route('client.calendar.events', $client, false))
         ->assertForbidden();
 
     $portalClient = User::factory()->create([
-        'organization_id' => 2,
         'role' => 'client',
         'approved_at' => now(),
     ]);
-    grantClientCalendarDisclosurePermissions(
-        $portalClient,
-        ['clients.viewPortal', 'calendar.view'],
-        'client',
+    $portalRole = Role::query()->firstOrCreate(
+        ['name' => 'client'],
+        ['label' => 'Client', 'level' => 1, 'type' => 'system'],
     );
+    $portalClient->roles()->attach($portalRole->id);
+    foreach (['clients.viewPortal', 'calendar.view'] as $permissionKey) {
+        $permission = Permission::query()->firstOrCreate(
+            ['key' => $permissionKey],
+            ['description' => $permissionKey, 'group' => 'test', 'module' => 'Test'],
+        );
+        $portalClient->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+    }
     $client->portalUsers()->attach($portalClient->id, ['relation' => 'self']);
 
     $this->actingAs($portalClient)

@@ -24,6 +24,7 @@ test('configuration snapshot maps every supported gl30 remote section by writabl
     $parsed = (new ConfigurationSnapshotService)->parseConfigurationText($raw);
 
     expect($parsed['summary']['server']['main_host'])->toBe('oblivionfindings.com')
+        ->and($parsed['summary']['global'])->not->toHaveKey('new_password')
         ->and($parsed['summary']['global']['battery_low_percentage'])->toBe('20')
         ->and($parsed['summary']['pin']['auto_unlock_pin'])->toBe('1')
         ->and($parsed['summary']['dog']['send_failure_timeout'])->toBe('60')

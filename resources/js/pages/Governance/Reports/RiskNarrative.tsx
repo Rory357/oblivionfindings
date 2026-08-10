@@ -1,11 +1,17 @@
-import { Head } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, AlertCircle, TrendingUp, Shield } from 'lucide-react';
+import { PageProps } from '@/types';
+import { Head } from '@inertiajs/react';
+import { AlertCircle, AlertTriangle, Shield, TrendingUp } from 'lucide-react';
 
 interface Risk {
     id: number;
@@ -51,7 +57,13 @@ const severityBadge: Record<string, string> = {
 
 export default function RiskNarrative({ auth, risks, summary }: Props) {
     const formatDate = (d: string | null) =>
-        d ? new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set';
+        d
+            ? new Date(d).toLocaleDateString('en-NZ', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+              })
+            : 'Not set';
 
     return (
         <AppLayout
@@ -73,22 +85,29 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                         stats={[
                             { label: 'Critical', value: summary.critical },
                             { label: 'High', value: summary.high },
-                            { label: 'Above Appetite', value: summary.above_appetite },
+                            {
+                                label: 'Above Appetite',
+                                value: summary.above_appetite,
+                            },
                             { label: 'Total', value: summary.total_active },
                         ]}
                     />
                 }
             >
                 {/* Summary Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
                     <Card className="border-status-critical/30">
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-status-critical">Critical</p>
-                                    <p className="text-3xl font-bold text-status-critical">{summary.critical}</p>
+                                    <p className="text-sm text-status-critical">
+                                        Critical
+                                    </p>
+                                    <p className="text-3xl font-bold text-status-critical">
+                                        {summary.critical}
+                                    </p>
                                 </div>
-                                <AlertTriangle className="w-8 h-8 text-status-critical" />
+                                <AlertTriangle className="h-8 w-8 text-status-critical" />
                             </div>
                         </CardContent>
                     </Card>
@@ -96,10 +115,14 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-status-warning">High</p>
-                                    <p className="text-3xl font-bold text-status-warning">{summary.high}</p>
+                                    <p className="text-sm text-status-warning">
+                                        High
+                                    </p>
+                                    <p className="text-3xl font-bold text-status-warning">
+                                        {summary.high}
+                                    </p>
                                 </div>
-                                <AlertCircle className="w-8 h-8 text-status-warning" />
+                                <AlertCircle className="h-8 w-8 text-status-warning" />
                             </div>
                         </CardContent>
                     </Card>
@@ -107,10 +130,14 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-primary">Above Appetite</p>
-                                    <p className="text-3xl font-bold text-primary">{summary.above_appetite}</p>
+                                    <p className="text-sm text-primary">
+                                        Above Appetite
+                                    </p>
+                                    <p className="text-3xl font-bold text-primary">
+                                        {summary.above_appetite}
+                                    </p>
                                 </div>
-                                <TrendingUp className="w-8 h-8 text-primary" />
+                                <TrendingUp className="h-8 w-8 text-primary" />
                             </div>
                         </CardContent>
                     </Card>
@@ -118,10 +145,14 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Total Active</p>
-                                    <p className="text-3xl font-bold">{summary.total_active}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        Total Active
+                                    </p>
+                                    <p className="text-3xl font-bold">
+                                        {summary.total_active}
+                                    </p>
                                 </div>
-                                <Shield className="w-8 h-8 text-muted-foreground" />
+                                <Shield className="h-8 w-8 text-muted-foreground" />
                             </div>
                         </CardContent>
                     </Card>
@@ -130,25 +161,49 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                 {/* Risk Detail Cards */}
                 <div className="space-y-4">
                     {risks.map((risk) => (
-                        <Card key={risk.id} className={cn('border-l-4', severityBorder[risk.severity] ?? 'border-l-gray-300')}>
+                        <Card
+                            key={risk.id}
+                            className={cn(
+                                'border-l-4',
+                                severityBorder[risk.severity] ??
+                                    'border-l-gray-300',
+                            )}
+                        >
                             <CardHeader>
                                 <div className="flex items-start justify-between gap-4">
                                     <div>
-                                        <CardTitle className="flex items-center gap-2 flex-wrap">
+                                        <CardTitle className="flex flex-wrap items-center gap-2">
                                             {risk.title}
-                                            <Badge variant="outline">{risk.reference}</Badge>
-                                            <Badge className={severityBadge[risk.severity] ?? 'bg-muted-foreground/80 text-white'}>
+                                            <Badge variant="outline">
+                                                {risk.reference}
+                                            </Badge>
+                                            <Badge
+                                                className={
+                                                    severityBadge[
+                                                        risk.severity
+                                                    ] ??
+                                                    'bg-muted-foreground/80 text-white'
+                                                }
+                                            >
                                                 {risk.severity}
                                             </Badge>
                                             {!risk.within_appetite && (
-                                                <Badge className="bg-primary/10 text-primary">Above Appetite</Badge>
+                                                <Badge className="bg-primary/10 text-primary">
+                                                    Above Appetite
+                                                </Badge>
                                             )}
                                         </CardTitle>
-                                        <CardDescription className="capitalize mt-1">{risk.category?.replace(/_/g, ' ')}</CardDescription>
+                                        <CardDescription className="mt-1 capitalize">
+                                            {risk.category?.replace(/_/g, ' ')}
+                                        </CardDescription>
                                     </div>
-                                    <div className="text-right shrink-0">
-                                        <div className="text-sm text-muted-foreground">Residual Score</div>
-                                        <div className="text-2xl font-bold">{risk.residual_score}</div>
+                                    <div className="shrink-0 text-right">
+                                        <div className="text-sm text-muted-foreground">
+                                            Residual Score
+                                        </div>
+                                        <div className="text-2xl font-bold">
+                                            {risk.residual_score}
+                                        </div>
                                     </div>
                                 </div>
                             </CardHeader>
@@ -156,37 +211,74 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                                 <div className="space-y-4">
                                     {risk.description && (
                                         <div>
-                                            <p className="text-sm font-medium text-foreground mb-1">Description</p>
-                                            <p className="text-sm text-muted-foreground">{risk.description}</p>
+                                            <p className="mb-1 text-sm font-medium text-foreground">
+                                                Description
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {risk.description}
+                                            </p>
                                         </div>
                                     )}
 
                                     {risk.mitigation_strategy && (
                                         <div>
-                                            <p className="text-sm font-medium text-foreground mb-1">Mitigation Strategy</p>
-                                            <p className="text-sm text-muted-foreground">{risk.mitigation_strategy}</p>
+                                            <p className="mb-1 text-sm font-medium text-foreground">
+                                                Mitigation Strategy
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {risk.mitigation_strategy}
+                                            </p>
                                         </div>
                                     )}
 
                                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                        <span>Inherent: <strong>{risk.inherent_score}</strong></span>
-                                        <span>Residual: <strong>{risk.residual_score}</strong></span>
-                                        <span>Control Effectiveness: <strong className="capitalize">{risk.control_effectiveness}</strong></span>
-                                        <span>Owner: <strong>{risk.owner?.name ?? 'Unassigned'}</strong></span>
+                                        <span>
+                                            Inherent:{' '}
+                                            <strong>
+                                                {risk.inherent_score}
+                                            </strong>
+                                        </span>
+                                        <span>
+                                            Residual:{' '}
+                                            <strong>
+                                                {risk.residual_score}
+                                            </strong>
+                                        </span>
+                                        <span>
+                                            Control Effectiveness:{' '}
+                                            <strong className="capitalize">
+                                                {risk.control_effectiveness}
+                                            </strong>
+                                        </span>
+                                        <span>
+                                            Owner:{' '}
+                                            <strong>
+                                                {risk.owner?.name ??
+                                                    'Unassigned'}
+                                            </strong>
+                                        </span>
                                         <span>
                                             Treatments:{' '}
                                             <Badge variant="outline">
-                                                {risk.active_treatments} / {risk.treatments_count}
+                                                {risk.active_treatments} /{' '}
+                                                {risk.treatments_count}
                                             </Badge>
                                         </span>
-                                        <span>Next Review: <strong>{formatDate(risk.next_review)}</strong></span>
+                                        <span>
+                                            Next Review:{' '}
+                                            <strong>
+                                                {formatDate(risk.next_review)}
+                                            </strong>
+                                        </span>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                     ))}
                     {risks.length === 0 && (
-                        <div className="py-12 text-center text-sm text-muted-foreground">No active risks found.</div>
+                        <div className="py-12 text-center text-sm text-muted-foreground">
+                            No active risks found.
+                        </div>
                     )}
                 </div>
             </PageLayout>

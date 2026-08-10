@@ -2,6 +2,7 @@
 
 namespace App\Notifications\It;
 
+use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Models\ItTicket;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,7 +15,7 @@ use Illuminate\Notifications\Notification;
  * Reference + title only — frontline privacy keeps client details out of
  * inboxes.
  */
-class TicketSlaNotification extends Notification implements ShouldQueue
+class TicketSlaNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
     use Queueable;
 
@@ -23,6 +24,25 @@ class TicketSlaNotification extends Notification implements ShouldQueue
         private string $transition = 'at_risk', // at_risk | breached | escalation
         private ?string $clock = null, // first_response | resolution (null for escalation)
     ) {}
+
+    public function itEmailDeliveryContext(): array
+    {
+        $subject = match ($this->transition) {
+            'breached' => "SLA breached — {$this->ticket->reference} {$this->ticket->title}",
+            'escalation' => "Unassigned urgent ticket — {$this->ticket->reference} {$this->ticket->title}",
+            default => "SLA at risk — {$this->ticket->reference} {$this->ticket->title}",
+        };
+
+        return [
+            'ticket_id' => (int) $this->ticket->id,
+            'type' => 'ticket_sla',
+            'subject' => $subject,
+            'retry_context' => [
+                'transition' => $this->transition,
+                'clock' => $this->clock,
+            ],
+        ];
+    }
 
     public function via(object $notifiable): array
     {

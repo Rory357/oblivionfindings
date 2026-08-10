@@ -6,7 +6,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 configure({ testIdAttribute: 'data-test' });
 
 vi.mock('@inertiajs/react', () => ({
-    Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    Link: ({
+        href,
+        children,
+        ...props
+    }: {
+        href: string;
+        children: React.ReactNode;
+    }) => (
         <a href={href} {...props}>
             {children}
         </a>
@@ -62,35 +69,37 @@ const entry = {
 };
 
 function mockFetch(data: unknown[], total = data.length) {
-    global.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
-        const url =
-            typeof input === 'string'
-                ? input
-                : input instanceof URL
-                  ? input.toString()
-                  : input.url;
+    global.fetch = vi
+        .fn()
+        .mockImplementation(async (input: RequestInfo | URL) => {
+            const url =
+                typeof input === 'string'
+                    ? input
+                    : input instanceof URL
+                      ? input.toString()
+                      : input.url;
 
-        if (url.includes('/health-safety/restraints/clients/')) {
+            if (url.includes('/health-safety/restraints/clients/')) {
+                return {
+                    ok: true,
+                    json: async () => ({
+                        active_plan: null,
+                        recent_events: [],
+                        total_events: 0,
+                    }),
+                };
+            }
+
             return {
                 ok: true,
                 json: async () => ({
-                    active_plan: null,
-                    recent_events: [],
-                    total_events: 0,
+                    data,
+                    current_page: 1,
+                    last_page: 1,
+                    total,
                 }),
             };
-        }
-
-        return {
-            ok: true,
-            json: async () => ({
-                data,
-                current_page: 1,
-                last_page: 1,
-                total,
-            }),
-        };
-    }) as unknown as typeof fetch;
+        }) as unknown as typeof fetch;
 }
 
 afterEach(() => {
@@ -140,10 +149,14 @@ describe('BehaviourAbcTab', () => {
         // The row arrives after the lazy fetch resolves.
         const row = await screen.findByText('Paced the hallway');
         expect(row).toBeTruthy();
-        expect(screen.getAllByText('Escape / avoidance').length).toBeGreaterThan(0);
+        expect(
+            screen.getAllByText('Escape / avoidance').length,
+        ).toBeGreaterThan(0);
 
         fireEvent.click(screen.getAllByTestId('abc-entry-row')[0]);
-        expect(onOpenEntry).toHaveBeenCalledWith(expect.objectContaining({ id: 10 }));
+        expect(onOpenEntry).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 10 }),
+        );
     });
 
     it('fires onNewEntry from the header CTA', async () => {
@@ -221,8 +234,12 @@ describe('AbcEntryDialog', () => {
 
         // Fill A·B·C so the step is valid, then advance to Analysis.
         fireEvent.change(antecedent, { target: { value: 'Noisy room' } });
-        fireEvent.change(screen.getByTestId('abc-behaviour'), { target: { value: 'Paced' } });
-        fireEvent.change(screen.getByTestId('abc-consequence'), { target: { value: 'Quiet space' } });
+        fireEvent.change(screen.getByTestId('abc-behaviour'), {
+            target: { value: 'Paced' },
+        });
+        fireEvent.change(screen.getByTestId('abc-consequence'), {
+            target: { value: 'Quiet space' },
+        });
         fireEvent.click(screen.getByTestId('abc-continue'));
 
         // Analysis step exposes the PBS function tiles.

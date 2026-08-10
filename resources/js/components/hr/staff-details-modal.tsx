@@ -37,7 +37,7 @@ interface Employee {
     department: string | null;
     team: string | null;
     site: string | null;
-    profile_photo_path: string | null;
+    profile_photo_url: string | null;
     bio: string | null;
     start_date: string | null;
     employment_type: string | null;
@@ -49,7 +49,6 @@ interface PersonRef {
     id: number;
     name: string;
     position_title: string | null;
-    profile_photo_path: string | null;
 }
 
 interface Kudos {
@@ -128,7 +127,9 @@ export function StaffDetailsModal({
                 'X-Requested-With': 'XMLHttpRequest',
             },
         })
-            .then((r) => (r.ok ? r.json() : Promise.reject(new Error('failed'))))
+            .then((r) =>
+                r.ok ? r.json() : Promise.reject(new Error('failed')),
+            )
             .then((json: StaffDetails) => {
                 if (!cancelled) setData(json);
             })
@@ -171,11 +172,7 @@ export function StaffDetailsModal({
                         <div className="flex items-start gap-4">
                             <Avatar className="size-16">
                                 <AvatarImage
-                                    src={
-                                        emp.profile_photo_path
-                                            ? `/storage/${emp.profile_photo_path}`
-                                            : undefined
-                                    }
+                                    src={emp.profile_photo_url ?? undefined}
                                     alt={emp.name}
                                 />
                                 <AvatarFallback className="text-lg font-bold">
@@ -183,7 +180,9 @@ export function StaffDetailsModal({
                                 </AvatarFallback>
                             </Avatar>
                             <div className="min-w-0 flex-1">
-                                <h3 className="text-lg font-semibold">{emp.name}</h3>
+                                <h3 className="text-lg font-semibold">
+                                    {emp.name}
+                                </h3>
                                 {emp.position_title && (
                                     <p className="text-sm text-muted-foreground">
                                         {emp.position_title}
@@ -215,7 +214,9 @@ export function StaffDetailsModal({
                         </div>
 
                         {emp.bio && (
-                            <p className="text-sm text-muted-foreground">{emp.bio}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {emp.bio}
+                            </p>
                         )}
 
                         {/* Contact */}
@@ -226,7 +227,9 @@ export function StaffDetailsModal({
                                     className="flex items-center gap-2 text-primary hover:underline"
                                 >
                                     <Mail className="size-3.5 shrink-0" />
-                                    <span className="truncate">{emp.email}</span>
+                                    <span className="truncate">
+                                        {emp.email}
+                                    </span>
                                 </a>
                             )}
                             {emp.work_phone && (
@@ -235,7 +238,9 @@ export function StaffDetailsModal({
                                     className="flex items-center gap-2 text-primary hover:underline"
                                 >
                                     <Phone className="size-3.5 shrink-0" />
-                                    <span className="truncate">{emp.work_phone}</span>
+                                    <span className="truncate">
+                                        {emp.work_phone}
+                                    </span>
                                 </a>
                             )}
                             {emp.personal_email && (
@@ -326,8 +331,11 @@ export function StaffDetailsModal({
                                 {data.directReports.length > 0 && (
                                     <p className="flex items-center gap-1.5 text-muted-foreground">
                                         <Users className="size-3.5" />
-                                        {data.directReports.length} direct report
-                                        {data.directReports.length === 1 ? '' : 's'}
+                                        {data.directReports.length} direct
+                                        report
+                                        {data.directReports.length === 1
+                                            ? ''
+                                            : 's'}
                                     </p>
                                 )}
                             </div>
@@ -347,14 +355,19 @@ export function StaffDetailsModal({
                                             variant="outline"
                                             className="border-status-success/30 bg-status-success-bg text-status-success-foreground"
                                         >
-                                            {data.complianceSummary.compliant} compliant
+                                            {data.complianceSummary.compliant}{' '}
+                                            compliant
                                         </Badge>
-                                        {data.complianceSummary.expiring_soon > 0 && (
+                                        {data.complianceSummary.expiring_soon >
+                                            0 && (
                                             <Badge
                                                 variant="outline"
                                                 className="border-status-warning/30 bg-status-warning-bg text-status-warning-foreground"
                                             >
-                                                {data.complianceSummary.expiring_soon}{' '}
+                                                {
+                                                    data.complianceSummary
+                                                        .expiring_soon
+                                                }{' '}
                                                 expiring
                                             </Badge>
                                         )}
@@ -363,7 +376,8 @@ export function StaffDetailsModal({
                                                 variant="outline"
                                                 className="border-status-critical/30 bg-status-critical-bg text-status-critical-foreground"
                                             >
-                                                {data.complianceSummary.expired} expired
+                                                {data.complianceSummary.expired}{' '}
+                                                expired
                                             </Badge>
                                         )}
                                     </div>
@@ -390,7 +404,9 @@ export function StaffDetailsModal({
                                             )}
                                             <p className="mt-0.5 text-xs text-muted-foreground">
                                                 — {k.from_name}
-                                                {k.created_at ? ` · ${k.created_at}` : ''}
+                                                {k.created_at
+                                                    ? ` · ${k.created_at}`
+                                                    : ''}
                                             </p>
                                         </li>
                                     ))}

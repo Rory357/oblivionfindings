@@ -1,12 +1,18 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { FileText } from 'lucide-react';
 
@@ -27,11 +33,24 @@ export default function IncidentTemplateEdit({ template }: Props) {
     });
 
     const addPrompt = () => form.setData('prompts', [...form.data.prompts, '']);
-    const addChecklist = () => form.setData('checklist', [...form.data.checklist, '']);
+    const addChecklist = () =>
+        form.setData('checklist', [...form.data.checklist, '']);
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Incidents', href: '/incidents' }, { title: 'Templates', href: '/incidents/templates' }, { title: isNew ? 'New' : form.data.name || 'Edit', href: '#' }]}>
-            <Head title={isNew ? 'New incident template' : `Template • ${form.data.name}`} />
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Incidents', href: '/incidents' },
+                { title: 'Templates', href: '/incidents/templates' },
+                { title: isNew ? 'New' : form.data.name || 'Edit', href: '#' },
+            ]}
+        >
+            <Head
+                title={
+                    isNew
+                        ? 'New incident template'
+                        : `Template • ${form.data.name}`
+                }
+            />
 
             <PageLayout
                 hero={
@@ -52,11 +71,21 @@ export default function IncidentTemplateEdit({ template }: Props) {
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div className="space-y-1 sm:col-span-2">
                                 <Label>Name</Label>
-                                <Input value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} />
+                                <Input
+                                    value={form.data.name}
+                                    onChange={(e) =>
+                                        form.setData('name', e.target.value)
+                                    }
+                                />
                             </div>
 
                             <div className="flex items-center gap-2 pt-6">
-                                <Checkbox checked={!!form.data.is_active} onCheckedChange={(v) => form.setData('is_active', !!v)} />
+                                <Checkbox
+                                    checked={!!form.data.is_active}
+                                    onCheckedChange={(v) =>
+                                        form.setData('is_active', !!v)
+                                    }
+                                />
                                 <Label>Active</Label>
                             </div>
                         </div>
@@ -64,16 +93,30 @@ export default function IncidentTemplateEdit({ template }: Props) {
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="space-y-1">
                                 <Label>Type (optional)</Label>
-                                <Input value={form.data.type} onChange={(e) => form.setData('type', e.target.value)} />
+                                <Input
+                                    value={form.data.type}
+                                    onChange={(e) =>
+                                        form.setData('type', e.target.value)
+                                    }
+                                />
                             </div>
 
                             <div className="space-y-1">
                                 <Label>Severity (optional)</Label>
-                                <Select value={form.data.severity || 'low'} onValueChange={(v) => form.setData('severity', v)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                <Select
+                                    value={form.data.severity || 'low'}
+                                    onValueChange={(v) =>
+                                        form.setData('severity', v)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        {['low','medium','high'].map((s) => (
-                                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                                        {['low', 'medium', 'high'].map((s) => (
+                                            <SelectItem key={s} value={s}>
+                                                {s}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -82,45 +125,73 @@ export default function IncidentTemplateEdit({ template }: Props) {
 
                         <div className="space-y-1">
                             <Label>Default description</Label>
-                            <Textarea value={form.data.default_description} onChange={(e) => form.setData('default_description', e.target.value)} />
+                            <Textarea
+                                value={form.data.default_description}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'default_description',
+                                        e.target.value,
+                                    )
+                                }
+                            />
                         </div>
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <Label>Prompt fields (optional)</Label>
-                                <Button type="button" size="sm" variant="outline" onClick={addPrompt}>Add</Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={addPrompt}
+                                >
+                                    Add
+                                </Button>
                             </div>
-                            {(form.data.prompts || []).map((p: string, idx: number) => (
-                                <Input
-                                    key={idx}
-                                    value={p}
-                                    onChange={(e) => {
-                                        const next = [...form.data.prompts];
-                                        next[idx] = e.target.value;
-                                        form.setData('prompts', next);
-                                    }}
-                                    placeholder={`Prompt ${idx + 1}`}
-                                />
-                            ))}
+                            {(form.data.prompts || []).map(
+                                (p: string, idx: number) => (
+                                    <Input
+                                        key={idx}
+                                        value={p}
+                                        onChange={(e) => {
+                                            const next = [...form.data.prompts];
+                                            next[idx] = e.target.value;
+                                            form.setData('prompts', next);
+                                        }}
+                                        placeholder={`Prompt ${idx + 1}`}
+                                    />
+                                ),
+                            )}
                         </div>
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <Label>Checklist items (optional)</Label>
-                                <Button type="button" size="sm" variant="outline" onClick={addChecklist}>Add</Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={addChecklist}
+                                >
+                                    Add
+                                </Button>
                             </div>
-                            {(form.data.checklist || []).map((c: string, idx: number) => (
-                                <Input
-                                    key={idx}
-                                    value={c}
-                                    onChange={(e) => {
-                                        const next = [...form.data.checklist];
-                                        next[idx] = e.target.value;
-                                        form.setData('checklist', next);
-                                    }}
-                                    placeholder={`Checklist ${idx + 1}`}
-                                />
-                            ))}
+                            {(form.data.checklist || []).map(
+                                (c: string, idx: number) => (
+                                    <Input
+                                        key={idx}
+                                        value={c}
+                                        onChange={(e) => {
+                                            const next = [
+                                                ...form.data.checklist,
+                                            ];
+                                            next[idx] = e.target.value;
+                                            form.setData('checklist', next);
+                                        }}
+                                        placeholder={`Checklist ${idx + 1}`}
+                                    />
+                                ),
+                            )}
                         </div>
 
                         <div className="flex items-center justify-end">
@@ -130,7 +201,9 @@ export default function IncidentTemplateEdit({ template }: Props) {
                                     if (isNew) {
                                         form.post('/incidents/templates');
                                     } else {
-                                        form.put(`/incidents/templates/${template.id}`);
+                                        form.put(
+                                            `/incidents/templates/${template.id}`,
+                                        );
                                     }
                                 }}
                             >

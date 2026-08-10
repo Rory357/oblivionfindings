@@ -4,7 +4,9 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Announcement;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Database\Factories\Hr\HrAnnouncementFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,11 +16,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrAnnouncement extends Model
 {
-    use HasFactory, AuditableChanges, SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrAnnouncementFactory::new();
+        return HrAnnouncementFactory::new();
     }
 
     protected $fillable = [
@@ -51,7 +53,7 @@ class HrAnnouncement extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function creator(): BelongsTo
@@ -85,13 +87,8 @@ class HrAnnouncement extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     /**
      * Live notices — explicitly published, in date window. Honours both the

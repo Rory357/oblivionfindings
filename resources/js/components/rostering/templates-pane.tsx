@@ -100,7 +100,8 @@ function WeekStrip({ shifts }: { shifts: RosterTemplateShiftRow[] }) {
     const byDay = useMemo(() => {
         const counts = [0, 0, 0, 0, 0, 0, 0];
         for (const s of shifts) {
-            if (s.day_of_week >= 0 && s.day_of_week < 7) counts[s.day_of_week]++;
+            if (s.day_of_week >= 0 && s.day_of_week < 7)
+                counts[s.day_of_week]++;
         }
         return counts;
     }, [shifts]);
@@ -120,7 +121,7 @@ function WeekStrip({ shifts }: { shifts: RosterTemplateShiftRow[] }) {
                                 : 'border-border bg-muted/40 text-muted-foreground',
                         )}
                     >
-                        <span className="uppercase tracking-wide">{day}</span>
+                        <span className="tracking-wide uppercase">{day}</span>
                         <span className="tabular-nums">{count || '·'}</span>
                     </div>
                 );
@@ -185,7 +186,7 @@ function TemplateCard({
                         {template.name}
                     </h3>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold capitalize text-primary">
+                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary capitalize">
                             {template.template_type}
                         </span>
                         <span
@@ -233,7 +234,9 @@ function TemplateCard({
                                 </DropdownMenuItem>
                             ) : null}
                             {canManage ? (
-                                <DropdownMenuItem onSelect={() => onDuplicate()}>
+                                <DropdownMenuItem
+                                    onSelect={() => onDuplicate()}
+                                >
                                     <Copy className="h-3.5 w-3.5" /> Duplicate
                                 </DropdownMenuItem>
                             ) : null}
@@ -338,14 +341,10 @@ export function TemplatesPane({
     const list = useMemo(() => templates ?? [], [templates]);
 
     const stats: MicroStat[] = useMemo(() => {
-        const rows = list.reduce(
-            (sum, t) => sum + t.template_shifts_count,
-            0,
-        );
+        const rows = list.reduce((sum, t) => sum + t.template_shifts_count, 0);
         const openRows = list.reduce(
             (sum, t) =>
-                sum +
-                t.template_shifts.filter((s) => s.user_id == null).length,
+                sum + t.template_shifts.filter((s) => s.user_id == null).length,
             0,
         );
         return [
@@ -394,7 +393,7 @@ export function TemplatesPane({
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -407,7 +406,8 @@ export function TemplatesPane({
                             { key: false, label: 'All' },
                             { key: true, label: 'Active' },
                         ].map((opt) => (
-                            <Button unstyled
+                            <Button
+                                unstyled
                                 key={String(opt.key)}
                                 type="button"
                                 aria-pressed={activeOnly === opt.key}
@@ -465,7 +465,8 @@ export function TemplatesPane({
                     </div>
                     {canManage && list.length === 0 ? (
                         <Button size="sm" onClick={onCreate}>
-                            <Plus className="h-4 w-4" /> Create your first template
+                            <Plus className="h-4 w-4" /> Create your first
+                            template
                         </Button>
                     ) : null}
                 </div>

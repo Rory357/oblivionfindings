@@ -143,9 +143,8 @@ class HsInvestigationTest extends TestCase
     public function test_target_completion_date_is_stored_and_presented_as_the_exact_calendar_date(): void
     {
         $this->seed(RbacSeeder::class);
-        $site = Site::factory()->create(['tenant_id' => 1]);
+        $site = Site::factory()->create();
         $viewer = User::factory()->create([
-            'organization_id' => 1,
             'approved_at' => now(),
         ]);
         $hazardsView = Permission::query()->where('key', 'hazards.view')->firstOrFail();
@@ -153,13 +152,11 @@ class HsInvestigationTest extends TestCase
             $hazardsView->id => ['allowed' => true],
         ]);
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 1,
             'user_id' => $viewer->id,
             'primary_site_id' => $site->id,
             'secondary_site_ids' => [],
         ]);
         $event = HsEvent::factory()->high()->create([
-            'organization_id' => 1,
             'site_id' => $site->id,
         ]);
         $investigation = HsInvestigation::factory()->create([

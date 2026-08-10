@@ -9,13 +9,11 @@ test('hr demo seeder fills production-readiness demo workflows without duplicate
     $admin = User::factory()->create([
         'name' => 'Demo Admin',
         'email' => 'admin@demo.test',
-        'organization_id' => 1,
         'role' => 'admin',
     ]);
     $manager = User::factory()->create([
         'name' => 'Demo Manager',
         'email' => 'manager@demo.test',
-        'organization_id' => 1,
         'role' => 'hr',
     ]);
 
@@ -23,12 +21,10 @@ test('hr demo seeder fills production-readiness demo workflows without duplicate
         $user = User::factory()->create([
             'name' => "Demo Worker {$index}",
             'email' => "demo.worker{$index}@example.test",
-            'organization_id' => 1,
             'role' => 'support_worker',
         ]);
 
         HrEmployeeProfile::factory()->create([
-            'tenant_id' => 1,
             'user_id' => $user->id,
             'employee_number' => sprintf('DEMO-%03d', $index),
             'position_role' => 'support_worker',

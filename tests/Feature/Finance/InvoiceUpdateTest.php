@@ -2,8 +2,10 @@
 
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinInvoiceLine;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 
 /**
@@ -14,13 +16,29 @@ use App\Models\User;
  * from the funding body, and the 'default' tax sentinel maps to null (15% GST).
  * Editing is locked to draft invoices (a sent invoice has posted its GL journal).
  */
-function invoiceUpdateUser(): User
+function invoiceUpdateUser(Site $site): User
 {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
     foreach (['finance.ar.view', 'finance.ar.manage'] as $key) {
         $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
     }
+
+    HrEmployeeProfile::query()->create([
+        'user_id' => $user->id,
+        'employee_number' => 'EMP-INVOICE-UPDATE-'.$user->id,
+        'work_email' => $user->email,
+        'position_title' => 'Accounts Receivable Officer',
+        'position_role' => 'finance',
+        'employment_type' => 'full_time',
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
 
     return $user;
 }
@@ -28,7 +46,6 @@ function invoiceUpdateUser(): User
 function draftInvoiceForUpdate(array $overrides = []): FinInvoice
 {
     $invoice = FinInvoice::factory()->create(array_merge([
-        'organization_id' => 1,
         'status' => 'draft',
         'client_name' => 'Original Name',
         'total_amount' => '115.00',
@@ -42,10 +59,11 @@ function draftInvoiceForUpdate(array $overrides = []): FinInvoice
 }
 
 it('edits a client-billed draft invoice, deriving the name from the client and mapping the default tax sentinel', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $invoice = draftInvoiceForUpdate(['client_id' => null]);
 
-    $this->actingAs(invoiceUpdateUser())
+    $this->actingAs(invoiceUpdateUser($site))
         ->put(route('finance.invoices.update', $invoice->id), [
             'client_id' => $client->id,
             'client_name' => null,
@@ -69,9 +87,10 @@ it('edits a client-billed draft invoice, deriving the name from the client and m
 });
 
 it('edits a funder-billed draft invoice, persisting the funding body', function () {
+    $site = Site::factory()->create();
     $invoice = draftInvoiceForUpdate(['client_id' => null]);
 
-    $this->actingAs(invoiceUpdateUser())
+    $this->actingAs(invoiceUpdateUser($site))
         ->put(route('finance.invoices.update', $invoice->id), [
             'client_id' => null,
             'client_name' => null,
@@ -92,10 +111,11 @@ it('edits a funder-billed draft invoice, persisting the funding body', function 
 });
 
 it('refuses to edit a non-draft invoice (GL already posted on send)', function () {
+    $site = Site::factory()->create();
     $invoice = draftInvoiceForUpdate(['client_id' => null]);
     $invoice->update(['status' => 'sent']);
 
-    $this->actingAs(invoiceUpdateUser())
+    $this->actingAs(invoiceUpdateUser($site))
         ->put(route('finance.invoices.update', $invoice->id), [
             'funding_body' => 'Hacker',
             'invoice_date' => '2026-06-01',

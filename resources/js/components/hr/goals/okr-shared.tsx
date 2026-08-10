@@ -10,8 +10,19 @@ import { cn } from '@/lib/utils';
 
 export type Confidence = 'on_track' | 'at_risk' | 'off_track';
 export type GoalType = 'company' | 'team' | 'individual';
-export type GoalStatus = 'draft' | 'active' | 'on_hold' | 'blocked' | 'completed' | 'cancelled';
-export type KrType = 'number' | 'percent' | 'currency' | 'milestone' | 'boolean';
+export type GoalStatus =
+    | 'draft'
+    | 'active'
+    | 'on_hold'
+    | 'blocked'
+    | 'completed'
+    | 'cancelled';
+export type KrType =
+    | 'number'
+    | 'percent'
+    | 'currency'
+    | 'milestone'
+    | 'boolean';
 
 export interface ObjectiveTemplate {
     id: number;
@@ -79,8 +90,18 @@ export interface DevelopmentPlan {
     id: number;
     title: string;
     competency_area: string | null;
-    category: 'growth' | 'performance' | 'leadership' | 'compliance' | 'capability';
-    status: 'not_started' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+    category:
+        | 'growth'
+        | 'performance'
+        | 'leadership'
+        | 'compliance'
+        | 'capability';
+    status:
+        | 'not_started'
+        | 'in_progress'
+        | 'blocked'
+        | 'completed'
+        | 'cancelled';
     progress_percent: number;
     current_level: number | null;
     target_level: number | null;
@@ -124,7 +145,10 @@ export interface CascadeNode {
 /*  Vocabulary maps                                                   */
 /* ------------------------------------------------------------------ */
 
-export const RAG: Record<Confidence, { label: string; dot: string; text: string; chip: string }> = {
+export const RAG: Record<
+    Confidence,
+    { label: string; dot: string; text: string; chip: string }
+> = {
     on_track: {
         label: 'On track',
         dot: 'bg-status-success',
@@ -223,11 +247,20 @@ export function krProgress(k: {
 }) {
     const denom = k.target_value - k.start_value;
     if (denom === 0) return k.current_value >= k.target_value ? 100 : 0;
-    return Math.round(clamp((k.current_value - k.start_value) / denom, 0, 1) * 100);
+    return Math.round(
+        clamp((k.current_value - k.start_value) / denom, 0, 1) * 100,
+    );
 }
 
 /** Weighted roll-up across KRs, mirroring GoalService::recalculateGoalProgress. */
-export function rollup(krs: { weight: number; start_value: number; current_value: number; target_value: number }[]) {
+export function rollup(
+    krs: {
+        weight: number;
+        start_value: number;
+        current_value: number;
+        target_value: number;
+    }[],
+) {
     if (!krs.length) return 0;
     let w = 0;
     let s = 0;
@@ -280,7 +313,13 @@ export function formatKrMeasure(k: KeyResult) {
 /*  Presentational atoms                                              */
 /* ------------------------------------------------------------------ */
 
-export function Avatar({ name, className }: { name?: string | null; className?: string }) {
+export function Avatar({
+    name,
+    className,
+}: {
+    name?: string | null;
+    className?: string;
+}) {
     return (
         <span
             className={cn(
@@ -296,23 +335,50 @@ export function Avatar({ name, className }: { name?: string | null; className?: 
 export function RagPill({ confidence }: { confidence: Confidence }) {
     const r = RAG[confidence];
     return (
-        <span className={cn('inline-flex items-center gap-1.5 text-[11px] font-semibold', r.text)}>
+        <span
+            className={cn(
+                'inline-flex items-center gap-1.5 text-[11px] font-semibold',
+                r.text,
+            )}
+        >
             <span className={cn('h-1.5 w-1.5 rounded-full', r.dot)} /> {r.label}
         </span>
     );
 }
 
-export function ProgressBar({ pct, className }: { pct: number; className?: string }) {
+export function ProgressBar({
+    pct,
+    className,
+}: {
+    pct: number;
+    className?: string;
+}) {
     return (
-        <div className={cn('h-1.5 flex-1 overflow-hidden rounded-full bg-muted', className)}>
-            <div className={cn('h-full rounded-full transition-all', barColor(pct))} style={{ width: `${pct}%` }} />
+        <div
+            className={cn(
+                'h-1.5 flex-1 overflow-hidden rounded-full bg-muted',
+                className,
+            )}
+        >
+            <div
+                className={cn(
+                    'h-full rounded-full transition-all',
+                    barColor(pct),
+                )}
+                style={{ width: `${pct}%` }}
+            />
         </div>
     );
 }
 
 export function TypeBadge({ type }: { type: GoalType }) {
     return (
-        <span className={cn('inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold', TYPE_BADGE[type])}>
+        <span
+            className={cn(
+                'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold',
+                TYPE_BADGE[type],
+            )}
+        >
             {TYPE_LABEL[type]}
         </span>
     );

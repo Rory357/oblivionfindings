@@ -7,6 +7,7 @@ use App\Domain\Finance\Services\FinancialEventService;
 use App\Models\SiteUtility;
 use App\Models\SiteUtilityActual;
 use App\Models\SiteUtilityPosting;
+use App\Support\LegacyStorageContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -61,10 +62,7 @@ class PostSiteUtilitiesJob implements ShouldQueue
                     continue;
                 }
 
-                $orgId = $utility->tenant_id;
-                if (! $orgId) {
-                    continue;
-                }
+                $orgId = LegacyStorageContext::id();
 
                 // Check if an actual exists for this period
                 $actual = SiteUtilityActual::where('site_utility_id', $utility->id)

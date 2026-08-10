@@ -1,6 +1,5 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import PageShell from '@/components/page-shell';
-import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
-import { RefChip } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,19 +12,13 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { ConfirmDialog } from '@/components/confirm-dialog';
-import { cn } from '@/lib/utils';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
-import {
-    Calendar,
-    DollarSign,
-    Loader2,
-    User,
-    Wrench,
-} from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/fleet-utils';
-
+import { cn } from '@/lib/utils';
+import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-hero';
+import { RefChip } from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Calendar, DollarSign, Loader2, User, Wrench } from 'lucide-react';
+import { useState } from 'react';
 
 type Props = {
     work_order: {
@@ -33,7 +26,13 @@ type Props = {
         reference_number?: string | null;
         title: string;
         description: string | null;
-        asset: { id: number; name: string; asset_tag: string | null; category: string | null; status: string | null } | null;
+        asset: {
+            id: number;
+            name: string;
+            asset_tag: string | null;
+            category: string | null;
+            status: string | null;
+        } | null;
         priority: string;
         status: string;
         reported_by: { id: number; name: string; email: string | null } | null;
@@ -49,32 +48,45 @@ type Props = {
 };
 
 const priorityBannerColors: Record<string, string> = {
-    critical: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
+    critical:
+        'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
     high: 'bg-status-critical-bg border-status-critical/30 text-status-critical dark:bg-status-critical-bg dark:border-status-critical/30 dark:text-status-critical',
     medium: 'bg-status-warning-bg border-status-warning/30 text-status-warning dark:bg-status-warning-bg dark:border-status-warning/30 dark:text-status-warning',
     low: 'bg-status-info-bg border-status-info/30 text-status-info dark:bg-status-info-bg dark:border-status-info/30 dark:text-status-info',
 };
 
-function statusVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function statusVariant(
+    status: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (status) {
-        case 'completed': return 'default';
-        case 'in_progress': return 'default';
-        case 'open': return 'outline';
-        default: return 'secondary';
+        case 'completed':
+            return 'default';
+        case 'in_progress':
+            return 'default';
+        case 'open':
+            return 'outline';
+        default:
+            return 'secondary';
     }
 }
 
-function priorityVariant(priority: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function priorityVariant(
+    priority: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
     switch (priority) {
-        case 'critical': return 'destructive';
-        case 'high': return 'destructive';
-        case 'medium': return 'default';
-        default: return 'secondary';
+        case 'critical':
+            return 'destructive';
+        case 'high':
+            return 'destructive';
+        case 'medium':
+            return 'default';
+        default:
+            return 'secondary';
     }
 }
 
 export default function WorkOrderShow({ work_order }: Props) {
-    const wo = work_order ?? {} as Props['work_order'];
+    const wo = work_order ?? ({} as Props['work_order']);
 
     const updateForm = useForm({
         status: wo.status ?? 'open',
@@ -86,7 +98,10 @@ export default function WorkOrderShow({ work_order }: Props) {
 
     const handleUpdate = (e: React.FormEvent) => {
         e.preventDefault();
-        if (updateForm.data.status === 'cancelled' && wo.status !== 'cancelled') {
+        if (
+            updateForm.data.status === 'cancelled' &&
+            wo.status !== 'cancelled'
+        ) {
             setShowCancelConfirm(true);
             return;
         }
@@ -105,7 +120,10 @@ export default function WorkOrderShow({ work_order }: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
-                { title: 'Work Orders', href: '/fleet-assets/maintenance/work-orders' },
+                {
+                    title: 'Work Orders',
+                    href: '/fleet-assets/maintenance/work-orders',
+                },
                 { title: wo.title ?? 'Work Order', href: '#' },
             ]}
         >
@@ -119,16 +137,34 @@ export default function WorkOrderShow({ work_order }: Props) {
                 />
 
                 {/* Priority Banner */}
-                <div className={cn('rounded-lg border px-5 py-4', priorityBannerColors[wo.priority] ?? priorityBannerColors.medium)}>
+                <div
+                    className={cn(
+                        'rounded-lg border px-5 py-4',
+                        priorityBannerColors[wo.priority] ??
+                            priorityBannerColors.medium,
+                    )}
+                >
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <Wrench className="h-5 w-5" />
-                            <RefChip value={wo.reference_number ?? `#${wo.id}`} />
+                            <RefChip
+                                value={wo.reference_number ?? `#${wo.id}`}
+                            />
                             <span className="font-medium">{wo.title}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Badge variant={statusVariant(wo.status ?? '')} className="text-xs">{(wo.status ?? '').replace(/_/g, ' ')}</Badge>
-                            <Badge variant={priorityVariant(wo.priority ?? '')} className="text-xs capitalize">{wo.priority}</Badge>
+                            <Badge
+                                variant={statusVariant(wo.status ?? '')}
+                                className="text-xs"
+                            >
+                                {(wo.status ?? '').replace(/_/g, ' ')}
+                            </Badge>
+                            <Badge
+                                variant={priorityVariant(wo.priority ?? '')}
+                                className="text-xs capitalize"
+                            >
+                                {wo.priority}
+                            </Badge>
                         </div>
                     </div>
                 </div>
@@ -139,19 +175,31 @@ export default function WorkOrderShow({ work_order }: Props) {
                     <div className="space-y-4">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Work Order Details</CardTitle>
+                                <CardTitle className="text-base">
+                                    Work Order Details
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <dl className="space-y-3 text-sm">
                                     <div className="rounded-md bg-muted/40 p-3">
-                                        <dt className="text-xs text-muted-foreground">Asset</dt>
+                                        <dt className="text-xs text-muted-foreground">
+                                            Asset
+                                        </dt>
                                         <dd className="mt-1">
                                             {wo.asset ? (
-                                                <Link href={`/fleet-assets/assets/${wo.asset.id}`} className="text-primary hover:underline font-medium">
-                                                    {wo.asset.name}{wo.asset.asset_tag ? ` (${wo.asset.asset_tag})` : ''}
+                                                <Link
+                                                    href={`/fleet-assets/assets/${wo.asset.id}`}
+                                                    className="font-medium text-primary hover:underline"
+                                                >
+                                                    {wo.asset.name}
+                                                    {wo.asset.asset_tag
+                                                        ? ` (${wo.asset.asset_tag})`
+                                                        : ''}
                                                 </Link>
                                             ) : (
-                                                <span className="text-muted-foreground">---</span>
+                                                <span className="text-muted-foreground">
+                                                    ---
+                                                </span>
                                             )}
                                         </dd>
                                     </div>
@@ -159,15 +207,25 @@ export default function WorkOrderShow({ work_order }: Props) {
                                         <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
                                             <User className="h-4 w-4 text-muted-foreground" />
                                             <div>
-                                                <dt className="text-xs text-muted-foreground">Reported By</dt>
-                                                <dd className="font-medium">{wo.reported_by?.name ?? 'Unknown'}</dd>
+                                                <dt className="text-xs text-muted-foreground">
+                                                    Reported By
+                                                </dt>
+                                                <dd className="font-medium">
+                                                    {wo.reported_by?.name ??
+                                                        'Unknown'}
+                                                </dd>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
                                             <User className="h-4 w-4 text-muted-foreground" />
                                             <div>
-                                                <dt className="text-xs text-muted-foreground">Assigned To</dt>
-                                                <dd className="font-medium">{wo.assigned_to?.name ?? 'Unassigned'}</dd>
+                                                <dt className="text-xs text-muted-foreground">
+                                                    Assigned To
+                                                </dt>
+                                                <dd className="font-medium">
+                                                    {wo.assigned_to?.name ??
+                                                        'Unassigned'}
+                                                </dd>
                                             </div>
                                         </div>
                                     </div>
@@ -175,23 +233,41 @@ export default function WorkOrderShow({ work_order }: Props) {
                                         <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
                                             <Calendar className="h-4 w-4 text-muted-foreground" />
                                             <div>
-                                                <dt className="text-xs text-muted-foreground">Due Date</dt>
-                                                <dd className="font-medium">{wo.due_at ? formatDate(wo.due_at) : '---'}</dd>
+                                                <dt className="text-xs text-muted-foreground">
+                                                    Due Date
+                                                </dt>
+                                                <dd className="font-medium">
+                                                    {wo.due_at
+                                                        ? formatDate(wo.due_at)
+                                                        : '---'}
+                                                </dd>
                                             </div>
                                         </div>
                                         {wo.completed_at && (
                                             <div className="flex items-center gap-2 rounded-md bg-muted/40 p-3">
                                                 <Calendar className="h-4 w-4 text-status-success" />
                                                 <div>
-                                                    <dt className="text-xs text-muted-foreground">Completed</dt>
-                                                    <dd className="font-medium">{formatDate(wo.completed_at)}</dd>
+                                                    <dt className="text-xs text-muted-foreground">
+                                                        Completed
+                                                    </dt>
+                                                    <dd className="font-medium">
+                                                        {formatDate(
+                                                            wo.completed_at,
+                                                        )}
+                                                    </dd>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
                                     <div className="rounded-md bg-muted/40 p-3">
-                                        <dt className="text-xs text-muted-foreground">Created</dt>
-                                        <dd className="mt-1 font-medium">{wo.created_at ? formatDate(wo.created_at) : '---'}</dd>
+                                        <dt className="text-xs text-muted-foreground">
+                                            Created
+                                        </dt>
+                                        <dd className="mt-1 font-medium">
+                                            {wo.created_at
+                                                ? formatDate(wo.created_at)
+                                                : '---'}
+                                        </dd>
                                     </div>
                                 </dl>
                             </CardContent>
@@ -200,10 +276,14 @@ export default function WorkOrderShow({ work_order }: Props) {
                         {wo.description && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Description</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Description
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-sm whitespace-pre-wrap leading-relaxed text-muted-foreground">{wo.description}</p>
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                                        {wo.description}
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}
@@ -211,10 +291,14 @@ export default function WorkOrderShow({ work_order }: Props) {
                         {wo.notes && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-base">Notes</CardTitle>
+                                    <CardTitle className="text-base">
+                                        Notes
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">{wo.notes}</p>
+                                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                                        {wo.notes}
+                                    </p>
                                 </CardContent>
                             </Card>
                         )}
@@ -233,77 +317,138 @@ export default function WorkOrderShow({ work_order }: Props) {
                             <CardContent>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="rounded-md bg-muted/40 p-3 text-center">
-                                        <div className="text-xs text-muted-foreground">Estimated</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Estimated
+                                        </div>
                                         <div className="mt-1 text-lg font-bold">
-                                            {wo.estimated_cost != null ? formatCurrency(wo.estimated_cost) : '---'}
+                                            {wo.estimated_cost != null
+                                                ? formatCurrency(
+                                                      wo.estimated_cost,
+                                                  )
+                                                : '---'}
                                         </div>
                                     </div>
                                     <div className="rounded-md bg-muted/40 p-3 text-center">
-                                        <div className="text-xs text-muted-foreground">Actual</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            Actual
+                                        </div>
                                         <div className="mt-1 text-lg font-bold">
-                                            {wo.actual_cost != null ? formatCurrency(wo.actual_cost) : '---'}
+                                            {wo.actual_cost != null
+                                                ? formatCurrency(wo.actual_cost)
+                                                : '---'}
                                         </div>
                                     </div>
                                 </div>
-                                {wo.estimated_cost != null && wo.actual_cost != null && (
-                                    <div className={cn(
-                                        'mt-3 rounded-md border p-2 text-center text-sm font-medium',
-                                        wo.actual_cost <= wo.estimated_cost
-                                            ? 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success'
-                                            : 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical'
-                                    )}>
-                                        {wo.actual_cost <= wo.estimated_cost
-                                            ? `${formatCurrency(wo.estimated_cost - wo.actual_cost)} under budget`
-                                            : `${formatCurrency(wo.actual_cost - wo.estimated_cost)} over budget`
-                                        }
-                                    </div>
-                                )}
+                                {wo.estimated_cost != null &&
+                                    wo.actual_cost != null && (
+                                        <div
+                                            className={cn(
+                                                'mt-3 rounded-md border p-2 text-center text-sm font-medium',
+                                                wo.actual_cost <=
+                                                    wo.estimated_cost
+                                                    ? 'border-status-success/30 bg-status-success-bg text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success'
+                                                    : 'border-status-critical/30 bg-status-critical-bg text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical',
+                                            )}
+                                        >
+                                            {wo.actual_cost <= wo.estimated_cost
+                                                ? `${formatCurrency(wo.estimated_cost - wo.actual_cost)} under budget`
+                                                : `${formatCurrency(wo.actual_cost - wo.estimated_cost)} over budget`}
+                                        </div>
+                                    )}
                             </CardContent>
                         </Card>
 
                         {/* Update Form */}
                         <Card className="border-2 border-dashed">
                             <CardHeader className="pb-3">
-                                <CardTitle className="text-base">Update Status</CardTitle>
+                                <CardTitle className="text-base">
+                                    Update Status
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <form onSubmit={handleUpdate} className="space-y-3">
+                                <form
+                                    onSubmit={handleUpdate}
+                                    className="space-y-3"
+                                >
                                     <div>
-                                        <label className="text-xs font-medium text-muted-foreground">Status</label>
-                                        <Select value={updateForm.data.status} onValueChange={(v) => updateForm.setData('status', v)}>
-                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <label className="text-xs font-medium text-muted-foreground">
+                                            Status
+                                        </label>
+                                        <Select
+                                            value={updateForm.data.status}
+                                            onValueChange={(v) =>
+                                                updateForm.setData('status', v)
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="open">Open</SelectItem>
-                                                <SelectItem value="in_progress">In Progress</SelectItem>
-                                                <SelectItem value="on_hold">On Hold</SelectItem>
-                                                <SelectItem value="completed">Completed</SelectItem>
-                                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                                                <SelectItem value="open">
+                                                    Open
+                                                </SelectItem>
+                                                <SelectItem value="in_progress">
+                                                    In Progress
+                                                </SelectItem>
+                                                <SelectItem value="on_hold">
+                                                    On Hold
+                                                </SelectItem>
+                                                <SelectItem value="completed">
+                                                    Completed
+                                                </SelectItem>
+                                                <SelectItem value="cancelled">
+                                                    Cancelled
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        {updateForm.errors.status && <p className="mt-1 text-xs text-destructive">{updateForm.errors.status}</p>}
+                                        {updateForm.errors.status && (
+                                            <p className="mt-1 text-xs text-destructive">
+                                                {updateForm.errors.status}
+                                            </p>
+                                        )}
                                     </div>
                                     <div>
-                                        <label className="text-xs font-medium text-muted-foreground">Actual Cost ($)</label>
+                                        <label className="text-xs font-medium text-muted-foreground">
+                                            Actual Cost ($)
+                                        </label>
                                         <Input
                                             type="number"
                                             step="0.01"
                                             value={updateForm.data.actual_cost}
-                                            onChange={(e) => updateForm.setData('actual_cost', e.target.value)}
+                                            onChange={(e) =>
+                                                updateForm.setData(
+                                                    'actual_cost',
+                                                    e.target.value,
+                                                )
+                                            }
                                             placeholder="0.00"
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-medium text-muted-foreground">Notes</label>
+                                        <label className="text-xs font-medium text-muted-foreground">
+                                            Notes
+                                        </label>
                                         <textarea
-                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                                             rows={3}
                                             value={updateForm.data.notes}
-                                            onChange={(e) => updateForm.setData('notes', e.target.value)}
+                                            onChange={(e) =>
+                                                updateForm.setData(
+                                                    'notes',
+                                                    e.target.value,
+                                                )
+                                            }
                                             placeholder="Add notes..."
                                         />
                                     </div>
-                                    <Button type="submit" disabled={updateForm.processing} className="w-full">
-                                        {updateForm.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    <Button
+                                        type="submit"
+                                        disabled={updateForm.processing}
+                                        className="w-full"
+                                    >
+                                        {updateForm.processing && (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        )}
                                         Update Work Order
                                     </Button>
                                 </form>

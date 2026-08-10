@@ -3,7 +3,7 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
 import { edit as editPassword } from '@/routes/user-password';
-import { Link, type InertiaLinkProps, usePage } from '@inertiajs/react';
+import { type InertiaLinkProps, Link, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
@@ -15,7 +15,6 @@ import {
     FileText,
     Inbox,
     Key,
-    Languages,
     Lock,
     Mail,
     MailCheck,
@@ -28,12 +27,16 @@ import {
     User,
     UserCog,
     Users,
-    Wifi,
 } from 'lucide-react';
 import { type PropsWithChildren, useMemo, useState } from 'react';
 
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import {
+    Sheet,
+    SheetContent,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet';
 import type { LucideIcon } from 'lucide-react';
 
 interface NavSection {
@@ -54,7 +57,11 @@ const navSections: NavSection[] = [
             { icon: User, title: 'Profile', href: edit() },
             { icon: Palette, title: 'Appearance', href: editAppearance() },
             { icon: Lock, title: 'Password', href: editPassword() },
-            { icon: ShieldCheck, title: 'Two-Factor Authentication', href: show() },
+            {
+                icon: ShieldCheck,
+                title: 'Two-Factor Authentication',
+                href: show(),
+            },
         ],
     },
     {
@@ -67,7 +74,12 @@ const navSections: NavSection[] = [
     {
         label: 'Organisation',
         items: [
-            { icon: Building2, title: 'Service Contexts', href: '/settings/service-contexts', permission: 'settings.manageServiceContexts' },
+            {
+                icon: Building2,
+                title: 'Service Contexts',
+                href: '/settings/service-contexts',
+                permission: 'settings.manageServiceContexts',
+            },
         ],
     },
     {
@@ -76,52 +88,121 @@ const navSections: NavSection[] = [
         items: [
             { icon: Users, title: 'Users', href: '/system/users' },
             { icon: Shield, title: 'Roles', href: '/system/access/roles' },
-            { icon: UserCog, title: 'Overrides & Governance', href: '/settings/access' },
+            {
+                icon: UserCog,
+                title: 'Overrides & Governance',
+                href: '/settings/access',
+            },
         ],
     },
     {
         label: 'Identity & SSO',
         permission: 'settings.manageAccess',
         items: [
-            { icon: ShieldCheck, title: 'SSO Configuration', href: '/settings/sso' },
+            {
+                icon: ShieldCheck,
+                title: 'SSO Configuration',
+                href: '/settings/sso',
+            },
         ],
     },
     {
         label: 'Notifications',
         items: [
-            { icon: Bell, title: 'My Notifications', href: '/settings/notifications' },
-            { icon: BellRing, title: 'Role Defaults', href: '/settings/notifications/roles', permission: 'settings.manageAccess' },
-            { icon: AlertTriangle, title: 'Escalation Rules', href: '/settings/notifications/escalations', permission: 'settings.manageAccess' },
-            { icon: MailCheck, title: 'Email', href: '/settings/email', permission: 'settings.manageAccess' },
-            { icon: Mail, title: 'Templates', href: '/settings/templates', permission: 'settings.templatesManage' },
+            {
+                icon: Bell,
+                title: 'My Notifications',
+                href: '/settings/notifications',
+            },
+            {
+                icon: BellRing,
+                title: 'Role Defaults',
+                href: '/settings/notifications/roles',
+                permission: 'settings.manageAccess',
+            },
+            {
+                icon: AlertTriangle,
+                title: 'Escalation Rules',
+                href: '/settings/notifications/escalations',
+                permission: 'settings.manageAccess',
+            },
+            {
+                icon: MailCheck,
+                title: 'Email',
+                href: '/settings/email',
+                permission: 'settings.manageAccess',
+            },
+            {
+                icon: Mail,
+                title: 'Templates',
+                href: '/settings/templates',
+                permission: 'settings.templatesManage',
+            },
         ],
     },
     {
         label: 'Integrations',
         items: [
-            { icon: CalendarSync, title: 'Calendar Sync', href: '/settings/calendar-sync', permission: 'integrations.manageTenantSecrets' },
-            { icon: Inbox, title: 'Support Mailbox', href: '/settings/it-mailbox', permission: 'integrations.manageTenantSecrets' },
-            { icon: Plug, title: 'Device Integrations', href: '/security-devices/integrations', permission: 'securityDevices.integrationsView' },
-            { icon: Key, title: 'Outbound API & Webhooks', href: '/settings/api', permission: 'integrations.view' },
+            {
+                icon: CalendarSync,
+                title: 'Calendar Sync',
+                href: '/settings/calendar-sync',
+                permission: 'integrations.manageSecrets',
+            },
+            {
+                icon: Inbox,
+                title: 'Support Mailbox',
+                href: '/settings/it-mailbox',
+                permission: 'integrations.manageSecrets',
+            },
+            {
+                icon: Plug,
+                title: 'Device Integrations',
+                href: '/security-devices/integrations',
+                permission: 'securityDevices.integrationsView',
+            },
+            {
+                icon: Key,
+                title: 'Outbound API & Webhooks',
+                href: '/settings/api',
+                permission: 'integrations.view',
+            },
         ],
     },
     {
         label: 'Data & Compliance',
         items: [
-            { icon: Database, title: 'Data & Privacy', href: '/settings/data', permission: 'settings.manageAccess' },
-            { icon: FileText, title: 'Audit Logs', href: '/settings/audit-logs', permission: 'audit.viewAny' },
+            {
+                icon: Database,
+                title: 'Data & Privacy',
+                href: '/settings/data',
+                permission: 'settings.manageAccess',
+            },
+            {
+                icon: FileText,
+                title: 'Audit Logs',
+                href: '/settings/audit-logs',
+                permission: 'audit.viewAny',
+            },
         ],
     },
     {
         label: 'System',
         permission: 'settings.manageAccess',
         items: [
-            { icon: Boxes, title: 'Modules & Features', href: '/settings/modules' },
+            {
+                icon: Boxes,
+                title: 'Modules & Features',
+                href: '/settings/modules',
+            },
         ],
     },
 ];
 
-function resolvePermission(can: Record<string, any> | undefined, key: string): boolean {
+function resolvePermission(
+    can: Record<string, any> | undefined,
+    key: string,
+): boolean {
     if (!can || !key) return true;
     const parts = key.split('.');
     let current: any = can;
@@ -132,7 +213,13 @@ function resolvePermission(can: Record<string, any> | undefined, key: string): b
     return !!current;
 }
 
-function NavContent({ currentPath, can }: { currentPath: string; can: Record<string, any> | undefined }) {
+function NavContent({
+    currentPath,
+    can,
+}: {
+    currentPath: string;
+    can: Record<string, any> | undefined;
+}) {
     return (
         <nav className="flex flex-col gap-1 py-2">
             {navSections.map((section) => {
@@ -146,7 +233,7 @@ function NavContent({ currentPath, can }: { currentPath: string; can: Record<str
 
                 return (
                     <div key={section.label}>
-                        <h4 className="text-muted-foreground px-3 pt-4 pb-1 text-xs font-medium uppercase tracking-wider">
+                        <h4 className="px-3 pt-4 pb-1 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                             {section.label}
                         </h4>
                         {visibleItems.map((item) => {
@@ -167,7 +254,9 @@ function NavContent({ currentPath, can }: { currentPath: string; can: Record<str
                                     <Icon
                                         className={cn(
                                             'h-4 w-4 shrink-0',
-                                            isActive ? 'text-primary' : 'text-muted-foreground',
+                                            isActive
+                                                ? 'text-primary'
+                                                : 'text-muted-foreground',
                                         )}
                                     />
                                     {item.title}
@@ -185,7 +274,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const { auth } = usePage().props as any;
     const can = auth?.can;
     const [mobileOpen, setMobileOpen] = useState(false);
-    const currentPath = typeof window === 'undefined' ? '/settings' : window.location.pathname;
+    const currentPath =
+        typeof window === 'undefined' ? '/settings' : window.location.pathname;
 
     // Find current page title for mobile header
     const currentTitle = useMemo(() => {
@@ -208,7 +298,9 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             {/* Desktop sidebar */}
             <aside className="hidden w-60 shrink-0 overflow-y-auto border-r bg-card lg:block">
                 <div className="px-3 pt-4 pb-2">
-                    <h2 className="px-3 text-lg font-semibold tracking-tight">Settings</h2>
+                    <h2 className="px-3 text-lg font-semibold tracking-tight">
+                        Settings
+                    </h2>
                 </div>
                 <NavContent currentPath={currentPath} can={can} />
             </aside>
@@ -218,15 +310,29 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                 <div className="flex items-center gap-3 border-b bg-card px-4 py-3 lg:hidden">
                     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                         <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon" className="shrink-0">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="shrink-0"
+                            >
                                 <Menu className="h-5 w-5" />
-                                <span className="sr-only">Open settings menu</span>
+                                <span className="sr-only">
+                                    Open settings menu
+                                </span>
                             </Button>
                         </SheetTrigger>
                         <SheetContent side="left" className="w-72 p-0">
-                            <SheetTitle className="px-6 pt-5 pb-0 text-lg font-semibold">Settings</SheetTitle>
-                            <div className="px-3" onClick={() => setMobileOpen(false)}>
-                                <NavContent currentPath={currentPath} can={can} />
+                            <SheetTitle className="px-6 pt-5 pb-0 text-lg font-semibold">
+                                Settings
+                            </SheetTitle>
+                            <div
+                                className="px-3"
+                                onClick={() => setMobileOpen(false)}
+                            >
+                                <NavContent
+                                    currentPath={currentPath}
+                                    can={can}
+                                />
                             </div>
                         </SheetContent>
                     </Sheet>

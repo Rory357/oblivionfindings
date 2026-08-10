@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Services\References\ReferenceNumberGenerator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SafeguardingConcern extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
         'reference_number',
@@ -56,7 +59,6 @@ class SafeguardingConcern extends Model
         'lessons_learned',
         'related_incident_id',
         'site_id',
-        'organization_id',
         'created_by',
         'updated_by',
     ];
@@ -96,7 +98,7 @@ class SafeguardingConcern extends Model
      */
     public static function generateReferenceNumber(): string
     {
-        return app(\App\Services\References\ReferenceNumberGenerator::class)->next('SG');
+        return app(ReferenceNumberGenerator::class)->next('SG');
     }
 
     /**
@@ -161,14 +163,6 @@ class SafeguardingConcern extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
-    }
-
-    /**
-     * Organization.
-     */
-    public function organization(): BelongsTo
-    {
-        return $this->belongsTo(Organization::class);
     }
 
     /**
@@ -250,9 +244,9 @@ class SafeguardingConcern extends Model
     /**
      * Corrective actions raised against the linked HsEvent (empty collection if none).
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, \App\Models\HsCorrectiveAction>
+     * @return Collection<int, HsCorrectiveAction>
      */
-    public function linkedCorrectiveActions(): \Illuminate\Database\Eloquent\Collection
+    public function linkedCorrectiveActions(): Collection
     {
         return $this->linkedHsEvent()?->correctiveActions()->with('assignedTo:id,name')->get() ?? collect();
     }

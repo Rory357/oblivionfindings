@@ -1,7 +1,3 @@
-import { useRef, useState } from 'react';
-import axios from 'axios';
-import { router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -13,6 +9,10 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { router } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Download,
     File,
@@ -25,7 +25,7 @@ import {
     X,
     type LucideIcon,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useRef, useState } from 'react';
 
 export interface GovernanceAttachment {
     id: string;
@@ -67,8 +67,21 @@ export interface GovernanceAttachmentsPanelProps {
 }
 
 const ACCEPTED_EXTENSIONS = [
-    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.csv', '.txt', '.md',
+    '.pdf',
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.ppt',
+    '.pptx',
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.webp',
+    '.csv',
+    '.txt',
+    '.md',
 ];
 const ACCEPT_ATTR = ACCEPTED_EXTENSIONS.join(',');
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB matches the server validation.
@@ -77,8 +90,18 @@ function iconForMime(mime: string | null): LucideIcon {
     if (!mime) return File;
     if (mime.startsWith('image/')) return FileImage;
     if (mime.includes('pdf')) return FileText;
-    if (mime.includes('sheet') || mime.includes('excel') || mime.includes('csv')) return FileSpreadsheet;
-    if (mime.startsWith('text/') || mime.includes('word') || mime.includes('document')) return FileText;
+    if (
+        mime.includes('sheet') ||
+        mime.includes('excel') ||
+        mime.includes('csv')
+    )
+        return FileSpreadsheet;
+    if (
+        mime.startsWith('text/') ||
+        mime.includes('word') ||
+        mime.includes('document')
+    )
+        return FileText;
     return File;
 }
 
@@ -134,7 +157,9 @@ export function GovernanceAttachmentsPanel({
 
         const tooBig = list.find((f) => f.size > MAX_FILE_BYTES);
         if (tooBig) {
-            setError(`"${tooBig.name}" is larger than 20 MB. Pick a smaller file.`);
+            setError(
+                `"${tooBig.name}" is larger than 20 MB. Pick a smaller file.`,
+            );
             return;
         }
 
@@ -170,7 +195,9 @@ export function GovernanceAttachmentsPanel({
             onChanged?.();
             router.reload({ only: [reloadProp] });
         } catch (err: any) {
-            setError(err?.response?.data?.message ?? 'Failed to remove attachment.');
+            setError(
+                err?.response?.data?.message ?? 'Failed to remove attachment.',
+            );
         }
     };
 
@@ -206,11 +233,16 @@ export function GovernanceAttachmentsPanel({
                             : 'border-border hover:border-primary/40',
                     )}
                 >
-                    <Upload className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
+                    <Upload
+                        className="h-6 w-6 text-muted-foreground"
+                        aria-hidden="true"
+                    />
                     <p className="text-sm font-medium text-foreground">
                         Drag files here or click to browse
                     </p>
-                    <p className="text-xs text-muted-foreground">{helperText}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {helperText}
+                    </p>
                     <Button
                         type="button"
                         variant="outline"
@@ -237,7 +269,8 @@ export function GovernanceAttachmentsPanel({
                         className="hidden"
                         accept={ACCEPT_ATTR}
                         onChange={(e) => {
-                            if (e.target.files) void uploadFiles(e.target.files);
+                            if (e.target.files)
+                                void uploadFiles(e.target.files);
                         }}
                     />
                 </div>
@@ -246,7 +279,8 @@ export function GovernanceAttachmentsPanel({
             {error && (
                 <div className="flex items-start justify-between gap-3 rounded-md border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
                     <span>{error}</span>
-                    <Button unstyled
+                    <Button
+                        unstyled
                         type="button"
                         onClick={() => setError(null)}
                         aria-label="Dismiss error"
@@ -279,14 +313,22 @@ export function GovernanceAttachmentsPanel({
                                 data-dusk={`governance-attachment-${a.id}`}
                             >
                                 <div className="rounded-md bg-muted p-2">
-                                    <Icon className="h-5 w-5 text-foreground" aria-hidden="true" />
+                                    <Icon
+                                        className="h-5 w-5 text-foreground"
+                                        aria-hidden="true"
+                                    />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-medium text-foreground" title={a.original_name}>
+                                    <p
+                                        className="truncate text-sm font-medium text-foreground"
+                                        title={a.original_name}
+                                    >
                                         {a.original_name}
                                     </p>
                                     {meta && (
-                                        <p className="truncate text-xs text-muted-foreground">{meta}</p>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            {meta}
+                                        </p>
                                     )}
                                 </div>
                                 <div className="flex shrink-0 items-center gap-1">
@@ -317,16 +359,28 @@ export function GovernanceAttachmentsPanel({
                                             </AlertDialogTrigger>
                                             <AlertDialogContent>
                                                 <AlertDialogHeader>
-                                                    <AlertDialogTitle>Remove attachment?</AlertDialogTitle>
+                                                    <AlertDialogTitle>
+                                                        Remove attachment?
+                                                    </AlertDialogTitle>
                                                     <AlertDialogDescription>
-                                                        <span className="font-medium">{a.original_name}</span>{' '}
-                                                        will be permanently removed. This cannot be undone.
+                                                        <span className="font-medium">
+                                                            {a.original_name}
+                                                        </span>{' '}
+                                                        will be permanently
+                                                        removed. This cannot be
+                                                        undone.
                                                     </AlertDialogDescription>
                                                 </AlertDialogHeader>
                                                 <AlertDialogFooter>
-                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogCancel>
+                                                        Cancel
+                                                    </AlertDialogCancel>
                                                     <AlertDialogAction
-                                                        onClick={() => void deleteAttachment(a)}
+                                                        onClick={() =>
+                                                            void deleteAttachment(
+                                                                a,
+                                                            )
+                                                        }
                                                         className="bg-status-critical hover:bg-status-critical/90"
                                                     >
                                                         Remove

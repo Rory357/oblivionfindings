@@ -138,11 +138,16 @@ function buildRows(detail: RespiteDetail): Row[] {
             ],
             [
                 'Private pay portion',
-                b.privatePayPortion != null ? `$${b.privatePayPortion.toFixed(2)}` : '—',
+                b.privatePayPortion != null
+                    ? `$${b.privatePayPortion.toFixed(2)}`
+                    : '—',
             ],
             ['Recurring block', b.recurrenceRule ?? '—'],
             ['Series', b.seriesId ?? '—'],
-            ['Setting restriction', b.settingRestriction?.replace(/_/g, ' ') ?? '—'],
+            [
+                'Setting restriction',
+                b.settingRestriction?.replace(/_/g, ' ') ?? '—',
+            ],
             ['Critical alerts', criticalAlertLabel(b.criticalAlerts)],
             ['Pre-stay readiness', `${b.readiness}%`],
             [
@@ -203,7 +208,10 @@ function agreementLabel(
         ? ` · ${agreement.carerSupportEntitlementYear}`
         : '';
 
-    if (agreement.carerSupportDaysRemaining !== null && agreement.carerSupportDaysRemaining !== undefined) {
+    if (
+        agreement.carerSupportDaysRemaining !== null &&
+        agreement.carerSupportDaysRemaining !== undefined
+    ) {
         return `${title} · ${agreement.carerSupportDaysRemaining}d left${entitlement}${agreement.signedDate ? ' · signed' : ''}`;
     }
 

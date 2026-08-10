@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientIncident;
@@ -14,12 +15,14 @@ use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\ShiftCancellationService;
 use App\Services\ShiftHandoverService;
 use App\Services\ShiftTimelineService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\DatabaseNotification;
 use Mockery\MockInterface;
@@ -35,13 +38,15 @@ class ShiftCancellationCascadeTest extends TestCase
 
     protected Client $client;
 
+    protected Site $site;
+
     protected ServiceContext $serviceContext;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -49,16 +54,13 @@ class ShiftCancellationCascadeTest extends TestCase
         ]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 
-        $this->staff = User::factory()->create([
-            'role' => 'support_worker',
-            'approved_at' => now(),
-        ]);
-        $this->staff->roles()->attach(Role::where('name', 'support_worker')->first());
-
         $this->serviceContext = ServiceContext::factory()->create();
+        $this->site = Site::factory()->create();
         $this->client = Client::factory()->create([
             'service_context_id' => $this->serviceContext->id,
+            'site_id' => $this->site->id,
         ]);
+        $this->staff = $this->makeCurrentSiteStaff();
     }
 
     public function test_cancelling_shift_returns_linked_timesheets_and_records_reason(): void
@@ -261,15 +263,13 @@ class ShiftCancellationCascadeTest extends TestCase
 
     public function test_cancelling_shift_notifies_incoming_handover_staff(): void
     {
-        $incomingStaff = User::factory()->create([
-            'role' => 'support_worker',
-            'approved_at' => now(),
-        ]);
+        $incomingStaff = $this->makeCurrentSiteStaff();
 
         $shift = $this->makeShift();
 
         $incomingShift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => $incomingStaff->id,
             'created_by' => $this->admin->id,
@@ -323,10 +323,7 @@ class ShiftCancellationCascadeTest extends TestCase
 
     public function test_duplicate_cancellation_does_not_send_duplicate_notification(): void
     {
-        $incomingStaff = User::factory()->create([
-            'role' => 'support_worker',
-            'approved_at' => now(),
-        ]);
+        $incomingStaff = $this->makeCurrentSiteStaff();
 
         $shift = $this->makeShift();
 
@@ -356,15 +353,13 @@ class ShiftCancellationCascadeTest extends TestCase
 
     public function test_acknowledged_handover_does_not_trigger_notification(): void
     {
-        $incomingStaff = User::factory()->create([
-            'role' => 'support_worker',
-            'approved_at' => now(),
-        ]);
+        $incomingStaff = $this->makeCurrentSiteStaff();
 
         $shift = $this->makeShift();
 
         $incomingShift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => $incomingStaff->id,
             'created_by' => $this->admin->id,
@@ -400,10 +395,28 @@ class ShiftCancellationCascadeTest extends TestCase
     {
         return Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => $this->staff->id,
             'created_by' => $this->admin->id,
             'status' => 'scheduled',
         ]);
+    }
+
+    protected function makeCurrentSiteStaff(): User
+    {
+        $staff = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
+        $staff->roles()->attach(Role::where('name', 'support_worker')->firstOrFail());
+
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $staff->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
+
+        return $staff;
     }
 }

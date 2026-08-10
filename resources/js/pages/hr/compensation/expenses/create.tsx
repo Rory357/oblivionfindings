@@ -72,7 +72,9 @@ const emptyItem: ExpenseItem = {
 
 export default function CreateExpense({ categories, prefill }: Props) {
     const { errors } = usePage<{ errors: Record<string, string> }>().props;
-    const [title, setTitle] = useState(prefill?.description ? `Development — ${prefill.description}` : '');
+    const [title, setTitle] = useState(
+        prefill?.description ? `Development — ${prefill.description}` : '',
+    );
     const [notes, setNotes] = useState('');
     const [items, setItems] = useState<ExpenseItem[]>([
         prefill
@@ -96,7 +98,13 @@ export default function CreateExpense({ categories, prefill }: Props) {
 
     const updateItem = (
         index: number,
-        key: 'description' | 'category' | 'amount' | 'expense_date' | 'tax_amount' | 'notes',
+        key:
+            | 'description'
+            | 'category'
+            | 'amount'
+            | 'expense_date'
+            | 'tax_amount'
+            | 'notes',
         value: string,
     ) => {
         setItems((prev) =>
@@ -151,7 +159,8 @@ export default function CreateExpense({ categories, prefill }: Props) {
             <Head title="New Expense Claim" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         variant="compact"
                         backHref="/hr/compensation/expenses"
                         title="New Expense Claim"
@@ -460,7 +469,9 @@ export default function CreateExpense({ categories, prefill }: Props) {
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => router.get('/hr/compensation/expenses')}
+                            onClick={() =>
+                                router.get('/hr/compensation/expenses')
+                            }
                         >
                             Cancel
                         </Button>

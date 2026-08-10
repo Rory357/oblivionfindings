@@ -10,8 +10,13 @@
  *
  * Semantic tokens only; app-primary gradient. NZ / web-only / need-to-know.
  */
-import AppLayout from '@/layouts/app-layout';
+import { TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
+import { RecordAbcDialog } from '@/pages/health-clinical/components/record-abc-dialog';
+import { RecordEventDialog } from '@/pages/health-clinical/components/record-event-dialog';
+import { RecordObservationDialog } from '@/pages/health-clinical/components/record-observation-dialog';
 import {
     HeroCluster,
     HeroClusterTile,
@@ -20,21 +25,12 @@ import {
     HeroStatusPill,
     fmt,
 } from '@/pages/health-safety/components/hs-hero-kit';
-import {
-    TabStrip,
-    type RosterTabItem,
-} from '@/components/rostering';
-import { cn } from '@/lib/utils';
-import { RecordAbcDialog } from '@/pages/health-clinical/components/record-abc-dialog';
-import { RecordEventDialog } from '@/pages/health-clinical/components/record-event-dialog';
-import { RecordObservationDialog } from '@/pages/health-clinical/components/record-observation-dialog';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
     Brain,
     CheckCircle2,
-    Eye,
     HeartPulse,
     Lock,
     ShieldCheck,
@@ -98,10 +94,14 @@ type ClinicalAbilities = ClinicalCan & {
 type ChipTone = 'success' | 'warning' | 'critical' | 'neutral';
 
 const CHIP_CLASS: Record<ChipTone, string> = {
-    success: 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90',
-    warning: 'border-status-warning/50 bg-status-warning/25 text-primary-foreground',
-    critical: 'border-status-critical/50 bg-status-critical/25 text-primary-foreground',
-    neutral: 'border-primary-foreground/20 bg-primary-foreground/5 text-primary-foreground/80',
+    success:
+        'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90',
+    warning:
+        'border-status-warning/50 bg-status-warning/25 text-primary-foreground',
+    critical:
+        'border-status-critical/50 bg-status-critical/25 text-primary-foreground',
+    neutral:
+        'border-primary-foreground/20 bg-primary-foreground/5 text-primary-foreground/80',
 };
 const CHIP_ICON: Record<ChipTone, string> = {
     success: 'text-primary-foreground/80',
@@ -124,7 +124,12 @@ function ClinicalChips({ kpis }: { kpis: HealthClinicalKpis }) {
         },
         {
             icon: onWatch && onWatch > 0 ? AlertTriangle : HeartPulse,
-            tone: onWatch === null ? 'neutral' : onWatch > 0 ? 'warning' : 'success',
+            tone:
+                onWatch === null
+                    ? 'neutral'
+                    : onWatch > 0
+                      ? 'warning'
+                      : 'success',
             label:
                 onWatch === null
                     ? 'Deterioration watch · NEWS2'
@@ -134,7 +139,12 @@ function ClinicalChips({ kpis }: { kpis: HealthClinicalKpis }) {
         },
         {
             icon: signOff && signOff > 0 ? AlertTriangle : CheckCircle2,
-            tone: signOff === null ? 'neutral' : signOff > 0 ? 'warning' : 'success',
+            tone:
+                signOff === null
+                    ? 'neutral'
+                    : signOff > 0
+                      ? 'warning'
+                      : 'success',
             label:
                 signOff === null
                     ? 'Sign-off backlog'
@@ -188,7 +198,11 @@ function GroupPills({
 }) {
     const groups = groupsWithBuiltTabs(can);
     return (
-        <div className="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Clinical navigation groups">
+        <div
+            className="flex flex-wrap items-center gap-1.5"
+            role="tablist"
+            aria-label="Clinical navigation groups"
+        >
             {groups.map((g) => {
                 const active = g.key === activeGroup;
                 const attention = builtTabsForGroup(g.key, can).reduce(
@@ -215,7 +229,9 @@ function GroupPills({
                             <span
                                 className={cn(
                                     'inline-flex min-w-[18px] items-center justify-center rounded-full px-1 py-0.5 text-[10px] font-bold tabular-nums',
-                                    active ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-background text-foreground',
+                                    active
+                                        ? 'bg-primary-foreground/20 text-primary-foreground'
+                                        : 'bg-background text-foreground',
                                 )}
                             >
                                 {attention}
@@ -239,9 +255,13 @@ export function HealthClinicalShell({
     children,
 }: HealthClinicalShellProps) {
     const activeGroup = groupForTab(activeTab);
-    const page = usePage<{ auth?: { can?: { clinical?: ClinicalAbilities } } }>();
+    const page = usePage<{
+        auth?: { can?: { clinical?: ClinicalAbilities } };
+    }>();
     const can = page.props.auth?.can?.clinical ?? {};
-    const canRecordObs = !!(can.observationsRecord || can.observationsRecordClinical);
+    const canRecordObs = !!(
+        can.observationsRecord || can.observationsRecordClinical
+    );
     const canRecordEvent = !!can.eventsRecord;
     const [obsOpen, setObsOpen] = useState(false);
     const [eventOpen, setEventOpen] = useState(false);
@@ -256,16 +276,22 @@ export function HealthClinicalShell({
         if (first && first.id !== activeTab) go(first.href);
     };
 
-    const tabItems: RosterTabItem[] = builtTabsForGroup(activeGroup, can).map((t) => ({
-        id: t.id,
-        label: t.label,
-        icon: t.icon,
-        tone: t.tone,
-        badge: tabCounts?.[t.id] || undefined,
-    }));
+    const tabItems: RosterTabItem[] = builtTabsForGroup(activeGroup, can).map(
+        (t) => ({
+            id: t.id,
+            label: t.label,
+            icon: t.icon,
+            tone: t.tone,
+            badge: tabCounts?.[t.id] || undefined,
+        }),
+    );
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Health & Clinical', href: '/health-clinical' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Health & Clinical', href: '/health-clinical' },
+            ]}
+        >
             <Head title="Health & Clinical" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -275,13 +301,17 @@ export function HealthClinicalShell({
                         <div className="flex items-start gap-4">
                             <HeroMedallion icon={HeartPulse} />
                             <div className="flex flex-col gap-1.5">
-                                <HeroStatusPill>Clinical command centre · synced just now</HeroStatusPill>
+                                <HeroStatusPill>
+                                    Clinical command centre · synced just now
+                                </HeroStatusPill>
                                 <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
                                     Health &amp; Clinical
                                 </h1>
                                 <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    Observations, deterioration watch and clinical events for registered nurses and
-                                    clinical leads — record at the point of care and close the loop on sign-off.
+                                    Observations, deterioration watch and
+                                    clinical events for registered nurses and
+                                    clinical leads — record at the point of care
+                                    and close the loop on sign-off.
                                 </p>
                             </div>
                         </div>
@@ -294,7 +324,8 @@ export function HealthClinicalShell({
                                         onClick={() => setObsOpen(true)}
                                         className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                                     >
-                                        <Activity className="mr-1.5 h-4 w-4" /> Record observation
+                                        <Activity className="mr-1.5 h-4 w-4" />{' '}
+                                        Record observation
                                     </Button>
                                 ) : null}
                                 {canRecordEvent ? (
@@ -304,7 +335,8 @@ export function HealthClinicalShell({
                                         onClick={() => setEventOpen(true)}
                                         className="border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
                                     >
-                                        <Stethoscope className="mr-1.5 h-4 w-4" /> Log clinical event
+                                        <Stethoscope className="mr-1.5 h-4 w-4" />{' '}
+                                        Log clinical event
                                     </Button>
                                 ) : null}
                                 {canRecordEvent ? (
@@ -314,7 +346,8 @@ export function HealthClinicalShell({
                                         onClick={() => setAbcOpen(true)}
                                         className="border border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
                                     >
-                                        <Brain className="mr-1.5 h-4 w-4" /> Record ABC
+                                        <Brain className="mr-1.5 h-4 w-4" />{' '}
+                                        Record ABC
                                     </Button>
                                 ) : null}
                             </div>
@@ -323,7 +356,10 @@ export function HealthClinicalShell({
 
                     {/* stat clusters */}
                     <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster title="Compliance & coverage" icon={ShieldCheck}>
+                        <HeroCluster
+                            title="Compliance & coverage"
+                            icon={ShieldCheck}
+                        >
                             <HeroClusterTile
                                 href="/health-clinical/protocols"
                                 label="Active protocols"
@@ -348,11 +384,22 @@ export function HealthClinicalShell({
                                 href="/health-clinical/observations"
                                 label="Overdue"
                                 value={fmt(kpis.schedules_overdue)}
-                                caption={kpis.schedules_due > 0 ? `${kpis.schedules_due} due soon` : 'all on track'}
-                                tone={kpis.schedules_overdue > 0 ? 'critical' : 'success'}
+                                caption={
+                                    kpis.schedules_due > 0
+                                        ? `${kpis.schedules_due} due soon`
+                                        : 'all on track'
+                                }
+                                tone={
+                                    kpis.schedules_overdue > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
                             />
                         </HeroCluster>
-                        <HeroCluster title="Clinical risk & events" icon={Activity}>
+                        <HeroCluster
+                            title="Clinical risk & events"
+                            icon={Activity}
+                        >
                             <HeroClusterTile
                                 href="/health-clinical/events"
                                 label="Events 30d"
@@ -365,20 +412,32 @@ export function HealthClinicalShell({
                                 label="High severity"
                                 value={fmt(kpis.events_high_severity_30d)}
                                 caption="last 30 days"
-                                tone={kpis.events_high_severity_30d > 0 ? 'critical' : 'success'}
+                                tone={
+                                    kpis.events_high_severity_30d > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 label="On watch"
                                 value={fmt(kpis.clients_on_watch ?? null)}
                                 caption="NEWS2 ≥ medium"
-                                tone={(kpis.clients_on_watch ?? 0) > 0 ? 'critical' : 'success'}
+                                tone={
+                                    (kpis.clients_on_watch ?? 0) > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/health-clinical/events"
                                 label="Sign-off due"
                                 value={fmt(kpis.events_unreviewed ?? null)}
                                 caption="awaiting review"
-                                tone={(kpis.events_unreviewed ?? 0) > 0 ? 'warning' : 'success'}
+                                tone={
+                                    (kpis.events_unreviewed ?? 0) > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
                             />
                         </HeroCluster>
                     </div>
@@ -388,10 +447,21 @@ export function HealthClinicalShell({
 
                 {/* ── Two-tier navigation ── */}
                 <div className="flex flex-col gap-2.5">
-                    <GroupPills activeGroup={activeGroup} tabCounts={tabCounts} can={can} onSelect={selectGroup} />
+                    <GroupPills
+                        activeGroup={activeGroup}
+                        tabCounts={tabCounts}
+                        can={can}
+                        onSelect={selectGroup}
+                    />
                     <TabStrip
                         value={activeTab}
-                        onChange={(id) => go(builtTabsForGroup(activeGroup, can).find((t) => t.id === id)?.href ?? null)}
+                        onChange={(id) =>
+                            go(
+                                builtTabsForGroup(activeGroup, can).find(
+                                    (t) => t.id === id,
+                                )?.href ?? null,
+                            )
+                        }
                         items={tabItems}
                         ariaLabel="Clinical views"
                     />
@@ -406,7 +476,10 @@ export function HealthClinicalShell({
                 onClose={() => setObsOpen(false)}
                 canRecordClinical={!!can.observationsRecordClinical}
             />
-            <RecordEventDialog open={eventOpen} onClose={() => setEventOpen(false)} />
+            <RecordEventDialog
+                open={eventOpen}
+                onClose={() => setEventOpen(false)}
+            />
             <RecordAbcDialog open={abcOpen} onClose={() => setAbcOpen(false)} />
         </AppLayout>
     );
@@ -436,7 +509,12 @@ export function RegisterStatStrip({ stats }: { stats: RegisterStat[] }) {
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-card px-4 py-2.5">
             {stats.map((s, i) => (
                 <div key={i} className="flex items-baseline gap-1.5">
-                    <span className={cn('text-[15px] font-bold tabular-nums', STAT_TONE[s.tone ?? 'default'])}>
+                    <span
+                        className={cn(
+                            'text-[15px] font-bold tabular-nums',
+                            STAT_TONE[s.tone ?? 'default'],
+                        )}
+                    >
                         {s.value}
                     </span>
                     <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">

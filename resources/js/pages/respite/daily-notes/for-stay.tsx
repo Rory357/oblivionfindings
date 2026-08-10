@@ -1,9 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import RespiteSubnav from '@/components/respite-subnav';
+import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
@@ -14,14 +14,26 @@ type Props = {
     wellbeingTrend: any[];
 };
 
-export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props) {
+export default function DailyNotesForStay({
+    stay,
+    notes,
+    wellbeingTrend,
+}: Props) {
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'Stays', href: '/respite/stays' },
-            { title: `${stay.client?.first_name} ${stay.client?.last_name}`, href: `/respite/stays/${stay.id}` },
-            { title: 'Daily Notes', href: `/respite/stays/${stay.id}/daily-notes` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Stays', href: '/respite/stays' },
+                {
+                    title: `${stay.client?.first_name} ${stay.client?.last_name}`,
+                    href: `/respite/stays/${stay.id}`,
+                },
+                {
+                    title: 'Daily Notes',
+                    href: `/respite/stays/${stay.id}/daily-notes`,
+                },
+            ]}
+        >
             <Head title="Daily Notes for Stay" />
 
             <PageLayout
@@ -32,7 +44,9 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                         title={`Daily Notes for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
                         description={`${formatDateTimeLong(stay.start_date)} — ${formatDateTimeLong(stay.end_date)}`}
                         actions={
-                            <Link href={`/respite/daily-notes/create?stay_id=${stay.id}`}>
+                            <Link
+                                href={`/respite/daily-notes/create?stay_id=${stay.id}`}
+                            >
                                 <Button size="sm" variant="outline">
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New Note
@@ -47,28 +61,49 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                 {wellbeingTrend.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Wellbeing Trend</CardTitle>
+                            <CardTitle className="text-base">
+                                Wellbeing Trend
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-xs text-muted-foreground">
-                                            <th className="pb-2 pr-4">Date</th>
-                                            <th className="pb-2 pr-4">Shift</th>
-                                            <th className="pb-2 pr-4">Score</th>
+                                            <th className="pr-4 pb-2">Date</th>
+                                            <th className="pr-4 pb-2">Shift</th>
+                                            <th className="pr-4 pb-2">Score</th>
                                             <th className="pb-2">Mood</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {wellbeingTrend.map((entry: any, i: number) => (
-                                            <tr key={i} className="border-b last:border-0">
-                                                <td className="py-2 pr-4">{formatDateTimeLong(entry.date)}</td>
-                                                <td className="py-2 pr-4"><Badge variant="outline">{entry.shift}</Badge></td>
-                                                <td className="py-2 pr-4">{entry.score}</td>
-                                                <td className="py-2"><Badge variant="outline">{entry.mood}</Badge></td>
-                                            </tr>
-                                        ))}
+                                        {wellbeingTrend.map(
+                                            (entry: any, i: number) => (
+                                                <tr
+                                                    key={i}
+                                                    className="border-b last:border-0"
+                                                >
+                                                    <td className="py-2 pr-4">
+                                                        {formatDateTimeLong(
+                                                            entry.date,
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 pr-4">
+                                                        <Badge variant="outline">
+                                                            {entry.shift}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="py-2 pr-4">
+                                                        {entry.score}
+                                                    </td>
+                                                    <td className="py-2">
+                                                        <Badge variant="outline">
+                                                            {entry.mood}
+                                                        </Badge>
+                                                    </td>
+                                                </tr>
+                                            ),
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -84,16 +119,35 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
                                             <div className="flex flex-wrap gap-2">
-                                                <Badge variant="outline">{note.shift_period}</Badge>
-                                                {note.mood && <Badge variant="outline">{note.mood}</Badge>}
-                                                {note.has_concerns && <Badge variant="outline">Concern</Badge>}
-                                                {note.incident_occurred && <Badge variant="outline">Incident</Badge>}
+                                                <Badge variant="outline">
+                                                    {note.shift_period}
+                                                </Badge>
+                                                {note.mood && (
+                                                    <Badge variant="outline">
+                                                        {note.mood}
+                                                    </Badge>
+                                                )}
+                                                {note.has_concerns && (
+                                                    <Badge variant="outline">
+                                                        Concern
+                                                    </Badge>
+                                                )}
+                                                {note.incident_occurred && (
+                                                    <Badge variant="outline">
+                                                        Incident
+                                                    </Badge>
+                                                )}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTimeLong(note.note_date)}
+                                                {formatDateTimeLong(
+                                                    note.note_date,
+                                                )}
                                             </div>
                                         </div>
-                                        <Link href={`/respite/daily-notes/${note.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link
+                                            href={`/respite/daily-notes/${note.id}`}
+                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                        >
                                             View
                                         </Link>
                                     </div>

@@ -3,8 +3,9 @@
  * (WizardShell + primitives) so it is visually identical to the Add-Client /
  * Leave-request modals. Zero confirm(): every action is a reviewed stepper modal
  * ending in a success pane. Vehicles & keys federate to the canonical Fleet
- * register rather than being hand-typed. */
-import { useForm } from '@inertiajs/react';
+ * register rather than being hand-typed. Technology is registered in the
+ * canonical Security & Devices inventory and projected back into HR. */
+import { Link, useForm } from '@inertiajs/react';
 import {
     Boxes,
     CheckCircle2,
@@ -42,6 +43,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { fireConfetti } from '@/lib/confetti';
 
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     categoryLabel,
     fdate,
@@ -50,7 +52,6 @@ import {
     type CategoryOption,
     type StaffOption,
 } from './asset-parts';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 /* ------------------------------------------------------------------ */
 /*  Public types                                                      */
@@ -101,7 +102,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 /** Flash error carried by an Inertia redirect (validation / logic-guard). Read
  *  from the page passed to onSuccess — `back()->with('error')` fires onSuccess,
  *  not onError (see reference_inertia_flash_error). */
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
@@ -132,7 +135,13 @@ export function AssetWizard({
                 />
             );
         case 'assign':
-            return <AssignWizard asset={modal.asset} staff={staff} onClose={onClose} />;
+            return (
+                <AssignWizard
+                    asset={modal.asset}
+                    staff={staff}
+                    onClose={onClose}
+                />
+            );
         case 'return':
             return (
                 <ReturnWizard
@@ -144,7 +153,9 @@ export function AssetWizard({
         case 'maintenance':
             return <MaintenanceWizard asset={modal.asset} onClose={onClose} />;
         case 'rfs':
-            return <ReturnToServiceWizard asset={modal.asset} onClose={onClose} />;
+            return (
+                <ReturnToServiceWizard asset={modal.asset} onClose={onClose} />
+            );
         case 'retire':
             return <RetireWizard asset={modal.asset} onClose={onClose} />;
     }
@@ -165,12 +176,42 @@ interface FleetMatch {
 }
 
 const NEW_STEPS: readonly WizardStep[] = [
-    { key: 'identity', label: 'Identity', blurb: 'Tag, name & type', icon: Hash },
-    { key: 'specs', label: 'Specifications', blurb: 'Make, model, serial', icon: Boxes },
-    { key: 'purchase', label: 'Purchase & warranty', blurb: 'Cost, supplier, cover', icon: FileText },
-    { key: 'tagging', label: 'Tagging', blurb: 'QR / barcode label', icon: QrCode },
-    { key: 'docs', label: 'Documents', blurb: 'Receipt, warranty, photo', icon: FileText },
-    { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: CheckCircle2 },
+    {
+        key: 'identity',
+        label: 'Identity',
+        blurb: 'Tag, name & type',
+        icon: Hash,
+    },
+    {
+        key: 'specs',
+        label: 'Specifications',
+        blurb: 'Make, model, serial',
+        icon: Boxes,
+    },
+    {
+        key: 'purchase',
+        label: 'Purchase & warranty',
+        blurb: 'Cost, supplier, cover',
+        icon: FileText,
+    },
+    {
+        key: 'tagging',
+        label: 'Tagging',
+        blurb: 'QR / barcode label',
+        icon: QrCode,
+    },
+    {
+        key: 'docs',
+        label: 'Documents',
+        blurb: 'Receipt, warranty, photo',
+        icon: FileText,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & create',
+        icon: CheckCircle2,
+    },
 ];
 
 function NewAssetWizard({
@@ -192,7 +233,7 @@ function NewAssetWizard({
     const form = useForm({
         asset_tag: asset?.tag ?? '',
         name: asset?.name ?? '',
-        category: asset?.category ?? 'laptop',
+        category: asset?.category ?? 'uniform',
         make: asset?.make ?? '',
         model: asset?.model ?? '',
         serial_number: asset?.serial ?? '',
@@ -202,13 +243,27 @@ function NewAssetWizard({
         supplier: asset?.supplier ?? '',
         warranty_expiry: asset?.warranty ?? '',
         depreciation_method: asset?.depreciation_method ?? 'straight',
-        useful_life_years: asset?.useful_life_years != null ? String(asset.useful_life_years) : '',
-        fleet_asset_id: asset?.fleet_asset_id != null ? String(asset.fleet_asset_id) : '',
+        useful_life_years:
+            asset?.useful_life_years != null
+                ? String(asset.useful_life_years)
+                : '',
+        fleet_asset_id:
+            asset?.fleet_asset_id != null ? String(asset.fleet_asset_id) : '',
         notes: '',
     });
 
-    const isFleetCategory = form.data.category === 'vehicle' || form.data.category === 'key';
+    const isFleetCategory =
+        form.data.category === 'vehicle' || form.data.category === 'key';
     const fleetLinked = form.data.fleet_asset_id !== '';
+    const availableCategories = useMemo(
+        () =>
+            categories.filter(
+                (category) =>
+                    !category.device ||
+                    (isEdit && category.value === asset?.category),
+            ),
+        [asset?.category, categories, isEdit],
+    );
 
     // Federation: search the canonical Fleet register (debounced) when a
     // fleet-owned category is chosen — vehicles/keys are linked, never re-typed.
@@ -219,9 +274,12 @@ function NewAssetWizard({
         }
         let cancelled = false;
         const t = setTimeout(() => {
-            fetch(`/hr/assets/fleet-search?q=${encodeURIComponent(fleetQuery)}`, {
-                headers: { Accept: 'application/json' },
-            })
+            fetch(
+                `/hr/assets/fleet-search?q=${encodeURIComponent(fleetQuery)}`,
+                {
+                    headers: { Accept: 'application/json' },
+                },
+            )
                 .then((r) => (r.ok ? r.json() : { data: [] }))
                 .then((d) => {
                     if (!cancelled) setFleetResults(d.data ?? []);
@@ -273,7 +331,8 @@ function NewAssetWizard({
         wizard.goTo(0);
     };
 
-    const canContinue = form.data.asset_tag.trim() !== '' && form.data.name.trim() !== '';
+    const canContinue =
+        form.data.asset_tag.trim() !== '' && form.data.name.trim() !== '';
 
     return (
         <WizardShell
@@ -295,7 +354,10 @@ function NewAssetWizard({
                         blurb={
                             <>
                                 “{form.data.name || 'New asset'}” is{' '}
-                                {isEdit ? 'updated' : 'now in the register and ready to assign'}.
+                                {isEdit
+                                    ? 'updated'
+                                    : 'now in the register and ready to assign'}
+                                .
                             </>
                         }
                         actions={
@@ -324,7 +386,10 @@ function NewAssetWizard({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !canContinue}>
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !canContinue}
+                        >
                             {form.processing
                                 ? 'Saving…'
                                 : isEdit
@@ -349,11 +414,41 @@ function NewAssetWizard({
                         title="Identify the asset"
                         blurb="Tag, name and what type of equipment this is."
                     />
+                    {!isEdit ? (
+                        <div className="mb-4 flex items-start justify-between gap-4 rounded-xl border border-status-info/30 bg-status-info-bg px-4 py-3">
+                            <div className="flex items-start gap-2.5">
+                                <Shield className="mt-0.5 h-4 w-4 shrink-0 text-status-info" />
+                                <div>
+                                    <p className="text-sm font-semibold">
+                                        Technology has one canonical register
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        Register laptops, phones, and tablets in
+                                        Security &amp; Devices, then assign them
+                                        to staff there. They appear
+                                        automatically in the employee profile.
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                asChild
+                                size="sm"
+                                variant="outline"
+                                className="shrink-0"
+                            >
+                                <Link href="/security-devices/devices">
+                                    Open devices
+                                </Link>
+                            </Button>
+                        </div>
+                    ) : null}
                     <div className="grid gap-3.5 sm:grid-cols-2">
                         <Field label="Asset tag" required>
                             <Input
                                 value={form.data.asset_tag}
-                                onChange={(e) => form.setData('asset_tag', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('asset_tag', e.target.value)
+                                }
                                 placeholder="LT-0436"
                                 className="font-mono"
                                 readOnly={fleetLinked}
@@ -362,7 +457,9 @@ function NewAssetWizard({
                         <Field label="Asset name" required>
                             <Input
                                 value={form.data.name}
-                                onChange={(e) => form.setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('name', e.target.value)
+                                }
                                 placeholder='e.g. MacBook Pro 14"'
                                 readOnly={fleetLinked}
                             />
@@ -374,13 +471,16 @@ function NewAssetWizard({
                                 value={form.data.category}
                                 onChange={(v) => {
                                     form.setData('category', v);
-                                    if (v !== 'vehicle' && v !== 'key') unlinkFleet();
+                                    if (v !== 'vehicle' && v !== 'key')
+                                        unlinkFleet();
                                 }}
                                 cols={3}
-                                options={categories.map((c) => ({
+                                options={availableCategories.map((c) => ({
                                     key: c.value,
                                     label: c.label,
-                                    meta: c.fleet ? '→ Links to Fleet register' : undefined,
+                                    meta: c.fleet
+                                        ? '→ Links to Fleet register'
+                                        : undefined,
                                 }))}
                             />
                         </Field>
@@ -409,21 +509,30 @@ function NewAssetWizard({
                         <Field label="Make / manufacturer">
                             <Input
                                 value={form.data.make}
-                                onChange={(e) => form.setData('make', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('make', e.target.value)
+                                }
                                 placeholder="Apple"
                             />
                         </Field>
                         <Field label="Model">
                             <Input
                                 value={form.data.model}
-                                onChange={(e) => form.setData('model', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('model', e.target.value)
+                                }
                                 placeholder="M3 Pro"
                             />
                         </Field>
                         <Field label="Serial number">
                             <Input
                                 value={form.data.serial_number}
-                                onChange={(e) => form.setData('serial_number', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'serial_number',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="C02XR9…"
                                 className="font-mono"
                             />
@@ -455,7 +564,12 @@ function NewAssetWizard({
                             <Input
                                 type="date"
                                 value={form.data.purchase_date}
-                                onChange={(e) => form.setData('purchase_date', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'purchase_date',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                         <Field label="Purchase cost (NZD)">
@@ -464,14 +578,21 @@ function NewAssetWizard({
                                 min="0"
                                 step="0.01"
                                 value={form.data.purchase_cost}
-                                onChange={(e) => form.setData('purchase_cost', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'purchase_cost',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="3299"
                             />
                         </Field>
                         <Field label="Supplier">
                             <Input
                                 value={form.data.supplier}
-                                onChange={(e) => form.setData('supplier', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('supplier', e.target.value)
+                                }
                                 placeholder="Noel Leeming Business"
                             />
                         </Field>
@@ -479,16 +600,29 @@ function NewAssetWizard({
                             <Input
                                 type="date"
                                 value={form.data.warranty_expiry}
-                                onChange={(e) => form.setData('warranty_expiry', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'warranty_expiry',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                         <Field label="Depreciation">
                             <Segmented
                                 value={form.data.depreciation_method}
-                                onChange={(v) => form.setData('depreciation_method', v)}
+                                onChange={(v) =>
+                                    form.setData('depreciation_method', v)
+                                }
                                 options={[
-                                    { value: 'straight', label: 'Straight-line' },
-                                    { value: 'diminishing', label: 'Diminishing' },
+                                    {
+                                        value: 'straight',
+                                        label: 'Straight-line',
+                                    },
+                                    {
+                                        value: 'diminishing',
+                                        label: 'Diminishing',
+                                    },
                                 ]}
                             />
                         </Field>
@@ -498,7 +632,12 @@ function NewAssetWizard({
                                 min="0"
                                 max="50"
                                 value={form.data.useful_life_years}
-                                onChange={(e) => form.setData('useful_life_years', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'useful_life_years',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="4"
                             />
                         </Field>
@@ -514,7 +653,10 @@ function NewAssetWizard({
                         blurb="A QR label staff can scan to open this record and log a scan event."
                     />
                     <div className="flex flex-col items-start gap-4 rounded-xl border border-dashed border-border bg-muted/40 p-5 sm:flex-row sm:items-center">
-                        <GuardrailCard unstyled className="grid h-[120px] w-[120px] flex-none place-items-center rounded-xl border border-border bg-card">
+                        <GuardrailCard
+                            unstyled
+                            className="grid h-[120px] w-[120px] flex-none place-items-center rounded-xl border border-border bg-card"
+                        >
                             {isEdit && asset?.qr_token ? (
                                 <img
                                     src={`/hr/assets/${asset.id}/qr.svg`}
@@ -527,11 +669,13 @@ function NewAssetWizard({
                         </GuardrailCard>
                         <div className="min-w-0">
                             <div className="text-sm font-bold">
-                                {isEdit ? 'QR token ready' : 'QR token generated on save'}
+                                {isEdit
+                                    ? 'QR token ready'
+                                    : 'QR token generated on save'}
                             </div>
                             <div className="mt-1 text-[13px] text-muted-foreground">
-                                Scanning opens the asset detail and logs a scan event for the
-                                audit trail.
+                                Scanning opens the asset detail and logs a scan
+                                event for the audit trail.
                             </div>
                             {isEdit ? (
                                 <Button
@@ -539,7 +683,10 @@ function NewAssetWizard({
                                     size="sm"
                                     className="mt-3"
                                     onClick={() =>
-                                        window.open(`/hr/assets/${asset!.id}/qr.svg`, '_blank')
+                                        window.open(
+                                            `/hr/assets/${asset!.id}/qr.svg`,
+                                            '_blank',
+                                        )
                                     }
                                 >
                                     <QrCode className="h-4 w-4" /> Print label
@@ -560,10 +707,14 @@ function NewAssetWizard({
                     <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 p-4">
                         <FileText className="mt-0.5 h-5 w-5 flex-none text-primary" />
                         <div className="text-[13px] text-muted-foreground">
-                            Once the asset is {isEdit ? 'saved' : 'created'} you can attach the
-                            receipt, warranty PDF and photos from its{' '}
-                            <strong className="text-foreground">Documents</strong> library on the
-                            asset detail page — each upload is stored privately and audit-logged.
+                            Once the asset is {isEdit ? 'saved' : 'created'} you
+                            can attach the receipt, warranty PDF and photos from
+                            its{' '}
+                            <strong className="text-foreground">
+                                Documents
+                            </strong>{' '}
+                            library on the asset detail page — each upload is
+                            stored privately and audit-logged.
                         </div>
                     </div>
                     <div className="mt-3.5">
@@ -571,7 +722,9 @@ function NewAssetWizard({
                             <Textarea
                                 rows={3}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Charger and case included, asset kept at Auckland Central…"
                             />
                         </Field>
@@ -587,21 +740,45 @@ function NewAssetWizard({
                         blurb="Check the details, then confirm below."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={Hash} title="Identity" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Tag" value={form.data.asset_tag} />
+                        <ReviewCard
+                            icon={Hash}
+                            title="Identity"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Tag"
+                                value={form.data.asset_tag}
+                            />
                             <ReviewRow label="Name" value={form.data.name} />
-                            <ReviewRow label="Type" value={categoryLabel(form.data.category)} />
+                            <ReviewRow
+                                label="Type"
+                                value={categoryLabel(form.data.category)}
+                            />
                             {fleetLinked ? (
                                 <ReviewRow label="Fleet-linked" value="Yes" />
                             ) : null}
                         </ReviewCard>
-                        <ReviewCard icon={Boxes} title="Specifications" onEdit={() => wizard.goTo(1)}>
+                        <ReviewCard
+                            icon={Boxes}
+                            title="Specifications"
+                            onEdit={() => wizard.goTo(1)}
+                        >
                             <ReviewRow
                                 label="Make / model"
-                                value={[form.data.make, form.data.model].filter(Boolean).join(' ') || undefined}
+                                value={
+                                    [form.data.make, form.data.model]
+                                        .filter(Boolean)
+                                        .join(' ') || undefined
+                                }
                             />
-                            <ReviewRow label="Serial" value={form.data.serial_number || undefined} />
-                            <ReviewRow label="Condition" value={form.data.condition} />
+                            <ReviewRow
+                                label="Serial"
+                                value={form.data.serial_number || undefined}
+                            />
+                            <ReviewRow
+                                label="Condition"
+                                value={form.data.condition}
+                            />
                         </ReviewCard>
                         <ReviewCard
                             icon={FileText}
@@ -611,12 +788,23 @@ function NewAssetWizard({
                         >
                             <ReviewRow
                                 label="Cost"
-                                value={form.data.purchase_cost ? nzd(Number(form.data.purchase_cost)) : undefined}
+                                value={
+                                    form.data.purchase_cost
+                                        ? nzd(Number(form.data.purchase_cost))
+                                        : undefined
+                                }
                             />
-                            <ReviewRow label="Supplier" value={form.data.supplier || undefined} />
+                            <ReviewRow
+                                label="Supplier"
+                                value={form.data.supplier || undefined}
+                            />
                             <ReviewRow
                                 label="Warranty"
-                                value={form.data.warranty_expiry ? fdate(form.data.warranty_expiry) : undefined}
+                                value={
+                                    form.data.warranty_expiry
+                                        ? fdate(form.data.warranty_expiry)
+                                        : undefined
+                                }
                             />
                         </ReviewCard>
                     </div>
@@ -645,29 +833,54 @@ function FleetLinkPanel({
         <div
             className="mt-4 rounded-xl border p-4"
             style={{
-                borderColor: 'color-mix(in oklch, var(--category-fleet) 35%, transparent)',
-                background: 'color-mix(in oklch, var(--category-fleet) 8%, transparent)',
+                borderColor:
+                    'color-mix(in oklch, var(--category-fleet) 35%, transparent)',
+                background:
+                    'color-mix(in oklch, var(--category-fleet) 8%, transparent)',
             }}
         >
             <div className="flex items-start gap-2.5">
-                <Truck className="mt-0.5 h-5 w-5 flex-none" style={{ color: 'var(--category-fleet)' }} />
+                <Truck
+                    className="mt-0.5 h-5 w-5 flex-none"
+                    style={{ color: 'var(--category-fleet)' }}
+                />
                 <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-bold">This type is owned by Fleet &amp; Assets</div>
+                    <div className="text-[13px] font-bold">
+                        This type is owned by Fleet &amp; Assets
+                    </div>
                     <div className="mt-0.5 text-[12.5px] text-muted-foreground">
-                        To avoid duplicates, vehicles and keys link to the canonical Fleet register
-                        rather than being re-typed here.
+                        To avoid duplicates, vehicles and keys link to the
+                        canonical Fleet register rather than being re-typed
+                        here.
                     </div>
 
                     {picked ? (
-                        <GuardrailCard unstyled className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-card p-2.5">
-                            <Truck className="h-4 w-4 flex-none" style={{ color: 'var(--category-fleet)' }} />
+                        <GuardrailCard
+                            unstyled
+                            className="mt-3 flex items-center gap-3 rounded-lg border border-border bg-card p-2.5"
+                        >
+                            <Truck
+                                className="h-4 w-4 flex-none"
+                                style={{ color: 'var(--category-fleet)' }}
+                            />
                             <div className="min-w-0 flex-1">
-                                <div className="truncate text-[13px] font-semibold">{picked.name}</div>
+                                <div className="truncate text-[13px] font-semibold">
+                                    {picked.name}
+                                </div>
                                 <div className="truncate font-mono text-[11px] text-muted-foreground">
-                                    {[picked.asset_tag, picked.registration_number].filter(Boolean).join(' · ')}
+                                    {[
+                                        picked.asset_tag,
+                                        picked.registration_number,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
                                 </div>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={onUnlink}>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={onUnlink}
+                            >
                                 Change
                             </Button>
                         </GuardrailCard>
@@ -685,11 +898,14 @@ function FleetLinkPanel({
                             <div className="mt-2 flex max-h-44 flex-col gap-1 overflow-y-auto">
                                 {results.length === 0 ? (
                                     <div className="px-1 py-3 text-center text-[12.5px] text-muted-foreground">
-                                        {query ? 'No matching Fleet asset.' : 'Start typing to search the Fleet register.'}
+                                        {query
+                                            ? 'No matching Fleet asset.'
+                                            : 'Start typing to search the Fleet register.'}
                                     </div>
                                 ) : (
                                     results.map((m) => (
-                                        <Button unstyled
+                                        <Button
+                                            unstyled
                                             key={m.id}
                                             type="button"
                                             onClick={() => onPick(m)}
@@ -697,12 +913,21 @@ function FleetLinkPanel({
                                         >
                                             <Truck className="h-4 w-4 flex-none text-muted-foreground" />
                                             <div className="min-w-0 flex-1">
-                                                <div className="truncate text-[13px] font-semibold">{m.name}</div>
+                                                <div className="truncate text-[13px] font-semibold">
+                                                    {m.name}
+                                                </div>
                                                 <div className="truncate font-mono text-[11px] text-muted-foreground">
-                                                    {[m.asset_tag, m.registration_number].filter(Boolean).join(' · ')}
+                                                    {[
+                                                        m.asset_tag,
+                                                        m.registration_number,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(' · ')}
                                                 </div>
                                             </div>
-                                            <span className="text-[11px] text-muted-foreground capitalize">{m.status}</span>
+                                            <span className="text-[11px] text-muted-foreground capitalize">
+                                                {m.status}
+                                            </span>
                                         </Button>
                                     ))
                                 )}
@@ -721,9 +946,24 @@ function FleetLinkPanel({
 
 const ASSIGN_STEPS: readonly WizardStep[] = [
     { key: 'who', label: 'Employee', blurb: 'Who receives it', icon: User },
-    { key: 'cond', label: 'Condition & dates', blurb: 'State out + return-by', icon: Boxes },
-    { key: 'ack', label: 'Acknowledgement', blurb: 'Handover sign-off', icon: Shield },
-    { key: 'review', label: 'Review', blurb: 'Confirm & assign', icon: CheckCircle2 },
+    {
+        key: 'cond',
+        label: 'Condition & dates',
+        blurb: 'State out + return-by',
+        icon: Boxes,
+    },
+    {
+        key: 'ack',
+        label: 'Acknowledgement',
+        blurb: 'Handover sign-off',
+        icon: Shield,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & assign',
+        icon: CheckCircle2,
+    },
 ];
 
 function AssignWizard({
@@ -752,11 +992,15 @@ function AssignWizard({
         const q = search.trim().toLowerCase();
         if (!q) return staff;
         return staff.filter((s) =>
-            `${s.name} ${s.role ?? ''} ${s.site ?? ''}`.toLowerCase().includes(q),
+            `${s.name} ${s.role ?? ''} ${s.site ?? ''}`
+                .toLowerCase()
+                .includes(q),
         );
     }, [search, staff]);
 
-    const picked = staff.find((s) => String(s.id) === form.data.employee_profile_id) ?? null;
+    const picked =
+        staff.find((s) => String(s.id) === form.data.employee_profile_id) ??
+        null;
 
     const submit = () => {
         form.post(`/hr/assets/${asset.id}/assign`, {
@@ -792,7 +1036,8 @@ function AssignWizard({
                         title="Asset assigned"
                         blurb={
                             <>
-                                “{asset.name}” is now with {picked?.name ?? 'the employee'}.
+                                “{asset.name}” is now with{' '}
+                                {picked?.name ?? 'the employee'}.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -812,11 +1057,17 @@ function AssignWizard({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !picked}>
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !picked}
+                        >
                             {form.processing ? 'Assigning…' : 'Assign'}
                         </Button>
                     ) : (
-                        <Button onClick={wizard.next} disabled={wizard.index === 0 && !picked}>
+                        <Button
+                            onClick={wizard.next}
+                            disabled={wizard.index === 0 && !picked}
+                        >
                             Continue
                         </Button>
                     )}
@@ -841,24 +1092,37 @@ function AssignWizard({
                     </div>
                     <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
                         {filtered.map((s) => {
-                            const active = String(s.id) === form.data.employee_profile_id;
+                            const active =
+                                String(s.id) === form.data.employee_profile_id;
                             return (
-                                <Button unstyled
+                                <Button
+                                    unstyled
                                     key={s.id}
                                     type="button"
-                                    onClick={() => form.setData('employee_profile_id', String(s.id))}
+                                    onClick={() =>
+                                        form.setData(
+                                            'employee_profile_id',
+                                            String(s.id),
+                                        )
+                                    }
                                     className={`flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left transition-colors ${active ? 'border-primary bg-primary/[0.06]' : 'border-border hover:border-primary/50'}`}
                                 >
                                     <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-primary/12 text-[12.5px] font-bold text-primary">
                                         {initials(s.name)}
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <div className="text-[13.5px] font-bold">{s.name}</div>
+                                        <div className="text-[13.5px] font-bold">
+                                            {s.name}
+                                        </div>
                                         <div className="text-[11.5px] text-muted-foreground">
-                                            {[s.role, s.site].filter(Boolean).join(' · ') || '—'}
+                                            {[s.role, s.site]
+                                                .filter(Boolean)
+                                                .join(' · ') || '—'}
                                         </div>
                                     </div>
-                                    {active ? <CheckCircle2 className="h-5 w-5 text-primary" /> : null}
+                                    {active ? (
+                                        <CheckCircle2 className="h-5 w-5 text-primary" />
+                                    ) : null}
                                 </Button>
                             );
                         })}
@@ -883,14 +1147,18 @@ function AssignWizard({
                             <Input
                                 type="date"
                                 value={form.data.assigned_at}
-                                onChange={(e) => form.setData('assigned_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('assigned_at', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Return-by date" hint="optional">
                             <Input
                                 type="date"
                                 value={form.data.due_at}
-                                onChange={(e) => form.setData('due_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('due_at', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
@@ -898,7 +1166,9 @@ function AssignWizard({
                         <Field label="Condition on assign">
                             <Segmented
                                 value={form.data.condition_on_assign}
-                                onChange={(v) => form.setData('condition_on_assign', v)}
+                                onChange={(v) =>
+                                    form.setData('condition_on_assign', v)
+                                }
                                 options={COND_OPTS}
                             />
                         </Field>
@@ -908,7 +1178,9 @@ function AssignWizard({
                             <Textarea
                                 rows={3}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Charger and case included…"
                             />
                         </Field>
@@ -927,17 +1199,21 @@ function AssignWizard({
                         <input
                             type="checkbox"
                             checked={form.data.acknowledged}
-                            onChange={(e) => form.setData('acknowledged', e.target.checked)}
+                            onChange={(e) =>
+                                form.setData('acknowledged', e.target.checked)
+                            }
                             className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
                         />
                         <span>
                             <span className="block text-[13px] font-semibold">
-                                {picked?.name ?? 'The employee'} acknowledged receipt
+                                {picked?.name ?? 'The employee'} acknowledged
+                                receipt
                             </span>
                             <span className="block text-[12.5px] text-muted-foreground">
-                                Records the handover acknowledgement timestamp against this
-                                assignment. Leave unchecked to assign now and collect the
-                                acknowledgement later.
+                                Records the handover acknowledgement timestamp
+                                against this assignment. Leave unchecked to
+                                assign now and collect the acknowledgement
+                                later.
                             </span>
                         </span>
                     </label>
@@ -952,17 +1228,53 @@ function AssignWizard({
                         blurb="Check the details, then assign."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={User} title="Employee" onEdit={() => wizard.goTo(0)}>
+                        <ReviewCard
+                            icon={User}
+                            title="Employee"
+                            onEdit={() => wizard.goTo(0)}
+                        >
                             <ReviewRow label="Assignee" value={picked?.name} />
-                            <ReviewRow label="Asset" value={`${asset.name} · ${asset.tag}`} />
+                            <ReviewRow
+                                label="Asset"
+                                value={`${asset.name} · ${asset.tag}`}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Boxes} title="Condition & dates" onEdit={() => wizard.goTo(1)}>
-                            <ReviewRow label="Assigned" value={fdate(form.data.assigned_at)} />
-                            <ReviewRow label="Return by" value={form.data.due_at ? fdate(form.data.due_at) : undefined} />
-                            <ReviewRow label="Condition" value={form.data.condition_on_assign} />
+                        <ReviewCard
+                            icon={Boxes}
+                            title="Condition & dates"
+                            onEdit={() => wizard.goTo(1)}
+                        >
+                            <ReviewRow
+                                label="Assigned"
+                                value={fdate(form.data.assigned_at)}
+                            />
+                            <ReviewRow
+                                label="Return by"
+                                value={
+                                    form.data.due_at
+                                        ? fdate(form.data.due_at)
+                                        : undefined
+                                }
+                            />
+                            <ReviewRow
+                                label="Condition"
+                                value={form.data.condition_on_assign}
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={Shield} title="Acknowledgement" onEdit={() => wizard.goTo(2)} span>
-                            <ReviewRow label="Status" value={form.data.acknowledged ? 'Acknowledged' : 'Pending'} />
+                        <ReviewCard
+                            icon={Shield}
+                            title="Acknowledgement"
+                            onEdit={() => wizard.goTo(2)}
+                            span
+                        >
+                            <ReviewRow
+                                label="Status"
+                                value={
+                                    form.data.acknowledged
+                                        ? 'Acknowledged'
+                                        : 'Pending'
+                                }
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>
@@ -976,8 +1288,18 @@ function AssignWizard({
 /* ================================================================== */
 
 const RETURN_STEPS: readonly WizardStep[] = [
-    { key: 'when', label: 'Return', blurb: 'Date & condition', icon: RotateCcw },
-    { key: 'review', label: 'Review', blurb: 'Confirm & return', icon: CheckCircle2 },
+    {
+        key: 'when',
+        label: 'Return',
+        blurb: 'Date & condition',
+        icon: RotateCcw,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & return',
+        icon: CheckCircle2,
+    },
 ];
 
 function ReturnWizard({
@@ -1032,7 +1354,10 @@ function ReturnWizard({
                         blurb={
                             <>
                                 “{asset.name}” is back and marked{' '}
-                                {form.data.damaged ? 'for maintenance' : 'available'}.
+                                {form.data.damaged
+                                    ? 'for maintenance'
+                                    : 'available'}
+                                .
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -1073,13 +1398,17 @@ function ReturnWizard({
                             <Input
                                 type="date"
                                 value={form.data.returned_at}
-                                onChange={(e) => form.setData('returned_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('returned_at', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Condition on return">
                             <Segmented
                                 value={form.data.condition_on_return}
-                                onChange={(v) => form.setData('condition_on_return', v)}
+                                onChange={(v) =>
+                                    form.setData('condition_on_return', v)
+                                }
                                 options={COND_OPTS}
                             />
                         </Field>
@@ -1089,7 +1418,9 @@ function ReturnWizard({
                             <Textarea
                                 rows={3}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Returned with charger, minor scuffs…"
                             />
                         </Field>
@@ -1098,14 +1429,18 @@ function ReturnWizard({
                         <input
                             type="checkbox"
                             checked={form.data.damaged}
-                            onChange={(e) => form.setData('damaged', e.target.checked)}
+                            onChange={(e) =>
+                                form.setData('damaged', e.target.checked)
+                            }
                             className="mt-0.5 h-4 w-4 accent-[var(--status-critical)]"
                         />
                         <span>
-                            <span className="block text-[13px] font-semibold">Damaged or lost</span>
+                            <span className="block text-[13px] font-semibold">
+                                Damaged or lost
+                            </span>
                             <span className="block text-[12.5px] text-muted-foreground">
-                                Parks the asset in maintenance on return so you can log a repair or
-                                retire it as lost/damaged.
+                                Parks the asset in maintenance on return so you
+                                can log a repair or retire it as lost/damaged.
                             </span>
                         </span>
                     </label>
@@ -1119,12 +1454,34 @@ function ReturnWizard({
                         title="Confirm the return"
                         blurb="Check the details, then confirm."
                     />
-                    <ReviewCard icon={RotateCcw} title="Return" onEdit={() => wizard.goTo(0)} span>
-                        <ReviewRow label="Asset" value={`${asset.name} · ${asset.tag}`} />
-                        <ReviewRow label="From" value={asset.assignee ?? undefined} />
-                        <ReviewRow label="Date" value={fdate(form.data.returned_at)} />
-                        <ReviewRow label="Condition" value={form.data.condition_on_return} />
-                        <ReviewRow label="Flag" value={form.data.damaged ? 'Damaged / lost' : 'None'} />
+                    <ReviewCard
+                        icon={RotateCcw}
+                        title="Return"
+                        onEdit={() => wizard.goTo(0)}
+                        span
+                    >
+                        <ReviewRow
+                            label="Asset"
+                            value={`${asset.name} · ${asset.tag}`}
+                        />
+                        <ReviewRow
+                            label="From"
+                            value={asset.assignee ?? undefined}
+                        />
+                        <ReviewRow
+                            label="Date"
+                            value={fdate(form.data.returned_at)}
+                        />
+                        <ReviewRow
+                            label="Condition"
+                            value={form.data.condition_on_return}
+                        />
+                        <ReviewRow
+                            label="Flag"
+                            value={
+                                form.data.damaged ? 'Damaged / lost' : 'None'
+                            }
+                        />
                     </ReviewCard>
                 </WizardStepPane>
             )}
@@ -1137,11 +1494,27 @@ function ReturnWizard({
 /* ================================================================== */
 
 const MAINT_STEPS: readonly WizardStep[] = [
-    { key: 'job', label: 'Repair job', blurb: 'Vendor, cost, dates', icon: Wrench },
-    { key: 'review', label: 'Review', blurb: 'Confirm & log', icon: CheckCircle2 },
+    {
+        key: 'job',
+        label: 'Repair job',
+        blurb: 'Vendor, cost, dates',
+        icon: Wrench,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & log',
+        icon: CheckCircle2,
+    },
 ];
 
-function MaintenanceWizard({ asset, onClose }: { asset: AssetRef; onClose: () => void }) {
+function MaintenanceWizard({
+    asset,
+    onClose,
+}: {
+    asset: AssetRef;
+    onClose: () => void;
+}) {
     const wizard = useWizard(MAINT_STEPS.length);
     const [done, setDone] = useState(false);
     const form = useForm({
@@ -1234,7 +1607,9 @@ function MaintenanceWizard({ asset, onClose }: { asset: AssetRef; onClose: () =>
                         <Field label="Vendor">
                             <Input
                                 value={form.data.vendor}
-                                onChange={(e) => form.setData('vendor', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('vendor', e.target.value)
+                                }
                                 placeholder="iFix Repairs"
                             />
                         </Field>
@@ -1244,7 +1619,9 @@ function MaintenanceWizard({ asset, onClose }: { asset: AssetRef; onClose: () =>
                                 min="0"
                                 step="0.01"
                                 value={form.data.cost}
-                                onChange={(e) => form.setData('cost', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('cost', e.target.value)
+                                }
                                 placeholder="240"
                             />
                         </Field>
@@ -1252,21 +1629,30 @@ function MaintenanceWizard({ asset, onClose }: { asset: AssetRef; onClose: () =>
                             <Input
                                 type="date"
                                 value={form.data.sent_at}
-                                onChange={(e) => form.setData('sent_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('sent_at', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Expected back">
                             <Input
                                 type="date"
                                 value={form.data.expected_back_at}
-                                onChange={(e) => form.setData('expected_back_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'expected_back_at',
+                                        e.target.value,
+                                    )
+                                }
                             />
                         </Field>
                         <Field label="Next service due">
                             <Input
                                 type="date"
                                 value={form.data.next_due_at}
-                                onChange={(e) => form.setData('next_due_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('next_due_at', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
@@ -1275,7 +1661,9 @@ function MaintenanceWizard({ asset, onClose }: { asset: AssetRef; onClose: () =>
                             <Textarea
                                 rows={3}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Screen replacement, battery health 78%…"
                             />
                         </Field>
@@ -1290,14 +1678,36 @@ function MaintenanceWizard({ asset, onClose }: { asset: AssetRef; onClose: () =>
                         title="Confirm the job"
                         blurb="Check the details, then log."
                     />
-                    <ReviewCard icon={Wrench} title="Repair job" onEdit={() => wizard.goTo(0)} span>
-                        <ReviewRow label="Asset" value={`${asset.name} · ${asset.tag}`} />
+                    <ReviewCard
+                        icon={Wrench}
+                        title="Repair job"
+                        onEdit={() => wizard.goTo(0)}
+                        span
+                    >
+                        <ReviewRow
+                            label="Asset"
+                            value={`${asset.name} · ${asset.tag}`}
+                        />
                         <ReviewRow label="Type" value={form.data.type} />
-                        <ReviewRow label="Vendor" value={form.data.vendor || undefined} />
-                        <ReviewRow label="Cost" value={form.data.cost ? nzd(Number(form.data.cost)) : undefined} />
+                        <ReviewRow
+                            label="Vendor"
+                            value={form.data.vendor || undefined}
+                        />
+                        <ReviewRow
+                            label="Cost"
+                            value={
+                                form.data.cost
+                                    ? nzd(Number(form.data.cost))
+                                    : undefined
+                            }
+                        />
                         <ReviewRow
                             label="Expected back"
-                            value={form.data.expected_back_at ? fdate(form.data.expected_back_at) : undefined}
+                            value={
+                                form.data.expected_back_at
+                                    ? fdate(form.data.expected_back_at)
+                                    : undefined
+                            }
                         />
                     </ReviewCard>
                 </WizardStepPane>
@@ -1311,10 +1721,21 @@ function MaintenanceWizard({ asset, onClose }: { asset: AssetRef; onClose: () =>
 /* ================================================================== */
 
 const RFS_STEPS: readonly WizardStep[] = [
-    { key: 'out', label: 'Return to service', blurb: 'Outcome & cost', icon: CheckCircle2 },
+    {
+        key: 'out',
+        label: 'Return to service',
+        blurb: 'Outcome & cost',
+        icon: CheckCircle2,
+    },
 ];
 
-function ReturnToServiceWizard({ asset, onClose }: { asset: AssetRef; onClose: () => void }) {
+function ReturnToServiceWizard({
+    asset,
+    onClose,
+}: {
+    asset: AssetRef;
+    onClose: () => void;
+}) {
     const wizard = useWizard(RFS_STEPS.length);
     const [done, setDone] = useState(false);
     const form = useForm({
@@ -1395,7 +1816,9 @@ function ReturnToServiceWizard({ asset, onClose }: { asset: AssetRef; onClose: (
                             min="0"
                             step="0.01"
                             value={form.data.cost}
-                            onChange={(e) => form.setData('cost', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('cost', e.target.value)
+                            }
                             placeholder="240"
                         />
                     </Field>
@@ -1410,15 +1833,17 @@ function ReturnToServiceWizard({ asset, onClose }: { asset: AssetRef; onClose: (
                         <Input
                             type="date"
                             value={form.data.next_due_at}
-                            onChange={(e) => form.setData('next_due_at', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('next_due_at', e.target.value)
+                            }
                         />
                     </Field>
                 </div>
                 <div className="mt-4 flex items-start gap-3 rounded-xl border border-status-success/35 bg-status-success-bg p-4">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 flex-none text-status-success" />
                     <div className="text-[12.5px]">
-                        Status returns to <strong>Available</strong> and the maintenance log is
-                        closed.
+                        Status returns to <strong>Available</strong> and the
+                        maintenance log is closed.
                     </div>
                 </div>
             </WizardStepPane>
@@ -1431,11 +1856,22 @@ function ReturnToServiceWizard({ asset, onClose }: { asset: AssetRef; onClose: (
 /* ================================================================== */
 
 const RETIRE_STEPS: readonly WizardStep[] = [
-    { key: 'why', label: 'Retire / dispose', blurb: 'Reason & evidence', icon: Trash2 },
+    {
+        key: 'why',
+        label: 'Retire / dispose',
+        blurb: 'Reason & evidence',
+        icon: Trash2,
+    },
     { key: 'review', label: 'Review', blurb: 'Confirm', icon: CheckCircle2 },
 ];
 
-function RetireWizard({ asset, onClose }: { asset: AssetRef; onClose: () => void }) {
+function RetireWizard({
+    asset,
+    onClose,
+}: {
+    asset: AssetRef;
+    onClose: () => void;
+}) {
     const wizard = useWizard(RETIRE_STEPS.length);
     const [done, setDone] = useState(false);
     const form = useForm({
@@ -1494,7 +1930,11 @@ function RetireWizard({ asset, onClose }: { asset: AssetRef; onClose: () => void
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button variant="destructive" onClick={submit} disabled={form.processing}>
+                        <Button
+                            variant="destructive"
+                            onClick={submit}
+                            disabled={form.processing}
+                        >
                             {form.processing ? 'Retiring…' : 'Retire'}
                         </Button>
                     ) : (
@@ -1529,7 +1969,9 @@ function RetireWizard({ asset, onClose }: { asset: AssetRef; onClose: () => void
                             <Input
                                 type="date"
                                 value={form.data.disposed_at}
-                                onChange={(e) => form.setData('disposed_at', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('disposed_at', e.target.value)
+                                }
                             />
                         </Field>
                         <Field label="Disposal value (NZD)">
@@ -1538,7 +1980,12 @@ function RetireWizard({ asset, onClose }: { asset: AssetRef; onClose: () => void
                                 min="0"
                                 step="0.01"
                                 value={form.data.disposal_value}
-                                onChange={(e) => form.setData('disposal_value', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'disposal_value',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="0"
                             />
                         </Field>
@@ -1548,7 +1995,9 @@ function RetireWizard({ asset, onClose }: { asset: AssetRef; onClose: () => void
                             <Textarea
                                 rows={3}
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Approved by site manager…"
                             />
                         </Field>
@@ -1563,13 +2012,31 @@ function RetireWizard({ asset, onClose }: { asset: AssetRef; onClose: () => void
                         title="Confirm retirement"
                         blurb="Check the details, then confirm."
                     />
-                    <ReviewCard icon={Trash2} title="Retire / dispose" onEdit={() => wizard.goTo(0)} span>
-                        <ReviewRow label="Asset" value={`${asset.name} · ${asset.tag}`} />
-                        <ReviewRow label="Reason" value={form.data.disposal_reason} />
-                        <ReviewRow label="Date" value={fdate(form.data.disposed_at)} />
+                    <ReviewCard
+                        icon={Trash2}
+                        title="Retire / dispose"
+                        onEdit={() => wizard.goTo(0)}
+                        span
+                    >
+                        <ReviewRow
+                            label="Asset"
+                            value={`${asset.name} · ${asset.tag}`}
+                        />
+                        <ReviewRow
+                            label="Reason"
+                            value={form.data.disposal_reason}
+                        />
+                        <ReviewRow
+                            label="Date"
+                            value={fdate(form.data.disposed_at)}
+                        />
                         <ReviewRow
                             label="Disposal value"
-                            value={form.data.disposal_value ? nzd(Number(form.data.disposal_value)) : undefined}
+                            value={
+                                form.data.disposal_value
+                                    ? nzd(Number(form.data.disposal_value))
+                                    : undefined
+                            }
                         />
                     </ReviewCard>
                 </WizardStepPane>

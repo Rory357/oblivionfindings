@@ -334,7 +334,6 @@ class HsLinkedOperationalEvidenceTest extends TestCase
     {
         $user = User::factory()->create([
             'approved_at' => now(),
-            'organization_id' => $site->tenant_id,
         ]);
         $permissionIds = Permission::query()->whereIn('key', $permissionKeys)->pluck('id');
         $user->permissionOverrides()->sync($permissionIds->mapWithKeys(

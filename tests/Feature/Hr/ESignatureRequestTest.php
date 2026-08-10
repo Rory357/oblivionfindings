@@ -5,6 +5,7 @@ use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\SignatureOutcomeNotification;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -15,24 +16,36 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
+    $this->site = Site::factory()->create([
+        'name' => 'E-signature Site',
+    ]);
+
     // hr.documents.manage (request perm accepts it) is granted to provider_manager.
     $this->manager = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'provider_manager',
         'approved_at' => now(),
     ]);
     $this->manager->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'provider_manager')->first()->id,
     ]);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $this->manager->id,
+        'employee_number' => 'EMP-MANAGER-'.$this->manager->id,
+        'work_email' => $this->manager->email,
+        'position_title' => 'Manager',
+        'position_role' => 'provider_manager',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
+    ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
 
     $this->profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'employee_number' => 'EMP-'.$this->worker->id,
         'work_email' => $this->worker->email,
@@ -41,10 +54,10 @@ beforeEach(function () {
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     $this->document = HrDocument::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $this->profile->id,
         'title' => 'Code of Conduct',
         'category' => 'policy',
@@ -97,7 +110,6 @@ test('the signer can download the document they were asked to sign', function ()
     Storage::disk('local')->put('hr/documents/code.pdf', 'PDF BYTES');
 
     $signature = HrDocumentSignature::query()->create([
-        'tenant_id' => 1,
         'document_id' => $this->document->id,
         'signer_user_id' => $this->worker->id,
         'status' => 'pending',
@@ -110,26 +122,35 @@ test('the signer can download the document they were asked to sign', function ()
         ->assertOk();
 
     // A different (non-signer) user cannot download it.
-    $other = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $other = User::factory()->create(['approved_at' => now()]);
     $this->actingAs($other)
         ->get("/hr/signatures/{$signature->id}/document")
-        ->assertForbidden();
+        ->assertNotFound();
 });
 
-test('signing notifies the same tenant requester exactly once', function () {
+test('signing notifies the accessible current requester exactly once', function () {
     Notification::fake();
 
     $signature = HrDocumentSignature::query()->create([
-        'tenant_id' => 1,
         'document_id' => $this->document->id,
         'signer_user_id' => $this->worker->id,
         'status' => 'pending',
         'requested_by' => $this->manager->id,
         'requested_at' => now(),
     ]);
-    $otherSigner = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $otherSigner = User::factory()->create(['approved_at' => now()]);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $otherSigner->id,
+        'employee_number' => 'EMP-COSIGNER-'.$otherSigner->id,
+        'work_email' => $otherSigner->email,
+        'position_title' => 'Co-signer',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
+    ]);
     HrDocumentSignature::query()->create([
-        'tenant_id' => 1,
         'document_id' => $this->document->id,
         'signer_user_id' => $otherSigner->id,
         'status' => 'pending',
@@ -146,11 +167,10 @@ test('signing notifies the same tenant requester exactly once', function () {
     Notification::assertSentToTimes($this->manager, SignatureOutcomeNotification::class, 1);
 });
 
-test('declining notifies the same tenant requester once and a repeat transition notifies nobody again', function () {
+test('declining notifies the accessible current requester once and a repeat transition notifies nobody again', function () {
     Notification::fake();
 
     $signature = HrDocumentSignature::query()->create([
-        'tenant_id' => 1,
         'document_id' => $this->document->id,
         'signer_user_id' => $this->worker->id,
         'status' => 'pending',
@@ -172,7 +192,6 @@ test('a self requested signature outcome does not send a redundant notification'
     Notification::fake();
 
     $signature = HrDocumentSignature::query()->create([
-        'tenant_id' => 1,
         'document_id' => $this->document->id,
         'signer_user_id' => $this->worker->id,
         'status' => 'pending',

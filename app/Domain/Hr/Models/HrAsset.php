@@ -4,8 +4,8 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Asset;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\FleetIncident;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,10 +15,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrAsset extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
+
+    public const HR_OWNED_CATEGORIES = ['uniform', 'card', 'other'];
+
+    /** Technology rows retained only as history until they are reconciled to Device. */
+    public const LEGACY_TECHNOLOGY_CATEGORIES = ['laptop', 'phone', 'tablet'];
 
     protected $fillable = [
-        'tenant_id',
         'asset_tag',
         'name',
         'category',
@@ -51,7 +55,7 @@ class HrAsset extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function assignments(): HasMany
@@ -105,21 +109,29 @@ class HrAsset extends Model
         return $this->fleet_asset_id !== null;
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
-    /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
+    /** A pre-canonical technology row whose lifecycle now belongs to Security & Devices. */
+    public function isLegacyTechnology(): bool
     {
-        return $query->where('tenant_id', $tenantId);
+        return in_array($this->category, self::LEGACY_TECHNOLOGY_CATEGORIES, true);
     }
 
-    public function scopeAvailable(Builder $query): Builder
+    /** Whether HR remains the authoritative lifecycle owner for this record. */
+    public function isHrLifecycleOwned(): bool
+    {
+        return ! $this->isFleetLinked()
+            && in_array($this->category, self::HR_OWNED_CATEGORIES, true);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Scopes */
+    /* ------------------------------------------------------------------ */
+
+    public function scopeAvailable($query)
     {
         return $query->where('status', 'available');
     }
 
-    public function scopeAssigned(Builder $query): Builder
+    public function scopeAssigned($query)
     {
         return $query->where('status', 'assigned');
     }

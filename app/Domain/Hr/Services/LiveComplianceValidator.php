@@ -2,8 +2,8 @@
 
 namespace App\Domain\Hr\Services;
 
-use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
+use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\User;
@@ -23,6 +23,10 @@ use Illuminate\Support\Collection;
  */
 class LiveComplianceValidator
 {
+    public function __construct(
+        private ?ComplianceRequirementApplicabilityService $applicability = null,
+    ) {}
+
     /**
      * Validate all hard-stop requirements for a user against live source data.
      *
@@ -31,6 +35,27 @@ class LiveComplianceValidator
     public function validateHardStops(User $user): array
     {
         $requirements = $this->getHardStopRequirements($user);
+
+        if ($requirements->isEmpty()) {
+            return ['passed' => true, 'failures' => []];
+        }
+
+        // A manager-approved exemption is an explicit, audited override of a
+        // hard-stop. Apply it before live source checks so the shift decision
+        // matches the compliance worklist and the promise made by the waiver UI.
+        $exemptRequirementIds = HrStaffComplianceStatus::query()
+            ->where('user_id', $user->id)
+            ->whereIn('requirement_id', $requirements->pluck('id'))
+            ->whereNotNull('exemption_reason')
+            ->whereNotNull('exempted_at')
+            ->where(function ($query): void {
+                $query->whereNull('exempted_until')
+                    ->orWhere('exempted_until', '>', now());
+            })
+            ->pluck('requirement_id');
+        $requirements = $requirements
+            ->reject(fn (HrComplianceRequirement $requirement) => $exemptRequirementIds->contains($requirement->id))
+            ->values();
 
         if ($requirements->isEmpty()) {
             return ['passed' => true, 'failures' => []];
@@ -66,18 +91,12 @@ class LiveComplianceValidator
      */
     protected function getHardStopRequirements(User $user): Collection
     {
-        $roles = $user->roles->pluck('name')->toArray();
+        return $this->applicability()->forUser($user, true);
+    }
 
-        if (empty($roles)) {
-            return collect();
-        }
-
-        return HrComplianceRequirement::query()
-            ->when($user->tenant_id !== null, fn ($q) => $q->where('tenant_id', $user->tenant_id))
-            ->where('is_active', true)
-            ->where('hard_stop', true)
-            ->whereHas('matrixEntries', fn ($q) => $q->whereIn('role', $roles))
-            ->get();
+    private function applicability(): ComplianceRequirementApplicabilityService
+    {
+        return $this->applicability ??= app(ComplianceRequirementApplicabilityService::class);
     }
 
     /**
@@ -89,7 +108,7 @@ class LiveComplianceValidator
 
         // Resolve canonical HrCourse ids for these requirements in one query
         // (requirement id → hr_course_id) via the HrCourse back-link.
-        $hrCourseByReq = \App\Domain\Hr\Models\HrCourse::query()
+        $hrCourseByReq = HrCourse::query()
             ->whereIn('compliance_requirement_id', $requirements->pluck('id')->all() ?: [0])
             ->pluck('id', 'compliance_requirement_id');
         $hrCourseIds = $hrCourseByReq->values()->all();
@@ -121,6 +140,7 @@ class LiveComplianceValidator
 
             if (! $record) {
                 $failures[] = $this->failure($req, "{$req->name} training is missing or not completed.");
+
                 continue;
             }
 
@@ -156,6 +176,7 @@ class LiveComplianceValidator
 
             if (! $credential) {
                 $failures[] = $this->failure($req, "{$req->name} credential is missing.");
+
                 continue;
             }
 
@@ -185,6 +206,7 @@ class LiveComplianceValidator
         foreach ($requirements as $req) {
             if (! $check) {
                 $failures[] = $this->failure($req, "{$req->name} is missing or not cleared.");
+
                 continue;
             }
 
@@ -223,6 +245,7 @@ class LiveComplianceValidator
 
             if (! $attestation) {
                 $failures[] = $this->failure($req, "{$req->name} policy attestation is missing or outdated.");
+
                 continue;
             }
 
@@ -252,11 +275,13 @@ class LiveComplianceValidator
         foreach ($requirements as $req) {
             if (! $record) {
                 $failures[] = $this->failure($req, "{$req->name}: no driver eligibility record.");
+
                 continue;
             }
 
             if ($record->status === 'suspended') {
                 $failures[] = $this->failure($req, "{$req->name}: driving privileges suspended.");
+
                 continue;
             }
 
@@ -277,7 +302,6 @@ class LiveComplianceValidator
     {
         $statuses = HrStaffComplianceStatus::where('user_id', $user->id)
             ->whereIn('requirement_id', $requirements->pluck('id'))
-            ->where('evidence_type', 'manual')
             ->get()
             ->keyBy('requirement_id');
 
@@ -286,8 +310,31 @@ class LiveComplianceValidator
         foreach ($requirements as $req) {
             $status = $statuses->get($req->id);
 
-            if (! $status || $status->status !== 'compliant') {
+            if (! $status
+                || ! in_array($status->status, ['compliant', 'expiring_soon'], true)
+                || ($status->evidence_type !== 'manual' && blank($status->exemption_reason))
+            ) {
                 $failures[] = $this->failure($req, "{$req->name} has not been manually verified.");
+
+                continue;
+            }
+
+            if ($status->exempted_until?->isPast()) {
+                $failures[] = $this->failure(
+                    $req,
+                    "{$req->name} exemption expired on {$status->exempted_until->format('j M Y')}.",
+                    $status->exempted_until,
+                );
+
+                continue;
+            }
+
+            if ($status->expires_at?->isPast()) {
+                $failures[] = $this->failure(
+                    $req,
+                    "{$req->name} expired on {$status->expires_at->format('j M Y')}.",
+                    $status->expires_at,
+                );
             }
         }
 

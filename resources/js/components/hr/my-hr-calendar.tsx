@@ -39,12 +39,23 @@ import type { MyHrCalendarEvent, MyHrCalendarFeed } from './my-hr-types';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS_SHORT = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
 ];
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const isoOf = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
+const isoOf = (y: number, m: number, d: number) =>
+    `${y}-${pad(m + 1)}-${pad(d)}`;
 const monthKeyOf = (y: number, m: number) => `${y}-${pad(m + 1)}`;
 
 function todayIso(): string {
@@ -91,9 +102,20 @@ const PALETTE: CSSProperties = {
 
 type MenuEntry =
     | { divider: true }
-    | { divider?: false; label: string; icon: LucideIcon; onClick: () => void; danger?: boolean };
+    | {
+          divider?: false;
+          label: string;
+          icon: LucideIcon;
+          onClick: () => void;
+          danger?: boolean;
+      };
 
-type MenuState = { x: number; y: number; title: string; items: MenuEntry[] } | null;
+type MenuState = {
+    x: number;
+    y: number;
+    title: string;
+    items: MenuEntry[];
+} | null;
 type HoverState = { iso: string; x: number; y: number } | null;
 
 /* ------------------------------------------------------------------ */
@@ -129,7 +151,9 @@ export function MyHrCalendar({
     const [selDate, setSelDate] = useState<string>(() => {
         // Prefer today when it sits in the anchor month, else the 1st.
         const [ty, tm] = today.split('-').map(Number);
-        return ty === anchorY && tm - 1 === anchorM ? today : isoOf(anchorY, anchorM, 1);
+        return ty === anchorY && tm - 1 === anchorM
+            ? today
+            : isoOf(anchorY, anchorM, 1);
     });
     const [pickerOpen, setPickerOpen] = useState(false);
     const [pickerYear, setPickerYear] = useState(anchorY);
@@ -280,7 +304,11 @@ export function MyHrCalendar({
             },
         ];
         if (evs.some((ev) => ev.type === 'shift')) {
-            items.push({ label: 'View in roster', icon: Eye, onClick: viewShift });
+            items.push({
+                label: 'View in roster',
+                icon: Eye,
+                onClick: viewShift,
+            });
         }
         openMenuAt(e.clientX, e.clientY, label, items);
     };
@@ -288,8 +316,12 @@ export function MyHrCalendar({
     const openEventMenu = (e: React.MouseEvent, ev: MyHrCalendarEvent) => {
         e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
-        const x = 'clientX' in e && e.clientX ? e.clientX : Math.round(rect.right);
-        const y = 'clientY' in e && e.clientY ? e.clientY : Math.round(rect.bottom + 4);
+        const x =
+            'clientX' in e && e.clientX ? e.clientX : Math.round(rect.right);
+        const y =
+            'clientY' in e && e.clientY
+                ? e.clientY
+                : Math.round(rect.bottom + 4);
         let items: MenuEntry[];
         if (ev.type === 'shift') {
             items = [
@@ -376,16 +408,22 @@ export function MyHrCalendar({
             <div
                 role="dialog"
                 aria-label={`Calendar — ${monthLabel}`}
-                className="absolute left-[22px] top-full z-50 mt-2.5 flex w-[668px] max-w-[calc(100vw-96px)] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-[0_34px_80px_-24px_rgba(20,10,40,0.5)] animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none"
+                className="absolute top-full left-[22px] z-50 mt-2.5 flex w-[668px] max-w-[calc(100vw-96px)] animate-in overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-[0_34px_80px_-24px_rgba(20,10,40,0.5)] duration-200 fade-in-0 slide-in-from-top-1 motion-reduce:animate-none"
             >
                 {/* ---- month grid pane ---- */}
                 <div className="relative w-[348px] flex-none border-r border-border p-[18px_18px_14px]">
                     <div className="mb-3.5 flex items-center justify-between">
                         <div className="flex items-center gap-1">
-                            <GridNavButton label="Previous month" onClick={prevMonth}>
+                            <GridNavButton
+                                label="Previous month"
+                                onClick={prevMonth}
+                            >
                                 <ChevronLeft className="h-[15px] w-[15px]" />
                             </GridNavButton>
-                            <GridNavButton label="Next month" onClick={nextMonth}>
+                            <GridNavButton
+                                label="Next month"
+                                onClick={nextMonth}
+                            >
                                 <ChevronRight className="h-[15px] w-[15px]" />
                             </GridNavButton>
                         </div>
@@ -433,7 +471,8 @@ export function MyHrCalendar({
                             </div>
                             <div className="grid grid-cols-3 gap-1.5">
                                 {MONTHS_SHORT.map((label, i) => {
-                                    const active = i === calM && pickerYear === calY;
+                                    const active =
+                                        i === calM && pickerYear === calY;
                                     return (
                                         <button
                                             key={label}
@@ -463,7 +502,7 @@ export function MyHrCalendar({
                         {WEEKDAYS.map((w) => (
                             <span
                                 key={w}
-                                className="text-center text-[10px] font-bold uppercase tracking-wide text-muted-foreground"
+                                className="text-center text-[10px] font-bold tracking-wide text-muted-foreground uppercase"
                             >
                                 {w}
                             </span>
@@ -479,7 +518,8 @@ export function MyHrCalendar({
                                 onClick={() => selectDay(cell.iso)}
                                 onContextMenu={(e) => openDayMenu(e, cell.iso)}
                                 onMouseEnter={(e) => {
-                                    const r = e.currentTarget.getBoundingClientRect();
+                                    const r =
+                                        e.currentTarget.getBoundingClientRect();
                                     setHover({
                                         iso: cell.iso,
                                         x: Math.round(r.left + r.width / 2),
@@ -487,7 +527,9 @@ export function MyHrCalendar({
                                     });
                                 }}
                                 onMouseLeave={() =>
-                                    setHover((h) => (h?.iso === cell.iso ? null : h))
+                                    setHover((h) =>
+                                        h?.iso === cell.iso ? null : h,
+                                    )
                                 }
                                 className={cn(
                                     'flex h-[38px] flex-col items-center justify-center rounded-[9px] transition-colors',
@@ -533,8 +575,14 @@ export function MyHrCalendar({
                     {/* legend */}
                     <div className="mt-3.5 flex gap-3.5 border-t border-border pt-3">
                         <LegendDot className="bg-primary" label="Shift" />
-                        <LegendDot className="bg-[color:var(--hr-leave)]" label="Leave" />
-                        <LegendDot className="bg-[color:var(--hr-holiday)]" label="Holiday" />
+                        <LegendDot
+                            className="bg-[color:var(--hr-leave)]"
+                            label="Leave"
+                        />
+                        <LegendDot
+                            className="bg-[color:var(--hr-holiday)]"
+                            label="Holiday"
+                        />
                         {loading ? (
                             <span className="ml-auto text-[10.5px] text-muted-foreground">
                                 Loading…
@@ -550,7 +598,7 @@ export function MyHrCalendar({
                             {agendaHeading}
                         </h3>
                         {selDate === today ? (
-                            <span className="rounded-full bg-primary/10 px-[7px] py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-primary">
+                            <span className="rounded-full bg-primary/10 px-[7px] py-0.5 text-[9.5px] font-bold tracking-wide text-primary uppercase">
                                 Today
                             </span>
                         ) : null}
@@ -562,7 +610,9 @@ export function MyHrCalendar({
                             <p className="text-[13px] font-semibold text-foreground/80">
                                 Nothing scheduled
                             </p>
-                            <p className="mt-1 text-[11.5px]">A clear day — ka pai.</p>
+                            <p className="mt-1 text-[11.5px]">
+                                A clear day — ka pai.
+                            </p>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2.5">
@@ -571,7 +621,9 @@ export function MyHrCalendar({
                                 return (
                                     <div
                                         key={i}
-                                        onContextMenu={(e) => openEventMenu(e, ev)}
+                                        onContextMenu={(e) =>
+                                            openEventMenu(e, ev)
+                                        }
                                         className={cn(
                                             'flex gap-3 rounded-xl p-[12px_13px]',
                                             meta.tint,
@@ -591,7 +643,7 @@ export function MyHrCalendar({
                                                 <div className="flex flex-none items-center gap-1.5">
                                                     <span
                                                         className={cn(
-                                                            'rounded-full px-[7px] py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-primary-foreground',
+                                                            'rounded-full px-[7px] py-0.5 text-[9.5px] font-bold tracking-wide text-primary-foreground uppercase',
                                                             meta.chip,
                                                         )}
                                                     >
@@ -634,7 +686,8 @@ export function MyHrCalendar({
                                                         'mt-1.5 text-[11.5px] font-semibold',
                                                         ev.type === 'shift'
                                                             ? 'text-primary'
-                                                            : ev.type === 'leave'
+                                                            : ev.type ===
+                                                                'leave'
                                                               ? 'text-[color:var(--hr-leave)]'
                                                               : 'text-[color:var(--hr-holiday)]',
                                                     )}
@@ -676,9 +729,9 @@ export function MyHrCalendar({
                         role="menu"
                         aria-label={menu.title}
                         style={{ left: menu.x, top: menu.y }}
-                        className="fixed z-[61] min-w-[214px] rounded-xl border border-border bg-popover p-1.5 shadow-[0_22px_52px_-16px_rgba(20,10,40,0.42)] animate-in fade-in-0 zoom-in-95 duration-150 motion-reduce:animate-none"
+                        className="fixed z-[61] min-w-[214px] animate-in rounded-xl border border-border bg-popover p-1.5 shadow-[0_22px_52px_-16px_rgba(20,10,40,0.42)] duration-150 fade-in-0 zoom-in-95 motion-reduce:animate-none"
                     >
-                        <div className="mb-1 border-b border-border px-[9px] pb-2 pt-[7px] text-[10.5px] font-bold uppercase tracking-wide text-muted-foreground">
+                        <div className="mb-1 border-b border-border px-[9px] pt-[7px] pb-2 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                             {menu.title}
                         </div>
                         {menu.items.map((item, i) =>
@@ -694,7 +747,9 @@ export function MyHrCalendar({
                                     role="menuitem"
                                     onClick={() => {
                                         closeMenu();
-                                        (item as { onClick: () => void }).onClick();
+                                        (
+                                            item as { onClick: () => void }
+                                        ).onClick();
                                     }}
                                     className={cn(
                                         'flex w-full items-center gap-2.5 rounded-lg px-[9px] py-2 text-left text-[12.5px] font-semibold transition-colors hover:bg-muted',
@@ -704,8 +759,12 @@ export function MyHrCalendar({
                                     )}
                                 >
                                     {(() => {
-                                        const Icon = (item as { icon: LucideIcon }).icon;
-                                        return <Icon className="h-[15px] w-[15px]" />;
+                                        const Icon = (
+                                            item as { icon: LucideIcon }
+                                        ).icon;
+                                        return (
+                                            <Icon className="h-[15px] w-[15px]" />
+                                        );
                                     })()}
                                     {(item as { label: string }).label}
                                 </button>
@@ -764,9 +823,9 @@ function HoverPreview({
     return (
         <div
             style={{ left: state.x, top: state.y }}
-            className="pointer-events-none fixed z-[70] min-w-[148px] max-w-[240px] -translate-x-1/2 -translate-y-[calc(100%+9px)] rounded-[10px] bg-[oklch(0.19_0.02_277)] p-[9px_11px] text-primary-foreground shadow-[0_16px_38px_-12px_rgba(0,0,0,0.55)]"
+            className="pointer-events-none fixed z-[70] max-w-[240px] min-w-[148px] -translate-x-1/2 -translate-y-[calc(100%+9px)] rounded-[10px] bg-[oklch(0.19_0.02_277)] p-[9px_11px] text-primary-foreground shadow-[0_16px_38px_-12px_rgba(0,0,0,0.55)]"
         >
-            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground/60">
+            <div className="mb-1.5 text-[10px] font-bold tracking-wide text-primary-foreground/60 uppercase">
                 {heading}
             </div>
             {events.length === 0 ? (
@@ -775,7 +834,10 @@ function HoverPreview({
                 </div>
             ) : (
                 events.map((ev, i) => (
-                    <div key={i} className="mt-[3px] flex items-center gap-1.5 text-xs">
+                    <div
+                        key={i}
+                        className="mt-[3px] flex items-center gap-1.5 text-xs"
+                    >
                         <span
                             className={cn(
                                 'h-1.5 w-1.5 flex-none rounded-full',

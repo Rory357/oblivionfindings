@@ -23,7 +23,9 @@ export function FinanceTabs(props: {
     className?: string;
     ariaLabel?: string;
 }) {
-    return <TabStrip {...props} ariaLabel={props.ariaLabel ?? 'Finance views'} />;
+    return (
+        <TabStrip {...props} ariaLabel={props.ariaLabel ?? 'Finance views'} />
+    );
 }
 
 /**
@@ -41,7 +43,9 @@ export function useFinanceTab(
     const syncUrl = options?.syncUrl ?? true;
     const [tab, setTab] = useState<string>(() => {
         if (typeof window === 'undefined') return defaultTab;
-        return new URLSearchParams(window.location.search).get(param) || defaultTab;
+        return (
+            new URLSearchParams(window.location.search).get(param) || defaultTab
+        );
     });
     const change = useCallback(
         (next: string) => {
@@ -49,7 +53,11 @@ export function useFinanceTab(
             if (syncUrl && typeof window !== 'undefined') {
                 const url = new URL(window.location.href);
                 url.searchParams.set(param, next);
-                window.history.replaceState(window.history.state, '', url.toString());
+                window.history.replaceState(
+                    window.history.state,
+                    '',
+                    url.toString(),
+                );
             }
         },
         [param, syncUrl],

@@ -162,10 +162,19 @@ echo json_encode([
             'Replace bathroom rail and sign the inspection check',
             state.incident.reference,
         ]) {
-            await page.goto(`/tasks?q=${encodeURIComponent(query)}`);
-            await expect(
-                page.getByLabel('Journey references').first(),
-            ).toContainText(state.incident.reference);
+            await test.step(`discovers the journey from ${query}`, async () => {
+                await page.goto(`/tasks?q=${encodeURIComponent(query)}`);
+                await expect(
+                    page.getByRole('textbox', { name: 'Search tasks' }),
+                ).toHaveValue(query);
+                await expect(
+                    page
+                        .getByLabel('Journey references')
+                        .filter({ hasText: state.incident.reference })
+                        .first(),
+                    `Expected ${query} to find the exact incident journey`,
+                ).toBeVisible({ timeout: 60_000 });
+            });
         }
         await postLaravel(page, `/incidents/${incidentId}/review`, {
             review_notes:
@@ -444,8 +453,15 @@ echo json_encode([
             manifest.shift.id,
             manifest.users.operator,
         );
-        expect(scope.required_alert_ids).toContain(alertId);
-        expect(scope.required_alert_ids.length).toBeLessThanOrEqual(3);
+        expect(scope.required_alert_ids).toEqual(
+            expect.arrayContaining([
+                ...manifest.records.required_alert_ids,
+                alertId,
+            ]),
+        );
+        expect(new Set(scope.required_alert_ids).size).toBe(
+            scope.required_alert_ids.length,
+        );
         await patchLaravel(
             page,
             `/control-room/shifts/${manifest.shift.id}/handover/draft`,
@@ -499,6 +515,9 @@ echo json_encode([
             `/control-room/shifts/${manifest.shift.id}/accept-handover`,
             { expected_version: preparedVersion },
         );
+        // Acceptance retires the handover page. Leave it before its live inbox
+        // poll refreshes a route that is now intentionally unavailable.
+        await page.goto('/control-room/shifts');
         await postLaravel(page, `/control-room/alerts/${alertId}/resolve`, {
             resolution_notes:
                 'Immediate response and transferred operational task are complete.',
@@ -560,7 +579,7 @@ echo json_encode([
         const actionRow = page.getByRole('button', {
             name: `Open ${state.action!.reference}`,
         });
-        await expect(actionRow).toBeVisible();
+        await expect(actionRow).toBeVisible({ timeout: 20_000 });
         await actionRow.focus();
         await actionRow.press('Enter');
         const taskDialog = page.getByTestId('tasks-detail-dialog');

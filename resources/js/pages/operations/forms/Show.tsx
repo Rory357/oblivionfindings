@@ -1,7 +1,7 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 
@@ -35,7 +35,8 @@ export default function CustomFormShow({ form }: Props) {
     return (
         <AppLayout>
             <Head title={form.name} />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title={form.name}
                 description="Review this custom form's structure and current workflow type."
                 backHref="/operations/forms"

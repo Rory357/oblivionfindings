@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\ControlRoom;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\Playbook;
@@ -9,6 +10,7 @@ use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -24,7 +26,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected User $operator;
 
     protected Site $site;
 
@@ -33,14 +35,30 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
-        $this->admin = User::factory()->create([
-            'organization_id' => 1,
-            'role' => 'admin',
+        $this->site = Site::factory()->create();
+        $this->operator = User::factory()->create([
+            'role' => 'support_worker',
             'approved_at' => now(),
         ]);
-        $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        $this->site = Site::factory()->create([
-            'tenant_id' => $this->admin->organization_id,
+        $this->operator->roles()->syncWithoutDetaching([
+            Role::query()->where('name', 'support_worker')->firstOrFail()->id,
+        ]);
+        $permissionIds = Permission::query()
+            ->whereIn('key', ['controlRoom.viewAny', 'controlRoom.alerts.view'])
+            ->pluck('id');
+        $this->operator->permissionOverrides()->sync($permissionIds->mapWithKeys(
+            fn ($permissionId) => [$permissionId => ['allowed' => true]],
+        ));
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->operator->id,
+            'position_role' => 'support_worker',
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+            'created_by' => $this->operator->id,
+            'updated_by' => $this->operator->id,
         ]);
     }
 
@@ -78,7 +96,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
     {
         $this->makeTruthfulComplianceFixture();
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room/stats')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -88,7 +106,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
                 )
             );
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room/sla')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -142,25 +160,25 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
             ->firstWhere('metric', 'sla_compliance');
         $this->assertNull($slaAttentionFlag);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room/stats')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('kpis.sla_compliance_pct', null)
             );
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->missing('analytics')
             );
 
-        $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->admin);
+        $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->operator);
         $this->assertNull(data_get($dashboardAnalytics, 'sla.compliance_pct'));
         $this->assertNull(data_get($dashboardAnalytics, 'sla_daily_trend.0.compliance_pct'));
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room/sla')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -301,7 +319,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
             'acknowledge_breached' => false,
         ]);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room/alerts')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -309,7 +327,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
                 ->where('alerts.data.0.sla.status', 'breached')
             );
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room/integration-alerts')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -317,7 +335,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
                 ->where('alerts.data.0.sla_status', 'red')
             );
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -350,7 +368,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
             'resolution_deadline' => now()->addHour(),
         ]);
 
-        $this->actingAs($this->admin)
+        $this->actingAs($this->operator)
             ->get('/control-room')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -388,14 +406,14 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
             $sla->recordResponse($secondCycleStartedAt->copy()->addMinutes(20));
             $sla->recordResolution($secondCycleStartedAt->copy()->addMinutes(60));
 
-            $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->admin);
+            $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->operator);
             $this->assertSame(50.0, data_get($dashboardAnalytics, 'sla.compliance_pct'));
             $this->assertSame([
                 ['date' => '2026-07-10', 'compliance_pct' => 100],
                 ['date' => '2026-07-12', 'compliance_pct' => 0],
             ], data_get($dashboardAnalytics, 'sla_daily_trend'));
 
-            $this->actingAs($this->admin)
+            $this->actingAs($this->operator)
                 ->get('/control-room')
                 ->assertOk()
                 ->assertInertia(fn ($page) => $page
@@ -403,7 +421,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
                     ->where('hero.last_24_hours.avg_response_minutes', null)
                 );
 
-            $this->actingAs($this->admin)
+            $this->actingAs($this->operator)
                 ->get('/control-room/stats')
                 ->assertOk()
                 ->assertInertia(fn ($page) => $page
@@ -418,179 +436,193 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
 
     public function test_dashboard_and_stats_cycle_metrics_reuse_canonical_alert_scope_integrity(): void
     {
-        $foreignSite = Site::factory()->create(['tenant_id' => 202]);
-        $foreignClient = Client::factory()->create([
-            'organization_id' => 202,
-            'site_id' => $foreignSite->id,
-        ]);
-        $definition = SlaDefinition::query()->create([
-            'name' => 'Canonical alert scope cycle truth',
-            'code' => 'canonical-alert-scope-cycle-truth',
-            'acknowledge_target_minutes' => 10,
-            'is_active' => true,
-        ]);
+        Carbon::setTestNow(Carbon::parse('2026-08-09 12:00:00 UTC'));
 
-        $visibleLegacyAlert = ControlRoomAlert::factory()->open()->create([
-            'site_id' => null,
-            'client_id' => null,
-            'context' => ['site' => ['id' => $this->site->id]],
-            'triggered_at' => now()->subMinutes(30),
-        ]);
-        $visibleSla = AlertSla::createFromDefinition(
-            $visibleLegacyAlert,
-            $definition,
-            now()->subMinutes(30),
-        );
-        $visibleSla->recordAcknowledge(now()->subMinutes(25));
+        try {
+            $otherSite = Site::factory()->create();
+            $otherSiteClient = Client::factory()->create([
+                'site_id' => $otherSite->id,
+            ]);
+            $definition = SlaDefinition::query()->create([
+                'name' => 'Canonical alert scope cycle truth',
+                'code' => 'canonical-alert-scope-cycle-truth',
+                'acknowledge_target_minutes' => 10,
+                'is_active' => true,
+            ]);
 
-        $poisonedAlert = ControlRoomAlert::factory()->open()->create([
-            'site_id' => $this->site->id,
-            'client_id' => $foreignClient->id,
-            'triggered_at' => now()->subMinutes(20),
-        ]);
-        $poisonedSla = AlertSla::createFromDefinition(
-            $poisonedAlert,
-            $definition,
-            now()->subMinutes(20),
-        );
-        $poisonedSla->recordAcknowledge(now()->subMinutes(5));
-
-        $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->admin);
-        $this->assertSame(100.0, data_get($dashboardAnalytics, 'sla.compliance_pct'));
-        $this->assertSame([[
-            'date' => now()->toDateString(),
-            'compliance_pct' => 100,
-        ]], data_get($dashboardAnalytics, 'sla_daily_trend'));
-
-        $this->actingAs($this->admin)
-            ->get('/control-room')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->missing('analytics')
+            $visibleLegacyAlert = ControlRoomAlert::factory()->open()->create([
+                'site_id' => null,
+                'client_id' => null,
+                'context' => ['site' => ['id' => $this->site->id]],
+                'triggered_at' => now()->subMinutes(30),
+                'created_by_user_id' => $this->operator->id,
+            ]);
+            $visibleSla = AlertSla::createFromDefinition(
+                $visibleLegacyAlert,
+                $definition,
+                now()->subMinutes(30),
             );
+            $visibleSla->recordAcknowledge(now()->subMinutes(25));
 
-        $this->actingAs($this->admin)
-            ->get('/control-room/stats')
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('kpis.avg_acknowledge_minutes', fn ($value) => is_numeric($value) && (float) $value === 5.0)
-                ->where('kpis.sla_compliance_pct', fn ($value) => is_numeric($value) && (float) $value === 100.0)
+            $explicitSiteAlert = ControlRoomAlert::factory()->open()->create([
+                'site_id' => $this->site->id,
+                'client_id' => $otherSiteClient->id,
+                'triggered_at' => now()->subMinutes(20),
+                'created_by_user_id' => $this->operator->id,
+            ]);
+            $explicitSiteSla = AlertSla::createFromDefinition(
+                $explicitSiteAlert,
+                $definition,
+                now()->subMinutes(20),
             );
+            $explicitSiteSla->recordAcknowledge(now()->subMinutes(5));
+
+            $dashboardAnalytics = app(ControlRoomDeskService::class)->analytics($this->operator);
+            $this->assertSame(50.0, data_get($dashboardAnalytics, 'sla.compliance_pct'));
+            $this->assertSame([[
+                'date' => now()->toDateString(),
+                'compliance_pct' => 50,
+            ]], data_get($dashboardAnalytics, 'sla_daily_trend'));
+
+            $this->actingAs($this->operator)
+                ->get('/control-room')
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->missing('analytics')
+                );
+
+            $this->actingAs($this->operator)
+                ->get('/control-room/stats')
+                ->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->where('kpis.avg_acknowledge_minutes', fn ($value) => is_numeric($value) && (float) $value === 10.0)
+                    ->where('kpis.sla_compliance_pct', fn ($value) => is_numeric($value) && (float) $value === 50.0)
+                );
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_task7_final_gap_dashboard_report_surfaces_use_canonical_explicit_site_precedence(): void
     {
-        $foreignSite = Site::factory()->create(['tenant_id' => 202]);
-        $foreignClient = Client::factory()->create([
-            'organization_id' => 202,
-            'site_id' => $foreignSite->id,
-        ]);
-        $definition = SlaDefinition::query()->create([
-            'name' => 'Canonical report surface truth',
-            'code' => 'canonical-report-surface-truth',
-            'acknowledge_target_minutes' => 10,
-            'is_active' => true,
-        ]);
-        $queue = TriageQueue::query()->create([
-            'name' => 'Canonical report queue',
-            'code' => 'canonical-report-queue',
-            'tier' => 1,
-            'is_active' => true,
-        ]);
+        Carbon::setTestNow(Carbon::parse('2026-08-09 12:00:00 UTC'));
 
-        $visibleAlerts = collect(range(1, 3))->map(function (int $index) use ($queue) {
-            return ControlRoomAlert::factory()->open()->create([
-                'source' => 'context_visible',
-                'alert_type' => "Context-visible alert {$index}",
-                'severity' => 'critical',
-                'site_id' => null,
-                'client_id' => null,
-                'assigned_to_user_id' => $index === 3 ? null : $this->admin->id,
-                'queue_id' => $queue->id,
-                'escalation_level' => $index,
-                'triggered_at' => now()->subMinutes(30 - $index),
-                'context' => ['site' => ['id' => $this->site->id]],
+        try {
+            $otherSite = Site::factory()->create();
+            $otherSiteClient = Client::factory()->create([
+                'site_id' => $otherSite->id,
             ]);
-        });
-        $poisonedAlert = ControlRoomAlert::factory()->open()->create([
-            'source' => 'poisoned_foreign_client',
-            'alert_type' => 'Foreign client must not enter local reports',
-            'severity' => 'critical',
-            'site_id' => $this->site->id,
-            'client_id' => $foreignClient->id,
-            'assigned_to_user_id' => $this->admin->id,
-            'queue_id' => $queue->id,
-            'escalation_level' => 5,
-            'triggered_at' => now()->subMinutes(20),
-        ]);
+            $definition = SlaDefinition::query()->create([
+                'name' => 'Canonical report surface truth',
+                'code' => 'canonical-report-surface-truth',
+                'acknowledge_target_minutes' => 10,
+                'is_active' => true,
+            ]);
+            $queue = TriageQueue::query()->create([
+                'name' => 'Canonical report queue',
+                'code' => 'canonical-report-queue',
+                'tier' => 1,
+                'is_active' => true,
+            ]);
 
-        $playbook = Playbook::factory()->create([
-            'name' => 'Canonical report playbook',
-            'code' => 'canonical-report-playbook',
-        ]);
-        foreach ($visibleAlerts as $visibleAlert) {
+            $visibleAlerts = collect(range(1, 3))->map(function (int $index) use ($queue) {
+                return ControlRoomAlert::factory()->open()->create([
+                    'source' => 'context_visible',
+                    'alert_type' => "Context-visible alert {$index}",
+                    'severity' => 'critical',
+                    'site_id' => null,
+                    'client_id' => null,
+                    'assigned_to_user_id' => $index === 3 ? null : $this->operator->id,
+                    'queue_id' => $queue->id,
+                    'escalation_level' => $index,
+                    'triggered_at' => now()->subMinutes(30 - $index),
+                    'context' => ['site' => ['id' => $this->site->id]],
+                    'created_by_user_id' => $this->operator->id,
+                ]);
+            });
+            $explicitSiteAlert = ControlRoomAlert::factory()->open()->create([
+                'source' => 'explicit_site',
+                'alert_type' => 'Explicit alert site wins over client fallback',
+                'severity' => 'critical',
+                'site_id' => $this->site->id,
+                'client_id' => $otherSiteClient->id,
+                'assigned_to_user_id' => $this->operator->id,
+                'queue_id' => $queue->id,
+                'escalation_level' => 5,
+                'triggered_at' => now()->subMinutes(20),
+                'created_by_user_id' => $this->operator->id,
+            ]);
+
+            $playbook = Playbook::factory()->create([
+                'name' => 'Canonical report playbook',
+                'code' => 'canonical-report-playbook',
+            ]);
+            foreach ($visibleAlerts as $visibleAlert) {
+                PlaybookRun::query()->create([
+                    'playbook_id' => $playbook->id,
+                    'alert_id' => $visibleAlert->id,
+                    'status' => PlaybookRun::STATUS_COMPLETED,
+                    'started_at' => now()->subMinutes(15),
+                    'completed_at' => now()->subMinutes(5),
+                ]);
+            }
             PlaybookRun::query()->create([
                 'playbook_id' => $playbook->id,
-                'alert_id' => $visibleAlert->id,
+                'alert_id' => $explicitSiteAlert->id,
                 'status' => PlaybookRun::STATUS_COMPLETED,
                 'started_at' => now()->subMinutes(15),
                 'completed_at' => now()->subMinutes(5),
             ]);
-        }
-        PlaybookRun::query()->create([
-            'playbook_id' => $playbook->id,
-            'alert_id' => $poisonedAlert->id,
-            'status' => PlaybookRun::STATUS_COMPLETED,
-            'started_at' => now()->subMinutes(15),
-            'completed_at' => now()->subMinutes(5),
-        ]);
 
-        foreach ($visibleAlerts as $index => $visibleAlert) {
-            $sla = AlertSla::createFromDefinition(
-                $visibleAlert,
+            foreach ($visibleAlerts as $index => $visibleAlert) {
+                $sla = AlertSla::createFromDefinition(
+                    $visibleAlert,
+                    $definition,
+                    now()->subMinutes(30 - $index),
+                );
+                $sla->recordAcknowledge(now()->subMinutes(25 - $index));
+            }
+            $explicitSiteSla = AlertSla::createFromDefinition(
+                $explicitSiteAlert,
                 $definition,
-                now()->subMinutes(30 - $index),
+                now()->subMinutes(20),
             );
-            $sla->recordAcknowledge(now()->subMinutes(25 - $index));
+            $explicitSiteSla->recordAcknowledge(now()->subMinute());
+
+            $reports = app(ControlRoomReportService::class);
+            $from = now()->subDay();
+            $to = now()->addDay();
+            $volume = $reports->alertVolume($from, $to, $this->site->id);
+            $escalations = $reports->escalationAnalysis($from, $to, $this->site->id);
+            $sla = $reports->slaCompliance($from, $to, $this->site->id);
+            $slaTrend = $reports->slaDailyTrend($from, $to, $this->site->id);
+            $workload = $reports->workloadDistribution($from, $to, $this->site->id);
+            $playbooks = $reports->playbookPerformance($from, $to, $this->site->id);
+            $attention = $reports->attentionFlags($this->site->id);
+            $comparison = $reports->siteComparison($from, $to, $this->site->id);
+
+            $this->assertSame(4, $volume['total']);
+            $this->assertSame(['context_visible' => 3, 'explicit_site' => 1], $volume['by_source']);
+            $this->assertSame(4, $escalations['total_alerts']);
+            $this->assertSame(4, $escalations['escalated']);
+            $this->assertSame(2, $escalations['stuck_at_high_escalation']);
+            $this->assertSame(4, $sla['total_sla_cycles']);
+            $this->assertSame(75.0, $sla['compliance_pct']);
+            $this->assertSame(75, data_get($slaTrend, '0.compliance_pct'));
+            $this->assertSame(3, data_get($workload, 'active_per_user.0.active_alerts'));
+            $this->assertSame(3, data_get($workload, 'handled_per_user.0.alerts_handled'));
+            $this->assertSame(4, data_get($workload, 'per_queue.0.active_alerts'));
+            $this->assertSame(1, data_get($workload, 'unassigned'));
+            $this->assertSame(4, $playbooks['total_runs']);
+            $this->assertSame(4, $playbooks['completed']);
+            $this->assertSame(4, data_get($playbooks, 'by_playbook.0.total_runs'));
+            $this->assertSame(4, collect($attention)->firstWhere('metric', 'critical_alerts')['value'] ?? null);
+            $this->assertSame(75.0, collect($attention)->firstWhere('metric', 'sla_compliance')['value'] ?? null);
+            $this->assertSame($this->site->id, data_get($comparison, '0.site_id'));
+            $this->assertSame(4, data_get($comparison, '0.total_alerts'));
+        } finally {
+            Carbon::setTestNow();
         }
-        $poisonedSla = AlertSla::createFromDefinition(
-            $poisonedAlert,
-            $definition,
-            now()->subMinutes(20),
-        );
-        $poisonedSla->recordAcknowledge(now()->subMinute());
-
-        $reports = app(ControlRoomReportService::class);
-        $from = now()->subDay();
-        $to = now()->addDay();
-        $volume = $reports->alertVolume($from, $to, $this->site->id);
-        $escalations = $reports->escalationAnalysis($from, $to, $this->site->id);
-        $sla = $reports->slaCompliance($from, $to, $this->site->id);
-        $slaTrend = $reports->slaDailyTrend($from, $to, $this->site->id);
-        $workload = $reports->workloadDistribution($from, $to, $this->site->id);
-        $playbooks = $reports->playbookPerformance($from, $to, $this->site->id);
-        $attention = $reports->attentionFlags($this->site->id);
-        $comparison = $reports->siteComparison($from, $to, $this->site->id);
-
-        $this->assertSame(3, $volume['total']);
-        $this->assertSame(['context_visible' => 3], $volume['by_source']);
-        $this->assertSame(3, $escalations['total_alerts']);
-        $this->assertSame(3, $escalations['escalated']);
-        $this->assertSame(1, $escalations['stuck_at_high_escalation']);
-        $this->assertSame(3, $sla['total_sla_cycles']);
-        $this->assertSame(100.0, $sla['compliance_pct']);
-        $this->assertSame(100, data_get($slaTrend, '0.compliance_pct'));
-        $this->assertSame(2, data_get($workload, 'active_per_user.0.active_alerts'));
-        $this->assertSame(2, data_get($workload, 'handled_per_user.0.alerts_handled'));
-        $this->assertSame(3, data_get($workload, 'per_queue.0.active_alerts'));
-        $this->assertSame(1, data_get($workload, 'unassigned'));
-        $this->assertSame(3, $playbooks['total_runs']);
-        $this->assertSame(3, $playbooks['completed']);
-        $this->assertSame(3, data_get($playbooks, 'by_playbook.0.total_runs'));
-        $this->assertSame(3, collect($attention)->firstWhere('metric', 'critical_alerts')['value'] ?? null);
-        $this->assertNull(collect($attention)->firstWhere('metric', 'sla_compliance'));
-        $this->assertSame($this->site->id, data_get($comparison, '0.site_id'));
-        $this->assertSame(3, data_get($comparison, '0.total_alerts'));
     }
 
     public function test_compliance_counts_each_reopened_cycle_in_the_period_using_cycle_timestamps(): void
@@ -755,6 +787,7 @@ class ControlRoomSlaComplianceTruthTest extends TestCase
     {
         return ControlRoomAlert::factory()->state([
             'site_id' => $this->site->id,
+            'created_by_user_id' => $this->operator->id,
         ]);
     }
 }

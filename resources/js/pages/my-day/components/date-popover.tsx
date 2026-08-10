@@ -39,7 +39,8 @@ export function DatePopover({
 
     useEffect(() => {
         const onMouseDown = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+            if (ref.current && !ref.current.contains(e.target as Node))
+                onClose();
         };
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -53,7 +54,11 @@ export function DatePopover({
     }, [onClose]);
 
     const month = useMemo(() => {
-        const d = new Date(anchor.getFullYear(), anchor.getMonth() + monthOffset, 1);
+        const d = new Date(
+            anchor.getFullYear(),
+            anchor.getMonth() + monthOffset,
+            1,
+        );
         return d;
     }, [anchor, monthOffset]);
 
@@ -61,23 +66,26 @@ export function DatePopover({
     const todayKey = isoKey(new Date());
     const selectedKey = selected ? isoKey(selected) : null;
     const shiftKeys = useMemo(() => new Set(shiftDates), [shiftDates]);
-    const monthLabel = month.toLocaleString(undefined, { month: 'long', year: 'numeric' });
+    const monthLabel = month.toLocaleString(undefined, {
+        month: 'long',
+        year: 'numeric',
+    });
 
     return (
         <div
             ref={ref}
             data-test="my-day-date-popover"
             className={cn(
-                'absolute left-0 top-[calc(100%+8px)] z-50 w-[296px]',
+                'absolute top-[calc(100%+8px)] left-0 z-50 w-[296px]',
                 'rounded-xl border border-border bg-popover p-3.5 text-popover-foreground',
                 'shadow-[0_18px_50px_-12px_rgba(0,0,0,0.30),0_4px_12px_-4px_rgba(0,0,0,0.18)]',
-                'animate-in fade-in-0 slide-in-from-top-2 duration-150',
+                'animate-in duration-150 fade-in-0 slide-in-from-top-2',
             )}
         >
             {/* arrow */}
             <div
                 aria-hidden="true"
-                className="absolute -top-[7px] left-5 h-3 w-3 rotate-45 border-l border-t border-border bg-popover"
+                className="absolute -top-[7px] left-5 h-3 w-3 rotate-45 border-t border-l border-border bg-popover"
             />
 
             <div className="mb-2.5 flex items-center gap-1.5">
@@ -90,7 +98,9 @@ export function DatePopover({
                 >
                     <ChevronLeft className="h-3 w-3" />
                 </button>
-                <div className="flex-1 text-center text-[13.5px] font-semibold">{monthLabel}</div>
+                <div className="flex-1 text-center text-[13.5px] font-semibold">
+                    {monthLabel}
+                </div>
                 {/* eslint-disable-next-line no-restricted-syntax -- 24px calendar nav chevron, not a shadcn Button. */}
                 <button
                     type="button"
@@ -106,7 +116,7 @@ export function DatePopover({
                 {WEEK_HEADERS.map((d, i) => (
                     <div
                         key={i}
-                        className="text-center text-[10.5px] font-semibold uppercase tracking-wider text-text-faint"
+                        className="text-center text-[10.5px] font-semibold tracking-wider text-text-faint uppercase"
                     >
                         {d}
                     </div>
@@ -129,9 +139,14 @@ export function DatePopover({
                             className={cn(
                                 'relative h-[34px] rounded-md text-[12.5px] tabular-nums transition-colors',
                                 cell.muted && 'cursor-default text-text-faint',
-                                !cell.muted && !isToday && 'text-foreground hover:bg-muted',
-                                isToday && 'bg-primary font-semibold text-primary-foreground',
-                                isSelected && !isToday && 'ring-2 ring-primary/40',
+                                !cell.muted &&
+                                    !isToday &&
+                                    'text-foreground hover:bg-muted',
+                                isToday &&
+                                    'bg-primary font-semibold text-primary-foreground',
+                                isSelected &&
+                                    !isToday &&
+                                    'ring-2 ring-primary/40',
                             )}
                         >
                             {cell.date.getDate()}
@@ -139,7 +154,9 @@ export function DatePopover({
                                 <span
                                     className={cn(
                                         'absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full',
-                                        isToday ? 'bg-primary-foreground' : 'bg-primary',
+                                        isToday
+                                            ? 'bg-primary-foreground'
+                                            : 'bg-primary',
                                     )}
                                 />
                             ) : null}
@@ -174,7 +191,11 @@ function buildMonthCells(month: Date): { date: Date; muted: boolean }[] {
     const start = new Date(year, monthIdx, 1 - offset);
     const cells: { date: Date; muted: boolean }[] = [];
     for (let i = 0; i < 42; i++) {
-        const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+        const d = new Date(
+            start.getFullYear(),
+            start.getMonth(),
+            start.getDate() + i,
+        );
         cells.push({ date: d, muted: d.getMonth() !== monthIdx });
     }
     return cells;

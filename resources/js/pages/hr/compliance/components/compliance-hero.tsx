@@ -6,14 +6,15 @@ import { cn } from '@/lib/utils';
 import { ShieldCheck, type LucideIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 
-/** Tenant-brand gradient (re-themes with --primary), amber for attention values. */
+/** Application-brand gradient (re-themes with --primary), amber for attention values. */
 export const heroGradientStyle: CSSProperties = {
     ['--hr-amber' as string]: 'oklch(0.86 0.13 90)',
     ['--hr-amber-soft' as string]:
         'color-mix(in oklch, oklch(0.86 0.13 90) 25%, transparent)',
     background:
         'linear-gradient(120deg, color-mix(in oklch, var(--primary) 72%, black 22%), var(--primary) 60%, color-mix(in oklch, var(--primary) 92%, white 6%))',
-    boxShadow: '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
+    boxShadow:
+        '0 28px 64px -30px color-mix(in oklch, var(--primary) 86%, black)',
 };
 
 const CHIP_DOT: Record<string, string> = {
@@ -29,7 +30,11 @@ export type HeroStat = {
     onClick?: () => void;
 };
 
-export type HeroAction = { icon: LucideIcon; label: string; onClick: () => void };
+export type HeroAction = {
+    icon: LucideIcon;
+    label: string;
+    onClick: () => void;
+};
 export type HeroChip = { key: string; label: string; tone: string };
 export type HeroNeed = { key: string; label: string; onClick: () => void };
 
@@ -55,9 +60,12 @@ export function ComplianceHubHero({
     needs: HeroNeed[];
 }) {
     return (
-        <div style={heroGradientStyle} className="relative rounded-[24px] text-primary-foreground">
+        <div
+            style={heroGradientStyle}
+            className="relative rounded-[24px] text-primary-foreground"
+        >
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
-                <div className="absolute right-[22%] -top-20 h-60 w-60 rounded-full bg-primary-foreground/[0.05]" />
+                <div className="absolute -top-20 right-[22%] h-60 w-60 rounded-full bg-primary-foreground/[0.05]" />
             </div>
 
             <div className="relative px-[34px] pt-[30px]">
@@ -67,14 +75,18 @@ export function ComplianceHubHero({
                         <ShieldCheck className="h-[26px] w-[26px]" />
                     </span>
                     <div>
-                        <h1 className="text-[27px] font-bold leading-[1.05] tracking-tight">
+                        <h1 className="text-[27px] leading-[1.05] font-bold tracking-tight">
                             Staff compliance
                         </h1>
                         <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-primary-foreground/75">
                             <span className="font-semibold">{today}</span>
-                            <span className="text-primary-foreground/40">·</span>
+                            <span className="text-primary-foreground/40">
+                                ·
+                            </span>
                             <span>{role}</span>
-                            <span className="text-primary-foreground/40">·</span>
+                            <span className="text-primary-foreground/40">
+                                ·
+                            </span>
                             <span>{site}</span>
                         </p>
                     </div>
@@ -86,11 +98,15 @@ export function ComplianceHubHero({
                         {chips.map((c) => (
                             <span
                                 key={c.key}
-                                className="inline-flex items-center whitespace-nowrap rounded-full border border-primary-foreground/20 bg-primary-foreground/[0.12] px-3 py-[5px] text-[12px] font-semibold"
+                                className="inline-flex items-center rounded-full border border-primary-foreground/20 bg-primary-foreground/[0.12] px-3 py-[5px] text-[12px] font-semibold whitespace-nowrap"
                             >
                                 <span
                                     className="mr-[7px] inline-block h-[7px] w-[7px] flex-none rounded-full"
-                                    style={{ background: CHIP_DOT[c.tone] ?? CHIP_DOT.warning }}
+                                    style={{
+                                        background:
+                                            CHIP_DOT[c.tone] ??
+                                            CHIP_DOT.warning,
+                                    }}
                                 />
                                 {c.label}
                             </span>
@@ -108,7 +124,7 @@ export function ComplianceHubHero({
                             disabled={!s.onClick}
                             className="flex flex-col items-start gap-[3px] rounded-xl px-3.5 py-2.5 text-left transition-colors hover:bg-primary-foreground/10 disabled:cursor-default disabled:hover:bg-transparent"
                         >
-                            <span className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.09em] text-primary-foreground/60">
+                            <span className="text-[10px] font-bold tracking-[0.09em] whitespace-nowrap text-primary-foreground/60 uppercase">
                                 {s.label}
                             </span>
                             <span
@@ -141,7 +157,7 @@ export function ComplianceHubHero({
 
             {/* needs-you footer */}
             <div className="relative flex flex-wrap items-center gap-3 rounded-b-[24px] border-t border-primary-foreground/15 bg-black/[0.08] px-[22px] py-[11px]">
-                <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-primary-foreground/50">
+                <span className="text-[10px] font-bold tracking-[0.1em] text-primary-foreground/50 uppercase">
                     Needs you
                 </span>
                 {needs.length === 0 ? (
@@ -172,9 +188,12 @@ export function ComplianceHubHero({
 
 export function CompactHeroBand({ children }: { children: ReactNode }) {
     return (
-        <div style={heroGradientStyle} className="relative overflow-hidden rounded-[24px] text-primary-foreground">
+        <div
+            style={heroGradientStyle}
+            className="relative overflow-hidden rounded-[24px] text-primary-foreground"
+        >
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
-                <div className="absolute right-[18%] -top-16 h-52 w-52 rounded-full bg-primary-foreground/[0.05]" />
+                <div className="absolute -top-16 right-[18%] h-52 w-52 rounded-full bg-primary-foreground/[0.05]" />
             </div>
             <div className="relative flex flex-wrap items-center justify-between gap-[18px] px-7 py-6">
                 {children}
@@ -183,7 +202,13 @@ export function CompactHeroBand({ children }: { children: ReactNode }) {
     );
 }
 
-export function HeroInitials({ name, size = 60 }: { name: string; size?: number }) {
+export function HeroInitials({
+    name,
+    size = 60,
+}: {
+    name: string;
+    size?: number;
+}) {
     const init =
         name
             .split(/\s+/)

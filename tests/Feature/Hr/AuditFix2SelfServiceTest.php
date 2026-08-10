@@ -13,6 +13,7 @@ use App\Domain\Hr\Services\BenefitsService;
 use App\Domain\Hr\Services\FeedService;
 use App\Models\ItProvisioningRequest;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -22,10 +23,10 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
     Notification::fake();
+    $this->site = Site::factory()->create(['name' => 'Audit fix self-service Site']);
 
     // HR manager — holds hr.employees.manage, hr.benefits.*, it.manage.
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -35,7 +36,6 @@ beforeEach(function () {
 
     // Plain staff members.
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
@@ -44,24 +44,25 @@ beforeEach(function () {
     ]);
 
     $this->teammate = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     $this->teammate->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'support_worker')->first()->id,
     ]);
+
+    af2Profile($this->hr);
 });
 
 function af2Profile(User $user): HrEmployeeProfile
 {
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-AF2-'.$user->id,
         'work_email' => $user->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
+        'primary_site_id' => Site::query()->value('id'),
         'employment_type' => 'full_time',
         'start_date' => now()->subDays(10)->toDateString(),
         'is_active' => true,
@@ -71,7 +72,6 @@ function af2Profile(User $user): HrEmployeeProfile
 function af2Checklist(HrEmployeeProfile $profile, int $createdBy): HrOnboardingChecklist
 {
     return HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'in_progress',
@@ -95,7 +95,7 @@ function af2Task(HrOnboardingChecklist $checklist, array $overrides = []): HrOnb
 }
 
 /* ------------------------------------------------------------------ */
-/*  1 · New hire sees + completes their own onboarding checklist       */
+/*  1 · New hire sees + completes their own onboarding checklist */
 /* ------------------------------------------------------------------ */
 
 test('a new hire sees their own onboarding checklist on /hr/my and can complete their own task', function () {
@@ -181,7 +181,7 @@ test('the subject cannot complete a sign-off task assigned to someone else, and 
 });
 
 /* ------------------------------------------------------------------ */
-/*  2 · IT provisioning cancel annotates the task + notifies creator   */
+/*  2 · IT provisioning cancel annotates the task + notifies creator */
 /* ------------------------------------------------------------------ */
 
 test('cancelling an IT request annotates the still-pending onboarding task and notifies the checklist creator', function () {
@@ -193,7 +193,6 @@ test('cancelling an IT request annotates the still-pending onboarding task and n
     ]);
 
     $request = ItProvisioningRequest::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'onboarding_task_id' => $task->id,
         'type' => 'account',
@@ -227,13 +226,12 @@ test('cancelling an IT request annotates the still-pending onboarding task and n
 });
 
 /* ------------------------------------------------------------------ */
-/*  3 · KiwiSaver enrolment ↔ payroll (profile) sync                   */
+/*  3 · KiwiSaver enrolment ↔ payroll (profile) sync */
 /* ------------------------------------------------------------------ */
 
 test('a kiwisaver enrolment syncs the employee profile rate and opting out zeroes it', function () {
     $profile = af2Profile($this->worker);
     $plan = HrBenefitPlan::query()->create([
-        'tenant_id' => 1,
         'name' => 'KiwiSaver — Default',
         'type' => 'kiwisaver',
         'employer_contribution_rate' => 3,
@@ -243,7 +241,7 @@ test('a kiwisaver enrolment syncs the employee profile rate and opting out zeroe
     $enrollment = app(BenefitsService::class)->enrollEmployee($profile, $plan, [
         'enrollment_date' => now()->toDateString(),
         'employee_contribution_rate' => 4,
-    ]);
+    ], $this->hr);
 
     // Payroll reads profile.kiwisaver_rate — the enrolment must mirror there.
     expect((float) $profile->fresh()->kiwisaver_rate)->toBe(4.0);
@@ -267,7 +265,6 @@ test('a non-kiwisaver enrolment never touches the profile kiwisaver rate', funct
     $profile->update(['kiwisaver_rate' => 3]);
 
     $plan = HrBenefitPlan::query()->create([
-        'tenant_id' => 1,
         'name' => 'Southern Cross Wellbeing',
         'type' => 'health_insurance',
         'employer_contribution_rate' => 50,
@@ -277,13 +274,13 @@ test('a non-kiwisaver enrolment never touches the profile kiwisaver rate', funct
     app(BenefitsService::class)->enrollEmployee($profile, $plan, [
         'enrollment_date' => now()->toDateString(),
         'employee_contribution_rate' => 50,
-    ]);
+    ], $this->hr);
 
     expect((float) $profile->fresh()->kiwisaver_rate)->toBe(3.0);
 });
 
 /* ------------------------------------------------------------------ */
-/*  4 · /hr/my/benefits is owner-scoped                                */
+/*  4 · /hr/my/benefits is owner-scoped */
 /* ------------------------------------------------------------------ */
 
 test('the my-benefits page shows only the viewer’s own enrolments', function () {
@@ -291,7 +288,6 @@ test('the my-benefits page shows only the viewer’s own enrolments', function (
     $theirs = af2Profile($this->teammate);
 
     $plan = HrBenefitPlan::query()->create([
-        'tenant_id' => 1,
         'name' => 'KiwiSaver — Default',
         'type' => 'kiwisaver',
         'employer_contribution_rate' => 3,
@@ -299,7 +295,6 @@ test('the my-benefits page shows only the viewer’s own enrolments', function (
     ]);
 
     $ownEnrolment = HrBenefitEnrollment::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $mine->id,
         'benefit_plan_id' => $plan->id,
         'enrollment_date' => now()->toDateString(),
@@ -308,7 +303,6 @@ test('the my-benefits page shows only the viewer’s own enrolments', function (
         'employer_contribution_rate' => 3,
     ]);
     HrBenefitEnrollment::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $theirs->id,
         'benefit_plan_id' => $plan->id,
         'enrollment_date' => now()->toDateString(),
@@ -328,7 +322,7 @@ test('the my-benefits page shows only the viewer’s own enrolments', function (
 });
 
 /* ------------------------------------------------------------------ */
-/*  5 · Kudos notifies the recipient (never the sender)                */
+/*  5 · Kudos notifies the recipient (never the sender) */
 /* ------------------------------------------------------------------ */
 
 test('sending kudos notifies each recipient but never the sender', function () {
@@ -340,7 +334,6 @@ test('sending kudos notifies each recipient but never the sender', function () {
         [$this->teammate->id],
         'teamwork',
         'Amazing cover on the night shift — thank you!',
-        1,
         'impressive',
     );
 
@@ -362,14 +355,13 @@ test('sending kudos notifies each recipient but never the sender', function () {
 });
 
 /* ------------------------------------------------------------------ */
-/*  6 · Feed moderation — delete gated + audited                       */
+/*  6 · Feed moderation — delete gated + audited */
 /* ------------------------------------------------------------------ */
 
 test('feed moderation delete is 403 for a plain user and removes the post (with audit log) for a manager', function () {
     af2Profile($this->worker);
 
     $post = HrFeedPost::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'post_type' => 'update',
         'content' => 'Something wildly inappropriate.',
@@ -405,7 +397,6 @@ test('removing a kudos also removes its feed post, reactions and replies', funct
         $this->teammate->id,
         'teamwork',
         'Nice one!',
-        1,
     );
     app(FeedService::class)->toggleReaction($kudos, $this->teammate->id, 'heart');
     app(FeedService::class)->addReply($kudos, $this->teammate->id, 'Thanks!');

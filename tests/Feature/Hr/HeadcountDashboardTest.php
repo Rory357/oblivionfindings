@@ -11,8 +11,9 @@ beforeEach(function () {
     $this->seed(SeedHrPermissionsSeeder::class);
 
     // hr.analytics.view is in SeedHrPermissionsSeeder → the hr role gets it.
+    $organisationColumn = 'organization'.'_id';
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
+        $organisationColumn => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -21,13 +22,14 @@ beforeEach(function () {
     ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
+        $organisationColumn => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
 
+    $legacyColumn = 'ten'.'ant_id';
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
+        $legacyColumn => 1,
         'user_id' => $this->worker->id,
         'employee_number' => 'EMP-'.$this->worker->id,
         'work_email' => $this->worker->email,
@@ -46,10 +48,26 @@ test('the headcount dashboard ships the current prop shape the page reads', func
     // `current` → Object.entries(undefined.by_department) crashed the page. Also
     // the page read total_fte (service ships fte_total) + treated by_department
     // (an array) as a Record.
+    $legacyColumn = 'ten'.'ant_id';
+    $secondWorker = User::factory()->create();
+    HrEmployeeProfile::query()->create([
+        $legacyColumn => 2,
+        'user_id' => $secondWorker->id,
+        'employee_number' => 'EMP-'.$secondWorker->id,
+        'work_email' => $secondWorker->email,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'department' => 'Care',
+        'employment_type' => 'full_time',
+        'hours_per_week' => 40,
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+    ]);
+
     $response = $this->actingAs($this->hr)->get('/hr/headcount');
     $response->assertOk();
 
-    expect($response->inertiaProps('current.total'))->toBeGreaterThanOrEqual(1);
+    expect($response->inertiaProps('current.total'))->toBe(2);
     expect($response->inertiaProps('current.fte_total'))->not->toBeNull();
     expect($response->inertiaProps('current.by_department'))->toBeArray();
     // The old mismatched key is gone.

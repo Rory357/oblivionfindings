@@ -3,6 +3,7 @@
 namespace App\Domain\Roadmap\Models;
 
 use App\Domain\Governance\Models\Resolution;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,11 +15,11 @@ class DecisionRequest extends Model
 {
     use HasFactory;
     use SoftDeletes;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_decision_requests';
 
     protected $fillable = [
-        'tenant_id',
         'source_type',
         'source_id',
         'request_type',

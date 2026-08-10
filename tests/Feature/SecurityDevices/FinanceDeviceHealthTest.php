@@ -37,8 +37,7 @@ class FinanceDeviceHealthTest extends TestCase
     {
         $asset = Asset::factory()->vehicle()->create(['name' => 'Fleet Van 7']);
 
-        $fixedAsset = FinFixedAsset::create([
-            'organization_id' => 1,
+        $fixedAsset = FinFixedAsset::factory()->create([
             'asset_name' => 'Fleet Van 7 (Finance)',
             'category' => 'vehicle',
             'purchase_date' => '2025-01-15',
@@ -70,18 +69,20 @@ class FinanceDeviceHealthTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(function ($page) {
-            $linkedDevices = $page->toArray()['props']['linkedDevices'];
+            $props = $page->toArray()['props'];
+            $linkedDevices = $props['assetReconciliation']['technology']['devices'];
             $this->assertCount(1, $linkedDevices);
 
             $d = $linkedDevices[0];
             $this->assertEquals('Van 7 GPS', $d['name']);
             $this->assertEquals('queclink', $d['provider']);
-            $this->assertEquals(92, $d['battery_level']);
+            $this->assertEquals(92, $d['battery']);
             $this->assertNotEmpty($d['device_uid']);
-            $this->assertNotNull($d['detail_url']);
-            $this->assertStringContainsString('/security-devices/devices/', $d['detail_url']);
-            $this->assertArrayHasKey('health_status', $d);
+            $this->assertNotNull($d['href']);
+            $this->assertStringContainsString('/security-devices/devices/', $d['href']);
+            $this->assertArrayHasKey('health', $d);
             $this->assertEquals('installed_in', $d['link_type']);
+            $this->assertArrayNotHasKey('linkedDevices', $props);
         });
     }
 
@@ -91,8 +92,7 @@ class FinanceDeviceHealthTest extends TestCase
     {
         $asset = Asset::factory()->create(['name' => 'Server Alpha', 'asset_tag' => 'SRV-001']);
 
-        $fixedAsset = FinFixedAsset::create([
-            'organization_id' => 1,
+        $fixedAsset = FinFixedAsset::factory()->create([
             'asset_name' => 'Server Alpha (Finance)',
             'category' => 'it_equipment',
             'purchase_date' => '2025-06-01',
@@ -110,10 +110,12 @@ class FinanceDeviceHealthTest extends TestCase
             ->get("/finance/fixed-assets/{$fixedAsset->id}");
 
         $response->assertInertia(function ($page) {
-            $linkedAsset = $page->toArray()['props']['linkedAsset'];
+            $props = $page->toArray()['props'];
+            $linkedAsset = $props['assetReconciliation']['operational_asset'];
             $this->assertNotNull($linkedAsset);
             $this->assertEquals('Server Alpha', $linkedAsset['name']);
             $this->assertEquals('SRV-001', $linkedAsset['asset_tag']);
+            $this->assertArrayNotHasKey('linkedAsset', $props);
         });
     }
 
@@ -132,8 +134,7 @@ class FinanceDeviceHealthTest extends TestCase
             'unlinked_at' => now()->subDays(5),
         ]);
 
-        $fixedAsset = FinFixedAsset::create([
-            'organization_id' => 1,
+        $fixedAsset = FinFixedAsset::factory()->create([
             'asset_name' => 'Test FA',
             'category' => 'equipment',
             'purchase_date' => '2025-01-01',
@@ -151,7 +152,10 @@ class FinanceDeviceHealthTest extends TestCase
             ->get("/finance/fixed-assets/{$fixedAsset->id}");
 
         $response->assertInertia(function ($page) {
-            $this->assertCount(0, $page->toArray()['props']['linkedDevices']);
+            $this->assertCount(
+                0,
+                $page->toArray()['props']['assetReconciliation']['technology']['devices'],
+            );
         });
     }
 
@@ -170,8 +174,7 @@ class FinanceDeviceHealthTest extends TestCase
             'linked_at' => now(),
         ]);
 
-        $fixedAsset = FinFixedAsset::create([
-            'organization_id' => 1,
+        $fixedAsset = FinFixedAsset::factory()->create([
             'asset_name' => 'FA for Asset A',
             'category' => 'equipment',
             'purchase_date' => '2025-01-01',
@@ -189,7 +192,10 @@ class FinanceDeviceHealthTest extends TestCase
             ->get("/finance/fixed-assets/{$fixedAsset->id}");
 
         $response->assertInertia(function ($page) {
-            $this->assertCount(0, $page->toArray()['props']['linkedDevices']);
+            $this->assertCount(
+                0,
+                $page->toArray()['props']['assetReconciliation']['technology']['devices'],
+            );
         });
     }
 
@@ -197,8 +203,7 @@ class FinanceDeviceHealthTest extends TestCase
 
     public function test_no_linked_asset_returns_empty(): void
     {
-        $fixedAsset = FinFixedAsset::create([
-            'organization_id' => 1,
+        $fixedAsset = FinFixedAsset::factory()->create([
             'asset_name' => 'Standalone FA',
             'category' => 'furniture',
             'purchase_date' => '2025-01-01',
@@ -217,8 +222,15 @@ class FinanceDeviceHealthTest extends TestCase
 
         $response->assertOk();
         $response->assertInertia(function ($page) {
-            $this->assertNull($page->toArray()['props']['linkedAsset']);
-            $this->assertCount(0, $page->toArray()['props']['linkedDevices']);
+            $props = $page->toArray()['props'];
+            $this->assertNull($props['assetReconciliation']['operational_asset']);
+            $this->assertNull($props['assetReconciliation']['technology']);
+            $this->assertSame(
+                'financial_record_only',
+                $props['assetReconciliation']['reconciliation']['state'],
+            );
+            $this->assertArrayNotHasKey('linkedAsset', $props);
+            $this->assertArrayNotHasKey('linkedDevices', $props);
         });
     }
 
@@ -239,8 +251,7 @@ class FinanceDeviceHealthTest extends TestCase
             'linked_at' => now(),
         ]);
 
-        $fixedAsset = FinFixedAsset::create([
-            'organization_id' => 1,
+        $fixedAsset = FinFixedAsset::factory()->create([
             'asset_name' => 'Core Switch (Finance)',
             'category' => 'it_equipment',
             'purchase_date' => '2025-03-01',
@@ -258,19 +269,19 @@ class FinanceDeviceHealthTest extends TestCase
             ->get("/finance/fixed-assets/{$fixedAsset->id}");
 
         $response->assertInertia(function ($page) {
-            $d = $page->toArray()['props']['linkedDevices'][0];
+            $d = $page->toArray()['props']['assetReconciliation']['technology']['devices'][0];
             $this->assertArrayHasKey('id', $d);
             $this->assertArrayHasKey('device_uid', $d);
             $this->assertArrayHasKey('name', $d);
             $this->assertArrayHasKey('domain', $d);
             $this->assertArrayHasKey('category', $d);
             $this->assertArrayHasKey('status', $d);
-            $this->assertArrayHasKey('health_status', $d);
+            $this->assertArrayHasKey('health', $d);
             $this->assertArrayHasKey('provider', $d);
             $this->assertArrayHasKey('last_seen_at', $d);
-            $this->assertArrayHasKey('battery_level', $d);
+            $this->assertArrayHasKey('battery', $d);
             $this->assertArrayHasKey('link_type', $d);
-            $this->assertArrayHasKey('detail_url', $d);
+            $this->assertArrayHasKey('href', $d);
         });
     }
 }

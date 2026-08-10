@@ -51,7 +51,10 @@ export function RecordedDetailDialog({
                         label="Recorded at"
                         value={recorded?.time ?? '—'}
                     />
-                    <SummaryRow label="Recorded by" value={recorded?.by ?? '—'} />
+                    <SummaryRow
+                        label="Recorded by"
+                        value={recorded?.by ?? '—'}
+                    />
                     {recorded?.witness ? (
                         <SummaryRow label="Witness" value={recorded.witness} />
                     ) : null}

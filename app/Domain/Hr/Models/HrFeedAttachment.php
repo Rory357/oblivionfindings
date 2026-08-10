@@ -2,17 +2,21 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Http\Controllers\Concerns\ServesPrivateAttachments;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * An image attached to a community-wall post, stored on the private disk and
- * served through the hardened {@see \App\Http\Controllers\Concerns\ServesPrivateAttachments}
+ * served through the hardened {@see ServesPrivateAttachments}
  * route.
  */
 class HrFeedAttachment extends Model
 {
+    use WritesLegacyStorageContext;
+
     protected $fillable = [
         'tenant_id',
         'feed_post_id',

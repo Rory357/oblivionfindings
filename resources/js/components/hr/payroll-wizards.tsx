@@ -61,13 +61,17 @@ export interface ExportFieldOption {
 
 /** Flash error carried by an Inertia redirect — `back()->with('error')` fires
  *  onSuccess, not onError (see reference_inertia_flash_error). */
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
 
 function toDateInputValue(date: Date): string {
-    const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    const offsetDate = new Date(
+        date.getTime() - date.getTimezoneOffset() * 60000,
+    );
     return offsetDate.toISOString().slice(0, 10);
 }
 
@@ -87,8 +91,18 @@ function fdate(value: string): string {
 /* ================================================================== */
 
 const RUN_STEPS: readonly WizardStep[] = [
-    { key: 'period', label: 'Pay period', blurb: 'Dates & notes', icon: CalendarRange },
-    { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: CheckCircle2 },
+    {
+        key: 'period',
+        label: 'Pay period',
+        blurb: 'Dates & notes',
+        icon: CalendarRange,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & create',
+        icon: CheckCircle2,
+    },
 ];
 
 export function CreateRunWizard({ onClose }: { onClose: () => void }) {
@@ -111,14 +125,13 @@ export function CreateRunWizard({ onClose }: { onClose: () => void }) {
         form.data.period_end !== '' &&
         form.data.period_end > form.data.period_start;
 
-    const periodDays =
-        periodValid
-            ? Math.round(
-                  (new Date(`${form.data.period_end}T00:00:00`).getTime() -
-                      new Date(`${form.data.period_start}T00:00:00`).getTime()) /
-                      86400000,
-              ) + 1
-            : null;
+    const periodDays = periodValid
+        ? Math.round(
+              (new Date(`${form.data.period_end}T00:00:00`).getTime() -
+                  new Date(`${form.data.period_start}T00:00:00`).getTime()) /
+                  86400000,
+          ) + 1
+        : null;
 
     const submit = () => {
         form.post('/hr/payroll/runs', {
@@ -154,9 +167,10 @@ export function CreateRunWizard({ onClose }: { onClose: () => void }) {
                         title="Pay run created"
                         blurb={
                             <>
-                                A draft run for {fdate(form.data.period_start)} –{' '}
-                                {fdate(form.data.period_end)} is ready. Review its items, then
-                                lock and export it to your payroll provider.
+                                A draft run for {fdate(form.data.period_start)}{' '}
+                                – {fdate(form.data.period_end)} is ready. Review
+                                its items, then lock and export it to your
+                                payroll provider.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -176,7 +190,10 @@ export function CreateRunWizard({ onClose }: { onClose: () => void }) {
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !periodValid}>
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !periodValid}
+                        >
                             {form.processing ? 'Creating…' : 'Create run'}
                         </Button>
                     ) : (
@@ -195,33 +212,53 @@ export function CreateRunWizard({ onClose }: { onClose: () => void }) {
                         blurb="The draft run gathers approved time into gross pay for this window — PAYE and KiwiSaver are applied by your payroll provider after export."
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Period start" required error={serverErrors.period_start}>
+                        <Field
+                            label="Period start"
+                            required
+                            error={serverErrors.period_start}
+                        >
                             <Input
                                 type="date"
                                 value={form.data.period_start}
-                                onChange={(e) => form.setData('period_start', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('period_start', e.target.value)
+                                }
                             />
                         </Field>
-                        <Field label="Period end" required error={serverErrors.period_end}>
+                        <Field
+                            label="Period end"
+                            required
+                            error={serverErrors.period_end}
+                        >
                             <Input
                                 type="date"
                                 min={form.data.period_start || undefined}
                                 value={form.data.period_end}
-                                onChange={(e) => form.setData('period_end', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('period_end', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
                     {form.data.period_end !== '' &&
                     form.data.period_start !== '' &&
                     form.data.period_end <= form.data.period_start ? (
-                        <FieldErr>Period end must be after the period start.</FieldErr>
+                        <FieldErr>
+                            Period end must be after the period start.
+                        </FieldErr>
                     ) : null}
                     <FieldErr>{serverErrors.period}</FieldErr>
                     <div className="mt-3.5">
-                        <Field label="Notes" hint="optional" error={serverErrors.notes}>
+                        <Field
+                            label="Notes"
+                            hint="optional"
+                            error={serverErrors.notes}
+                        >
                             <Input
                                 value={form.data.notes}
-                                onChange={(e) => form.setData('notes', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('notes', e.target.value)
+                                }
                                 placeholder="Optional payroll notes"
                             />
                         </Field>
@@ -243,13 +280,26 @@ export function CreateRunWizard({ onClose }: { onClose: () => void }) {
                             onEdit={() => wizard.goTo(0)}
                             span
                         >
-                            <ReviewRow label="Start" value={fdate(form.data.period_start)} />
-                            <ReviewRow label="End" value={fdate(form.data.period_end)} />
+                            <ReviewRow
+                                label="Start"
+                                value={fdate(form.data.period_start)}
+                            />
+                            <ReviewRow
+                                label="End"
+                                value={fdate(form.data.period_end)}
+                            />
                             <ReviewRow
                                 label="Length"
-                                value={periodDays != null ? `${periodDays} days` : undefined}
+                                value={
+                                    periodDays != null
+                                        ? `${periodDays} days`
+                                        : undefined
+                                }
                             />
-                            <ReviewRow label="Notes" value={form.data.notes || undefined} />
+                            <ReviewRow
+                                label="Notes"
+                                value={form.data.notes || undefined}
+                            />
                         </ReviewCard>
                     </div>
                     <FieldErr>{serverErrors.period}</FieldErr>
@@ -264,10 +314,30 @@ export function CreateRunWizard({ onClose }: { onClose: () => void }) {
 /* ================================================================== */
 
 const PROFILE_STEPS: readonly WizardStep[] = [
-    { key: 'basics', label: 'Basics', blurb: 'Name & provider', icon: FileText },
-    { key: 'format', label: 'File format', blurb: 'Delimiters & headers', icon: Settings2 },
-    { key: 'columns', label: 'Columns', blurb: 'Export mappings', icon: Columns3 },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+    {
+        key: 'basics',
+        label: 'Basics',
+        blurb: 'Name & provider',
+        icon: FileText,
+    },
+    {
+        key: 'format',
+        label: 'File format',
+        blurb: 'Delimiters & headers',
+        icon: Settings2,
+    },
+    {
+        key: 'columns',
+        label: 'Columns',
+        blurb: 'Export mappings',
+        icon: Columns3,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: CheckCircle2,
+    },
 ];
 
 const LINE_ENDING_OPTIONS = [
@@ -340,7 +410,9 @@ export function ExportProfileWizard({
     const setMapping = (index: number, patch: Partial<MappingRow>) => {
         form.setData(
             'mappings',
-            form.data.mappings.map((m, i) => (i === index ? { ...m, ...patch } : m)),
+            form.data.mappings.map((m, i) =>
+                i === index ? { ...m, ...patch } : m,
+            ),
         );
     };
 
@@ -358,7 +430,11 @@ export function ExportProfileWizard({
                 .filter((m) => m.header.trim() !== '' && m.source !== '')
                 .map((m) =>
                     m.source === 'static'
-                        ? { header: m.header.trim(), source: m.source, value: m.value }
+                        ? {
+                              header: m.header.trim(),
+                              source: m.source,
+                              value: m.value,
+                          }
                         : { header: m.header.trim(), source: m.source },
                 ),
         }));
@@ -402,9 +478,10 @@ export function ExportProfileWizard({
                         title={isEdit ? 'Profile updated' : 'Profile created'}
                         blurb={
                             <>
-                                “{form.data.name}” is ready with {validMappings.length}{' '}
-                                column{validMappings.length === 1 ? '' : 's'}. Pick it when
-                                exporting a locked pay run.
+                                “{form.data.name}” is ready with{' '}
+                                {validMappings.length} column
+                                {validMappings.length === 1 ? '' : 's'}. Pick it
+                                when exporting a locked pay run.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -442,8 +519,10 @@ export function ExportProfileWizard({
                         <Button
                             onClick={wizard.next}
                             disabled={
-                                (wizard.index === 0 && form.data.name.trim() === '') ||
-                                (wizard.index === 2 && validMappings.length === 0)
+                                (wizard.index === 0 &&
+                                    form.data.name.trim() === '') ||
+                                (wizard.index === 2 &&
+                                    validMappings.length === 0)
                             }
                         >
                             Continue
@@ -460,10 +539,16 @@ export function ExportProfileWizard({
                         blurb="A profile describes the CSV layout one payroll provider expects."
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
-                        <Field label="Profile name" required error={serverErrors.name}>
+                        <Field
+                            label="Profile name"
+                            required
+                            error={serverErrors.name}
+                        >
                             <Input
                                 value={form.data.name}
-                                onChange={(e) => form.setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('name', e.target.value)
+                                }
                                 placeholder="MYOB payroll export"
                             />
                         </Field>
@@ -474,7 +559,9 @@ export function ExportProfileWizard({
                         >
                             <Input
                                 value={form.data.provider_key}
-                                onChange={(e) => form.setData('provider_key', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('provider_key', e.target.value)
+                                }
                                 placeholder="myob, xero, custom"
                             />
                         </Field>
@@ -486,7 +573,9 @@ export function ExportProfileWizard({
                         >
                             <Input
                                 value={form.data.description}
-                                onChange={(e) => form.setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
                                 placeholder="What this layout is for…"
                             />
                         </Field>
@@ -505,18 +594,28 @@ export function ExportProfileWizard({
                         <Field label="Delimiter" error={serverErrors.delimiter}>
                             <Input
                                 value={form.data.delimiter}
-                                onChange={(e) => form.setData('delimiter', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('delimiter', e.target.value)
+                                }
                             />
                         </Field>
-                        <Field label="Text enclosure" error={serverErrors.enclosure}>
+                        <Field
+                            label="Text enclosure"
+                            error={serverErrors.enclosure}
+                        >
                             <Input
                                 value={form.data.enclosure}
-                                onChange={(e) => form.setData('enclosure', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('enclosure', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
                     <div className="mt-4">
-                        <Field label="Line ending" error={serverErrors.line_ending}>
+                        <Field
+                            label="Line ending"
+                            error={serverErrors.line_ending}
+                        >
                             <Segmented
                                 value={form.data.line_ending}
                                 onChange={(v) => form.setData('line_ending', v)}
@@ -530,7 +629,10 @@ export function ExportProfileWizard({
                             <Checkbox
                                 checked={form.data.include_headers}
                                 onCheckedChange={(checked) =>
-                                    form.setData('include_headers', Boolean(checked))
+                                    form.setData(
+                                        'include_headers',
+                                        Boolean(checked),
+                                    )
                                 }
                             />
                             <span>Include header row</span>
@@ -564,14 +666,20 @@ export function ExportProfileWizard({
                             >
                                 <Input
                                     value={mapping.header}
-                                    onChange={(e) => setMapping(index, { header: e.target.value })}
+                                    onChange={(e) =>
+                                        setMapping(index, {
+                                            header: e.target.value,
+                                        })
+                                    }
                                     placeholder="Column header"
                                     aria-label={`Column ${index + 1} header`}
                                 />
                                 <div className="flex flex-col gap-2">
                                     <SelectInput
                                         value={mapping.source}
-                                        onChange={(v) => setMapping(index, { source: v })}
+                                        onChange={(v) =>
+                                            setMapping(index, { source: v })
+                                        }
                                         placeholder="Field source"
                                         options={sourceOptions}
                                         ariaLabel={`Column ${index + 1} source`}
@@ -580,7 +688,9 @@ export function ExportProfileWizard({
                                         <Input
                                             value={mapping.value}
                                             onChange={(e) =>
-                                                setMapping(index, { value: e.target.value })
+                                                setMapping(index, {
+                                                    value: e.target.value,
+                                                })
                                             }
                                             placeholder="Static value"
                                             aria-label={`Column ${index + 1} static value`}
@@ -595,7 +705,9 @@ export function ExportProfileWizard({
                                     onClick={() =>
                                         form.setData(
                                             'mappings',
-                                            form.data.mappings.filter((_, i) => i !== index),
+                                            form.data.mappings.filter(
+                                                (_, i) => i !== index,
+                                            ),
                                         )
                                     }
                                 >
@@ -620,7 +732,10 @@ export function ExportProfileWizard({
                         Add column
                     </Button>
                     {validMappings.length === 0 ? (
-                        <FieldErr>At least one column with a header and source is required.</FieldErr>
+                        <FieldErr>
+                            At least one column with a header and source is
+                            required.
+                        </FieldErr>
                     ) : null}
                     <FieldErr>{serverErrors.mappings}</FieldErr>
                 </WizardStepPane>
@@ -634,9 +749,16 @@ export function ExportProfileWizard({
                         blurb="Check the layout, then save."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={FileText} title="Basics" onEdit={() => wizard.goTo(0)}>
+                        <ReviewCard
+                            icon={FileText}
+                            title="Basics"
+                            onEdit={() => wizard.goTo(0)}
+                        >
                             <ReviewRow label="Name" value={form.data.name} />
-                            <ReviewRow label="Provider" value={form.data.provider_key || undefined} />
+                            <ReviewRow
+                                label="Provider"
+                                value={form.data.provider_key || undefined}
+                            />
                             <ReviewRow
                                 label="Description"
                                 value={form.data.description || undefined}
@@ -647,19 +769,30 @@ export function ExportProfileWizard({
                             title="File format"
                             onEdit={() => wizard.goTo(1)}
                         >
-                            <ReviewRow label="Delimiter" value={form.data.delimiter} />
-                            <ReviewRow label="Enclosure" value={form.data.enclosure} />
+                            <ReviewRow
+                                label="Delimiter"
+                                value={form.data.delimiter}
+                            />
+                            <ReviewRow
+                                label="Enclosure"
+                                value={form.data.enclosure}
+                            />
                             <ReviewRow
                                 label="Line ending"
                                 value={
                                     LINE_ENDING_OPTIONS.find(
-                                        (o) => o.value === form.data.line_ending,
+                                        (o) =>
+                                            o.value === form.data.line_ending,
                                     )?.label
                                 }
                             />
                             <ReviewRow
                                 label="Headers"
-                                value={form.data.include_headers ? 'Included' : 'Omitted'}
+                                value={
+                                    form.data.include_headers
+                                        ? 'Included'
+                                        : 'Omitted'
+                                }
                             />
                             <ReviewRow
                                 label="Default"
@@ -679,8 +812,9 @@ export function ExportProfileWizard({
                                     value={
                                         m.source === 'static'
                                             ? `Static: ${m.value || '—'}`
-                                            : (sourceOptions.find((o) => o.value === m.source)
-                                                  ?.label ?? m.source)
+                                            : (sourceOptions.find(
+                                                  (o) => o.value === m.source,
+                                              )?.label ?? m.source)
                                     }
                                 />
                             ))}
@@ -689,8 +823,8 @@ export function ExportProfileWizard({
                     <FieldErr>{serverErrors.mappings}</FieldErr>
                     {form.hasErrors ? (
                         <FieldErr>
-                            Some fields need attention — use Edit to jump back to the
-                            highlighted step.
+                            Some fields need attention — use Edit to jump back
+                            to the highlighted step.
                         </FieldErr>
                     ) : null}
                 </WizardStepPane>

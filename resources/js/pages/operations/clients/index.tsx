@@ -6,7 +6,6 @@
  * PageHeroActions' `[data-slot=button]` colour overrides. They are therefore built as styled
  * native elements rather than design-system components, sourcing every colour from semantic
  * tokens (never hardcoded hex). */
-import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { AssignWorkerDialog } from '@/components/assign-worker-dialog';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
 import {
@@ -33,8 +32,8 @@ import {
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { Head, router, usePage } from '@inertiajs/react';
-import { AddClientDialog } from './_create-dialog';
 import {
     Activity,
     AlertTriangle,
@@ -71,6 +70,7 @@ import {
     type ComponentType,
 } from 'react';
 import { toast } from 'sonner';
+import { AddClientDialog } from './_create-dialog';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -146,7 +146,7 @@ type Can = {
     timeline?: { create?: boolean };
 };
 
-type ClientFormOption = { id: number; name: string };
+type ClientFormOption = { id: number; name: string; site_id?: number | null };
 type ServiceContextOption = { id: number; type?: string | null; name: string };
 
 type PageProps = {

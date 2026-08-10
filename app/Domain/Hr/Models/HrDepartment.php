@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class HrDepartment extends Model
 {
     protected $fillable = [
-        'tenant_id',
         'name',
         'code',
         'cost_centre',
@@ -29,7 +28,7 @@ class HrDepartment extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeActive($query)
@@ -38,7 +37,7 @@ class HrDepartment extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function manager(): BelongsTo
@@ -70,7 +69,7 @@ class HrDepartment extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Hierarchy helpers (cycle-safe)                                     */
+    /*  Hierarchy helpers (cycle-safe) */
     /* ------------------------------------------------------------------ */
 
     /**

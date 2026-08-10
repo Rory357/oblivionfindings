@@ -12,6 +12,7 @@ use App\Models\Role;
 use App\Models\RosterPeriod;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\ShiftSeries;
 use App\Models\ShiftTask;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
@@ -312,6 +313,82 @@ class ShiftControllerTest extends TestCase
             ->assertOk();
 
         $this->assertSame(1, CoverageReservation::query()->count());
+
+        $otherAdmin = User::factory()->create([
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
+        $otherAdmin->roles()->attach(Role::where('name', 'admin')->firstOrFail());
+
+        $this->actingAs($otherAdmin)
+            ->getJson(route('operations.shifts.create', array_merge($payload, [
+                'coverage_reservation_token' => $first['token'],
+            ])))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('coverage_reservation_token');
+    }
+
+    public function test_coverage_state_actions_reject_unassigned_sites_and_mismatched_requirements(): void
+    {
+        $permissions = Permission::query()
+            ->whereIn('key', ['shifts.create', 'rostering.viewAny'])
+            ->pluck('id')
+            ->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])
+            ->all();
+        $this->staff->permissionOverrides()->syncWithoutDetaching($permissions);
+
+        $otherSite = Site::factory()->create(['name' => 'Rimu House']);
+        $startsAt = now()->addDay()->setTime(9, 0);
+        $endsAt = now()->addDay()->setTime(10, 0);
+        $otherSiteRule = SiteCoverageRequirement::create([
+            'site_id' => $otherSite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'name' => 'Other Site Coverage',
+            'coverage_type' => 'custom',
+            'day_of_week' => strtolower($startsAt->format('D')),
+            'starts_time' => $startsAt->format('H:i'),
+            'ends_time' => $endsAt->format('H:i'),
+            'minimum_staff' => 1,
+            'role_requirements' => [],
+            'allow_overstaffing' => true,
+            'is_active' => true,
+        ]);
+
+        $reservationPayload = [
+            'site_id' => $otherSite->id,
+            'coverage_rule_id' => $otherSiteRule->id,
+            'starts_at' => $startsAt->toIso8601String(),
+            'ends_at' => $endsAt->toIso8601String(),
+        ];
+
+        $this->actingAs($this->staff)
+            ->postJson(route('operations.coverage.reservations.store'), $reservationPayload)
+            ->assertForbidden();
+
+        $this->actingAs($this->staff)
+            ->postJson(route('operations.coverage.reservations.store'), array_merge($reservationPayload, [
+                'site_id' => $this->site->id,
+            ]))
+            ->assertForbidden();
+
+        $mismatchedKey = app(ShiftSignalService::class)->buildCoverageWindowKey([
+            'site_id' => $this->site->id,
+            'rule_id' => $otherSiteRule->id,
+            'starts_at' => $startsAt->toIso8601String(),
+            'ends_at' => $endsAt->toIso8601String(),
+        ]);
+
+        $this->actingAs($this->staff)
+            ->postJson(route('operations.rostering.coverage.ack', $mismatchedKey), [
+                'site_id' => $this->site->id,
+                'coverage_requirement_id' => $otherSiteRule->id,
+                'window_starts_at' => $startsAt->toIso8601String(),
+                'window_ends_at' => $endsAt->toIso8601String(),
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(0, CoverageReservation::query()->count());
+        $this->assertSame(0, CoverageGapAcknowledgement::query()->count());
     }
 
     public function test_manager_can_ack_dismiss_and_clear_coverage_gap(): void
@@ -509,6 +586,7 @@ class ShiftControllerTest extends TestCase
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'roster_period_id' => $period->id,
+            'user_id' => $this->staff->id,
             'starts_at' => Carbon::parse('2026-05-04 09:00:00', 'Pacific/Auckland')->utc(),
             'ends_at' => Carbon::parse('2026-05-04 13:00:00', 'Pacific/Auckland')->utc(),
             'status' => 'scheduled',
@@ -774,6 +852,9 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
             'location' => 'Old Location',
             'status' => 'scheduled',
         ]);
@@ -798,6 +879,9 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->completed()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
         ]);
 
         $response = $this->actingAs($this->admin)
@@ -815,6 +899,9 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
             'status' => 'scheduled',
         ]);
 
@@ -930,7 +1017,7 @@ class ShiftControllerTest extends TestCase
             ])
             ->assertSessionHasNoErrors();
 
-        $series = \App\Models\ShiftSeries::query()->latest('id')->first();
+        $series = ShiftSeries::query()->latest('id')->first();
         $this->assertNotNull($series);
         $this->assertTrue((bool) $series->is_lone_worker, 'Series should persist is_lone_worker.');
 

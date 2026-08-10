@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+required_variables=(
+    OBLIVION_COLLECTOR_PHP_BINARY
+    OBLIVION_COLLECTOR_ARTIFACT_DIR
+    OBLIVION_COLLECTOR_IDENTITY_FILE
+    OBLIVION_COLLECTOR_CONFIG_FILE
+)
+
+for variable in "${required_variables[@]}"; do
+    if [[ -z "${!variable:-}" ]]; then
+        echo "Collector runtime variable ${variable} is unavailable." >&2
+        exit 78
+    fi
+done
+
+if [[ ! -x "$OBLIVION_COLLECTOR_PHP_BINARY" ]]; then
+    echo 'Collector PHP binary is unavailable.' >&2
+    exit 78
+fi
+if [[ ! -r "$OBLIVION_COLLECTOR_ARTIFACT_DIR/bin/oblivion-collector" || ! -r "$OBLIVION_COLLECTOR_ARTIFACT_DIR/vendor/autoload.php" ]]; then
+    echo 'Collector runtime artifact is incomplete.' >&2
+    exit 78
+fi
+if [[ ! -r "$OBLIVION_COLLECTOR_IDENTITY_FILE" ]]; then
+    echo 'Collector identity is unavailable.' >&2
+    exit 78
+fi
+
+if [[ ! -d /run/oblivion-monitoring-collector ]]; then
+    echo 'Collector runtime directory is unavailable.' >&2
+    exit 78
+fi
+exec 9>/run/oblivion-monitoring-collector/cycle.lock
+if ! flock -n 9; then
+    echo 'A collector cycle is already active; the overlapping trigger was skipped.' >&2
+    exit 0
+fi
+
+exec "$OBLIVION_COLLECTOR_PHP_BINARY" \
+    "$OBLIVION_COLLECTOR_ARTIFACT_DIR/bin/oblivion-collector" \
+    run \
+    "--identity=$OBLIVION_COLLECTOR_IDENTITY_FILE" \
+    "--config=$OBLIVION_COLLECTOR_CONFIG_FILE"

@@ -52,17 +52,31 @@ class ServiceContext extends Model
         return $this->hasMany(Shift::class);
     }
 
-    public function scopeForOrganization(Builder $query, ?int $organizationId): Builder
+    public function scopeAvailableToSite(Builder $query, ?int $siteId): Builder
     {
-        if ($organizationId === null) {
-            return $query;
-        }
+        return $this->scopeAvailableToSites(
+            $query,
+            $siteId === null ? [] : [$siteId],
+        );
+    }
 
-        return $query->where(function (Builder $query) use ($organizationId) {
-            $query->whereNull('site_id')->orWhereHas(
-                'site',
-                fn (Builder $sites) => $sites->where('tenant_id', $organizationId),
-            );
+    /**
+     * @param  array<int, int>  $siteIds
+     */
+    public function scopeAvailableToSites(Builder $query, array $siteIds): Builder
+    {
+        $siteIds = collect($siteIds)
+            ->map(fn (mixed $siteId): int => (int) $siteId)
+            ->filter(fn (int $siteId): bool => $siteId > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        return $query->where(function (Builder $query) use ($siteIds): void {
+            $query->whereNull('site_id');
+            if ($siteIds !== []) {
+                $query->orWhereIn('site_id', $siteIds);
+            }
         });
     }
 
@@ -82,5 +96,23 @@ class ServiceContext extends Model
         }
 
         return self::query()->whereKey($id)->where('is_active', true)->exists() ? $id : null;
+    }
+
+    /**
+     * Returns the active configured default only when it is available to the
+     * selected Site. A null Site can use only an application-wide context.
+     */
+    public static function defaultIdForSite(?int $siteId): ?int
+    {
+        $id = self::defaultId();
+        if ($id === null) {
+            return null;
+        }
+
+        return self::query()
+            ->availableToSite($siteId)
+            ->whereKey($id)
+            ->where('is_active', true)
+            ->exists() ? $id : null;
     }
 }

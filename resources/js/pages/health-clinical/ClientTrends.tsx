@@ -1,8 +1,14 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Activity } from 'lucide-react';
@@ -93,14 +99,24 @@ export default function ClientTrends({
                         description={`${clientName} with chartable observation data over time.`}
                         actions={
                             <>
-                                <Link href={`/health-clinical/clients/${client.id}/summary`}>
-                                    <Button variant="outline" size="sm">Health Summary</Button>
+                                <Link
+                                    href={`/health-clinical/clients/${client.id}/summary`}
+                                >
+                                    <Button variant="outline" size="sm">
+                                        Health Summary
+                                    </Button>
                                 </Link>
                                 <Link href={`/operations/clients/${client.id}`}>
-                                    <Button variant="outline" size="sm">Client Profile</Button>
+                                    <Button variant="outline" size="sm">
+                                        Client Profile
+                                    </Button>
                                 </Link>
-                                <Link href={`/health-clinical/observations?client_id=${client.id}`}>
-                                    <Button variant="outline" size="sm">Observation Register</Button>
+                                <Link
+                                    href={`/health-clinical/observations?client_id=${client.id}`}
+                                >
+                                    <Button variant="outline" size="sm">
+                                        Observation Register
+                                    </Button>
                                 </Link>
                             </>
                         }
@@ -111,13 +127,16 @@ export default function ClientTrends({
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base">Date Range</CardTitle>
                         <CardDescription>
-                            Last 30 days is the default window for this trends view.
+                            Last 30 days is the default window for this trends
+                            view.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-3 sm:grid-cols-3">
                             <div>
-                                <Label htmlFor="date_from" className="text-xs">From</Label>
+                                <Label htmlFor="date_from" className="text-xs">
+                                    From
+                                </Label>
                                 <Input
                                     id="date_from"
                                     type="date"
@@ -131,7 +150,9 @@ export default function ClientTrends({
                                 />
                             </div>
                             <div>
-                                <Label htmlFor="date_to" className="text-xs">To</Label>
+                                <Label htmlFor="date_to" className="text-xs">
+                                    To
+                                </Label>
                                 <Input
                                     id="date_to"
                                     type="date"
@@ -148,7 +169,11 @@ export default function ClientTrends({
                                 <Button size="sm" onClick={applyFilters}>
                                     Apply
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={resetFilters}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={resetFilters}
+                                >
                                     Reset
                                 </Button>
                             </div>
@@ -160,9 +185,13 @@ export default function ClientTrends({
                     <Card>
                         <CardContent className="flex h-[220px] flex-col items-center justify-center gap-2 text-center">
                             <Activity className="h-8 w-8 text-muted-foreground" />
-                            <h2 className="text-lg font-semibold">No chartable observations in this range</h2>
+                            <h2 className="text-lg font-semibold">
+                                No chartable observations in this range
+                            </h2>
                             <p className="max-w-lg text-sm text-muted-foreground">
-                                Try a wider date range or review the observation register for non-chartable entries such as general notes or sleep logs.
+                                Try a wider date range or review the observation
+                                register for non-chartable entries such as
+                                general notes or sleep logs.
                             </p>
                         </CardContent>
                     </Card>
@@ -173,12 +202,17 @@ export default function ClientTrends({
                 <Card>
                     <CardContent className="flex items-center justify-between gap-3 p-4">
                         <div>
-                            <p className="text-sm font-medium">Chartable observations in range</p>
+                            <p className="text-sm font-medium">
+                                Chartable observations in range
+                            </p>
                             <p className="text-xs text-muted-foreground">
-                                {chartable_observation_count} entries across weight, pain, vitals, and fluid intake.
+                                {chartable_observation_count} entries across
+                                weight, pain, vitals, and fluid intake.
                             </p>
                         </div>
-                        <Link href={`/health-clinical/observations?client_id=${client.id}&date_from=${filters.date_from}&date_to=${filters.date_to}`}>
+                        <Link
+                            href={`/health-clinical/observations?client_id=${client.id}&date_from=${filters.date_from}&date_to=${filters.date_to}`}
+                        >
                             <Button size="sm" variant="outline">
                                 View matching register entries
                             </Button>

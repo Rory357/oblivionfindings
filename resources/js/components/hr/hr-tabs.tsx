@@ -42,7 +42,9 @@ export function useHrTab(
     const syncUrl = options?.syncUrl ?? true;
     const [tab, setTab] = useState<string>(() => {
         if (typeof window === 'undefined') return defaultTab;
-        return new URLSearchParams(window.location.search).get(param) || defaultTab;
+        return (
+            new URLSearchParams(window.location.search).get(param) || defaultTab
+        );
     });
     const change = useCallback(
         (next: string) => {

@@ -179,13 +179,18 @@ function ExitInterviewDialog({
                             )}
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="interview_date">Interview date</Label>
+                            <Label htmlFor="interview_date">
+                                Interview date
+                            </Label>
                             <Input
                                 id="interview_date"
                                 type="date"
                                 value={form.data.interview_date}
                                 onChange={(e) =>
-                                    form.setData('interview_date', e.target.value)
+                                    form.setData(
+                                        'interview_date',
+                                        e.target.value,
+                                    )
                                 }
                             />
                             {form.errors.interview_date && (
@@ -246,7 +251,10 @@ function ExitInterviewDialog({
                             rows={3}
                             value={form.data.what_could_improve}
                             onChange={(e) =>
-                                form.setData('what_could_improve', e.target.value)
+                                form.setData(
+                                    'what_could_improve',
+                                    e.target.value,
+                                )
                             }
                         />
                     </div>
@@ -373,7 +381,10 @@ export default function OffboardingShow({
                                     {checklist.employee_profile.user.name}
                                 </CardTitle>
                                 <p className="mt-1 text-sm text-muted-foreground capitalize">
-                                    {checklist.template_key.replace(/[:_]/g, ' ')}
+                                    {checklist.template_key.replace(
+                                        /[:_]/g,
+                                        ' ',
+                                    )}
                                 </p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -611,10 +622,9 @@ export default function OffboardingShow({
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Use this when the departure is not going ahead —
-                            e.g. a retracted resignation. The checklist and
-                            its history are kept, tasks stop counting as due,
-                            and it can be resumed later. System access is not
-                            changed.
+                            e.g. a retracted resignation. The checklist and its
+                            history are kept, tasks stop counting as due, and it
+                            can be resumed later. System access is not changed.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

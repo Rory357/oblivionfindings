@@ -2,10 +2,12 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -13,6 +15,18 @@ beforeEach(function () {
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    $this->site = Site::factory()->create(['name' => 'Add Employee Allowed Site']);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $this->hr->id,
+        'employee_number' => 'EMP-ADD-VIEWER',
+        'work_email' => $this->hr->email,
+        'position_title' => 'HR Manager',
+        'position_role' => 'hr',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 });
 
@@ -23,6 +37,7 @@ test('an HR manager can add an employee via people.store', function () {
         'role' => 'support_worker',
         'employment_type' => 'full_time',
         'position_title' => 'Support Worker',
+        'primary_site_id' => $this->site->id,
     ]);
 
     $response->assertRedirect();
@@ -56,7 +71,7 @@ test('a non-manager cannot add an employee', function () {
     expect(User::query()->where('email', 'blocked@example.test')->exists())->toBeFalse();
 });
 
-test('adding an email that exists without a profile links to that user', function () {
+test('adding an unproven email that exists without a profile is rejected', function () {
     $existing = User::factory()->create([
         'email' => 'candidate@example.test',
         'role' => 'support_worker',
@@ -67,13 +82,13 @@ test('adding an email that exists without a profile links to that user', functio
         'name' => 'Candidate Hire',
         'email' => 'candidate@example.test',
         'role' => 'support_worker',
-    ])->assertRedirect();
+        'primary_site_id' => $this->site->id,
+    ])->assertSessionHasErrors('email');
 
-    // Linked, not duplicated: still one user, now with a profile.
     expect(User::query()->where('email', 'candidate@example.test')->count())->toBe(1);
     expect(
         HrEmployeeProfile::query()->where('user_id', $existing->id)->exists()
-    )->toBeTrue();
+    )->toBeFalse();
 });
 
 test('adding an email already used by a staff member needs link confirmation', function () {
@@ -83,7 +98,6 @@ test('adding an email already used by a staff member needs link confirmation', f
         'approved_at' => now(),
     ]);
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $existing->id,
         'employee_number' => 'EMP-EXIST',
         'work_email' => $existing->email,
@@ -92,6 +106,7 @@ test('adding an email already used by a staff member needs link confirmation', f
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
     ]);
 
     // Without link_existing → rejected with a validation error.
@@ -99,6 +114,7 @@ test('adding an email already used by a staff member needs link confirmation', f
         'name' => 'Staffer Again',
         'email' => 'staffer@example.test',
         'role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
     ])->assertSessionHasErrors('email');
 
     // With link_existing → updates the existing profile in place (no duplicate).
@@ -107,6 +123,7 @@ test('adding an email already used by a staff member needs link confirmation', f
         'email' => 'staffer@example.test',
         'role' => 'support_worker',
         'position_title' => 'Senior Support Worker',
+        'primary_site_id' => $this->site->id,
         'link_existing' => true,
     ])->assertRedirect();
 

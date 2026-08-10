@@ -433,6 +433,7 @@ export interface MyDayPageProps {
     incidents: MyDayIncident[];
     tasks: MyDayTaskFollowup[];
     stats: MyDayStats;
+    pending_claims_count?: number;
     clock?: MyDayClockState;
     active_shift?: (MyDayShift & { site?: MyDayActiveSite | null }) | null;
     active_round?: MyDayActiveRound | null;

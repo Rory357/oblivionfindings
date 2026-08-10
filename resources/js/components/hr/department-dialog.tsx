@@ -38,9 +38,24 @@ export interface Department {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Name, code & cost centre', icon: Building2 },
-    { key: 'structure', label: 'Structure', blurb: 'Parent, head & order', icon: GitBranch },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Name, code & cost centre',
+        icon: Building2,
+    },
+    {
+        key: 'structure',
+        label: 'Structure',
+        blurb: 'Parent, head & order',
+        icon: GitBranch,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: ClipboardCheck,
+    },
 ];
 
 /** Create/edit a department on the shared wizard shell. People-hub Departments tab. */
@@ -101,7 +116,11 @@ export function DepartmentDialog({
             preserveScroll: true,
             onSuccess: () => close(),
             onError: () => {
-                if (form.errors.name || form.errors.code || form.errors.cost_centre) {
+                if (
+                    form.errors.name ||
+                    form.errors.code ||
+                    form.errors.cost_centre
+                ) {
                     wizard.goTo(0);
                 } else {
                     wizard.goTo(1); // parent_id (incl. cycle), manager, sort order
@@ -118,8 +137,8 @@ export function DepartmentDialog({
         parentOptions.find((p) => String(p.id) === form.data.parent_id)?.name ??
         '—';
     const managerLabel =
-        managers.find((m) => String(m.id) === form.data.manager_user_id)?.name ??
-        '—';
+        managers.find((m) => String(m.id) === form.data.manager_user_id)
+            ?.name ?? '—';
     const siteLabels = siteOptions
         .filter((s) => form.data.site_ids.includes(s.id))
         .map((s) => s.name);
@@ -202,7 +221,12 @@ export function DepartmentDialog({
                         blurb="The unit's name, an optional code, and the cost centre it reports against."
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Name" required span error={form.errors.name}>
+                        <Field
+                            label="Name"
+                            required
+                            span
+                            error={form.errors.name}
+                        >
                             <Input
                                 value={form.data.name}
                                 onChange={(e) =>
@@ -211,7 +235,11 @@ export function DepartmentDialog({
                                 placeholder="e.g. Care Services"
                             />
                         </Field>
-                        <Field label="Code" hint="optional" error={form.errors.code}>
+                        <Field
+                            label="Code"
+                            hint="optional"
+                            error={form.errors.code}
+                        >
                             <Input
                                 value={form.data.code}
                                 onChange={(e) =>

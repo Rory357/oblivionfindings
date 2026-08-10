@@ -7,12 +7,15 @@ import {
     runLaravelPhp,
 } from './helpers';
 
-function seedSiteOverviewContactsFixture(): { siteId: number } {
+function seedSiteOverviewContactsFixture(): {
+    siteId: number;
+    responsibleName: string;
+} {
     const output = runLaravelPhp(`
+$responsible = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->firstOrFail();
 $site = \\App\\Models\\Site::query()->updateOrCreate(
     ['name' => 'Playwright Overview Contacts House'],
     [
-        'tenant_id' => 1,
         'type' => 'house',
         'address_line_1' => '24 Contact Lane',
         'suburb' => 'Mount Eden',
@@ -22,6 +25,7 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
         'country' => 'New Zealand',
         'phone' => '09 555 0240',
         'email' => 'overview-contacts@example.test',
+        'primary_contact_user_id' => $responsible->id,
         'emergency_plan_location' => 'Kitchen folder',
         'medication_storage_location' => 'Medication cabinet',
         'is_active' => true,
@@ -31,7 +35,6 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
 \\App\\Models\\SiteContact::query()->where('site_id', $site->id)->delete();
 
 \\App\\Models\\SiteContact::query()->create([
-    'tenant_id' => $site->tenant_id,
     'site_id' => $site->id,
     'type' => 'site_lead',
     'name' => 'Taylor Site Lead',
@@ -41,7 +44,6 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
 ]);
 
 \\App\\Models\\SiteContact::query()->create([
-    'tenant_id' => $site->tenant_id,
     'site_id' => $site->id,
     'type' => 'team_lead',
     'name' => 'Riley Team Lead',
@@ -50,16 +52,22 @@ $site = \\App\\Models\\Site::query()->updateOrCreate(
     'is_primary' => false,
 ]);
 
-echo json_encode(['siteId' => $site->id]);
+echo json_encode([
+    'siteId' => $site->id,
+    'responsibleName' => $responsible->name,
+]);
 `);
 
-    return JSON.parse(output) as { siteId: number };
+    return JSON.parse(output) as {
+        siteId: number;
+        responsibleName: string;
+    };
 }
 
 test('site overview contact card uses site contacts and locked role creation', async ({
     page,
 }) => {
-    const { siteId } = seedSiteOverviewContactsFixture();
+    const { siteId, responsibleName } = seedSiteOverviewContactsFixture();
     const consoleErrors = collectConsoleErrors(page);
 
     await loginAsStaff(page);
@@ -75,12 +83,15 @@ test('site overview contact card uses site contacts and locked role creation', a
     await expect(card.getByTestId('site-contact-row-email')).toContainText(
         'overview-contacts@example.test',
     );
+    await expect(
+        card.getByTestId('site-contact-row-responsible-staff'),
+    ).toContainText(responsibleName);
     await expect(card.getByTestId('site-contact-row-site-lead')).toContainText(
         'Taylor Site Lead',
     );
-    await expect(card.getByTestId('site-contact-row-site-lead')).not.toContainText(
-        'Riley Team Lead',
-    );
+    await expect(
+        card.getByTestId('site-contact-row-site-lead'),
+    ).not.toContainText('Riley Team Lead');
     await expect(card.getByTestId('site-contact-row-manager')).toContainText(
         'Not set',
     );
@@ -103,9 +114,9 @@ test('site overview contact card uses site contacts and locked role creation', a
         '021 555 0242',
     );
 
-    await card.getByRole('button', { name: /edit site line/i }).click();
+    await card.getByRole('button', { name: /edit phone & email/i }).click();
     const siteLineDialog = page.getByRole('dialog');
-    await expect(siteLineDialog).toContainText('Edit site line');
+    await expect(siteLineDialog).toContainText('Edit phone & email');
     await expect(siteLineDialog.getByLabel('Phone')).toBeVisible();
     await expect(siteLineDialog.getByLabel('Email')).toBeVisible();
     await expect(siteLineDialog.getByText('Manager phone')).toHaveCount(0);

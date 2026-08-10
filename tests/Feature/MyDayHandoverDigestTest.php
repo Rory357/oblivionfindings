@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Shift;
@@ -19,18 +20,26 @@ afterEach(function () {
 });
 
 it('populates the My Day digest handover prop for the incoming worker', function () {
-    $worker = makeClockCapableWorker();
+    $site = Site::factory()->create(['type' => 'house']);
+    $worker = makeClockCapableWorker($site);
     $outgoing = User::factory()->frontlineWorker()->create(['name' => 'Alex Taylor']);
-    $client = Client::factory()->create(['first_name' => 'Mere', 'last_name' => 'Wilson']);
+    assignHandoverWorkerToSite($outgoing, $site);
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'Mere',
+        'last_name' => 'Wilson',
+    ]);
     $incomingShift = Shift::factory()
         ->assignedToday($worker, Carbon::parse('2026-06-08 10:00:00', 'Pacific/Auckland'))
         ->published()
         ->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'user_id' => $worker->id,
         ]);
     $outgoingShift = Shift::factory()->completed()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'user_id' => $outgoing->id,
         'starts_at' => Carbon::parse('2026-06-08 02:00:00', 'Pacific/Auckland')->utc(),
         'ends_at' => Carbon::parse('2026-06-08 10:00:00', 'Pacific/Auckland')->utc(),
@@ -68,9 +77,11 @@ it('populates the My Day digest handover prop for the incoming worker', function
 });
 
 it('does not surface an unassigned handover for a resident outside the worker site shift', function () {
-    $worker = makeClockCapableWorker();
     $workerSite = Site::factory()->create(['type' => 'house']);
     $foreignSite = Site::factory()->create(['type' => 'house']);
+    $worker = makeClockCapableWorker($workerSite);
+    $foreignOutgoing = User::factory()->frontlineWorker()->create();
+    assignHandoverWorkerToSite($foreignOutgoing, $foreignSite);
     $workerResident = Client::factory()->create(['site_id' => $workerSite->id]);
     $foreignResident = Client::factory()->create(['site_id' => $foreignSite->id]);
     $workerShift = Shift::factory()
@@ -85,6 +96,7 @@ it('does not surface an unassigned handover for a resident outside the worker si
     $foreignOutgoingShift = Shift::factory()->completed()->create([
         'client_id' => $foreignResident->id,
         'site_id' => $foreignSite->id,
+        'user_id' => $foreignOutgoing->id,
         'starts_at' => Carbon::parse('2026-06-08 02:00:00', 'Pacific/Auckland')->utc(),
         'ends_at' => Carbon::parse('2026-06-08 09:30:00', 'Pacific/Auckland')->utc(),
     ]);
@@ -92,6 +104,7 @@ it('does not surface an unassigned handover for a resident outside the worker si
         'outgoing_shift_id' => $foreignOutgoingShift->id,
         'incoming_shift_id' => null,
         'client_id' => $foreignResident->id,
+        'outgoing_staff_id' => $foreignOutgoing->id,
         'incoming_staff_id' => null,
         'status' => ShiftHandoverService::STATUS_SUBMITTED,
         'handover_notes' => 'This belongs to a different house.',
@@ -110,9 +123,11 @@ it('does not surface an unassigned handover for a resident outside the worker si
 });
 
 it('does not let a worker claim an unassigned handover for a foreign resident', function () {
-    $worker = makeClockCapableWorker();
     $workerSite = Site::factory()->create(['type' => 'house']);
     $foreignSite = Site::factory()->create(['type' => 'house']);
+    $worker = makeClockCapableWorker($workerSite);
+    $foreignOutgoing = User::factory()->frontlineWorker()->create();
+    assignHandoverWorkerToSite($foreignOutgoing, $foreignSite);
     $workerResident = Client::factory()->create(['site_id' => $workerSite->id]);
     $foreignResident = Client::factory()->create(['site_id' => $foreignSite->id]);
     Shift::factory()
@@ -126,6 +141,7 @@ it('does not let a worker claim an unassigned handover for a foreign resident', 
     $foreignOutgoingShift = Shift::factory()->completed()->create([
         'client_id' => $foreignResident->id,
         'site_id' => $foreignSite->id,
+        'user_id' => $foreignOutgoing->id,
         'starts_at' => Carbon::parse('2026-06-08 02:00:00', 'Pacific/Auckland')->utc(),
         'ends_at' => Carbon::parse('2026-06-08 09:30:00', 'Pacific/Auckland')->utc(),
     ]);
@@ -133,6 +149,7 @@ it('does not let a worker claim an unassigned handover for a foreign resident', 
         'outgoing_shift_id' => $foreignOutgoingShift->id,
         'incoming_shift_id' => null,
         'client_id' => $foreignResident->id,
+        'outgoing_staff_id' => $foreignOutgoing->id,
         'incoming_staff_id' => null,
         'status' => ShiftHandoverService::STATUS_SUBMITTED,
         'submitted_at' => Carbon::parse('2026-06-08 09:30:00', 'Pacific/Auckland')->utc(),
@@ -150,9 +167,10 @@ it('does not let a worker claim an unassigned handover for a foreign resident', 
     ]);
 });
 
-function makeClockCapableWorker(): User
+function makeClockCapableWorker(Site $site): User
 {
     $worker = User::factory()->frontlineWorker()->create();
+    assignHandoverWorkerToSite($worker, $site);
     $permission = Permission::query()->firstOrCreate(
         ['key' => 'shifts.viewAssigned'],
         ['description' => 'shifts.viewAssigned'],
@@ -162,4 +180,21 @@ function makeClockCapableWorker(): User
     ]);
 
     return $worker;
+}
+
+function assignHandoverWorkerToSite(User $worker, Site $site): void
+{
+    HrEmployeeProfile::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $worker->id,
+        'employee_number' => 'EMP-MYDAY-'.$worker->id,
+        'work_email' => $worker->email,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+    ]);
 }

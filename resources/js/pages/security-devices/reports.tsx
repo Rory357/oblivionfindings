@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import {
@@ -74,10 +74,20 @@ export default function SecurityDevicesReports({ stats, windowDays }: Props) {
                     description="Stable CSV exports for inventory, events, and maintenance. A broader per-domain reporting surface lands with the dedicated Reporting module."
                     stats={[
                         { label: 'Devices', value: stats.devices },
-                        { label: `Events (${windowDays}d)`, value: stats.events_90d },
+                        {
+                            label: `Events (${windowDays}d)`,
+                            value: stats.events_90d,
+                        },
                         { label: 'Maintenance', value: stats.maintenance },
                     ]}
-                    actions={<Badge variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">CSV exports</Badge>}
+                    actions={
+                        <Badge
+                            variant="outline"
+                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm"
+                        >
+                            CSV exports
+                        </Badge>
+                    }
                 />
 
                 <div className="grid gap-4 lg:grid-cols-3">
@@ -90,8 +100,12 @@ export default function SecurityDevicesReports({ stats, windowDays }: Props) {
                                     </div>
                                     <Badge variant="secondary">{r.stat}</Badge>
                                 </div>
-                                <CardTitle className="text-lg">{r.title}</CardTitle>
-                                <CardDescription>{r.description}</CardDescription>
+                                <CardTitle className="text-lg">
+                                    {r.title}
+                                </CardTitle>
+                                <CardDescription>
+                                    {r.description}
+                                </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <Button asChild className="w-full">
@@ -109,15 +123,16 @@ export default function SecurityDevicesReports({ stats, windowDays }: Props) {
                     <CardHeader>
                         <CardTitle>Notes</CardTitle>
                         <CardDescription>
-                            How these exports behave and what they are and are not for.
+                            How these exports behave and what they are and are
+                            not for.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-3 text-sm md:grid-cols-2">
                         <div className="rounded-xl border p-4">
-                            <p className="font-medium">Tenant scope</p>
+                            <p className="font-medium">Site access scope</p>
                             <p className="leading-6 text-muted-foreground">
-                                Every export is filtered to the current
-                                tenant. Users without the
+                                Every export is filtered to Sites the user is
+                                allowed to access. Users without the
                                 <code className="mx-1 rounded bg-muted px-1 text-xs">
                                     securityDevices.reports.view
                                 </code>
@@ -128,15 +143,15 @@ export default function SecurityDevicesReports({ stats, windowDays }: Props) {
                             <p className="font-medium">Streaming</p>
                             <p className="leading-6 text-muted-foreground">
                                 Files are streamed row-by-row via a cursor
-                                query. Large tenants can export without
+                                query. Large exports can complete without
                                 buffering the whole dataset in memory.
                             </p>
                         </div>
                         <div className="rounded-xl border p-4">
                             <p className="font-medium">Encoding</p>
                             <p className="leading-6 text-muted-foreground">
-                                UTF-8 with a BOM so Excel opens NZ-format
-                                names and te reo characters correctly.
+                                UTF-8 with a BOM so Excel opens NZ-format names
+                                and te reo characters correctly.
                             </p>
                         </div>
                         <div className="rounded-xl border p-4">

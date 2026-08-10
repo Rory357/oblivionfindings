@@ -5,6 +5,7 @@ use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use PragmaRX\Google2FA\Google2FA;
@@ -12,7 +13,7 @@ use PragmaRX\Google2FA\Google2FA;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->admin = User::factory()->create([
         'role' => 'admin',
@@ -28,7 +29,7 @@ beforeEach(function () {
 });
 
 test('credential store accepts a pasted Base32 TOTP secret and persists it encrypted', function () {
-    $google2fa = new Google2FA();
+    $google2fa = new Google2FA;
     $secret = $google2fa->generateSecretKey(); // emulating a secret from another service
 
     $this->actingAs($this->admin)
@@ -51,7 +52,7 @@ test('credential store accepts a pasted Base32 TOTP secret and persists it encry
 });
 
 test('credential store normalizes pasted secrets: whitespace stripped, uppercased', function () {
-    $google2fa = new Google2FA();
+    $google2fa = new Google2FA;
     $secret = $google2fa->generateSecretKey();
     // Many services show the secret in groups of 4 (lowercase too in some).
     $messy = strtolower(implode(' ', str_split($secret, 4)));
@@ -69,11 +70,10 @@ test('credential store normalizes pasted secrets: whitespace stripped, uppercase
 });
 
 test('credential update with totp_secret rotates the secret; leaving it blank keeps existing', function () {
-    $google2fa = new Google2FA();
+    $google2fa = new Google2FA;
     $original = $google2fa->generateSecretKey();
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'before',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('pw'),
@@ -107,7 +107,7 @@ test('credential update with totp_secret rotates the secret; leaving it blank ke
 });
 
 test('totp code endpoint returns a valid 6-digit code for a pasted secret + audits', function () {
-    $google2fa = new Google2FA();
+    $google2fa = new Google2FA;
     $secret = $google2fa->generateSecretKey();
 
     $this->actingAs($this->admin)
@@ -139,12 +139,11 @@ test('totp code endpoint returns a valid 6-digit code for a pasted secret + audi
 });
 
 test('totp code endpoint requires re-auth when the credential requires reauth', function () {
-    $google2fa = new Google2FA();
+    $google2fa = new Google2FA;
     $secret = $google2fa->generateSecretKey();
 
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Protected admin',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('pw'),
@@ -187,7 +186,6 @@ test('totp code endpoint requires re-auth when the credential requires reauth', 
 test('totp code endpoint returns 404 when no secret is stored', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'no totp',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('pw'),
@@ -201,7 +199,6 @@ test('totp code endpoint returns 404 when no secret is stored', function () {
 test('removing TOTP clears the columns and audits totp_remove', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'with totp',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('pw'),
@@ -230,7 +227,6 @@ test('removing TOTP clears the columns and audits totp_remove', function () {
 test('removed enrollment endpoints no longer respond', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'x',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('pw'),

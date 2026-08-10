@@ -15,19 +15,17 @@ class CheckCarePlanReviewsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(
-        public int $organizationId
-    ) {}
+    private const NOTIFICATION_APPLICATION_CONTEXT = 1;
 
     public function handle(CarePlanService $carePlanService, OpsNotificationService $notificationService): void
     {
-        $dueForReview = $carePlanService->getReviewsDue($this->organizationId, 14);
+        $dueForReview = $carePlanService->getReviewsDue(14);
 
         foreach ($dueForReview as $plan) {
             if ($plan->created_by) {
                 $notificationService->notifySpecific(
                     $plan->created_by,
-                    $this->organizationId,
+                    self::NOTIFICATION_APPLICATION_CONTEXT,
                     'Care Plan Review Due',
                     sprintf(
                         'Care plan "%s" for %s is due for review by %s.',
@@ -41,6 +39,6 @@ class CheckCarePlanReviewsJob implements ShouldQueue
             }
         }
 
-        Log::info("Checked care plan reviews for org {$this->organizationId}: {$dueForReview->count()} due.");
+        Log::info("Checked care plan reviews: {$dueForReview->count()} due.");
     }
 }

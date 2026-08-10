@@ -3,17 +3,14 @@
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
-function userWithRosteringLeavePermissions(): User
+/** @return array{User, Site} */
+function userWithRosteringLeavePermissions(): array
 {
     $manager = User::factory()->create([
-        // Leave queries scope by the leave-record user's organization
-        // (scopeHrRecordOrganization → whereHas user.organization_id), so the
-        // manager must share the leave users' organization. users has no
-        // tenant_id column — passing one here makes the factory INSERT fail.
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
@@ -45,19 +42,18 @@ function userWithRosteringLeavePermissions(): User
     $role->permissions()->sync($permissions->pluck('id'));
     $manager->roles()->attach($role);
 
-    return $manager;
+    return [$manager, ensureCanonicalHrStaffProfile($manager)];
 }
 
 it('surfaces pending HR leave overlapping the rostering week', function () {
-    $manager = userWithRosteringLeavePermissions();
+    [$manager, $site] = userWithRosteringLeavePermissions();
     $staff = User::factory()->create([
-        'organization_id' => 1,
         'name' => 'Ari Kauri',
         'approved_at' => now(),
     ]);
+    ensureCanonicalHrStaffProfile($staff, $site);
 
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'leave_type' => 'annual',
         'starts_at' => '2026-05-05 09:00:00',
@@ -70,7 +66,6 @@ it('surfaces pending HR leave overlapping the rostering week', function () {
     ]);
 
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'leave_type' => 'annual',
         'starts_at' => '2026-05-20 09:00:00',
@@ -83,7 +78,6 @@ it('surfaces pending HR leave overlapping the rostering week', function () {
     ]);
 
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'leave_type' => 'sick',
         'starts_at' => '2026-05-06 09:00:00',
@@ -110,15 +104,14 @@ it('surfaces pending HR leave overlapping the rostering week', function () {
 
 it('redacts a sensitive (sick) leave reason from the rostering overlay for a non-HR scheduler', function () {
     // The scheduler holds hr.leave.approve but NOT hr.leave.manage.
-    $manager = userWithRosteringLeavePermissions();
+    [$manager, $site] = userWithRosteringLeavePermissions();
     $staff = User::factory()->create([
-        'organization_id' => 1,
         'name' => 'Bo Rata',
         'approved_at' => now(),
     ]);
+    ensureCanonicalHrStaffProfile($staff, $site);
 
     HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'leave_type' => 'sick',
         'starts_at' => '2026-05-05 09:00:00',

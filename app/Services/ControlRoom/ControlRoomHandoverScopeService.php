@@ -88,9 +88,9 @@ class ControlRoomHandoverScopeService
             fn (ControlRoomAlert $alert): bool => $this->hasGovernanceClaim($alert),
         );
         $governanceCandidates->loadMissing([
-            'site:id,name,tenant_id',
-            'client:id,site_id,organization_id',
-            'client.site:id,tenant_id',
+            'site:id,name',
+            'client:id,site_id',
+            'client.site:id,name',
             'asset.client.site',
             'fleetSignal.asset.client.site',
             'device',
@@ -167,8 +167,8 @@ class ControlRoomHandoverScopeService
 
     /**
      * Return records the viewer can currently access regardless of lifecycle
-     * state. Prepared-snapshot acceptance uses this only to recheck tenant/site
-     * authorization for the frozen required IDs.
+     * state. Prepared-snapshot acceptance uses this only to recheck canonical
+     * Site authorization for the frozen required IDs.
      *
      * @param  list<int>  $candidateIds
      * @return Collection<int, int>
@@ -252,7 +252,10 @@ class ControlRoomHandoverScopeService
         }
 
         return AuditLog::query()
-            ->where('auditable_type', ControlRoomAlert::class)
+            ->whereIn('auditable_type', [
+                ControlRoomAlert::class,
+                (new ControlRoomAlert)->getMorphClass(),
+            ])
             ->whereIn('auditable_id', $alertIds)
             ->whereIn('action', self::MATERIAL_ALERT_ACTIONS)
             ->whereBetween('created_at', [$shiftStart, $criteriaAt])

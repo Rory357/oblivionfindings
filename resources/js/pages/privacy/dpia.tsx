@@ -1,13 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Activity, Plus, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Activity, Plus } from 'lucide-react';
 
 type Props = {
     filters: {
@@ -42,7 +48,11 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
     const can = auth?.can?.privacy ?? {};
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/privacy/pia', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/privacy/pia',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const getOutcomeColor = (outcome: string | null) => {
@@ -84,10 +94,12 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Impact Assessments', href: '/privacy/pia' }
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Privacy', href: '/privacy/dashboard' },
+                { title: 'Impact Assessments', href: '/privacy/pia' },
+            ]}
+        >
             <Head title="Privacy Impact Assessments" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -96,16 +108,28 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
                     title="Privacy Impact Assessments"
                     description="Privacy Impact Assessment — assess privacy risks before processing changes"
                     icon={<Activity className="h-7 w-7 text-white" />}
-                    stats={stats ? [
-                        { label: 'Total', value: stats.total },
-                        { label: 'Pending Review', value: stats.pending_review },
-                        { label: 'High Risk', value: stats.high_risk },
-                        { label: 'Approved', value: stats.approved },
-                    ] : undefined}
+                    stats={
+                        stats
+                            ? [
+                                  { label: 'Total', value: stats.total },
+                                  {
+                                      label: 'Pending Review',
+                                      value: stats.pending_review,
+                                  },
+                                  {
+                                      label: 'High Risk',
+                                      value: stats.high_risk,
+                                  },
+                                  { label: 'Approved', value: stats.approved },
+                              ]
+                            : undefined
+                    }
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
                             <Link href="/privacy/dashboard">
-                                <Button variant="outline" size="sm">Privacy Dashboard</Button>
+                                <Button variant="outline" size="sm">
+                                    Privacy Dashboard
+                                </Button>
                             </Link>
                             {can.conductDPIA && (
                                 <Link href="/privacy/pia/create">
@@ -125,44 +149,74 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Search by name or project"
                                 value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ q: e.target.value })
+                                }
                             />
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Outcome</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Outcome
+                            </Label>
                             <Select
                                 value={filters.outcome ?? ANY}
-                                onValueChange={(v) => onFilter({ outcome: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ outcome: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Outcome" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Outcome" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="approved">Approved</SelectItem>
-                                    <SelectItem value="approved_with_conditions">Approved with Conditions</SelectItem>
-                                    <SelectItem value="requires_dpo_review">Requires Privacy Officer Review</SelectItem>
-                                    <SelectItem value="rejected">Rejected</SelectItem>
+                                    <SelectItem value="approved">
+                                        Approved
+                                    </SelectItem>
+                                    <SelectItem value="approved_with_conditions">
+                                        Approved with Conditions
+                                    </SelectItem>
+                                    <SelectItem value="requires_dpo_review">
+                                        Requires Privacy Officer Review
+                                    </SelectItem>
+                                    <SelectItem value="rejected">
+                                        Rejected
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Risk Level</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Risk Level
+                            </Label>
                             <Select
                                 value={filters.risk_level ?? ANY}
-                                onValueChange={(v) => onFilter({ risk_level: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        risk_level: v === ANY ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Risk" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Risk" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     <SelectItem value="low">Low</SelectItem>
-                                    <SelectItem value="medium">Medium</SelectItem>
+                                    <SelectItem value="medium">
+                                        Medium
+                                    </SelectItem>
                                     <SelectItem value="high">High</SelectItem>
-                                    <SelectItem value="very_high">Very High</SelectItem>
+                                    <SelectItem value="very_high">
+                                        Very High
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -181,15 +235,40 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
                                                 {dpia.assessment_name}
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge className={getOutcomeColor(dpia.outcome)}>
-                                                    {dpia.outcome ? OUTCOME_LABELS[dpia.outcome] ?? dpia.outcome.replace(/_/g, ' ') : 'Pending review'}
+                                                <Badge
+                                                    className={getOutcomeColor(
+                                                        dpia.outcome,
+                                                    )}
+                                                >
+                                                    {dpia.outcome
+                                                        ? (OUTCOME_LABELS[
+                                                              dpia.outcome
+                                                          ] ??
+                                                          dpia.outcome.replace(
+                                                              /_/g,
+                                                              ' ',
+                                                          ))
+                                                        : 'Pending review'}
                                                 </Badge>
-                                                <Badge className={getRiskColor(dpia.overall_risk_level)}>
-                                                    {RISK_LABELS[dpia.overall_risk_level] ?? dpia.overall_risk_level} risk
+                                                <Badge
+                                                    className={getRiskColor(
+                                                        dpia.overall_risk_level,
+                                                    )}
+                                                >
+                                                    {RISK_LABELS[
+                                                        dpia.overall_risk_level
+                                                    ] ??
+                                                        dpia.overall_risk_level}{' '}
+                                                    risk
                                                 </Badge>
                                                 {dpia.residual_risk_level && (
                                                     <Badge variant="outline">
-                                                        Residual: {RISK_LABELS[dpia.residual_risk_level] ?? dpia.residual_risk_level}
+                                                        Residual:{' '}
+                                                        {RISK_LABELS[
+                                                            dpia
+                                                                .residual_risk_level
+                                                        ] ??
+                                                            dpia.residual_risk_level}
                                                     </Badge>
                                                 )}
                                             </div>
@@ -197,12 +276,20 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
                                                 {dpia.project_or_process}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                Assessed: {formatDate(dpia.assessment_date)}
-                                                {dpia.assessor && ` by ${dpia.assessor.name}`}
-                                                {dpia.review_date && ` • Review: ${formatDate(dpia.review_date)}`}
+                                                Assessed:{' '}
+                                                {formatDate(
+                                                    dpia.assessment_date,
+                                                )}
+                                                {dpia.assessor &&
+                                                    ` by ${dpia.assessor.name}`}
+                                                {dpia.review_date &&
+                                                    ` • Review: ${formatDate(dpia.review_date)}`}
                                             </div>
                                         </div>
-                                        <Link href={`/privacy/pia/${dpia.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link
+                                            href={`/privacy/pia/${dpia.id}`}
+                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                        >
                                             View
                                         </Link>
                                     </div>
@@ -226,7 +313,17 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
                                 variant={l.active ? 'secondary' : 'outline'}
                                 size="sm"
                                 disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

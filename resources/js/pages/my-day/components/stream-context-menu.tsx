@@ -11,7 +11,12 @@ import {
 } from 'lucide-react';
 import { type ComponentType, useEffect, useRef } from 'react';
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 import type { StreamItem } from '../lib/stream-grouping';
@@ -47,12 +52,17 @@ interface MenuEntry {
     disabled?: boolean;
 }
 
-export function StreamContextMenu({ menu, onClose, onAction }: StreamContextMenuProps) {
+export function StreamContextMenu({
+    menu,
+    onClose,
+    onAction,
+}: StreamContextMenuProps) {
     const ref = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         const onMouseDown = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+            if (ref.current && !ref.current.contains(e.target as Node))
+                onClose();
         };
         const onKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -66,28 +76,37 @@ export function StreamContextMenu({ menu, onClose, onAction }: StreamContextMenu
     }, [onClose]);
 
     const { item, x, y } = menu;
-    const sections = item.kind === 'task' ? buildTaskMenu(item) : buildMedMenu(item);
+    const sections =
+        item.kind === 'task' ? buildTaskMenu(item) : buildMedMenu(item);
 
     // Clamp to viewport.
-    const left = Math.min(x, (typeof window !== 'undefined' ? window.innerWidth : 1024) - 240);
-    const top = Math.min(y, (typeof window !== 'undefined' ? window.innerHeight : 768) - 320);
+    const left = Math.min(
+        x,
+        (typeof window !== 'undefined' ? window.innerWidth : 1024) - 240,
+    );
+    const top = Math.min(
+        y,
+        (typeof window !== 'undefined' ? window.innerHeight : 768) - 320,
+    );
 
     return (
         <div
             ref={ref}
             role="menu"
-            aria-label={item.kind === 'task' ? 'Task actions' : 'Medication actions'}
+            aria-label={
+                item.kind === 'task' ? 'Task actions' : 'Medication actions'
+            }
             data-test="my-day-stream-context-menu"
             style={{ left, top }}
             className={cn(
                 'fixed z-[1000] w-[224px] rounded-xl border border-border bg-popover p-1 text-popover-foreground',
                 'shadow-[0_18px_50px_-12px_rgba(0,0,0,0.35),0_4px_12px_-4px_rgba(0,0,0,0.18)]',
-                'animate-in fade-in-0 slide-in-from-top-1 duration-100',
+                'animate-in duration-100 fade-in-0 slide-in-from-top-1',
             )}
         >
-            <div className="flex items-center gap-1.5 overflow-hidden truncate whitespace-nowrap px-2.5 pb-1.5 pt-2 text-[10.5px] font-bold uppercase tracking-[0.08em] text-text-faint">
+            <div className="flex items-center gap-1.5 truncate overflow-hidden px-2.5 pt-2 pb-1.5 text-[10.5px] font-bold tracking-[0.08em] whitespace-nowrap text-text-faint uppercase">
                 {item.kind === 'task' ? 'Care task' : 'Medication'}
-                <span className="ml-auto text-[11px] font-medium normal-case tracking-normal text-muted-foreground">
+                <span className="ml-auto text-[11px] font-medium tracking-normal text-muted-foreground normal-case">
                     {item.at}
                 </span>
             </div>
@@ -96,13 +115,17 @@ export function StreamContextMenu({ menu, onClose, onAction }: StreamContextMenu
                 {sections.map((section, sIdx) => (
                     <div
                         key={sIdx}
-                        className={cn(sIdx > 0 && 'mt-1 border-t border-border pt-1')}
+                        className={cn(
+                            sIdx > 0 && 'mt-1 border-t border-border pt-1',
+                        )}
                     >
                         {section.map((entry) => (
                             <ContextMenuEntry
                                 key={entry.label}
                                 entry={entry}
-                                onClick={() => !entry.disabled && onAction(entry.action)}
+                                onClick={() =>
+                                    !entry.disabled && onAction(entry.action)
+                                }
                             />
                         ))}
                     </div>
@@ -112,7 +135,13 @@ export function StreamContextMenu({ menu, onClose, onAction }: StreamContextMenu
     );
 }
 
-function ContextMenuEntry({ entry, onClick }: { entry: MenuEntry; onClick: () => void }) {
+function ContextMenuEntry({
+    entry,
+    onClick,
+}: {
+    entry: MenuEntry;
+    onClick: () => void;
+}) {
     const Icon = entry.icon;
     const body = (
         // eslint-disable-next-line no-restricted-syntax -- menuitem in a custom context menu, not a shadcn Button.
@@ -126,13 +155,16 @@ function ContextMenuEntry({ entry, onClick }: { entry: MenuEntry; onClick: () =>
                 entry.tone === 'danger'
                     ? 'text-status-critical hover:bg-status-critical-bg'
                     : 'text-foreground hover:bg-muted',
-                entry.disabled && 'cursor-not-allowed opacity-50 hover:bg-transparent',
+                entry.disabled &&
+                    'cursor-not-allowed opacity-50 hover:bg-transparent',
             )}
         >
             <Icon
                 className={cn(
                     'h-3.5 w-3.5 shrink-0',
-                    entry.tone === 'danger' ? 'text-status-critical' : 'text-muted-foreground',
+                    entry.tone === 'danger'
+                        ? 'text-status-critical'
+                        : 'text-muted-foreground',
                 )}
             />
             <span className="flex-1">{entry.label}</span>
@@ -156,28 +188,69 @@ function ContextMenuEntry({ entry, onClick }: { entry: MenuEntry; onClick: () =>
     return body;
 }
 
-function buildTaskMenu(item: Extract<StreamItem, { kind: 'task' }>): MenuEntry[][] {
+function buildTaskMenu(
+    item: Extract<StreamItem, { kind: 'task' }>,
+): MenuEntry[][] {
     const t = item.data;
     return [
         [
             t.is_completed
-                ? { icon: ArrowRight, label: 'Mark incomplete', action: 'complete-task', shortcut: '⏎' }
-                : { icon: Check, label: 'Complete task', action: 'complete-task', shortcut: '⏎' },
-            { icon: StickyNote, label: 'Add note', action: 'add-note', shortcut: 'N' },
-            { icon: Mic, label: 'Dictate update', action: 'dictate', disabled: true },
+                ? {
+                      icon: ArrowRight,
+                      label: 'Mark incomplete',
+                      action: 'complete-task',
+                      shortcut: '⏎',
+                  }
+                : {
+                      icon: Check,
+                      label: 'Complete task',
+                      action: 'complete-task',
+                      shortcut: '⏎',
+                  },
+            {
+                icon: StickyNote,
+                label: 'Add note',
+                action: 'add-note',
+                shortcut: 'N',
+            },
+            {
+                icon: Mic,
+                label: 'Dictate update',
+                action: 'dictate',
+                disabled: true,
+            },
         ],
         [
-            { icon: Plus, label: 'New task here', action: 'new-task', shortcut: '⌘N', disabled: true },
-            { icon: Clock, label: 'Reschedule', action: 'reschedule', disabled: true },
+            {
+                icon: Plus,
+                label: 'New task here',
+                action: 'new-task',
+                shortcut: '⌘N',
+                disabled: true,
+            },
+            {
+                icon: Clock,
+                label: 'Reschedule',
+                action: 'reschedule',
+                disabled: true,
+            },
             { icon: Shield, label: 'Open care plan', action: 'open-care-plan' },
         ],
         [
-            { icon: AlertTriangle, label: 'Skip task', action: 'skip-task', tone: 'danger', disabled: true },
+            {
+                icon: AlertTriangle,
+                label: 'Skip task',
+                action: 'skip-task',
+                tone: 'danger',
+                disabled: true,
+            },
         ],
     ];
 }
 
-function buildMedMenu(item: Extract<StreamItem, { kind: 'med' }>): MenuEntry[][] {
+function buildMedMenu(
+    item: Extract<StreamItem, { kind: 'med' }>,
+): MenuEntry[][] {
     const m = item.data;
     const resolvedLabel =
         m.status === 'given'
@@ -190,24 +263,49 @@ function buildMedMenu(item: Extract<StreamItem, { kind: 'med' }>): MenuEntry[][]
     if (resolvedLabel) {
         return [
             [
-                { icon: ArrowRight, label: resolvedLabel, action: 'noop', disabled: true },
+                {
+                    icon: ArrowRight,
+                    label: resolvedLabel,
+                    action: 'noop',
+                    disabled: true,
+                },
                 { icon: Pill, label: 'Open in eMAR', action: 'open-emar' },
-                { icon: Shield, label: 'Why this dose?', action: 'explain-med', disabled: true },
+                {
+                    icon: Shield,
+                    label: 'Why this dose?',
+                    action: 'explain-med',
+                    disabled: true,
+                },
             ],
         ];
     }
     return [
         [
-            { icon: Check, label: 'Mark as given', action: 'give-med', shortcut: '⏎' },
+            {
+                icon: Check,
+                label: 'Mark as given',
+                action: 'give-med',
+                shortcut: '⏎',
+            },
             { icon: Clock, label: 'Snooze 15 min', action: 'snooze-med' },
             { icon: StickyNote, label: 'Add note', action: 'add-note' },
         ],
         [
             { icon: Pill, label: 'Open in eMAR', action: 'open-emar' },
-            { icon: Shield, label: 'Why this dose?', action: 'explain-med', disabled: true },
+            {
+                icon: Shield,
+                label: 'Why this dose?',
+                action: 'explain-med',
+                disabled: true,
+            },
         ],
         [
-            { icon: AlertTriangle, label: 'Refuse / not given', action: 'refuse-med', tone: 'danger' },
+            {
+                icon: AlertTriangle,
+                label: 'Refuse / not given',
+                action: 'refuse-med',
+                tone: 'danger',
+            },
         ],
     ];
 }

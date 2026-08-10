@@ -4,12 +4,20 @@
  * TicketThread with a condensed read-only rail. Actions beyond replying
  * live on the full page — one click away. */
 import {
+    TicketRoutingSummary,
+    type TicketRoutingDetails,
+} from '@/components/it/ticket-routing-summary';
+import {
     TicketThread,
     type ThreadAttachment,
     type ThreadComment,
     type ThreadEvent,
     type ThreadKbHint,
 } from '@/components/it/ticket-thread';
+import {
+    waitingStatusLabel,
+    type TicketWaitingDetails,
+} from '@/components/it/ticket-waiting-dialog';
 import { Button } from '@/components/ui/button';
 import {
     Sheet,
@@ -33,8 +41,10 @@ interface PeekPayload {
         description: string | null;
         priority: string;
         status: string;
+        waiting: TicketWaitingDetails | null;
         requester: { id: number | null; name: string; role: string | null };
         assignee: { id: number; name: string } | null;
+        routing?: TicketRoutingDetails;
         watchers: { id: number; name: string }[];
         attachments: ThreadAttachment[];
         created_human: string | null;
@@ -42,7 +52,8 @@ interface PeekPayload {
     comments: ThreadComment[];
     events: ThreadEvent[];
     kbSuggestions?: ThreadKbHint[];
-    can: { internal: boolean };
+    can: { internal: boolean; comment: boolean };
+    replyUnavailableReason: string | null;
 }
 
 const statusVariant: Record<string, StatusVariant> = {
@@ -96,8 +107,14 @@ export function TicketDrawer({
     const t = data?.ticket;
 
     return (
-        <Sheet open={ticketId !== null} onOpenChange={(open) => !open && onClose()}>
-            <SheetContent side="right" className="flex w-full flex-col gap-3 overflow-y-auto sm:max-w-xl">
+        <Sheet
+            open={ticketId !== null}
+            onOpenChange={(open) => !open && onClose()}
+        >
+            <SheetContent
+                side="right"
+                className="flex w-full flex-col gap-3 overflow-y-auto sm:max-w-xl"
+            >
                 <SheetHeader className="space-y-1.5 pr-8">
                     <div className="flex flex-wrap items-center gap-2">
                         {t?.reference ? (
@@ -107,10 +124,25 @@ export function TicketDrawer({
                         ) : null}
                         {t ? (
                             <>
-                                <StatusBadge variant={statusVariant[t.status] ?? 'neutral'} size="sm">
-                                    {t.status === 'waiting' ? 'Waiting on requester' : label(t.status)}
+                                <StatusBadge
+                                    variant={
+                                        statusVariant[t.status] ?? 'neutral'
+                                    }
+                                    size="sm"
+                                >
+                                    {t.status === 'waiting'
+                                        ? waitingStatusLabel(
+                                              t.waiting?.party,
+                                              !data?.can.internal,
+                                          )
+                                        : label(t.status)}
                                 </StatusBadge>
-                                <StatusBadge variant={priorityVariant[t.priority] ?? 'neutral'} size="sm">
+                                <StatusBadge
+                                    variant={
+                                        priorityVariant[t.priority] ?? 'neutral'
+                                    }
+                                    size="sm"
+                                >
                                     {label(t.priority)}
                                 </StatusBadge>
                             </>
@@ -120,9 +152,12 @@ export function TicketDrawer({
                                 size="sm"
                                 variant="outline"
                                 className="ml-auto"
-                                onClick={() => router.visit(`/it/tickets/${ticketId}`)}
+                                onClick={() =>
+                                    router.visit(`/it/tickets/${ticketId}`)
+                                }
                             >
-                                <ExternalLink className="h-3.5 w-3.5" /> Open full page
+                                <ExternalLink className="h-3.5 w-3.5" /> Open
+                                full page
                             </Button>
                         ) : null}
                     </div>
@@ -139,10 +174,19 @@ export function TicketDrawer({
                     </SheetDescription>
                 </SheetHeader>
 
+                {t?.routing ? (
+                    <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2">
+                        <TicketRoutingSummary routing={t.routing} compact />
+                    </div>
+                ) : null}
+
                 {loading && !data ? (
                     <div className="flex flex-col gap-2" aria-hidden>
                         {[0, 1, 2].map((i) => (
-                            <div key={i} className="h-16 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
+                            <div
+                                key={i}
+                                className="h-16 animate-pulse rounded-xl bg-muted motion-reduce:animate-none"
+                            />
                         ))}
                     </div>
                 ) : null}
@@ -156,6 +200,8 @@ export function TicketDrawer({
                         comments={data.comments}
                         events={data.events}
                         canInternal={data.can.internal}
+                        canReply={data.can.comment}
+                        replyUnavailableReason={data.replyUnavailableReason}
                         kbSuggestions={data.kbSuggestions}
                         compact
                         onPosted={fetchTicket}

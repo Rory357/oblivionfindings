@@ -1,14 +1,20 @@
-import { Head, Link } from '@inertiajs/react';
-import { type PageProps } from '@/types';
-import { type BreadcrumbItem } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Edit, DollarSign, FileText, ShoppingCart, Users } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
 import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem, type PageProps } from '@/types';
+import { Head, Link } from '@inertiajs/react';
+import { DollarSign, Edit, FileText, ShoppingCart, Users } from 'lucide-react';
 
 interface Contact {
     id: number;
@@ -107,12 +113,22 @@ const formatDate = (date: string) =>
     });
 
 const formatStatus = (status: string) =>
-    status
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+    status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutstanding, totalPaidYtd }: Props) {
-    const address = [vendor.address_line_1, vendor.address_line_2, vendor.city, vendor.region, vendor.postal_code]
+export default function VendorsShow({
+    vendor,
+    bills,
+    purchaseOrders,
+    totalOutstanding,
+    totalPaidYtd,
+}: Props) {
+    const address = [
+        vendor.address_line_1,
+        vendor.address_line_2,
+        vendor.city,
+        vendor.region,
+        vendor.postal_code,
+    ]
         .filter(Boolean)
         .join(', ');
 
@@ -128,14 +144,19 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/vendors"
                         title={
                             <span className="flex flex-wrap items-center gap-3">
                                 {vendor.name}
                                 <Badge
-                                    variant={vendor.is_active ? 'default' : 'secondary'}
+                                    variant={
+                                        vendor.is_active
+                                            ? 'default'
+                                            : 'secondary'
+                                    }
                                     className={
                                         vendor.is_active
                                             ? 'bg-status-success-bg text-status-success'
@@ -146,11 +167,17 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                 </Badge>
                             </span>
                         }
-                        description={vendor.trading_name ? `Trading as: ${vendor.trading_name}` : undefined}
+                        description={
+                            vendor.trading_name
+                                ? `Trading as: ${vendor.trading_name}`
+                                : undefined
+                        }
                         actions={
                             <Button asChild>
-                                <Link href={`/finance/vendors/${vendor.id}/edit`}>
-                                    <Edit className="w-4 h-4 mr-2" />
+                                <Link
+                                    href={`/finance/vendors/${vendor.id}/edit`}
+                                >
+                                    <Edit className="mr-2 h-4 w-4" />
                                     Edit
                                 </Link>
                             </Button>
@@ -158,35 +185,47 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                     />
                 }
             >
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     {/* Left column */}
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="space-y-6 lg:col-span-2">
                         {/* Vendor Details */}
                         <Card>
                             <CardHeader>
                                 <CardTitle>Vendor Details</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                                     <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">Type</dt>
+                                        <dt className="text-sm font-medium text-muted-foreground">
+                                            Type
+                                        </dt>
                                         <dd className="mt-1">
                                             <Badge
                                                 variant="secondary"
-                                                className={vendorTypeColors[vendor.vendor_type] || ''}
+                                                className={
+                                                    vendorTypeColors[
+                                                        vendor.vendor_type
+                                                    ] || ''
+                                                }
                                             >
-                                                {vendorTypeLabels[vendor.vendor_type] || vendor.vendor_type}
+                                                {vendorTypeLabels[
+                                                    vendor.vendor_type
+                                                ] || vendor.vendor_type}
                                             </Badge>
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">GST Number</dt>
+                                        <dt className="text-sm font-medium text-muted-foreground">
+                                            GST Number
+                                        </dt>
                                         <dd className="mt-1 text-sm">
                                             {vendor.gst_number || '-'}
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">Email</dt>
+                                        <dt className="text-sm font-medium text-muted-foreground">
+                                            Email
+                                        </dt>
                                         <dd className="mt-1 text-sm">
                                             {vendor.email ? (
                                                 <a
@@ -201,19 +240,25 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">Phone</dt>
+                                        <dt className="text-sm font-medium text-muted-foreground">
+                                            Phone
+                                        </dt>
                                         <dd className="mt-1 text-sm">
                                             {vendor.phone || '-'}
                                         </dd>
                                     </div>
                                     <div className="sm:col-span-2">
-                                        <dt className="text-sm font-medium text-muted-foreground">Address</dt>
+                                        <dt className="text-sm font-medium text-muted-foreground">
+                                            Address
+                                        </dt>
                                         <dd className="mt-1 text-sm">
                                             {address || '-'}
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-muted-foreground">Payment Terms</dt>
+                                        <dt className="text-sm font-medium text-muted-foreground">
+                                            Payment Terms
+                                        </dt>
                                         <dd className="mt-1 text-sm">
                                             {vendor.payment_terms_days != null
                                                 ? `${vendor.payment_terms_days} days`
@@ -222,7 +267,9 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                     </div>
                                     {vendor.notes && (
                                         <div className="sm:col-span-2">
-                                            <dt className="text-sm font-medium text-muted-foreground">Notes</dt>
+                                            <dt className="text-sm font-medium text-muted-foreground">
+                                                Notes
+                                            </dt>
                                             <dd className="mt-1 text-sm whitespace-pre-line">
                                                 {vendor.notes}
                                             </dd>
@@ -236,13 +283,13 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
-                                    <Users className="w-5 h-5 text-muted-foreground" />
+                                    <Users className="h-5 w-5 text-muted-foreground" />
                                     <CardTitle>Contacts</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {vendor.contacts.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                    <p className="py-4 text-center text-sm text-muted-foreground">
                                         No contacts recorded.
                                     </p>
                                 ) : (
@@ -290,23 +337,27 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-muted-foreground" />
+                                    <FileText className="h-5 w-5 text-muted-foreground" />
                                     <CardTitle>Recent Bills</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {bills.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                    <p className="py-4 text-center text-sm text-muted-foreground">
                                         No bills recorded.
                                     </p>
                                 ) : (
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Bill Number</TableHead>
+                                                <TableHead>
+                                                    Bill Number
+                                                </TableHead>
                                                 <TableHead>Date</TableHead>
                                                 <TableHead>Due Date</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead>
+                                                <TableHead className="text-right">
+                                                    Amount
+                                                </TableHead>
                                                 <TableHead>Status</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -322,20 +373,33 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                         </Link>
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">
-                                                        {formatDate(bill.bill_date)}
+                                                        {formatDate(
+                                                            bill.bill_date,
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">
-                                                        {formatDate(bill.due_date)}
+                                                        {formatDate(
+                                                            bill.due_date,
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        {formatMoney(bill.total_amount)}
+                                                        {formatMoney(
+                                                            bill.total_amount,
+                                                        )}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge
                                                             variant="secondary"
-                                                            className={billStatusColors[bill.status] || 'bg-muted text-foreground'}
+                                                            className={
+                                                                billStatusColors[
+                                                                    bill.status
+                                                                ] ||
+                                                                'bg-muted text-foreground'
+                                                            }
                                                         >
-                                                            {formatStatus(bill.status)}
+                                                            {formatStatus(
+                                                                bill.status,
+                                                            )}
                                                         </Badge>
                                                     </TableCell>
                                                 </TableRow>
@@ -350,13 +414,15 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
-                                    <ShoppingCart className="w-5 h-5 text-muted-foreground" />
-                                    <CardTitle>Recent Purchase Orders</CardTitle>
+                                    <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+                                    <CardTitle>
+                                        Recent Purchase Orders
+                                    </CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {purchaseOrders.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground text-center py-4">
+                                    <p className="py-4 text-center text-sm text-muted-foreground">
                                         No purchase orders recorded.
                                     </p>
                                 ) : (
@@ -365,7 +431,9 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                             <TableRow>
                                                 <TableHead>PO Number</TableHead>
                                                 <TableHead>Date</TableHead>
-                                                <TableHead className="text-right">Amount</TableHead>
+                                                <TableHead className="text-right">
+                                                    Amount
+                                                </TableHead>
                                                 <TableHead>Status</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -381,17 +449,28 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                         </Link>
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">
-                                                        {formatDate(po.order_date)}
+                                                        {formatDate(
+                                                            po.order_date,
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        {formatMoney(po.total_amount)}
+                                                        {formatMoney(
+                                                            po.total_amount,
+                                                        )}
                                                     </TableCell>
                                                     <TableCell>
                                                         <Badge
                                                             variant="secondary"
-                                                            className={poStatusColors[po.status] || 'bg-muted text-foreground'}
+                                                            className={
+                                                                poStatusColors[
+                                                                    po.status
+                                                                ] ||
+                                                                'bg-muted text-foreground'
+                                                            }
                                                         >
-                                                            {formatStatus(po.status)}
+                                                            {formatStatus(
+                                                                po.status,
+                                                            )}
                                                         </Badge>
                                                     </TableCell>
                                                 </TableRow>
@@ -408,20 +487,24 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
-                                    <DollarSign className="w-5 h-5 text-muted-foreground" />
+                                    <DollarSign className="h-5 w-5 text-muted-foreground" />
                                     <CardTitle>Financial Summary</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Total Outstanding</p>
-                                    <p className="text-2xl font-bold mt-1">
+                                    <p className="text-sm font-medium text-muted-foreground">
+                                        Total Outstanding
+                                    </p>
+                                    <p className="mt-1 text-2xl font-bold">
                                         {formatMoney(totalOutstanding)}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Total Paid YTD</p>
-                                    <p className="text-2xl font-bold mt-1">
+                                    <p className="text-sm font-medium text-muted-foreground">
+                                        Total Paid YTD
+                                    </p>
+                                    <p className="mt-1 text-2xl font-bold">
                                         {formatMoney(totalPaidYtd)}
                                     </p>
                                 </div>

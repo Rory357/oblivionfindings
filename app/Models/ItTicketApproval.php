@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,12 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ItTicketApproval extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     public const STATUSES = ['pending', 'approved', 'rejected'];
 
     protected $fillable = [
-        'tenant_id',
         'it_ticket_id',
         'requested_by',
         'approver_id',

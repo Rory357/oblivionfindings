@@ -13,8 +13,18 @@ import {
 } from '@/components/ui/dialog';
 
 const MONTHS = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
 ];
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -68,7 +78,9 @@ export function CalendarYearPicker({
                         >
                             <ChevronLeft className="h-4 w-4" />
                         </button>
-                        <span className="text-xl font-bold tabular-nums">{year}</span>
+                        <span className="text-xl font-bold tabular-nums">
+                            {year}
+                        </span>
                         <button
                             type="button"
                             aria-label="Next year"
@@ -78,7 +90,9 @@ export function CalendarYearPicker({
                             <ChevronRight className="h-4 w-4" />
                         </button>
                     </DialogTitle>
-                    <DialogDescription className="sr-only">Pick a month or day to jump to.</DialogDescription>
+                    <DialogDescription className="sr-only">
+                        Pick a month or day to jump to.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
@@ -93,7 +107,10 @@ export function CalendarYearPicker({
                             </button>
                             <div className="grid grid-cols-7 gap-0.5 text-center">
                                 {WEEKDAYS.map((w, i) => (
-                                    <span key={i} className="text-[9px] font-semibold text-muted-foreground">
+                                    <span
+                                        key={i}
+                                        className="text-[9px] font-semibold text-muted-foreground"
+                                    >
                                         {w}
                                     </span>
                                 ))}

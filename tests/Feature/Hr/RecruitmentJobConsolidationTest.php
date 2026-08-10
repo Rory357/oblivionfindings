@@ -2,8 +2,10 @@
 
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -23,10 +25,19 @@ test('the duplicate job-postings list redirects to the live requisition jobs UI'
 });
 
 test('candidate applications expose the linked requisition title (not the orphaned posting)', function () {
+    $site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+        'created_by' => $this->hr->id,
+        'updated_by' => $this->hr->id,
+    ]);
+
     $requisition = HrJobRequisition::query()->create([
-        'tenant_id' => 1,
         'title' => 'Night Support Worker',
         'slug' => 'night-support-worker',
+        'site_id' => $site->id,
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
         'openings' => 1,
@@ -35,15 +46,14 @@ test('candidate applications expose the linked requisition title (not the orphan
     ]);
 
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'status' => 'new',
         'created_by' => $this->hr->id,
     ]);
 
     HrApplication::factory()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'requisition_id' => $requisition->id,
+        'target_site_id' => $site->id,
         'position_title' => 'Night Support Worker',
         'status' => 'active',
     ]);

@@ -5,28 +5,30 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrCompetency;
 use App\Domain\Hr\Models\HrCompetencyAssessment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Http\Controllers\Controller;
+use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CompetencyController extends Controller
 {
-    use ResolvesHrTenant;
     use ServesPrivateAttachments;
+
+    public function __construct(private readonly HrPerformanceAccessService $access) {}
 
     /**
      * List competencies grouped by category.
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.view'), 403);
+        $user = $this->viewer($request);
 
         $competencies = HrCompetency::query()
             ->active()
@@ -36,7 +38,7 @@ class CompetencyController extends Controller
 
         $grouped = $competencies->groupBy('category')->map(fn ($items) => $items->values());
 
-        $staff = User::orderBy('name')->get(['id', 'name', 'email']);
+        $staff = $this->staffOptions($user, useProfileIds: true);
 
         return Inertia::render('hr/performance/competencies/index', [
             'competencies' => $competencies,
@@ -53,11 +55,10 @@ class CompetencyController extends Controller
      */
     public function store(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $user = $this->manager($request);
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', Rule::unique('hr_competencies', 'name')],
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['required', 'string', 'max:255'],
             'proficiency_levels' => ['nullable', 'array'],
@@ -66,7 +67,6 @@ class CompetencyController extends Controller
         ]);
 
         HrCompetency::create([
-            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'category' => $data['category'],
@@ -84,11 +84,15 @@ class CompetencyController extends Controller
      */
     public function update(Request $request, HrCompetency $competency)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->manager($request);
 
         $data = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
+            'name' => [
+                'sometimes',
+                'string',
+                'max:255',
+                Rule::unique('hr_competencies', 'name')->ignore($competency->getKey()),
+            ],
             'description' => ['nullable', 'string', 'max:2000'],
             'category' => ['sometimes', 'string', 'max:255'],
             'proficiency_levels' => ['nullable', 'array'],
@@ -97,7 +101,12 @@ class CompetencyController extends Controller
             'sort_order' => ['nullable', 'integer'],
         ]);
 
-        $competency->update($data);
+        DB::transaction(function () use ($competency, $data): void {
+            HrCompetency::query()
+                ->lockForUpdate()
+                ->findOrFail($competency->getKey())
+                ->update($data);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Competency updated.');
     }
@@ -107,10 +116,14 @@ class CompetencyController extends Controller
      */
     public function deactivate(Request $request, HrCompetency $competency)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->manager($request);
 
-        $competency->update(['is_active' => false]);
+        DB::transaction(function () use ($competency): void {
+            HrCompetency::query()
+                ->lockForUpdate()
+                ->findOrFail($competency->getKey())
+                ->update(['is_active' => false]);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Competency deactivated.');
     }
@@ -120,15 +133,22 @@ class CompetencyController extends Controller
      */
     public function signOffAssessment(Request $request, HrCompetencyAssessment $assessment)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $assessment->tenant_id);
+        $user = $this->manager($request);
+        $assessment = $this->access->competencyAssessment($user, $assessment);
 
-        $assessment->update([
-            'assessor_declared_at' => now(),
-            'assessed_by' => $assessment->assessed_by ?? $user->id,
-        ]);
+        DB::transaction(function () use ($assessment, $user): void {
+            $locked = $this->access
+                ->applyCompetencyAssessmentScope(HrCompetencyAssessment::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($assessment->getKey());
+
+            if ($locked->assessor_declared_at === null) {
+                $locked->update([
+                    'assessor_declared_at' => now(),
+                    'assessed_by' => $locked->assessed_by ?? $user->id,
+                ]);
+            }
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Assessment signed off.');
     }
@@ -138,20 +158,34 @@ class CompetencyController extends Controller
      */
     public function uploadAssessmentEvidence(Request $request, HrCompetencyAssessment $assessment)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $assessment->tenant_id);
+        $user = $this->manager($request);
+        $assessment = $this->access->competencyAssessment($user, $assessment);
 
         $request->validate([
             'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'],
         ]);
 
-        if ($assessment->evidence_path) {
-            Storage::disk('private')->delete($assessment->evidence_path);
+        $path = $request->file('file')->store('hr/competency-assessments/'.$assessment->id, 'private');
+        $oldPath = null;
+
+        try {
+            DB::transaction(function () use ($assessment, $path, $user, &$oldPath): void {
+                $locked = $this->access
+                    ->applyCompetencyAssessmentScope(HrCompetencyAssessment::query(), $user)
+                    ->lockForUpdate()
+                    ->findOrFail($assessment->getKey());
+                $oldPath = $locked->evidence_path;
+                $locked->update(['evidence_path' => $path]);
+            }, attempts: 1);
+        } catch (\Throwable $exception) {
+            Storage::disk('private')->delete($path);
+
+            throw $exception;
         }
 
-        $path = $request->file('file')->store('hr/competency-assessments/'.$assessment->id, 'private');
-        $assessment->update(['evidence_path' => $path]);
+        if ($oldPath && $oldPath !== $path) {
+            Storage::disk('private')->delete($oldPath);
+        }
 
         return redirect()->back()->with('success', 'Evidence uploaded.');
     }
@@ -161,9 +195,8 @@ class CompetencyController extends Controller
      */
     public function downloadAssessmentEvidence(Request $request, HrCompetencyAssessment $assessment)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.view'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $assessment->tenant_id);
+        $user = $this->viewer($request);
+        $assessment = $this->access->competencyAssessment($user, $assessment);
         abort_unless($assessment->evidence_path, 404);
 
         return $this->streamPrivateAttachment(
@@ -177,29 +210,15 @@ class CompetencyController extends Controller
 
     public function createAssessment(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->manager($request);
 
         $competencies = HrCompetency::query()
-            ->forTenant($tenantId)
             ->active()
             ->orderBy('category')
             ->orderBy('sort_order')
             ->get();
 
-        $staffUserIds = HrEmployeeProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->pluck('user_id')
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
-            ->values();
-
-        $staff = User::query()
-            ->whereIn('id', $staffUserIds)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
+        $staff = $this->staffOptions($user);
 
         return Inertia::render('hr/performance/competencies/assess', [
             'competencies' => $competencies,
@@ -212,46 +231,93 @@ class CompetencyController extends Controller
      */
     public function assess(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $user = $this->manager($request);
 
         $data = $request->validate([
-            'employee_user_id' => ['required', 'integer', 'exists:users,id'],
+            'employee_user_id' => ['required', 'integer'],
             'assessments' => ['required', 'array', 'min:1'],
-            'assessments.*.competency_id' => ['required', 'integer', 'exists:hr_competencies,id'],
+            'assessments.*.competency_id' => ['required', 'integer', 'distinct'],
             'assessments.*.proficiency_level' => ['required', 'integer', 'min:1', 'max:5'],
             'assessments.*.target_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'assessments.*.notes' => ['nullable', 'string', 'max:2000'],
-            'performance_review_id' => ['nullable', 'integer', 'exists:hr_performance_reviews,id'],
+            'performance_review_id' => ['nullable', 'integer'],
         ]);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $profile = HrEmployeeProfile::query()
+        $profile = $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->where('user_id', $data['employee_user_id'])
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->first();
+            ->firstOrFail();
 
-        if (! $profile) {
+        $competencyIds = collect($data['assessments'])
+            ->pluck('competency_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values();
+        $competencies = HrCompetency::query()
+            ->active()
+            ->whereIn('id', $competencyIds)
+            ->get()
+            ->keyBy('id');
+
+        if ($competencies->count() !== $competencyIds->count()) {
             throw ValidationException::withMessages([
-                'employee_user_id' => 'Select an employee with an HR profile before recording competencies.',
+                'assessments' => 'Select active competencies from the application catalogue.',
             ]);
         }
 
-        DB::transaction(function () use ($user, $data, $profile, $tenantId) {
+        $review = isset($data['performance_review_id'])
+            ? $this->access->performanceReview($user, (int) $data['performance_review_id'])
+            : null;
+        if ($review && (int) $review->employee_user_id !== (int) $profile->user_id) {
+            throw ValidationException::withMessages([
+                'performance_review_id' => 'The performance review must belong to the assessed employee.',
+            ]);
+        }
+
+        DB::transaction(function () use ($user, $data, $profile, $competencyIds, $review): void {
+            $lockedProfile = $this->access
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($profile->getKey());
+            $lockedCompetencies = HrCompetency::query()
+                ->active()
+                ->whereIn('id', $competencyIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            if ($lockedCompetencies->count() !== $competencyIds->count()) {
+                throw ValidationException::withMessages([
+                    'assessments' => 'Select active competencies from the application catalogue.',
+                ]);
+            }
+
+            $lockedReview = null;
+            if ($review) {
+                $lockedReview = $this->access
+                    ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $user)
+                    ->lockForUpdate()
+                    ->findOrFail($review->getKey());
+                if ((int) $lockedReview->employee_user_id !== (int) $lockedProfile->user_id) {
+                    throw ValidationException::withMessages([
+                        'performance_review_id' => 'The performance review must belong to the assessed employee.',
+                    ]);
+                }
+            }
+
             foreach ($data['assessments'] as $assessment) {
                 HrCompetencyAssessment::create([
-                    'tenant_id' => $tenantId,
-                    'employee_profile_id' => $profile->id,
-                    'competency_id' => $assessment['competency_id'],
+                    'employee_profile_id' => $lockedProfile->id,
+                    'competency_id' => $lockedCompetencies->get((int) $assessment['competency_id'])->id,
                     'assessed_by' => $user->id,
-                    'performance_review_id' => $data['performance_review_id'] ?? null,
+                    'performance_review_id' => $lockedReview?->id,
                     'assessed_level' => $assessment['proficiency_level'],
                     'target_level' => $assessment['target_level'] ?? null,
                     'assessment_date' => now()->toDateString(),
                     'notes' => $assessment['notes'] ?? null,
                 ]);
             }
-        });
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Competency assessment recorded.');
     }
@@ -261,8 +327,10 @@ class CompetencyController extends Controller
      */
     public function employeeProfile(Request $request, HrEmployeeProfile $profile)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.view'), 403);
+        $user = $this->viewer($request);
+        $profile = $this->access
+            ->applyHistoricalProfileScope(HrEmployeeProfile::query(), $user)
+            ->findOrFail($profile->getKey());
 
         $employee = User::findOrFail($profile->user_id);
 
@@ -292,7 +360,7 @@ class CompetencyController extends Controller
 
         return Inertia::render('hr/performance/competencies/profile', [
             'employee' => $employee->only('id', 'name', 'email'),
-            'profile' => $profile,
+            'profile' => ['id' => $profile->id],
             'latestAssessments' => $latestAssessments,
             'history' => $history,
             'radarData' => $radarData,
@@ -323,5 +391,38 @@ class CompetencyController extends Controller
             'has_evidence' => (bool) $assessment->evidence_path,
             'assessor_declared_at' => $assessment->assessor_declared_at?->toDateString(),
         ];
+    }
+
+    private function viewer(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.view'), 403);
+
+        return $this->access->currentStaff($user, $user);
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+
+        return $this->access->currentStaff($user, $user);
+    }
+
+    private function staffOptions(User $viewer, bool $useProfileIds = false): array
+    {
+        return $this->access
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $viewer)
+            ->with('user:id,name,email')
+            ->get(['id', 'user_id'])
+            ->filter(fn (HrEmployeeProfile $profile): bool => $profile->user !== null)
+            ->sortBy(fn (HrEmployeeProfile $profile): string => mb_strtolower($profile->user->name))
+            ->map(fn (HrEmployeeProfile $profile): array => [
+                'id' => $useProfileIds ? $profile->id : $profile->user_id,
+                'name' => $profile->user->name,
+                'email' => $profile->user->email,
+            ])
+            ->values()
+            ->all();
     }
 }

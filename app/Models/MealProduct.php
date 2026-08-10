@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -10,11 +11,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MealProduct extends Model
 {
-    use AuditableChanges;
-    use SoftDeletes;
+    use AuditableChanges, SoftDeletes, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'name',
         'category',
         'default_unit',

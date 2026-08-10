@@ -10,8 +10,10 @@ use RuntimeException;
 
 class ClientFundJournalService
 {
+    private const APPLICATION_STORAGE_CONTEXT_ID = 1;
+
     /**
-     * GL account code -> FinAccount cache (per-request, keyed by orgId:code).
+     * GL account code -> FinAccount cache (per-request, keyed by storage context and code).
      *
      * @var array<string, FinAccount>
      */
@@ -29,6 +31,12 @@ class ClientFundJournalService
     {
         return DB::transaction(function () use ($txn) {
             $txn = ClientFundTransaction::query()
+                ->whereHas('fund.client', fn ($clientQuery) => $clientQuery
+                    ->whereNotNull('site_id')
+                    ->whereHas('site', fn ($siteQuery) => $siteQuery
+                        ->active()
+                        ->notArchived()
+                        ->whereNull('archived_at')))
                 ->lockForUpdate()
                 ->findOrFail($txn->id);
 
@@ -36,7 +44,7 @@ class ClientFundJournalService
                 return FinJournal::findOrFail($txn->journal_id);
             }
 
-            $orgId = $txn->organization_id;
+            $storageContextId = self::APPLICATION_STORAGE_CONTEXT_ID;
             $amount = (string) $txn->amount;
             $absAmount = ltrim($amount, '-');
 
@@ -46,8 +54,8 @@ class ClientFundJournalService
                 );
             }
 
-            $bankTrustAccount = $this->findAccountByCode($orgId, '1010');
-            $clientTrustAccount = $this->findAccountByCode($orgId, '2500');
+            $bankTrustAccount = $this->findAccountByCode($storageContextId, '1010');
+            $clientTrustAccount = $this->findAccountByCode($storageContextId, '2500');
 
             $transactionType = strtolower((string) $txn->transaction_type);
             $isWithdrawal = in_array($transactionType, ['debit', 'withdrawal', 'outflow'], true)
@@ -90,7 +98,7 @@ class ClientFundJournalService
                 ? "Client fund {$txn->transaction_type}: {$txn->description}"
                 : "Client fund {$txn->transaction_type}";
 
-            $journal = $this->journalPostingService->createAndPost($orgId, [
+            $journal = $this->journalPostingService->createAndPost($storageContextId, [
                 'journal_date' => ($txn->transaction_date ?? now())->toDateString(),
                 'type' => 'standard',
                 'source_type' => 'client_fund_transaction',
@@ -112,22 +120,22 @@ class ClientFundJournalService
      |  Helper: find a GL account by code (cached per request)
      | ------------------------------------------------------------------ */
 
-    public function findAccountByCode(?int $orgId, string $code): FinAccount
+    public function findAccountByCode(int $storageContextId, string $code): FinAccount
     {
-        $cacheKey = "{$orgId}:{$code}";
+        $cacheKey = "{$storageContextId}:{$code}";
 
         if (isset($this->accountCache[$cacheKey])) {
             return $this->accountCache[$cacheKey];
         }
 
-        $account = FinAccount::where('organization_id', $orgId)
+        $account = FinAccount::where('organization_id', $storageContextId)
             ->where('code', $code)
             ->where('is_active', true)
             ->first();
 
         if (! $account) {
             throw new RuntimeException(
-                "GL account with code '{$code}' not found (or inactive) for organisation #{$orgId}."
+                "GL account with code '{$code}' not found (or inactive) for the application storage context."
             );
         }
 

@@ -90,42 +90,139 @@ const MODE_META: Record<
     TimeDialogMode,
     { title: string; railTitle: string; railSub: string; icon: typeof Clock }
 > = {
-    add: { title: 'Add time entry', railTitle: 'New entry', railSub: 'HR · Timekeeping', icon: Clock },
-    behalf: { title: 'Clock on behalf', railTitle: 'On behalf', railSub: 'HR · Timekeeping', icon: UserPlus },
-    edit: { title: 'Edit time entry', railTitle: 'Amend entry', railSub: 'HR · Timekeeping', icon: FileText },
-    correct: { title: 'Correct clock-out', railTitle: 'Correct', railSub: 'HR · Timekeeping', icon: CalendarClock },
-    void: { title: 'Void entry', railTitle: 'Void', railSub: 'HR · Timekeeping', icon: Trash2 },
+    add: {
+        title: 'Add time entry',
+        railTitle: 'New entry',
+        railSub: 'HR · Timekeeping',
+        icon: Clock,
+    },
+    behalf: {
+        title: 'Clock on behalf',
+        railTitle: 'On behalf',
+        railSub: 'HR · Timekeeping',
+        icon: UserPlus,
+    },
+    edit: {
+        title: 'Edit time entry',
+        railTitle: 'Amend entry',
+        railSub: 'HR · Timekeeping',
+        icon: FileText,
+    },
+    correct: {
+        title: 'Correct clock-out',
+        railTitle: 'Correct',
+        railSub: 'HR · Timekeeping',
+        icon: CalendarClock,
+    },
+    void: {
+        title: 'Void entry',
+        railTitle: 'Void',
+        railSub: 'HR · Timekeeping',
+        icon: Trash2,
+    },
 };
 
 function stepsFor(mode: TimeDialogMode): WizardStep[] {
     switch (mode) {
         case 'add':
             return [
-                { key: 'staff', label: 'Staff & date', blurb: 'Who & when', icon: UserPlus },
-                { key: 'times', label: 'Times & break', blurb: 'Clock + break', icon: Clock },
-                { key: 'pay', label: 'Pay & context', blurb: 'Loadings & links', icon: Moon },
-                { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: ClipboardCheck },
+                {
+                    key: 'staff',
+                    label: 'Staff & date',
+                    blurb: 'Who & when',
+                    icon: UserPlus,
+                },
+                {
+                    key: 'times',
+                    label: 'Times & break',
+                    blurb: 'Clock + break',
+                    icon: Clock,
+                },
+                {
+                    key: 'pay',
+                    label: 'Pay & context',
+                    blurb: 'Loadings & links',
+                    icon: Moon,
+                },
+                {
+                    key: 'review',
+                    label: 'Review',
+                    blurb: 'Confirm & save',
+                    icon: ClipboardCheck,
+                },
             ];
         case 'behalf':
             return [
-                { key: 'staff', label: 'Staff', blurb: 'Pick the person', icon: UserPlus },
-                { key: 'times', label: 'Times & break', blurb: 'Clock + break', icon: Clock },
-                { key: 'pay', label: 'Pay & context', blurb: 'Loadings & links', icon: Moon },
-                { key: 'review', label: 'Reason & review', blurb: 'Why & confirm', icon: ClipboardCheck },
+                {
+                    key: 'staff',
+                    label: 'Staff',
+                    blurb: 'Pick the person',
+                    icon: UserPlus,
+                },
+                {
+                    key: 'times',
+                    label: 'Times & break',
+                    blurb: 'Clock + break',
+                    icon: Clock,
+                },
+                {
+                    key: 'pay',
+                    label: 'Pay & context',
+                    blurb: 'Loadings & links',
+                    icon: Moon,
+                },
+                {
+                    key: 'review',
+                    label: 'Reason & review',
+                    blurb: 'Why & confirm',
+                    icon: ClipboardCheck,
+                },
             ];
         case 'edit':
             return [
-                { key: 'times', label: 'Times & break', blurb: 'Clock + break', icon: Clock },
-                { key: 'pay', label: 'Pay & context', blurb: 'Loadings & links', icon: Moon },
-                { key: 'reason', label: 'Reason & diff', blurb: 'Audit trail', icon: ClipboardCheck },
+                {
+                    key: 'times',
+                    label: 'Times & break',
+                    blurb: 'Clock + break',
+                    icon: Clock,
+                },
+                {
+                    key: 'pay',
+                    label: 'Pay & context',
+                    blurb: 'Loadings & links',
+                    icon: Moon,
+                },
+                {
+                    key: 'reason',
+                    label: 'Reason & diff',
+                    blurb: 'Audit trail',
+                    icon: ClipboardCheck,
+                },
             ];
         case 'correct':
             return [
-                { key: 'finish', label: 'Finish time', blurb: 'Close the clock', icon: Clock },
-                { key: 'reason', label: 'Reason & confirm', blurb: 'Audit trail', icon: ClipboardCheck },
+                {
+                    key: 'finish',
+                    label: 'Finish time',
+                    blurb: 'Close the clock',
+                    icon: Clock,
+                },
+                {
+                    key: 'reason',
+                    label: 'Reason & confirm',
+                    blurb: 'Audit trail',
+                    icon: ClipboardCheck,
+                },
             ];
         case 'void':
-            return [{ key: 'reason', label: 'Void & confirm', blurb: 'Required reason', icon: Trash2 }];
+            return [
+                {
+                    key: 'reason',
+                    label: 'Void & confirm',
+                    blurb: 'Required reason',
+                    icon: Trash2,
+                },
+            ];
     }
 }
 
@@ -160,7 +257,11 @@ function disturbanceMinutes(start: string, end: string): number {
 function buildDisturbances(list: Disturbance[]): Disturbance[] {
     return list
         .filter((d) => d.start && d.end)
-        .map((d) => ({ start: d.start, end: d.end, minutes: disturbanceMinutes(d.start, d.end) }));
+        .map((d) => ({
+            start: d.start,
+            end: d.end,
+            minutes: disturbanceMinutes(d.start, d.end),
+        }));
 }
 
 export function TimeEntryDialog({
@@ -194,7 +295,12 @@ export function TimeEntryDialog({
         if (!open) return;
         wizard.reset();
         setSubmitted(false);
-        if ((activeMode === 'edit' || activeMode === 'correct' || activeMode === 'void') && entry) {
+        if (
+            (activeMode === 'edit' ||
+                activeMode === 'correct' ||
+                activeMode === 'void') &&
+            entry
+        ) {
             form.setData({
                 ...EMPTY,
                 clock_in: entry.clock_in,
@@ -205,7 +311,8 @@ export function TimeEntryDialog({
                 is_on_call: entry.is_on_call,
                 is_public_holiday: entry.is_public_holiday,
                 disturbances: entry.sleepover_disturbances ?? [],
-                mileage_km: entry.mileage_km != null ? String(entry.mileage_km) : '',
+                mileage_km:
+                    entry.mileage_km != null ? String(entry.mileage_km) : '',
                 cost_centre: entry.cost_centre ?? '',
                 project_code: entry.project_code ?? '',
                 notes: entry.notes ?? '',
@@ -223,7 +330,11 @@ export function TimeEntryDialog({
     );
 
     const breakMin = Number(form.data.break_minutes) || 0;
-    const totalHours = hoursBetween(form.data.clock_in, form.data.clock_out, breakMin);
+    const totalHours = hoursBetween(
+        form.data.clock_in,
+        form.data.clock_out,
+        breakMin,
+    );
     const reqBreak = requiredBreak(form.data.clock_in, form.data.clock_out);
     const breakShort = form.data.clock_out !== '' && breakMin < reqBreak;
 
@@ -237,9 +348,12 @@ export function TimeEntryDialog({
     };
 
     const staffName =
-        activeMode === 'edit' || activeMode === 'correct' || activeMode === 'void'
+        activeMode === 'edit' ||
+        activeMode === 'correct' ||
+        activeMode === 'void'
             ? (entry?.user_name ?? '')
-            : (staff.find((s) => String(s.id) === form.data.user_id)?.name ?? '');
+            : (staff.find((s) => String(s.id) === form.data.user_id)?.name ??
+              '');
 
     /* ---- per-step validation ---- */
     function validateStep(idx: number): boolean {
@@ -251,16 +365,22 @@ export function TimeEntryDialog({
         }
         if (key === 'times' || key === 'finish') {
             if (!form.data.clock_in) errs.clock_in = 'Set a clock-in time.';
-            if ((activeMode === 'add' || activeMode === 'correct') && !form.data.clock_out)
+            if (
+                (activeMode === 'add' || activeMode === 'correct') &&
+                !form.data.clock_out
+            )
                 errs.clock_out = 'Set a clock-out time.';
             if (form.data.clock_out && totalHours == null)
                 errs.clock_out = 'Clock-out must be after clock-in.';
         }
         if (key === 'reason') {
             if (activeMode === 'edit' && !form.data.amendment_reason.trim())
-                errs.amendment_reason = 'A reason is required for the audit trail.';
+                errs.amendment_reason =
+                    'A reason is required for the audit trail.';
             if (
-                (activeMode === 'behalf' || activeMode === 'correct' || activeMode === 'void') &&
+                (activeMode === 'behalf' ||
+                    activeMode === 'correct' ||
+                    activeMode === 'void') &&
                 !form.data.reason.trim()
             )
                 errs.reason = 'A reason is required.';
@@ -288,31 +408,39 @@ export function TimeEntryDialog({
         // back as back()->with('error') — a 200 redirect that fires Inertia's
         // onSuccess. Gate the success pane/toast on the absence of flash.error so
         // we don't show a false "saved" while nothing persisted.
-        const onOk =
-            (kind: string) =>
-            (page: Page) => {
-                const flashError = (page.props as { flash?: { error?: string } })
-                    .flash?.error;
-                if (flashError) {
-                    toast.error('Could not save', { description: flashError });
-                    return;
-                }
-                toast.success(kind);
-                if (addAnother && (activeMode === 'add' || activeMode === 'behalf')) {
-                    form.reset();
-                    form.clearErrors();
-                    wizard.reset();
-                    setSavedAnother(true);
-                } else {
-                    setSubmitted(true);
-                }
-            };
+        const onOk = (kind: string) => (page: Page) => {
+            const flashError = (page.props as { flash?: { error?: string } })
+                .flash?.error;
+            if (flashError) {
+                toast.error('Could not save', { description: flashError });
+                return;
+            }
+            toast.success(kind);
+            if (
+                addAnother &&
+                (activeMode === 'add' || activeMode === 'behalf')
+            ) {
+                form.reset();
+                form.clearErrors();
+                wizard.reset();
+                setSavedAnother(true);
+            } else {
+                setSubmitted(true);
+            }
+        };
         const common = {
             preserveScroll: true,
             onError: () => {
                 // Jump to the step owning the first error.
                 if (form.errors.clock_in || form.errors.clock_out)
-                    wizard.goTo(steps.findIndex((s) => s.key === 'times' || s.key === 'staff' || s.key === 'finish'));
+                    wizard.goTo(
+                        steps.findIndex(
+                            (s) =>
+                                s.key === 'times' ||
+                                s.key === 'staff' ||
+                                s.key === 'finish',
+                        ),
+                    );
             },
         };
 
@@ -326,7 +454,9 @@ export function TimeEntryDialog({
                 is_sleepover: d.is_sleepover,
                 is_on_call: d.is_on_call,
                 is_public_holiday: d.is_public_holiday,
-                sleepover_disturbances: d.is_sleepover ? buildDisturbances(d.disturbances) : [],
+                sleepover_disturbances: d.is_sleepover
+                    ? buildDisturbances(d.disturbances)
+                    : [],
                 mileage_km: d.mileage_km || undefined,
                 site_id: d.site_id || undefined,
                 client_id: d.client_id || undefined,
@@ -334,7 +464,10 @@ export function TimeEntryDialog({
                 project_code: d.project_code || undefined,
                 notes: d.notes || undefined,
             }));
-            form.post('/hr/time/entries', { ...common, onSuccess: onOk('Time entry created.') });
+            form.post('/hr/time/entries', {
+                ...common,
+                onSuccess: onOk('Time entry created.'),
+            });
         } else if (activeMode === 'behalf') {
             form.transform((d) => ({
                 target_user_id: d.user_id,
@@ -345,14 +478,19 @@ export function TimeEntryDialog({
                 is_sleepover: d.is_sleepover,
                 is_on_call: d.is_on_call,
                 is_public_holiday: d.is_public_holiday,
-                sleepover_disturbances: d.is_sleepover ? buildDisturbances(d.disturbances) : [],
+                sleepover_disturbances: d.is_sleepover
+                    ? buildDisturbances(d.disturbances)
+                    : [],
                 mileage_km: d.mileage_km || undefined,
                 site_id: d.site_id || undefined,
                 client_id: d.client_id || undefined,
                 reason: d.reason,
                 notes: d.notes || undefined,
             }));
-            form.post('/hr/time/clock-on-behalf', { ...common, onSuccess: onOk('Entry created on behalf.') });
+            form.post('/hr/time/clock-on-behalf', {
+                ...common,
+                onSuccess: onOk('Entry created on behalf.'),
+            });
         } else if (activeMode === 'edit' && entry) {
             form.transform((d) => ({
                 clock_in: d.clock_in,
@@ -362,24 +500,35 @@ export function TimeEntryDialog({
                 is_sleepover: d.is_sleepover,
                 is_on_call: d.is_on_call,
                 is_public_holiday: d.is_public_holiday,
-                sleepover_disturbances: d.is_sleepover ? buildDisturbances(d.disturbances) : [],
+                sleepover_disturbances: d.is_sleepover
+                    ? buildDisturbances(d.disturbances)
+                    : [],
                 mileage_km: d.mileage_km || undefined,
                 cost_centre: d.cost_centre || undefined,
                 project_code: d.project_code || undefined,
                 notes: d.notes || undefined,
                 amendment_reason: d.amendment_reason,
             }));
-            form.put(`/hr/time/entries/${entry.id}`, { ...common, onSuccess: onOk('Time entry updated.') });
+            form.put(`/hr/time/entries/${entry.id}`, {
+                ...common,
+                onSuccess: onOk('Time entry updated.'),
+            });
         } else if (activeMode === 'correct' && entry) {
             form.transform((d) => ({
                 clock_out: d.clock_out,
                 break_minutes: Number(d.break_minutes) || 0,
                 reason: d.reason,
             }));
-            form.post(`/hr/time/entries/${entry.id}/correct`, { ...common, onSuccess: onOk('Clock-out corrected.') });
+            form.post(`/hr/time/entries/${entry.id}/correct`, {
+                ...common,
+                onSuccess: onOk('Clock-out corrected.'),
+            });
         } else if (activeMode === 'void' && entry) {
             form.transform((d) => ({ reason: d.reason }));
-            form.post(`/hr/time/entries/${entry.id}/void`, { ...common, onSuccess: onOk('Time entry voided.') });
+            form.post(`/hr/time/entries/${entry.id}/void`, {
+                ...common,
+                onSuccess: onOk('Time entry voided.'),
+            });
         }
     }
 
@@ -447,7 +596,7 @@ export function TimeEntryDialog({
                     </button>
                     {wizard.isLast ? (
                         <>
-                            {(activeMode === 'add' || activeMode === 'behalf') ? (
+                            {activeMode === 'add' || activeMode === 'behalf' ? (
                                 <button
                                     type="button"
                                     onClick={() => submit(true)}
@@ -463,7 +612,9 @@ export function TimeEntryDialog({
                                 disabled={form.processing}
                                 className={cn(
                                     'inline-flex items-center gap-2 rounded-[10px] px-[18px] py-2.5 text-sm font-semibold text-primary-foreground hover:brightness-95 disabled:opacity-50',
-                                    activeMode === 'void' ? 'bg-status-critical' : 'bg-primary',
+                                    activeMode === 'void'
+                                        ? 'bg-status-critical'
+                                        : 'bg-primary',
                                 )}
                             >
                                 {form.processing
@@ -496,7 +647,11 @@ export function TimeEntryDialog({
                 <WizardStepPane>
                     <StepHead
                         icon={UserPlus}
-                        title={activeMode === 'behalf' ? "Who's this for?" : 'Who is this for?'}
+                        title={
+                            activeMode === 'behalf'
+                                ? "Who's this for?"
+                                : 'Who is this for?'
+                        }
                         blurb={
                             activeMode === 'behalf'
                                 ? 'Pick the team member you are clocking for — you’ll set the times next.'
@@ -504,7 +659,11 @@ export function TimeEntryDialog({
                         }
                     />
                     <div className="max-w-[560px] space-y-4">
-                        <Field label="Staff member" required error={form.errors.user_id}>
+                        <Field
+                            label="Staff member"
+                            required
+                            error={form.errors.user_id}
+                        >
                             <PeoplePicker
                                 value={form.data.user_id}
                                 onChange={(v) => form.setData('user_id', v)}
@@ -521,7 +680,11 @@ export function TimeEntryDialog({
                 <WizardStepPane>
                     <StepHead
                         icon={Clock}
-                        title={stepKey === 'finish' ? 'Finish the shift' : 'Times & break'}
+                        title={
+                            stepKey === 'finish'
+                                ? 'Finish the shift'
+                                : 'Times & break'
+                        }
                         blurb={
                             stepKey === 'finish'
                                 ? 'Set when the staff member actually finished and the break taken.'
@@ -537,19 +700,27 @@ export function TimeEntryDialog({
                             >
                                 <DateTimeInput
                                     value={form.data.clock_in}
-                                    onChange={(v) => form.setData('clock_in', v)}
+                                    onChange={(v) =>
+                                        form.setData('clock_in', v)
+                                    }
                                     disabled={stepKey === 'finish'}
                                 />
                             </Field>
                             <Field
                                 label="Clock out"
                                 required={activeMode !== 'behalf'}
-                                hint={activeMode === 'behalf' ? '— optional' : undefined}
+                                hint={
+                                    activeMode === 'behalf'
+                                        ? '— optional'
+                                        : undefined
+                                }
                                 error={form.errors.clock_out}
                             >
                                 <DateTimeInput
                                     value={form.data.clock_out}
-                                    onChange={(v) => form.setData('clock_out', v)}
+                                    onChange={(v) =>
+                                        form.setData('clock_out', v)
+                                    }
                                 />
                             </Field>
                         </div>
@@ -560,7 +731,12 @@ export function TimeEntryDialog({
                                     min={0}
                                     max={240}
                                     value={form.data.break_minutes}
-                                    onChange={(e) => form.setData('break_minutes', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'break_minutes',
+                                            e.target.value,
+                                        )
+                                    }
                                     className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 />
                             </Field>
@@ -570,7 +746,12 @@ export function TimeEntryDialog({
                                     min={0}
                                     step="0.1"
                                     value={form.data.mileage_km}
-                                    onChange={(e) => form.setData('mileage_km', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'mileage_km',
+                                            e.target.value,
+                                        )
+                                    }
                                     className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 />
                             </Field>
@@ -578,10 +759,10 @@ export function TimeEntryDialog({
                         {totalHours != null ? (
                             <div className="flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
                                 <div className="text-center">
-                                    <div className="text-[22px] font-bold leading-none text-primary">
+                                    <div className="text-[22px] leading-none font-bold text-primary">
                                         {totalHours}
                                     </div>
-                                    <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                    <div className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
                                         Hours
                                     </div>
                                 </div>
@@ -590,11 +771,13 @@ export function TimeEntryDialog({
                                     {breakShort ? (
                                         <span className="inline-flex items-center gap-1.5 font-semibold text-status-warning">
                                             <AlertTriangle className="h-3.5 w-3.5" />
-                                            NZ rule: this shift needs at least {reqBreak}m break.
+                                            NZ rule: this shift needs at least{' '}
+                                            {reqBreak}m break.
                                         </span>
                                     ) : (
                                         <span className="text-muted-foreground">
-                                            {breakMin}m break logged · meets the NZ break rule.
+                                            {breakMin}m break logged · meets the
+                                            NZ break rule.
                                         </span>
                                     )}
                                 </div>
@@ -623,23 +806,38 @@ export function TimeEntryDialog({
                         </Field>
 
                         <div>
-                            <div className="mb-2 text-[13px] font-semibold">Loadings</div>
+                            <div className="mb-2 text-[13px] font-semibold">
+                                Loadings
+                            </div>
                             <div className="flex flex-wrap gap-2">
                                 <ToggleChip
                                     label="Sleepover"
                                     active={form.data.is_sleepover}
-                                    onClick={() => form.setData('is_sleepover', !form.data.is_sleepover)}
+                                    onClick={() =>
+                                        form.setData(
+                                            'is_sleepover',
+                                            !form.data.is_sleepover,
+                                        )
+                                    }
                                 />
                                 <ToggleChip
                                     label="On-call"
                                     active={form.data.is_on_call}
-                                    onClick={() => form.setData('is_on_call', !form.data.is_on_call)}
+                                    onClick={() =>
+                                        form.setData(
+                                            'is_on_call',
+                                            !form.data.is_on_call,
+                                        )
+                                    }
                                 />
                                 <ToggleChip
                                     label="Public holiday"
                                     active={form.data.is_public_holiday}
                                     onClick={() =>
-                                        form.setData('is_public_holiday', !form.data.is_public_holiday)
+                                        form.setData(
+                                            'is_public_holiday',
+                                            !form.data.is_public_holiday,
+                                        )
                                     }
                                 />
                             </div>
@@ -652,13 +850,24 @@ export function TimeEntryDialog({
                                         Sleepover disturbance log
                                     </div>
                                     <span className="text-[11.5px] text-muted-foreground">
-                                        {form.data.disturbances.filter((d) => d.start && d.end).length}{' '}
-                                        {form.data.disturbances.filter((d) => d.start && d.end).length === 1
+                                        {
+                                            form.data.disturbances.filter(
+                                                (d) => d.start && d.end,
+                                            ).length
+                                        }{' '}
+                                        {form.data.disturbances.filter(
+                                            (d) => d.start && d.end,
+                                        ).length === 1
                                             ? 'disturbance'
                                             : 'disturbances'}{' '}
                                         ·{' '}
                                         {form.data.disturbances.reduce(
-                                            (sum, d) => sum + disturbanceMinutes(d.start, d.end),
+                                            (sum, d) =>
+                                                sum +
+                                                disturbanceMinutes(
+                                                    d.start,
+                                                    d.end,
+                                                ),
                                             0,
                                         )}{' '}
                                         min paid as active time
@@ -666,7 +875,10 @@ export function TimeEntryDialog({
                                 </div>
                                 <div className="flex flex-col gap-2">
                                     {form.data.disturbances.map((d, i) => (
-                                        <div key={i} className="flex items-center gap-2">
+                                        <div
+                                            key={i}
+                                            className="flex items-center gap-2"
+                                        >
                                             <input
                                                 type="time"
                                                 aria-label={`Wake-up ${i + 1} start`}
@@ -674,14 +886,24 @@ export function TimeEntryDialog({
                                                 onChange={(e) =>
                                                     form.setData(
                                                         'disturbances',
-                                                        form.data.disturbances.map((x, idx) =>
-                                                            idx === i ? { ...x, start: e.target.value } : x,
+                                                        form.data.disturbances.map(
+                                                            (x, idx) =>
+                                                                idx === i
+                                                                    ? {
+                                                                          ...x,
+                                                                          start: e
+                                                                              .target
+                                                                              .value,
+                                                                      }
+                                                                    : x,
                                                         ),
                                                     )
                                                 }
                                                 className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             />
-                                            <span className="text-muted-foreground">→</span>
+                                            <span className="text-muted-foreground">
+                                                →
+                                            </span>
                                             <input
                                                 type="time"
                                                 aria-label={`Wake-up ${i + 1} end`}
@@ -689,15 +911,27 @@ export function TimeEntryDialog({
                                                 onChange={(e) =>
                                                     form.setData(
                                                         'disturbances',
-                                                        form.data.disturbances.map((x, idx) =>
-                                                            idx === i ? { ...x, end: e.target.value } : x,
+                                                        form.data.disturbances.map(
+                                                            (x, idx) =>
+                                                                idx === i
+                                                                    ? {
+                                                                          ...x,
+                                                                          end: e
+                                                                              .target
+                                                                              .value,
+                                                                      }
+                                                                    : x,
                                                         ),
                                                     )
                                                 }
                                                 className="h-9 rounded-lg border border-border bg-card px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                             />
-                                            <span className="w-12 text-[12px] font-semibold tabular-nums text-muted-foreground">
-                                                {disturbanceMinutes(d.start, d.end)}m
+                                            <span className="w-12 text-[12px] font-semibold text-muted-foreground tabular-nums">
+                                                {disturbanceMinutes(
+                                                    d.start,
+                                                    d.end,
+                                                )}
+                                                m
                                             </span>
                                             <button
                                                 type="button"
@@ -705,7 +939,10 @@ export function TimeEntryDialog({
                                                 onClick={() =>
                                                     form.setData(
                                                         'disturbances',
-                                                        form.data.disturbances.filter((_, idx) => idx !== i),
+                                                        form.data.disturbances.filter(
+                                                            (_, idx) =>
+                                                                idx !== i,
+                                                        ),
                                                     )
                                                 }
                                                 className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
@@ -724,7 +961,8 @@ export function TimeEntryDialog({
                                         }
                                         className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-1.5 text-[12.5px] font-semibold text-muted-foreground hover:border-primary/50 hover:text-foreground"
                                     >
-                                        <Plus className="h-3.5 w-3.5" /> Add wake-up
+                                        <Plus className="h-3.5 w-3.5" /> Add
+                                        wake-up
                                     </button>
                                 </div>
                             </div>
@@ -739,7 +977,9 @@ export function TimeEntryDialog({
                                     <Field label="Site" hint="— optional">
                                         <SelectInput
                                             value={form.data.site_id}
-                                            onChange={(v) => form.setData('site_id', v)}
+                                            onChange={(v) =>
+                                                form.setData('site_id', v)
+                                            }
                                             placeholder="No site"
                                             options={sites.map((s) => ({
                                                 value: String(s.id),
@@ -752,7 +992,9 @@ export function TimeEntryDialog({
                                     <Field label="Client" hint="— optional">
                                         <SelectInput
                                             value={form.data.client_id}
-                                            onChange={(v) => form.setData('client_id', v)}
+                                            onChange={(v) =>
+                                                form.setData('client_id', v)
+                                            }
                                             placeholder="No client"
                                             options={clients.map((c) => ({
                                                 value: String(c.id),
@@ -769,7 +1011,12 @@ export function TimeEntryDialog({
                                 <input
                                     type="text"
                                     value={form.data.cost_centre}
-                                    onChange={(e) => form.setData('cost_centre', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'cost_centre',
+                                            e.target.value,
+                                        )
+                                    }
                                     className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 />
                             </Field>
@@ -777,7 +1024,12 @@ export function TimeEntryDialog({
                                 <input
                                     type="text"
                                     value={form.data.project_code}
-                                    onChange={(e) => form.setData('project_code', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'project_code',
+                                            e.target.value,
+                                        )
+                                    }
                                     className="h-10 w-full rounded-lg border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                 />
                             </Field>
@@ -819,23 +1071,42 @@ export function TimeEntryDialog({
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 px-4 py-3 text-[12.5px]">
-                                    <SummaryRow label="Hours" value={totalHours != null ? `${totalHours}h` : '—'} />
-                                    <SummaryRow label="Break" value={`${breakMin}m`} />
-                                    <SummaryRow label="Pay type" value={payTypeLabel(form.data.pay_type)} />
+                                    <SummaryRow
+                                        label="Hours"
+                                        value={
+                                            totalHours != null
+                                                ? `${totalHours}h`
+                                                : '—'
+                                        }
+                                    />
+                                    <SummaryRow
+                                        label="Break"
+                                        value={`${breakMin}m`}
+                                    />
+                                    <SummaryRow
+                                        label="Pay type"
+                                        value={payTypeLabel(form.data.pay_type)}
+                                    />
                                     <SummaryRow
                                         label="Loadings"
                                         value={
                                             [
-                                                form.data.is_sleepover && 'Sleepover',
-                                                form.data.is_on_call && 'On-call',
-                                                form.data.is_public_holiday && 'PH',
+                                                form.data.is_sleepover &&
+                                                    'Sleepover',
+                                                form.data.is_on_call &&
+                                                    'On-call',
+                                                form.data.is_public_holiday &&
+                                                    'PH',
                                             ]
                                                 .filter(Boolean)
                                                 .join(', ') || 'None'
                                         }
                                     />
                                     {form.data.mileage_km ? (
-                                        <SummaryRow label="Mileage" value={`${form.data.mileage_km} km`} />
+                                        <SummaryRow
+                                            label="Mileage"
+                                            value={`${form.data.mileage_km} km`}
+                                        />
                                     ) : null}
                                 </div>
                             </div>
@@ -843,9 +1114,15 @@ export function TimeEntryDialog({
                             <div className="flex items-start gap-2.5 rounded-xl border border-status-critical/30 bg-status-critical-bg px-4 py-3 text-[12.5px] text-status-critical">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
                                 <div>
-                                    Voiding {staffName ? <strong>{staffName}</strong> : 'this'}
-                                    &apos;s entry for {entry?.entry_date} removes it from the
-                                    register. Approved entries cannot be voided.
+                                    Voiding{' '}
+                                    {staffName ? (
+                                        <strong>{staffName}</strong>
+                                    ) : (
+                                        'this'
+                                    )}
+                                    &apos;s entry for {entry?.entry_date}{' '}
+                                    removes it from the register. Approved
+                                    entries cannot be voided.
                                 </div>
                             </div>
                         )}
@@ -863,20 +1140,35 @@ export function TimeEntryDialog({
                                 <Textarea
                                     rows={3}
                                     value={form.data.amendment_reason}
-                                    onChange={(e) => form.setData('amendment_reason', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'amendment_reason',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="Why is this entry being amended?"
                                 />
                             </Field>
                         ) : (
                             <Field
-                                label={activeMode === 'void' ? 'Reason for voiding' : 'Reason'}
-                                required={activeMode === 'behalf' || activeMode === 'correct' || activeMode === 'void'}
+                                label={
+                                    activeMode === 'void'
+                                        ? 'Reason for voiding'
+                                        : 'Reason'
+                                }
+                                required={
+                                    activeMode === 'behalf' ||
+                                    activeMode === 'correct' ||
+                                    activeMode === 'void'
+                                }
                                 error={form.errors.reason}
                             >
                                 <Textarea
                                     rows={3}
                                     value={form.data.reason}
-                                    onChange={(e) => form.setData('reason', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('reason', e.target.value)
+                                    }
                                     placeholder={
                                         activeMode === 'behalf'
                                             ? 'e.g. Staff forgot to clock in during an emergency handover'
@@ -889,11 +1181,16 @@ export function TimeEntryDialog({
                         )}
 
                         {activeMode !== 'void' && activeMode !== 'correct' ? (
-                            <Field label="Notes" hint="— optional, team-visible">
+                            <Field
+                                label="Notes"
+                                hint="— optional, team-visible"
+                            >
                                 <Textarea
                                     rows={2}
                                     value={form.data.notes}
-                                    onChange={(e) => form.setData('notes', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('notes', e.target.value)
+                                    }
                                     placeholder="Anything useful for the record…"
                                 />
                             </Field>
@@ -959,14 +1256,34 @@ function EditDiff({ entry, data }: { entry: TimeEntry; data: FormShape }) {
     const push = (label: string, from: string, to: string) => {
         if (from !== to) rows.push({ label, from: from || '—', to: to || '—' });
     };
-    push('Clock in', entry.clock_in.replace('T', ' '), data.clock_in.replace('T', ' '));
-    push('Clock out', (entry.clock_out ?? '').replace('T', ' '), data.clock_out.replace('T', ' '));
+    push(
+        'Clock in',
+        entry.clock_in.replace('T', ' '),
+        data.clock_in.replace('T', ' '),
+    );
+    push(
+        'Clock out',
+        (entry.clock_out ?? '').replace('T', ' '),
+        data.clock_out.replace('T', ' '),
+    );
     push('Break (min)', String(entry.break_minutes ?? 0), data.break_minutes);
     push('Pay type', payTypeLabel(entry.pay_type), payTypeLabel(data.pay_type));
-    push('Sleepover', boolLabel(entry.is_sleepover), boolLabel(data.is_sleepover));
+    push(
+        'Sleepover',
+        boolLabel(entry.is_sleepover),
+        boolLabel(data.is_sleepover),
+    );
     push('On-call', boolLabel(entry.is_on_call), boolLabel(data.is_on_call));
-    push('Public holiday', boolLabel(entry.is_public_holiday), boolLabel(data.is_public_holiday));
-    push('Mileage (km)', entry.mileage_km != null ? String(entry.mileage_km) : '', data.mileage_km);
+    push(
+        'Public holiday',
+        boolLabel(entry.is_public_holiday),
+        boolLabel(data.is_public_holiday),
+    );
+    push(
+        'Mileage (km)',
+        entry.mileage_km != null ? String(entry.mileage_km) : '',
+        data.mileage_km,
+    );
     push('Cost centre', entry.cost_centre ?? '', data.cost_centre);
     push('Project code', entry.project_code ?? '', data.project_code);
     push('Notes', entry.notes ?? '', data.notes);
@@ -974,14 +1291,15 @@ function EditDiff({ entry, data }: { entry: TimeEntry; data: FormShape }) {
     if (rows.length === 0) {
         return (
             <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-[12.5px] text-muted-foreground">
-                No field changes yet — adjust the times, pay or context to amend.
+                No field changes yet — adjust the times, pay or context to
+                amend.
             </div>
         );
     }
 
     return (
         <div className="overflow-hidden rounded-xl border border-border">
-            <div className="border-b border-border bg-muted/40 px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <div className="border-b border-border bg-muted/40 px-4 py-2 text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
                 {rows.length} {rows.length === 1 ? 'change' : 'changes'}
             </div>
             <div className="divide-y divide-border">
@@ -990,7 +1308,9 @@ function EditDiff({ entry, data }: { entry: TimeEntry; data: FormShape }) {
                         key={r.label}
                         className="flex flex-wrap items-center gap-2 px-4 py-2 text-[12.5px]"
                     >
-                        <span className="w-28 shrink-0 text-muted-foreground">{r.label}</span>
+                        <span className="w-28 shrink-0 text-muted-foreground">
+                            {r.label}
+                        </span>
                         <span className="rounded-md bg-status-critical-bg px-2 py-0.5 font-semibold text-status-critical line-through">
                             {r.from}
                         </span>

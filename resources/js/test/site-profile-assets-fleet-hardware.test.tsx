@@ -44,12 +44,15 @@ describe('Site Profile asset, fleet, hardware, and plan depth', () => {
         for (const term of [
             'assignment_type',
             'deviceRoomDraft',
+            'assignDeviceRoom',
+            '/assign-room',
             'PlanThumbnail',
             'savePlanPin',
             'removePlanPin',
         ]) {
             expect(surface).toContain(term);
         }
+        expect(surface).not.toContain("d.provider === 'unifi'");
     });
 
     it('embeds one canonical full plan and room surface', () => {

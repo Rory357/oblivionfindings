@@ -22,7 +22,9 @@ const twoSteps = [
     },
 ] as const;
 
-function renderWizard(overrides: Partial<ComponentProps<typeof WizardShell>> = {}) {
+function renderWizard(
+    overrides: Partial<ComponentProps<typeof WizardShell>> = {},
+) {
     const onClose = vi.fn();
 
     const rendered = render(

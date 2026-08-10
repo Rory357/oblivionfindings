@@ -3,6 +3,55 @@ import { describe, expect, it } from 'vitest';
 import { buildNavSearchCatalog, isIconActive } from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
+    it('uses the grouped Security & Devices contract in application search', () => {
+        const catalog = buildNavSearchCatalog({
+            can: {
+                securityDevices: {
+                    viewAny: true,
+                    devicesView: true,
+                    groupsManage: true,
+                    eventsView: true,
+                    maintenanceView: true,
+                    integrationsView: true,
+                    integrationsManage: true,
+                    monitoringManage: true,
+                    reportsView: true,
+                },
+            },
+        }).filter((item) => item.section === 'Security & Devices');
+
+        expect([...new Set(catalog.map((item) => item.group))]).toEqual([
+            'Overview',
+            'Workspaces',
+            'Operations',
+            'Setup',
+        ]);
+        expect(catalog.map((item) => item.label)).toEqual([
+            'Estate overview',
+            'Sites',
+            'All devices',
+            'Network & IT',
+            'Security',
+            'Healthcare',
+            'Tracking',
+            'Facilities & IoT',
+            'Monitoring',
+            'Maintenance',
+            'Discovery & collectors',
+            'Integrations',
+            'Settings & audit',
+        ]);
+        expect(catalog.map((item) => item.label)).not.toEqual(
+            expect.arrayContaining([
+                'Tracking Devices',
+                'Smart IoT & Healthcare',
+                'IT Infrastructure',
+                'Alerts & Events',
+                'APIs & Integrations',
+            ]),
+        );
+    });
+
     it('moves billing navigation into Finance and leaves funding with client management', () => {
         const catalog = buildNavSearchCatalog({
             can: {
@@ -15,8 +64,12 @@ describe('app sidebar workforce navigation', () => {
             },
         });
 
-        const operationsItems = catalog.filter((item) => item.section === 'Operations');
-        const financeItems = catalog.filter((item) => item.section === 'Finance');
+        const operationsItems = catalog.filter(
+            (item) => item.section === 'Operations',
+        );
+        const financeItems = catalog.filter(
+            (item) => item.section === 'Finance',
+        );
 
         expect(operationsItems).toEqual(
             expect.arrayContaining([
@@ -28,18 +81,41 @@ describe('app sidebar workforce navigation', () => {
             ]),
         );
 
-        expect(operationsItems.map((item) => item.group)).not.toContain('Time & Billing');
+        expect(operationsItems.map((item) => item.group)).not.toContain(
+            'Time & Billing',
+        );
         expect(operationsItems.map((item) => item.label)).not.toEqual(
-            expect.arrayContaining(['Billing', 'Invoices', 'Price Books', 'Quotes', 'Recurring Charges']),
+            expect.arrayContaining([
+                'Billing',
+                'Invoices',
+                'Price Books',
+                'Quotes',
+                'Recurring Charges',
+            ]),
         );
 
         expect(financeItems).toEqual(
             expect.arrayContaining([
-                expect.objectContaining({ label: 'Billing', href: '/finance/billing' }),
-                expect.objectContaining({ label: 'Invoices', href: '/finance/invoices' }),
-                expect.objectContaining({ label: 'Price Books', href: '/finance/price-books' }),
-                expect.objectContaining({ label: 'Quotes', href: '/finance/quotes' }),
-                expect.objectContaining({ label: 'Recurring Charges', href: '/finance/recurring-charges' }),
+                expect.objectContaining({
+                    label: 'Billing',
+                    href: '/finance/billing',
+                }),
+                expect.objectContaining({
+                    label: 'Invoices',
+                    href: '/finance/invoices',
+                }),
+                expect.objectContaining({
+                    label: 'Price Books',
+                    href: '/finance/price-books',
+                }),
+                expect.objectContaining({
+                    label: 'Quotes',
+                    href: '/finance/quotes',
+                }),
+                expect.objectContaining({
+                    label: 'Recurring Charges',
+                    href: '/finance/recurring-charges',
+                }),
             ]),
         );
     });

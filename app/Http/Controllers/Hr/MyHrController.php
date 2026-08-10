@@ -25,34 +25,42 @@ use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\AnnouncementAudienceResolver;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\CycleService;
 use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\ESignatureService;
 use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\FeedService;
+use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Domain\Hr\Services\HrDocumentAccessService;
+use App\Domain\Hr\Services\HrLeaveAccessService;
 use App\Domain\Hr\Services\HrNotificationService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\OnboardingService;
+use App\Domain\Hr\Services\PolicyAttestationService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\BuildsMyHrOverview;
 use App\Http\Controllers\Hr\Concerns\BuildsMyHrShell;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Models\ProcedureAcknowledgement;
 use App\Models\SafeWorkProcedure;
 use App\Models\Shift;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class MyHrController extends Controller
 {
-    use BuildsMyHrOverview, BuildsMyHrShell, ResolvesHrTenant;
+    use BuildsMyHrOverview, BuildsMyHrShell;
 
     public function __construct(
         private readonly LeaveService $leaveService,
@@ -62,18 +70,38 @@ class MyHrController extends Controller
         private readonly ExpenseService $expenseService,
         private readonly FeedService $feedService,
         private readonly OnboardingService $onboardingService,
+        private readonly AnnouncementAudienceResolver $announcementAudiences,
+        private readonly HrCurrentStaffService $currentStaff,
+        private readonly ESignatureService $signatureService,
+        private readonly HrDocumentAccessService $documentAccess,
+        private readonly HrLeaveAccessService $leaveAccess,
+        private readonly HrPerformanceAccessService $performanceAccess,
+        private readonly PolicyAttestationService $policyAttestations,
     ) {}
+
+    private function currentMyHrUser(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user instanceof User && $this->currentStaff->isCurrent($user), 404);
+
+        return $user;
+    }
 
     public function sendKudos(Request $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $notForeignTenant = $this->rejectForeignTenantRecipient($tenantId);
+        abort_unless(
+            $user
+                && $user->canDo('hr.recognition.give')
+                && $this->currentStaff->isCurrent($user),
+            403,
+        );
+        $currentStaffRecipientRule = $this->currentStaff->recipientRule();
 
         $validated = $request->validate([
-            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id', $notForeignTenant],
+            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id', $currentStaffRecipientRule],
             'to_user_ids' => ['required_without:to_user_id', 'array', 'min:1'],
-            'to_user_ids.*' => ['integer', 'exists:users,id', $notForeignTenant],
+            'to_user_ids.*' => ['integer', 'exists:users,id', $currentStaffRecipientRule],
             'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
             'impact' => ['nullable', 'string', Rule::in(array_keys(FeedService::KUDOS_IMPACTS))],
             'message' => ['required', 'string', 'max:2000'],
@@ -87,7 +115,6 @@ class MyHrController extends Controller
                 $recipientIds,
                 $validated['category'],
                 $validated['message'],
-                $tenantId,
                 $validated['impact'] ?? null,
             );
         } catch (\Throwable $e) {
@@ -107,26 +134,27 @@ class MyHrController extends Controller
      */
     public function shoutouts(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
         return Inertia::render('hr/my/shoutouts', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
-            'received' => $this->myHrShoutouts($user, $tenantId, 'received'),
-            'given' => $this->myHrShoutouts($user, $tenantId, 'given'),
+            'myHr' => $this->myHrShellProps($user),
+            'received' => $this->myHrShoutouts($user, 'received'),
+            'given' => $this->myHrShoutouts($user, 'given'),
         ]);
     }
 
     /**
      * Toggle an emoji reaction on a kudos for the current user (one of each
      * emoji per person — click again to remove). Open to any teammate in the
-     * tenant since kudos live on the shared recognition feed.
+     * application since kudos live on the shared recognition feed.
      */
     public function reactKudos(Request $request, HrKudos $kudos)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+        $user = $this->currentMyHrUser($request);
+
+        $kudos = HrKudos::query()->findOrFail($kudos->getKey());
+        abort_unless($this->feedService->canViewKudos($kudos, $user), 404);
+        abort_unless($user->canDo('hr.recognition.give'), 403);
 
         $validated = $request->validate([
             'emoji' => ['required', 'string', Rule::in(FeedService::REACTION_EMOJIS)],
@@ -144,9 +172,11 @@ class MyHrController extends Controller
      */
     public function replyKudos(Request $request, HrKudos $kudos)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $kudos->tenant_id);
+        $user = $this->currentMyHrUser($request);
+
+        $kudos = HrKudos::query()->findOrFail($kudos->getKey());
+        abort_unless($this->feedService->canViewKudos($kudos, $user), 404);
+        abort_unless($user->canDo('hr.recognition.give'), 403);
         abort_unless(in_array($user->id, [$kudos->from_user_id, $kudos->to_user_id], true), 403);
 
         $validated = $request->validate([
@@ -160,25 +190,24 @@ class MyHrController extends Controller
 
     public function index(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $profile = HrEmployeeProfile::query()
             ->where('user_id', $user->id)
             ->with('user:id,name,email,profile_photo_path')
             ->first();
 
-        $pendingLeave = HrLeaveRequest::where('tenant_id', $tenantId)
+        $pendingLeave = HrLeaveRequest::query()
             ->where('user_id', $user->id)
             ->where('status', 'pending')
             ->count();
 
-        $leaveBalances = HrLeaveBalance::where('tenant_id', $tenantId)
+        $leaveBalances = HrLeaveBalance::query()
             ->where('user_id', $user->id)
             ->where('year', now()->year)
             ->get();
 
-        $complianceStatuses = HrStaffComplianceStatus::where('tenant_id', $tenantId)
+        $complianceStatuses = HrStaffComplianceStatus::query()
             ->where('user_id', $user->id)
             ->with('requirement:id,code,name,category')
             ->get();
@@ -191,35 +220,35 @@ class MyHrController extends Controller
         ];
 
         $policiesDue = HrPolicy::active()
-            ->where('tenant_id', $tenantId)
             ->where('requires_attestation', true)
             ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
             ->count();
 
-        $pendingReviews = HrPerformanceReview::where('tenant_id', $tenantId)
-            ->where('employee_user_id', $user->id)
-            ->whereIn('status', ['in_progress', 'completed'])
+        $pendingReviews = HrPerformanceReview::where('employee_user_id', $user->id)
+            ->whereIn('status', ['in_progress', 'completed', 'signed_off'])
             ->where(fn ($q) => $q->whereNull('employee_signed_off')->orWhere('employee_signed_off', false))
             ->count();
 
-        $activeGoals = HrDevelopmentGoal::where('tenant_id', $tenantId)
+        $activeGoals = HrDevelopmentGoal::query()
             ->where('employee_user_id', $user->id)
             ->whereIn('status', ['not_started', 'in_progress', 'blocked'])
             ->count();
 
-        $availableSurveys = HrEngagementSurvey::where('tenant_id', $tenantId)
+        $availableSurveys = HrEngagementSurvey::query()
             ->where('status', 'published')
+            ->get()
+            ->filter(fn (HrEngagementSurvey $survey) => $this->engagementService->isCurrentRecipient($survey, $user))
             ->count();
 
         // Timekeeping
-        $activeClock = HrTimeEntry::forTenant($tenantId)
+        $activeClock = HrTimeEntry::query()
             ->forUser($user->id)
             ->active()
             ->first(['id', 'clock_in', 'notes']);
 
-        $weeklySummary = $this->timeTrackingService->getWeeklySummary($tenantId, $user->id);
+        $weeklySummary = $this->timeTrackingService->getWeeklySummary($user->id);
 
-        $todayTotal = (float) HrTimeEntry::forTenant($tenantId)
+        $todayTotal = (float) HrTimeEntry::query()
             ->forUser($user->id)
             ->where('entry_date', now()->toDateString())
             ->whereNotNull('clock_out')
@@ -232,14 +261,14 @@ class MyHrController extends Controller
             ->first(['net_pay', 'payment_date']);
 
         // Expenses
-        $pendingExpenses = HrExpenseClaim::where('tenant_id', $tenantId)
+        $pendingExpenses = HrExpenseClaim::query()
             ->where('user_id', $user->id)
             ->where('status', 'submitted')
             ->selectRaw('count(*) as count, coalesce(sum(total_amount), 0) as total')
             ->first();
 
         // Kudos received (last 30 days)
-        $kudosReceived = HrKudos::where('tenant_id', $tenantId)
+        $kudosReceived = HrKudos::query()
             ->where('to_user_id', $user->id)
             ->where('created_at', '>=', now()->subDays(30))
             ->count();
@@ -247,14 +276,17 @@ class MyHrController extends Controller
         // Announcements (active) for the "Around your team" card + "See all" modal.
         // The card surfaces unacknowledged ones first; the modal lists every active
         // notice with its body + an Acknowledge affordance (Seen ✓ once done).
-        $announcements = HrAnnouncement::forTenant($tenantId)
+        $announcements = HrAnnouncement::query()
             ->active()
-            ->with('creator:id,name')
+            ->with(['creator:id,name', 'targets'])
             ->withExists(['acknowledgements as acknowledged' => fn ($q) => $q->where('user_id', $user->id)])
             ->orderByDesc('is_pinned')
             ->orderByDesc('published_at')
-            ->limit(12)
-            ->get()
+            ->lazy(100)
+            ->filter(fn (HrAnnouncement $announcement) => (int) $announcement->created_by === (int) $user->id
+                || $this->announcementAudiences->includesCurrentUser($announcement, $user))
+            ->take(12)
+            ->collect()
             ->map(fn (HrAnnouncement $a) => [
                 'id' => $a->id,
                 'title' => $a->title,
@@ -293,11 +325,11 @@ class MyHrController extends Controller
             : collect();
 
         return Inertia::render('hr/my/index', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
-            'overview' => $this->myHrOverviewProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
+            'overview' => $this->myHrOverviewProps($user),
             // "Getting started" — the new hire's own active onboarding checklist
             // (null once completed/cancelled, or when they never had one).
-            'onboarding' => $this->myOnboardingChecklist($user->id, $tenantId, $profile?->id),
+            'onboarding' => $this->myOnboardingChecklist($user->id, $profile?->id),
             'safeWorkProcedures' => $safeWorkProcedures,
             // Shaped for the Overview's hosted "Request leave" wizard (mirrors
             // the Leave tab's `balances` contract).
@@ -330,7 +362,7 @@ class MyHrController extends Controller
             // Feeds the Overview's hosted "Request leave" wizard (tile picker +
             // calendar holiday highlight).
             'leaveTypes' => LeaveService::LEAVE_TYPES,
-            'publicHolidays' => $this->leaveService->publicHolidayMap($tenantId),
+            'publicHolidays' => $this->leaveService->publicHolidayMap(),
         ]);
     }
 
@@ -346,14 +378,13 @@ class MyHrController extends Controller
      *
      * @return array<string, mixed>|null
      */
-    private function myOnboardingChecklist(int $userId, int $tenantId, ?int $profileId): ?array
+    private function myOnboardingChecklist(int $userId, ?int $profileId): ?array
     {
         if (! $profileId) {
             return null;
         }
 
         $checklist = HrOnboardingChecklist::query()
-            ->where('tenant_id', $tenantId)
             ->where('employee_profile_id', $profileId)
             ->whereIn('status', ['pending', 'in_progress'])
             ->with(['tasks' => fn ($q) => $q->orderBy('sort_order')->orderBy('id')])
@@ -412,11 +443,9 @@ class MyHrController extends Controller
      */
     public function completeOnboardingTask(Request $request, HrOnboardingTask $task)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $checklist = $task->checklist()->with('employeeProfile:id,user_id,tenant_id')->firstOrFail();
-        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
+        $checklist = $task->checklist()->with('employeeProfile:id,user_id')->firstOrFail();
 
         // Owner-only: the checklist must belong to the requesting employee.
         abort_unless($checklist->employeeProfile?->user_id === $user->id, 403);
@@ -447,15 +476,16 @@ class MyHrController extends Controller
      */
     public function benefits(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
+        $this->performanceAccess->currentStaff($user, $user);
 
-        $profileId = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $profileId = $this->performanceAccess
+            ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
             ->where('user_id', $user->id)
             ->value('id');
 
         $enrolments = $profileId
-            ? HrBenefitEnrollment::forTenant($tenantId)
+            ? HrBenefitEnrollment::query()
                 ->where('employee_profile_id', $profileId)
                 ->with('benefitPlan:id,name,type,provider,description')
                 ->orderByDesc('enrollment_date')
@@ -480,17 +510,17 @@ class MyHrController extends Controller
             : collect();
 
         return Inertia::render('hr/my/benefits', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'enrolments' => $enrolments,
         ]);
     }
 
     public function leave(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
+        $this->leaveAccess->currentSubject($user, $user);
 
-        $requests = HrLeaveRequest::where('tenant_id', $tenantId)
+        $requests = HrLeaveRequest::query()
             ->where('user_id', $user->id)
             ->with('reviewer:id,name')
             ->orderByDesc('submitted_at')
@@ -508,7 +538,7 @@ class MyHrController extends Controller
             'created_at' => $r->submitted_at?->toDateString() ?? $r->created_at?->toDateString(),
         ]);
 
-        $balances = HrLeaveBalance::where('tenant_id', $tenantId)
+        $balances = HrLeaveBalance::query()
             ->where('user_id', $user->id)
             ->where('year', now()->year)
             ->get()
@@ -520,18 +550,19 @@ class MyHrController extends Controller
             ]);
 
         return Inertia::render('hr/my/leave', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
-            'whosOutWeek' => $this->myHrWhosOutByDay($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
+            'whosOutWeek' => $this->myHrWhosOutByDay($user),
             'requests' => $requests,
             'balances' => $balances,
             'leaveTypes' => LeaveService::LEAVE_TYPES,
-            'publicHolidays' => $this->leaveService->publicHolidayMap($tenantId),
+            'publicHolidays' => $this->leaveService->publicHolidayMap(),
         ]);
     }
 
     public function submitLeave(Request $request)
     {
-        $user = $request->user();
+        $user = $this->currentMyHrUser($request);
+        $this->leaveAccess->currentSubject($user, $user);
 
         $validated = $request->validate([
             'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
@@ -569,7 +600,8 @@ class MyHrController extends Controller
      */
     public function previewLeave(Request $request)
     {
-        $user = $request->user();
+        $user = $this->currentMyHrUser($request);
+        $this->leaveAccess->currentSubject($user, $user);
 
         $validated = $request->validate([
             'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
@@ -589,11 +621,9 @@ class MyHrController extends Controller
 
     public function expenses(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
         $claims = HrExpenseClaim::query()
-            ->where('tenant_id', $tenantId)
             ->where('user_id', $user->id)
             ->withCount('items')
             ->orderByDesc('created_at')
@@ -613,7 +643,7 @@ class MyHrController extends Controller
         ]);
 
         return Inertia::render('hr/my/expenses', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'claims' => $claims,
             'categories' => ExpenseService::CATEGORIES,
         ]);
@@ -621,8 +651,10 @@ class MyHrController extends Controller
 
     public function submitExpense(StoreExpenseClaimRequest $request)
     {
+        $user = $this->currentMyHrUser($request);
+
         try {
-            $this->expenseService->createClaim($request->user(), $request->validated());
+            $this->expenseService->createClaim($user, $request->validated());
         } catch (\Throwable $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
         }
@@ -636,10 +668,8 @@ class MyHrController extends Controller
      */
     public function submitExpenseClaim(Request $request, HrExpenseClaim $expenseClaim)
     {
-        $user = $request->user();
-        abort_unless($expenseClaim->user_id === $user->id, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $expenseClaim->tenant_id);
+        $user = $this->currentMyHrUser($request);
+        abort_unless((int) $expenseClaim->user_id === (int) $user->id, 403);
 
         try {
             $this->expenseService->submitClaim($expenseClaim);
@@ -656,10 +686,8 @@ class MyHrController extends Controller
      */
     public function withdrawExpenseClaim(Request $request, HrExpenseClaim $expenseClaim)
     {
-        $user = $request->user();
-        abort_unless($expenseClaim->user_id === $user->id, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $expenseClaim->tenant_id);
+        $user = $this->currentMyHrUser($request);
+        abort_unless((int) $expenseClaim->user_id === (int) $user->id, 403);
 
         try {
             $this->expenseService->withdrawClaim($expenseClaim);
@@ -672,12 +700,13 @@ class MyHrController extends Controller
 
     public function cancelLeave(Request $request, HrLeaveRequest $leaveRequest)
     {
-        $user = $request->user();
+        $user = $this->currentMyHrUser($request);
+        $this->leaveAccess->currentSubject($user, $user);
         abort_unless($leaveRequest->user_id === $user->id, 403);
         abort_unless(in_array($leaveRequest->status, ['pending', 'approved'], true), 422);
 
         try {
-            $this->leaveService->cancelRequest($leaveRequest, $user->id);
+            $this->leaveService->cancelRequest($leaveRequest, $user);
         } catch (\LogicException $exception) {
             return redirect()->back()->withErrors(['leave_request' => $exception->getMessage()]);
         }
@@ -687,12 +716,11 @@ class MyHrController extends Controller
 
     public function training(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
         // Active course assignments (my to-do list): everything not yet
         // completed or waived, soonest due first, with an explicit overdue flag.
-        $assignments = HrCourseAssignment::forTenant($tenantId)
+        $assignments = HrCourseAssignment::query()
             ->where('user_id', $user->id)
             ->whereNotIn('status', ['completed', 'waived'])
             ->with('course:id,title,code,category,delivery_method,duration_hours')
@@ -714,7 +742,7 @@ class MyHrController extends Controller
         // In-progress enrolments not already represented by an active assignment
         // (assignments carry the due date, so they win the card).
         $assignedCourseTitles = $assignments->pluck('course_title')->all();
-        $enrolments = HrCourseEnrollment::forTenant($tenantId)
+        $enrolments = HrCourseEnrollment::query()
             ->where('user_id', $user->id)
             ->whereIn('status', ['enrolled', 'in_progress'])
             ->with(['course:id,title,category,delivery_method', 'session:id,session_date'])
@@ -732,7 +760,7 @@ class MyHrController extends Controller
             ->reject(fn (array $e) => in_array($e['course_title'], $assignedCourseTitles, true))
             ->values();
 
-        $complianceStatuses = HrStaffComplianceStatus::where('tenant_id', $tenantId)
+        $complianceStatuses = HrStaffComplianceStatus::query()
             ->where('user_id', $user->id)
             ->with('requirement:id,code,name,category,description,validity_months,renewal_reminder_days,check_type')
             ->orderByRaw("FIELD(status, 'expired', 'non_compliant', 'expiring_soon', 'not_started', 'compliant')")
@@ -769,7 +797,7 @@ class MyHrController extends Controller
             ->values();
 
         return Inertia::render('hr/my/training', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'assignments' => $assignments,
             'enrolments' => $enrolments,
             'complianceStatuses' => $complianceStatuses,
@@ -783,20 +811,17 @@ class MyHrController extends Controller
 
     public function policies(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
         $attestByDays = (int) config('hr.policy_attestation_overdue_days', 7);
 
         $policies = HrPolicy::active()
-            ->where('tenant_id', $tenantId)
             ->where('requires_attestation', true)
             ->with(['versions' => fn ($q) => $q->where('is_current', true)])
             ->orderBy('title')
             ->get()
-            ->map(function ($policy) use ($user, $tenantId, $attestByDays) {
+            ->map(function ($policy) use ($user, $attestByDays) {
                 $attestation = HrPolicyAttestation::where('policy_id', $policy->id)
-                    ->where('tenant_id', $tenantId)
                     ->where('user_id', $user->id)
                     ->orderByDesc('attested_at')
                     ->first();
@@ -839,37 +864,30 @@ class MyHrController extends Controller
             });
 
         return Inertia::render('hr/my/policies', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'policies' => $policies,
         ]);
     }
 
     public function attestPolicy(Request $request, HrPolicy $policy)
     {
-        $user = $request->user();
+        $user = $this->currentMyHrUser($request);
         abort_unless($user->canDo('hr.policies.attest'), 403);
-        abort_unless($policy->requires_attestation, 422);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
-
-        HrPolicyAttestation::create([
-            'tenant_id' => $tenantId,
-            'policy_id' => $policy->id,
-            'policy_version_id' => $policy->currentVersion?->id,
-            'user_id' => $user->id,
-            'attested_at' => now(),
-            'ip_address' => $request->ip(),
-        ]);
+        $this->policyAttestations->attest(
+            $user,
+            $policy,
+            $request->ip(),
+            $request->userAgent(),
+        );
 
         return redirect()->back()->with('success', 'Policy attestation recorded.');
     }
 
     public function profile(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $profile = HrEmployeeProfile::query()
             ->where('user_id', $user->id)
             ->with(['user:id,name,email', 'primarySite:id,name'])
             ->first();
@@ -903,17 +921,16 @@ class MyHrController extends Controller
         ] : null;
 
         return Inertia::render('hr/my/profile', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'profile' => $profileData,
         ]);
     }
 
     public function updateProfile(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $profile = HrEmployeeProfile::query()
             ->where('user_id', $user->id)
             ->firstOrFail();
 
@@ -973,16 +990,13 @@ class MyHrController extends Controller
      */
     public function directory(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $viewerProfile = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('user_id', $user->id)
-            ->first(['id']);
-        abort_unless($viewerProfile, 403);
+        $visibleStaffIds = app(UserSiteAccessService::class)
+            ->applyStaffScope($this->currentStaff->currentUsersQuery()->select('users.id'), $user);
 
-        $people = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('is_active', true)
+        $people = HrEmployeeProfile::query()
+            ->whereIn('user_id', $visibleStaffIds)
             ->whereNotNull('user_id')
             ->with([
                 'user:id,name,email',
@@ -1017,7 +1031,7 @@ class MyHrController extends Controller
             ->all();
 
         return Inertia::render('hr/my/directory', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'people' => $people,
         ]);
     }
@@ -1028,11 +1042,10 @@ class MyHrController extends Controller
 
     public function reviews(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $reviews = HrPerformanceReview::where('tenant_id', $tenantId)
-            ->where('employee_user_id', $user->id)
+        $reviews = HrPerformanceReview::where('employee_user_id', $user->id)
+            ->whereIn('status', ['in_progress', 'completed', 'signed_off'])
             ->with('reviewer:id,name')
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -1061,36 +1074,46 @@ class MyHrController extends Controller
         ]);
 
         return Inertia::render('hr/my/reviews', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'reviews' => $reviews,
         ]);
     }
 
     public function updateReview(Request $request, HrPerformanceReview $review)
     {
-        $user = $request->user();
-        abort_unless($review->employee_user_id === $user->id, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
+        $user = $this->currentMyHrUser($request);
 
         $validated = $request->validate([
             'employee_comments' => ['nullable', 'string', 'max:5000'],
             'employee_signed_off' => ['nullable', 'boolean'],
         ]);
 
-        $data = ['employee_comments' => $validated['employee_comments'] ?? $review->employee_comments];
+        $signingOff = DB::transaction(function () use ($review, $user, $validated): bool {
+            $locked = $this->performanceAccess
+                ->applyHistoricalSubjectScope(HrPerformanceReview::query(), $user)
+                ->whereKey($review->getKey())
+                ->where('employee_user_id', $user->id)
+                ->whereIn('status', ['in_progress', 'completed', 'signed_off'])
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_if($locked->employee_signed_off, 422, 'This acknowledgement is locked.');
+            $data = ['employee_comments' => $validated['employee_comments'] ?? $locked->employee_comments];
+            $signingOff = ! empty($validated['employee_signed_off']) && ! $locked->employee_signed_off;
 
-        $signingOff = ! empty($validated['employee_signed_off']) && ! $review->employee_signed_off;
+            if ($signingOff) {
+                abort_unless(
+                    $locked->status === 'signed_off' && $locked->manager_signed_off,
+                    422,
+                    'Only a manager-signed review can be acknowledged.',
+                );
+                $data['employee_signed_off'] = true;
+                $data['employee_signed_off_at'] = now();
+            }
 
-        if ($signingOff) {
-            // Mirrors the UI's canSignOff gate: you can only acknowledge a
-            // review that has actually been completed and discussed.
-            abort_unless($review->status === 'completed', 422, 'Only a completed review can be signed off.');
-            $data['employee_signed_off'] = true;
-            $data['employee_signed_off_at'] = now();
-        }
+            $locked->update($data);
 
-        $review->update($data);
+            return $signingOff;
+        }, attempts: 1);
 
         if ($signingOff) {
             app(HrNotificationService::class)->notifyReviewSignedOff($review->fresh());
@@ -1105,10 +1128,9 @@ class MyHrController extends Controller
 
     public function goals(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $goals = HrDevelopmentGoal::where('tenant_id', $tenantId)
+        $goals = HrDevelopmentGoal::query()
             ->where('employee_user_id', $user->id)
             ->with('manager:id,name')
             ->orderByRaw("CASE WHEN status IN ('in_progress','not_started','blocked') THEN 0 ELSE 1 END")
@@ -1138,8 +1160,8 @@ class MyHrController extends Controller
 
         // My OKR objectives (HrGoal, owned by me, scoped to the current cycle
         // when one exists) with progress/RAG + the check-in affordance.
-        $currentCycle = app(CycleService::class)->currentCycle($tenantId);
-        $objectives = HrGoal::forTenant($tenantId)
+        $currentCycle = app(CycleService::class)->currentCycle();
+        $objectives = HrGoal::query()
             ->where('user_id', $user->id)
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->when($currentCycle, fn ($q) => $q->where(
@@ -1171,7 +1193,7 @@ class MyHrController extends Controller
             ->values();
 
         return Inertia::render('hr/my/goals', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'goals' => $goals,
             'objectives' => $objectives,
         ]);
@@ -1179,10 +1201,11 @@ class MyHrController extends Controller
 
     public function updateGoal(Request $request, HrDevelopmentGoal $goal)
     {
-        $user = $request->user();
-        abort_unless($goal->employee_user_id === $user->id, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $goal->tenant_id);
+        $user = $this->currentMyHrUser($request);
+        $goal = HrDevelopmentGoal::query()
+            ->whereKey($goal->getKey())
+            ->where('employee_user_id', $user->id)
+            ->firstOrFail();
 
         $validated = $request->validate([
             'status' => ['sometimes', 'string', Rule::in(['not_started', 'in_progress', 'blocked', 'completed'])],
@@ -1214,13 +1237,13 @@ class MyHrController extends Controller
 
     public function surveys(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $surveys = HrEngagementSurvey::where('tenant_id', $tenantId)
+        $surveys = HrEngagementSurvey::query()
             ->where('status', 'published')
             ->with('questions')
             ->get()
+            ->filter(fn (HrEngagementSurvey $survey) => $this->engagementService->isCurrentRecipient($survey, $user))
             ->map(function (HrEngagementSurvey $survey) use ($user) {
                 $respondentHash = hash_hmac('sha256', $survey->id.':'.$user->id, (string) config('app.key'));
 
@@ -1255,17 +1278,17 @@ class MyHrController extends Controller
             ->values();
 
         return Inertia::render('hr/my/surveys', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'surveys' => $surveys,
         ]);
     }
 
     public function submitSurvey(Request $request, HrEngagementSurvey $survey)
     {
-        $user = $request->user();
-        abort_unless($user !== null, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $user = $this->currentMyHrUser($request);
+
+        $survey = HrEngagementSurvey::query()->findOrFail($survey->getKey());
+        abort_unless($this->engagementService->isCurrentRecipient($survey, $user), 404);
 
         $validated = $request->validate([
             'answers' => ['required', 'array'],
@@ -1286,10 +1309,9 @@ class MyHrController extends Controller
 
     public function time(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $activeClock = HrTimeEntry::forTenant($tenantId)
+        $activeClock = HrTimeEntry::query()
             ->forUser($user->id)
             ->active()
             ->with([
@@ -1299,7 +1321,7 @@ class MyHrController extends Controller
             ])
             ->first(['id', 'clock_in', 'notes', 'shift_id']);
 
-        $todayEntries = HrTimeEntry::forTenant($tenantId)
+        $todayEntries = HrTimeEntry::query()
             ->forUser($user->id)
             ->where('entry_date', now()->toDateString())
             ->with(
@@ -1338,13 +1360,13 @@ class MyHrController extends Controller
                     : null,
             ]);
 
-        $weeklySummary = $this->timeTrackingService->getWeeklySummary($tenantId, $user->id);
+        $weeklySummary = $this->timeTrackingService->getWeeklySummary($user->id);
 
         // This week's roster (read-only from Operations) — 7 day columns.
         $weekStart = now()->startOfWeek();
         $weekEnd = now()->endOfWeek();
         $weekShifts = Shift::where('user_id', $user->id)
-            ->visibleToFrontline($user->organization_id)
+            ->visibleToFrontline()
             ->whereBetween('starts_at', [$weekStart, $weekEnd])
             ->with('client:id,first_name,last_name', 'serviceContext:id,name')
             ->orderBy('starts_at')
@@ -1378,7 +1400,7 @@ class MyHrController extends Controller
 
         // Upcoming shifts for the next 3 days
         $upcomingShifts = Shift::where('user_id', $user->id)
-            ->visibleToFrontline($user->organization_id)
+            ->visibleToFrontline()
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->where('starts_at', '>=', now())
             ->where('starts_at', '<=', now()->addDays(3))
@@ -1401,7 +1423,7 @@ class MyHrController extends Controller
             ]);
 
         return Inertia::render('hr/my/time', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'weekRoster' => $weekRoster,
             'activeClock' => $activeClock ? [
                 'id' => $activeClock->id,
@@ -1428,8 +1450,7 @@ class MyHrController extends Controller
 
     public function clockIn(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
         $validated = $request->validate([
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
@@ -1438,7 +1459,7 @@ class MyHrController extends Controller
 
         // Guard against a second concurrent clock-in (which would leave two open
         // entries and a stuck "on shift" banner). One active clock at a time.
-        $alreadyClockedIn = HrTimeEntry::forTenant($tenantId)
+        $alreadyClockedIn = HrTimeEntry::query()
             ->forUser($user->id)
             ->active()
             ->exists();
@@ -1449,7 +1470,6 @@ class MyHrController extends Controller
 
         try {
             $session = $this->attendanceService->clockIn($user, [
-                'tenant_id' => $tenantId,
                 'shift_id' => $validated['shift_id'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'source' => 'self_service',
@@ -1469,8 +1489,7 @@ class MyHrController extends Controller
 
     public function clockOut(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
         $validated = $request->validate([
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
@@ -1510,7 +1529,6 @@ class MyHrController extends Controller
 
         $closed = $this->timeTrackingService->closeOpenEntries(
             $user,
-            $tenantId,
             $clockOutAt,
             $breakMinutes,
             $validated['mileage_km'] ?? null,
@@ -1527,8 +1545,12 @@ class MyHrController extends Controller
     /** Download a single roster shift as a calendar (.ics) event. */
     public function shiftCalendar(Request $request, Shift $shift)
     {
-        $user = $request->user();
-        abort_unless($shift->user_id === $user->id, 403);
+        $user = $this->currentMyHrUser($request);
+        $shift = Shift::query()
+            ->visibleToFrontline()
+            ->whereKey($shift->getKey())
+            ->where('user_id', $user->id)
+            ->firstOrFail();
 
         $start = $shift->starts_at?->copy()->utc();
         abort_unless($start, 404);
@@ -1581,14 +1603,12 @@ class MyHrController extends Controller
 
     public function one(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
         // Phase 1 surfaces the existing HrSupervisionNote (employee-visible only).
         // Phase 2 (first-class shared agenda / action-item tables w/ carry-forward
         // + shared-vs-private notes) is deferred pending confirmation.
-        $notes = HrSupervisionNote::forTenant($tenantId)
-            ->forEmployee($user->id)
+        $notes = HrSupervisionNote::forEmployee($user->id)
             ->where('is_visible_to_employee', true)
             ->with('supervisor:id,name')
             ->orderByDesc('session_date')
@@ -1637,41 +1657,18 @@ class MyHrController extends Controller
         ] : null;
 
         return Inertia::render('hr/my/one', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'sessions' => $sessions,
             'openActions' => $openActions,
             'next' => $next,
         ]);
     }
 
-    public function acknowledgeOne(Request $request, HrSupervisionNote $note)
-    {
-        $user = $request->user();
-        abort_unless($note->employee_user_id === $user->id, 403);
-        abort_unless($note->is_visible_to_employee, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
-
-        $validated = $request->validate([
-            'employee_comments' => ['nullable', 'string', 'max:5000'],
-        ]);
-
-        $note->update([
-            'employee_acknowledged' => true,
-            'employee_acknowledged_at' => now(),
-            'employee_comments' => $validated['employee_comments'] ?? $note->employee_comments,
-        ]);
-
-        return redirect()->back()->with('success', 'Marked as reviewed.');
-    }
-
     public function documents(Request $request)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('user_id', $user->id)
+        $profile = HrEmployeeProfile::where('user_id', $user->id)
             ->first();
 
         abort_unless($profile, 404, 'Employee profile not found.');
@@ -1694,23 +1691,20 @@ class MyHrController extends Controller
             ]);
 
         // Documents awaiting this employee's e-signature (reuses ESignature flow).
-        $pendingSignatures = HrDocumentSignature::forSigner($user->id)
-            ->pending()
-            ->with(['document:id,title,category', 'requestedBy:id,name'])
-            ->orderBy('requested_at')
-            ->get()
+        $pendingSignatures = $this->signatureService
+            ->getPendingForUser($user)
             ->map(fn (HrDocumentSignature $s) => [
                 'id' => $s->id,
                 'document_title' => $s->document?->title ?? 'Document',
                 'document_category' => $s->document?->category,
-                'requested_by' => $s->requestedBy?->name,
+                'requested_by' => $s->requestedBy?->name ?? 'HR team',
                 'requested_at' => $s->requested_at?->toIso8601String(),
                 'download_url' => route('hr.signatures.document', $s),
             ])
             ->values();
 
         return Inertia::render('hr/my/documents', [
-            'myHr' => $this->myHrShellProps($user, $tenantId),
+            'myHr' => $this->myHrShellProps($user),
             'pendingSignatures' => $pendingSignatures,
             'documents' => $documents,
             'categories' => ['contract', 'letter', 'policy', 'certificate', 'offer', 'other'],
@@ -1721,15 +1715,20 @@ class MyHrController extends Controller
      *  reuses the shared ESignatureService and stays on the My HR documents page). */
     public function signDocument(Request $request, HrDocumentSignature $signature)
     {
-        $user = $request->user();
-        abort_unless($signature->signer_user_id === $user->id, 403);
+        $user = $this->currentMyHrUser($request);
+        $signature = HrDocumentSignature::query()
+            ->whereKey($signature->getKey())
+            ->where('signer_user_id', $user->id)
+            ->firstOrFail();
+        $document = $this->documentAccess->siteDocument($user, (int) $signature->document_id);
+        $signature->setRelation('document', $document);
 
         $validated = $request->validate([
             'signature_data' => ['required', 'string', 'max:255'],
         ]);
 
         try {
-            app(ESignatureService::class)->sign($signature, $validated['signature_data'], $request);
+            $this->signatureService->sign($signature, $validated['signature_data'], $request);
         } catch (\LogicException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
@@ -1739,16 +1738,12 @@ class MyHrController extends Controller
 
     public function downloadDocument(Request $request, HrDocument $document)
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
-        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('user_id', $user->id)
-            ->first();
-
-        abort_unless($profile, 404);
-        abort_unless($document->employee_profile_id === $profile->id, 403);
-        abort_unless(! $document->is_restricted, 403, 'This document is restricted.');
+        $document = $this->documentAccess->siteDocument($user, $document);
+        $profileId = HrEmployeeProfile::query()->where('user_id', $user->id)->value('id');
+        abort_unless($profileId && (int) $document->employee_profile_id === (int) $profileId, 404);
+        abort_if($document->is_restricted && ! $user->canDo('hr.documents.manage'), 404);
 
         abort_unless(
             Storage::disk($document->storage_disk)->exists($document->storage_path),
@@ -1768,8 +1763,7 @@ class MyHrController extends Controller
      */
     public function calendar(Request $request): JsonResponse
     {
-        $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->currentMyHrUser($request);
 
         $monthParam = (string) $request->query('month', now()->format('Y-m'));
 
@@ -1780,7 +1774,7 @@ class MyHrController extends Controller
         }
 
         return response()->json(
-            $this->myHrCalendarFeed($user, $tenantId, ($anchor ?: now())->startOfMonth()),
+            $this->myHrCalendarFeed($user, ($anchor ?: now())->startOfMonth()),
         );
     }
 }

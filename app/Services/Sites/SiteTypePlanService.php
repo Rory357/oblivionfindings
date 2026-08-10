@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\SiteFacilityZone;
 use App\Models\SiteHoResource;
 use App\Models\SiteHouseRoom;
+use App\Models\SiteRoom;
 use App\Models\SiteTypePlan;
 use App\Models\SiteTypePlanPin;
 use Illuminate\Database\Eloquent\Collection;
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class SiteTypePlanService
 {
+    public function __construct(
+        private readonly SiteTypePlanPinPayloadValidator $pinValidator,
+    ) {}
+
     public function currentDraft(Site $site): ?SiteTypePlan
     {
         return SiteTypePlan::currentDraft($site);
@@ -32,14 +37,20 @@ class SiteTypePlanService
     public function storeDraft(Site $site, array $layout, ?string $notes, ?int $userId): SiteTypePlan
     {
         return DB::transaction(function () use ($site, $layout, $notes, $userId) {
-            $draft = $this->currentDraft($site);
+            $site = $this->lockedSite($site);
+            $draft = SiteTypePlan::query()
+                ->forSite($site)
+                ->draft()
+                ->lockForUpdate()
+                ->latest('id')
+                ->first();
 
             if (! $draft) {
                 $draft = new SiteTypePlan([
-                    'tenant_id' => $site->tenant_id,
                     'site_id' => $site->id,
                     'site_type' => $site->type,
                     'status' => SiteTypePlan::STATUS_DRAFT,
+                    'current_slot' => SiteTypePlan::STATUS_DRAFT,
                     'version' => max(1, $this->nextVersion($site)),
                     'created_by_user_id' => $userId,
                 ]);
@@ -59,18 +70,31 @@ class SiteTypePlanService
     public function cloneToDraft(Site $site, ?int $userId = null): SiteTypePlan
     {
         return DB::transaction(function () use ($site, $userId) {
-            if ($draft = $this->currentDraft($site)) {
+            $site = $this->lockedSite($site);
+            $draft = SiteTypePlan::query()
+                ->forSite($site)
+                ->draft()
+                ->lockForUpdate()
+                ->latest('id')
+                ->first();
+            if ($draft) {
                 return $draft->load('pins');
             }
 
-            $published = $this->currentPublished($site);
+            $published = SiteTypePlan::query()
+                ->forSite($site)
+                ->published()
+                ->lockForUpdate()
+                ->latest('version')
+                ->latest('id')
+                ->first();
             abort_unless($published, 404, 'No published plan exists to edit.');
 
             $draft = SiteTypePlan::create([
-                'tenant_id' => $site->tenant_id,
                 'site_id' => $site->id,
                 'site_type' => $site->type,
                 'status' => SiteTypePlan::STATUS_DRAFT,
+                'current_slot' => SiteTypePlan::STATUS_DRAFT,
                 'version' => $this->nextVersion($site),
                 'layout' => $published->layout,
                 'notes' => $published->notes,
@@ -79,7 +103,6 @@ class SiteTypePlanService
 
             foreach ($published->pins as $pin) {
                 $draft->pins()->create($pin->only([
-                    'tenant_id',
                     'kind',
                     'subkind',
                     'device_id',
@@ -105,8 +128,15 @@ class SiteTypePlanService
     public function discardDraft(Site $site): void
     {
         DB::transaction(function () use ($site) {
-            $draft = $this->currentDraft($site);
+            $site = $this->lockedSite($site);
+            $draft = SiteTypePlan::query()
+                ->forSite($site)
+                ->draft()
+                ->lockForUpdate()
+                ->latest('id')
+                ->first();
             if ($draft) {
+                $draft->forceFill(['current_slot' => null])->save();
                 $draft->delete();
             }
         });
@@ -115,7 +145,13 @@ class SiteTypePlanService
     public function publishDraft(Site $site, ?int $userId): SiteTypePlan
     {
         return DB::transaction(function () use ($site, $userId) {
-            $draft = $this->currentDraft($site);
+            $site = $this->lockedSite($site);
+            $draft = SiteTypePlan::query()
+                ->forSite($site)
+                ->draft()
+                ->lockForUpdate()
+                ->latest('id')
+                ->first();
             abort_unless($draft, 404, 'No draft plan exists to publish.');
 
             SiteTypePlan::query()
@@ -124,12 +160,14 @@ class SiteTypePlanService
                 ->whereKeyNot($draft->id)
                 ->update([
                     'status' => SiteTypePlan::STATUS_ARCHIVED,
+                    'current_slot' => null,
                     'archived_at' => now(),
                     'updated_at' => now(),
                 ]);
 
             $draft->forceFill([
                 'status' => SiteTypePlan::STATUS_PUBLISHED,
+                'current_slot' => SiteTypePlan::STATUS_PUBLISHED,
                 'version' => $this->nextVersion($site),
                 'published_at' => now(),
                 'published_by_user_id' => $userId,
@@ -143,6 +181,9 @@ class SiteTypePlanService
     public function replacePins(SiteTypePlan $plan, array $pins, bool $replace = false): Collection
     {
         return DB::transaction(function () use ($plan, $pins, $replace) {
+            [$site, $plan] = $this->lockedDraft($plan);
+            $this->pinValidator->assertReferences($pins, $site);
+
             if ($replace) {
                 $plan->pins()->delete();
             }
@@ -152,7 +193,7 @@ class SiteTypePlanService
                 $pinId = $replace ? null : ($pinData['id'] ?? null);
 
                 if ($pinId) {
-                    $plan->pins()->whereKey($pinId)->firstOrFail()->update($payload);
+                    $plan->pins()->whereKey($pinId)->lockForUpdate()->firstOrFail()->update($payload);
 
                     continue;
                 }
@@ -180,6 +221,9 @@ class SiteTypePlanService
     public function replaceEmergencyPins(SiteTypePlan $plan, array $pins): Collection
     {
         return DB::transaction(function () use ($plan, $pins) {
+            [$site, $plan] = $this->lockedDraft($plan);
+            $this->pinValidator->assertReferences($pins, $site, 'emergency');
+
             $plan->pins()
                 ->whereIn('kind', SiteTypePlanPin::EMERGENCY_KINDS)
                 ->delete();
@@ -189,6 +233,58 @@ class SiteTypePlanService
             }
 
             return $plan->fresh(['pins'])->pins;
+        });
+    }
+
+    public function updatePin(Site $site, SiteTypePlanPin $pin, array $data): SiteTypePlanPin
+    {
+        return DB::transaction(function () use ($site, $pin, $data): SiteTypePlanPin {
+            $site = $this->lockedSite($site);
+            $plan = SiteTypePlan::query()
+                ->whereKey($pin->site_type_plan_id)
+                ->where('site_id', $site->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($plan->status === SiteTypePlan::STATUS_DRAFT, 409, 'Published plan pins cannot be edited. Copy the plan to a draft first.');
+
+            $pin = SiteTypePlanPin::query()
+                ->whereKey($pin->id)
+                ->where('site_type_plan_id', $plan->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $candidate = array_merge($pin->only([
+                'kind',
+                'subkind',
+                'device_id',
+                'room_ref_type',
+                'room_ref_id',
+                'path_points',
+            ]), $data);
+            $this->pinValidator->assertReferences([$candidate], $site);
+
+            $pin->update($data);
+
+            return $pin->fresh();
+        });
+    }
+
+    public function deletePin(Site $site, SiteTypePlanPin $pin): void
+    {
+        DB::transaction(function () use ($site, $pin): void {
+            $site = $this->lockedSite($site);
+            $plan = SiteTypePlan::query()
+                ->whereKey($pin->site_type_plan_id)
+                ->where('site_id', $site->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            abort_unless($plan->status === SiteTypePlan::STATUS_DRAFT, 409, 'Published plan pins cannot be deleted. Copy the plan to a draft first.');
+
+            SiteTypePlanPin::query()
+                ->whereKey($pin->id)
+                ->where('site_type_plan_id', $plan->id)
+                ->lockForUpdate()
+                ->firstOrFail()
+                ->delete();
         });
     }
 
@@ -274,7 +370,6 @@ class SiteTypePlanService
 
         SiteHouseRoom::query()
             ->where('site_id', $site->id)
-            ->when($site->tenant_id, fn ($query, $tenantId) => $query->where('tenant_id', $tenantId))
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get()
@@ -291,7 +386,6 @@ class SiteTypePlanService
 
         SiteHoResource::query()
             ->where('site_id', $site->id)
-            ->when($site->tenant_id, fn ($query, $tenantId) => $query->where('tenant_id', $tenantId))
             ->orderBy('name')
             ->get()
             ->each(function (SiteHoResource $resource) use (&$rooms) {
@@ -307,7 +401,6 @@ class SiteTypePlanService
 
         SiteFacilityZone::query()
             ->where('site_id', $site->id)
-            ->when($site->tenant_id, fn ($query, $tenantId) => $query->where('tenant_id', $tenantId))
             ->orderBy('name')
             ->get()
             ->each(function (SiteFacilityZone $zone) use (&$rooms) {
@@ -327,9 +420,18 @@ class SiteTypePlanService
     public function siteDevices(Site $site): array
     {
         return DeviceAssignment::query()
-            ->where('assignable_type', DeviceAssignment::TARGET_SITE)
-            ->where('assignable_id', $site->id)
             ->whereNull('released_at')
+            ->where(function ($query) use ($site): void {
+                $query->where(function ($siteAssignment) use ($site): void {
+                    $siteAssignment
+                        ->where('assignable_type', DeviceAssignment::TARGET_SITE)
+                        ->where('assignable_id', $site->id);
+                })->orWhere(function ($roomAssignment) use ($site): void {
+                    $roomAssignment
+                        ->where('assignable_type', DeviceAssignment::TARGET_ROOM)
+                        ->whereIn('assignable_id', SiteRoom::query()->select('id')->where('site_id', $site->id));
+                });
+            })
             ->with('device')
             ->get()
             ->map(function (DeviceAssignment $assignment) {
@@ -559,6 +661,26 @@ class SiteTypePlanService
         };
     }
 
+    private function lockedSite(Site $site): Site
+    {
+        return Site::query()->whereKey($site->id)->lockForUpdate()->firstOrFail();
+    }
+
+    /** @return array{0: Site, 1: SiteTypePlan} */
+    private function lockedDraft(SiteTypePlan $plan): array
+    {
+        $site = Site::query()->whereKey($plan->site_id)->lockForUpdate()->firstOrFail();
+        $plan = SiteTypePlan::query()
+            ->whereKey($plan->id)
+            ->where('site_id', $site->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        abort_unless($plan->status === SiteTypePlan::STATUS_DRAFT, 409, 'Published plans are immutable. Copy the plan to a draft first.');
+
+        return [$site, $plan];
+    }
+
     private function nextVersion(Site $site): int
     {
         $max = (int) SiteTypePlan::query()
@@ -612,7 +734,6 @@ class SiteTypePlanService
     private function pinPayload(SiteTypePlan $plan, array $pinData, int $index): array
     {
         return [
-            'tenant_id' => $plan->tenant_id,
             'kind' => $pinData['kind'],
             'subkind' => $pinData['subkind'] ?? null,
             'device_id' => $pinData['device_id'] ?? null,

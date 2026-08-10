@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -16,6 +18,24 @@ beforeEach(function () {
     ]);
 
     $this->recipient = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->recipient->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->first()->id,
+    ]);
+
+    $this->site = Site::factory()->create([
+        'name' => 'Recognition Dialog Site',
+    ]);
+
+    foreach ([$this->hr, $this->recipient] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
 });
 
 test('the Give-recognition modal payload creates a kudos and a linked feed post', function () {

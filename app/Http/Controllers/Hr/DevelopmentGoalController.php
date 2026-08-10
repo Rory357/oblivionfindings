@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\Hr\Models\HrCompetency;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Notifications\DevelopmentGoalAssignedNotification;
 use App\Domain\Hr\Services\HrNotificationService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class DevelopmentGoalController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(private readonly HrPerformanceAccessService $access) {}
 
     /**
      * Development plans are now a tab inside the Goals & OKR hub. This legacy
@@ -29,27 +32,17 @@ class DevelopmentGoalController extends Controller
 
     public function store(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $employeeRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
-        $managerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
-        $goalRule = Rule::exists('hr_goals', 'id');
-        if ($tenantId !== null) {
-            $goalRule->where('tenant_id', $tenantId);
-        }
+        $user = $this->manager($request);
 
         $validated = $request->validate([
-            'employee_user_id' => ['required', 'integer', $employeeRule],
-            'manager_user_id' => ['nullable', 'integer', $managerRule],
-            'hr_goal_id' => ['nullable', 'integer', $goalRule],
+            'employee_user_id' => ['required', 'integer'],
+            'manager_user_id' => ['nullable', 'integer'],
+            'hr_goal_id' => ['nullable', 'integer'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'category' => ['required', 'string', Rule::in(['growth', 'performance', 'leadership', 'compliance', 'capability'])],
             'competency_area' => ['nullable', 'string', 'max:255'],
-            'competency_id' => ['nullable', 'integer', Rule::exists('hr_competencies', 'id')],
+            'competency_id' => ['nullable', 'integer'],
             'target_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'current_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'status' => ['nullable', 'string', Rule::in(['not_started', 'in_progress', 'blocked', 'completed', 'cancelled'])],
@@ -60,6 +53,17 @@ class DevelopmentGoalController extends Controller
             'review_notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
+        $employee = $this->access->currentStaff($user, (int) $validated['employee_user_id']);
+        $manager = isset($validated['manager_user_id'])
+            ? $this->access->currentStaff($user, (int) $validated['manager_user_id'])
+            : null;
+        $objective = isset($validated['hr_goal_id'])
+            ? $this->objective($user, (int) $validated['hr_goal_id'])
+            : null;
+        $competency = isset($validated['competency_id'])
+            ? HrCompetency::query()->active()->findOrFail((int) $validated['competency_id'])
+            : null;
+
         // Seed the next review date so the reminder job has a target.
         $nextReview = $validated['due_date'] ?? null;
         if (! $nextReview && ! empty($validated['review_frequency'])) {
@@ -67,9 +71,12 @@ class DevelopmentGoalController extends Controller
             $nextReview = $days ? now()->addDays($days)->toDateString() : null;
         }
 
-        $goal = HrDevelopmentGoal::create([
-            'tenant_id' => $tenantId,
+        $goal = HrDevelopmentGoal::query()->create([
             ...$validated,
+            'employee_user_id' => $employee->id,
+            'manager_user_id' => $manager?->id,
+            'hr_goal_id' => $objective?->id,
+            'competency_id' => $competency?->id,
             'status' => $validated['status'] ?? 'not_started',
             'progress_percent' => (int) ($validated['progress_percent'] ?? 0),
             'next_review_at' => $nextReview,
@@ -89,25 +96,28 @@ class DevelopmentGoalController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $goal->tenant_id);
 
         $canManage = $user->canDo('hr.performance.manage');
-        $isGoalOwner = $goal->employee_user_id === $user->id;
-        abort_unless($canManage || $isGoalOwner, 403);
-
-        $goalRule = Rule::exists('hr_goals', 'id');
-        if ($tenantId !== null) {
-            $goalRule->where('tenant_id', $tenantId);
+        if ($canManage) {
+            $this->access->currentStaff($user, $user);
+            $goal = $this->developmentGoal($user, $goal);
+        } else {
+            $this->access->currentStaff($user, $user);
+            $goal = HrDevelopmentGoal::query()
+                ->where('employee_user_id', $user->id)
+                ->findOrFail($goal->getKey());
         }
+
+        $isGoalOwner = (int) $goal->employee_user_id === (int) $user->id;
+        abort_unless($canManage || $isGoalOwner, 403);
 
         $validated = $request->validate([
             'title' => [$canManage ? 'sometimes' : 'prohibited', 'string', 'max:255'],
-            'hr_goal_id' => [$canManage ? 'nullable' : 'prohibited', 'integer', $goalRule],
+            'hr_goal_id' => [$canManage ? 'nullable' : 'prohibited', 'integer'],
             'description' => [$canManage ? 'nullable' : 'prohibited', 'string', 'max:5000'],
             'category' => [$canManage ? 'sometimes' : 'prohibited', 'string', Rule::in(['growth', 'performance', 'leadership', 'compliance', 'capability'])],
             'competency_area' => ['nullable', 'string', 'max:255'],
-            'competency_id' => [$canManage ? 'nullable' : 'prohibited', 'integer', Rule::exists('hr_competencies', 'id')],
+            'competency_id' => [$canManage ? 'nullable' : 'prohibited', 'integer'],
             'target_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'current_level' => ['nullable', 'integer', 'min:1', 'max:5'],
             'status' => ['sometimes', 'string', Rule::in(['not_started', 'in_progress', 'blocked', 'completed', 'cancelled'])],
@@ -117,6 +127,16 @@ class DevelopmentGoalController extends Controller
             'review_frequency' => [$canManage ? 'nullable' : 'prohibited', 'string', Rule::in(['weekly', 'fortnightly', 'monthly', 'quarterly'])],
             'review_notes' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        if ($canManage && isset($validated['hr_goal_id'])) {
+            $validated['hr_goal_id'] = $this->objective($user, (int) $validated['hr_goal_id'])->id;
+        }
+        if ($canManage && isset($validated['competency_id'])) {
+            $validated['competency_id'] = HrCompetency::query()
+                ->active()
+                ->findOrFail((int) $validated['competency_id'])
+                ->id;
+        }
 
         $payload = [
             ...$validated,
@@ -135,15 +155,28 @@ class DevelopmentGoalController extends Controller
             $payload['next_review_at'] = $next;
         }
 
-        $wasCompleted = $goal->status === 'completed';
+        [$goal, $wasCompleted] = DB::transaction(function () use ($goal, $payload, $user, $canManage): array {
+            $locked = $canManage
+                ? $this->access
+                    ->applyHistoricalSubjectScope(HrDevelopmentGoal::query(), $user)
+                    ->lockForUpdate()
+                    ->findOrFail($goal->getKey())
+                : HrDevelopmentGoal::query()
+                    ->where('employee_user_id', $user->id)
+                    ->lockForUpdate()
+                    ->findOrFail($goal->getKey());
+            $wasCompleted = $locked->status === 'completed';
 
-        if (($payload['status'] ?? null) === 'completed') {
-            $payload['completed_at'] = now()->toDateString();
-            $payload['progress_percent'] = 100;
-            $payload['next_review_at'] = null;
-        }
+            if (($payload['status'] ?? null) === 'completed') {
+                $payload['completed_at'] = now()->toDateString();
+                $payload['progress_percent'] = 100;
+                $payload['next_review_at'] = null;
+            }
 
-        $goal->update($payload);
+            $locked->update($payload);
+
+            return [$locked->fresh(), $wasCompleted];
+        }, attempts: 1);
 
         // Completing the goal (a fresh transition) → tell the manager who set it.
         // The store path already notifies the employee on assignment; this is the
@@ -157,15 +190,42 @@ class DevelopmentGoalController extends Controller
 
     public function destroy(Request $request, HrDevelopmentGoal $goal)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $goal->tenant_id);
+        $user = $this->manager($request);
+        $goal = $this->developmentGoal($user, $goal);
 
-        abort_unless($user->canDo('hr.performance.manage'), 403);
-
-        $goal->delete();
+        DB::transaction(function () use ($goal, $user): void {
+            $this->access
+                ->applyHistoricalSubjectScope(HrDevelopmentGoal::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($goal->getKey())
+                ->delete();
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Development goal deleted.');
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $this->access->currentStaff($user, $user);
+
+        return $user;
+    }
+
+    private function developmentGoal(User $viewer, HrDevelopmentGoal|int $goal): HrDevelopmentGoal
+    {
+        $goalId = $goal instanceof HrDevelopmentGoal ? $goal->getKey() : $goal;
+
+        return $this->access
+            ->applyHistoricalSubjectScope(HrDevelopmentGoal::query(), $viewer)
+            ->findOrFail($goalId);
+    }
+
+    private function objective(User $viewer, int $goalId): HrGoal
+    {
+        return $this->access
+            ->applyHistoricalSubjectScope(HrGoal::query(), $viewer, 'user_id')
+            ->findOrFail($goalId);
     }
 }

@@ -13,7 +13,13 @@ import {
     Zap,
     type LucideIcon,
 } from 'lucide-react';
-import type { AttachedTo, AttachType, RaLevel, RaStatus, ReviewState } from './types';
+import type {
+    AttachedTo,
+    AttachType,
+    RaLevel,
+    RaStatus,
+    ReviewState,
+} from './types';
 
 /* ------------------------------------------------------------------ */
 /*  Tone system (semantic tokens only)                                 */
@@ -49,8 +55,20 @@ export const RA_TONE_DOT: Record<RaTone, string> = {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-export const LIKELIHOOD_LABELS = ['Rare', 'Unlikely', 'Possible', 'Likely', 'Almost certain'];
-export const CONSEQUENCE_LABELS = ['Insignificant', 'Minor', 'Moderate', 'Major', 'Catastrophic'];
+export const LIKELIHOOD_LABELS = [
+    'Rare',
+    'Unlikely',
+    'Possible',
+    'Likely',
+    'Almost certain',
+];
+export const CONSEQUENCE_LABELS = [
+    'Insignificant',
+    'Minor',
+    'Moderate',
+    'Major',
+    'Catastrophic',
+];
 
 export const FREQ_OPTIONS: { value: number; label: string }[] = [
     { value: 30, label: '30 days' },
@@ -59,7 +77,13 @@ export const FREQ_OPTIONS: { value: number; label: string }[] = [
     { value: 365, label: '1 year' },
 ];
 
-export const RIBBON_STAGES = ['Draft', 'Active', 'Review', 'Superseded', 'Archived'];
+export const RIBBON_STAGES = [
+    'Draft',
+    'Active',
+    'Review',
+    'Superseded',
+    'Archived',
+];
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -73,7 +97,14 @@ export function scoreLevel(score: number): RaLevel {
 }
 
 export function levelTone(level: RaLevel): RaTone {
-    return ({ low: 'success', medium: 'info', high: 'warning', extreme: 'critical' } as const)[level];
+    return (
+        {
+            low: 'success',
+            medium: 'info',
+            high: 'warning',
+            extreme: 'critical',
+        } as const
+    )[level];
 }
 
 export function cap(s: string): string {
@@ -90,7 +121,10 @@ export function statusMeta(status: RaStatus): { label: string; tone: RaTone } {
     }[status];
 }
 
-export function attachMeta(type: AttachType): { icon: LucideIcon; tone: RaTone } {
+export function attachMeta(type: AttachType): {
+    icon: LucideIcon;
+    tone: RaTone;
+} {
     return {
         site: { icon: Building2, tone: 'info' as const },
         client: { icon: User, tone: 'success' as const },
@@ -101,7 +135,11 @@ export function attachMeta(type: AttachType): { icon: LucideIcon; tone: RaTone }
 
 export function fmtDate(iso: string | null): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 /* ------------------------------------------------------------------ */
@@ -121,7 +159,12 @@ export function LevelCell({ score, level }: { score: number; level: RaLevel }) {
             >
                 {score}
             </span>
-            <span className={cn('inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-bold', RA_TONE_CHIP[tone])}>
+            <span
+                className={cn(
+                    'inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-bold',
+                    RA_TONE_CHIP[tone],
+                )}
+            >
                 {cap(level)}
             </span>
         </span>
@@ -131,8 +174,15 @@ export function LevelCell({ score, level }: { score: number; level: RaLevel }) {
 export function StatusChip({ status }: { status: RaStatus }) {
     const { label, tone } = statusMeta(status);
     return (
-        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold', RA_TONE_CHIP[tone])}>
-            <span className={cn('h-1.5 w-1.5 rounded-full', RA_TONE_DOT[tone])} />
+        <span
+            className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                RA_TONE_CHIP[tone],
+            )}
+        >
+            <span
+                className={cn('h-1.5 w-1.5 rounded-full', RA_TONE_DOT[tone])}
+            />
             {label}
         </span>
     );
@@ -141,7 +191,12 @@ export function StatusChip({ status }: { status: RaStatus }) {
 export function AttachChip({ attached }: { attached: AttachedTo }) {
     const { icon: Icon, tone } = attachMeta(attached.type);
     return (
-        <span className={cn('inline-flex max-w-[180px] items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold', RA_TONE_CHIP[tone])}>
+        <span
+            className={cn(
+                'inline-flex max-w-[180px] items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold',
+                RA_TONE_CHIP[tone],
+            )}
+        >
             <Icon className="h-3 w-3 shrink-0" />
             <span className="truncate">{attached.name}</span>
         </span>
@@ -152,30 +207,55 @@ export function AcceptableBadge({ value }: { value: boolean | null }) {
     if (value === null) return <span className="text-muted-foreground">—</span>;
     const tone: RaTone = value ? 'success' : 'critical';
     return (
-        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[10.5px] font-bold', RA_TONE_CHIP[tone])}>
+        <span
+            className={cn(
+                'inline-flex items-center rounded-md px-2 py-0.5 text-[10.5px] font-bold',
+                RA_TONE_CHIP[tone],
+            )}
+        >
             {value ? 'Yes' : 'No'}
         </span>
     );
 }
 
 /** Review-due flag: red overdue / amber due-soon / plain date / em-dash. */
-export function ReviewBadge({ state, dueAt }: { state: ReviewState; dueAt: string | null }) {
+export function ReviewBadge({
+    state,
+    dueAt,
+}: {
+    state: ReviewState;
+    dueAt: string | null;
+}) {
     if (state.kind === 'overdue') {
         return (
-            <span className={cn('inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-bold', RA_TONE_CHIP.critical)}>
+            <span
+                className={cn(
+                    'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-bold',
+                    RA_TONE_CHIP.critical,
+                )}
+            >
                 <AlertTriangle className="h-3 w-3" /> Overdue
             </span>
         );
     }
     if (state.kind === 'soon') {
         return (
-            <span className={cn('inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-bold', RA_TONE_CHIP.warning)}>
+            <span
+                className={cn(
+                    'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10.5px] font-bold',
+                    RA_TONE_CHIP.warning,
+                )}
+            >
                 <Clock className="h-3 w-3" /> Due {state.days}d
             </span>
         );
     }
     if (state.kind === 'ok') {
-        return <span className="text-xs text-muted-foreground">{fmtDate(dueAt)}</span>;
+        return (
+            <span className="text-xs text-muted-foreground">
+                {fmtDate(dueAt)}
+            </span>
+        );
     }
     return <span className="text-muted-foreground">—</span>;
 }

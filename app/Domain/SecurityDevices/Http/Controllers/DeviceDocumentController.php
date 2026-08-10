@@ -4,17 +4,18 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceDocument;
+use App\Domain\SecurityDevices\Services\DeviceDocumentLifecycleService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
+use DomainException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Document uploads for Security & Devices detail pages.
  *
- * Files are stored on the `local` disk under `device_documents/{device_id}/`
+ * Files are stored on the private disk under `device_documents/{device_id}/`
  * and the DeviceDocument row tracks title, category, effective / expiry
- * dates, and uploader. Delete also removes the underlying file so orphan
- * blobs do not accumulate.
+ * dates, uploader, integrity hash, and reasoned removal evidence.
  */
 class DeviceDocumentController extends Controller
 {
@@ -30,10 +31,16 @@ class DeviceDocumentController extends Controller
 
     private const MAX_SIZE_KB = 20480; // 20 MB
 
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceDocumentLifecycleService $lifecycle,
+    ) {}
+
     public function store(Request $request, Device $device)
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'max:'.self::MAX_SIZE_KB],
@@ -45,59 +52,69 @@ class DeviceDocumentController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $file = $request->file('file');
-        $disk = 'local';
-        $storagePath = $file->store("device_documents/{$device->id}", $disk);
+        $document = $this->lifecycle->stageUpload($device, $user, $request->file('file'), $validated);
 
-        if ($storagePath === false) {
-            return redirect()->back()->with('error', 'Failed to store uploaded file.');
+        if ($document->isDownloadable()) {
+            return redirect()->back()->with('success', 'Document uploaded and verified in private storage.');
         }
 
-        DeviceDocument::create([
-            'device_id' => $device->id,
-            'uploaded_by_user_id' => $user->id,
-            'title' => $validated['title'],
-            'category' => $validated['category'],
-            'version' => $validated['version'] ?? null,
-            'effective_date' => $validated['effective_date'] ?? null,
-            'expiry_date' => $validated['expiry_date'] ?? null,
-            'storage_disk' => $disk,
-            'storage_path' => $storagePath,
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getClientMimeType() ?: 'application/octet-stream',
-            'size_bytes' => $file->getSize() ?: 0,
-            'notes' => $validated['notes'] ?? null,
-        ]);
-
-        return redirect()->back()->with('success', 'Document uploaded.');
+        return redirect()->back()->with(
+            'warning',
+            'The document is safely staged but not yet available. Automatic storage recovery will retry it.',
+        );
     }
 
     public function download(Request $request, Device $device, DeviceDocument $document)
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
+        $this->access->assertCanViewDevice($user, $device);
         abort_unless($document->device_id === $device->id, 404);
+        abort_unless($document->isDownloadable(), 404);
 
-        return Storage::disk($document->storage_disk)
-            ->download($document->storage_path, $document->original_name);
+        try {
+            $contents = $this->lifecycle->verifiedContents($document);
+        } catch (DomainException) {
+            abort(409, 'This private document could not pass integrity verification. Storage recovery is required before download.');
+        }
+
+        return response()->streamDownload(function () use (&$contents): void {
+            try {
+                echo $contents;
+            } finally {
+                if (function_exists('sodium_memzero')) {
+                    sodium_memzero($contents);
+                }
+            }
+        }, $document->original_name, [
+            'Content-Type' => $document->mime_type,
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function destroy(Request $request, Device $device, DeviceDocument $document)
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
         abort_unless($document->device_id === $device->id, 404);
+        abort_if($document->isRemoved(), 404);
 
-        // Remove the underlying blob first; only delete the row if it succeeds
-        // (or if the blob was already missing — treat that as a soft recovery).
-        try {
-            Storage::disk($document->storage_disk)->delete($document->storage_path);
-        } catch (\Throwable) {
-            // Ignore missing-file errors — we still want to clean up the row.
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:500', 'not_regex:/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/'],
+        ]);
+        $removed = $this->lifecycle->requestRemoval($device, $document, $user, $validated['reason']);
+
+        if ($removed->isRemoved() && $removed->storage_deleted_at !== null) {
+            return redirect()->back()->with(
+                'success',
+                'Document removed. Its reasoned lifecycle and integrity evidence remains in history.',
+            );
         }
 
-        $document->delete();
-
-        return redirect()->back()->with('success', 'Document removed.');
+        return redirect()->back()->with(
+            'warning',
+            'Removal is recorded and the document is unavailable. Automatic private-storage recovery will finish the quarantine cleanup.',
+        );
     }
 }

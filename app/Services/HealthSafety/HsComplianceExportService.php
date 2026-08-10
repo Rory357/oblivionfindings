@@ -6,7 +6,10 @@ use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRiskAssessment;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Structured compliance exports for WorkSafe, auditors, and governance.
@@ -24,14 +27,24 @@ use Carbon\Carbon;
  */
 class HsComplianceExportService
 {
+    /** @var list<string> */
+    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /* ------------------------------------------------------------------ */
-    /*  Report type identifiers — stable contract values                   */
-    /*  These are used in report envelopes and must not be renamed.        */
+    /*  Report type identifiers — stable contract values */
+    /*  These are used in report envelopes and must not be renamed. */
     /* ------------------------------------------------------------------ */
 
     public const REPORT_WORKSAFE_REGISTER = 'worksafe_register';
+
     public const REPORT_INVESTIGATION_OUTCOMES = 'investigation_outcomes';
+
     public const REPORT_CORRECTIVE_ACTION_TRACEABILITY = 'corrective_action_traceability';
+
     public const REPORT_RISK_ASSESSMENT_REGISTER = 'risk_assessment_register';
 
     /** All available report types. */
@@ -43,12 +56,17 @@ class HsComplianceExportService
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  WorkSafe Notifiable Events Register                                */
+    /*  WorkSafe Notifiable Events Register */
     /* ------------------------------------------------------------------ */
 
-    public function worksafeRegister(?Carbon $from = null, ?Carbon $to = null): array
-    {
-        $query = HsEvent::where('worksafe_notifiable', true)
+    public function worksafeRegister(
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+        ?User $viewer = null,
+        ?int $siteId = null,
+    ): array {
+        $query = $this->eventQuery($viewer, $siteId)
+            ->where('worksafe_notifiable', true)
             ->with(['site:id,name', 'client:id,first_name,last_name', 'staff:id,name'])
             ->orderByDesc('reported_at');
 
@@ -80,12 +98,17 @@ class HsComplianceExportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Investigation Outcomes Report                                       */
+    /*  Investigation Outcomes Report */
     /* ------------------------------------------------------------------ */
 
-    public function investigationOutcomes(?Carbon $from = null, ?Carbon $to = null): array
-    {
-        $query = HsInvestigation::ofStatus(HsInvestigation::STATUS_COMPLETED)
+    public function investigationOutcomes(
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+        ?User $viewer = null,
+        ?int $siteId = null,
+    ): array {
+        $query = $this->investigationQuery($viewer, $siteId)
+            ->ofStatus(HsInvestigation::STATUS_COMPLETED)
             ->with([
                 'hsEvent:id,reference_number,event_category,severity,site_id',
                 'hsEvent.site:id,name',
@@ -129,12 +152,18 @@ class HsComplianceExportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Corrective Action Traceability Report                              */
+    /*  Corrective Action Traceability Report */
     /* ------------------------------------------------------------------ */
 
-    public function correctiveActionTraceability(?string $statusFilter = null, ?Carbon $from = null, ?Carbon $to = null): array
-    {
-        $query = HsCorrectiveAction::with([
+    public function correctiveActionTraceability(
+        ?string $statusFilter = null,
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+        ?User $viewer = null,
+        ?int $siteId = null,
+    ): array {
+        $summaryQuery = $this->correctiveActionQuery($viewer, $siteId);
+        $query = (clone $summaryQuery)->with([
             'hsEvent:id,reference_number,event_category,severity',
             'hsInvestigation:id,reference_number,investigation_type',
             'assignedTo:id,name',
@@ -153,13 +182,17 @@ class HsComplianceExportService
         }
 
         return $this->envelope(self::REPORT_CORRECTIVE_ACTION_TRACEABILITY, 'Corrective Action Traceability Report', $from, $to, [
-            'total' => HsCorrectiveAction::count(),
-            'open' => HsCorrectiveAction::open()->count(),
-            'overdue' => HsCorrectiveAction::overdue()->count(),
-            'awaiting_verification' => HsCorrectiveAction::awaitingVerification()->count(),
-            'verified' => HsCorrectiveAction::where('status', HsCorrectiveAction::STATUS_VERIFIED)->count(),
-            'closed' => HsCorrectiveAction::where('status', HsCorrectiveAction::STATUS_CLOSED)->count(),
-            'effectiveness_rate' => $this->effectivenessRate(),
+            'total' => (clone $summaryQuery)->count(),
+            'open' => (clone $summaryQuery)->open()->count(),
+            'overdue' => (clone $summaryQuery)->overdue()->count(),
+            'awaiting_verification' => (clone $summaryQuery)->awaitingVerification()->count(),
+            'verified' => (clone $summaryQuery)
+                ->where('status', HsCorrectiveAction::STATUS_VERIFIED)
+                ->count(),
+            'closed' => (clone $summaryQuery)
+                ->where('status', HsCorrectiveAction::STATUS_CLOSED)
+                ->count(),
+            'effectiveness_rate' => $this->effectivenessRate($summaryQuery),
             'applied_filter' => $statusFilter,
         ], $query->get()->map(fn (HsCorrectiveAction $a) => [
             'reference_number' => $a->reference_number,
@@ -182,12 +215,29 @@ class HsComplianceExportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Risk Assessment Register                                           */
+    /*  Risk Assessment Register */
     /* ------------------------------------------------------------------ */
 
-    public function riskAssessmentRegister(): array
+    public function riskAssessmentRegister(?User $viewer = null, ?int $siteId = null): array
     {
-        $assessments = HsRiskAssessment::active()
+        $query = HsRiskAssessment::query()->active();
+        if ($viewer) {
+            if ($siteId !== null) {
+                $this->assertRequestedSite($viewer, $siteId);
+                $this->siteAccess->applyHsRiskAssessmentSiteScopeForSiteIds($query, [$siteId]);
+            } else {
+                $this->siteAccess->applyHsRiskAssessmentScope(
+                    $query,
+                    $viewer,
+                    self::SITE_BYPASS_PERMISSIONS,
+                );
+            }
+        } else {
+            abort_if($siteId !== null, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+            $query->whereRaw('1 = 0');
+        }
+
+        $assessments = $query
             ->with(['assessedBy:id,name', 'approvedBy:id,name'])
             ->orderByDesc('risk_score')
             ->get();
@@ -219,7 +269,7 @@ class HsComplianceExportService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Internal helpers                                                    */
+    /*  Internal helpers */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -241,15 +291,76 @@ class HsComplianceExportService
         ];
     }
 
-    private function effectivenessRate(): int
+    private function effectivenessRate(Builder $actions): int
     {
-        $total = HsCorrectiveAction::where('status', HsCorrectiveAction::STATUS_VERIFIED)->count();
+        $verified = (clone $actions)->where('status', HsCorrectiveAction::STATUS_VERIFIED);
+        $total = (clone $verified)->count();
         if ($total === 0) {
             return 100;
         }
-        $effective = HsCorrectiveAction::where('status', HsCorrectiveAction::STATUS_VERIFIED)
+        $effective = (clone $verified)
             ->where('effectiveness_confirmed', true)->count();
 
         return (int) round(($effective / $total) * 100);
+    }
+
+    private function eventQuery(?User $viewer, ?int $siteId): Builder
+    {
+        $query = HsEvent::query();
+        if (! $viewer) {
+            abort_if($siteId !== null, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+
+            return $query->whereRaw('1 = 0');
+        }
+
+        $this->siteAccess->applyHsEventScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
+        if ($siteId !== null) {
+            $this->assertRequestedSite($viewer, $siteId);
+            $query->where('site_id', $siteId);
+        }
+
+        return $query;
+    }
+
+    private function investigationQuery(?User $viewer, ?int $siteId): Builder
+    {
+        return HsInvestigation::query()->whereHas(
+            'hsEvent',
+            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId),
+        );
+    }
+
+    private function correctiveActionQuery(?User $viewer, ?int $siteId): Builder
+    {
+        return HsCorrectiveAction::query()->whereHas(
+            'hsEvent',
+            fn (Builder $event): Builder => $this->scopeEventBuilder($event, $viewer, $siteId),
+        );
+    }
+
+    private function scopeEventBuilder(Builder $query, ?User $viewer, ?int $siteId): Builder
+    {
+        if (! $viewer) {
+            abort_if($siteId !== null, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+
+            return $query->whereRaw('1 = 0');
+        }
+
+        $this->siteAccess->applyHsEventScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
+        if ($siteId !== null) {
+            $this->assertRequestedSite($viewer, $siteId);
+            $query->where($query->qualifyColumn('site_id'), $siteId);
+        }
+
+        return $query;
+    }
+
+    private function assertRequestedSite(User $viewer, int $siteId): void
+    {
+        $this->siteAccess->assertCanAccessSiteId(
+            $viewer,
+            $siteId,
+            self::SITE_BYPASS_PERMISSIONS,
+        );
     }
 }

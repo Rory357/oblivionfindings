@@ -6,12 +6,13 @@ use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayrollRunItem;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('private');
 
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
@@ -29,7 +30,6 @@ beforeEach(function () {
     }
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'employee_number' => 'EMP78001',
         'work_email' => "worker-{$this->worker->id}@example.test",
@@ -66,10 +66,8 @@ test('hr can create default payroll export profile and export mapped csv', funct
     $profile = HrPayrollExportProfile::query()->latest('id')->first();
     expect($profile)->not->toBeNull();
     expect($profile->is_default)->toBeTrue();
-    expect($profile->tenant_id)->toBe(1);
 
     $run = HrPayrollRun::query()->create([
-        'tenant_id' => 1,
         'period_start' => now()->subDays(14)->toDateString(),
         'period_end' => now()->subDay()->toDateString(),
         'status' => 'locked',
@@ -121,7 +119,6 @@ test('hr can create default payroll export profile and export mapped csv', funct
 
 test('setting a new default payroll export profile unsets previous defaults', function () {
     $first = HrPayrollExportProfile::query()->create([
-        'tenant_id' => 1,
         'name' => 'Default A',
         'provider_key' => 'custom',
         'delimiter' => ',',
@@ -137,7 +134,6 @@ test('setting a new default payroll export profile unsets previous defaults', fu
     ]);
 
     $second = HrPayrollExportProfile::query()->create([
-        'tenant_id' => 1,
         'name' => 'Default B',
         'provider_key' => 'custom',
         'delimiter' => ',',
@@ -162,4 +158,3 @@ test('setting a new default payroll export profile unsets previous defaults', fu
     expect($first->is_default)->toBeFalse();
     expect($second->is_default)->toBeTrue();
 });
-

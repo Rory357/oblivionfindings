@@ -17,11 +17,9 @@ class WorkforceAnalyticsService
      * Returns an array of {month, count} entries representing the active
      * employee headcount at the end of each month.
      *
-     * @param  int|null  $tenantId
-     * @param  int       $months
      * @return array<int, array{month: string, count: int}>
      */
-    public function getHeadcountTrend(?int $tenantId, int $months = 12): array
+    public function getHeadcountTrend(int $months = 12): array
     {
         $trend = [];
         $now = Carbon::now();
@@ -29,11 +27,11 @@ class WorkforceAnalyticsService
         for ($i = $months - 1; $i >= 0; $i--) {
             $date = $now->copy()->subMonths($i)->endOfMonth();
 
-            $count = HrEmployeeProfile::forTenant($tenantId)
+            $count = HrEmployeeProfile::query()
                 ->where('start_date', '<=', $date)
                 ->where(function ($q) use ($date) {
                     $q->whereNull('end_date')
-                      ->orWhere('end_date', '>', $date);
+                        ->orWhere('end_date', '>', $date);
                 })
                 ->count();
 
@@ -51,32 +49,31 @@ class WorkforceAnalyticsService
      *
      * Turnover = (Separations during period / Average headcount) * 100
      *
-     * @param  int|null  $tenantId
-     * @param  string    $period  'quarter' or 'year'
+     * @param  string  $period  'quarter' or 'year'
      * @return array{rate: float, separations: int, avg_headcount: float}
      */
-    public function getTurnoverRate(?int $tenantId, string $period = 'year'): array
+    public function getTurnoverRate(string $period = 'year'): array
     {
         $now = Carbon::now();
         $start = $period === 'quarter'
             ? $now->copy()->subQuarter()->startOfDay()
             : $now->copy()->subYear()->startOfDay();
 
-        $separations = HrEmployeeProfile::forTenant($tenantId)
+        $separations = HrEmployeeProfile::query()
             ->whereNotNull('end_date')
             ->where('end_date', '>=', $start)
             ->where('end_date', '<=', $now)
             ->count();
 
-        $startCount = HrEmployeeProfile::forTenant($tenantId)
+        $startCount = HrEmployeeProfile::query()
             ->where('start_date', '<=', $start)
             ->where(function ($q) use ($start) {
                 $q->whereNull('end_date')
-                  ->orWhere('end_date', '>', $start);
+                    ->orWhere('end_date', '>', $start);
             })
             ->count();
 
-        $endCount = HrEmployeeProfile::forTenant($tenantId)
+        $endCount = HrEmployeeProfile::query()
             ->active()
             ->count();
 
@@ -98,14 +95,13 @@ class WorkforceAnalyticsService
      *
      * Groups active employees into tenure ranges: <1yr, 1-2yr, 2-5yr, 5-10yr, 10+yr
      *
-     * @param  int|null  $tenantId
      * @return array<int, array{bracket: string, count: int}>
      */
-    public function getTenureBrackets(?int $tenantId): array
+    public function getTenureBrackets(): array
     {
         $now = Carbon::now();
 
-        $profiles = HrEmployeeProfile::forTenant($tenantId)
+        $profiles = HrEmployeeProfile::query()
             ->active()
             ->whereNotNull('start_date')
             ->get(['start_date']);
@@ -143,16 +139,12 @@ class WorkforceAnalyticsService
     /**
      * Calculate the overall compliance score as a percentage.
      *
-     * @param  int|null  $tenantId
      * @return array{score: float, compliant: int, total: int}
      */
-    public function getComplianceScore(?int $tenantId): array
+    public function getComplianceScore(): array
     {
-        $total = HrStaffComplianceStatus::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
-            ->count();
+        $total = HrStaffComplianceStatus::query()->count();
         $compliant = HrStaffComplianceStatus::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->where('status', 'compliant')
             ->count();
 
@@ -168,12 +160,11 @@ class WorkforceAnalyticsService
     /**
      * Get leave utilization breakdown by leave type.
      *
-     * @param  int|null  $tenantId
      * @return array<int, array{type: string, approved: int, pending: int, declined: int}>
      */
-    public function getLeaveUtilization(?int $tenantId): array
+    public function getLeaveUtilization(): array
     {
-        $results = HrLeaveRequest::forTenant($tenantId)
+        $results = HrLeaveRequest::query()
             ->whereYear('created_at', now()->year)
             ->select('leave_type', 'status', DB::raw('COUNT(*) as count'))
             ->groupBy('leave_type', 'status')
@@ -196,13 +187,11 @@ class WorkforceAnalyticsService
     /**
      * Get employee count breakdown by department.
      *
-     * @param  int|null  $tenantId
      * @return array<int, array{department: string, count: int}>
      */
-    public function getDepartmentBreakdown(?int $tenantId): array
+    public function getDepartmentBreakdown(): array
     {
         return HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
             ->where('is_active', true)
             ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
             ->having('employees_count', '>', 0)

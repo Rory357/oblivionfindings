@@ -2,29 +2,45 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers\Integrations;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
+use App\Domain\SecurityDevices\Management\Models\DeviceConfigurationProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Presenters\IntegrationSiteCredentialsPresenter;
+use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Domain\SecurityDevices\Services\DeviceLinkService;
+use App\Domain\SecurityDevices\Services\QueclinkIntegrationAccessService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Queclink\BulkActionRequest;
 use App\Http\Requests\Queclink\UpdateSectionRequest;
 use App\Models\AppSetting;
 use App\Models\Asset;
-use App\Models\AssetTracker;
 use App\Models\Client;
 use App\Models\ClientConsent;
-use App\Models\Integration\IntegrationTenantSecret;
+use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Queclink\QueclinkAuditEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\Queclink\QueclinkPreset;
 use App\Models\Queclink\QueclinkRawFrame;
+use App\Models\Site;
+use App\Models\SiteHouseRoom;
+use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\ConsentValidationService;
 use App\Services\Queclink\CommandBuilder;
 use App\Services\Queclink\ConfigurationSnapshotService;
+use App\Services\Queclink\LocateNowService;
+use App\Services\Queclink\QueclinkConfigurationProfileService;
+use App\Support\SafeOperationalData;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -37,12 +53,22 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * Queclink integration hub — TCP listener configuration, pending-tray
  * pairing, paired-device management, debug console, and AT command REPL.
  *
- * The existing QueclinkController.php remains the home for IMS cloud
- * credentials; this controller owns everything to do with direct
- * device-to-server intake via the TCP listener.
+ * No cloud API capability is inferred. QueclinkController retains only the
+ * cleanup route for credentials saved by the retired cloud scaffold.
  */
 class QueclinkHubController extends Controller
 {
+    private const DEVICE_PAGE_SIZE = 25;
+
+    public function __construct(
+        private readonly QueclinkIntegrationAccessService $queclinkAccess,
+        private readonly IntegrationSiteCredentialsPresenter $siteCredentials,
+        private readonly SecurityDevicesAccessService $devicesAccess,
+        private readonly DeviceLinkService $deviceLinks,
+        private readonly DeviceAssignmentService $deviceAssignments,
+        private readonly QueclinkConfigurationProfileService $configurationProfiles,
+    ) {}
+
     /** Canonical section keys a preset payload may contain. */
     private const PRESET_SECTIONS = [
         'server', 'tracking', 'pin', 'dog', 'time', 'non_movement',
@@ -50,91 +76,103 @@ class QueclinkHubController extends Controller
         'firmware_update', 'firmware_version',
     ];
 
-    public function index(Request $request, ConfigurationSnapshotService $configurations)
+    public function index(Request $request, ConfigurationSnapshotService $configurations, SecurityDevicesAccessService $access)
     {
         abort_unless($this->userCanManage($request->user()), 403);
-        $tenantId = $this->resolveTenantId($request->user());
-
-        $port = (int) (AppSetting::query()->where('key', 'queclink.listener.port')->value('value')
-            ?? config('services.queclink.port', 8090));
-        $hostname = (string) (AppSetting::query()->where('key', 'queclink.public_hostname')->value('value')
-            ?? config('services.queclink.public_hostname')
-            ?? '');
-
-        $serviceState = $this->systemdState();
-
-        $devices = QueclinkDevice::query()
-            ->orderByDesc('last_seen_at')
-            ->get()
-            ->map(fn (QueclinkDevice $d) => $this->serialiseDevice($d, $configurations))
-            ->values();
-
-        $pending = $devices->where('status', QueclinkDevice::STATUS_PENDING)->values();
-        $paired = $devices->where('status', QueclinkDevice::STATUS_PAIRED)->values();
-        $rejected = $devices->where('status', QueclinkDevice::STATUS_REJECTED)->values();
-
-        $imsSecret = IntegrationTenantSecret::query()
-            ->forTenant($tenantId)
-            ->where('provider', 'queclink')
-            ->first();
+        $user = $request->user();
+        $targetType = in_array($request->string('target_type')->toString(), ['vehicle', 'staff', 'client'], true)
+            ? $request->string('target_type')->toString()
+            : null;
+        $targetSearch = Str::limit(trim($request->string('target_search')->toString()), 100, '');
+        $selectedTargetId = $request->integer('selected_target_id') > 0
+            ? $request->integer('selected_target_id')
+            : null;
+        $deviceSearch = Str::limit(trim($request->string('device_search')->toString()), 100, '');
 
         return Inertia::render('security-devices/integrations/queclink-hub', [
-            'listener' => [
-                'port' => $port,
-                'public_hostname' => $hostname,
-                'service_state' => $serviceState,
-                'connected_count' => QueclinkDevice::connected()->count(),
-            ],
-            'devices' => [
-                'paired' => $paired,
-                'pending' => $pending,
-                'rejected' => $rejected,
-                'total' => $devices->count(),
-            ],
-            'statistics' => [
-                'frames_last_hour' => QueclinkRawFrame::query()->where('created_at', '>=', now()->subHour())->count(),
-                'last_frame_at' => optional(QueclinkRawFrame::query()->max('created_at'))?->toDateTimeString(),
-            ],
-            'imsCloud' => $imsSecret ? [
-                'status' => $imsSecret->status,
-                'secret_last4' => $imsSecret->secret_last4,
-                'last_tested_at' => $imsSecret->last_tested_at?->toDateTimeString(),
-            ] : null,
-            'targets' => [
-                'vehicles' => Asset::query()
-                    ->where(function ($q) {
-                        $q->where('category', 'vehicle')
-                            ->orWhereHas('categoryRef', fn ($qq) => $qq->where('slug', 'vehicle'));
-                    })
-                    ->limit(500)
-                    ->orderBy('name')
-                    ->get(['id', 'name', 'registration_number'])
+            'listener' => function () use ($user): array {
+                $port = (int) (AppSetting::query()->where('key', 'queclink.listener.port')->value('value')
+                    ?? config('services.queclink.port', 8090));
+                $hostname = (string) (AppSetting::query()->where('key', 'queclink.public_hostname')->value('value')
+                    ?? config('services.queclink.public_hostname')
+                    ?? '');
+
+                return [
+                    'port' => $port,
+                    'endpoint_configured' => $hostname !== '',
+                    'service_state' => $this->systemdState(),
+                    'connected_count' => $this->visibleDeviceQuery($user)->connected()->count(),
+                ];
+            },
+            'devices' => fn (): array => $this->devicePagePayload(
+                $request,
+                $configurations,
+                $deviceSearch,
+            ),
+            'statistics' => function () use ($user): array {
+                $lastFrameAt = $this->visibleFrameQuery($user)->max('created_at');
+
+                return [
+                    'frames_last_hour' => $this->visibleFrameQuery($user)->where('created_at', '>=', now()->subHour())->count(),
+                    'last_frame_at' => $lastFrameAt ? Carbon::parse($lastFrameAt)->toDateTimeString() : null,
+                ];
+            },
+            'cloudIntegration' => function (): array {
+                $connection = IntegrationProviderConnection::query()
+                    ->forProvider('queclink')
+                    ->first();
+
+                return [
+                    'status' => 'unavailable',
+                    'legacy_credential_stored' => $connection !== null,
+                    'legacy_credential_last4' => $connection?->secret_last4,
+                ];
+            },
+            'siteCredentials' => fn (): array => $this->siteCredentials->present($user, 'queclink'),
+            'targets' => fn (): array => [
+                'vehicles' => $access->assignableVehicles(
+                    $request->user(),
+                    $targetType === 'vehicle' ? $targetSearch : null,
+                    $targetType === 'vehicle' ? $selectedTargetId : null,
+                )
+                    ->sortBy('name')
                     ->map(fn (Asset $a) => [
                         'id' => $a->id,
                         'label' => trim($a->name.($a->registration_number ? " ({$a->registration_number})" : '')),
                     ])->values(),
-                'staff' => User::query()
-                    ->whereNotNull('approved_at')
-                    ->orderBy('name')
-                    ->limit(500)
-                    ->get(['id', 'name', 'email'])
-                    ->map(fn (User $u) => ['id' => $u->id, 'label' => $u->name." <{$u->email}>"])
+                'staff' => $access->assignableStaffTargets(
+                    $request->user(),
+                    $targetType === 'staff' ? $targetSearch : null,
+                    $targetType === 'staff' ? $selectedTargetId : null,
+                )
+                    ->map(fn (User $u) => ['id' => $u->id, 'label' => $u->name])
                     ->values(),
-                'clients' => Client::query()
-                    ->orderBy('first_name')
-                    ->limit(500)
-                    ->get(['id', 'first_name', 'last_name'])
+                'clients' => $access->assignableClients(
+                    $request->user(),
+                    $targetType === 'client' ? $targetSearch : null,
+                    $targetType === 'client' ? $selectedTargetId : null,
+                )
+                    ->sortBy('first_name')
                     ->map(fn (Client $c) => [
                         'id' => $c->id,
                         'label' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
                     ])->values(),
             ],
-            'presets' => QueclinkPreset::query()
-                ->availableTo($tenantId)
+            'presets' => fn (): Collection => QueclinkPreset::query()
+                ->active()
+                ->with('configurationProfile')
                 ->orderByDesc('is_system')
                 ->orderBy('name')
                 ->get()
                 ->map(fn (QueclinkPreset $preset) => $this->serialisePreset($preset))
+                ->values(),
+            'retiredPresets' => fn (): Collection => QueclinkPreset::query()
+                ->retired()
+                ->with(['configurationProfile', 'retiredBy:id,name'])
+                ->orderByDesc('retired_at')
+                ->limit(100)
+                ->get()
+                ->map(fn (QueclinkPreset $preset) => $this->serialiseRetiredPreset($preset))
                 ->values(),
             'can' => [
                 'manage' => true,
@@ -153,13 +191,15 @@ class QueclinkHubController extends Controller
 
         $previousPort = (int) (AppSetting::query()->where('key', 'queclink.listener.port')->value('value') ?? 8090);
         AppSetting::updateOrCreate(['key' => 'queclink.listener.port'], ['value' => (int) $validated['port']]);
-        AppSetting::updateOrCreate(['key' => 'queclink.public_hostname'], ['value' => (string) ($validated['public_hostname'] ?? '')]);
+        if (filled($validated['public_hostname'] ?? null)) {
+            AppSetting::updateOrCreate(['key' => 'queclink.public_hostname'], ['value' => trim((string) $validated['public_hostname'])]);
+        }
 
         if (PHP_OS_FAMILY === 'Linux' && (int) $validated['port'] !== $previousPort) {
             try {
                 Artisan::call('queclink:install', ['--port' => $validated['port']]);
-            } catch (\Throwable $e) {
-                return back()->with('warning', 'Settings saved, but the listener could not be restarted automatically: '.$e->getMessage());
+            } catch (\Throwable) {
+                return back()->with('warning', 'Settings saved, but the listener could not be restarted automatically. Review the bounded server diagnostics.');
             }
         }
 
@@ -169,81 +209,101 @@ class QueclinkHubController extends Controller
     public function claimDevice(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
-        abort_unless($queclinkDevice->isPending(), 422, 'Device is not in the pending state.');
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
 
         $validated = $request->validate([
             'pairing_type' => ['required', 'in:vehicle,staff,client'],
             'target_id' => ['required', 'integer'],
-            'consent_id' => ['nullable', 'integer', 'exists:client_consents,id'],
+            'consent_id' => ['nullable', 'integer', 'prohibited_unless:pairing_type,client'],
             'create_personal_tracker_asset' => ['nullable', 'boolean'],
         ]);
 
         return DB::transaction(function () use ($queclinkDevice, $validated, $request) {
-            $tenantId = $this->resolveTenantId($request->user());
+            $lockedDevice = QueclinkDevice::query()
+                ->whereKey($queclinkDevice->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->queclinkAccess->assertDevice($request->user(), $lockedDevice);
+            abort_unless($lockedDevice->isPending(), 422, 'Device is not in the pending state.');
+
             $pairingType = $validated['pairing_type'];
             $targetId = (int) $validated['target_id'];
-            $client = $pairingType === 'client'
-                ? Client::query()->findOrFail($targetId)
-                : null;
+            $target = match ($pairingType) {
+                'vehicle' => $this->queclinkAccess->vehicle($request->user(), $targetId, true),
+                'staff' => $this->queclinkAccess->staff($request->user(), $targetId, true),
+                'client' => $this->queclinkAccess->client($request->user(), $targetId, true),
+            };
+            $client = $target instanceof Client ? $target : null;
             $consentId = $client
                 ? $this->resolveClientTrackingConsentId($client, $validated['consent_id'] ?? null)
                 : null;
 
             $asset = match ($pairingType) {
-                'vehicle' => $this->resolveVehicleAsset($targetId),
+                'vehicle' => $target,
                 'staff' => $this->ensurePersonalTrackerAsset(
                     type: 'staff',
-                    targetId: $targetId,
-                    tenantId: $tenantId,
+                    target: $target,
+                    viewer: $request->user(),
                 ),
                 'client' => $this->ensurePersonalTrackerAsset(
                     type: 'client',
-                    targetId: $targetId,
-                    tenantId: $tenantId,
+                    target: $target,
+                    viewer: $request->user(),
                 ),
             };
+            $this->queclinkAccess->assertAsset($request->user(), $asset);
 
-            $device = $this->ensureCanonicalDevice($queclinkDevice, $tenantId, $pairingType);
+            if (in_array($pairingType, ['staff', 'client'], true)) {
+                $activeAssignments = DeviceAssignment::query()
+                    ->forTarget($pairingType, $targetId)
+                    ->active()
+                    ->lockForUpdate()
+                    ->get();
+                abort_if(
+                    $activeAssignments->isNotEmpty(),
+                    409,
+                    'This person already has an active tracker assignment.',
+                );
+            }
 
-            DeviceAssignment::create([
-                'device_id' => $device->id,
-                'assignable_type' => $pairingType,
-                'assignable_id' => $targetId,
-                'assignment_type' => AssignmentType::Permanent->value,
-                'assigned_at' => now(),
-                'assigned_by_user_id' => $request->user()->id,
-                'consent_id' => $consentId,
-            ]);
+            $device = $this->ensureCanonicalDevice($lockedDevice, $request->user(), $pairingType);
 
-            AssetTracker::updateOrCreate(
-                [
-                    'vendor' => 'queclink',
-                    'device_uid' => $queclinkDevice->imei,
-                ],
-                [
-                    'asset_id' => $asset->id,
-                    'imei' => $queclinkDevice->imei,
-                    'status' => 'paired',
-                    'paired_at' => now(),
-                    'consent_id' => $consentId,
-                ],
+            $activeAssetLinks = $device->activeAssetLinks()->lockForUpdate()->get();
+            abort_if(
+                $activeAssetLinks->count() > 1
+                || ($activeAssetLinks->isNotEmpty() && (int) $activeAssetLinks->first()->asset_id !== (int) $asset->id),
+                409,
+                'This provider identity is already linked to another canonical asset.',
+            );
+            if ($activeAssetLinks->isEmpty()) {
+                $this->deviceLinks->link($device, $asset, (int) $request->user()->id);
+            }
+
+            $assignment = $this->deviceAssignments->assign(
+                device: $device,
+                assignableType: $pairingType,
+                assignableId: $targetId,
+                assignedByUserId: (int) $request->user()->id,
+                assignmentType: AssignmentType::Permanent,
+                consentId: $consentId,
             );
 
-            $queclinkDevice->update([
+            $lockedDevice->update([
                 'status' => QueclinkDevice::STATUS_PAIRED,
                 'pending_pairing_type' => null,
                 'device_id' => $device->id,
-                'tenant_id' => $tenantId,
+                'binding_uuid' => (string) Str::uuid(),
             ]);
 
-            $this->logAudit($request, $queclinkDevice, 'claim', null, null, [
+            $this->logAudit($request, $lockedDevice, 'claim', null, null, [
                 'pairing_type' => $pairingType,
                 'target_id' => $targetId,
                 'device_id' => $device->id,
+                'device_assignment_id' => $assignment->id,
                 'consent_id' => $consentId,
             ]);
 
-            return back()->with('success', "Device {$queclinkDevice->imei} paired.");
+            return back()->with('success', "Device {$lockedDevice->imei} paired.");
         });
     }
 
@@ -252,9 +312,10 @@ class QueclinkHubController extends Controller
         if ($requestedConsentId) {
             $consent = ClientConsent::query()
                 ->where('client_id', $client->id)
+                ->with('consentType')
                 ->find($requestedConsentId);
 
-            if ($this->isUsableConsent($consent)) {
+            if ($consent && ConsentValidationService::isValidTrackingConsent($consent)) {
                 return (int) $consent->id;
             }
 
@@ -274,59 +335,96 @@ class QueclinkHubController extends Controller
         ]);
     }
 
-    private function isUsableConsent(?ClientConsent $consent): bool
-    {
-        return $consent !== null
-            && ! $consent->withdrawn_at
-            && $consent->isValid();
-    }
-
     public function rejectDevice(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
-        $before = ['status' => $queclinkDevice->status];
-        $queclinkDevice->update(['status' => QueclinkDevice::STATUS_REJECTED]);
-        $this->logAudit($request, $queclinkDevice, 'release', null, $before, ['status' => QueclinkDevice::STATUS_REJECTED], null, 'Pending device rejected.');
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
+
+        DB::transaction(function () use ($request, $queclinkDevice): void {
+            $lockedDevice = QueclinkDevice::query()
+                ->whereKey($queclinkDevice->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->queclinkAccess->assertDevice($request->user(), $lockedDevice);
+            abort_unless($lockedDevice->isPending(), 422, 'Only pending devices can be rejected.');
+
+            $before = ['status' => $lockedDevice->status];
+            $lockedDevice->update(['status' => QueclinkDevice::STATUS_REJECTED]);
+            $this->logAudit($request, $lockedDevice, 'reject', null, $before, ['status' => QueclinkDevice::STATUS_REJECTED]);
+        });
 
         return back()->with('success', "Device {$queclinkDevice->imei} rejected.");
+    }
+
+    public function restoreDevice(Request $request, QueclinkDevice $queclinkDevice)
+    {
+        abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
+
+        DB::transaction(function () use ($request, $queclinkDevice): void {
+            $lockedDevice = QueclinkDevice::query()
+                ->whereKey($queclinkDevice->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->queclinkAccess->assertDevice($request->user(), $lockedDevice);
+            abort_unless($lockedDevice->status === QueclinkDevice::STATUS_REJECTED, 422, 'Only rejected devices can be restored.');
+
+            $before = ['status' => $lockedDevice->status];
+            $lockedDevice->update(['status' => QueclinkDevice::STATUS_PENDING]);
+            $this->logAudit($request, $lockedDevice, 'restore', null, $before, ['status' => QueclinkDevice::STATUS_PENDING]);
+        });
+
+        return back()->with('success', "Device {$queclinkDevice->imei} restored to pending.");
     }
 
     public function releaseDevice(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
-        abort_unless($queclinkDevice->isPaired(), 422);
+        $this->queclinkAccess->assertDeviceForRelease($request->user(), $queclinkDevice);
 
         DB::transaction(function () use ($queclinkDevice, $request) {
-            DeviceAssignment::query()
-                ->where('device_id', $queclinkDevice->device_id)
-                ->whereNull('released_at')
-                ->update([
-                    'released_at' => now(),
-                    'released_by_user_id' => $request->user()->id,
-                ]);
+            $lockedDevice = QueclinkDevice::query()
+                ->whereKey($queclinkDevice->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->queclinkAccess->assertDeviceForRelease($request->user(), $lockedDevice);
+            abort_unless($lockedDevice->isPaired(), 422);
 
-            AssetTracker::query()
-                ->where('vendor', 'queclink')
-                ->where('device_uid', $queclinkDevice->imei)
-                ->update(['status' => 'unpaired', 'unpaired_at' => now()]);
+            $canonicalDeviceId = $lockedDevice->device_id ? (int) $lockedDevice->device_id : null;
+            $auditSiteId = $this->resolveAuditSiteId($canonicalDeviceId);
 
-            $queclinkDevice->update([
+            $canonicalDevice = Device::query()
+                ->whereKey($lockedDevice->device_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->devicesAccess->assertCanReleaseActiveAssignment(
+                $request->user(),
+                $canonicalDevice,
+                true,
+            );
+            $this->deviceAssignments->release($canonicalDevice, (int) $request->user()->id);
+
+            $this->deviceLinks->unlinkAllForDevice($canonicalDevice);
+
+            $lockedDevice->update([
                 'status' => QueclinkDevice::STATUS_PENDING,
                 'device_id' => null,
+                'binding_uuid' => null,
             ]);
 
-            $this->logAudit($request, $queclinkDevice, 'release', null, null, [
+            $this->logAudit($request, $lockedDevice, 'release', null, null, [
                 'status' => QueclinkDevice::STATUS_PENDING,
                 'device_id' => null,
-            ]);
+            ], canonicalDeviceId: $canonicalDeviceId, siteId: $auditSiteId);
         });
 
         return back()->with('success', "Device {$queclinkDevice->imei} released — moved back to pending.");
     }
 
-    public function sendCommand(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    public function sendCommand(Request $request, QueclinkDevice $queclinkDevice, LocateNowService $locateNow)
     {
         abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
         abort_unless($queclinkDevice->isPaired(), 422, 'Commands can only be sent to paired devices.');
 
         $validated = $request->validate([
@@ -336,40 +434,32 @@ class QueclinkHubController extends Controller
             'interval_seconds' => ['nullable', 'integer', 'between:5,86400'],
         ]);
 
-        $family = $this->guessFamily($queclinkDevice);
+        if ($validated['mode'] !== 'preset'
+            || ! in_array($validated['preset'], ['request_location', 'reboot'], true)) {
+            throw ValidationException::withMessages([
+                'command' => 'Direct or state-changing Queclink commands are not available from the provider console. Use the governed Device Management workflow.',
+            ]);
+        }
+        abort_unless($queclinkDevice->device, 422, 'This Queclink tracker is not linked to a canonical Device.');
 
-        try {
-            $built = match ($validated['mode']) {
-                'preset' => match ($validated['preset']) {
-                    'request_location' => $builder->requestLocation($family),
-                    'reboot' => $builder->reboot($family),
-                    'set_interval' => $builder->setReportingInterval($family, (int) $validated['interval_seconds']),
-                    default => throw new \InvalidArgumentException('Unknown preset'),
-                },
-                'raw' => $builder->fromRaw((string) $validated['raw'], $family),
-            };
-        } catch (\InvalidArgumentException $e) {
-            return back()->withErrors(['raw' => $e->getMessage()]);
+        if ($validated['preset'] === 'reboot') {
+            return $this->deviceManagementHandoff(
+                $queclinkDevice,
+                'device.reboot',
+                'Review the governed restart, confirm the impact and approved IT Change, then dispatch from Device Management.',
+            );
         }
 
-        QueclinkPendingCommand::create([
-            'queclink_device_id' => $queclinkDevice->id,
-            'imei' => $queclinkDevice->imei,
-            'tenant_id' => $queclinkDevice->tenant_id,
-            'command_word' => $built['command_word'],
-            'raw_command' => $built['raw'],
-            'serial_number' => $built['serial'],
-            'status' => QueclinkPendingCommand::STATUS_QUEUED,
-            'created_by_user_id' => $request->user()->id,
-            'expires_at' => now()->addMinutes(5),
-        ]);
-
-        return back()->with('success', 'Command queued — it will be sent on the device\'s next frame.');
+        return redirect()->to($locateNow->managementUrlForDevice($queclinkDevice->device))->with(
+            'success',
+            'Review the governed location refresh, confirm your identity, and record the operational reason before dispatch.',
+        );
     }
 
-    public function readConfiguration(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    public function readConfiguration(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be read from paired devices.');
 
         $validated = $request->validate([
@@ -377,47 +467,30 @@ class QueclinkHubController extends Controller
         ]);
 
         $section = $validated['section'] ?? 'all';
-        $family = $this->guessFamily($queclinkDevice);
 
-        try {
-            $built = $builder->readConfiguration($family, $section);
-        } catch (\InvalidArgumentException $e) {
-            return back()->withErrors(['section' => $e->getMessage()]);
-        }
-
-        $this->queueCommand($request, $queclinkDevice, $built, now()->addMinutes(10));
-
-        return back()->with('success', 'Configuration read queued — it will be sent on the device\'s next frame.');
+        return $this->configurationRefreshHandoff($queclinkDevice, $section);
     }
 
-    public function readConfigurationSection(Request $request, QueclinkDevice $queclinkDevice, string $section, CommandBuilder $builder)
+    public function readConfigurationSection(Request $request, QueclinkDevice $queclinkDevice, string $section)
     {
         abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be read from paired devices.');
 
         $code = $this->resolveReadSectionCode($section, $request->string('command')->toString());
-        $family = $this->guessFamily($queclinkDevice);
 
-        try {
-            $built = $builder->readConfiguration($family, $code);
-        } catch (\InvalidArgumentException $e) {
-            return back()->withErrors(['section' => $e->getMessage()]);
-        }
-
-        $command = $this->queueCommand($request, $queclinkDevice, $built, now()->addMinutes(10));
-        $this->logAudit($request, $queclinkDevice, 'config_read', $section, null, ['section_code' => $code], $command->raw_command);
-
-        return back()->with('success', "{$code} configuration read queued.");
+        return $this->configurationRefreshHandoff($queclinkDevice, $code);
     }
 
-    public function updateServerConfiguration(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    public function updateServerConfiguration(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
         abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
 
         if ($request->filled('command') && ! in_array($request->string('command')->toString(), ['server', 'sri'], true)) {
-            return $this->queueSectionConfiguration($request, $queclinkDevice, $builder, 'server', $request->all());
+            return $this->configurationApplyDraftHandoff($request, $queclinkDevice, 'server', $request->all());
         }
 
         $validated = $request->validate([
@@ -436,16 +509,13 @@ class QueclinkHubController extends Controller
             'protocol_format' => ['required', 'integer', 'in:0'],
         ]);
 
-        $built = $builder->gl30ServerRegistration($validated);
-        $command = $this->queueCommand($request, $queclinkDevice, $built);
-        $this->logAudit($request, $queclinkDevice, 'config_write', 'server', null, $validated, $command->raw_command);
-
-        return back()->with('success', 'Server registration update queued.');
+        return $this->configurationApplyDraftHandoff($request, $queclinkDevice, 'server', $validated);
     }
 
-    public function updateGlobalConfiguration(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    public function updateGlobalConfiguration(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
         abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
 
@@ -470,36 +540,32 @@ class QueclinkHubController extends Controller
             'charge_standby_mode' => ['required', 'integer', 'between:0,1'],
         ]);
 
-        $built = $builder->gl30GlobalConfiguration($validated);
-        $command = $this->queueCommand($request, $queclinkDevice, $built);
-        $this->logAudit($request, $queclinkDevice, 'config_write', 'tracking', null, $validated, $command->raw_command);
-
-        return back()->with('success', 'Global tracking settings update queued.');
+        return $this->configurationApplyDraftHandoff($request, $queclinkDevice, 'tracking', $validated);
     }
 
-    public function applyResidentSafetyProfile(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder)
+    public function applyResidentSafetyProfile(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
         abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
 
-        $built = $builder->gl30ResidentSafetyProfile();
-        $command = $this->queueCommand($request, $queclinkDevice, $built);
-        $this->logAudit($request, $queclinkDevice, 'preset_apply', 'tracking', null, ['preset' => 'resident-safety'], $command->raw_command);
+        $preset = QueclinkPreset::query()->active()->where('slug', 'resident-safety')->firstOrFail();
 
-        return back()->with('success', 'Resident safety profile queued.');
+        return $this->configurationApplyHandoff($queclinkDevice, $this->profileForPreset($preset));
     }
 
     /**
      * Apply every section in a saved preset to one paired GL30 device, queuing
      * one command per section in a single transaction.
      */
-    public function applyPreset(Request $request, QueclinkDevice $queclinkDevice, QueclinkPreset $preset, CommandBuilder $builder)
+    public function applyPreset(Request $request, QueclinkDevice $queclinkDevice, QueclinkPreset $preset)
     {
         abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
+        $this->queclinkAccess->assertPreset($request->user(), $preset);
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
         abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
-        abort_unless($this->presetVisibleTo($preset, $request->user()), 404);
 
         if ($preset->target_category === 'vehicle_tracker') {
             throw ValidationException::withMessages([
@@ -507,42 +573,20 @@ class QueclinkHubController extends Controller
             ]);
         }
 
-        $sections = $preset->sectionPayloads();
-        if ($sections === []) {
+        if ($preset->sectionPayloads() === []) {
             throw ValidationException::withMessages([
                 'preset' => 'This preset has no configuration sections to apply.',
             ]);
         }
 
-        $queued = 0;
-
-        DB::transaction(function () use ($sections, $request, $queclinkDevice, $builder, $preset, &$queued) {
-            foreach ($sections as $sectionKey => $fields) {
-                try {
-                    $built = $this->buildSectionCommand($builder, (string) $sectionKey, is_array($fields) ? $fields : []);
-                } catch (\InvalidArgumentException $e) {
-                    throw ValidationException::withMessages(['preset' => $e->getMessage()]);
-                }
-
-                $command = $this->queueCommand($request, $queclinkDevice, $built);
-                $this->logAudit($request, $queclinkDevice, 'preset_apply', (string) $sectionKey, null, [
-                    'preset_id' => $preset->id,
-                    'preset_slug' => $preset->slug,
-                    'fields' => $fields,
-                ], $command->raw_command);
-
-                $queued++;
-            }
-        });
-
-        return back()->with('success', "Preset \"{$preset->name}\" queued ({$queued} command".($queued === 1 ? '' : 's').').');
+        return $this->configurationApplyHandoff($queclinkDevice, $this->profileForPreset($preset));
     }
 
     /**
-     * Save a reusable preset for the operator's tenant. Each section is built
+     * Save a reusable application preset. Each section is built
      * once up front so a preset that would fail to apply is never persisted.
      */
-    public function storePreset(Request $request, CommandBuilder $builder)
+    public function storePreset(Request $request)
     {
         abort_unless($this->userCanManage($request->user()), 403);
 
@@ -564,30 +608,35 @@ class QueclinkHubController extends Controller
                 ]);
             }
 
-            try {
-                $this->buildSectionCommand($builder, $sectionKey, is_array($fields) ? $fields : []);
-            } catch (\InvalidArgumentException $e) {
-                throw ValidationException::withMessages(['sections' => $e->getMessage()]);
-            }
-
             $sections[$sectionKey] = array_filter(
                 (array) $fields,
                 fn ($value) => $value !== null && $value !== '',
             );
         }
 
-        $tenantId = $this->resolveTenantId($request->user());
+        $slug = $this->uniquePresetSlug($validated['name']);
+        $preset = DB::transaction(function () use ($validated, $sections, $request, $slug): QueclinkPreset {
+            $profile = $this->configurationProfiles->createProfile(
+                profileKey: QueclinkConfigurationProfileService::profileKey($slug),
+                name: $validated['name'],
+                description: $validated['description'] ?? null,
+                targetCategory: $validated['target_category'] ?? 'personal_tracker',
+                sections: $sections,
+                isSystem: false,
+                createdByUserId: (int) $request->user()->id,
+            );
 
-        $preset = QueclinkPreset::create([
-            'tenant_id' => $tenantId,
-            'name' => $validated['name'],
-            'slug' => $this->uniquePresetSlug($validated['name'], $tenantId),
-            'description' => $validated['description'] ?? null,
-            'target_category' => $validated['target_category'] ?? 'personal_tracker',
-            'payload' => $sections,
-            'is_system' => false,
-            'created_by_user_id' => $request->user()->id,
-        ]);
+            return QueclinkPreset::query()->create([
+                'device_configuration_profile_id' => $profile->id,
+                'name' => $validated['name'],
+                'slug' => $slug,
+                'description' => $validated['description'] ?? null,
+                'target_category' => $validated['target_category'] ?? 'personal_tracker',
+                'payload' => [],
+                'is_system' => false,
+                'created_by_user_id' => $request->user()->id,
+            ]);
+        });
 
         return back()->with('success', "Preset \"{$preset->name}\" saved.");
     }
@@ -595,29 +644,81 @@ class QueclinkHubController extends Controller
     public function destroyPreset(Request $request, QueclinkPreset $preset)
     {
         abort_unless($this->userCanManage($request->user()), 403);
-        abort_if($preset->is_system, 422, 'Built-in presets cannot be deleted.');
-        abort_unless(
-            $preset->tenant_id !== null && (int) $preset->tenant_id === $this->resolveTenantId($request->user()),
-            404,
-        );
+        $this->queclinkAccess->assertPreset($request->user(), $preset);
+        abort_if($preset->is_system, 422, 'Built-in presets cannot be retired.');
 
-        $name = $preset->name;
-        $preset->delete();
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:500', 'not_regex:/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/'],
+        ]);
+        $actor = $request->user();
 
-        return back()->with('success', "Preset \"{$name}\" deleted.");
+        $name = DB::transaction(function () use ($actor, $preset, $validated): string {
+            $locked = QueclinkPreset::query()
+                ->whereKey($preset->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->queclinkAccess->assertPreset($actor, $locked);
+            abort_if($locked->is_system, 422, 'Built-in presets cannot be retired.');
+
+            $profile = DeviceConfigurationProfile::query()
+                ->whereKey($locked->device_configuration_profile_id)
+                ->lockForUpdate()
+                ->first();
+            abort_unless(
+                $profile instanceof DeviceConfigurationProfile,
+                409,
+                'This preset has no governed configuration profile. Repair its retained evidence before retrying.',
+            );
+            abort_unless(
+                $profile->status === DeviceConfigurationProfile::STATUS_ACTIVE,
+                409,
+                'This preset configuration is already retired. Reconcile its retained preset evidence before retrying.',
+            );
+
+            $activeVersions = DeviceConfigurationProfile::query()
+                ->where('profile_key', $profile->profile_key)
+                ->where('status', DeviceConfigurationProfile::STATUS_ACTIVE)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            foreach ($activeVersions as $activeVersion) {
+                $activeVersion->retire();
+            }
+            $locked->retireGoverned((int) $actor->id, $validated['reason']);
+
+            AuditLogger::logOrFail('security_devices.queclink.preset.retired', $locked, [
+                'actor_id' => (int) $actor->id,
+                'application_scope' => 'single_application',
+                'reason' => trim($validated['reason']),
+                'profile_version' => (int) $profile->version,
+                'profile_status' => DeviceConfigurationProfile::STATUS_RETIRED,
+                'profile_versions_retired' => $activeVersions->count(),
+            ]);
+
+            return $locked->name;
+        }, 3);
+
+        return back()->with('success', "Preset \"{$name}\" retired. Its governed history remains available for audit.");
     }
 
-    public function updateSectionConfiguration(UpdateSectionRequest $request, QueclinkDevice $queclinkDevice, string $section, CommandBuilder $builder)
+    public function updateSectionConfiguration(UpdateSectionRequest $request, QueclinkDevice $queclinkDevice, string $section)
     {
+        $this->queclinkAccess->assertDevice($request->user(), $queclinkDevice);
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
         abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
 
-        return $this->queueSectionConfiguration($request, $queclinkDevice, $builder, $section, $request->validated());
+        return $this->configurationApplyDraftHandoff($request, $queclinkDevice, $section, $request->validated());
     }
 
     public function cancelCommand(Request $request, QueclinkPendingCommand $command)
     {
         abort_unless($this->userCanManage($request->user()), 403);
+        $this->queclinkAccess->assertCommand($request->user(), $command);
+        abort_if(
+            $command->device_command_request_id !== null,
+            409,
+            'Governed commands must be cancelled from the canonical Device Management workflow.',
+        );
         abort_unless($command->status === QueclinkPendingCommand::STATUS_QUEUED, 422, 'Only queued commands can be cancelled.');
 
         $before = $command->only(['status', 'raw_command', 'serial_number']);
@@ -634,58 +735,14 @@ class QueclinkHubController extends Controller
         return back()->with('success', 'Queued command cancelled.');
     }
 
-    public function retryCommand(Request $request, QueclinkPendingCommand $command)
-    {
-        abort_unless($this->userCanManage($request->user()), 403);
-        abort_unless(in_array($command->status, [
-            QueclinkPendingCommand::STATUS_FAILED,
-            QueclinkPendingCommand::STATUS_EXPIRED,
-            QueclinkPendingCommand::STATUS_CANCELLED,
-        ], true), 422, 'Only failed, expired, or cancelled commands can be retried.');
-
-        $retry = QueclinkPendingCommand::create([
-            'queclink_device_id' => $command->queclink_device_id,
-            'imei' => $command->imei,
-            'tenant_id' => $command->tenant_id,
-            'command_word' => $command->command_word,
-            'raw_command' => $command->raw_command,
-            'serial_number' => $command->serial_number,
-            'status' => QueclinkPendingCommand::STATUS_QUEUED,
-            'created_by_user_id' => $request->user()->id,
-            'expires_at' => now()->addMinutes(5),
-        ]);
-
-        $device = $command->device;
-        if ($device) {
-            $this->logAudit($request, $device, 'retry', null, [
-                'command_id' => $command->id,
-                'status' => $command->status,
-            ], [
-                'command_id' => $retry->id,
-                'status' => $retry->status,
-            ], $retry->raw_command);
-        }
-
-        return back()->with('success', 'Command retry queued.');
-    }
-
-    public function bulkAction(BulkActionRequest $request, CommandBuilder $builder)
+    public function bulkAction(BulkActionRequest $request)
     {
         $validated = $request->validated();
         $ids = array_values(array_unique(array_map('intval', $validated['device_ids'])));
         $action = $validated['action'];
         $section = $validated['section'] ?? 'all';
 
-        $devices = QueclinkDevice::query()
-            ->whereIn('id', $ids)
-            ->get()
-            ->keyBy('id');
-
-        if ($devices->count() !== count($ids)) {
-            throw ValidationException::withMessages([
-                'device_ids' => 'One or more selected devices could not be found.',
-            ]);
-        }
+        $devices = $this->queclinkAccess->devicesForBulk($request->user(), $ids);
 
         $notPaired = $devices->first(fn (QueclinkDevice $device) => ! $device->isPaired());
         if ($notPaired) {
@@ -694,17 +751,18 @@ class QueclinkHubController extends Controller
             ]);
         }
 
-        $preset = null;
-        if ($action === 'apply_preset') {
-            $preset = QueclinkPreset::query()
-                ->availableTo($this->resolveTenantId($request->user()))
-                ->find((int) ($validated['preset_id'] ?? 0));
+        $profile = null;
+        if (in_array($action, ['resident_safety_profile', 'apply_preset'], true)) {
+            $preset = $action === 'resident_safety_profile'
+                ? QueclinkPreset::query()->active()->where('slug', 'resident-safety')->first()
+                : QueclinkPreset::query()->active()->find((int) ($validated['preset_id'] ?? 0));
 
             if (! $preset || $preset->sectionPayloads() === [] || $preset->target_category === 'vehicle_tracker') {
                 throw ValidationException::withMessages([
                     'preset_id' => 'The selected preset cannot be applied to these devices.',
                 ]);
             }
+            $profile = $this->profileForPreset($preset);
         }
 
         if (in_array($action, ['resident_safety_profile', 'apply_preset'], true)) {
@@ -716,51 +774,41 @@ class QueclinkHubController extends Controller
             }
         }
 
-        $queued = 0;
+        $canonicalIds = $devices->pluck('device_id')->filter()->map(fn ($id): int => (int) $id)->values();
+        if ($canonicalIds->count() !== $devices->count()) {
+            throw ValidationException::withMessages([
+                'device_ids' => 'Every tracker must be linked to one canonical Device before governed bulk management.',
+            ]);
+        }
+        $capability = match ($action) {
+            'read_configuration' => 'configuration.refresh',
+            'reboot' => 'device.reboot',
+            'resident_safety_profile', 'apply_preset' => 'configuration.apply',
+        };
+        if ($canonicalIds->count() === 1) {
+            $device = $devices->firstOrFail();
+            $parameters = $capability === 'configuration.apply'
+                ? ['command_configuration_profile_id' => (string) $profile?->id]
+                : ($capability === 'configuration.refresh' ? ['command_section' => $section] : []);
 
-        DB::transaction(function () use ($devices, $request, $builder, $action, $section, $preset, &$queued) {
-            foreach ($devices as $device) {
-                if ($action === 'apply_preset') {
-                    foreach ($preset->sectionPayloads() as $sectionKey => $fields) {
-                        $built = $this->buildSectionCommand($builder, (string) $sectionKey, is_array($fields) ? $fields : []);
-                        $command = $this->queueCommand($request, $device, $built);
-                        $this->logAudit($request, $device, 'bulk_apply', (string) $sectionKey, null, [
-                            'action' => $action,
-                            'preset_id' => $preset->id,
-                            'command_id' => $command->id,
-                        ], $command->raw_command);
-                    }
+            return $this->deviceManagementHandoff(
+                $device,
+                $capability,
+                'Review the governed action, its current Device evidence, and the required approvals before dispatch.',
+                $parameters,
+            );
+        }
 
-                    $queued++;
-
-                    continue;
-                }
-
-                $family = $this->guessFamily($device);
-                $built = match ($action) {
-                    'read_configuration' => $builder->readConfiguration($family, $section),
-                    'reboot' => $builder->reboot($family),
-                    'resident_safety_profile' => $builder->gl30ResidentSafetyProfile(),
-                };
-
-                $command = $this->queueCommand(
-                    $request,
-                    $device,
-                    $built,
-                    $action === 'read_configuration' ? now()->addMinutes(10) : null,
-                );
-
-                $this->logAudit($request, $device, 'bulk_apply', null, null, [
-                    'action' => $action,
-                    'section' => $section,
-                    'command_id' => $command->id,
-                ], $command->raw_command);
-
-                $queued++;
-            }
-        });
-
-        return back()->with('success', "Bulk action queued for {$queued} device(s).");
+        return redirect()->to('/security-devices/tracking?'.http_build_query([
+            'tab' => 'management',
+            'bulk_action' => $capability,
+            'bulk_device_ids' => $canonicalIds->implode(','),
+            ...($capability === 'configuration.apply' ? ['bulk_configuration_profile_id' => $profile?->id] : []),
+            ...($capability === 'configuration.refresh' ? ['bulk_section' => $section] : []),
+        ], '', '&', PHP_QUERY_RFC3986))->with(
+            'success',
+            'Review every included Device and Site, attach the required IT Change per Device, and approve the governed bulk request before dispatch.',
+        );
     }
 
     /**
@@ -771,11 +819,8 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
 
-        $query = QueclinkRawFrame::query()->orderByDesc('id')->limit(200);
+        $query = $this->visibleFrameQuery($request->user())->orderByDesc('id')->limit(200);
 
-        if ($request->filled('imei')) {
-            $query->where('imei', $request->string('imei')->toString());
-        }
         if ($request->filled('direction')) {
             $query->where('direction', $request->string('direction')->toString());
         }
@@ -790,30 +835,12 @@ class QueclinkHubController extends Controller
                 $query->where('parse_ok', false);
             }
         }
-        if ($request->filled('search')) {
-            $search = '%'.$request->string('search')->toString().'%';
-            $query->where(function ($q) use ($search) {
-                $q->where('raw_frame', 'like', $search)
-                    ->orWhere('imei', 'like', $search)
-                    ->orWhere('parse_error', 'like', $search);
-            });
-        }
         if ($request->filled('since_id')) {
             $query->where('id', '>', (int) $request->input('since_id'))->orderBy('id');
         }
 
         return response()->json([
-            'frames' => $query->get()->map(fn (QueclinkRawFrame $f) => [
-                'id' => $f->id,
-                'imei' => $f->imei,
-                'direction' => $f->direction,
-                'frame_type' => $f->frame_type,
-                'command_word' => $f->command_word,
-                'raw_frame' => $f->raw_frame,
-                'parse_ok' => $f->parse_ok,
-                'parse_error' => $f->parse_error,
-                'created_at' => $f->created_at?->toIso8601String(),
-            ])->values(),
+            'frames' => $query->get()->map(fn (QueclinkRawFrame $f) => $this->safeFrame($f))->values(),
         ]);
     }
 
@@ -825,14 +852,13 @@ class QueclinkHubController extends Controller
     {
         abort_unless($this->userCanManage($request->user()), 403);
 
-        $imei = $request->string('imei')->toString() ?: null;
+        $user = $request->user();
         $direction = $request->string('direction')->toString() ?: null;
         $commandWord = $request->string('command_word')->toString() ?: null;
         $parseStatus = $request->string('parse_status')->toString() ?: null;
-        $search = $request->string('search')->toString() ?: null;
-        $cursor = (int) ($request->input('since_id') ?? QueclinkRawFrame::query()->max('id') ?? 0);
+        $cursor = (int) ($request->input('since_id') ?? $this->visibleFrameQuery($user)->max('id') ?? 0);
 
-        return new StreamedResponse(function () use (&$cursor, $imei, $direction, $commandWord, $parseStatus, $search) {
+        return new StreamedResponse(function () use (&$cursor, $user, $direction, $commandWord, $parseStatus) {
             ignore_user_abort(false);
             @set_time_limit(0);
             echo "retry: 3000\n\n";
@@ -845,13 +871,10 @@ class QueclinkHubController extends Controller
                     break;
                 }
 
-                $query = QueclinkRawFrame::query()
+                $query = $this->visibleFrameQuery($user)
                     ->where('id', '>', $cursor)
                     ->orderBy('id')
                     ->limit(100);
-                if ($imei !== null) {
-                    $query->where('imei', $imei);
-                }
                 if ($direction !== null && in_array($direction, ['inbound', 'outbound'], true)) {
                     $query->where('direction', $direction);
                 }
@@ -863,28 +886,9 @@ class QueclinkHubController extends Controller
                 } elseif ($parseStatus === 'error') {
                     $query->where('parse_ok', false);
                 }
-                if ($search !== null) {
-                    $like = '%'.$search.'%';
-                    $query->where(function ($q) use ($like) {
-                        $q->where('raw_frame', 'like', $like)
-                            ->orWhere('imei', 'like', $like)
-                            ->orWhere('parse_error', 'like', $like);
-                    });
-                }
-
                 $rows = $query->get();
                 foreach ($rows as $row) {
-                    $payload = json_encode([
-                        'id' => $row->id,
-                        'imei' => $row->imei,
-                        'direction' => $row->direction,
-                        'frame_type' => $row->frame_type,
-                        'command_word' => $row->command_word,
-                        'raw_frame' => $row->raw_frame,
-                        'parse_ok' => $row->parse_ok,
-                        'parse_error' => $row->parse_error,
-                        'created_at' => $row->created_at?->toIso8601String(),
-                    ]);
+                    $payload = json_encode($this->safeFrame($row));
                     echo "data: {$payload}\n\n";
                     $cursor = $row->id;
                 }
@@ -904,72 +908,196 @@ class QueclinkHubController extends Controller
     }
 
     /**
-     * Generates the AT+GTSRI provisioning string operators paste into the
-     *
-     * @Track MT Setup tool to point a fresh device at this server.
+     * Confirms that protected provisioning can proceed for a supported family.
+     * The endpoint never returns the provider target or a raw device command.
      */
     public function provisioningString(Request $request)
     {
         abort_unless($this->userCanManage($request->user()), 403);
 
-        $hostname = (string) (AppSetting::query()->where('key', 'queclink.public_hostname')->value('value') ?? '');
-        $port = (int) (AppSetting::query()->where('key', 'queclink.listener.port')->value('value') ?? 8090);
-        $family = strtolower($request->string('family', 'gv500cg')->toString());
+        $validated = $request->validate([
+            'family' => ['sometimes', 'string', Rule::in([
+                CommandBuilder::FAMILY_GV500CG,
+                CommandBuilder::FAMILY_GL30M,
+            ])],
+        ]);
+
+        $hostname = trim((string) (AppSetting::query()->where('key', 'queclink.public_hostname')->value('value')
+            ?? config('services.queclink.public_hostname')
+            ?? ''));
+        $family = (string) ($validated['family'] ?? CommandBuilder::FAMILY_GV500CG);
 
         if ($hostname === '') {
             return response()->json(['error' => 'Set the public hostname under Listener settings first.'], 422);
         }
 
-        if ($family === CommandBuilder::FAMILY_GL30M) {
-            // GL30MEUR01 @Track v2.04: ReportMode, ManualNetreg, BufferMode,
-            // Main/Backup domains, heartbeat, SACK, SMS ACK, PSM hold, ASCII.
-            $line = sprintf(
-                'AT+GTSRI=gl30,3,0,1,%s,%d,%s,%d,,5,1,0,30,0,0,FFFF$',
-                $hostname,
-                $port,
-                $hostname,
-                $port,
-            );
-        } else {
-            // GV500CG @Track v5.01: ReportMode, Reserved, BufferMode,
-            // Main/Backup domains, heartbeat, SACK, protocol, DNS, serial.
-            $line = sprintf(
-                'AT+GTSRI=gv500cg,3,,1,%s,%d,%s,%d,,5,1,0,0,0,30,0.0.0.0,0.0.0.0,FFFF$',
-                $hostname,
-                $port,
-                $hostname,
-                $port,
-            );
-        }
-
         return response()->json([
-            'config_string' => $line,
+            'state' => 'ready_for_secure_provisioning',
+            'family' => $family === CommandBuilder::FAMILY_GL30M ? 'personal_tracker' : 'vehicle_tracker',
             'instructions' => [
-                'Connect the device via the CH340G USB cable.',
-                'Open the Queclink @Track MT Setup tool.',
-                'Open a session with the COM port; click Read to confirm the device responds.',
-                'Paste the configuration string below into the command box and click Send.',
-                'Verify the device sends a +RESP:GTHBD frame to this server within 30 seconds.',
+                'Use the approved secure device-management process to retrieve and apply the protected server configuration.',
+                'Return here to confirm the tracker appears and that bounded heartbeat state is current.',
             ],
         ]);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
 
-    private function serialiseDevice(QueclinkDevice $d, ?ConfigurationSnapshotService $configurations = null): array
-    {
-        $assignment = $d->device_id
-            ? DeviceAssignment::query()
-                ->where('device_id', $d->device_id)
-                ->whereNull('released_at')
-                ->latest('assigned_at')
-                ->first()
+    /** @return array<string, mixed> */
+    private function devicePagePayload(
+        Request $request,
+        ConfigurationSnapshotService $configurations,
+        string $search,
+    ): array {
+        $baseQuery = $this->visibleDeviceQuery($request->user())
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $match) use ($search): void {
+                $match->where('imei', 'like', "%{$search}%")
+                    ->orWhere('model_hint', 'like', "%{$search}%")
+                    ->orWhere('protocol_version', 'like', "%{$search}%")
+                    ->orWhere('firmware_version', 'like', "%{$search}%");
+            }));
+
+        $pages = collect([
+            'paired' => QueclinkDevice::STATUS_PAIRED,
+            'pending' => QueclinkDevice::STATUS_PENDING,
+            'rejected' => QueclinkDevice::STATUS_REJECTED,
+        ])->mapWithKeys(function (string $status, string $key) use ($baseQuery): array {
+            $page = (clone $baseQuery)
+                ->where('status', $status)
+                ->with([
+                    'device.assignments' => fn ($assignment) => $assignment
+                        ->active()
+                        ->orderByDesc('assigned_at')
+                        ->orderByDesc('id')
+                        ->limit(1),
+                    'rawFrames' => fn ($frame) => $frame
+                        ->where('direction', QueclinkRawFrame::DIRECTION_INBOUND)
+                        ->where('command_word', 'GTALM')
+                        ->where('parse_ok', true)
+                        ->orderByDesc('id')
+                        ->limit(30),
+                    'pendingCommands' => fn ($command) => $command
+                        ->orderByDesc('created_at')
+                        ->orderByDesc('id')
+                        ->limit(12),
+                ])
+                ->orderByDesc('last_seen_at')
+                ->orderByDesc('id')
+                ->paginate(self::DEVICE_PAGE_SIZE, ['*'], "{$key}_page")
+                ->withQueryString();
+
+            return [$key => $page];
+        });
+
+        $assignments = $pages
+            ->flatMap(fn (LengthAwarePaginator $page): Collection => $page->getCollection())
+            ->map(function (QueclinkDevice $tracker): ?DeviceAssignment {
+                $device = $tracker->relationLoaded('device') ? $tracker->getRelation('device') : null;
+
+                return $device instanceof Device && $device->relationLoaded('assignments')
+                    ? $device->getRelation('assignments')->first()
+                    : null;
+            })
+            ->filter()
+            ->values();
+        $assignmentLabels = $this->assignmentLabels($assignments, $request->user());
+
+        $serialised = $pages->map(fn (LengthAwarePaginator $page): Collection => $page->getCollection()
+            ->map(fn (QueclinkDevice $device): array => $this->serialiseDevice(
+                $device,
+                $configurations,
+                $assignmentLabels,
+            ))
+            ->values());
+
+        $counts = $pages->map(fn (LengthAwarePaginator $page): int => $page->total());
+
+        return [
+            'paired' => $serialised['paired'],
+            'pending' => $serialised['pending'],
+            'rejected' => $serialised['rejected'],
+            'counts' => $counts,
+            'total' => $counts->sum(),
+            'search' => $search,
+            'pagination' => $pages->map(fn (LengthAwarePaginator $page): array => [
+                'current_page' => $page->currentPage(),
+                'last_page' => $page->lastPage(),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+                'prev_page_url' => $page->previousPageUrl(),
+                'next_page_url' => $page->nextPageUrl(),
+            ]),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, DeviceAssignment>  $assignments
+     * @return array<string, string>
+     */
+    private function assignmentLabels(
+        Collection $assignments,
+        User $viewer,
+    ): array {
+        $idsFor = fn (string $type): array => $assignments
+            ->where('assignable_type', $type)
+            ->pluck('assignable_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $labels = [];
+
+        $assets = Asset::query()
+            ->whereKey($idsFor(DeviceAssignment::TARGET_VEHICLE))
+            ->whereIn('id', $this->devicesAccess->authorizedAssetIds($viewer))
+            ->get(['id', 'name', 'registration_number']);
+        foreach ($assets as $asset) {
+            $labels[DeviceAssignment::TARGET_VEHICLE.':'.$asset->id] = $asset->name
+                .($asset->registration_number ? " ({$asset->registration_number})" : '');
+        }
+        foreach ($this->devicesAccess->assignableStaff($viewer)->whereKey($idsFor(DeviceAssignment::TARGET_STAFF))->get(['id', 'name']) as $staff) {
+            $labels[DeviceAssignment::TARGET_STAFF.':'.$staff->id] = $staff->name;
+        }
+        $clients = Client::query()
+            ->whereKey($idsFor(DeviceAssignment::TARGET_CLIENT))
+            ->whereIn('id', $this->devicesAccess->authorizedClientIds($viewer))
+            ->get(['id', 'first_name', 'last_name']);
+        foreach ($clients as $client) {
+            $labels[DeviceAssignment::TARGET_CLIENT.':'.$client->id] = trim(($client->first_name ?? '').' '.($client->last_name ?? ''));
+        }
+        foreach (Site::query()->whereKey($idsFor(DeviceAssignment::TARGET_SITE))->whereIn('id', $this->devicesAccess->accessibleSiteIds($viewer))->get(['id', 'name']) as $site) {
+            $labels[DeviceAssignment::TARGET_SITE.':'.$site->id] = $site->name;
+        }
+        foreach (SiteRoom::query()
+            ->whereKey($idsFor(DeviceAssignment::TARGET_ROOM))
+            ->whereIn('site_id', $this->devicesAccess->accessibleSiteIds($viewer))
+            ->whereHas('site')
+            ->get(['id', 'name']) as $room) {
+            $labels[DeviceAssignment::TARGET_ROOM.':'.$room->id] = $room->name;
+        }
+
+        return $labels;
+    }
+
+    /** @param array<string, string> $assignmentLabels */
+    private function serialiseDevice(
+        QueclinkDevice $d,
+        ?ConfigurationSnapshotService $configurations = null,
+        array $assignmentLabels = [],
+    ): array {
+        $canonicalDevice = $d->relationLoaded('device') ? $d->getRelation('device') : null;
+        $assignment = $canonicalDevice instanceof Device && $canonicalDevice->relationLoaded('assignments')
+            ? $canonicalDevice->getRelation('assignments')->first()
             : null;
+
+        $snapshot = $configurations?->latestForDevice($d);
 
         return [
             'id' => $d->id,
-            'imei' => $d->imei,
+            'canonical_device_id' => $canonicalDevice?->id,
+            'reference' => 'Tracker ending '.substr((string) $d->imei, -4),
             'status' => $d->status,
+            'pending_pairing_type' => $d->pending_pairing_type,
             'model_hint' => $d->model_hint,
             'protocol_version' => $d->protocol_version,
             'firmware_version' => $d->firmware_version,
@@ -977,14 +1105,17 @@ class QueclinkHubController extends Controller
             'first_seen_at' => $d->first_seen_at?->toIso8601String(),
             'last_seen_at' => $d->last_seen_at?->toIso8601String(),
             'last_frame_at' => $d->last_frame_at?->toIso8601String(),
-            'remote_address' => $d->remote_address,
             'assignment' => $assignment ? [
                 'type' => $assignment->assignable_type,
-                'target_id' => $assignment->assignable_id,
                 'assigned_at' => $assignment->assigned_at?->toIso8601String(),
-                'label' => $this->resolveAssignmentLabel($assignment),
+                'label' => $assignmentLabels[$assignment->assignable_type.':'.$assignment->assignable_id]
+                    ?? "(unknown {$assignment->assignable_type} #{$assignment->assignable_id})",
             ] : null,
-            'configuration' => $configurations?->latestForDevice($d),
+            'configuration' => [
+                'state' => ($snapshot['available'] ?? false) ? 'observed' : 'not_observed',
+                'observed_at' => $snapshot['received_at'] ?? null,
+                'sections' => array_values(array_keys($snapshot['sections'] ?? [])),
+            ],
             'recent_commands' => $this->recentCommands($d),
         ];
     }
@@ -1000,22 +1131,25 @@ class QueclinkHubController extends Controller
             'target_category' => $preset->target_category,
             'is_system' => $preset->is_system,
             'sections' => array_keys($preset->sectionPayloads()),
-            'payload' => $preset->sectionPayloads(),
+            'profile_uuid' => $preset->configurationProfile?->uuid,
+            'profile_version' => $preset->configurationProfile?->version,
+            'payload_hash' => $preset->configurationProfile?->payload_hash,
             'created_at' => $preset->created_at?->toIso8601String(),
         ];
     }
 
-    private function presetVisibleTo(QueclinkPreset $preset, ?User $user): bool
+    /** @return array<string, mixed> */
+    private function serialiseRetiredPreset(QueclinkPreset $preset): array
     {
-        if ($preset->is_system) {
-            return true;
-        }
-
-        return $preset->tenant_id !== null
-            && (int) $preset->tenant_id === $this->resolveTenantId($user);
+        return [
+            ...$this->serialisePreset($preset),
+            'retired_at' => $preset->retired_at?->toIso8601String(),
+            'retired_by' => $preset->retiredBy?->name,
+            'retirement_reason' => $preset->retirement_reason,
+        ];
     }
 
-    private function uniquePresetSlug(string $name, ?int $tenantId): string
+    private function uniquePresetSlug(string $name): string
     {
         $base = Str::slug($name) ?: 'preset';
         $slug = $base;
@@ -1023,7 +1157,6 @@ class QueclinkHubController extends Controller
 
         while (QueclinkPreset::query()
             ->where('slug', $slug)
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhere('is_system', true))
             ->exists()) {
             $slug = $base.'-'.$suffix;
             $suffix++;
@@ -1032,64 +1165,80 @@ class QueclinkHubController extends Controller
         return $slug;
     }
 
-    private function queueCommand(Request $request, QueclinkDevice $queclinkDevice, array $built, ?Carbon $expiresAt = null): QueclinkPendingCommand
-    {
-        return QueclinkPendingCommand::create([
-            'queclink_device_id' => $queclinkDevice->id,
-            'imei' => $queclinkDevice->imei,
-            'tenant_id' => $queclinkDevice->tenant_id,
-            'command_word' => $built['command_word'],
-            'raw_command' => $built['raw'],
-            'serial_number' => $built['serial'],
-            'status' => QueclinkPendingCommand::STATUS_QUEUED,
-            'created_by_user_id' => $request->user()->id,
-            'expires_at' => $expiresAt ?? now()->addMinutes(5),
+    /** @param array<string, mixed> $payload */
+    private function configurationApplyDraftHandoff(
+        Request $request,
+        QueclinkDevice $queclinkDevice,
+        string $section,
+        array $payload,
+    ) {
+        $commandKey = strtolower((string) ($payload['command'] ?? $section));
+        $device = $queclinkDevice->device;
+        abort_unless($device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+        $profile = $this->configurationProfiles->createProfile(
+            profileKey: 'queclink:device-'.$device->id.':draft:'.Str::orderedUuid(),
+            name: $device->name.' · '.Str::headline($commandKey).' change',
+            description: 'Immutable one-use desired state authored from the Queclink configuration workspace.',
+            targetCategory: $device->category,
+            sections: [$commandKey => $payload],
+            isSystem: false,
+            createdByUserId: (int) $request->user()->id,
+        );
+        $this->logAudit($request, $queclinkDevice, 'configuration_profile_authored', $section, null, [
+            'profile_uuid' => $profile->uuid,
+            'profile_version' => $profile->version,
+            'payload_hash' => $profile->payload_hash,
         ]);
+
+        return $this->configurationApplyHandoff($queclinkDevice, $profile);
     }
 
-    /** @param array<string, mixed> $payload */
-    private function queueSectionConfiguration(Request $request, QueclinkDevice $queclinkDevice, CommandBuilder $builder, string $section, array $payload)
-    {
-        $commandKey = strtolower((string) ($payload['command'] ?? $section));
+    private function configurationApplyHandoff(
+        QueclinkDevice $queclinkDevice,
+        DeviceConfigurationProfile $profile,
+    ) {
+        $device = $queclinkDevice->device;
+        abort_unless($device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+        $this->configurationProfiles->assertCompatible($device, (int) $profile->id);
 
-        try {
-            $built = $this->buildSectionCommand($builder, $commandKey, $payload);
-        } catch (\InvalidArgumentException $e) {
-            return back()->withErrors(['command' => $e->getMessage()]);
+        return $this->deviceManagementHandoff(
+            $queclinkDevice,
+            'configuration.apply',
+            'The desired state was saved as an encrypted immutable profile. Review the impact, attach the approved IT Change, obtain independent approval, and dispatch from Device Management.',
+            ['command_configuration_profile_id' => (string) $profile->id],
+        );
+    }
+
+    private function profileForPreset(QueclinkPreset $preset): DeviceConfigurationProfile
+    {
+        $profile = $preset->configurationProfile()->first();
+        if ($profile) {
+            return $profile;
         }
 
-        $command = $this->queueCommand($request, $queclinkDevice, $built);
-        $this->logAudit($request, $queclinkDevice, 'config_write', $section, null, $payload, $command->raw_command);
+        return DB::transaction(function () use ($preset): DeviceConfigurationProfile {
+            $locked = QueclinkPreset::query()->lockForUpdate()->findOrFail($preset->id);
+            abort_if($locked->isRetired(), 404);
+            $profile = $locked->configurationProfile()->first();
+            if ($profile) {
+                return $profile;
+            }
+            $profile = $this->configurationProfiles->createProfile(
+                profileKey: QueclinkConfigurationProfileService::profileKey($locked->slug),
+                name: $locked->name,
+                description: $locked->description,
+                targetCategory: $locked->target_category,
+                sections: $locked->sectionPayloads(),
+                isSystem: (bool) $locked->is_system,
+                createdByUserId: $locked->created_by_user_id,
+            );
+            $locked->forceFill([
+                'device_configuration_profile_id' => $profile->id,
+                'payload' => [],
+            ])->save();
 
-        return back()->with('success', "{$built['command_word']} configuration update queued.");
-    }
-
-    /**
-     * Resolve a section key (or alias) + payload into a built AT command.
-     * Shared by single-section writes and preset application.
-     *
-     * @param  array<string, mixed>  $payload
-     * @return array{command_word: string, raw: string, serial: string}
-     */
-    private function buildSectionCommand(CommandBuilder $builder, string $commandKey, array $payload): array
-    {
-        return match (strtolower($commandKey)) {
-            'server', 'sri' => $builder->gl30ServerRegistration($payload),
-            'tracking', 'global', 'cfg', 'cfg_alarm' => $builder->gl30GlobalConfiguration($payload),
-            'pin' => $builder->gl30Pin($payload),
-            'dog' => $builder->gl30Dog($payload),
-            'time', 'tma' => $builder->gl30Tma($payload),
-            'non_movement', 'nmd' => $builder->gl30Nmd($payload),
-            'power', 'pds' => $builder->gl30Pds($payload),
-            'wifi', 'wfi' => $builder->gl30Wifi($payload),
-            'geo' => $builder->gl30Geo((int) ($payload['slot'] ?? 0), $payload),
-            'bluetooth', 'bt', 'bts' => $builder->gl30Bts($payload),
-            'beacons', 'bid' => $builder->gl30Bid($payload),
-            'allowlist', 'wlt' => $builder->gl30Wlt($payload),
-            'firmware_update', 'upc' => $builder->gl30Upc($payload),
-            'firmware_version', 'fvr' => $builder->gl30Fvr($payload),
-            default => throw new \InvalidArgumentException("Unsupported Queclink configuration command [{$commandKey}]."),
-        };
+            return $profile;
+        });
     }
 
     private function resolveReadSectionCode(string $section, ?string $command = null): string
@@ -1124,6 +1273,41 @@ class QueclinkHubController extends Controller
         return $code;
     }
 
+    private function configurationRefreshHandoff(QueclinkDevice $queclinkDevice, string $section)
+    {
+        $device = $queclinkDevice->device;
+        abort_unless($device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+        $parameter = strtoupper(trim($section));
+        if ($parameter === '' || $parameter === 'ALL') {
+            $parameter = 'all';
+        }
+
+        return redirect()->to('/security-devices/devices/'.$device->id.'?'.http_build_query([
+            'section' => 'management',
+            'action' => 'configuration.refresh',
+            'command_section' => $parameter,
+        ], '', '&', PHP_QUERY_RFC3986))->with(
+            'success',
+            'Review the governed configuration refresh, confirm your identity, and record the operational reason before dispatch.',
+        );
+    }
+
+    private function deviceManagementHandoff(
+        QueclinkDevice $queclinkDevice,
+        string $action,
+        string $message,
+        array $parameters = [],
+    ) {
+        $device = $queclinkDevice->device;
+        abort_unless($device, 422, 'This Queclink tracker is not linked to a canonical Device.');
+
+        return redirect()->to('/security-devices/devices/'.$device->id.'?'.http_build_query([
+            'section' => 'management',
+            'action' => $action,
+            ...$parameters,
+        ], '', '&', PHP_QUERY_RFC3986))->with('success', $message);
+    }
+
     /** @param array<string, mixed>|null $before @param array<string, mixed>|null $after */
     private function logAudit(
         Request $request,
@@ -1134,116 +1318,199 @@ class QueclinkHubController extends Controller
         ?array $after = null,
         ?string $rawCommand = null,
         ?string $notes = null,
+        ?int $canonicalDeviceId = null,
+        ?int $siteId = null,
     ): void {
+        $canonicalDeviceId ??= $queclinkDevice->device_id ? (int) $queclinkDevice->device_id : null;
+
         QueclinkAuditEvent::log([
-            'tenant_id' => $queclinkDevice->tenant_id ?? $this->resolveTenantId($request->user()),
+            'provider_connection_id' => IntegrationProviderConnection::query()
+                ->forProvider('queclink')
+                ->oldest('id')
+                ->value('id'),
+            'site_id' => $siteId ?? $this->resolveAuditSiteId($canonicalDeviceId),
+            'canonical_device_id' => $canonicalDeviceId,
             'queclink_device_id' => $queclinkDevice->id,
-            'imei' => $queclinkDevice->imei,
+            'imei' => null,
             'user_id' => $request->user()?->id,
             'event_type' => $eventType,
+            'outcome' => 'succeeded',
             'section' => $section,
-            'payload_before' => $before,
-            'payload_after' => $after,
-            'raw_command' => $rawCommand,
-            'notes' => $notes,
+            'payload_before' => $before === null ? null : ['fields' => SafeOperationalData::auditFields($before)],
+            'payload_after' => $after === null ? null : ['fields' => SafeOperationalData::auditFields($after)],
+            'raw_command' => null,
+            'notes' => null,
         ]);
+    }
+
+    private function resolveAuditSiteId(?int $canonicalDeviceId): ?int
+    {
+        if (! $canonicalDeviceId) {
+            return null;
+        }
+
+        $assignment = DeviceAssignment::query()
+            ->where('device_id', $canonicalDeviceId)
+            ->whereNull('released_at')
+            ->latest('assigned_at')
+            ->first(['assignable_type', 'assignable_id']);
+
+        if (! $assignment) {
+            return null;
+        }
+
+        return match ($assignment->assignable_type) {
+            DeviceAssignment::TARGET_SITE => Site::query()->whereKey($assignment->assignable_id)->value('id'),
+            DeviceAssignment::TARGET_ROOM => SiteRoom::query()->whereKey($assignment->assignable_id)->value('site_id'),
+            DeviceAssignment::TARGET_CLIENT => Client::query()->whereKey($assignment->assignable_id)->value('site_id'),
+            DeviceAssignment::TARGET_STAFF => HrEmployeeProfile::query()
+                ->where('user_id', $assignment->assignable_id)
+                ->where('is_active', true)
+                ->value('primary_site_id'),
+            DeviceAssignment::TARGET_VEHICLE => $this->resolveAssetSiteId((int) $assignment->assignable_id),
+            default => null,
+        };
+    }
+
+    private function resolveAssetSiteId(int $assetId): ?int
+    {
+        $asset = Asset::query()->find($assetId, ['site_id', 'room_id', 'home_site_id', 'client_id']);
+
+        if (! $asset) {
+            return null;
+        }
+
+        return $asset->site_id
+            ?? ($asset->room_id ? SiteHouseRoom::query()->whereKey($asset->room_id)->value('site_id') : null)
+            ?? $asset->home_site_id
+            ?? ($asset->client_id ? Client::query()->whereKey($asset->client_id)->value('site_id') : null);
     }
 
     private function recentCommands(QueclinkDevice $d): array
     {
-        return QueclinkPendingCommand::query()
-            ->recentFor($d, 12)
-            ->get()
+        $commands = $d->relationLoaded('pendingCommands')
+            ? $d->pendingCommands->sortByDesc('created_at')->take(12)->values()
+            : QueclinkPendingCommand::query()->recentFor($d, 12)->get();
+
+        return $commands
             ->map(fn (QueclinkPendingCommand $command) => [
                 'id' => $command->id,
                 'command_word' => $command->command_word,
-                'raw_command' => $command->raw_command,
-                'serial_number' => $command->serial_number,
                 'status' => $command->status,
                 'created_at' => $command->created_at?->toIso8601String(),
                 'sent_at' => $command->sent_at?->toIso8601String(),
                 'acked_at' => $command->acked_at?->toIso8601String(),
+                'fulfilled_at' => $command->fulfilled_at?->toIso8601String(),
                 'cancelled_at' => $command->cancelled_at?->toIso8601String(),
                 'expires_at' => $command->expires_at?->toIso8601String(),
-                'failed_reason' => $command->failed_reason,
-                'ack_response' => $command->ack_response,
+                'governed' => $command->device_command_request_id !== null,
+                'failure_category' => $command->status === QueclinkPendingCommand::STATUS_FAILED ? 'provider_failure' : null,
             ])
             ->values()
             ->all();
     }
 
-    private function resolveAssignmentLabel(DeviceAssignment $assignment): string
+    private function visibleDeviceQuery(User $viewer): Builder
     {
-        $entity = $assignment->assignable();
-        if (! $entity) {
-            return "(unknown {$assignment->assignable_type} #{$assignment->assignable_id})";
-        }
+        return QueclinkDevice::query()->where(function (Builder $query) use ($viewer): void {
+            $query->whereIn('device_id', $this->devicesAccess->visibleDevices($viewer)->select('devices.id'))
+                ->orWhereIn('device_id', $this->devicesAccess->releasableDevices($viewer)->select('devices.id'));
 
-        return match ($assignment->assignable_type) {
-            DeviceAssignment::TARGET_VEHICLE => $entity->name.($entity->registration_number ? " ({$entity->registration_number})" : ''),
-            DeviceAssignment::TARGET_STAFF => $entity->name,
-            DeviceAssignment::TARGET_CLIENT => trim(($entity->first_name ?? '').' '.($entity->last_name ?? '')),
-            default => (string) ($entity->name ?? $entity->id),
-        };
+            if ($this->devicesAccess->canViewUnassigned($viewer)) {
+                $query->orWhereNull('device_id');
+            }
+        });
     }
 
-    private function resolveVehicleAsset(int $assetId): Asset
+    private function visibleFrameQuery(User $viewer): Builder
     {
-        return Asset::query()->findOrFail($assetId);
+        return QueclinkRawFrame::query()
+            ->whereIn('queclink_device_id', $this->visibleDeviceQuery($viewer)->select('queclink_devices.id'));
     }
 
-    private function ensurePersonalTrackerAsset(string $type, int $targetId, int $tenantId): Asset
+    /** @return array<string, mixed> */
+    private function safeFrame(QueclinkRawFrame $frame): array
     {
+        return [
+            'id' => $frame->id,
+            'direction' => $frame->direction,
+            'frame_type' => $frame->frame_type,
+            'command_word' => $frame->command_word,
+            'parse_ok' => (bool) $frame->parse_ok,
+            'failure_category' => $frame->parse_ok ? null : 'parse_failure',
+            'created_at' => $frame->created_at?->toIso8601String(),
+        ];
+    }
+
+    private function ensurePersonalTrackerAsset(string $type, User|Client $target, User $viewer): Asset
+    {
+        $targetId = (int) $target->getKey();
         $existing = Asset::query()
             ->where('category', 'personal_tracker')
             ->when($type === 'staff', fn ($q) => $q->where('primary_driver_user_id', $targetId))
             ->when($type === 'client', fn ($q) => $q->where('client_id', $targetId))
-            ->first();
+            ->lockForUpdate()
+            ->get();
 
-        if ($existing) {
-            return $existing;
+        foreach ($existing as $candidate) {
+            $this->queclinkAccess->assertAsset($viewer, $candidate);
+        }
+        abort_if($existing->count() > 1, 409, 'Multiple canonical personal assets require reconciliation before pairing.');
+        if ($existing->isNotEmpty()) {
+            return $existing->first();
         }
 
+        $siteId = match ($type) {
+            'staff' => HrEmployeeProfile::query()
+                ->where('user_id', $targetId)
+                ->where('is_active', true)
+                ->value('primary_site_id'),
+            'client' => $target->site_id,
+        };
+        abort_unless(is_numeric($siteId), 404);
+        $this->devicesAccess->assertCanViewSite($viewer, (int) $siteId);
+
         $name = match ($type) {
-            'staff' => 'Personal tracker — '.(User::find($targetId)?->name ?? "user #{$targetId}"),
-            'client' => 'Care tracker — '.trim(((Client::find($targetId)?->first_name) ?? '').' '.((Client::find($targetId)?->last_name) ?? '')),
+            'staff' => 'Personal tracker — '.$target->name,
+            'client' => 'Care tracker — '.trim(($target->first_name ?? '').' '.($target->last_name ?? '')),
         };
 
         return Asset::create([
             'name' => $name,
             'category' => 'personal_tracker',
             'status' => 'active',
+            'site_id' => (int) $siteId,
             'primary_driver_user_id' => $type === 'staff' ? $targetId : null,
             'client_id' => $type === 'client' ? $targetId : null,
         ]);
     }
 
-    private function ensureCanonicalDevice(QueclinkDevice $qd, int $tenantId, string $pairingType): Device
+    private function ensureCanonicalDevice(QueclinkDevice $qd, User $viewer, string $pairingType): Device
     {
-        $existing = Device::query()
+        $identityQuery = Device::query()
             ->where('provider', 'queclink')
             ->where(function ($q) use ($qd) {
                 $q->where('imei', $qd->imei)
                     ->orWhere('device_uid', $qd->imei);
-            })
-            ->first();
+            });
+        $existing = $identityQuery->first();
 
         if ($existing) {
+            abort_unless($this->devicesAccess->visibleDevices($viewer)->whereKey($existing->id)->exists(), 404);
             $existing->fill([
                 'imei' => $qd->imei,
                 'device_uid' => $existing->device_uid ?: $qd->imei,
                 'manufacturer' => $existing->manufacturer ?: 'Queclink',
                 'model' => $existing->model ?: $qd->model_hint,
                 'firmware_version' => $existing->firmware_version ?: $qd->firmware_version,
-                'tenant_id' => $existing->tenant_id ?: $tenantId,
                 'last_seen_at' => $qd->last_seen_at ?: $existing->last_seen_at,
+                'config' => $this->withNativeManagementCapability($existing->config ?? []),
             ])->save();
 
             return $existing;
         }
 
         return Device::create([
-            'tenant_id' => $tenantId,
             'device_uid' => $qd->imei,
             'name' => match ($pairingType) {
                 'vehicle' => "Vehicle tracker {$qd->imei}",
@@ -1260,9 +1527,34 @@ class QueclinkHubController extends Controller
             'imei' => $qd->imei,
             'firmware_version' => $qd->firmware_version,
             'provider' => 'queclink',
+            'config' => $this->withNativeManagementCapability([]),
             'status' => 'active',
             'last_seen_at' => $qd->last_seen_at,
         ]);
+    }
+
+    /** @param array<string, mixed> $config @return array<string, mixed> */
+    private function withNativeManagementCapability(array $config): array
+    {
+        $capabilities = data_get($config, 'management.capabilities', []);
+        if (! is_array($capabilities)) {
+            $capabilities = [];
+        }
+        if (array_is_list($capabilities)) {
+            foreach (['tracking.location_refresh', 'configuration.refresh', 'configuration.apply', 'device.reboot'] as $capability) {
+                if (! in_array($capability, $capabilities, true)) {
+                    $capabilities[] = $capability;
+                }
+            }
+        } else {
+            $capabilities['tracking.location_refresh'] = true;
+            $capabilities['configuration.refresh'] = true;
+            $capabilities['configuration.apply'] = true;
+            $capabilities['device.reboot'] = true;
+        }
+        data_set($config, 'management.capabilities', $capabilities);
+
+        return $config;
     }
 
     private function guessFamily(QueclinkDevice $qd): string
@@ -1298,22 +1590,17 @@ class QueclinkHubController extends Controller
     private function systemdState(): string
     {
         if (PHP_OS_FAMILY !== 'Linux') {
-            return 'not_applicable';
+            return 'unavailable';
         }
         $output = [];
         $code = 0;
         @exec('systemctl is-active oblivion-queclink.service 2>&1', $output, $code);
 
-        return trim(implode(' ', $output)) ?: 'unknown';
+        return SafeOperationalData::serviceState(implode(' ', $output), $code);
     }
 
     private function userCanManage($user): bool
     {
         return $user && $user->canDo('securityDevices.integrations.manage');
-    }
-
-    private function resolveTenantId($user): int
-    {
-        return (int) ($user->tenant_id ?? $user->organization_id ?? 1);
     }
 }

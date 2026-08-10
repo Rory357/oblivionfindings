@@ -8,21 +8,18 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Http\Controllers\HealthSafety\LoneWorkerController;
 use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
-use App\Models\LoneWorkerSession;
 use App\Models\LocationHardware;
+use App\Models\LoneWorkerSession;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\Integration\IntegrationContextProvider;
 use Database\Seeders\RbacSeeder;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Symfony\Component\HttpKernel\Exception\HttpException;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
@@ -183,7 +180,11 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $this->assertNotNull($firstTriggeredAt);
         $this->assertTrue($session->emergency_triggered_at->equalTo($firstTriggeredAt));
         $this->assertSame('Worker requested urgent help.', $session->emergency_notes);
-        $this->assertSame(1, $session->alerts()->where('alert_type', 'emergency')->count());
+        $this->assertSame(0, $session->alerts()->count());
+        $this->assertSame(1, ControlRoomAlert::query()
+            ->where('source', 'lone_worker')
+            ->where('context->normalized_data->lone_worker_session_id', $session->id)
+            ->count());
     }
 
     public function test_stale_session_update_cannot_clear_an_emergency_transition(): void
@@ -219,23 +220,39 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         $this->assertSame('Emergency won the race.', $session->emergency_notes);
     }
 
-    public function test_session_detail_does_not_expose_a_foreign_tenant_worker_tracker(): void
+    public function test_session_detail_does_not_expose_a_tracker_with_another_site_assignment(): void
     {
         $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
         $worker = $this->siteScopedUser($site);
-        $coordinator = $this->siteScopedUser($site, ['hazards.view']);
+        $coordinator = $this->siteScopedUser($site, ['hazards.view', 'hazards.manage']);
         $session = $this->makeSession($worker, $site);
-        $foreignTracker = Device::factory()->create([
-            'tenant_id' => 999,
+        $otherSiteTracker = Device::factory()->create([
             'domain' => 'tracking',
-            'imei' => 'FOREIGN-TENANT-IMEI',
+            'imei' => 'OTHER-SITE-IMEI',
+        ]);
+        $reassignedAt = now()->subMinute();
+        DeviceAssignment::create([
+            'device_id' => $otherSiteTracker->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $otherSite->id,
+            'assigned_at' => now()->subHours(2),
+            'released_at' => $reassignedAt,
+        ]);
+        $worker->hrEmployeeProfile()->update([
+            'primary_site_id' => $otherSite->id,
+            'secondary_site_ids' => [$site->id],
         ]);
         DeviceAssignment::create([
-            'device_id' => $foreignTracker->id,
+            'device_id' => $otherSiteTracker->id,
             'assignable_type' => DeviceAssignment::TARGET_STAFF,
             'assignable_id' => $worker->id,
-            'assigned_at' => now(),
+            'assigned_at' => $reassignedAt->copy()->addSecond(),
         ]);
+        $this->assertSame(1, DeviceAssignment::query()
+            ->where('device_id', $otherSiteTracker->id)
+            ->active()
+            ->count());
 
         $this->actingAs($coordinator)
             ->get("/health-safety/lone-workers?session={$session->id}")
@@ -243,7 +260,12 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.id', $session->id)
                 ->where('detail.tracker', null)
+                ->where('detail.tracker_state', 'integrity_error')
             );
+
+        $this->actingAs($coordinator)
+            ->post("/health-safety/lone-workers/sessions/{$session->id}/locate")
+            ->assertForbidden();
     }
 
     public function test_session_creation_cannot_leave_a_site_scoped_coordinator_with_an_active_orphan(): void
@@ -275,96 +297,73 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         }
     }
 
-    public function test_integration_context_uses_the_supplied_tenant_for_site_devices(): void
+    public function test_integration_context_uses_the_supplied_canonical_site_for_devices(): void
     {
-        $tenantId = 37;
-        $site = Site::factory()->create(['tenant_id' => $tenantId]);
-        $this->assignDeviceToSite($tenantId, $site);
-        $this->assignDeviceToSite($tenantId, $site);
-        $this->assignDeviceToSite(1, $site);
+        $site = Site::factory()->create();
+        $this->assignDeviceToSite($site);
+        $this->assignDeviceToSite($site);
+        $this->assignDeviceToSite($site);
 
-        $context = app(IntegrationContextProvider::class)->getContext($tenantId, $site->id);
+        $context = app(IntegrationContextProvider::class)->getContext($site->id);
 
-        $this->assertSame(2, $context['site_summary']['hardware_total']);
-        $this->assertSame(2, $context['site_summary']['hardware_online']);
+        $this->assertSame(3, $context['site_summary']['hardware_total']);
+        $this->assertSame(3, $context['site_summary']['hardware_online']);
         $this->assertSame(0, $context['site_summary']['hardware_offline']);
     }
 
-    public function test_integration_context_does_not_return_a_site_from_another_tenant(): void
+    public function test_integration_context_returns_the_requested_canonical_site(): void
     {
-        $requestedTenantId = 41;
-        $foreignSite = Site::factory()->create(['tenant_id' => 42]);
+        $site = Site::factory()->create();
         IntegrationEvent::factory()->create([
-            'tenant_id' => 42,
-            'site_id' => $foreignSite->id,
-            'event_type' => 'foreign_site_event',
+            'site_id' => $site->id,
+            'event_type' => 'site_event',
         ]);
         SiteRoom::create([
-            'tenant_id' => 42,
-            'site_id' => $foreignSite->id,
-            'name' => 'Foreign tenant room',
+            'site_id' => $site->id,
+            'name' => 'Site room',
         ]);
         ControlRoomAlert::factory()->create([
-            'site_id' => $foreignSite->id,
+            'site_id' => $site->id,
             'source' => 'integration_nurse_call',
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
 
-        try {
-            $context = app(IntegrationContextProvider::class)
-                ->getContext($requestedTenantId, $foreignSite->id);
-        } catch (ModelNotFoundException|AuthorizationException) {
-            $this->addToAssertionCount(1);
-
-            return;
-        } catch (HttpException $exception) {
-            $this->assertSame(403, $exception->getStatusCode());
-
-            return;
-        }
-
+        $context = app(IntegrationContextProvider::class)->getContext($site->id);
         $this->assertSame(0, $context['site_summary']['hardware_total']);
-        $this->assertSame(0, $context['site_summary']['open_alerts']);
-        $this->assertSame([], $context['recent_events']);
-        $this->assertSame([], $context['open_alerts']);
-        $this->assertSame([], $context['rooms']);
-        $this->assertSame([], $context['providers']);
+        $this->assertSame(1, $context['site_summary']['open_alerts']);
+        $this->assertCount(1, $context['recent_events']);
+        $this->assertCount(1, $context['open_alerts']);
+        $this->assertCount(1, $context['rooms']);
     }
 
-    public function test_integration_context_does_not_follow_poisoned_cross_tenant_room_or_hardware_links(): void
+    public function test_integration_context_does_not_follow_poisoned_cross_site_room_or_hardware_links(): void
     {
-        $tenantId = 51;
-        $foreignTenantId = 52;
-        $site = Site::factory()->create(['tenant_id' => $tenantId]);
-        $foreignSite = Site::factory()->create(['tenant_id' => $foreignTenantId]);
+        $site = Site::factory()->create();
+        $otherSite = Site::factory()->create();
         $localRoom = SiteRoom::create([
-            'tenant_id' => $tenantId,
             'site_id' => $site->id,
             'name' => 'Local room',
         ]);
-        $foreignRoom = SiteRoom::create([
-            'tenant_id' => $foreignTenantId,
-            'site_id' => $foreignSite->id,
-            'name' => 'Foreign room name',
+        $otherSiteRoom = SiteRoom::create([
+            'site_id' => $otherSite->id,
+            'name' => 'Other Site room name',
         ]);
-        $foreignHardware = LocationHardware::create([
-            'tenant_id' => $foreignTenantId,
-            'site_id' => $foreignSite->id,
+        $otherSiteHardware = LocationHardware::create([
+            'site_id' => $otherSite->id,
             'room_id' => $localRoom->id,
             'provider' => 'manual',
             'category' => 'sensor',
-            'name' => 'Foreign hardware name',
+            'name' => 'Other Site hardware name',
             'status' => 'online',
         ]);
         IntegrationEvent::factory()->create([
-            'tenant_id' => $tenantId,
             'site_id' => $site->id,
-            'room_id' => $foreignRoom->id,
-            'hardware_id' => $foreignHardware->id,
+            'room_id' => $otherSiteRoom->id,
+            'hardware_id' => $otherSiteHardware->id,
             'event_type' => 'poisoned_relation_event',
         ]);
 
-        $context = app(IntegrationContextProvider::class)->getContext($tenantId, $site->id);
+        $context = app(IntegrationContextProvider::class)->getContext($site->id);
 
         $this->assertCount(1, $context['recent_events']);
         $this->assertNull($context['recent_events'][0]['hardware']);
@@ -422,9 +421,9 @@ class LoneWorkerLifecycleAndIntegrationContextTest extends TestCase
         ], $overrides));
     }
 
-    private function assignDeviceToSite(int $tenantId, Site $site): Device
+    private function assignDeviceToSite(Site $site): Device
     {
-        $device = Device::factory()->create(['tenant_id' => $tenantId]);
+        $device = Device::factory()->create();
         DeviceAssignment::create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_SITE,

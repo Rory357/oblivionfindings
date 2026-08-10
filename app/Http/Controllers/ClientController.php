@@ -14,7 +14,10 @@ namespace App\Http\Controllers;
 
 use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Domain\SecurityDevices\Presenters\ClientProfileHealthcareDevicesPresenter;
+use App\Domain\SecurityDevices\Services\PersonalTrackingLocationExportService;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Enums\NextOfKinRelationship;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
@@ -86,6 +89,7 @@ use App\Services\Clients\ClientFormOptions;
 use App\Services\Clients\ClientOnboardingAccess;
 use App\Services\Clients\ClientPhotoMediaUrls;
 use App\Services\Clients\ClientPhotoStorage;
+use App\Services\Clients\ClientPortalMembershipService;
 use App\Services\Clients\ClientProfileSectionAccess;
 use App\Services\Clients\ClientStaffPreparationProjection;
 use App\Services\Clients\ClientWorkerEligibility;
@@ -94,11 +98,11 @@ use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\NotificationService;
-use App\Services\Portal\PortalClientSectionAccess;
 use App\Services\Queclink\LocateNowService;
 use App\Services\Respite\ClientRespiteAllocationSummary;
 use App\Services\ShiftCoverageService;
 use App\Services\Tracking\GeofenceStatusService;
+use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
 use App\Support\HazardDetailPresenter;
 use App\Support\HealthSafety\RiskAssessmentPresenter;
@@ -121,25 +125,24 @@ class ClientController extends Controller
     {
         $this->authorize('viewAny', Client::class);
 
-        $user = auth()->user();
-        $organizationId = $user->organization_id;
+        $user = $request->user();
+        $clientsQuery = Client::query()->withTrashed();
+        app(UserSiteAccessService::class)->applyClientScope(
+            $clientsQuery,
+            $user,
+            ['clients.viewAny'],
+        );
 
-        $clients = Client::query()
+        $clients = $clientsQuery
             // Include soft-deleted (archived) clients so the redesigned index can
             // surface them under the "Archived" saved view / "Show archived" toggle.
             // They are excluded from the live stats and hidden by default client-side.
-            ->withTrashed()
             ->when(
-                $organizationId !== null,
-                fn ($q) => $q->where(
-                    fn ($tenantQuery) => $tenantQuery
-                        ->whereNull('organization_id')
-                        ->orWhere('organization_id', $organizationId),
+                ! $user->canDo('clients.viewAny'),
+                fn ($query) => $query->whereHas(
+                    'supportWorkers',
+                    fn ($workers) => $workers->whereKey($user->id),
                 ),
-            )
-            ->when(
-                $user->hasRole('support_worker') && ! $user->hasRole('admin', 'manager', 'coordinator'),
-                fn ($q) => $q->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
             )
             ->with([
                 'site:id,name,is_active',
@@ -161,6 +164,7 @@ class ClientController extends Controller
                 'respiteBookingRequests',
                 // Daily-style notes recorded in the last 7 days — shown on each card's footer.
                 'notes as notes_week_count' => fn ($q) => $q
+                    ->forUser($user)
                     ->dailyNotes()
                     ->where('occurred_at', '>=', now()->subDays(7)),
             ])
@@ -239,7 +243,7 @@ class ClientController extends Controller
             // Option lists for the in-context "Add client" wizard so it can
             // render without an extra round-trip.
             ...($user->canDo('clients.create')
-                ? app(ClientFormOptions::class)->forOrganization($user->organization_id)
+                ? app(ClientFormOptions::class)->forViewer($user)
                 : []),
         ]);
     }
@@ -335,8 +339,11 @@ class ClientController extends Controller
         ];
     }
 
-    public function show(Request $request, Client $client)
-    {
+    public function show(
+        Request $request,
+        Client $client,
+        ClientProfileHealthcareDevicesPresenter $healthcareDevicesPresenter,
+    ) {
         $this->authorize('view', $client);
 
         // `/clients/{client}` is retained only as a compatibility entry point.
@@ -355,10 +362,31 @@ class ClientController extends Controller
             return redirect()->to($location);
         }
 
+        // Canonicalize the retired profile tab before the Inertia page mounts.
+        // A client-side replacement is intentionally retained as a fallback,
+        // but using it for the initial visit can race a fast browser Back action
+        // because Inertia throttles history writes. The server redirect keeps the
+        // legacy bookmark compatible while preserving every unrelated query key
+        // in one deterministic browser-history entry.
+        if ($request->query('tab') === 'support_plan') {
+            $query = $request->query();
+            $query['tab'] = 'care_plans';
+            ksort($query);
+            $location = route('operations.clients.show', $client, false);
+
+            if ($query !== []) {
+                $location .= '?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+            }
+
+            return redirect()->to($location);
+        }
+
         AuditLogger::log('clients.view', $client);
 
         $sectionAccess = app(ClientProfileSectionAccess::class)
             ->for($request->user(), $client);
+        $sectionAccess['healthcare_devices'] = $healthcareDevicesPresenter
+            ->canView($request->user(), $client);
         $canViewClientLocation = (bool) $sectionAccess['tracking'];
         $canManageClientTrackers = $this->canManageClientTrackers($request->user());
         $canEditClientAssets = (bool) $request->user()?->can('update', $client);
@@ -375,9 +403,8 @@ class ClientController extends Controller
         )->canView($request->user(), $client);
         $onboardingAccess = app(ClientOnboardingAccess::class)
             ->forClient($request->user(), $client);
-        $clientTenantId = $this->clientTenantId($client);
         $profileRelations = [
-            'site:id,tenant_id,name',
+            'site:id,name',
             'room:id,site_id,name,notes',
             'serviceContext:id,type,name',
             'keyWorker:id,name',
@@ -664,7 +691,7 @@ class ClientController extends Controller
         $staffPreparation = $sectionAccess['onboarding']
             && ($request->user()?->canDo('hr.onboarding.view') ?? false)
             ? app(ClientStaffPreparationProjection::class)
-                ->forClient($client, $clientTenantId)
+                ->forClient($client)
             : null;
         $canCreateClientNote = $request->user()?->can('create', ClientNote::class) ?? false;
         $canRecordMedicationAdministration = $sectionAccess['medical'] && (
@@ -1204,7 +1231,7 @@ class ClientController extends Controller
                     ->values()
                 : [],
             'ra_pickers' => $sectionAccess['first_aid_manage']
-                ? RiskAssessmentPresenter::pickers($client->organization_id)
+                ? RiskAssessmentPresenter::pickers()
                 : ['sites' => [], 'clients' => [], 'events' => []],
 
             // Recent incidents (last 5)
@@ -1381,6 +1408,11 @@ class ClientController extends Controller
             'health_summary' => $sectionAccess['health']
                 ? $this->buildHealthSummary($client)
                 : null,
+            'healthcare_devices' => Inertia::optional(fn () => $healthcareDevicesPresenter->present(
+                $request->user(),
+                $client,
+                (bool) $sectionAccess['health'],
+            )),
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
                 'update_client' => $canEditClientAssets,
@@ -1394,6 +1426,7 @@ class ClientController extends Controller
                 'navigate_care_plans' => (bool) $sectionAccess['care_plans'],
                 'navigate_risks' => (bool) $sectionAccess['risks'],
                 'navigate_medical' => (bool) $sectionAccess['medical'],
+                'view_healthcare_devices' => (bool) $sectionAccess['healthcare_devices'],
                 'navigate_calendar' => (bool) $sectionAccess['calendar'],
                 'navigate_workers' => (bool) ($sectionAccess['daily_living'] || $canAssignWorkers),
                 'navigate_family_portal' => (bool) $sectionAccess['portal_access'],
@@ -1506,16 +1539,15 @@ class ClientController extends Controller
             'personal_assets' => $sectionAccess['personal_assets']
                 ? $this->buildPersonalAssetsData(
                     $client,
-                    $clientTenantId,
                     $canViewClientLocation,
                     $canManageClientTrackers,
                 )
                 : null,
             ...($sectionAccess['personal_assets'] && $canEditClientAssets ? [
-                'asset_locations' => $this->buildAssetLocations($clientTenantId),
+                'asset_locations' => $this->buildAssetLocations($client),
             ] : []),
             ...($sectionAccess['tracking'] && $canEditClientAssets && $canManageClientTrackers ? [
-                'available_trackers' => $this->buildAvailableTrackers($client, $clientTenantId),
+                'available_trackers' => $this->buildAvailableTrackers($client, $request->user()),
             ] : []),
             'emar_summary' => $sectionAccess['medical'] ? [
                 'active_medications_count' => ClientMedication::where('client_id', $client->id)
@@ -1536,7 +1568,11 @@ class ClientController extends Controller
                     ->value('scheduled_date'),
             ] : null,
             ...($sectionAccess['tracking'] && $canViewClientLocation ? [
-                'location' => $this->buildLocationData($client, $canManageClientTrackers),
+                'location' => $this->buildLocationData(
+                    $client,
+                    $canManageClientTrackers,
+                    $request->user(),
+                ),
             ] : []),
             'calendar_events' => $sectionAccess['calendar']
                 ? $this->buildCalendarEvents(
@@ -1595,6 +1631,7 @@ class ClientController extends Controller
             'medical' => 'medical',
             'health_monitoring' => 'health',
             'health_summary' => 'health',
+            'healthcare_devices' => 'healthcare_devices',
             'emar_summary' => 'medical',
             'client_finance' => 'finance',
             'consents' => 'consents',
@@ -1639,7 +1676,11 @@ class ClientController extends Controller
             }
         }
 
-        return inertia('operations/clients/show', $profileProps);
+        $response = inertia('operations/clients/show', $profileProps);
+
+        return $sectionAccess['tracking'] && $canViewClientLocation
+            ? $response->toResponse($request)->withHeaders($this->privateLocationHeaders())
+            : $response;
     }
 
     private function carePlanWorkingVersion(Client $client): ?CarePlan
@@ -2081,7 +2122,6 @@ class ClientController extends Controller
 
     private function buildPersonalAssetsData(
         Client $client,
-        int $tenantId,
         bool $canViewLocation,
         bool $canManageTrackers,
     ) {
@@ -2089,23 +2129,28 @@ class ClientController extends Controller
             ->where('client_id', $client->id)
             ->with([
                 'recordedBy:id,name',
-                'site:id,tenant_id,name',
-                'room:id,site_id,tenant_id,name',
-                'trackerDevice',
+                'site:id,name',
+                'room:id,site_id,name',
+                'trackerDevice.assignments' => fn ($query) => $query
+                    ->active()
+                    ->where('assignable_type', 'client')
+                    ->where('assignable_id', $client->id)
+                    ->with('consent.consentType'),
             ])
             ->orderByDesc('created_at')
             ->get()
-            ->map(function (ClientPersonalAsset $asset) use ($tenantId, $canViewLocation, $canManageTrackers): array {
-                $site = $asset->site && (int) $asset->site->tenant_id === $tenantId
-                    ? $asset->site
-                    : null;
+            ->map(function (ClientPersonalAsset $asset) use ($canViewLocation, $canManageTrackers): array {
+                $site = $asset->site;
                 $room = $site && $asset->room && (int) $asset->room->site_id === (int) $site->id
                     ? $asset->room
                     : null;
-                $tracker = $asset->trackerDevice
-                    && (int) $asset->trackerDevice->tenant_id === $tenantId
-                    ? $asset->trackerDevice
-                    : null;
+                $tracker = $asset->trackerDevice;
+                $trackerAssignment = $tracker?->assignments->first();
+                if (! $trackerAssignment
+                    || ! app(PersonalTrackingPrivacyService::class)
+                        ->assignmentAuthorisesClient($trackerAssignment, (int) $asset->client_id)) {
+                    $tracker = null;
+                }
                 $trackerMeta = $tracker?->meta ?? [];
 
                 return [
@@ -2121,7 +2166,7 @@ class ClientController extends Controller
                     'site_name' => $site?->name,
                     'room_id' => $room?->id,
                     'room_name' => $room?->name,
-                    'tracker_hardware_id' => $canManageTrackers ? $tracker?->id : null,
+                    'tracker_device_id' => $canManageTrackers ? $tracker?->id : null,
                     'tracker' => $canViewLocation && $tracker ? [
                         'id' => $tracker->id,
                         'name' => $tracker->name,
@@ -2159,10 +2204,14 @@ class ClientController extends Controller
             ->values();
     }
 
-    private function buildAssetLocations(int $tenantId)
+    private function buildAssetLocations(Client $client)
     {
+        if (! is_numeric($client->site_id)) {
+            return collect();
+        }
+
         return Site::query()
-            ->where('tenant_id', $tenantId)
+            ->whereKey((int) $client->site_id)
             ->where('is_active', true)
             ->with(['houseRooms' => fn ($query) => $query
                 ->where('is_active', true)
@@ -2181,35 +2230,19 @@ class ClientController extends Controller
             ]);
     }
 
-    private function buildAvailableTrackers(Client $client, int $tenantId)
+    private function buildAvailableTrackers(Client $client, User $viewer)
     {
         if (! Schema::hasTable('devices') || ! Schema::hasTable('location_hardware')) {
             return collect();
         }
 
         try {
-            $trackers = Device::query()
-                ->forTenant($tenantId)
-                ->where('domain', 'tracking')
-                ->whereNotIn('status', ['decommissioned', 'lost'])
-                ->whereNotNull('legacy_location_hardware_id')
-                ->whereDoesntHave('assignments', fn ($query) => $query->active())
-                ->whereExists(function ($query) use ($tenantId): void {
-                    $query->selectRaw('1')
-                        ->from('location_hardware')
-                        ->whereColumn('location_hardware.id', 'devices.legacy_location_hardware_id')
-                        ->where('location_hardware.tenant_id', $tenantId)
-                        ->where('location_hardware.category', LocationHardware::CATEGORY_TRACKER)
-                        ->where('location_hardware.status', '!=', LocationHardware::STATUS_RETIRED)
-                        ->whereNull('location_hardware.deleted_at');
-                })
-                ->whereNotExists(function ($query) use ($client): void {
-                    $query->selectRaw('1')
-                        ->from('client_personal_assets')
-                        ->whereColumn('client_personal_assets.tracker_hardware_id', 'devices.legacy_location_hardware_id')
-                        ->where('client_personal_assets.client_id', '!=', $client->id)
-                        ->whereNull('client_personal_assets.deleted_at');
-                })
+            $access = app(SecurityDevicesAccessService::class);
+            if (! $access->canViewUnassigned($viewer) || ! is_numeric($client->site_id)) {
+                return collect();
+            }
+
+            $trackers = $access->unassignedTrackingDevicesForClient($viewer, $client)
                 ->orderBy('name')
                 ->get([
                     'id',
@@ -2221,10 +2254,44 @@ class ClientController extends Controller
                     'battery_level',
                     'meta',
                 ]);
+            $currentTrackerIds = ClientPersonalAsset::query()
+                ->where('client_id', $client->id)
+                ->whereNotIn('status', ['disposed', 'returned'])
+                ->whereNotNull('tracker_device_id')
+                ->pluck('tracker_device_id');
+            if ($currentTrackerIds->isNotEmpty()) {
+                $currentTrackers = $access->visibleDevices($viewer)
+                    ->whereKey($currentTrackerIds)
+                    ->where('domain', 'tracking')
+                    ->whereHas('assignments', fn ($assignment) => $assignment
+                        ->active()
+                        ->where('assignable_type', 'client')
+                        ->where('assignable_id', $client->id))
+                    ->with(['assignments' => fn ($assignment) => $assignment
+                        ->active()
+                        ->where('assignable_type', 'client')
+                        ->where('assignable_id', $client->id)
+                        ->with('consent.consentType')])
+                    ->get([
+                        'id',
+                        'legacy_location_hardware_id',
+                        'name',
+                        'status',
+                        'last_seen_at',
+                        'serial_number',
+                        'battery_level',
+                        'meta',
+                    ])
+                    ->filter(fn (Device $tracker): bool => $tracker->assignments->contains(
+                        fn ($assignment): bool => app(PersonalTrackingPrivacyService::class)
+                            ->assignmentAuthorisesClient($assignment, $client),
+                    ));
+                $trackers = $trackers->concat($currentTrackers)->unique('id')->values();
+            }
 
             $hardwareById = LocationHardware::query()
-                ->forTenant($tenantId)
                 ->whereIn('id', $trackers->pluck('legacy_location_hardware_id'))
+                ->where('site_id', $client->site_id)
                 ->get(['id', 'site_id'])
                 ->keyBy('id');
 
@@ -2341,20 +2408,24 @@ class ClientController extends Controller
 
         return inertia(
             'operations/clients/create',
-            app(ClientFormOptions::class)->forOrganization($request->user()?->organization_id),
+            app(ClientFormOptions::class)->forViewer($request->user()),
         );
     }
 
-    public function store(StoreClientRequest $request)
-    {
+    public function store(
+        StoreClientRequest $request,
+        ClientPortalMembershipService $portalMembership,
+    ) {
         $this->authorize('create', Client::class);
 
         try {
             $data = $request->validated();
 
-            // If not specified, apply organisation default service context (if configured).
+            // If not specified, apply the active application default only when
+            // it is available to the selected Site.
             if (empty($data['service_context_id'])) {
-                $data['service_context_id'] = ServiceContext::defaultId();
+                $siteId = filled($data['site_id'] ?? null) ? (int) $data['site_id'] : null;
+                $data['service_context_id'] = ServiceContext::defaultIdForSite($siteId);
             }
 
             // Pull the related-record payloads out of the flat client attributes.
@@ -2386,9 +2457,8 @@ class ClientController extends Controller
             }
 
             $auth = $request->user();
-            $clientFields['organization_id'] = $auth->organization_id;
 
-            $client = DB::transaction(function () use ($clientFields, $medical, $conditions, $emergencyContacts, $createPortalUser, $data, $auth) {
+            $client = DB::transaction(function () use ($clientFields, $medical, $conditions, $emergencyContacts, $createPortalUser, $data, $auth, $portalMembership) {
                 if (! empty($clientFields['room_id'])) {
                     $roomIsStillAvailable = SiteHouseRoom::query()
                         ->whereKey((int) $clientFields['room_id'])
@@ -2481,9 +2551,7 @@ class ClientController extends Controller
                     if ($clientEmail !== '') {
                         $name = trim($client->first_name.' '.$client->last_name);
                         $clientUser = $this->findOrCreatePortalUser($clientEmail, $name, 'client');
-                        $client->portalUsers()->syncWithoutDetaching([
-                            $clientUser->id => ['relation' => 'client'],
-                        ]);
+                        $portalMembership->link($client, $clientUser, 'client');
                         $this->sendPasswordSetupEmail($clientEmail);
                     }
                 }
@@ -2563,10 +2631,18 @@ class ClientController extends Controller
             'emergencyContacts',
         ]);
 
-        $organizationId = $client->organization_id;
+        $currentSiteId = is_numeric($client->site_id) ? (int) $client->site_id : null;
+        $availableSiteIds = app(UserSiteAccessService::class)->accessibleSiteIds(
+            $request->user(),
+            ['clients.update'],
+        );
+        if ($currentSiteId !== null) {
+            $availableSiteIds[] = $currentSiteId;
+            $availableSiteIds = array_values(array_unique($availableSiteIds));
+        }
 
         $sitesQuery = Site::query()
-            ->forTenant($organizationId)
+            ->whereIn('id', $availableSiteIds)
             ->orderBy('name');
         // Keep inactive site visible if client currently assigned to it
         $sitesQuery->where(function ($query) use ($client) {
@@ -2595,7 +2671,7 @@ class ClientController extends Controller
             ]);
 
         $serviceContextsQuery = ServiceContext::query()
-            ->forOrganization($organizationId)
+            ->availableToSite($currentSiteId)
             ->orderBy('name');
         $serviceContextsQuery->where(function ($query) use ($client) {
             $query->where('is_active', true);
@@ -2603,18 +2679,12 @@ class ClientController extends Controller
                 $query->orWhere('id', $client->service_context_id);
             }
         });
-        $serviceContexts = $serviceContextsQuery->get(['id', 'type', 'name', 'is_active']);
+        $serviceContexts = $serviceContextsQuery->get(['id', 'site_id', 'type', 'name', 'is_active']);
 
         $geofences = AssetGeofence::query()
-            ->forOrganization($organizationId)
-            ->where(function ($query) use ($client) {
-                $query->where('is_active', true);
-                if ($client->house_geofence_id) {
-                    $query->orWhere('id', $client->house_geofence_id);
-                }
-            })
+            ->eligibleForClientSite(is_numeric($client->site_id) ? (int) $client->site_id : null)
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'site_id', 'name']);
 
         $keyWorkers = app(ClientWorkerEligibility::class)
             ->query($client)
@@ -2630,13 +2700,16 @@ class ClientController extends Controller
                 'phone', 'email', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode',
                 'profile_photo_path', 'funding_type', 'funding_notes',
             ]),
-            'initialValues' => $this->clientWizardInitialValues($client),
+            'initialValues' => $this->clientWizardInitialValues(
+                $client,
+                $geofences->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
+            ),
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
             'keyWorkers' => $keyWorkers,
             'geofences' => $geofences,
             'defaultServiceContextId' => ServiceContext::query()
-                ->forOrganization($organizationId)
+                ->availableToSite($currentSiteId)
                 ->whereKey(ServiceContext::defaultId())
                 ->value('id'),
         ];
@@ -2652,7 +2725,8 @@ class ClientController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function clientWizardInitialValues(Client $client): array
+    /** @param list<int>|null $eligibleGeofenceIds */
+    private function clientWizardInitialValues(Client $client, ?array $eligibleGeofenceIds = null): array
     {
         $stringId = fn (mixed $value): string => filled($value)
             ? (string) $value
@@ -2722,7 +2796,10 @@ class ClientController extends Controller
             'key_worker_id' => $stringId($client->key_worker_id),
             'risk_level' => $client->risk_level ?? 'low',
             'safeguarding_flag' => (bool) $client->safeguarding_flag,
-            'house_geofence_id' => $stringId($client->house_geofence_id),
+            'house_geofence_id' => $client->house_geofence_id !== null
+                && ($eligibleGeofenceIds === null || in_array((int) $client->house_geofence_id, $eligibleGeofenceIds, true))
+                    ? $stringId($client->house_geofence_id)
+                    : '',
             'funding_type' => $client->funding_type ?? '',
             'funding_notes' => $client->funding_notes ?? '',
             'emergency_contacts' => $client->emergencyContacts->map(fn ($contact) => [
@@ -2923,7 +3000,7 @@ class ClientController extends Controller
                 'integer',
                 function (string $attribute, mixed $value, \Closure $fail) use ($client): void {
                     if (! app(ClientWorkerEligibility::class)->contains($client, (int) $value)) {
-                        $fail('Choose an eligible key worker from this organisation.');
+                        $fail('Choose a current key worker assigned to the selected Site.');
                     }
                 },
             ],
@@ -3217,25 +3294,6 @@ class ClientController extends Controller
         ];
     }
 
-    /**
-     * Build location/tracker data for the client profile.
-     * Reads from canonical Security & Devices registry.
-     */
-    private function clientTenantId(Client $client): int
-    {
-        if ($client->organization_id !== null) {
-            return (int) $client->organization_id;
-        }
-
-        $siteTenantId = $client->relationLoaded('site')
-            ? $client->site?->tenant_id
-            : $client->site()->value('tenant_id');
-
-        // Preserve the repository's single-tenant compatibility convention only
-        // after checking the client's real organisation and site tenant.
-        return (int) ($siteTenantId ?? 1);
-    }
-
     private function canViewClientLocation(?User $user, Client $client): bool
     {
         return $user !== null
@@ -3247,11 +3305,16 @@ class ClientController extends Controller
         return (bool) ($user?->canDo('fleet.manage') || $user?->canDo('assets.trackers.manage'));
     }
 
-    private function buildLocationData(Client $client, bool $canManageTrackers): array
+    private function buildLocationData(Client $client, bool $canManageTrackers, User $viewer): array
     {
-        $tenantId = $this->clientTenantId($client);
-        $trackingConsent = app(PortalClientSectionAccess::class)
-            ->activeLocationTrackingConsent($client);
+        $assignment = app(PersonalTrackingPrivacyService::class)
+            ->authorisedClientAssignment($client);
+        $trackingConsent = $assignment?->consent;
+        $privacyStatusUrl = route(
+            'operations.clients.location.privacy-status',
+            ['client' => $client->id],
+            false,
+        );
 
         if (! $trackingConsent) {
             return [
@@ -3262,6 +3325,10 @@ class ClientController extends Controller
                 'trackingConsent' => null,
                 'geofences' => [],
                 'geofenceStatus' => GeofenceStatusService::STATUS_UNKNOWN,
+                'privacyStatusUrl' => $privacyStatusUrl,
+                'exportUrl' => null,
+                'canExport' => false,
+                'retentionDays' => null,
             ];
         }
 
@@ -3273,32 +3340,28 @@ class ClientController extends Controller
                 'currentLocation' => null,
                 'trackingConsent' => null,
                 'geofences' => [],
+                'privacyStatusUrl' => $privacyStatusUrl,
+                'exportUrl' => null,
+                'canExport' => false,
+                'retentionDays' => (int) $assignment->retention_days,
             ];
         }
 
-        // Find the active tracking device assigned to this client.
-        try {
-            $device = app(DeviceRegistryService::class)
-                ->forClient($tenantId, $client->id)
-                ->where('domain', 'tracking')
-                ->first();
-        } catch (QueryException $exception) {
-            report($exception);
-
-            return [
-                'trackingRestricted' => false,
-                'canManage' => $canManageTrackers,
-                'tracker' => null,
-                'currentLocation' => null,
-                'trackingConsent' => null,
-                'geofences' => [],
-            ];
-        }
+        $device = $assignment->device;
 
         $trackerInfo = null;
         $currentLocation = null;
 
         if ($device) {
+            $canonicalDeviceAvailable = $viewer->canDo('securityDevices.viewAny')
+                && $viewer->canDo('securityDevices.devices.view')
+                && app(SecurityDevicesAccessService::class)
+                    ->visibleDevices($viewer)
+                    ->whereKey($device->id)
+                    ->exists();
+            $canonicalDetailUrl = $canonicalDeviceAvailable
+                ? "/security-devices/devices/{$device->id}"
+                : null;
             $meta = $device->meta ?? [];
             $lat = $device->latitude ?? $meta['lat'] ?? $meta['latitude'] ?? null;
             $lng = $device->longitude ?? $meta['lng'] ?? $meta['longitude'] ?? null;
@@ -3358,12 +3421,27 @@ class ClientController extends Controller
                 ] : []),
                 'fleet_dashboard_url' => '/fleet-assets/resident-tracking?focus='.$client->id,
                 'history_url' => "/fleet-assets/resident-tracking/history/{$client->id}",
+                'tracking_workspace_url' => $canonicalDeviceAvailable
+                    ? '/security-devices/tracking?tab=personal-safety'
+                    : null,
+                'tracking_workspace_access' => [
+                    'state' => $canonicalDeviceAvailable ? 'available' : 'restricted',
+                    'label' => $canonicalDeviceAvailable
+                        ? 'Open Tracking workspace'
+                        : 'Tracking workspace access required',
+                ],
                 'last_command_status' => QueclinkPendingCommand::query()
                     ->where('command_word', 'GTRTO')
                     ->whereHas('device', fn ($query) => $query->where('device_id', $device->id))
                     ->latest()
                     ->value('status'),
-                'detail_url' => "/security-devices/devices/{$device->id}",
+                'detail_url' => $canonicalDetailUrl,
+                'detail_access' => [
+                    'state' => $canonicalDeviceAvailable ? 'available' : 'restricted',
+                    'label' => $canonicalDeviceAvailable
+                        ? 'Open Device Profile'
+                        : 'Device Profile access required',
+                ],
             ];
 
             if ($lat !== null && $lng !== null) {
@@ -3386,11 +3464,11 @@ class ClientController extends Controller
         $geofences = [];
         $houseGeofence = null;
         try {
-            if (Schema::hasTable('asset_geofences')) {
+            if (Schema::hasTable('asset_geofences') && is_numeric($client->site_id)) {
                 if ($client->house_geofence_id) {
                     $houseGeofence = AssetGeofence::query()
-                        ->forOrganization($tenantId)
                         ->whereKey($client->house_geofence_id)
+                        ->where('site_id', (int) $client->site_id)
                         ->where('is_active', true)
                         ->where(function ($q) {
                             $q->where('scope', 'house')->orWhere('scope', 'resident');
@@ -3400,7 +3478,6 @@ class ClientController extends Controller
 
                 if (! $houseGeofence && $client->site_id) {
                     $houseGeofence = AssetGeofence::query()
-                        ->forOrganization($tenantId)
                         ->where('site_id', $client->site_id)
                         ->where('is_active', true)
                         ->where(function ($q) {
@@ -3438,6 +3515,14 @@ class ClientController extends Controller
             ],
             'geofences' => $geofences,
             'geofenceStatus' => $geofenceStatus,
+            'privacyStatusUrl' => $privacyStatusUrl,
+            'exportUrl' => route(
+                'operations.clients.location.export',
+                ['client' => $client->id],
+                false,
+            ),
+            'canExport' => (bool) auth()->user()?->canDo('assets.telemetry.export'),
+            'retentionDays' => (int) $assignment->retention_days,
         ];
     }
 
@@ -3483,41 +3568,72 @@ class ClientController extends Controller
     {
         $this->authorize('view', $client);
         abort_unless($this->canViewClientLocation($request->user(), $client), 403);
-        abort_unless(
-            app(PortalClientSectionAccess::class)
-                ->activeLocationTrackingConsent($client),
-            403,
-        );
-
-        $tenantId = $this->clientTenantId($client);
-
-        // Canonical device lookup.
-        $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
-            ->where('domain', 'tracking')
-            ->first();
+        $assignment = app(PersonalTrackingPrivacyService::class)
+            ->authorisedClientAssignment($client);
+        abort_unless($assignment, 403);
 
         $locations = app(IntegrationEventHistoryService::class)
-            ->forDevice($device, $request->only(['date_from', 'date_to']));
+            ->forDevice(
+                $assignment->device,
+                $request->only(['date_from', 'date_to']),
+                false,
+                $assignment->retention_days,
+            );
 
-        return response()->json(['locations' => $locations]);
+        return response()->json(['locations' => $locations])
+            ->withHeaders($this->privateLocationHeaders());
+    }
+
+    public function locationPrivacyStatus(Request $request, Client $client)
+    {
+        $this->authorize('view', $client);
+        abort_unless($this->canViewClientLocation($request->user(), $client), 403);
+        $assignment = app(PersonalTrackingPrivacyService::class)
+            ->authorisedClientAssignment($client);
+
+        return response()->json([
+            'active' => $assignment !== null,
+            'checked_at' => now()->toISOString(),
+            'retention_days' => $assignment?->retention_days,
+            'export_allowed' => $assignment !== null
+                && $request->user()->canDo('assets.telemetry.export'),
+        ])->withHeaders($this->privateLocationHeaders());
+    }
+
+    public function exportLocationHistory(Request $request, Client $client)
+    {
+        $this->authorize('view', $client);
+        abort_unless($this->canViewClientLocation($request->user(), $client), 403);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+            'date_from' => ['required', 'date', 'before_or_equal:today'],
+            'date_to' => ['required', 'date', 'after_or_equal:date_from', 'before_or_equal:today'],
+            'event_types' => ['sometimes', 'array', 'max:20'],
+            'event_types.*' => ['string', 'max:100'],
+        ]);
+
+        return app(PersonalTrackingLocationExportService::class)
+            ->export($client, $request->user(), $data);
+    }
+
+    private function privateLocationHeaders(): array
+    {
+        return [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+            'Vary' => 'Cookie',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
     }
 
     public function locateNow(Request $request, Client $client, LocateNowService $locateNow)
     {
         $this->authorize('view', $client);
         abort_unless($this->canManageClientTrackers($request->user()), 403);
-        abort_unless(
-            app(PortalClientSectionAccess::class)
-                ->activeLocationTrackingConsent($client),
-            403,
-        );
-
-        $tenantId = $this->clientTenantId($client);
-        $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
-            ->where('domain', 'tracking')
-            ->first();
+        $assignment = app(PersonalTrackingPrivacyService::class)
+            ->authorisedClientAssignment($client);
+        abort_unless($assignment, 403);
+        $device = $assignment->device;
 
         if (! $device) {
             throw ValidationException::withMessages([
@@ -3525,9 +3641,12 @@ class ClientController extends Controller
             ]);
         }
 
-        $locateNow->queueForDevice($device, $request->user());
+        $managementUrl = $locateNow->managementUrlForDevice($device);
 
-        return back()->with('success', 'Locate Now queued. The tracker will report on its next connection.');
+        return redirect()->to($managementUrl)->with(
+            'success',
+            'Review the governed location refresh, confirm your identity, and record the operational reason before dispatch.',
+        );
     }
 
     public function acknowledgePanic(
@@ -3539,17 +3658,10 @@ class ClientController extends Controller
         abort_unless($user, 403);
         $this->authorize('view', $client);
         abort_unless($this->canManageClientTrackers($user), 403);
-        abort_unless(
-            app(PortalClientSectionAccess::class)
-                ->activeLocationTrackingConsent($client),
-            403,
-        );
-
-        $tenantId = $this->clientTenantId($client);
-        $device = app(DeviceRegistryService::class)
-            ->forClient($tenantId, $client->id)
-            ->where('domain', 'tracking')
-            ->first();
+        $assignment = app(PersonalTrackingPrivacyService::class)
+            ->authorisedClientAssignment($client);
+        abort_unless($assignment, 403);
+        $device = $assignment->device;
 
         if ($device) {
             $meta = $device->meta ?? [];

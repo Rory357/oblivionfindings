@@ -2,10 +2,10 @@
 
 use App\Models\Asset;
 use App\Models\Client;
-use App\Models\FleetVehicleBooking;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
+use App\Models\FleetVehicleBooking;
 use App\Models\Permission;
 use App\Models\User;
 use Laravel\Dusk\Browser;
@@ -106,14 +106,15 @@ test('fleet inspection entry points are hidden from read-only viewers', function
     $this->browse(function (Browser $viewerBrowser, Browser $managerBrowser) use ($viewer, $manager, $vehicle) {
         $viewerBrowser->loginAs($viewer)
             ->visit('/fleet-assets/mobile/dashboard')
-            ->waitFor('@fleet-mobile-dashboard-heading', 10)
-            ->assertDontSee('Start Inspection')
-            ->assertSee('Daily Vehicle Check');
+            ->waitForText('Fleet & Assets', 10)
+            ->assertPathIs('/fleet-assets')
+            ->assertDontSee('Mobile Dashboard');
 
         $managerBrowser->loginAs($manager)
             ->visit('/fleet-assets/mobile/dashboard')
-            ->waitFor('@fleet-mobile-dashboard-heading', 10)
-            ->assertSee('Start Inspection');
+            ->waitForText('Fleet & Assets', 10)
+            ->assertPathIs('/fleet-assets')
+            ->assertDontSee('Mobile Dashboard');
 
         $viewerBrowser->visit("/fleet-assets/vehicles/{$vehicle->id}")
             ->waitForText($vehicle->name, 10)
@@ -215,7 +216,7 @@ test('fleet alert actions stay manager-only', function () {
         'alert_type' => 'wandering',
     ]);
 
-    $this->browse(function (Browser $viewerBrowser, Browser $managerBrowser) use ($viewer, $manager, $fleetAlert, $wanderingAlert) {
+    $this->browse(function (Browser $viewerBrowser, Browser $managerBrowser) use ($viewer, $manager) {
         $viewerBrowser->loginAs($viewer)
             ->visit('/fleet-assets/alerts')
             ->waitForText('Alerts', 10)

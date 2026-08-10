@@ -1,11 +1,11 @@
 import { PerformanceTabs } from '@/components/hr';
+import { FeedbackHero } from '@/components/hr/feedback-hero';
 import {
     ManageTemplatesDialog,
     RequestFeedbackWizard,
     reviewTypeLabel,
     type FeedbackWizardData,
 } from '@/components/hr/feedback-wizards';
-import { FeedbackHero } from '@/components/hr/feedback-hero';
 import { PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -224,7 +224,8 @@ export default function FeedbackIndex({
         stats?.completed ??
         allData.filter((request) => request.status === 'completed').length;
     const overdueCount =
-        stats?.overdue ?? allData.filter((request) => isOverdue(request)).length;
+        stats?.overdue ??
+        allData.filter((request) => isOverdue(request)).length;
 
     const filtered =
         statusFilter === 'overdue'
@@ -287,7 +288,9 @@ export default function FeedbackIndex({
                                     </Button>
                                     <Button
                                         size="sm"
-                                        onClick={() => setShowRequestWizard(true)}
+                                        onClick={() =>
+                                            setShowRequestWizard(true)
+                                        }
                                     >
                                         <Plus className="h-4 w-4" />
                                         Request feedback

@@ -66,12 +66,42 @@ export interface NewHireOptions {
 }
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'person', label: 'Who is starting', blurb: 'Existing or new hire', icon: UserPlus },
-    { key: 'role', label: 'Role & start', blurb: 'Confirm details', icon: Briefcase },
-    { key: 'template', label: 'Template', blurb: 'Checklist source', icon: ClipboardList },
-    { key: 'preview', label: 'Preview', blurb: 'Tasks created', icon: ListChecks },
-    { key: 'options', label: 'On launch', blurb: 'Compliance & email', icon: ShieldCheck },
-    { key: 'review', label: 'Review', blurb: 'Confirm & launch', icon: ClipboardCheck },
+    {
+        key: 'person',
+        label: 'Who is starting',
+        blurb: 'Existing or new hire',
+        icon: UserPlus,
+    },
+    {
+        key: 'role',
+        label: 'Role & start',
+        blurb: 'Confirm details',
+        icon: Briefcase,
+    },
+    {
+        key: 'template',
+        label: 'Template',
+        blurb: 'Checklist source',
+        icon: ClipboardList,
+    },
+    {
+        key: 'preview',
+        label: 'Preview',
+        blurb: 'Tasks created',
+        icon: ListChecks,
+    },
+    {
+        key: 'options',
+        label: 'On launch',
+        blurb: 'Compliance & email',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & launch',
+        icon: ClipboardCheck,
+    },
 ];
 
 const prettyRole = (r?: string | null) =>
@@ -156,17 +186,23 @@ export function OnboardingWizardDialog({
             employees.map((e) => ({
                 value: String(e.id),
                 label: e.name,
-                sub: [e.position_title, e.email].filter(Boolean).join(' · ') || undefined,
+                sub:
+                    [e.position_title, e.email].filter(Boolean).join(' · ') ||
+                    undefined,
             })),
         [employees],
     );
 
-    const employee = employees.find((e) => String(e.id) === form.data.employee_profile_id);
+    const employee = employees.find(
+        (e) => String(e.id) === form.data.employee_profile_id,
+    );
 
     // Effective role / site type for template matching.
     const effRole = isNew ? form.data.role : (employee?.position_role ?? '');
     const effSiteType = isNew
-        ? (newHireOptions.sites.find((s) => String(s.id) === form.data.primary_site_id)?.type ?? 'all')
+        ? (newHireOptions.sites.find(
+              (s) => String(s.id) === form.data.primary_site_id,
+          )?.type ?? 'all')
         : (employee?.primary_site_type ?? 'all');
 
     const matched = useMemo(
@@ -175,7 +211,8 @@ export function OnboardingWizardDialog({
     );
 
     const chosen = form.data.template_id
-        ? (templates.find((t) => String(t.id) === form.data.template_id) ?? null)
+        ? (templates.find((t) => String(t.id) === form.data.template_id) ??
+          null)
         : matched;
 
     const templateOptions = [
@@ -189,9 +226,12 @@ export function OnboardingWizardDialog({
     ];
 
     const emailName =
-        emailTemplates.find((e) => String(e.id) === form.data.welcome_email_id)?.template_name ?? '—';
+        emailTemplates.find((e) => String(e.id) === form.data.welcome_email_id)
+            ?.template_name ?? '—';
 
-    const subjectName = isNew ? form.data.name || 'New hire' : (employee?.name ?? '—');
+    const subjectName = isNew
+        ? form.data.name || 'New hire'
+        : (employee?.name ?? '—');
     const subjectStart = isNew ? form.data.start_date : employee?.start_date;
 
     const step0Valid = isNew
@@ -256,10 +296,13 @@ export function OnboardingWizardDialog({
                             disabled={!canSubmit || form.processing}
                             className={cn(
                                 'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity',
-                                (!canSubmit || form.processing) && 'cursor-not-allowed opacity-50',
+                                (!canSubmit || form.processing) &&
+                                    'cursor-not-allowed opacity-50',
                             )}
                         >
-                            {form.processing ? 'Launching…' : 'Launch checklist'}
+                            {form.processing
+                                ? 'Launching…'
+                                : 'Launch checklist'}
                         </button>
                     ) : (
                         <button
@@ -268,7 +311,9 @@ export function OnboardingWizardDialog({
                             disabled={wizard.index === 0 && !step0Valid}
                             className={cn(
                                 'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground',
-                                wizard.index === 0 && !step0Valid && 'cursor-not-allowed opacity-50',
+                                wizard.index === 0 &&
+                                    !step0Valid &&
+                                    'cursor-not-allowed opacity-50',
                             )}
                         >
                             Continue
@@ -289,7 +334,10 @@ export function OnboardingWizardDialog({
                             value={form.data.hire_mode}
                             onChange={(v) => form.setData('hire_mode', v)}
                             options={[
-                                { value: 'existing', label: 'Existing employee' },
+                                {
+                                    value: 'existing',
+                                    label: 'Existing employee',
+                                },
                                 { value: 'new', label: '+ New hire' },
                             ]}
                         />
@@ -297,35 +345,54 @@ export function OnboardingWizardDialog({
 
                     {!isNew ? (
                         <>
-                            <Field label="Employee" required error={form.errors.employee_profile_id}>
+                            <Field
+                                label="Employee"
+                                required
+                                error={form.errors.employee_profile_id}
+                            >
                                 <PeoplePicker
                                     value={form.data.employee_profile_id}
-                                    onChange={(v) => form.setData('employee_profile_id', v)}
+                                    onChange={(v) =>
+                                        form.setData('employee_profile_id', v)
+                                    }
                                     people={people}
                                     placeholder="Select an employee…"
                                 />
                             </Field>
                             {employees.length === 0 && (
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                    Every active employee already has an onboarding checklist — try “+ New hire”.
+                                    Every active employee already has an
+                                    onboarding checklist — try “+ New hire”.
                                 </p>
                             )}
                         </>
                     ) : (
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Full name" required error={form.errors.name}>
+                            <Field
+                                label="Full name"
+                                required
+                                error={form.errors.name}
+                            >
                                 <input
                                     value={form.data.name}
-                                    onChange={(e) => form.setData('name', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('name', e.target.value)
+                                    }
                                     placeholder="e.g. Sade Adeyemi"
                                     className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus:border-ring"
                                 />
                             </Field>
-                            <Field label="Work email" required error={form.errors.email}>
+                            <Field
+                                label="Work email"
+                                required
+                                error={form.errors.email}
+                            >
                                 <input
                                     type="email"
                                     value={form.data.email}
-                                    onChange={(e) => form.setData('email', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('email', e.target.value)
+                                    }
                                     placeholder="name@company.nz"
                                     className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus:border-ring"
                                 />
@@ -333,7 +400,12 @@ export function OnboardingWizardDialog({
                             <Field label="Position">
                                 <input
                                     value={form.data.position_title}
-                                    onChange={(e) => form.setData('position_title', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'position_title',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="Support Worker"
                                     className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus:border-ring"
                                 />
@@ -343,24 +415,33 @@ export function OnboardingWizardDialog({
                                     value={form.data.role}
                                     onChange={(v) => form.setData('role', v)}
                                     placeholder="Select role"
-                                    options={newHireOptions.roles.map((r) => ({ value: r, label: prettyRole(r) }))}
+                                    options={newHireOptions.roles.map((r) => ({
+                                        value: r,
+                                        label: prettyRole(r),
+                                    }))}
                                 />
                             </Field>
                             <Field label="Employment type">
                                 <SelectInput
                                     value={form.data.employment_type}
-                                    onChange={(v) => form.setData('employment_type', v)}
+                                    onChange={(v) =>
+                                        form.setData('employment_type', v)
+                                    }
                                     placeholder="Select type"
-                                    options={newHireOptions.employment_types.map((t) => ({
-                                        value: t,
-                                        label: prettyRole(t),
-                                    }))}
+                                    options={newHireOptions.employment_types.map(
+                                        (t) => ({
+                                            value: t,
+                                            label: prettyRole(t),
+                                        }),
+                                    )}
                                 />
                             </Field>
                             <Field label="Primary site">
                                 <SelectInput
                                     value={form.data.primary_site_id}
-                                    onChange={(v) => form.setData('primary_site_id', v)}
+                                    onChange={(v) =>
+                                        form.setData('primary_site_id', v)
+                                    }
                                     placeholder="Select site"
                                     options={newHireOptions.sites.map((s) => ({
                                         value: String(s.id),
@@ -371,18 +452,28 @@ export function OnboardingWizardDialog({
                             <Field label="Manager">
                                 <SelectInput
                                     value={form.data.manager_user_id}
-                                    onChange={(v) => form.setData('manager_user_id', v)}
+                                    onChange={(v) =>
+                                        form.setData('manager_user_id', v)
+                                    }
                                     placeholder="Select manager"
                                     options={newHireOptions.managers
                                         .filter((m) => m.name)
-                                        .map((m) => ({ value: String(m.id), label: m.name as string }))}
+                                        .map((m) => ({
+                                            value: String(m.id),
+                                            label: m.name as string,
+                                        }))}
                                 />
                             </Field>
                             <Field label="Start date">
                                 <input
                                     type="date"
                                     value={form.data.start_date}
-                                    onChange={(e) => form.setData('start_date', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'start_date',
+                                            e.target.value,
+                                        )
+                                    }
                                     className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus:border-ring"
                                 />
                             </Field>
@@ -401,20 +492,37 @@ export function OnboardingWizardDialog({
                     <div className="grid gap-3 sm:grid-cols-2">
                         <ReviewCard icon={Briefcase} title="Profile">
                             <ReviewRow label="Name" value={subjectName} />
-                            <ReviewRow label="Position" value={isNew ? form.data.position_title : employee?.position_title} />
-                            <ReviewRow label="Access role" value={prettyRole(effRole)} />
+                            <ReviewRow
+                                label="Position"
+                                value={
+                                    isNew
+                                        ? form.data.position_title
+                                        : employee?.position_title
+                                }
+                            />
+                            <ReviewRow
+                                label="Access role"
+                                value={prettyRole(effRole)}
+                            />
                         </ReviewCard>
                         <ReviewCard icon={ClipboardList} title="Placement">
                             <ReviewRow
                                 label="Primary site"
                                 value={
                                     isNew
-                                        ? newHireOptions.sites.find((s) => String(s.id) === form.data.primary_site_id)?.name
+                                        ? newHireOptions.sites.find(
+                                              (s) =>
+                                                  String(s.id) ===
+                                                  form.data.primary_site_id,
+                                          )?.name
                                         : employee?.primary_site_name
                                 }
                             />
                             <ReviewRow label="Site type" value={effSiteType} />
-                            <ReviewRow label="Start date" value={subjectStart} />
+                            <ReviewRow
+                                label="Start date"
+                                value={subjectStart}
+                            />
                         </ReviewCard>
                     </div>
                 </WizardStepPane>
@@ -430,22 +538,32 @@ export function OnboardingWizardDialog({
                     <Field label="Template" error={form.errors.template_id}>
                         <SelectInput
                             value={form.data.template_id || 'auto'}
-                            onChange={(v) => form.setData('template_id', v === 'auto' ? '' : v)}
+                            onChange={(v) =>
+                                form.setData(
+                                    'template_id',
+                                    v === 'auto' ? '' : v,
+                                )
+                            }
                             placeholder="Auto-match by role & site"
                             options={templateOptions}
                         />
                     </Field>
                     {chosen ? (
                         <p className="mt-2 text-sm text-muted-foreground">
-                            {form.data.template_id ? 'Using the selected template' : 'Auto-matched'}:{' '}
+                            {form.data.template_id
+                                ? 'Using the selected template'
+                                : 'Auto-matched'}
+                            :{' '}
                             <span className="font-medium text-foreground">
-                                {prettyRole(chosen.role)} · {chosen.site_type ?? 'all'}
+                                {prettyRole(chosen.role)} ·{' '}
+                                {chosen.site_type ?? 'all'}
                             </span>{' '}
                             ({chosen.task_count} tasks).
                         </p>
                     ) : (
                         <p className="mt-2 text-sm text-status-critical">
-                            No active template matches this role/site. Pick one explicitly, or create a template first.
+                            No active template matches this role/site. Pick one
+                            explicitly, or create a template first.
                         </p>
                     )}
                 </WizardStepPane>
@@ -461,10 +579,17 @@ export function OnboardingWizardDialog({
                     {chosen && chosen.tasks.length > 0 ? (
                         <ul className="divide-y rounded-lg border">
                             {chosen.tasks.map((t, i) => (
-                                <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                                <li
+                                    key={i}
+                                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                                >
                                     <span className="min-w-0">
-                                        <span className="block truncate font-medium">{t.title}</span>
-                                        <span className="block truncate text-xs text-muted-foreground">{t.category}</span>
+                                        <span className="block truncate font-medium">
+                                            {t.title}
+                                        </span>
+                                        <span className="block truncate text-xs text-muted-foreground">
+                                            {t.category}
+                                        </span>
                                     </span>
                                     <span className="flex shrink-0 gap-1.5 text-[11px]">
                                         {t.is_required && (
@@ -482,26 +607,41 @@ export function OnboardingWizardDialog({
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-sm text-muted-foreground">No template resolved yet — go back and choose one.</p>
+                        <p className="text-sm text-muted-foreground">
+                            No template resolved yet — go back and choose one.
+                        </p>
                     )}
                 </WizardStepPane>
             )}
 
             {wizard.index === 4 && (
                 <WizardStepPane>
-                    <StepHead icon={ShieldCheck} title="On launch" blurb="Optional extras that run when the checklist is created." />
+                    <StepHead
+                        icon={ShieldCheck}
+                        title="On launch"
+                        blurb="Optional extras that run when the checklist is created."
+                    />
                     <div className="space-y-3">
                         <label className="flex items-start gap-2.5 rounded-lg border p-3 text-sm">
                             <input
                                 type="checkbox"
                                 checked={form.data.assign_compliance}
-                                onChange={(e) => form.setData('assign_compliance', e.target.checked)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'assign_compliance',
+                                        e.target.checked,
+                                    )
+                                }
                                 className="mt-0.5 rounded border-border"
                             />
                             <span>
-                                <span className="block font-medium">Assign compliance requirements</span>
+                                <span className="block font-medium">
+                                    Assign compliance requirements
+                                </span>
                                 <span className="block text-xs text-muted-foreground">
-                                    Seed the role's required checks so the new hire appears in the compliance matrix from day one.
+                                    Seed the role's required checks so the new
+                                    hire appears in the compliance matrix from
+                                    day one.
                                 </span>
                             </span>
                         </label>
@@ -516,29 +656,46 @@ export function OnboardingWizardDialog({
                                 type="checkbox"
                                 disabled={emailTemplates.length === 0}
                                 checked={form.data.send_welcome_email}
-                                onChange={(e) => form.setData('send_welcome_email', e.target.checked)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'send_welcome_email',
+                                        e.target.checked,
+                                    )
+                                }
                                 className="mt-0.5 rounded border-border"
                             />
                             <span className="min-w-0 flex-1">
-                                <span className="block font-medium">Send a welcome email now</span>
+                                <span className="block font-medium">
+                                    Send a welcome email now
+                                </span>
                                 <span className="block text-xs text-muted-foreground">
                                     {emailTemplates.length === 0
                                         ? 'No active email templates — create one under the Emails tab first.'
                                         : 'Fires immediately, regardless of the template’s day-offset schedule.'}
                                 </span>
-                                {form.data.send_welcome_email && emailTemplates.length > 0 && (
-                                    <span className="mt-2 block">
-                                        <SelectInput
-                                            value={form.data.welcome_email_id}
-                                            onChange={(v) => form.setData('welcome_email_id', v)}
-                                            placeholder="Select an email template"
-                                            options={emailTemplates.map((e) => ({
-                                                value: String(e.id),
-                                                label: e.template_name,
-                                            }))}
-                                        />
-                                    </span>
-                                )}
+                                {form.data.send_welcome_email &&
+                                    emailTemplates.length > 0 && (
+                                        <span className="mt-2 block">
+                                            <SelectInput
+                                                value={
+                                                    form.data.welcome_email_id
+                                                }
+                                                onChange={(v) =>
+                                                    form.setData(
+                                                        'welcome_email_id',
+                                                        v,
+                                                    )
+                                                }
+                                                placeholder="Select an email template"
+                                                options={emailTemplates.map(
+                                                    (e) => ({
+                                                        value: String(e.id),
+                                                        label: e.template_name,
+                                                    }),
+                                                )}
+                                            />
+                                        </span>
+                                    )}
                             </span>
                         </label>
                     </div>
@@ -547,32 +704,75 @@ export function OnboardingWizardDialog({
 
             {wizard.index === 5 && (
                 <WizardStepPane>
-                    <StepHead icon={ClipboardCheck} title="Review & launch" blurb="Generate the checklist and notify the assignees." />
+                    <StepHead
+                        icon={ClipboardCheck}
+                        title="Review & launch"
+                        blurb="Generate the checklist and notify the assignees."
+                    />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={UserPlus} title="Employee" onEdit={() => wizard.goTo(0)}>
+                        <ReviewCard
+                            icon={UserPlus}
+                            title="Employee"
+                            onEdit={() => wizard.goTo(0)}
+                        >
                             <ReviewRow label="Name" value={subjectName} />
-                            <ReviewRow label="Mode" value={isNew ? 'New hire' : 'Existing'} />
+                            <ReviewRow
+                                label="Mode"
+                                value={isNew ? 'New hire' : 'Existing'}
+                            />
                             <ReviewRow label="Start" value={subjectStart} />
                         </ReviewCard>
-                        <ReviewCard icon={ClipboardList} title="Checklist" onEdit={() => wizard.goTo(2)}>
+                        <ReviewCard
+                            icon={ClipboardList}
+                            title="Checklist"
+                            onEdit={() => wizard.goTo(2)}
+                        >
                             <ReviewRow
                                 label="Template"
-                                value={chosen ? `${prettyRole(chosen.role)} · ${chosen.site_type ?? 'all'}` : undefined}
+                                value={
+                                    chosen
+                                        ? `${prettyRole(chosen.role)} · ${chosen.site_type ?? 'all'}`
+                                        : undefined
+                                }
                             />
-                            <ReviewRow label="Tasks" value={chosen ? String(chosen.task_count) : undefined} />
+                            <ReviewRow
+                                label="Tasks"
+                                value={
+                                    chosen
+                                        ? String(chosen.task_count)
+                                        : undefined
+                                }
+                            />
                         </ReviewCard>
-                        <ReviewCard icon={ShieldCheck} title="On launch" span onEdit={() => wizard.goTo(4)}>
+                        <ReviewCard
+                            icon={ShieldCheck}
+                            title="On launch"
+                            span
+                            onEdit={() => wizard.goTo(4)}
+                        >
                             <ReviewRow
                                 label="Compliance"
-                                value={form.data.assign_compliance ? 'Assign role requirements' : 'Skip'}
+                                value={
+                                    form.data.assign_compliance
+                                        ? 'Assign role requirements'
+                                        : 'Skip'
+                                }
                             />
                             <ReviewRow
                                 label="Welcome email"
-                                value={form.data.send_welcome_email ? emailName : 'Don’t send'}
+                                value={
+                                    form.data.send_welcome_email
+                                        ? emailName
+                                        : 'Don’t send'
+                                }
                             />
                         </ReviewCard>
                     </div>
-                    {!chosen && <p className="mt-3 text-sm text-status-critical">Pick a template before launching.</p>}
+                    {!chosen && (
+                        <p className="mt-3 text-sm text-status-critical">
+                            Pick a template before launching.
+                        </p>
+                    )}
                 </WizardStepPane>
             )}
         </WizardShell>

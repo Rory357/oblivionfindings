@@ -5,8 +5,8 @@ import type {
     ReactNode,
 } from 'react';
 
-import { cn } from '@/lib/utils';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export type RosterTabTone =
     | 'primary'
@@ -31,15 +31,13 @@ const TONE_ACTIVE: Record<RosterTabTone, string> = {
         'bg-status-warning-bg text-status-warning [&_.chip]:bg-status-warning [&_.chip]:text-white [&_.underline-bar]:bg-status-warning',
     success:
         'bg-status-success-bg text-status-success [&_.chip]:bg-status-success [&_.chip]:text-white [&_.underline-bar]:bg-status-success',
-    info:
-        'bg-status-info-bg text-status-info [&_.chip]:bg-status-info [&_.chip]:text-white [&_.underline-bar]:bg-status-info',
+    info: 'bg-status-info-bg text-status-info [&_.chip]:bg-status-info [&_.chip]:text-white [&_.underline-bar]:bg-status-info',
     // 'violet' intentionally resolves to the brand purple. The app runs a
     // restrained monochrome-purple palette (note --status-info also === --primary
     // in app.css), so a "violet" accent is brand purple by design — not a clashing
     // hue. Kept as a named tone so callers read semantically; it uses the same
     // tokens as `primary` (no raw colour literals).
-    violet:
-        'bg-primary/10 text-primary [&_.chip]:bg-primary [&_.chip]:text-primary-foreground [&_.underline-bar]:bg-primary',
+    violet: 'bg-primary/10 text-primary [&_.chip]:bg-primary [&_.chip]:text-primary-foreground [&_.underline-bar]:bg-primary',
     critical:
         'bg-status-critical-bg text-status-critical [&_.chip]:bg-status-critical [&_.chip]:text-white [&_.underline-bar]:bg-status-critical',
 };
@@ -113,7 +111,8 @@ export function TabStrip({
                 const active = value === t.id;
                 const Icon = t.icon;
                 return (
-                    <GuardrailButton unstyled
+                    <GuardrailButton
+                        unstyled
                         key={t.id}
                         type="button"
                         role="tab"

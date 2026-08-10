@@ -2,20 +2,22 @@
 
 namespace App\Http\Requests\It;
 
-use App\Models\ItTicket;
+use App\Http\Requests\It\Concerns\ConcealsInaccessibleItWork;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Raise a sign-off request on a ticket (§P-S3). Authorised by
- * ItTicketPolicy@requestApproval — agent, category needs approval, none live.
+ * Base agent gate for raising sign-off. The request conceals an inaccessible
+ * ticket before the locked approval lifecycle revalidates the decision rules.
  */
 class RequestApprovalRequest extends FormRequest
 {
+    use ConcealsInaccessibleItWork;
+
     public function authorize(): bool
     {
-        $ticket = $this->route('ticket');
+        $this->workableTicketOrNotFound();
 
-        return (bool) ($ticket instanceof ItTicket && $this->user()?->can('requestApproval', $ticket));
+        return (bool) $this->user()?->canDo('it.manage');
     }
 
     /**

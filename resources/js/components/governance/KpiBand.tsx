@@ -1,5 +1,6 @@
-import { Link } from '@inertiajs/react';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import { Link } from '@inertiajs/react';
 import {
     AlertOctagon,
     CalendarDays,
@@ -8,7 +9,6 @@ import {
     ShieldAlert,
     type LucideIcon,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export type KpiTone = 'success' | 'info' | 'warning' | 'critical' | 'muted';
 
@@ -69,10 +69,21 @@ function KpiTileBody({ kpi }: { kpi: KpiTile }) {
                 <Icon className="h-5 w-5" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{kpi.label}</p>
-                <p className={cn('mt-1 text-3xl font-semibold leading-none', TONE_VALUE[tone])}>{kpi.value}</p>
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    {kpi.label}
+                </p>
+                <p
+                    className={cn(
+                        'mt-1 text-3xl leading-none font-semibold',
+                        TONE_VALUE[tone],
+                    )}
+                >
+                    {kpi.value}
+                </p>
                 {kpi.sublabel ? (
-                    <p className={cn('mt-2 text-xs', TONE_SUBLABEL[tone])}>{kpi.sublabel}</p>
+                    <p className={cn('mt-2 text-xs', TONE_SUBLABEL[tone])}>
+                        {kpi.sublabel}
+                    </p>
                 ) : null}
             </div>
         </CardContent>
@@ -89,15 +100,21 @@ export function KpiBand({ kpis, className }: KpiBandProps) {
 
     return (
         <div
-            className={cn('grid gap-4 md:grid-cols-2 xl:grid-cols-4', className)}
+            className={cn(
+                'grid gap-4 md:grid-cols-2 xl:grid-cols-4',
+                className,
+            )}
             data-dusk="cockpit-kpi-band"
         >
             {kpis.map((kpi) => (
-                <Card key={kpi.key} className="transition hover:border-primary/40 hover:shadow-sm">
+                <Card
+                    key={kpi.key}
+                    className="transition hover:border-primary/40 hover:shadow-sm"
+                >
                     {kpi.href ? (
                         <Link
                             href={kpi.href}
-                            className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                            className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             aria-label={`${kpi.label}: ${kpi.value}${kpi.sublabel ? ` (${kpi.sublabel})` : ''}`}
                         >
                             <KpiTileBody kpi={kpi} />

@@ -28,7 +28,10 @@ interface JobCardProps {
     density?: 'comfortable' | 'compact';
 }
 
-function formatDateParts(iso: string | null): { weekday: string; dayMonth: string } {
+function formatDateParts(iso: string | null): {
+    weekday: string;
+    dayMonth: string;
+} {
     if (!iso) return { weekday: '—', dayMonth: '—' };
     const date = new Date(`${iso}T00:00:00`);
     if (Number.isNaN(date.getTime())) return { weekday: '—', dayMonth: '—' };
@@ -58,9 +61,11 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_BADGE: Record<string, string> = {
     open: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    claimed: 'border-primary/25 bg-accent text-[var(--brand-deep,var(--primary))]',
+    claimed:
+        'border-primary/25 bg-accent text-[var(--brand-deep,var(--primary))]',
     filled: 'border-status-success/30 bg-status-success-bg text-status-success',
-    cancelled: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    cancelled:
+        'border-status-critical/30 bg-status-critical-bg text-status-critical',
 };
 
 const STATUS_DOT: Record<string, string> = {
@@ -78,7 +83,7 @@ const KIND_BADGE: Record<JobPostTaskKind, string> = {
 };
 
 function kindClass(kind: string): string {
-    return KIND_BADGE[(kind as JobPostTaskKind)] ?? KIND_BADGE.care;
+    return KIND_BADGE[kind as JobPostTaskKind] ?? KIND_BADGE.care;
 }
 
 function EligibilityChip({
@@ -90,7 +95,7 @@ function EligibilityChip({
     if (!eligibility.is_eligible) {
         return (
             <span
-                className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2 py-[2px] text-[10.5px] font-bold uppercase tracking-wide text-status-critical"
+                className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2 py-[2px] text-[10.5px] font-bold tracking-wide text-status-critical uppercase"
                 title={eligibility.blocked_reasons[0] ?? undefined}
             >
                 <ShieldCheck className="h-2.5 w-2.5" /> Blocked
@@ -99,7 +104,7 @@ function EligibilityChip({
     }
     if (eligibility.warning_count > 0) {
         return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-status-warning-bg px-2 py-[2px] text-[10.5px] font-bold uppercase tracking-wide text-status-warning">
+            <span className="inline-flex items-center gap-1 rounded-full bg-status-warning-bg px-2 py-[2px] text-[10.5px] font-bold tracking-wide text-status-warning uppercase">
                 <AlertTriangle className="h-2.5 w-2.5" />
                 {eligibility.warning_count}{' '}
                 {eligibility.warning_count === 1 ? 'warning' : 'warnings'}
@@ -107,7 +112,7 @@ function EligibilityChip({
         );
     }
     return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-status-success-bg px-2 py-[2px] text-[10.5px] font-bold uppercase tracking-wide text-status-success">
+        <span className="inline-flex items-center gap-1 rounded-full bg-status-success-bg px-2 py-[2px] text-[10.5px] font-bold tracking-wide text-status-success uppercase">
             <Check className="h-2.5 w-2.5" strokeWidth={3} /> Eligible
         </span>
     );
@@ -148,8 +153,10 @@ export function JobCard({
 
     const [tasksOpen, setTasksOpen] = useState<boolean>(isStrongMatch);
 
-    const claimBlockedReason = job.viewer_eligibility?.blocked_reasons[0] ?? null;
-    const claimDisabled = !!job.viewer_eligibility && !job.viewer_eligibility.is_eligible;
+    const claimBlockedReason =
+        job.viewer_eligibility?.blocked_reasons[0] ?? null;
+    const claimDisabled =
+        !!job.viewer_eligibility && !job.viewer_eligibility.is_eligible;
     const canShowSensitive = job.privacy.can_view_sensitive_details;
 
     const handleClaim = () => {
@@ -195,7 +202,7 @@ export function JobCard({
             )}
         >
             {isStrongMatch ? (
-                <div className="absolute left-1/2 top-0 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full bg-primary px-2.5 py-[3px] text-[10.5px] font-bold uppercase tracking-wide text-primary-foreground shadow-[0_6px_14px_-6px_color-mix(in_oklch,var(--primary)_55%,transparent)]">
+                <div className="absolute top-0 left-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-full bg-primary px-2.5 py-[3px] text-[10.5px] font-bold tracking-wide text-primary-foreground uppercase shadow-[0_6px_14px_-6px_color-mix(in_oklch,var(--primary)_55%,transparent)]">
                     <Sparkles className="h-2.5 w-2.5" strokeWidth={2.5} />
                     Strong match
                 </div>
@@ -205,7 +212,9 @@ export function JobCard({
                 <div className="-mx-1 -mt-1 inline-flex items-center gap-1.5 self-start rounded-lg bg-status-warning-bg px-2.5 py-1.5 text-xs font-semibold text-status-warning">
                     <AlertTriangle className="h-3 w-3" strokeWidth={2.5} />
                     Short-notice replacement
-                    {job.replacement.reason ? ` · ${job.replacement.reason}` : ''}
+                    {job.replacement.reason
+                        ? ` · ${job.replacement.reason}`
+                        : ''}
                 </div>
             ) : null}
 
@@ -219,25 +228,26 @@ export function JobCard({
                 >
                     <span
                         className={cn(
-                            'text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground',
-                            isStrongMatch && 'text-[var(--brand-deep,var(--primary))]',
+                            'text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase',
+                            isStrongMatch &&
+                                'text-[var(--brand-deep,var(--primary))]',
                         )}
                     >
                         {dateParts.weekday}
                     </span>
-                    <span className="mt-[1px] whitespace-nowrap text-[13.5px] font-bold text-foreground">
+                    <span className="mt-[1px] text-[13.5px] font-bold whitespace-nowrap text-foreground">
                         {dateParts.dayMonth}
                     </span>
                 </div>
 
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                        <h3 className="m-0 min-w-0 flex-auto text-[14.5px] font-bold leading-[1.25] tracking-tight">
+                        <h3 className="m-0 min-w-0 flex-auto text-[14.5px] leading-[1.25] font-bold tracking-tight">
                             {job.title}
                         </h3>
                         <span
                             className={cn(
-                                'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-[2px] text-[10.5px] font-bold uppercase tracking-wide',
+                                'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-[2px] text-[10.5px] font-bold tracking-wide uppercase',
                                 STATUS_BADGE[job.status] ??
                                     'border-border bg-muted text-muted-foreground',
                             )}
@@ -245,7 +255,8 @@ export function JobCard({
                             <span
                                 className={cn(
                                     'h-1.5 w-1.5 rounded-full',
-                                    STATUS_DOT[job.status] ?? 'bg-muted-foreground',
+                                    STATUS_DOT[job.status] ??
+                                        'bg-muted-foreground',
                                 )}
                             />
                             {STATUS_LABEL[job.status] ?? job.status}
@@ -273,7 +284,9 @@ export function JobCard({
                     label="Your schedule"
                     icon={<Calendar className="h-3 w-3" />}
                     tone={
-                        schedule?.conflict || schedule?.fatigue || schedule?.time_off
+                        schedule?.conflict ||
+                        schedule?.fatigue ||
+                        schedule?.time_off
                             ? 'warn'
                             : schedule?.free
                               ? 'ok'
@@ -284,11 +297,11 @@ export function JobCard({
                             ? 'Conflict'
                             : schedule?.fatigue
                               ? 'Fatigue flag'
-                                : schedule?.time_off
-                                  ? 'On leave'
-                                  : schedule?.free
-                                    ? 'Free'
-                                    : 'Schedule unknown'
+                              : schedule?.time_off
+                                ? 'On leave'
+                                : schedule?.free
+                                  ? 'Free'
+                                  : 'Schedule unknown'
                     }
                     sub={
                         schedule?.conflict?.label ??
@@ -320,7 +333,8 @@ export function JobCard({
                 />
             </dl>
 
-            {(job.required_skills.length > 0 || job.coverage_roles.length > 0) && (
+            {(job.required_skills.length > 0 ||
+                job.coverage_roles.length > 0) && (
                 <div className="flex flex-wrap gap-1">
                     {job.required_skills.map((skill) => {
                         const have = job.your_skills.includes(skill);
@@ -340,7 +354,10 @@ export function JobCard({
                                         strokeWidth={3}
                                     />
                                 ) : (
-                                    <X className="h-2.5 w-2.5" strokeWidth={3} />
+                                    <X
+                                        className="h-2.5 w-2.5"
+                                        strokeWidth={3}
+                                    />
                                 )}
                                 {skill}
                             </span>
@@ -349,7 +366,7 @@ export function JobCard({
                     {job.coverage_roles.map((role) => (
                         <span
                             key={`${job.id}-${role}`}
-                            className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-[2px] text-[10.5px] font-semibold capitalize text-muted-foreground"
+                            className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-[2px] text-[10.5px] font-semibold text-muted-foreground capitalize"
                         >
                             {role.replace(/_/g, ' ')}
                         </span>
@@ -364,7 +381,9 @@ export function JobCard({
                             className="group"
                             open={tasksOpen}
                             onToggle={(event) =>
-                                setTasksOpen((event.target as HTMLDetailsElement).open)
+                                setTasksOpen(
+                                    (event.target as HTMLDetailsElement).open,
+                                )
                             }
                         >
                             <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold text-foreground [&::-webkit-details-marker]:hidden">
@@ -391,7 +410,7 @@ export function JobCard({
                                     >
                                         <span
                                             className={cn(
-                                                'self-center rounded px-1.5 py-[2px] text-center text-[9.5px] font-bold uppercase tracking-wide',
+                                                'self-center rounded px-1.5 py-[2px] text-center text-[9.5px] font-bold tracking-wide uppercase',
                                                 kindClass(task.kind),
                                             )}
                                         >
@@ -438,7 +457,9 @@ export function JobCard({
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate text-xs font-semibold text-foreground">
-                            {job.status === 'filled' ? 'Filled by' : 'Claimed by'}{' '}
+                            {job.status === 'filled'
+                                ? 'Filled by'
+                                : 'Claimed by'}{' '}
                             {job.claimed_by.name}
                         </span>
                         {job.eligibility ? (
@@ -449,7 +470,7 @@ export function JobCard({
             )}
 
             <footer className="mt-auto flex items-center justify-between gap-2">
-                <div className="min-w-0">
+                <div className="min-w-0" data-test="viewer-eligibility">
                     <EligibilityChip eligibility={job.viewer_eligibility} />
                 </div>
                 <div className="flex gap-1.5">
@@ -529,12 +550,13 @@ function Fact({
             : tone === 'warn'
               ? 'text-status-warning'
               : 'text-muted-foreground';
-    const mainTone = tone === 'warn' ? 'text-status-warning' : 'text-foreground';
+    const mainTone =
+        tone === 'warn' ? 'text-status-warning' : 'text-foreground';
     return (
         <div className="min-w-0">
             <dt
                 className={cn(
-                    'inline-flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wide',
+                    'inline-flex items-center gap-1 text-[10.5px] font-semibold tracking-wide uppercase',
                     dtTone,
                 )}
             >
@@ -543,7 +565,10 @@ function Fact({
             </dt>
             <dd className="m-0 mt-0.5 flex flex-col text-[13px] font-semibold">
                 <span
-                    className={cn('text-[13px] font-semibold leading-snug', mainTone)}
+                    className={cn(
+                        'text-[13px] leading-snug font-semibold',
+                        mainTone,
+                    )}
                 >
                     {main}
                 </span>

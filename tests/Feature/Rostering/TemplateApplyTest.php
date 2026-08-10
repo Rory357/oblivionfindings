@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -23,18 +24,15 @@ it('creates roster templates with related shifts from the factory helper', funct
 it('applies a template once per actor and week through the lifecycle assignment path', function () {
     $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
-    $actor = rosteringTemplateActor();
-    $assignee = User::factory()->create(['organization_id' => 1]);
+    $actor = rosteringTemplateActor($site);
+    $assignee = rosteringTemplateAssignee($site);
     $template = RosterTemplate::factory()->create([
-        'organization_id' => 1,
         'created_by' => $actor->id,
     ]);
 
     RosterTemplateShift::factory()->create([
-        'organization_id' => 1,
         'roster_template_id' => $template->id,
         'client_id' => $client->id,
         'service_context_id' => null,
@@ -70,18 +68,15 @@ it('applies a template once per actor and week through the lifecycle assignment 
 it('blocks conflicting proposed template rows before creating shifts', function () {
     $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
-    $actor = rosteringTemplateActor();
-    $assignee = User::factory()->create(['organization_id' => 1]);
+    $actor = rosteringTemplateActor($site);
+    $assignee = rosteringTemplateAssignee($site);
     $template = RosterTemplate::factory()->create([
-        'organization_id' => 1,
         'created_by' => $actor->id,
     ]);
 
     RosterTemplateShift::factory()->count(2)->create([
-        'organization_id' => 1,
         'roster_template_id' => $template->id,
         'client_id' => $client->id,
         'service_context_id' => null,
@@ -104,17 +99,14 @@ it('blocks conflicting proposed template rows before creating shifts', function 
 it('surfaces preflight warnings before applying unassigned template rows', function () {
     $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
-    $actor = rosteringTemplateActor();
+    $actor = rosteringTemplateActor($site);
     $template = RosterTemplate::factory()->create([
-        'organization_id' => 1,
         'created_by' => $actor->id,
     ]);
 
     RosterTemplateShift::factory()->unassigned()->create([
-        'organization_id' => 1,
         'roster_template_id' => $template->id,
         'client_id' => $client->id,
         'service_context_id' => null,
@@ -144,18 +136,15 @@ it('surfaces preflight warnings before applying unassigned template rows', funct
 it('stamps the pattern across cadence cycles', function () {
     $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
-    $actor = rosteringTemplateActor();
+    $actor = rosteringTemplateActor($site);
     $template = RosterTemplate::factory()->create([
-        'organization_id' => 1,
         'created_by' => $actor->id,
         'template_type' => 'fortnightly',
     ]);
 
     RosterTemplateShift::factory()->unassigned()->create([
-        'organization_id' => 1,
         'roster_template_id' => $template->id,
         'client_id' => $client->id,
         'service_context_id' => null,
@@ -183,17 +172,14 @@ it('stamps the pattern across cadence cycles', function () {
 it('snaps a non-Monday week_start to the Monday anchor', function () {
     $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
-    $actor = rosteringTemplateActor();
+    $actor = rosteringTemplateActor($site);
     $template = RosterTemplate::factory()->create([
-        'organization_id' => 1,
         'created_by' => $actor->id,
     ]);
 
     RosterTemplateShift::factory()->unassigned()->create([
-        'organization_id' => 1,
         'roster_template_id' => $template->id,
         'client_id' => $client->id,
         'service_context_id' => null,
@@ -216,18 +202,15 @@ it('snaps a non-Monday week_start to the Monday anchor', function () {
 it('carries is_lone_worker from a template shift onto the generated shift', function () {
     $site = Site::factory()->create();
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $site->id,
     ]);
-    $actor = rosteringTemplateActor();
-    $assignee = User::factory()->create(['organization_id' => 1]);
+    $actor = rosteringTemplateActor($site);
+    $assignee = rosteringTemplateAssignee($site);
     $template = RosterTemplate::factory()->create([
-        'organization_id' => 1,
         'created_by' => $actor->id,
     ]);
 
     RosterTemplateShift::factory()->create([
-        'organization_id' => 1,
         'roster_template_id' => $template->id,
         'client_id' => $client->id,
         'service_context_id' => null,
@@ -249,9 +232,9 @@ it('carries is_lone_worker from a template shift onto the generated shift', func
     expect(Shift::first()->is_lone_worker)->toBeTrue();
 });
 
-function rosteringTemplateActor(): User
+function rosteringTemplateActor(Site $site): User
 {
-    $actor = User::factory()->create(['organization_id' => 1]);
+    $actor = rosteringTemplateAssignee($site);
     $role = Role::create([
         'name' => 'rostering-template-test-'.uniqid(),
         'label' => 'Rostering template test',
@@ -267,4 +250,20 @@ function rosteringTemplateActor(): User
     $actor->roles()->attach($role);
 
     return $actor;
+}
+
+function rosteringTemplateAssignee(Site $site): User
+{
+    $user = User::factory()->create(['approved_at' => now()]);
+
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+
+    return $user;
 }

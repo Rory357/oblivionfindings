@@ -1,9 +1,9 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { FileBarChart } from 'lucide-react';
@@ -196,7 +196,8 @@ export default function ReportShow({
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <caption className="sr-only">
-                                    {report_meta.name} {label.replace(/_/g, ' ')}
+                                    {report_meta.name}{' '}
+                                    {label.replace(/_/g, ' ')}
                                 </caption>
                                 <thead>
                                     <tr className="border-b text-left text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -348,7 +349,10 @@ export default function ReportShow({
                                 />
                                 <YAxis tick={{ fontSize: 12 }} />
                                 <Tooltip />
-                                <Bar dataKey={yKey} fill="hsl(var(--primary))" />
+                                <Bar
+                                    dataKey={yKey}
+                                    fill="hsl(var(--primary))"
+                                />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -362,7 +366,8 @@ export default function ReportShow({
     return (
         <AppLayout>
             <Head title={report_meta?.name ?? 'Report'} />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title={report_meta?.name ?? 'Report'}
                 description={
                     report_meta?.description ??
@@ -409,7 +414,10 @@ export default function ReportShow({
                         >
                             <option value="">All staff</option>
                             {staff.map((staffMember) => (
-                                <option key={staffMember.id} value={staffMember.id}>
+                                <option
+                                    key={staffMember.id}
+                                    value={staffMember.id}
+                                >
                                     {staffMember.name}
                                 </option>
                             ))}
@@ -436,7 +444,8 @@ export default function ReportShow({
                         <CardContent className="flex flex-col items-center justify-center py-12">
                             <FileBarChart className="mb-4 h-12 w-12 text-muted-foreground/30" />
                             <h2 className="text-lg font-semibold text-muted-foreground">
-                                No {report_meta?.name ?? 'Report'} Data Available
+                                No {report_meta?.name ?? 'Report'} Data
+                                Available
                             </h2>
                             <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground/80">
                                 Select a date range and filters to generate this

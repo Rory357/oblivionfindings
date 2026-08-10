@@ -7,10 +7,12 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftTask;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->worker = User::factory()->create([
         'role' => 'support_worker',
@@ -25,9 +27,11 @@ beforeEach(function () {
 
 function attendanceTaskUpdateOpenSessionFor(User $worker): array
 {
-    $client = Client::factory()->create();
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $serviceContext = ServiceContext::factory()->create();
     $shift = Shift::query()->create([
+        'site_id' => $site->id,
         'client_id' => $client->id,
         'service_context_id' => $serviceContext->id,
         'user_id' => $worker->id,
@@ -91,6 +95,7 @@ test('clock out with stale task updates returns a clean error with no partial cl
     [$session, $shift, $task] = attendanceTaskUpdateOpenSessionFor($this->worker);
 
     $otherShift = Shift::query()->create([
+        'site_id' => $shift->site_id,
         'client_id' => $shift->client_id,
         'service_context_id' => $shift->service_context_id,
         'user_id' => $this->worker->id,

@@ -44,6 +44,11 @@ const SEVERITIES = [
 
 type EventType = (typeof EVENT_TYPES)[number]['value'];
 type Severity = (typeof SEVERITIES)[number]['value'];
+const HS_LINKED_EVENT_TYPES: ReadonlySet<EventType> = new Set([
+    'fall',
+    'seizure',
+    'choking',
+]);
 
 interface Props {
     clientId?: number;
@@ -84,6 +89,7 @@ export default function EventRecordSheet({
     const [followupNotes, setFollowupNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const immediateActionRequired = HS_LINKED_EVENT_TYPES.has(eventType);
 
     const resetForm = useCallback(() => {
         setEventType('other');
@@ -104,6 +110,15 @@ export default function EventRecordSheet({
     }, [open, resetForm]);
 
     const handleSubmit = useCallback(() => {
+        if (immediateActionRequired && !immediateActionTaken.trim()) {
+            setErrors({
+                immediate_action_taken:
+                    'Record the immediate action taken before saving this Health & Safety-linked event.',
+            });
+
+            return;
+        }
+
         const url = shiftId
             ? storeShiftClinicalEvent.url(shiftId)
             : `/clients/${clientId}/clinical/events`;
@@ -146,6 +161,7 @@ export default function EventRecordSheet({
         eventType,
         followupNotes,
         immediateActionTaken,
+        immediateActionRequired,
         occurredAt,
         onOpenChange,
         onRecorded,
@@ -241,15 +257,31 @@ export default function EventRecordSheet({
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Immediate Action Taken</Label>
+                        <Label>
+                            Immediate Action Taken
+                            {immediateActionRequired ? ' *' : ''}
+                        </Label>
                         <Textarea
-                            placeholder="Document immediate actions taken."
+                            aria-invalid={Boolean(
+                                errors.immediate_action_taken,
+                            )}
+                            placeholder={
+                                immediateActionRequired
+                                    ? 'Required: document exactly what was done straight away.'
+                                    : 'Document immediate actions taken.'
+                            }
                             rows={3}
                             value={immediateActionTaken}
                             onChange={(event) =>
                                 setImmediateActionTaken(event.target.value)
                             }
                         />
+                        {immediateActionRequired ? (
+                            <p className="text-xs text-muted-foreground">
+                                Required because this event is linked to Health
+                                &amp; Safety.
+                            </p>
+                        ) : null}
                     </div>
 
                     <div className="space-y-2">

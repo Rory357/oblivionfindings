@@ -76,7 +76,12 @@ trait RecordsClinicalRecords
             'severity' => ['required', Rule::in(AlertSeverity::ALL)],
             'occurred_at' => ['required', 'date'],
             'description' => ['required', 'string', 'max:5000'],
-            'immediate_action_taken' => ['nullable', 'string', 'max:5000'],
+            'immediate_action_taken' => [
+                Rule::requiredIf(fn () => ClinicalEventType::tryFrom((string) $request->input('event_type'))?->requiresImmediateAction() ?? false),
+                'nullable',
+                'string',
+                'max:5000',
+            ],
             'outcome' => ['nullable', 'string', 'max:5000'],
             'witnesses' => ['nullable', 'array'],
             'witnesses.*' => ['string', 'max:255'],

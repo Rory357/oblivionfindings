@@ -155,7 +155,10 @@ export default function OperationsDashboard({
                             deliveredDeltaPct={metrics.hours_week.delta_pct}
                             avgShiftHours={metrics.hours_week.avg_shift}
                         />
-                        <ActivityFeed items={recent_activity} totalEventsToday={recent_activity.length} />
+                        <ActivityFeed
+                            items={recent_activity}
+                            totalEventsToday={recent_activity.length}
+                        />
                     </section>
 
                     <ModulesGrid openShifts={stats.unassigned_shifts} />

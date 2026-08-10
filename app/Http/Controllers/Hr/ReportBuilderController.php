@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrSavedReport;
 use App\Domain\Hr\Services\ReportBuilderService;
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -15,30 +17,24 @@ class ReportBuilderController extends Controller
         private readonly ReportBuilderService $reportBuilderService,
     ) {}
 
-    /* ------------------------------------------------------------------ */
-    /*  Index — list saved reports                                         */
-    /* ------------------------------------------------------------------ */
-
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
-        $tenantId = null;
-
-        $reports = HrSavedReport::forTenant($tenantId)
+        $reports = HrSavedReport::query()
+            ->where('created_by', $user->id)
             ->with('creator:id,name')
             ->orderByDesc('updated_at')
             ->paginate(20)
             ->withQueryString();
 
-        $reports->through(fn ($report) => [
+        $reports->through(fn (HrSavedReport $report): array => [
             'id' => $report->id,
             'name' => $report->name,
             'description' => $report->description,
             'report_type' => $report->report_type,
             'fields' => $report->fields,
-            'is_scheduled' => $report->is_scheduled,
             'last_run_at' => $report->last_run_at?->toDateTimeString(),
             'created_by' => $report->creator?->name ?? 'Unknown',
             'created_at' => $report->created_at?->toDateTimeString(),
@@ -46,13 +42,10 @@ class ReportBuilderController extends Controller
 
         return Inertia::render('hr/reports/saved', [
             'reports' => $reports,
-            'sources' => $this->reportBuilderService->getAvailableSources(),
+            'sources' => $this->reportBuilderService->getAvailableSources($user),
+            'canExport' => $user->canDo('hr.reports.export'),
         ]);
     }
-
-    /* ------------------------------------------------------------------ */
-    /*  Create — show report builder UI                                    */
-    /* ------------------------------------------------------------------ */
 
     public function create(Request $request)
     {
@@ -60,33 +53,27 @@ class ReportBuilderController extends Controller
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
         return Inertia::render('hr/reports/builder', [
-            'sources' => $this->reportBuilderService->getAvailableSources(),
+            'sources' => $this->reportBuilderService->getAvailableSources($user),
         ]);
     }
-
-    /* ------------------------------------------------------------------ */
-    /*  Preview — execute report and return first 50 rows                  */
-    /* ------------------------------------------------------------------ */
 
     public function preview(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
-        $validated = $request->validate([
-            'report_type' => ['required', 'string', Rule::in(array_keys(ReportBuilderService::REPORT_SOURCES))],
-            'fields' => ['required', 'array', 'min:1'],
-            'fields.*' => ['required', 'string'],
-            'filters' => ['nullable', 'array'],
-            'filters.*.field' => ['required_with:filters', 'string'],
-            'filters.*.operator' => ['required_with:filters', 'string'],
-            'filters.*.value' => ['nullable', 'string'],
-            'group_by' => ['nullable', 'string'],
-            'sort_by' => ['nullable', 'string'],
-            'sort_direction' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
-        ]);
+        $validated = $request->validate($this->definitionRules());
+        $this->reportBuilderService->assertDefinitionAllowed(
+            $user,
+            $validated['report_type'],
+            $validated['fields'],
+            $validated['filters'] ?? null,
+            $validated['group_by'] ?? null,
+            $validated['sort_by'] ?? null,
+        );
 
         $query = $this->reportBuilderService->buildQuery(
+            $user,
             $validated['report_type'],
             $validated['fields'],
             $validated['filters'] ?? null,
@@ -94,19 +81,15 @@ class ReportBuilderController extends Controller
             $validated['sort_by'] ?? null,
             $validated['sort_direction'] ?? 'asc',
         );
-
+        $total = (clone $query)->count();
         $data = $query->limit(50)->get()->toArray();
 
         return response()->json([
             'data' => $data,
             'fields' => $validated['fields'],
-            'total' => $query->count(),
+            'total' => $total,
         ]);
     }
-
-    /* ------------------------------------------------------------------ */
-    /*  Store — save report configuration                                  */
-    /* ------------------------------------------------------------------ */
 
     public function store(Request $request)
     {
@@ -114,25 +97,33 @@ class ReportBuilderController extends Controller
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('hr_saved_reports', 'name')->where(
+                    fn ($query) => $query->where('created_by', $user->id),
+                ),
+            ],
             'description' => ['nullable', 'string', 'max:2000'],
-            'report_type' => ['required', 'string', Rule::in(array_keys(ReportBuilderService::REPORT_SOURCES))],
-            'fields' => ['required', 'array', 'min:1'],
-            'fields.*' => ['required', 'string'],
-            'filters' => ['nullable', 'array'],
-            'group_by' => ['nullable', 'string'],
-            'sort_by' => ['nullable', 'string'],
-            'sort_direction' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
+            ...$this->definitionRules(),
         ]);
+        $this->reportBuilderService->assertDefinitionAllowed(
+            $user,
+            $validated['report_type'],
+            $validated['fields'],
+            $validated['filters'] ?? null,
+            $validated['group_by'] ?? null,
+            $validated['sort_by'] ?? null,
+        );
 
-        HrSavedReport::create([
-            'tenant_id' => null,
+        HrSavedReport::query()->create([
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'report_type' => $validated['report_type'],
             'fields' => $validated['fields'],
             'filters' => $validated['filters'] ?? null,
-            'group_by' => $validated['group_by'] ?? null,
+            'group_by' => null,
             'sort_by' => $validated['sort_by'] ?? null,
             'sort_direction' => $validated['sort_direction'] ?? 'asc',
             'created_by' => $user->id,
@@ -141,16 +132,14 @@ class ReportBuilderController extends Controller
         return redirect()->route('hr.reports.saved')->with('success', 'Report saved successfully.');
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Run — execute a saved report and return full data                  */
-    /* ------------------------------------------------------------------ */
-
     public function run(Request $request, HrSavedReport $report)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
+        $report = $this->ownedReport($user, $report);
 
-        $data = $this->reportBuilderService->executeReport($report);
+        $data = $this->reportBuilderService->executeReport($report, $user);
+        $report->forceFill(['last_run_at' => now()])->save();
 
         return response()->json([
             'data' => $data,
@@ -159,26 +148,20 @@ class ReportBuilderController extends Controller
                 'id' => $report->id,
                 'name' => $report->name,
                 'report_type' => $report->report_type,
+                'last_run_at' => $report->last_run_at?->toDateTimeString(),
             ],
         ]);
     }
-
-    /* ------------------------------------------------------------------ */
-    /*  Export — download report as CSV or Excel                           */
-    /* ------------------------------------------------------------------ */
 
     public function export(Request $request, HrSavedReport $report)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        $report = $this->ownedReport($user, $report);
 
-        $data = $this->reportBuilderService->executeReport($report);
-
-        // Exported as CSV (opens natively in Excel). A true .xlsx writer is not a
-        // dependency here, so we emit an honest .csv rather than CSV-bytes named
-        // .xlsx (which downloaded a corrupt "Excel" file).
+        $data = $this->reportBuilderService->executeReport($report, $user);
         $csv = $this->reportBuilderService->exportToCsv($data, $report->fields);
-        $filename = str_replace(' ', '_', strtolower($report->name)) . '_' . now()->format('Y-m-d') . '.csv';
+        $filename = str_replace(' ', '_', strtolower($report->name)).'_'.now()->format('Y-m-d').'.csv';
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
@@ -186,44 +169,52 @@ class ReportBuilderController extends Controller
         ]);
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Destroy — delete saved report                                      */
-    /* ------------------------------------------------------------------ */
-
     public function destroy(Request $request, HrSavedReport $report)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
-        $report->delete();
+        DB::transaction(function () use ($user, $report): void {
+            $lockedActor = User::query()
+                ->with(['roles.permissions', 'permissionOverrides'])
+                ->lockForUpdate()
+                ->findOrFail($user->id);
+            abort_unless($lockedActor->canDo('hr.reports.view'), 403);
+
+            HrSavedReport::query()
+                ->whereKey($report->getKey())
+                ->where('created_by', $lockedActor->id)
+                ->lockForUpdate()
+                ->firstOrFail()
+                ->delete();
+        });
 
         return redirect()->route('hr.reports.saved')->with('success', 'Report deleted.');
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Schedule — toggle scheduling on a saved report                     */
-    /* ------------------------------------------------------------------ */
-
-    public function schedule(Request $request, HrSavedReport $report)
+    /** @return array<string, array<int, mixed>> */
+    private function definitionRules(): array
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.reports.view'), 403);
+        return [
+            'report_type' => ['required', 'string', Rule::in(array_keys(ReportBuilderService::REPORT_SOURCES))],
+            'fields' => ['required', 'array', 'min:1', 'max:'.ReportBuilderService::MAX_FIELDS],
+            'fields.*' => ['required', 'string', 'max:64', 'distinct'],
+            'filters' => ['nullable', 'array', 'max:'.ReportBuilderService::MAX_FILTERS],
+            'filters.*' => ['array:field,operator,value'],
+            'filters.*.field' => ['required', 'string', 'max:64'],
+            'filters.*.operator' => ['required', 'string', Rule::in(ReportBuilderService::FILTER_OPERATORS)],
+            'filters.*.value' => ['nullable', 'string', 'max:255'],
+            'group_by' => ['prohibited'],
+            'sort_by' => ['nullable', 'string', 'max:64'],
+            'sort_direction' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
+        ];
+    }
 
-        $data = $request->validate([
-            'is_scheduled' => ['required', 'boolean'],
-            'schedule_frequency' => ['nullable', 'string', Rule::in(['daily', 'weekly', 'monthly'])],
-            'schedule_recipients' => ['nullable', 'array'],
-            'schedule_recipients.*' => ['integer', 'exists:users,id'],
-        ]);
-
-        $report->update([
-            'is_scheduled' => $data['is_scheduled'],
-            'schedule_frequency' => $data['is_scheduled'] ? ($data['schedule_frequency'] ?? 'weekly') : null,
-            'schedule_recipients' => $data['is_scheduled'] ? ($data['schedule_recipients'] ?? [$user->id]) : null,
-        ]);
-
-        $message = $data['is_scheduled'] ? 'Report scheduling enabled.' : 'Report scheduling disabled.';
-
-        return redirect()->back()->with('success', $message);
+    private function ownedReport(User $user, HrSavedReport $report): HrSavedReport
+    {
+        return HrSavedReport::query()
+            ->whereKey($report->getKey())
+            ->where('created_by', $user->id)
+            ->firstOrFail();
     }
 }

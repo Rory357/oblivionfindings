@@ -75,12 +75,25 @@ export type FeedbackWizardData = {
     defaultQuestions: Record<string, string>;
 };
 
-const REVIEW_TYPE_META: Record<string, { label: string; description: string }> = {
-    peer: { label: 'Peer review', description: 'Feedback from colleagues at the same level' },
-    manager: { label: 'Manager review', description: 'Feedback from a direct manager' },
-    direct_report: { label: 'Direct report', description: 'Feedback from people they manage' },
-    self: { label: 'Self assessment', description: 'Self-reflection on their own performance' },
-};
+const REVIEW_TYPE_META: Record<string, { label: string; description: string }> =
+    {
+        peer: {
+            label: 'Peer review',
+            description: 'Feedback from colleagues at the same level',
+        },
+        manager: {
+            label: 'Manager review',
+            description: 'Feedback from a direct manager',
+        },
+        direct_report: {
+            label: 'Direct report',
+            description: 'Feedback from people they manage',
+        },
+        self: {
+            label: 'Self assessment',
+            description: 'Self-reflection on their own performance',
+        },
+    };
 
 export function reviewTypeLabel(type: string): string {
     return REVIEW_TYPE_META[type]?.label ?? type;
@@ -107,12 +120,18 @@ function fdate(iso: string): string {
     const d = new Date(`${iso}T00:00:00`);
     return Number.isNaN(d.getTime())
         ? iso
-        : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+        : d.toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 }
 
 /** Flash error carried by an Inertia redirect — `back()->with('error')` fires
  *  onSuccess, not onError (see reference_inertia_flash_error). */
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
@@ -160,8 +179,12 @@ function PersonPickList({
                             <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-primary/10 text-[12.5px] font-bold text-primary">
                                 {initials(p.name)}
                             </span>
-                            <span className="min-w-0 flex-1 text-[13.5px] font-bold">{p.name}</span>
-                            {active ? <CheckCircle2 className="h-5 w-5 text-primary" /> : null}
+                            <span className="min-w-0 flex-1 text-[13.5px] font-bold">
+                                {p.name}
+                            </span>
+                            {active ? (
+                                <CheckCircle2 className="h-5 w-5 text-primary" />
+                            ) : null}
                         </button>
                     );
                 })}
@@ -180,11 +203,36 @@ function PersonPickList({
 /* ================================================================== */
 
 const REQUEST_STEPS: readonly WizardStep[] = [
-    { key: 'who', label: 'Employee', blurb: 'Who the feedback is about', icon: User },
-    { key: 'type', label: 'Review type', blurb: 'Peer, manager, report or self', icon: ArrowLeftRight },
-    { key: 'reviewers', label: 'Reviewers', blurb: 'Who provides feedback', icon: Users },
-    { key: 'questions', label: 'Questions', blurb: 'Template & due date', icon: FileText },
-    { key: 'review', label: 'Review', blurb: 'Confirm & send', icon: CheckCircle2 },
+    {
+        key: 'who',
+        label: 'Employee',
+        blurb: 'Who the feedback is about',
+        icon: User,
+    },
+    {
+        key: 'type',
+        label: 'Review type',
+        blurb: 'Peer, manager, report or self',
+        icon: ArrowLeftRight,
+    },
+    {
+        key: 'reviewers',
+        label: 'Reviewers',
+        blurb: 'Who provides feedback',
+        icon: Users,
+    },
+    {
+        key: 'questions',
+        label: 'Questions',
+        blurb: 'Template & due date',
+        icon: FileText,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & send',
+        icon: CheckCircle2,
+    },
 ];
 
 const DEFAULT_TEMPLATE_KEY = 'default';
@@ -214,19 +262,27 @@ export function RequestFeedbackWizard({
                 : '',
         review_type: '',
         reviewer_user_ids: [] as string[],
-        template_id: defaultTemplate ? String(defaultTemplate.id) : DEFAULT_TEMPLATE_KEY,
+        template_id: defaultTemplate
+            ? String(defaultTemplate.id)
+            : DEFAULT_TEMPLATE_KEY,
         due_date: '',
     });
 
     const isSelf = form.data.review_type === 'self';
-    const subject = employees.find((e) => String(e.id) === form.data.subject_user_id) ?? null;
+    const subject =
+        employees.find((e) => String(e.id) === form.data.subject_user_id) ??
+        null;
     const template =
         form.data.template_id === DEFAULT_TEMPLATE_KEY
             ? null
-            : (templates.find((t) => String(t.id) === form.data.template_id) ?? null);
+            : (templates.find((t) => String(t.id) === form.data.template_id) ??
+              null);
     const questions: FeedbackTemplateQuestion[] =
         template?.questions ??
-        Object.entries(defaultQuestions).map(([key, question]) => ({ key, question }));
+        Object.entries(defaultQuestions).map(([key, question]) => ({
+            key,
+            question,
+        }));
 
     // Self-assessment: the subject reviews themselves.
     useEffect(() => {
@@ -240,7 +296,9 @@ export function RequestFeedbackWizard({
         const current = form.data.reviewer_user_ids;
         form.setData(
             'reviewer_user_ids',
-            current.includes(id) ? current.filter((r) => r !== id) : [...current, id],
+            current.includes(id)
+                ? current.filter((r) => r !== id)
+                : [...current, id],
         );
     };
 
@@ -269,23 +327,28 @@ export function RequestFeedbackWizard({
             reviewer_user_ids: data.reviewer_user_ids.map(Number),
             review_type: data.review_type,
             template_id:
-                data.template_id === DEFAULT_TEMPLATE_KEY ? null : Number(data.template_id),
+                data.template_id === DEFAULT_TEMPLATE_KEY
+                    ? null
+                    : Number(data.template_id),
             ...(useBulk ? { due_date: data.due_date } : {}),
         }));
-        form.post(useBulk ? '/hr/feedback/bulk-request' : '/hr/feedback/request', {
-            preserveScroll: true,
-            onFinish: () => form.transform((data) => data),
-            onSuccess: (page) => {
-                const err = pageFlashError(page);
-                if (err) {
-                    toast.error(err);
-                    return;
-                }
-                setSentCount(count);
-                setDone(true);
-                fireConfetti();
+        form.post(
+            useBulk ? '/hr/feedback/bulk-request' : '/hr/feedback/request',
+            {
+                preserveScroll: true,
+                onFinish: () => form.transform((data) => data),
+                onSuccess: (page) => {
+                    const err = pageFlashError(page);
+                    if (err) {
+                        toast.error(err);
+                        return;
+                    }
+                    setSentCount(count);
+                    setDone(true);
+                    fireConfetti();
+                },
             },
-        });
+        );
     };
 
     return (
@@ -307,8 +370,9 @@ export function RequestFeedbackWizard({
                         title="Feedback requests sent"
                         blurb={
                             <>
-                                {sentCount} reviewer{sentCount === 1 ? '' : 's'} will be asked for
-                                feedback on {subject?.name ?? 'the employee'}.
+                                {sentCount} reviewer{sentCount === 1 ? '' : 's'}{' '}
+                                will be asked for feedback on{' '}
+                                {subject?.name ?? 'the employee'}.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -330,12 +394,18 @@ export function RequestFeedbackWizard({
                     {wizard.isLast ? (
                         <Button
                             onClick={submit}
-                            disabled={form.processing || !stepValid.slice(0, 3).every(Boolean)}
+                            disabled={
+                                form.processing ||
+                                !stepValid.slice(0, 3).every(Boolean)
+                            }
                         >
                             {form.processing ? 'Sending…' : 'Send requests'}
                         </Button>
                     ) : (
-                        <Button onClick={wizard.next} disabled={!stepValid[wizard.index]}>
+                        <Button
+                            onClick={wizard.next}
+                            disabled={!stepValid[wizard.index]}
+                        >
                             Continue
                         </Button>
                     )}
@@ -405,9 +475,12 @@ export function RequestFeedbackWizard({
                                 {subject ? initials(subject.name) : '—'}
                             </span>
                             <div>
-                                <p className="text-sm font-semibold">{subject?.name ?? '—'}</p>
+                                <p className="text-sm font-semibold">
+                                    {subject?.name ?? '—'}
+                                </p>
                                 <p className="text-[11.5px] text-muted-foreground">
-                                    Self-assessment — the employee reviews their own performance.
+                                    Self-assessment — the employee reviews their
+                                    own performance.
                                 </p>
                             </div>
                             <CheckCircle2 className="ml-auto h-5 w-5 text-primary" />
@@ -418,29 +491,38 @@ export function RequestFeedbackWizard({
                                 <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     value={reviewerSearch}
-                                    onChange={(e) => setReviewerSearch(e.target.value)}
+                                    onChange={(e) =>
+                                        setReviewerSearch(e.target.value)
+                                    }
                                     placeholder="Search reviewers…"
                                     className="pl-8"
                                 />
                             </div>
                             <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto">
                                 {availableReviewers.map((emp) => {
-                                    const selected = form.data.reviewer_user_ids.includes(
-                                        String(emp.id),
-                                    );
+                                    const selected =
+                                        form.data.reviewer_user_ids.includes(
+                                            String(emp.id),
+                                        );
                                     return (
                                         <button
                                             key={emp.id}
                                             type="button"
-                                            onClick={() => toggleReviewer(String(emp.id))}
+                                            onClick={() =>
+                                                toggleReviewer(String(emp.id))
+                                            }
                                             className={`flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5 text-left transition-colors ${selected ? 'border-primary bg-primary/[0.06]' : 'border-border hover:border-primary/50'}`}
                                         >
                                             <Checkbox
                                                 checked={selected}
                                                 onCheckedChange={() =>
-                                                    toggleReviewer(String(emp.id))
+                                                    toggleReviewer(
+                                                        String(emp.id),
+                                                    )
                                                 }
-                                                onClick={(e) => e.stopPropagation()}
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
+                                                }
                                                 aria-label={`Select ${emp.name}`}
                                             />
                                             <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-primary/10 text-[10.5px] font-bold text-primary">
@@ -465,8 +547,12 @@ export function RequestFeedbackWizard({
                             </div>
                             {form.data.reviewer_user_ids.length > 0 ? (
                                 <p className="mt-2 text-xs text-muted-foreground">
-                                    {form.data.reviewer_user_ids.length} reviewer
-                                    {form.data.reviewer_user_ids.length === 1 ? '' : 's'} selected.
+                                    {form.data.reviewer_user_ids.length}{' '}
+                                    reviewer
+                                    {form.data.reviewer_user_ids.length === 1
+                                        ? ''
+                                        : 's'}{' '}
+                                    selected.
                                 </p>
                             ) : null}
                         </>
@@ -496,7 +582,8 @@ export function RequestFeedbackWizard({
                                       {
                                           key: DEFAULT_TEMPLATE_KEY,
                                           label: 'Standard questions',
-                                          description: 'The built-in six-question 360 set',
+                                          description:
+                                              'The built-in six-question 360 set',
                                           icon: ListChecks,
                                           meta: `${Object.keys(defaultQuestions).length} questions`,
                                       },
@@ -524,7 +611,9 @@ export function RequestFeedbackWizard({
                             <Input
                                 type="date"
                                 value={form.data.due_date}
-                                onChange={(e) => form.setData('due_date', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('due_date', e.target.value)
+                                }
                             />
                         </Field>
                     </div>
@@ -564,7 +653,11 @@ export function RequestFeedbackWizard({
                         blurb="Check the details, then send the requests."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={User} title="Employee" onEdit={() => wizard.goTo(0)}>
+                        <ReviewCard
+                            icon={User}
+                            title="Employee"
+                            onEdit={() => wizard.goTo(0)}
+                        >
                             <ReviewRow label="Subject" value={subject?.name} />
                             <ReviewRow
                                 label="Review type"
@@ -575,7 +668,11 @@ export function RequestFeedbackWizard({
                                 }
                             />
                         </ReviewCard>
-                        <ReviewCard icon={Users} title="Reviewers" onEdit={() => wizard.goTo(2)}>
+                        <ReviewCard
+                            icon={Users}
+                            title="Reviewers"
+                            onEdit={() => wizard.goTo(2)}
+                        >
                             <ReviewRow
                                 label="Count"
                                 value={`${form.data.reviewer_user_ids.length} reviewer${form.data.reviewer_user_ids.length === 1 ? '' : 's'}`}
@@ -586,8 +683,9 @@ export function RequestFeedbackWizard({
                                     form.data.reviewer_user_ids
                                         .map(
                                             (id) =>
-                                                employees.find((e) => String(e.id) === id)?.name ??
-                                                id,
+                                                employees.find(
+                                                    (e) => String(e.id) === id,
+                                                )?.name ?? id,
                                         )
                                         .join(', ') || undefined
                                 }
@@ -603,10 +701,17 @@ export function RequestFeedbackWizard({
                                 label="Template"
                                 value={template?.name ?? 'Standard questions'}
                             />
-                            <ReviewRow label="Questions" value={String(questions.length)} />
+                            <ReviewRow
+                                label="Questions"
+                                value={String(questions.length)}
+                            />
                             <ReviewRow
                                 label="Due date"
-                                value={form.data.due_date ? fdate(form.data.due_date) : undefined}
+                                value={
+                                    form.data.due_date
+                                        ? fdate(form.data.due_date)
+                                        : undefined
+                                }
                             />
                         </ReviewCard>
                     </div>
@@ -621,9 +726,24 @@ export function RequestFeedbackWizard({
 /* ================================================================== */
 
 const TEMPLATE_STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Name & purpose', icon: FileText },
-    { key: 'questions', label: 'Questions', blurb: 'What reviewers answer', icon: ListChecks },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Name & purpose',
+        icon: FileText,
+    },
+    {
+        key: 'questions',
+        label: 'Questions',
+        blurb: 'What reviewers answer',
+        icon: ListChecks,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: CheckCircle2,
+    },
 ];
 
 export function TemplateWizard({
@@ -641,13 +761,16 @@ export function TemplateWizard({
     const form = useForm({
         name: template?.name ?? '',
         description: template?.description ?? '',
-        questions:
-            template?.questions?.length
-                ? template.questions.map((q) => ({ ...q }))
-                : ([{ key: '', question: '' }] as FeedbackTemplateQuestion[]),
+        questions: template?.questions?.length
+            ? template.questions.map((q) => ({ ...q }))
+            : ([{ key: '', question: '' }] as FeedbackTemplateQuestion[]),
     });
 
-    const setQuestion = (i: number, field: 'key' | 'question', value: string) => {
+    const setQuestion = (
+        i: number,
+        field: 'key' | 'question',
+        value: string,
+    ) => {
         const questions = form.data.questions.map((q) => ({ ...q }));
         questions[i] = { ...questions[i], [field]: value };
         if (field === 'question' && !questions[i].key) {
@@ -657,7 +780,10 @@ export function TemplateWizard({
     };
 
     const addQuestion = () =>
-        form.setData('questions', [...form.data.questions, { key: '', question: '' }]);
+        form.setData('questions', [
+            ...form.data.questions,
+            { key: '', question: '' },
+        ]);
     const removeQuestion = (i: number) =>
         form.setData(
             'questions',
@@ -665,7 +791,8 @@ export function TemplateWizard({
         );
 
     const questionsValid =
-        form.data.questions.length > 0 && form.data.questions.every((q) => q.question.trim());
+        form.data.questions.length > 0 &&
+        form.data.questions.every((q) => q.question.trim());
     const stepValid = [!!form.data.name.trim(), questionsValid, true];
 
     const submit = () => {
@@ -716,7 +843,8 @@ export function TemplateWizard({
                         title={isEdit ? 'Template updated' : 'Template created'}
                         blurb={
                             <>
-                                “{form.data.name}” is ready to use in feedback requests.
+                                “{form.data.name}” is ready to use in feedback
+                                requests.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -738,7 +866,10 @@ export function TemplateWizard({
                     {wizard.isLast ? (
                         <Button
                             onClick={submit}
-                            disabled={form.processing || !stepValid.slice(0, 2).every(Boolean)}
+                            disabled={
+                                form.processing ||
+                                !stepValid.slice(0, 2).every(Boolean)
+                            }
                         >
                             {form.processing
                                 ? 'Saving…'
@@ -747,7 +878,10 @@ export function TemplateWizard({
                                   : 'Create template'}
                         </Button>
                     ) : (
-                        <Button onClick={wizard.next} disabled={!stepValid[wizard.index]}>
+                        <Button
+                            onClick={wizard.next}
+                            disabled={!stepValid[wizard.index]}
+                        >
                             Continue
                         </Button>
                     )}
@@ -762,18 +896,30 @@ export function TemplateWizard({
                         blurb="Name the template and describe when to use it."
                     />
                     <div className="grid gap-3.5">
-                        <Field label="Template name" required error={form.errors.name}>
+                        <Field
+                            label="Template name"
+                            required
+                            error={form.errors.name}
+                        >
                             <Input
                                 value={form.data.name}
-                                onChange={(e) => form.setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('name', e.target.value)
+                                }
                                 placeholder="e.g. Leadership review"
                             />
                         </Field>
-                        <Field label="Description" hint="optional" error={form.errors.description}>
+                        <Field
+                            label="Description"
+                            hint="optional"
+                            error={form.errors.description}
+                        >
                             <Textarea
                                 rows={3}
                                 value={form.data.description}
-                                onChange={(e) => form.setData('description', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('description', e.target.value)
+                                }
                                 placeholder="Brief description of when to use this template…"
                             />
                         </Field>
@@ -790,20 +936,35 @@ export function TemplateWizard({
                     />
                     <div className="space-y-3">
                         {form.data.questions.map((q, i) => (
-                            <div key={i} className="flex gap-2 rounded-xl border border-border bg-card/50 p-3">
+                            <div
+                                key={i}
+                                className="flex gap-2 rounded-xl border border-border bg-card/50 p-3"
+                            >
                                 <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                                     {i + 1}
                                 </span>
                                 <div className="min-w-0 flex-1 space-y-2">
                                     <Input
                                         value={q.question}
-                                        onChange={(e) => setQuestion(i, 'question', e.target.value)}
+                                        onChange={(e) =>
+                                            setQuestion(
+                                                i,
+                                                'question',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="e.g. How effectively does this person communicate?"
                                         aria-label={`Question ${i + 1}`}
                                     />
                                     <Input
                                         value={q.key}
-                                        onChange={(e) => setQuestion(i, 'key', e.target.value)}
+                                        onChange={(e) =>
+                                            setQuestion(
+                                                i,
+                                                'key',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Key (auto-generated)"
                                         aria-label={`Question ${i + 1} key`}
                                         className="h-7 text-xs text-muted-foreground"
@@ -835,7 +996,9 @@ export function TemplateWizard({
                         Add question
                     </Button>
                     {form.errors.questions ? (
-                        <p className="mt-2 text-xs text-status-critical">{form.errors.questions}</p>
+                        <p className="mt-2 text-xs text-status-critical">
+                            {form.errors.questions}
+                        </p>
                     ) : null}
                 </WizardStepPane>
             )}
@@ -848,9 +1011,16 @@ export function TemplateWizard({
                         blurb="Check the template, then save it."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={FileText} title="Details" onEdit={() => wizard.goTo(0)}>
+                        <ReviewCard
+                            icon={FileText}
+                            title="Details"
+                            onEdit={() => wizard.goTo(0)}
+                        >
                             <ReviewRow label="Name" value={form.data.name} />
-                            <ReviewRow label="Description" value={form.data.description || undefined} />
+                            <ReviewRow
+                                label="Description"
+                                value={form.data.description || undefined}
+                            />
                         </ReviewCard>
                         <ReviewCard
                             icon={ListChecks}
@@ -862,9 +1032,17 @@ export function TemplateWizard({
                                 value={`${form.data.questions.length} question${form.data.questions.length === 1 ? '' : 's'}`}
                             />
                         </ReviewCard>
-                        <ReviewCard icon={ListChecks} title="Question list" span>
+                        <ReviewCard
+                            icon={ListChecks}
+                            title="Question list"
+                            span
+                        >
                             {form.data.questions.map((q, i) => (
-                                <ReviewRow key={i} label={`Q${i + 1}`} value={q.question} />
+                                <ReviewRow
+                                    key={i}
+                                    label={`Q${i + 1}`}
+                                    value={q.question}
+                                />
                             ))}
                         </ReviewCard>
                     </div>
@@ -885,7 +1063,9 @@ export function ManageTemplatesDialog({
     templates: FeedbackTemplate[];
     onClose: () => void;
 }) {
-    const [editing, setEditing] = useState<FeedbackTemplate | 'new' | null>(null);
+    const [editing, setEditing] = useState<FeedbackTemplate | 'new' | null>(
+        null,
+    );
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
     const [deleting, setDeleting] = useState(false);
 
@@ -917,7 +1097,8 @@ export function ManageTemplatesDialog({
                 <DialogHeader>
                     <DialogTitle>Question templates</DialogTitle>
                     <DialogDescription>
-                        The question sets reviewers answer in 360 feedback requests.
+                        The question sets reviewers answer in 360 feedback
+                        requests.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2">
@@ -925,7 +1106,8 @@ export function ManageTemplatesDialog({
                         <div className="rounded-xl border border-dashed border-border py-8 text-center">
                             <FileText className="mx-auto mb-2 h-7 w-7 text-muted-foreground" />
                             <p className="text-sm text-muted-foreground">
-                                No templates yet — requests use the standard questions.
+                                No templates yet — requests use the standard
+                                questions.
                             </p>
                         </div>
                     ) : (
@@ -939,7 +1121,9 @@ export function ManageTemplatesDialog({
                                 </span>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
-                                        <p className="truncate text-sm font-semibold">{t.name}</p>
+                                        <p className="truncate text-sm font-semibold">
+                                            {t.name}
+                                        </p>
                                         {t.is_default ? (
                                             <Badge className="border-0 bg-primary/10 text-[9px] text-primary">
                                                 Default
@@ -958,8 +1142,9 @@ export function ManageTemplatesDialog({
                                     {confirmDeleteId === t.id ? (
                                         <div className="mt-2 flex items-center gap-2 rounded-lg border border-status-critical/30 bg-status-critical-bg p-2">
                                             <p className="flex-1 text-xs text-status-critical">
-                                                Delete “{t.name}”? Existing requests keep their
-                                                question snapshot.
+                                                Delete “{t.name}”? Existing
+                                                requests keep their question
+                                                snapshot.
                                             </p>
                                             <Button
                                                 size="sm"
@@ -968,13 +1153,17 @@ export function ManageTemplatesDialog({
                                                 disabled={deleting}
                                                 onClick={() => destroy(t)}
                                             >
-                                                {deleting ? 'Deleting…' : 'Delete'}
+                                                {deleting
+                                                    ? 'Deleting…'
+                                                    : 'Delete'}
                                             </Button>
                                             <Button
                                                 size="sm"
                                                 variant="ghost"
                                                 className="h-7 text-xs"
-                                                onClick={() => setConfirmDeleteId(null)}
+                                                onClick={() =>
+                                                    setConfirmDeleteId(null)
+                                                }
                                             >
                                                 Keep
                                             </Button>
@@ -997,7 +1186,9 @@ export function ManageTemplatesDialog({
                                             size="icon"
                                             aria-label={`Delete ${t.name}`}
                                             className="h-8 w-8 text-status-critical"
-                                            onClick={() => setConfirmDeleteId(t.id)}
+                                            onClick={() =>
+                                                setConfirmDeleteId(t.id)
+                                            }
                                         >
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>

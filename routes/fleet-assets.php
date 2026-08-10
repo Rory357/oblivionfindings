@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Fleet\FleetTripController;
 use App\Http\Controllers\FleetAssets\AlertController;
 use App\Http\Controllers\FleetAssets\AssetController;
 use App\Http\Controllers\FleetAssets\ChecklistController;
@@ -10,7 +11,6 @@ use App\Http\Controllers\FleetAssets\DailyCheckController;
 use App\Http\Controllers\FleetAssets\DashboardController;
 use App\Http\Controllers\FleetAssets\DeviceController;
 use App\Http\Controllers\FleetAssets\DriverController;
-use App\Http\Controllers\Fleet\FleetTripController;
 use App\Http\Controllers\FleetAssets\GeofenceController;
 use App\Http\Controllers\FleetAssets\HandoverController;
 use App\Http\Controllers\FleetAssets\IncidentController;
@@ -19,7 +19,6 @@ use App\Http\Controllers\FleetAssets\KeyController;
 use App\Http\Controllers\FleetAssets\LiveMapController;
 use App\Http\Controllers\FleetAssets\MaintenanceDashboardController;
 use App\Http\Controllers\FleetAssets\MileageController;
-use App\Http\Controllers\FleetAssets\MobileController;
 use App\Http\Controllers\FleetAssets\OutingController;
 use App\Http\Controllers\FleetAssets\ReportController;
 use App\Http\Controllers\FleetAssets\ResidentTrackingController;
@@ -33,9 +32,9 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
-    // Mobile / Driver App
+    // Retain the old URL only as a compatibility redirect into the desktop web workspace.
     Route::middleware('permission:fleet.viewAny|assets.viewAny|assets.viewAssigned')->group(function () {
-        Route::get('/mobile/dashboard', [MobileController::class, 'dashboard'])->name('fleet-assets.mobile.dashboard');
+        Route::redirect('/mobile/dashboard', '/fleet-assets')->name('fleet-assets.mobile.dashboard');
     });
 
     // Dashboard & Map - viewable if user can see fleet or assets
@@ -206,10 +205,15 @@ Route::middleware(['auth'])->prefix('fleet-assets')->group(function () {
     });
 
     // Resident Tracking — read
-    Route::middleware('permission:fleet.viewAny|assets.viewAny')->group(function () {
+    Route::middleware([
+        'permission:fleet.viewAny|assets.viewAny',
+        'permission:assets.telemetry.view',
+    ])->group(function () {
         Route::get('/resident-tracking', [ResidentTrackingController::class, 'index'])->name('fleet-assets.resident-tracking.index');
         Route::get('/resident-tracking/assign', [ResidentTrackingController::class, 'assignPage'])->name('fleet-assets.resident-tracking.assign');
         Route::get('/resident-tracking/history/{client}', [ResidentTrackingController::class, 'history'])->whereNumber('client')->name('fleet-assets.resident-tracking.history');
+        Route::get('/resident-tracking/history/{client}/privacy-status', [ResidentTrackingController::class, 'privacyStatus'])->whereNumber('client')->name('fleet-assets.resident-tracking.privacy-status');
+        Route::post('/resident-tracking/history/{client}/export', [ResidentTrackingController::class, 'exportHistory'])->whereNumber('client')->middleware('permission:assets.telemetry.export')->name('fleet-assets.resident-tracking.export');
         Route::post('/resident-tracking/{client}/locate-now', [ResidentTrackingController::class, 'locateNow'])->whereNumber('client')->name('fleet-assets.resident-tracking.locate-now');
     });
 

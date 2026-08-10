@@ -2,15 +2,25 @@
 
 namespace App\Providers;
 
+use App\Domain\It\Services\ItAutomationRunRecorder;
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Events\CoverageSupplyAdded;
 use App\Events\RosterPeriodPublished;
 use App\Listeners\Care\NotifyOnBedExit;
 use App\Listeners\Care\NotifyOnFallDetected;
 use App\Listeners\Care\NotifyOnMedicationCabinetOpen;
+use App\Listeners\It\CreateOrUpdateMonitoringTicket;
+use App\Listeners\It\RecordItEmailDelivery;
 use App\Listeners\ResolveCoverageAlertForAddedSupply;
 use App\Listeners\Rostering\RecordRosterPeriodPublishedAudit;
+use Illuminate\Console\Events\ScheduledTaskFailed;
+use Illuminate\Console\Events\ScheduledTaskFinished;
+use Illuminate\Console\Events\ScheduledTaskSkipped;
+use Illuminate\Console\Events\ScheduledTaskStarting;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Illuminate\Notifications\Events\NotificationFailed;
+use Illuminate\Notifications\Events\NotificationSending;
+use Illuminate\Notifications\Events\NotificationSent;
 
 /**
  * Laravel event → listener bindings.
@@ -33,12 +43,34 @@ class EventServiceProvider extends ServiceProvider
             NotifyOnFallDetected::class,
             NotifyOnBedExit::class,
             NotifyOnMedicationCabinetOpen::class,
+            CreateOrUpdateMonitoringTicket::class,
         ],
         CoverageSupplyAdded::class => [
             ResolveCoverageAlertForAddedSupply::class,
         ],
         RosterPeriodPublished::class => [
             RecordRosterPeriodPublishedAudit::class,
+        ],
+        NotificationSending::class => [
+            RecordItEmailDelivery::class,
+        ],
+        NotificationSent::class => [
+            RecordItEmailDelivery::class,
+        ],
+        NotificationFailed::class => [
+            RecordItEmailDelivery::class,
+        ],
+        ScheduledTaskStarting::class => [
+            ItAutomationRunRecorder::class.'@starting',
+        ],
+        ScheduledTaskFinished::class => [
+            ItAutomationRunRecorder::class.'@finished',
+        ],
+        ScheduledTaskFailed::class => [
+            ItAutomationRunRecorder::class.'@failed',
+        ],
+        ScheduledTaskSkipped::class => [
+            ItAutomationRunRecorder::class.'@skipped',
         ],
     ];
 

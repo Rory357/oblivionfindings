@@ -11,7 +11,12 @@ import { cn } from '@/lib/utils';
  *
  * Tones map to the design-token status palette; never pass raw colours.
  */
-export type FinanceSummaryTone = 'info' | 'success' | 'warning' | 'critical' | 'muted';
+export type FinanceSummaryTone =
+    | 'info'
+    | 'success'
+    | 'warning'
+    | 'critical'
+    | 'muted';
 
 const TONE: Record<FinanceSummaryTone, { bg: string; fg: string }> = {
     info: { bg: 'bg-status-info-bg', fg: 'text-status-info' },
@@ -43,7 +48,9 @@ export function FinanceSummaryCard({
                     </div>
                     <div>
                         <p className="text-sm text-muted-foreground">{label}</p>
-                        <p className="text-xl font-bold text-foreground">{value}</p>
+                        <p className="text-xl font-bold text-foreground">
+                            {value}
+                        </p>
                     </div>
                 </div>
             </CardContent>

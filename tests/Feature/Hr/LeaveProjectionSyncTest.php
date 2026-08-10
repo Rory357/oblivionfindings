@@ -13,11 +13,11 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
 
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
-    $this->manager->setAttribute('tenant_id', 1);
     grantPerms($this->manager, ['hr.leave.viewAny', 'hr.leave.approve', 'hr.leave.manage', 'staff.availability.updateAny']);
+    $this->site = ensureCanonicalHrStaffProfile($this->manager);
 
     $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $this->staff->setAttribute('tenant_id', 1);
+    ensureCanonicalHrStaffProfile($this->staff, $this->site);
 });
 
 function grantPerms(User $user, array $keys): void
@@ -33,14 +33,13 @@ function grantPerms(User $user, array $keys): void
 function pendingRequest(User $staff, array $overrides = []): HrLeaveRequest
 {
     HrLeaveBalance::query()->firstOrCreate([
-        'tenant_id' => 1, 'user_id' => $staff->id, 'leave_type' => $overrides['leave_type'] ?? 'annual', 'year' => now()->year,
+        'user_id' => $staff->id, 'leave_type' => $overrides['leave_type'] ?? 'annual', 'year' => now()->year,
     ], [
         'balance_hours' => 200, 'accrued_hours' => 200, 'used_hours' => 0, 'pending_hours' => 8,
         'source' => 'system', 'last_synced_at' => now(), 'updated_by' => $staff->id,
     ]);
 
     return HrLeaveRequest::query()->create(array_merge([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'leave_type' => 'annual',
         'period' => 'full_day',
@@ -54,14 +53,13 @@ function pendingRequest(User $staff, array $overrides = []): HrLeaveRequest
     ], $overrides));
 }
 
-test('approving a request creates a tenant-stamped, back-linked projection carrying period', function () {
+test('approving a request creates one back-linked projection carrying the leave period', function () {
     $request = pendingRequest($this->staff, ['period' => 'half_day_am']);
 
     app(LeaveService::class)->approveRequest($request->fresh(), $this->manager, 'ok');
 
     $projection = StaffTimeOff::query()->where('hr_leave_request_id', $request->id)->first();
     expect($projection)->not->toBeNull();
-    expect($projection->tenant_id)->toBe(1);
     expect($projection->type)->toBe('annual');
     expect($projection->period)->toBe('half_day_am');
     expect($request->fresh()->time_off_id)->toBe($projection->id);
@@ -112,7 +110,7 @@ test('roster-entered leave routes through the engine: creates an approved reques
     expect(HrLeaveBalanceLedger::query()->where('user_id', $this->staff->id)->where('entry_type', 'approved')->exists())->toBeTrue();
 });
 
-test('roster-entered unavailable stays roster-only but is tenant-stamped', function () {
+test('roster-entered unavailable stays roster-only without creating a leave request', function () {
     $this->actingAs($this->manager)
         ->post(route('operations.rostering.time_off.store'), [
             'user_id' => $this->staff->id,
@@ -124,7 +122,6 @@ test('roster-entered unavailable stays roster-only but is tenant-stamped', funct
 
     $row = StaffTimeOff::query()->where('user_id', $this->staff->id)->where('type', 'unavailable')->first();
     expect($row)->not->toBeNull();
-    expect($row->tenant_id)->not->toBeNull();
     expect($row->hr_leave_request_id)->toBeNull();
     expect(HrLeaveRequest::query()->where('user_id', $this->staff->id)->exists())->toBeFalse();
 });
@@ -143,8 +140,8 @@ test('a roster delete of an approved leave projection is blocked to protect the 
 
 test('a manage-only user (no approve permission) can open a leave request — gate fix', function () {
     $manageOnly = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $manageOnly->setAttribute('tenant_id', 1);
     grantPerms($manageOnly, ['hr.leave.viewAny', 'hr.leave.manage']); // deliberately NOT approve
+    ensureCanonicalHrStaffProfile($manageOnly, $this->site);
 
     $request = pendingRequest($this->staff);
 

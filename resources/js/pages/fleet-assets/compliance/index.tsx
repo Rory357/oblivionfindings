@@ -1,12 +1,3 @@
-import {
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-    HeroSummaryMetric,
-    HeroSummaryStrip,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,20 +10,27 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { formatDate } from '@/lib/fleet-utils';
+import {
+    fmt,
+    HeroClusterTile,
+    HeroMedallion,
+    HeroShell,
+    HeroStatusPill,
+    HeroSummaryMetric,
+    HeroSummaryStrip,
+} from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Wrench,
-    Calendar,
     CheckCircle,
     Clock,
     Search,
     ShieldCheck,
+    Wrench,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
-import { formatDate } from '@/lib/fleet-utils';
-
 
 type Vehicle = {
     id: number;
@@ -73,7 +71,9 @@ type Props = {
 
 function daysUntil(dateStr: string | null): number | null {
     if (!dateStr) return null;
-    const diff = (new Date(dateStr).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
+    const diff =
+        (new Date(dateStr).getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24);
     return Math.floor(diff);
 }
 
@@ -86,7 +86,10 @@ function expiryColor(dateStr: string | null): string {
     return 'text-primary dark:text-primary';
 }
 
-function expiryBadge(dateStr: string | null): { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string } {
+function expiryBadge(dateStr: string | null): {
+    variant: 'default' | 'secondary' | 'destructive' | 'outline';
+    label: string;
+} {
     const days = daysUntil(dateStr);
     if (days === null) return { variant: 'secondary', label: 'N/A' };
     if (days < 0) return { variant: 'destructive', label: 'Expired' };
@@ -95,12 +98,20 @@ function expiryBadge(dateStr: string | null): { variant: 'default' | 'secondary'
     return { variant: 'outline', label: `${days}d` };
 }
 
-function statusBadge(status: string): { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; icon: typeof CheckCircle } {
+function statusBadge(status: string): {
+    variant: 'default' | 'secondary' | 'destructive' | 'outline';
+    label: string;
+    icon: typeof CheckCircle;
+} {
     switch (status) {
         case 'expired':
             return { variant: 'destructive', label: 'Expired', icon: XCircle };
         case 'critical':
-            return { variant: 'destructive', label: 'Expiring Soon', icon: AlertTriangle };
+            return {
+                variant: 'destructive',
+                label: 'Expiring Soon',
+                icon: AlertTriangle,
+            };
         case 'warning':
             return { variant: 'default', label: 'Warning', icon: Clock };
         default:
@@ -108,15 +119,29 @@ function statusBadge(status: string): { variant: 'default' | 'secondary' | 'dest
     }
 }
 
-export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filters }: Props) {
-    const hero = rawHero ?? { wof_due_30: 0, rego_due_30: 0, cof_due_30: 0, expired_now: 0 };
+export default function ComplianceIndex({
+    vehicles,
+    hero: rawHero,
+    summary,
+    filters,
+}: Props) {
+    const hero = rawHero ?? {
+        wof_due_30: 0,
+        rego_due_30: 0,
+        cof_due_30: 0,
+        expired_now: 0,
+    };
     const [search, setSearch] = useState(filters.search ?? '');
 
     const applyFilters = (newFilters: Partial<typeof filters>) => {
-        router.get('/fleet-assets/compliance', {
-            ...filters,
-            ...newFilters,
-        }, { preserveState: true });
+        router.get(
+            '/fleet-assets/compliance',
+            {
+                ...filters,
+                ...newFilters,
+            },
+            { preserveState: true },
+        );
     };
 
     const handleSearch = () => {
@@ -125,8 +150,18 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
 
     // Compute compliance percentage
     const totalVehicles = summary.total ?? 0;
-    const problemVehicles = (summary.expired_wof ?? 0) + (summary.expired_rego ?? 0) + (summary.expiring_30 ?? 0);
-    const compliancePct = totalVehicles > 0 ? Math.round(((totalVehicles - Math.min(problemVehicles, totalVehicles)) / totalVehicles) * 100) : 100;
+    const problemVehicles =
+        (summary.expired_wof ?? 0) +
+        (summary.expired_rego ?? 0) +
+        (summary.expiring_30 ?? 0);
+    const compliancePct =
+        totalVehicles > 0
+            ? Math.round(
+                  ((totalVehicles - Math.min(problemVehicles, totalVehicles)) /
+                      totalVehicles) *
+                      100,
+              )
+            : 100;
 
     return (
         <AppLayout
@@ -140,30 +175,59 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
                 <HeroShell
                     footer={
                         <HeroSummaryStrip label="Fleet posture">
-                            <HeroSummaryMetric tone={compliancePct >= 80 ? 'success' : compliancePct >= 50 ? 'warning' : 'critical'}>
+                            <HeroSummaryMetric
+                                tone={
+                                    compliancePct >= 80
+                                        ? 'success'
+                                        : compliancePct >= 50
+                                          ? 'warning'
+                                          : 'critical'
+                                }
+                            >
                                 {compliancePct}% of fleet compliant
                             </HeroSummaryMetric>
-                            <HeroSummaryMetric tone={summary.expiring_60 > 0 ? 'warning' : 'success'}>
-                                {summary.expiring_60} renewal{summary.expiring_60 === 1 ? '' : 's'} in 31–60 days
+                            <HeroSummaryMetric
+                                tone={
+                                    summary.expiring_60 > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
+                            >
+                                {summary.expiring_60} renewal
+                                {summary.expiring_60 === 1 ? '' : 's'} in 31–60
+                                days
                             </HeroSummaryMetric>
                             {summary.insurance_expiring !== null && (
-                                <HeroSummaryMetric tone={summary.insurance_expiring > 0 ? 'warning' : 'success'}>
+                                <HeroSummaryMetric
+                                    tone={
+                                        summary.insurance_expiring > 0
+                                            ? 'warning'
+                                            : 'success'
+                                    }
+                                >
                                     {summary.insurance_expiring === 0
                                         ? 'Insurance current'
                                         : `${summary.insurance_expiring} insurance polic${summary.insurance_expiring === 1 ? 'y' : 'ies'} expiring 30d`}
                                 </HeroSummaryMetric>
                             )}
-                            <HeroSummaryMetric tone="neutral">{summary.total} vehicles tracked</HeroSummaryMetric>
+                            <HeroSummaryMetric tone="neutral">
+                                {summary.total} vehicles tracked
+                            </HeroSummaryMetric>
                         </HeroSummaryStrip>
                     }
                 >
                     <div className="flex flex-wrap items-center gap-4">
                         <HeroMedallion icon={ShieldCheck} />
                         <div className="min-w-0">
-                            <HeroStatusPill>Compliance register · WOF / Rego / CoF</HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">Compliance & Registrations</h1>
+                            <HeroStatusPill>
+                                Compliance register · WOF / Rego / CoF
+                            </HeroStatusPill>
+                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
+                                Compliance & Registrations
+                            </h1>
                             <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Track vehicle registrations, WOF, and COF expiry dates.
+                                Track vehicle registrations, WOF, and COF expiry
+                                dates.
                             </p>
                         </div>
                         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
@@ -172,28 +236,38 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
                                 label="WOF due 30d"
                                 value={fmt(hero.wof_due_30)}
                                 caption="book inspections"
-                                tone={hero.wof_due_30 > 0 ? 'warning' : 'success'}
+                                tone={
+                                    hero.wof_due_30 > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/compliance?status=critical"
                                 label="Rego due 30d"
                                 value={fmt(hero.rego_due_30)}
                                 caption="renew registration"
-                                tone={hero.rego_due_30 > 0 ? 'warning' : 'success'}
+                                tone={
+                                    hero.rego_due_30 > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/compliance?status=critical"
                                 label="CoF due 30d"
                                 value={fmt(hero.cof_due_30)}
                                 caption="certificate of fitness"
-                                tone={hero.cof_due_30 > 0 ? 'warning' : 'success'}
+                                tone={
+                                    hero.cof_due_30 > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/compliance?status=expired"
                                 label="Expired now"
                                 value={fmt(hero.expired_now)}
                                 caption="off the road until renewed"
-                                tone={hero.expired_now > 0 ? 'critical' : 'success'}
+                                tone={
+                                    hero.expired_now > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
                             />
                         </div>
                     </div>
@@ -202,18 +276,24 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
                 {/* Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search vehicles..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            onKeyDown={(e) =>
+                                e.key === 'Enter' && handleSearch()
+                            }
                             className="pl-9"
                         />
                     </div>
                     <Select
                         value={filters.status || 'all'}
-                        onValueChange={(value) => applyFilters({ status: value === 'all' ? '' : value })}
+                        onValueChange={(value) =>
+                            applyFilters({
+                                status: value === 'all' ? '' : value,
+                            })
+                        }
                     >
                         <SelectTrigger className="w-44">
                             <SelectValue placeholder="Status" />
@@ -221,8 +301,12 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
                         <SelectContent>
                             <SelectItem value="all">All statuses</SelectItem>
                             <SelectItem value="ok">OK</SelectItem>
-                            <SelectItem value="warning">Warning (60d)</SelectItem>
-                            <SelectItem value="critical">Critical (30d)</SelectItem>
+                            <SelectItem value="warning">
+                                Warning (60d)
+                            </SelectItem>
+                            <SelectItem value="critical">
+                                Critical (30d)
+                            </SelectItem>
                             <SelectItem value="expired">Expired</SelectItem>
                         </SelectContent>
                     </Select>
@@ -230,94 +314,199 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
 
                 {/* Compliance Table */}
                 <div className="rounded-lg border">
-                    <div data-fleet-narrow-strategy="horizontal-scroll" className="overflow-x-auto">
+                    <div
+                        data-fleet-narrow-strategy="horizontal-scroll"
+                        className="overflow-x-auto"
+                    >
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
-                                    <th className="px-4 py-3 text-left font-medium">Vehicle</th>
-                                    <th className="px-4 py-3 text-left font-medium">Registration #</th>
-                                    <th className="px-4 py-3 text-left font-medium">Rego Expires</th>
-                                    <th className="px-4 py-3 text-left font-medium">WOF Expires</th>
-                                    <th className="px-4 py-3 text-left font-medium">CoF Expires</th>
-                                    <th className="px-4 py-3 text-left font-medium">Insurance</th>
-                                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                                    <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Vehicle
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Registration #
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Rego Expires
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        WOF Expires
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        CoF Expires
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Insurance
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Status
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {(vehicles ?? []).length > 0 ? (
                                     vehicles.map((vehicle) => {
-                                        const badge = statusBadge(vehicle.status);
+                                        const badge = statusBadge(
+                                            vehicle.status,
+                                        );
                                         const StatusIcon = badge.icon;
                                         return (
                                             <tr
                                                 key={vehicle.id}
                                                 className="cursor-pointer border-b transition-colors hover:bg-muted/50"
-                                                onClick={() => router.visit(`/fleet-assets/vehicles/${vehicle.id}`)}
+                                                onClick={() =>
+                                                    router.visit(
+                                                        `/fleet-assets/vehicles/${vehicle.id}`,
+                                                    )
+                                                }
                                             >
                                                 <td className="px-4 py-3">
-                                                    <div className="font-medium">{vehicle.name}</div>
+                                                    <div className="font-medium">
+                                                        {vehicle.name}
+                                                    </div>
                                                     {vehicle.asset_tag && (
-                                                        <div className="text-xs text-muted-foreground">{vehicle.asset_tag}</div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {vehicle.asset_tag}
+                                                        </div>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 font-mono text-xs">
-                                                    {vehicle.registration_number ?? '-'}
+                                                    {vehicle.registration_number ??
+                                                        '-'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {vehicle.registration_expires_at ? (
-                                                        <span className={expiryColor(vehicle.registration_expires_at)}>
-                                                            {formatDate(vehicle.registration_expires_at)}
-                                                            {' '}
-                                                            <Badge variant={expiryBadge(vehicle.registration_expires_at).variant} className="ml-1 text-xs">
-                                                                {expiryBadge(vehicle.registration_expires_at).label}
+                                                        <span
+                                                            className={expiryColor(
+                                                                vehicle.registration_expires_at,
+                                                            )}
+                                                        >
+                                                            {formatDate(
+                                                                vehicle.registration_expires_at,
+                                                            )}{' '}
+                                                            <Badge
+                                                                variant={
+                                                                    expiryBadge(
+                                                                        vehicle.registration_expires_at,
+                                                                    ).variant
+                                                                }
+                                                                className="ml-1 text-xs"
+                                                            >
+                                                                {
+                                                                    expiryBadge(
+                                                                        vehicle.registration_expires_at,
+                                                                    ).label
+                                                                }
                                                             </Badge>
                                                         </span>
                                                     ) : (
-                                                        <span className="text-muted-foreground">-</span>
+                                                        <span className="text-muted-foreground">
+                                                            -
+                                                        </span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {vehicle.wof_expires_at ? (
-                                                        <span className={expiryColor(vehicle.wof_expires_at)}>
-                                                            {formatDate(vehicle.wof_expires_at)}
-                                                            {' '}
-                                                            <Badge variant={expiryBadge(vehicle.wof_expires_at).variant} className="ml-1 text-xs">
-                                                                {expiryBadge(vehicle.wof_expires_at).label}
+                                                        <span
+                                                            className={expiryColor(
+                                                                vehicle.wof_expires_at,
+                                                            )}
+                                                        >
+                                                            {formatDate(
+                                                                vehicle.wof_expires_at,
+                                                            )}{' '}
+                                                            <Badge
+                                                                variant={
+                                                                    expiryBadge(
+                                                                        vehicle.wof_expires_at,
+                                                                    ).variant
+                                                                }
+                                                                className="ml-1 text-xs"
+                                                            >
+                                                                {
+                                                                    expiryBadge(
+                                                                        vehicle.wof_expires_at,
+                                                                    ).label
+                                                                }
                                                             </Badge>
                                                         </span>
                                                     ) : (
-                                                        <span className="text-muted-foreground">-</span>
+                                                        <span className="text-muted-foreground">
+                                                            -
+                                                        </span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {vehicle.cof_expires_at ? (
-                                                        <span className={expiryColor(vehicle.cof_expires_at)}>
-                                                            {formatDate(vehicle.cof_expires_at)}
-                                                            {' '}
-                                                            <Badge variant={expiryBadge(vehicle.cof_expires_at).variant} className="ml-1 text-xs">
-                                                                {expiryBadge(vehicle.cof_expires_at).label}
+                                                        <span
+                                                            className={expiryColor(
+                                                                vehicle.cof_expires_at,
+                                                            )}
+                                                        >
+                                                            {formatDate(
+                                                                vehicle.cof_expires_at,
+                                                            )}{' '}
+                                                            <Badge
+                                                                variant={
+                                                                    expiryBadge(
+                                                                        vehicle.cof_expires_at,
+                                                                    ).variant
+                                                                }
+                                                                className="ml-1 text-xs"
+                                                            >
+                                                                {
+                                                                    expiryBadge(
+                                                                        vehicle.cof_expires_at,
+                                                                    ).label
+                                                                }
                                                             </Badge>
                                                         </span>
                                                     ) : (
-                                                        <span className="text-muted-foreground">-</span>
+                                                        <span className="text-muted-foreground">
+                                                            -
+                                                        </span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {vehicle.insurance_expires_at ? (
-                                                        <span className={expiryColor(vehicle.insurance_expires_at)}>
-                                                            {formatDate(vehicle.insurance_expires_at)}
-                                                            {' '}
-                                                            <Badge variant={expiryBadge(vehicle.insurance_expires_at).variant} className="ml-1 text-xs">
-                                                                {expiryBadge(vehicle.insurance_expires_at).label}
+                                                        <span
+                                                            className={expiryColor(
+                                                                vehicle.insurance_expires_at,
+                                                            )}
+                                                        >
+                                                            {formatDate(
+                                                                vehicle.insurance_expires_at,
+                                                            )}{' '}
+                                                            <Badge
+                                                                variant={
+                                                                    expiryBadge(
+                                                                        vehicle.insurance_expires_at,
+                                                                    ).variant
+                                                                }
+                                                                className="ml-1 text-xs"
+                                                            >
+                                                                {
+                                                                    expiryBadge(
+                                                                        vehicle.insurance_expires_at,
+                                                                    ).label
+                                                                }
                                                             </Badge>
                                                         </span>
                                                     ) : (
-                                                        <span className="text-muted-foreground">-</span>
+                                                        <span className="text-muted-foreground">
+                                                            -
+                                                        </span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <Badge variant={badge.variant} className="gap-1">
+                                                    <Badge
+                                                        variant={badge.variant}
+                                                        className="gap-1"
+                                                    >
                                                         <StatusIcon className="h-3 w-3" />
                                                         {badge.label}
                                                     </Badge>
@@ -327,9 +516,13 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
                                                         variant="ghost"
                                                         size="sm"
                                                         asChild
-                                                        onClick={(e) => e.stopPropagation()}
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
                                                     >
-                                                        <Link href={`/fleet-assets/maintenance/work-orders?new=1&asset_id=${vehicle.id}`}>
+                                                        <Link
+                                                            href={`/fleet-assets/maintenance/work-orders?new=1&asset_id=${vehicle.id}`}
+                                                        >
                                                             <Wrench className="mr-1 h-3 w-3" />
                                                             Work order
                                                         </Link>
@@ -340,9 +533,14 @@ export default function ComplianceIndex({ vehicles, hero: rawHero, summary, filt
                                     })
                                 ) : (
                                     <tr>
-                                        <td colSpan={8} className="px-4 py-8 text-center">
+                                        <td
+                                            colSpan={8}
+                                            className="px-4 py-8 text-center"
+                                        >
                                             <ShieldCheck className="mx-auto mb-2 h-12 w-12 text-muted-foreground/50" />
-                                            <p className="text-sm text-muted-foreground">No vehicles found.</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                No vehicles found.
+                                            </p>
                                         </td>
                                     </tr>
                                 )}

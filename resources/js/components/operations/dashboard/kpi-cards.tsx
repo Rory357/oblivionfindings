@@ -1,4 +1,12 @@
-import { Activity, Clock, MousePointer2, ShieldCheck, Timer, TrendingUp, Users } from 'lucide-react';
+import {
+    Activity,
+    Clock,
+    MousePointer2,
+    ShieldCheck,
+    Timer,
+    TrendingUp,
+    Users,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -12,7 +20,13 @@ type CardWrapProps = {
     iconClass?: string;
 };
 
-function KpiCardShell({ onContextMenu, children, title, Icon, iconClass }: CardWrapProps) {
+function KpiCardShell({
+    onContextMenu,
+    children,
+    title,
+    Icon,
+    iconClass,
+}: CardWrapProps) {
     return (
         <a
             href="#"
@@ -26,7 +40,9 @@ function KpiCardShell({ onContextMenu, children, title, Icon, iconClass }: CardW
             style={{ borderColor: 'var(--border)' }}
         >
             <div className="flex items-center justify-between">
-                <div className="text-[11.5px] font-medium text-muted-foreground">{title}</div>
+                <div className="text-[11.5px] font-medium text-muted-foreground">
+                    {title}
+                </div>
                 <Icon className={cn('h-3.5 w-3.5 text-primary', iconClass)} />
             </div>
             {children}
@@ -38,9 +54,23 @@ const MENUS: Record<string, CtxMenuDef> = {
     'active-clients': {
         label: 'Active clients',
         items: [
-            { icon: 'users', text: 'View all clients', shortcut: '↵', href: '/operations/clients' },
-            { icon: 'user-plus', text: 'Add new client', shortcut: '⌘N', href: '/operations/clients/create' },
-            { icon: 'user-check', text: 'Onboarding queue', href: '/operations/clients?status=onboarding' },
+            {
+                icon: 'users',
+                text: 'View all clients',
+                shortcut: '↵',
+                href: '/operations/clients',
+            },
+            {
+                icon: 'user-plus',
+                text: 'Add new client',
+                shortcut: '⌘N',
+                href: '/operations/clients/create',
+            },
+            {
+                icon: 'user-check',
+                text: 'Onboarding queue',
+                href: '/operations/clients?status=onboarding',
+            },
             { icon: 'pie-chart', text: 'Status breakdown' },
             { divider: true },
             { icon: 'bar-chart-3', text: 'Compare to last month' },
@@ -81,7 +111,11 @@ const MENUS: Record<string, CtxMenuDef> = {
             { icon: 'sliders-horizontal', text: 'Adjust grace period…' },
             { icon: 'file-text', text: 'Open clock-in policy' },
             { divider: true },
-            { icon: 'download', text: 'Export adherence report', shortcut: '⌘E' },
+            {
+                icon: 'download',
+                text: 'Export adherence report',
+                shortcut: '⌘E',
+            },
             { icon: 'settings-2', text: 'Configure widget' },
         ],
     },
@@ -97,7 +131,11 @@ const MENUS: Record<string, CtxMenuDef> = {
             { icon: 'calendar-plus', text: 'Schedule audit' },
             { divider: true },
             { icon: 'target', text: 'Set compliance target…' },
-            { icon: 'file-spreadsheet', text: 'Export for regulator', shortcut: '⌘E' },
+            {
+                icon: 'file-spreadsheet',
+                text: 'Export for regulator',
+                shortcut: '⌘E',
+            },
             { divider: true },
             { icon: 'pin', text: 'Pin to favourites' },
             { icon: 'settings-2', text: 'Configure widget' },
@@ -107,7 +145,13 @@ const MENUS: Record<string, CtxMenuDef> = {
 
 type Props = {
     metrics: {
-        active_clients: { value: number; delta: number; new_mtd: number; onboarding: number; trend_12wk: number[] };
+        active_clients: {
+            value: number;
+            delta: number;
+            new_mtd: number;
+            onboarding: number;
+            trend_12wk: number[];
+        };
         hours_week: {
             value: number;
             delta_pct: number;
@@ -141,11 +185,17 @@ export function KpiCards({ metrics }: Props) {
     const ctx = useContextMenu();
 
     // Active clients — 12-wk bars
-    const trend = metrics.active_clients.trend_12wk.length > 0 ? metrics.active_clients.trend_12wk : new Array(12).fill(0);
+    const trend =
+        metrics.active_clients.trend_12wk.length > 0
+            ? metrics.active_clients.trend_12wk
+            : new Array(12).fill(0);
     const trendMax = Math.max(...trend, 1);
 
     // Hours sparkline points
-    const spark = metrics.hours_week.sparkline.length > 0 ? metrics.hours_week.sparkline : new Array(12).fill(0);
+    const spark =
+        metrics.hours_week.sparkline.length > 0
+            ? metrics.hours_week.sparkline
+            : new Array(12).fill(0);
     const sparkMax = Math.max(...spark, 1);
     const sparkPts = spark.map((v, i) => {
         const x = (i / (spark.length - 1 || 1)) * 100;
@@ -153,11 +203,22 @@ export function KpiCards({ metrics }: Props) {
         return `${x.toFixed(0)},${y.toFixed(1)}`;
     });
     const lineStr = sparkPts.join(' ');
-    const fillStr = `M${sparkPts[0] ?? '0,22'} ${sparkPts.slice(1).map((p) => `L${p}`).join(' ')} L100,28 L0,28 Z`;
+    const fillStr = `M${sparkPts[0] ?? '0,22'} ${sparkPts
+        .slice(1)
+        .map((p) => `L${p}`)
+        .join(' ')} L100,28 L0,28 Z`;
     const lastX = 100;
-    const lastY = sparkMax > 0 ? 22 - ((spark[spark.length - 1] ?? 0) / sparkMax) * 19 : 22;
+    const lastY =
+        sparkMax > 0
+            ? 22 - ((spark[spark.length - 1] ?? 0) / sparkMax) * 19
+            : 22;
 
-    const clockTotal = Math.max(1, metrics.clock_in.on_time + metrics.clock_in.late + metrics.clock_in.no_show);
+    const clockTotal = Math.max(
+        1,
+        metrics.clock_in.on_time +
+            metrics.clock_in.late +
+            metrics.clock_in.no_show,
+    );
     const onTimePct = (metrics.clock_in.on_time / clockTotal) * 100;
     const latePct = (metrics.clock_in.late / clockTotal) * 100;
     const noShowPct = (metrics.clock_in.no_show / clockTotal) * 100;
@@ -167,19 +228,21 @@ export function KpiCards({ metrics }: Props) {
             <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <Activity className="h-4 w-4 text-muted-foreground" />
-                    <h2 className="text-[13px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h2 className="text-[13px] font-semibold tracking-wider text-muted-foreground uppercase">
                         Operational metrics
                     </h2>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-status-success" /> Live
+                        <span className="h-1.5 w-1.5 rounded-full bg-status-success" />{' '}
+                        Live
                     </span>
                     <span>·</span>
                     <span>vs last week</span>
                     <span className="hidden md:inline">·</span>
                     <span className="hidden items-center gap-1 md:inline-flex">
-                        <MousePointer2 className="h-3 w-3" /> right-click for actions
+                        <MousePointer2 className="h-3 w-3" /> right-click for
+                        actions
                     </span>
                 </div>
             </div>
@@ -191,12 +254,15 @@ export function KpiCards({ metrics }: Props) {
                     onContextMenu={ctx.onContextMenu(MENUS['active-clients'])}
                 >
                     <div className="mt-1 flex items-baseline gap-1.5">
-                        <div className="text-2xl font-bold tabular-nums">{metrics.active_clients.value}</div>
+                        <div className="text-2xl font-bold tabular-nums">
+                            {metrics.active_clients.value}
+                        </div>
                         <div
                             className="inline-flex items-center text-[11px] font-medium"
                             style={{ color: 'var(--status-success)' }}
                         >
-                            <TrendingUp className="mr-0.5 h-3 w-3" />+{metrics.active_clients.delta}
+                            <TrendingUp className="mr-0.5 h-3 w-3" />+
+                            {metrics.active_clients.delta}
                         </div>
                     </div>
                     <div className="mt-2 flex h-7 items-end gap-[2px]">
@@ -215,8 +281,12 @@ export function KpiCards({ metrics }: Props) {
                         })}
                     </div>
                     <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-muted-foreground">
-                        <span>12-wk · {metrics.active_clients.new_mtd} new MTD</span>
-                        <span className="tabular-nums">{metrics.active_clients.onboarding} onboarding</span>
+                        <span>
+                            12-wk · {metrics.active_clients.new_mtd} new MTD
+                        </span>
+                        <span className="tabular-nums">
+                            {metrics.active_clients.onboarding} onboarding
+                        </span>
                     </div>
                 </KpiCardShell>
 
@@ -239,11 +309,29 @@ export function KpiCards({ metrics }: Props) {
                             {metrics.hours_week.delta_pct}%
                         </div>
                     </div>
-                    <svg viewBox="0 0 100 28" className="mt-2 h-7 w-full" preserveAspectRatio="none">
+                    <svg
+                        viewBox="0 0 100 28"
+                        className="mt-2 h-7 w-full"
+                        preserveAspectRatio="none"
+                    >
                         <defs>
-                            <linearGradient id="sparkFill" x1="0" x2="0" y1="0" y2="1">
-                                <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.25" />
-                                <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+                            <linearGradient
+                                id="sparkFill"
+                                x1="0"
+                                x2="0"
+                                y1="0"
+                                y2="1"
+                            >
+                                <stop
+                                    offset="0%"
+                                    stopColor="var(--primary)"
+                                    stopOpacity="0.25"
+                                />
+                                <stop
+                                    offset="100%"
+                                    stopColor="var(--primary)"
+                                    stopOpacity="0"
+                                />
                             </linearGradient>
                         </defs>
                         <path d={fillStr} fill="url(#sparkFill)" />
@@ -255,11 +343,21 @@ export function KpiCards({ metrics }: Props) {
                             strokeLinecap="round"
                             points={lineStr}
                         />
-                        <circle cx={lastX} cy={lastY} r="1.6" fill="var(--primary)" />
+                        <circle
+                            cx={lastX}
+                            cy={lastY}
+                            r="1.6"
+                            fill="var(--primary)"
+                        />
                     </svg>
                     <div className="mt-1.5 flex items-center justify-between text-[10.5px] text-muted-foreground">
-                        <span>vs {metrics.hours_week.prev_value.toLocaleString()} last wk</span>
-                        <span className="tabular-nums">avg {metrics.hours_week.avg_shift}h/shift</span>
+                        <span>
+                            vs {metrics.hours_week.prev_value.toLocaleString()}{' '}
+                            last wk
+                        </span>
+                        <span className="tabular-nums">
+                            avg {metrics.hours_week.avg_shift}h/shift
+                        </span>
                     </div>
                 </KpiCardShell>
 
@@ -271,7 +369,14 @@ export function KpiCards({ metrics }: Props) {
                 >
                     <div className="mt-1 flex items-center gap-3">
                         <svg viewBox="0 0 36 36" className="h-14 w-14 shrink-0">
-                            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--muted)" strokeWidth="3.5" />
+                            <circle
+                                cx="18"
+                                cy="18"
+                                r="15.9155"
+                                fill="none"
+                                stroke="var(--muted)"
+                                strokeWidth="3.5"
+                            />
                             <circle
                                 cx="18"
                                 cy="18"
@@ -299,46 +404,70 @@ export function KpiCards({ metrics }: Props) {
                         </svg>
                         <div className="min-w-0 flex-1 space-y-1.5">
                             <div className="flex items-center gap-1.5">
-                                <span className="w-12 shrink-0 text-[9.5px] text-muted-foreground">On time</span>
+                                <span className="w-12 shrink-0 text-[9.5px] text-muted-foreground">
+                                    On time
+                                </span>
                                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                     <div
                                         className="h-full rounded-full"
-                                        style={{ width: `${onTimePct}%`, background: 'var(--status-success)' }}
+                                        style={{
+                                            width: `${onTimePct}%`,
+                                            background: 'var(--status-success)',
+                                        }}
                                     />
                                 </div>
-                                <span className="text-[10px] font-semibold tabular-nums">{metrics.clock_in.on_time}</span>
+                                <span className="text-[10px] font-semibold tabular-nums">
+                                    {metrics.clock_in.on_time}
+                                </span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <span className="w-12 shrink-0 text-[9.5px] text-muted-foreground">Late</span>
+                                <span className="w-12 shrink-0 text-[9.5px] text-muted-foreground">
+                                    Late
+                                </span>
                                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                     <div
                                         className="h-full rounded-full"
-                                        style={{ width: `${latePct}%`, background: 'var(--status-warning)' }}
+                                        style={{
+                                            width: `${latePct}%`,
+                                            background: 'var(--status-warning)',
+                                        }}
                                     />
                                 </div>
-                                <span className="text-[10px] font-semibold tabular-nums">{metrics.clock_in.late}</span>
+                                <span className="text-[10px] font-semibold tabular-nums">
+                                    {metrics.clock_in.late}
+                                </span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <span className="w-12 shrink-0 text-[9.5px] text-muted-foreground">No show</span>
+                                <span className="w-12 shrink-0 text-[9.5px] text-muted-foreground">
+                                    No show
+                                </span>
                                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                     <div
                                         className="h-full rounded-full"
-                                        style={{ width: `${noShowPct}%`, background: 'var(--status-critical)' }}
+                                        style={{
+                                            width: `${noShowPct}%`,
+                                            background:
+                                                'var(--status-critical)',
+                                        }}
                                     />
                                 </div>
-                                <span className="text-[10px] font-semibold tabular-nums">{metrics.clock_in.no_show}</span>
+                                <span className="text-[10px] font-semibold tabular-nums">
+                                    {metrics.clock_in.no_show}
+                                </span>
                             </div>
                         </div>
                     </div>
                     <div className="mt-2 flex items-center justify-between text-[10.5px] text-muted-foreground">
                         <span>
-                            Avg {Math.floor(metrics.clock_in.avg_late_sec / 60)}m {metrics.clock_in.avg_late_sec % 60}s late
+                            Avg {Math.floor(metrics.clock_in.avg_late_sec / 60)}
+                            m {metrics.clock_in.avg_late_sec % 60}s late
                         </span>
                         <span
                             className="inline-flex items-center gap-0.5"
                             style={{ color: 'var(--status-success)' }}
                         >
-                            <TrendingUp className="h-2.5 w-2.5" />+{metrics.clock_in.delta_pp}pp
+                            <TrendingUp className="h-2.5 w-2.5" />+
+                            {metrics.clock_in.delta_pp}pp
                         </span>
                     </div>
                 </KpiCardShell>
@@ -391,11 +520,15 @@ export function KpiCards({ metrics }: Props) {
                         </div>
                         <div
                             className="absolute -top-0.5 h-4 w-0.5 bg-foreground"
-                            style={{ left: `${metrics.compliance.target_pct}%` }}
+                            style={{
+                                left: `${metrics.compliance.target_pct}%`,
+                            }}
                         />
                         <div
                             className="absolute -top-3 -translate-x-1/2 text-[8.5px] font-bold tabular-nums"
-                            style={{ left: `${metrics.compliance.target_pct}%` }}
+                            style={{
+                                left: `${metrics.compliance.target_pct}%`,
+                            }}
                         >
                             {metrics.compliance.target_pct}
                         </div>
@@ -425,7 +558,13 @@ export function KpiCards({ metrics }: Props) {
                     </div>
                 </KpiCardShell>
             </div>
-            <ContextMenu open={ctx.state.open} x={ctx.state.x} y={ctx.state.y} menu={ctx.state.menu} onClose={ctx.close} />
+            <ContextMenu
+                open={ctx.state.open}
+                x={ctx.state.x}
+                y={ctx.state.y}
+                menu={ctx.state.menu}
+                onClose={ctx.close}
+            />
         </section>
     );
 }

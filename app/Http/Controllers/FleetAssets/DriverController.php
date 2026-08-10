@@ -6,111 +6,128 @@ use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\FleetDriverSession;
-use App\Models\FleetDrivingMetric;
+use App\Models\FleetSignal;
 use App\Models\FleetTrip;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DriverController extends Controller
 {
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+
     public function index(Request $request)
     {
-        $query = User::query()
-            ->whereHas('hrDriverEligibility')
-            ->with('hrDriverEligibility');
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
 
-        // CSV export
+        $query = $this->visibleDriversQuery($viewer)
+            ->with([
+                'hrDriverEligibility',
+                'hrEmployeeProfile:id,user_id,is_active',
+            ]);
+        $filters = $this->registerFilters($request);
+
+        if ($filters['search'] !== null) {
+            $search = $filters['search'];
+            $query->where(function (Builder $driverQuery) use ($search): void {
+                $driverQuery->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if ($filters['status'] !== null) {
+            $status = $filters['status'];
+            if ($status === 'expiring_soon') {
+                $query->whereHas('hrDriverEligibility', fn (Builder $eligibility) => $eligibility
+                    ->where('licence_expires_at', '>=', now())
+                    ->where('licence_expires_at', '<=', now()->addDays(60))
+                );
+            } elseif ($status === 'expiring_30') {
+                $query->whereHas('hrDriverEligibility', fn (Builder $eligibility) => $eligibility
+                    ->where('licence_expires_at', '>=', now())
+                    ->where('licence_expires_at', '<=', now()->addDays(30))
+                );
+            } elseif ($status === 'at_risk') {
+                $query->whereHas('hrDriverEligibility', fn (Builder $eligibility) => $eligibility->where(
+                    fn (Builder $risk) => $risk
+                        ->whereIn('status', ['suspended', 'expired'])
+                        ->orWhere('licence_expires_at', '<', now()),
+                ));
+            } else {
+                $eligibilityStatuses = $status === 'pending'
+                    ? ['pending', 'pending_review', 'review_required']
+                    : [$status];
+                $query->whereHas(
+                    'hrDriverEligibility',
+                    fn (Builder $eligibility) => $eligibility->whereIn('status', $eligibilityStatuses),
+                );
+            }
+        }
+
+        $query->orderBy($filters['sort'], $filters['direction']);
+
+        // Export the same validated register query the user is viewing.
         if ($request->input('export') === 'csv') {
-            $exportQuery = (clone $query)->orderBy('name');
-            return response()->streamDownload(function () use ($exportQuery) {
+            $exportQuery = clone $query;
+
+            return response()->streamDownload(function () use ($exportQuery): void {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['Name', 'Email', 'Licence Class', 'Licence Expires', 'Status', 'Can Drive Clients']);
-                foreach ($exportQuery->lazy(200) as $u) {
-                    $e = $u->hrDriverEligibility;
+                foreach ($exportQuery->lazy(200) as $driver) {
+                    $eligibility = $driver->hrDriverEligibility;
                     $this->putCsv($handle, [
-                        $u->name, $u->email,
-                        $e?->licence_class ?? '', optional($e?->licence_expires_at)->format('Y-m-d') ?? '',
-                        $e?->status ?? '', $e?->can_drive_clients ? 'Yes' : 'No',
+                        $driver->name,
+                        $driver->email,
+                        $eligibility?->licence_class ?? '',
+                        optional($eligibility?->licence_expires_at)->format('Y-m-d') ?? '',
+                        $eligibility?->status ?? '',
+                        $eligibility?->can_drive_clients ? 'Yes' : 'No',
                     ]);
                 }
                 fclose($handle);
             }, 'drivers-export.csv');
         }
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('status')) {
-            $status = $request->input('status');
-            if ($status === 'expiring_soon') {
-                $query->whereHas('hrDriverEligibility', fn ($q) => $q
-                    ->where('licence_expires_at', '>=', now())
-                    ->where('licence_expires_at', '<=', now()->addDays(60))
-                );
-            } elseif ($status === 'expiring_30') {
-                // Hero tile drill-down: licences expiring inside 30 days.
-                $query->whereHas('hrDriverEligibility', fn ($q) => $q
-                    ->where('licence_expires_at', '>=', now())
-                    ->where('licence_expires_at', '<=', now()->addDays(30))
-                );
-            } elseif ($status === 'at_risk') {
-                // Hero tile drill-down: suspended/expired status OR licence past its date.
-                $query->whereHas('hrDriverEligibility', fn ($q) => $q->where(fn ($q2) => $q2
-                    ->whereIn('status', ['suspended', 'expired'])
-                    ->orWhere('licence_expires_at', '<', now())
-                ));
-            } else {
-                $query->whereHas('hrDriverEligibility', fn ($q) => $q->where('status', $status));
-            }
-        }
-
-        // Sorting
-        $allowedSorts = ['name', 'email'];
-        $sort = $request->input('sort', 'name');
-        $direction = $request->input('direction', 'asc');
-        if (!in_array($sort, $allowedSorts)) $sort = 'name';
-        if (!in_array($direction, ['asc', 'desc'])) $direction = 'asc';
-        $query->orderBy($sort, $direction);
-
         $drivers = $query->paginate(25)->withQueryString();
-
         $driverIds = $drivers->getCollection()->pluck('id')->all();
-        $assignedVehicles = Asset::query()
+        $visibleVehicles = $this->visibleVehiclesQuery($viewer);
+
+        $assignedVehicles = (clone $visibleVehicles)
             ->whereIn('primary_driver_user_id', $driverIds)
             ->get(['id', 'name', 'asset_tag', 'primary_driver_user_id'])
             ->groupBy('primary_driver_user_id');
 
-        // Get trip counts per driver
-        $tripCounts = FleetDriverSession::query()
+        $sessionCounts = FleetDriverSession::query()
             ->whereIn('user_id', $driverIds)
+            ->whereIn('asset_id', (clone $visibleVehicles)->select('assets.id'))
             ->selectRaw('user_id, COUNT(*) as session_count')
             ->groupBy('user_id')
             ->pluck('session_count', 'user_id');
 
-        // Hero band stats — whole-table (not page-scoped) licence compliance
-        // aggregate; the demo story here is licence status.
         $now = now()->toDateTimeString();
         $in30 = now()->addDays(30)->toDateTimeString();
+        $visibleDriverIds = $this->visibleDriversQuery($viewer)->select('users.id');
         $heroRow = HrDriverEligibility::query()
+            ->whereIn('user_id', $visibleDriverIds)
             ->selectRaw(
-                'COUNT(*) as total, ' .
-                "SUM(CASE WHEN status = 'eligible' AND (licence_expires_at IS NULL OR licence_expires_at >= ?) THEN 1 ELSE 0 END) as active, " .
-                'SUM(CASE WHEN licence_expires_at >= ? AND licence_expires_at <= ? THEN 1 ELSE 0 END) as expiring_30, ' .
-                "SUM(CASE WHEN status IN ('suspended', 'expired') OR licence_expires_at < ? THEN 1 ELSE 0 END) as at_risk, " .
+                'COUNT(*) as total, '.
+                "SUM(CASE WHEN status = 'eligible' AND (licence_expires_at IS NULL OR licence_expires_at >= ?) THEN 1 ELSE 0 END) as active, ".
+                'SUM(CASE WHEN licence_expires_at >= ? AND licence_expires_at <= ? THEN 1 ELSE 0 END) as expiring_30, '.
+                "SUM(CASE WHEN status IN ('suspended', 'expired') OR licence_expires_at < ? THEN 1 ELSE 0 END) as at_risk, ".
                 'SUM(CASE WHEN licence_expires_at IS NOT NULL AND licence_expires_at < ? THEN 1 ELSE 0 END) as licence_expired',
-                [$now, $now, $in30, $now, $now]
+                [$now, $now, $in30, $now, $now],
             )
             ->first();
 
         $sessionsToday = FleetDriverSession::query()
-            ->where('started_at', '>=', now()->startOfDay())
-            ->where('started_at', '<=', now()->endOfDay())
+            ->whereIn('user_id', $this->visibleDriversQuery($viewer)->select('users.id'))
+            ->whereIn('asset_id', (clone $visibleVehicles)->select('assets.id'))
+            ->whereBetween('started_at', [now()->startOfDay(), now()->endOfDay()])
             ->count();
 
         return Inertia::render('fleet-assets/drivers/index', [
@@ -123,22 +140,23 @@ class DriverController extends Controller
                 'sessions_today' => $sessionsToday,
             ],
             'drivers' => [
-                'data' => $drivers->getCollection()->map(fn ($user) => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'eligibility' => $user->hrDriverEligibility ? [
-                        'licence_class' => $user->hrDriverEligibility->licence_class,
-                        'licence_expires_at' => optional($user->hrDriverEligibility->licence_expires_at)->toDateString(),
-                        'status' => $user->hrDriverEligibility->status,
-                        'can_drive_clients' => $user->hrDriverEligibility->can_drive_clients,
+                'data' => $drivers->getCollection()->map(fn (User $driver) => [
+                    'id' => $driver->id,
+                    'hr_profile_id' => $driver->hrEmployeeProfile?->id,
+                    'name' => $driver->name,
+                    'email' => $driver->email,
+                    'eligibility' => $driver->hrDriverEligibility ? [
+                        'licence_class' => $driver->hrDriverEligibility->licence_class,
+                        'licence_expires_at' => optional($driver->hrDriverEligibility->licence_expires_at)->toDateString(),
+                        'status' => $driver->hrDriverEligibility->status,
+                        'can_drive_clients' => $driver->hrDriverEligibility->can_drive_clients,
                     ] : null,
-                    'assigned_vehicles' => ($assignedVehicles->get($user->id) ?? collect())->map(fn ($v) => [
-                        'id' => $v->id,
-                        'name' => $v->name,
-                        'asset_tag' => $v->asset_tag,
+                    'assigned_vehicles' => ($assignedVehicles->get($driver->id) ?? collect())->map(fn (Asset $vehicle) => [
+                        'id' => $vehicle->id,
+                        'name' => $vehicle->name,
+                        'asset_tag' => $vehicle->asset_tag,
                     ])->values(),
-                    'session_count' => $tripCounts->get($user->id, 0),
+                    'session_count' => (int) $sessionCounts->get($driver->id, 0),
                 ])->values(),
                 'links' => $drivers->linkCollection()->toArray(),
                 'meta' => [
@@ -147,169 +165,278 @@ class DriverController extends Controller
                     'total' => $drivers->total(),
                 ],
             ],
-            'filters' => $request->only(['search', 'status']),
+            'filters' => $filters,
         ]);
     }
 
     public function show(Request $request, User $user)
     {
-        $user->load('hrDriverEligibility');
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
 
-        // primary_driver_user_id column requires fleet migrations
-        $assignedVehicles = collect();
+        $user = $this->visibleDriver($viewer, (int) $user->getKey());
+        $visibleVehicles = $this->visibleVehiclesQuery($viewer);
+
+        $assignedVehicles = (clone $visibleVehicles)
+            ->where('primary_driver_user_id', $user->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'asset_tag', 'status'])
+            ->map(fn (Asset $vehicle) => [
+                'id' => $vehicle->id,
+                'name' => $vehicle->name,
+                'asset_tag' => $vehicle->asset_tag,
+                'status' => $vehicle->status,
+            ])
+            ->values();
 
         $sessions = FleetDriverSession::query()
             ->where('user_id', $user->id)
+            ->whereIn('asset_id', (clone $visibleVehicles)->select('assets.id'))
             ->with('asset:id,name,asset_tag')
             ->latest('started_at')
             ->limit(20)
             ->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'asset' => $s->asset ? ['id' => $s->asset->id, 'name' => $s->asset->name] : null,
-                'started_at' => optional($s->started_at)->toISOString(),
-                'ended_at' => optional($s->ended_at)->toISOString(),
-                'status' => $s->status,
-            ])->values();
-
-        $drivingMetrics = FleetDrivingMetric::query()
-            ->whereIn('asset_id', $assignedVehicles->pluck('id'))
-            ->latest('period_start')
-            ->limit(10)
-            ->get()
-            ->map(fn ($m) => [
-                'id' => $m->id,
-                'period_start' => optional($m->period_start)->toDateString(),
-                'period_end' => optional($m->period_end)->toDateString(),
-                'harsh_brake_count' => $m->harsh_brake_count,
-                'accel_count' => $m->accel_count,
-                'speeding_events' => $m->speeding_events,
-                'idle_minutes' => $m->idle_minutes,
-                'score' => $m->score,
+            ->map(fn (FleetDriverSession $session) => [
+                'id' => $session->id,
+                'asset' => $session->asset ? ['id' => $session->asset->id, 'name' => $session->asset->name] : null,
+                'started_at' => optional($session->started_at)->toISOString(),
+                'ended_at' => optional($session->ended_at)->toISOString(),
+                'status' => $session->status,
             ])->values();
 
         $recentTrips = FleetTrip::query()
-            ->whereHas('driverSession', fn ($q) => $q->where('user_id', $user->id))
+            ->whereIn('asset_id', (clone $visibleVehicles)->select('assets.id'))
+            ->whereHas('driverSession', fn (Builder $session) => $session
+                ->where('user_id', $user->id)
+                ->whereColumn('fleet_driver_sessions.asset_id', 'fleet_trips.asset_id'))
             ->with('asset:id,name')
             ->latest('started_at')
             ->limit(20)
             ->get()
-            ->map(fn ($t) => [
-                'id' => $t->id,
-                'asset' => $t->asset ? ['id' => $t->asset->id, 'name' => $t->asset->name] : null,
-                'started_at' => optional($t->started_at)->toISOString(),
-                'ended_at' => optional($t->ended_at)->toISOString(),
-                'distance_km' => $t->distance_km,
-                'status' => $t->status,
+            ->map(fn (FleetTrip $trip) => [
+                'id' => $trip->id,
+                'asset' => $trip->asset ? ['id' => $trip->asset->id, 'name' => $trip->asset->name] : null,
+                'started_at' => optional($trip->started_at)->toISOString(),
+                'ended_at' => optional($trip->ended_at)->toISOString(),
+                'distance_km' => $trip->distance_km,
+                'status' => $trip->status,
             ])->values();
 
         return Inertia::render('fleet-assets/drivers/show', [
             'driver' => [
                 'id' => $user->id,
+                'hr_profile_id' => $user->hrEmployeeProfile->id,
+                'hr_profile_href' => $viewer->canDo('hr.employees.viewAny')
+                    ? '/hr/people/'.$user->hrEmployeeProfile->id
+                    : null,
                 'name' => $user->name,
                 'email' => $user->email,
                 'eligibility' => $user->hrDriverEligibility,
-                'hr_status' => $user->status ?? null,
+                'hr_status' => $user->hrEmployeeProfile->is_active ? 'active' : 'inactive',
             ],
             'assigned_vehicles' => $assignedVehicles,
             'sessions' => $sessions,
-            'driving_metrics' => $drivingMetrics,
+            // FleetDrivingMetric is an asset/day roll-up with no driver or
+            // session provenance. Never present it as a driver's score.
+            'driving_metrics' => [],
             'recent_trips' => $recentTrips,
-            // Scorecard tab payload — several aggregate queries, so it is only
-            // computed when the tab is actually open: eager on a full load with
-            // ?tab=scorecard, otherwise deferred behind a partial reload.
             'scorecard' => $request->input('tab') === 'scorecard'
-                ? $this->scorecardData($user, $request)
-                : Inertia::optional(fn () => $this->scorecardData($user, $request)),
+                ? $this->scorecardData($user, $viewer, $request)
+                : Inertia::optional(fn () => $this->scorecardData($user, $viewer, $request)),
         ]);
     }
 
     /**
-     * Legacy GET /drivers/{user}/scorecard shim — the scorecard is now a tab on
-     * the driver profile. Redirect there, preserving the period selection.
+     * Legacy GET /drivers/{user}/scorecard shim. Direct-object scope is checked
+     * before redirecting to the canonical profile tab.
      */
     public function scorecard(Request $request, User $user)
     {
+        $viewer = $request->user();
+        abort_unless($viewer, 403);
+        $user = $this->visibleDriver($viewer, (int) $user->getKey());
+
         $params = ['tab' => 'scorecard'];
         if ($request->filled('period')) {
             $params['period'] = (string) (int) $request->input('period');
         }
 
-        return redirect('/fleet-assets/drivers/' . $user->id . '?' . http_build_query($params));
+        return redirect('/fleet-assets/drivers/'.$user->id.'?'.http_build_query($params));
     }
 
-    /**
-     * Safety-score payload for the Scorecard tab (formerly the standalone
-     * scorecard page — computation preserved exactly).
-     *
-     * @return array<string, mixed>
-     */
-    private function scorecardData(User $user, Request $request): array
+    /** @return array<string, mixed> */
+    private function scorecardData(User $driver, User $viewer, Request $request): array
     {
-        $period = $request->input('period', '30');
-        $days = (int) $period;
+        $requestedPeriod = (int) $request->input('period', 30);
+        $days = in_array($requestedPeriod, [7, 30, 90], true) ? $requestedPeriod : 30;
+        $period = (string) $days;
         $periodStart = now()->subDays($days)->startOfDay();
-        $previousPeriodStart = now()->subDays($days * 2)->startOfDay();
-
-        // Get driving metrics for this driver's sessions
-        $sessionAssetIds = FleetDriverSession::query()
-            ->where('user_id', $user->id)
-            ->pluck('asset_id')
-            ->unique();
-
-        $currentMetrics = FleetDrivingMetric::query()
-            ->whereIn('asset_id', $sessionAssetIds)
-            ->where('period_start', '>=', $periodStart)
-            ->get();
-
-        $previousMetrics = FleetDrivingMetric::query()
-            ->whereIn('asset_id', $sessionAssetIds)
-            ->where('period_start', '>=', $previousPeriodStart)
-            ->where('period_start', '<', $periodStart)
-            ->get();
-
-        $currentScore = $currentMetrics->avg('score') ?? 0;
-        $previousScore = $previousMetrics->avg('score') ?? 0;
+        $visibleVehicles = $this->visibleVehiclesQuery($viewer);
 
         $totalDistance = FleetTrip::query()
-            ->whereHas('driverSession', fn ($q) => $q->where('user_id', $user->id))
+            ->whereIn('asset_id', (clone $visibleVehicles)->select('assets.id'))
+            ->whereHas('driverSession', fn (Builder $session) => $session
+                ->where('user_id', $driver->id)
+                ->whereColumn('fleet_driver_sessions.asset_id', 'fleet_trips.asset_id'))
             ->where('started_at', '>=', $periodStart)
             ->sum('distance_km');
 
-        // Fleet average for comparison
-        $fleetAvgScore = FleetDrivingMetric::query()
-            ->where('period_start', '>=', $periodStart)
-            ->avg('score') ?? 0;
-
-        // Recent driving events (signals)
-        $recentEvents = \App\Models\FleetSignal::query()
-            ->whereIn('asset_id', $sessionAssetIds)
+        $recentEvents = FleetSignal::query()
+            ->whereIn('asset_id', (clone $visibleVehicles)->select('assets.id'))
+            ->whereHas('driverSession', fn (Builder $session) => $session
+                ->where('user_id', $driver->id)
+                ->whereColumn('fleet_driver_sessions.asset_id', 'fleet_signals.asset_id'))
             ->where('occurred_at', '>=', $periodStart)
             ->whereIn('signal_type', ['harsh_brake', 'harsh_accel', 'speeding', 'idle'])
             ->latest('occurred_at')
             ->limit(20)
             ->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'type' => $s->signal_type,
-                'severity' => $s->severity_hint,
-                'occurred_at' => optional($s->occurred_at)->toISOString(),
-                'asset_id' => $s->asset_id,
+            ->map(fn (FleetSignal $signal) => [
+                'id' => $signal->id,
+                'type' => $signal->signal_type,
+                'severity' => $signal->severity_hint,
+                'occurred_at' => optional($signal->occurred_at)->toISOString(),
+                'asset_id' => $signal->asset_id,
             ])->values();
 
         return [
             'period' => $period,
-            'score' => round($currentScore),
-            'previous_score' => round($previousScore),
-            'fleet_avg_score' => round($fleetAvgScore),
+            'score' => null,
+            'previous_score' => null,
+            'fleet_avg_score' => null,
+            'evidence_note' => 'Retained safety scores are vehicle-level and cannot be attributed to one driver. Driver-session trips and recent signals remain available below.',
             'metrics' => [
-                'harsh_brakes' => $currentMetrics->sum('harsh_brake_count'),
-                'hard_accels' => $currentMetrics->sum('accel_count'),
-                'speeding_events' => $currentMetrics->sum('speeding_events'),
-                'idle_minutes' => $currentMetrics->sum('idle_minutes'),
+                'harsh_brakes' => null,
+                'hard_accels' => null,
+                'speeding_events' => null,
+                'idle_minutes' => null,
                 'total_distance_km' => round((float) $totalDistance, 1),
             ],
             'recent_events' => $recentEvents,
         ];
+    }
+
+    /** @return array{search: ?string, status: ?string, sort: string, direction: string} */
+    private function registerFilters(Request $request): array
+    {
+        $search = $request->input('search');
+        $search = is_string($search) ? trim($search) : '';
+        $status = $request->input('status');
+        $status = is_string($status) ? trim($status) : '';
+        $allowedStatuses = [
+            'eligible',
+            'pending',
+            'pending_review',
+            'review_required',
+            'suspended',
+            'expired',
+            'expiring_soon',
+            'expiring_30',
+            'at_risk',
+        ];
+        $sort = $request->input('sort');
+        $sort = is_string($sort) && in_array($sort, ['name', 'email'], true)
+            ? $sort
+            : 'name';
+        $direction = $request->input('direction');
+        $direction = is_string($direction) && in_array($direction, ['asc', 'desc'], true)
+            ? $direction
+            : 'asc';
+
+        return [
+            'search' => $search !== '' ? mb_substr($search, 0, 200) : null,
+            'status' => in_array($status, $allowedStatuses, true) ? $status : null,
+            'sort' => $sort,
+            'direction' => $direction,
+        ];
+    }
+
+    private function visibleDriver(User $viewer, int $driverId): User
+    {
+        $driver = $this->visibleDriversQuery($viewer)
+            ->with([
+                'hrDriverEligibility',
+                'hrEmployeeProfile:id,user_id,is_active',
+            ])
+            ->whereKey($driverId)
+            ->first();
+        abort_unless($driver, 404);
+
+        return $driver;
+    }
+
+    /** @return Builder<User> */
+    private function visibleDriversQuery(User $viewer): Builder
+    {
+        $query = User::query()->whereHas('hrDriverEligibility');
+        $this->siteAccess->applyStaffScope($query, $viewer, self::SITE_BYPASS_PERMISSIONS);
+
+        return $query;
+    }
+
+    /** @return Builder<Asset> */
+    private function visibleVehiclesQuery(User $viewer): Builder
+    {
+        $siteIds = $this->siteAccess->accessibleSiteIds($viewer, self::SITE_BYPASS_PERMISSIONS);
+
+        return $this->applyAssetSiteScope(Asset::query()->vehicles(), $siteIds);
+    }
+
+    /** @param list<int> $siteIds */
+    private function applyAssetSiteScope(Builder $query, array $siteIds): Builder
+    {
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $siteColumn = $query->qualifyColumn('site_id');
+        $homeSiteColumn = $query->qualifyColumn('home_site_id');
+        $clientColumn = $query->qualifyColumn('client_id');
+
+        return $query->where(function (Builder $provenance) use (
+            $siteIds,
+            $siteColumn,
+            $homeSiteColumn,
+            $clientColumn,
+        ): void {
+            $provenance->where(function (Builder $directSite) use ($siteIds, $siteColumn, $clientColumn): void {
+                $directSite->whereIn($siteColumn, $siteIds)
+                    ->where(function (Builder $clientAgreement) use ($siteColumn, $clientColumn): void {
+                        $clientAgreement->whereNull($clientColumn)
+                            ->orWhereHas('client', fn (Builder $client) => $client->whereColumn(
+                                $client->qualifyColumn('site_id'),
+                                $siteColumn,
+                            ));
+                    });
+            })->orWhere(function (Builder $homeSite) use (
+                $siteIds,
+                $siteColumn,
+                $homeSiteColumn,
+                $clientColumn,
+            ): void {
+                $homeSite->whereNull($siteColumn)
+                    ->whereIn($homeSiteColumn, $siteIds)
+                    ->where(function (Builder $clientAgreement) use ($homeSiteColumn, $clientColumn): void {
+                        $clientAgreement->whereNull($clientColumn)
+                            ->orWhereHas('client', fn (Builder $client) => $client->whereColumn(
+                                $client->qualifyColumn('site_id'),
+                                $homeSiteColumn,
+                            ));
+                    });
+            })->orWhere(function (Builder $clientSite) use (
+                $siteIds,
+                $siteColumn,
+                $homeSiteColumn,
+                $clientColumn,
+            ): void {
+                $clientSite->whereNull($siteColumn)
+                    ->whereNull($homeSiteColumn)
+                    ->whereNotNull($clientColumn)
+                    ->whereHas('client', fn (Builder $client) => $client->whereIn(
+                        $client->qualifyColumn('site_id'),
+                        $siteIds,
+                    ));
+            });
+        });
     }
 }

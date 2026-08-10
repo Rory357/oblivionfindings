@@ -5,7 +5,12 @@
  * fires the request and closes the dialog on success.
  */
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
@@ -54,7 +59,11 @@ export function ReasonDialog({
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogTitle className="text-left text-lg">{title}</DialogTitle>
-                {description ? <DialogDescription className="text-left">{description}</DialogDescription> : null}
+                {description ? (
+                    <DialogDescription className="text-left">
+                        {description}
+                    </DialogDescription>
+                ) : null}
                 <div className="grid gap-1.5">
                     <Label htmlFor={fieldId}>{label}</Label>
                     <Textarea
@@ -75,7 +84,9 @@ export function ReasonDialog({
                         onClick={submit}
                         disabled={submitting || !reason.trim()}
                     >
-                        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                        {submitting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : null}
                         {confirmLabel}
                     </Button>
                 </div>

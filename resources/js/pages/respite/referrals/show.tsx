@@ -1,9 +1,9 @@
-import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 
 type Props = {
@@ -18,10 +18,15 @@ export default function RespiteReferralShow({ referral }: Props) {
     });
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Respite', href: '/respite' },
-            { title: 'Referral', href: `/respite/referrals/${referral.id}` },
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                {
+                    title: 'Referral',
+                    href: `/respite/referrals/${referral.id}`,
+                },
+            ]}
+        >
             <Head title="Respite Referral" />
 
             <PageLayout
@@ -29,11 +34,18 @@ export default function RespiteReferralShow({ referral }: Props) {
                     <PageHero
                         variant="compact"
                         backHref="/respite/referrals"
-                        title={`${referral.client?.first_name ?? ''} ${referral.client?.last_name ?? ''}`.trim() || 'Referral'}
+                        title={
+                            `${referral.client?.first_name ?? ''} ${referral.client?.last_name ?? ''}`.trim() ||
+                            'Referral'
+                        }
                         actions={
                             <div className="flex flex-wrap gap-2">
-                                <Badge variant="outline">{referral.status}</Badge>
-                                <Badge variant="outline">{referral.urgency}</Badge>
+                                <Badge variant="outline">
+                                    {referral.status}
+                                </Badge>
+                                <Badge variant="outline">
+                                    {referral.urgency}
+                                </Badge>
                             </div>
                         }
                     />
@@ -43,11 +55,16 @@ export default function RespiteReferralShow({ referral }: Props) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Referral Details</CardTitle>
+                        <CardTitle className="text-base">
+                            Referral Details
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm text-muted-foreground">
                         <div>Referrer: {referral.referrer_name}</div>
-                        <div>Contact: {referral.referrer_contact || 'Not provided'}</div>
+                        <div>
+                            Contact:{' '}
+                            {referral.referrer_contact || 'Not provided'}
+                        </div>
                         <div>Reason: {referral.referral_reason}</div>
                     </CardContent>
                 </Card>
@@ -65,42 +82,79 @@ export default function RespiteReferralShow({ referral }: Props) {
                         <CardContent className="space-y-3">
                             <div className="grid gap-3 sm:grid-cols-3">
                                 <div>
-                                    <label className="text-xs text-muted-foreground">Status</label>
+                                    <label className="text-xs text-muted-foreground">
+                                        Status
+                                    </label>
                                     <select
                                         className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
                                         value={form.data.status}
-                                        onChange={(e) => form.setData('status', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'status',
+                                                e.target.value,
+                                            )
+                                        }
                                     >
-                                        {['received', 'triaged', 'accepted', 'declined'].map((s) => (
-                                            <option key={s} value={s}>{s}</option>
+                                        {[
+                                            'received',
+                                            'triaged',
+                                            'accepted',
+                                            'declined',
+                                        ].map((s) => (
+                                            <option key={s} value={s}>
+                                                {s}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-muted-foreground">Risk Level</label>
+                                    <label className="text-xs text-muted-foreground">
+                                        Risk Level
+                                    </label>
                                     <select
                                         className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
                                         value={form.data.risk_level}
-                                        onChange={(e) => form.setData('risk_level', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'risk_level',
+                                                e.target.value,
+                                            )
+                                        }
                                     >
                                         <option value="">Not set</option>
-                                        {['low', 'medium', 'high', 'critical'].map((s) => (
-                                            <option key={s} value={s}>{s}</option>
+                                        {[
+                                            'low',
+                                            'medium',
+                                            'high',
+                                            'critical',
+                                        ].map((s) => (
+                                            <option key={s} value={s}>
+                                                {s}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs text-muted-foreground">Triage Notes</label>
+                                <label className="text-xs text-muted-foreground">
+                                    Triage Notes
+                                </label>
                                 <textarea
                                     className="mt-1 w-full rounded-md border px-3 py-2 text-sm"
                                     rows={4}
                                     value={form.data.triage_notes}
-                                    onChange={(e) => form.setData('triage_notes', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'triage_notes',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
                             <div className="flex justify-end">
-                                <Button type="submit" size="sm">Update</Button>
+                                <Button type="submit" size="sm">
+                                    Update
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

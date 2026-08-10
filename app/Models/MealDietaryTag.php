@@ -3,15 +3,15 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class MealDietaryTag extends Model
 {
-    use AuditableChanges;
+    use AuditableChanges, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'key',
         'label',
         'kind',

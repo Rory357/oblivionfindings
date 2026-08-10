@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\ItMailboxConnection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,7 +11,7 @@ use Laravel\Socialite\Facades\Socialite;
 /**
  * Admin OAuth connect/disconnect for the IT support-mailbox connection
  * (email-to-ticket, E6a). Mirrors CalendarSyncOAuthController — never logs a
- * user in; stores an org-level {@see ItMailboxConnection} whose token the
+ * user in; stores an application-level {@see ItMailboxConnection} whose token the
  * hourly PollItMailboxJob uses to read the support inbox.
  *
  * Scope note: markRead WRITES (Graph isRead / Gmail label removal), so the
@@ -21,8 +20,6 @@ use Laravel\Socialite\Facades\Socialite;
  */
 class ItMailboxOAuthController extends Controller
 {
-    use ResolvesHrTenant;
-
     /** Provider keys → Socialite driver. */
     private const DRIVERS = [
         ItMailboxConnection::PROVIDER_GOOGLE => 'google',
@@ -84,7 +81,6 @@ class ItMailboxOAuthController extends Controller
         // delegated support mailbox survives a token reconnect.
         ItMailboxConnection::updateOrCreate(
             [
-                'tenant_id' => $this->resolveHrTenantIdForUser($request->user()),
                 'provider' => $provider,
             ],
             [
@@ -110,7 +106,6 @@ class ItMailboxOAuthController extends Controller
         $this->driver($provider); // validates provider
 
         ItMailboxConnection::query()
-            ->where('tenant_id', $this->resolveHrTenantIdForUser($request->user()))
             ->where('provider', $provider)
             ->delete();
 
@@ -138,6 +133,6 @@ class ItMailboxOAuthController extends Controller
 
     private function authorizeManage(Request $request): void
     {
-        abort_unless($request->user()?->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($request->user()?->canDo('integrations.manage_secrets'), 403);
     }
 }

@@ -32,14 +32,12 @@ class ControlRoomIncidentReopenGateTest extends TestCase
 
         $this->seed(RbacSeeder::class);
         $this->admin = User::factory()->create([
-            'organization_id' => 1,
             'role' => 'admin',
             'approved_at' => now(),
         ]);
         $this->admin->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
-        $this->site = Site::factory()->create(['tenant_id' => 1]);
+        $this->site = Site::factory()->create();
         $this->client = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
@@ -119,9 +117,8 @@ class ControlRoomIncidentReopenGateTest extends TestCase
 
     public function test_incident_reopen_rejects_a_poisoned_foreign_alert_link_without_mutating_either_record(): void
     {
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $foreignSite = Site::factory()->create();
         $foreignClient = Client::factory()->create([
-            'organization_id' => 2,
             'site_id' => $foreignSite->id,
             'status' => 'active',
         ]);
@@ -141,7 +138,7 @@ class ControlRoomIncidentReopenGateTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/incidents/{$incident->id}/reopen", [
-                'reopened_reason' => 'This forged link must not cross the tenant boundary.',
+                'reopened_reason' => 'This forged link must not cross the Site ownership boundary.',
             ])
             ->assertNotFound();
 
@@ -201,9 +198,8 @@ class ControlRoomIncidentReopenGateTest extends TestCase
 
     public function test_operational_reopen_rejects_a_foreign_incident_that_claims_the_local_alert(): void
     {
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $foreignSite = Site::factory()->create();
         $foreignClient = Client::factory()->create([
-            'organization_id' => 2,
             'site_id' => $foreignSite->id,
         ]);
         $alert = ControlRoomAlert::factory()->closed()->create([
@@ -216,7 +212,7 @@ class ControlRoomIncidentReopenGateTest extends TestCase
             'control_room_alert_id' => $alert->id,
             'reopened_at' => now(),
             'reopened_by' => $this->admin->id,
-            'reopened_reason' => 'Poisoned cross-tenant relationship.',
+            'reopened_reason' => 'Poisoned cross-Site relationship.',
         ]);
         $alert->forceFill([
             'context' => [
@@ -230,10 +226,14 @@ class ControlRoomIncidentReopenGateTest extends TestCase
         ])->save();
 
         $this->actingAs($this->admin)
+            ->from("/control-room/alerts/{$alert->id}")
             ->post("/control-room/alerts/{$alert->id}/reopen-for-incident", [
                 'reason' => 'This must not cross the ownership boundary.',
             ])
-            ->assertForbidden();
+            ->assertRedirect("/control-room/alerts/{$alert->id}")
+            ->assertSessionHasErrors([
+                'alert' => 'The linked incident is not available for this operational alert.',
+            ]);
 
         $alert->refresh();
         $this->assertSame(ControlRoomAlert::STATUS_CLOSED, $alert->status);

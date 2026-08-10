@@ -4,15 +4,21 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
+use App\Models\CarePlanGoal;
 use App\Models\Client;
 use App\Models\ClientNote;
+use App\Models\Shift;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ProgressNoteController extends Controller
 {
     use HandlesOfflineSubmission;
+
+    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
 
     /*
      * The standalone progress-notes index page was retired in the client
@@ -28,44 +34,12 @@ class ProgressNoteController extends Controller
         abort_unless($auth && $auth->canDo('progress_notes.create'), 403);
 
         $clientId = $request->integer('client_id');
-        $organizationId = $auth->organization_id;
         $data = $request->validate([
-            'client_id' => [
-                'required',
-                'integer',
-                Rule::exists('clients', 'id')->where(
-                    fn ($query) => $query->when(
-                        $organizationId,
-                        fn ($scoped) => $scoped->where('organization_id', $organizationId),
-                    ),
-                ),
-            ],
+            'client_id' => ['required', 'integer', 'exists:clients,id'],
             'content' => ['required', 'string'],
             'note_type' => ['required', 'string', 'max:100'],
-            'shift_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('shifts', 'id')->where(
-                    fn ($query) => $query
-                        ->where('client_id', $clientId)
-                        ->when(
-                            $organizationId,
-                            fn ($scoped) => $scoped->where('organization_id', $organizationId),
-                        ),
-                ),
-            ],
-            'care_plan_goal_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('care_plan_goals', 'id')->where(
-                    fn ($query) => $query
-                        ->where('client_id', $clientId)
-                        ->when(
-                            $organizationId,
-                            fn ($scoped) => $scoped->where('organization_id', $organizationId),
-                        ),
-                ),
-            ],
+            'shift_id' => ['nullable', 'integer'],
+            'care_plan_goal_id' => ['nullable', 'integer'],
             'mood_rating' => ['nullable', 'integer', 'min:1', 'max:10'],
             'emotions' => ['nullable', 'array'],
             'emotions.*' => ['string', 'in:happy,calm,anxious,sad,frustrated,excited,tired,confused'],
@@ -77,6 +51,30 @@ class ProgressNoteController extends Controller
 
         $client = Client::query()->findOrFail($data['client_id']);
         $this->authorize('view', $client);
+
+        if (! empty($data['shift_id'])) {
+            $shift = $this->siteAccess
+                ->applyShiftScope(Shift::query(), $auth, ['clients.viewAny'])
+                ->where('client_id', $clientId)
+                ->find((int) $data['shift_id']);
+            if (! $shift || (int) ($shift->site_id ?: $shift->client?->site_id) !== (int) $client->site_id) {
+                throw ValidationException::withMessages([
+                    'shift_id' => 'Choose a Shift assigned to this Client and Site.',
+                ]);
+            }
+        }
+
+        if (! empty($data['care_plan_goal_id'])) {
+            $goal = CarePlanGoal::query()
+                ->where('client_id', $clientId)
+                ->whereHas('carePlan', fn (Builder $planQuery) => $planQuery->where('client_id', $clientId))
+                ->find((int) $data['care_plan_goal_id']);
+            if (! $goal) {
+                throw ValidationException::withMessages([
+                    'care_plan_goal_id' => 'Choose a care-plan goal assigned to this Client.',
+                ]);
+            }
+        }
 
         return $this->runOfflineSubmissionOnce('progress_note', $data, function () use ($auth, $data) {
             return $this->createProgressNote($auth, $data);
@@ -91,7 +89,6 @@ class ProgressNoteController extends Controller
         };
 
         ClientNote::create([
-            'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
             'body' => $data['content'],
             'type' => 'progress_note',
@@ -173,10 +170,12 @@ class ProgressNoteController extends Controller
     {
         $scoped = fn () => ClientNote::query()
             ->where('type', 'progress_note')
-            ->when(
-                $auth->organization_id,
-                fn ($query) => $query->where('organization_id', $auth->organization_id),
-            );
+            ->forUser($auth)
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
+                $clientQuery,
+                $auth,
+                ['clients.viewAny'],
+            ));
 
         $migratedLegacy = $scoped()
             ->where('legacy_progress_note_id', $note)

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Roadmap\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,11 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ChangeLogEntry extends Model
 {
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_change_log_entries';
 
     protected $fillable = [
-        'tenant_id',
         'entity_type',
         'entity_id',
         'change_type',

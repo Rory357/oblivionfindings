@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 
@@ -31,8 +32,22 @@ beforeEach(function () {
         $this->leaver->roles()->syncWithoutDetaching([$supportRole->id]);
     }
 
+    $this->site = Site::factory()->create(['name' => 'Rehire Allowed Site']);
+    HrEmployeeProfile::query()->create([
+        'user_id' => $this->hr->id,
+        'employee_number' => 'EMP-REHIRE-VIEWER',
+        'work_email' => $this->hr->email,
+        'position_title' => 'HR Manager',
+        'position_role' => 'hr',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'end_date' => null,
+        'is_active' => true,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+    ]);
+
     $this->profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->leaver->id,
         'employee_number' => 'EMP-'.str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
         'work_email' => $this->leaver->email,
@@ -44,6 +59,8 @@ beforeEach(function () {
         'end_date' => now()->subMonths(6)->toDateString(),
         'termination_reason' => 'resigned',
         'is_active' => false,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
     ]);
 });
 
@@ -88,7 +105,6 @@ test('rehiring an inactive profile reactivates it, archives the prior stint and 
 
 test('rehire generates a fresh onboarding checklist even though an old completed one exists', function () {
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'support_worker',
         'site_type' => 'all',
         'tasks' => [
@@ -107,7 +123,6 @@ test('rehire generates a fresh onboarding checklist even though an old completed
 
     // The first stint's checklist — long completed.
     $old = HrOnboardingChecklist::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $this->profile->id,
         'template_key' => 'support_worker:all',
         'status' => 'completed',
@@ -150,22 +165,23 @@ test('rehire is rejected for an active profile', function () {
     expect($this->profile->fresh()->employment_history)->toBeNull();
 });
 
-test('feedback picker excludes inactive-profile users but keeps profile-less admins', function () {
+test('feedback picker includes only current staff profiles', function () {
     $active = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $active->id,
         'employee_number' => 'EMP-'.str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
         'work_email' => $active->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
+        'primary_site_id' => $this->site->id,
         'employment_type' => 'full_time',
         'contract_type' => 'individual',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
     ]);
 
-    // A profile-less user (e.g. an admin) must stay selectable.
+    // Application administration is not evidence that someone is a current
+    // staff subject or reviewer in the HR feedback workflow.
     $admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
 
     $response = $this->actingAs($this->hr)->get('/hr/feedback');
@@ -174,14 +190,16 @@ test('feedback picker excludes inactive-profile users but keeps profile-less adm
     $ids = collect($response->inertiaProps('wizard.employees'))->pluck('id');
 
     expect($ids)->toContain($active->id);
-    expect($ids)->toContain($admin->id);
+    expect($ids)->not->toContain($admin->id);
     expect($ids)->not->toContain($this->leaver->id);
 });
 
 test('training enrolment picker excludes inactive-profile users', function () {
     $active = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $active->roles()->syncWithoutDetaching([
+        Role::query()->where('name', 'support_worker')->firstOrFail()->id,
+    ]);
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $active->id,
         'employee_number' => 'EMP-'.str_pad((string) random_int(1, 99999), 5, '0', STR_PAD_LEFT),
         'work_email' => $active->email,
@@ -190,7 +208,10 @@ test('training enrolment picker excludes inactive-profile users', function () {
         'employment_type' => 'full_time',
         'contract_type' => 'individual',
         'start_date' => now()->subYear()->toDateString(),
+        'end_date' => null,
         'is_active' => true,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
     ]);
 
     $response = $this->actingAs($this->hr)->get('/hr/training');

@@ -13,17 +13,48 @@ use App\Domain\Hr\Models\HrKudosReaction;
 use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Notifications\FeedReplyNotification;
 use App\Domain\Hr\Notifications\KudosReceivedNotification;
-use App\Domain\Hr\Services\AnnouncementAudienceResolver;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class FeedService
 {
+    public function __construct(
+        private readonly AnnouncementAudienceResolver $announcementAudiences,
+        private readonly HrAudienceAccessService $audiences,
+        private readonly HrCurrentStaffService $currentStaff,
+    ) {}
+
+    public function canViewKudos(HrKudos $kudos, User $viewer): bool
+    {
+        if (! $this->currentStaff->isCurrent($viewer)) {
+            return false;
+        }
+
+        if (in_array((int) $viewer->id, [(int) $kudos->from_user_id, (int) $kudos->to_user_id], true)) {
+            return true;
+        }
+
+        $post = $kudos->feedPost()->first();
+        if (! $post instanceof HrFeedPost) {
+            return false;
+        }
+
+        $targets = [[
+            'type' => $post->target_audience ?: 'all',
+            'value' => $post->target_value,
+        ]];
+
+        return $this->audiences->resolveUsers($targets)
+            ->contains(fn (User $recipient) => (int) $recipient->id === (int) $viewer->id);
+    }
+
     /**
      * Kudos *values* — what the colleague demonstrated (shown as the value badge).
      */
@@ -82,13 +113,18 @@ class FeedService
     /**
      * Create a new feed post.
      */
-    public function createPost(User $user, array $data, ?int $tenantId = null): HrFeedPost
+    public function createPost(User $user, array $data): HrFeedPost
     {
-        return DB::transaction(function () use ($user, $data, $tenantId) {
+        if (! $this->currentStaff->isCurrent($user)) {
+            throw ValidationException::withMessages([
+                'content' => 'Only current approved staff can publish to the community feed.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($user, $data) {
             $targetsSite = ($data['target_audience'] ?? 'all') === 'site' && ! empty($data['target_value']);
 
             return HrFeedPost::create([
-                'tenant_id' => $tenantId ?? $user->tenant_id,
                 'user_id' => $user->id,
                 'post_type' => $data['post_type'] ?? 'update',
                 'kind' => in_array($data['kind'] ?? null, self::POST_KINDS, true) ? $data['kind'] : null,
@@ -106,10 +142,9 @@ class FeedService
      */
     public function attachToPost(HrFeedPost $post, UploadedFile $file, int $userId): HrFeedAttachment
     {
-        $path = $file->store('hr/feed/'.$post->tenant_id, 'private');
+        $path = $file->store('hr/feed/'.$post->getKey(), 'private');
 
         return HrFeedAttachment::create([
-            'tenant_id' => $post->tenant_id,
             'feed_post_id' => $post->id,
             'uploaded_by' => $userId,
             'disk' => 'private',
@@ -123,15 +158,19 @@ class FeedService
     /**
      * Send kudos to another user. Also creates a corresponding feed post.
      */
-    public function sendKudos(User $from, int $toUserId, string $category, string $message, ?int $tenantId = null, ?string $impact = null): HrKudos
+    public function sendKudos(User $from, int $toUserId, string $category, string $message, ?string $impact = null): HrKudos
     {
-        return DB::transaction(function () use ($from, $toUserId, $category, $message, $tenantId, $impact) {
-            $recipient = User::findOrFail($toUserId);
-            $resolvedTenantId = $tenantId ?? $from->tenant_id;
+        if (! $this->currentStaff->isCurrent($from) || ! $this->currentStaff->isCurrent($toUserId)) {
+            throw ValidationException::withMessages([
+                'to_user_id' => 'Recognition can only be sent between current approved staff.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($from, $toUserId, $category, $message, $impact) {
+            $recipient = User::query()->findOrFail($toUserId);
 
             // Create a feed post for the kudos
             $feedPost = HrFeedPost::create([
-                'tenant_id' => $resolvedTenantId,
                 'user_id' => $from->id,
                 'post_type' => 'kudos',
                 'content' => $message,
@@ -139,7 +178,6 @@ class FeedService
             ]);
 
             $kudos = HrKudos::create([
-                'tenant_id' => $resolvedTenantId,
                 'from_user_id' => $from->id,
                 'to_user_id' => $toUserId,
                 'category' => $category,
@@ -176,7 +214,7 @@ class FeedService
      * @param  array<int|string>  $toUserIds
      * @return Collection<int, HrKudos>
      */
-    public function sendKudosToMany(User $from, array $toUserIds, string $category, string $message, ?int $tenantId = null, ?string $impact = null): Collection
+    public function sendKudosToMany(User $from, array $toUserIds, string $category, string $message, ?string $impact = null): Collection
     {
         $ids = collect($toUserIds)
             ->map(fn ($v) => (int) $v)
@@ -185,7 +223,7 @@ class FeedService
             ->values();
 
         return DB::transaction(fn () => $ids->map(
-            fn (int $id) => $this->sendKudos($from, $id, $category, $message, $tenantId, $impact),
+            fn (int $id) => $this->sendKudos($from, $id, $category, $message, $impact),
         ));
     }
 
@@ -209,12 +247,11 @@ class FeedService
 
         try {
             HrKudosReaction::create([
-                'tenant_id' => $kudos->tenant_id,
                 'kudos_id' => $kudos->id,
                 'user_id' => $userId,
                 'emoji' => $emoji,
             ]);
-        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException) {
             // A concurrent identical reaction won the race (rapid double-click) —
             // the unique(kudos_id,user_id,emoji) index already holds it. No-op.
         }
@@ -229,7 +266,6 @@ class FeedService
     public function addReply(HrKudos $kudos, int $userId, string $body): HrKudosReply
     {
         $reply = HrKudosReply::create([
-            'tenant_id' => $kudos->tenant_id,
             'kudos_id' => $kudos->id,
             'user_id' => $userId,
             'body' => $body,
@@ -276,7 +312,7 @@ class FeedService
      * Returns true when now active, false when removed. Authorisation is the
      * caller's concern.
      */
-    public function toggleFeedReaction(string $subjectType, int $subjectId, int $tenantId, int $userId, string $emoji): bool
+    public function toggleFeedReaction(string $subjectType, int $subjectId, int $userId, string $emoji): bool
     {
         $existing = HrFeedReaction::where('subject_type', $subjectType)
             ->where('subject_id', $subjectId)
@@ -292,23 +328,21 @@ class FeedService
 
         try {
             HrFeedReaction::create([
-                'tenant_id' => $tenantId,
                 'subject_type' => $subjectType,
                 'subject_id' => $subjectId,
                 'user_id' => $userId,
                 'emoji' => $emoji,
             ]);
-        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException) {
             // A concurrent identical reaction won the race — already on. No-op.
         }
 
         return true;
     }
 
-    public function addFeedReply(string $subjectType, int $subjectId, int $tenantId, int $userId, string $body): HrFeedReply
+    public function addFeedReply(string $subjectType, int $subjectId, int $userId, string $body): HrFeedReply
     {
         $reply = HrFeedReply::create([
-            'tenant_id' => $tenantId,
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'user_id' => $userId,
@@ -318,7 +352,7 @@ class FeedService
         // Tell a post's author that someone replied. (Announcements are org-wide;
         // reply-to-announcement notifications are a separate follow-up.)
         if ($subjectType === 'post') {
-            $authorId = HrFeedPost::where('tenant_id', $tenantId)->whereKey($subjectId)->value('user_id');
+            $authorId = HrFeedPost::query()->whereKey($subjectId)->value('user_id');
             if ($authorId) {
                 $this->notifyReply((int) $authorId, $userId, 'your post', $body);
             }
@@ -402,11 +436,11 @@ class FeedService
     /**
      * @param  array<int>  $viewerSiteIds  Site ids the viewer belongs to (for audience scoping).
      */
-    public function getFeed(?int $tenantId, ?string $type, ?string $search, int $viewerId, array $viewerSiteIds = [], int $perPage = 20): LengthAwarePaginator
+    public function getFeed(?string $type, ?string $search, int $viewerId, array $viewerSiteIds = [], int $perPage = 20): LengthAwarePaginator
     {
         $siteValues = array_values(array_unique(array_map('strval', $viewerSiteIds)));
 
-        return HrFeedPost::forTenant($tenantId)
+        return HrFeedPost::query()
             ->when($type, fn ($q) => $q->where('post_type', $type))
             // Audience scoping: org-wide posts + the viewer's own posts + posts
             // targeting a site the viewer belongs to.
@@ -444,26 +478,27 @@ class FeedService
      *
      * @return array{kudos_this_month:int, participation:int, celebrations:int, posts_this_week:int}
      */
-    public function getMetrics(?int $tenantId): array
+    public function getMetrics(): array
     {
         $now = now();
         $startOfMonth = $now->copy()->startOfMonth();
         $weekAgo = $now->copy()->subDays(7);
 
-        $kudosThisMonth = HrKudos::forTenant($tenantId)
+        $kudosThisMonth = HrKudos::query()
             ->where('created_at', '>=', $startOfMonth)
             ->count();
 
-        $postsThisWeek = HrFeedPost::forTenant($tenantId)
+        $postsThisWeek = HrFeedPost::query()
             ->where('created_at', '>=', $weekAgo)
             ->count();
 
-        $activeEmployees = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
+        $currentUserIds = $this->currentStaff->currentUserIds();
+        $activeEmployees = HrEmployeeProfile::query()
+            ->whereIn('user_id', $currentUserIds)
             ->whereNotNull('user_id')
             ->count();
 
-        $participants = HrKudos::forTenant($tenantId)
+        $participants = HrKudos::query()
             ->where('created_at', '>=', $startOfMonth)
             ->get(['from_user_id', 'to_user_id'])
             ->flatMap(fn ($k) => [$k->from_user_id, $k->to_user_id])
@@ -475,7 +510,7 @@ class FeedService
             ? (int) round(min($participants, $activeEmployees) / $activeEmployees * 100)
             : 0;
 
-        $milestones = $this->getMilestones($tenantId);
+        $milestones = $this->getMilestones();
         $celebrations = count($milestones['birthdays'])
             + count($milestones['anniversaries'])
             + count($milestones['new_hires']);
@@ -495,9 +530,14 @@ class FeedService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getFeedAnnouncements(?int $tenantId, int $viewerId, ?string $search = null): array
+    public function getFeedAnnouncements(int $viewerId, ?string $search = null): array
     {
-        $announcements = HrAnnouncement::forTenant($tenantId)
+        $viewer = User::query()->find($viewerId);
+        if (! $viewer) {
+            return [];
+        }
+
+        $announcements = HrAnnouncement::query()
             ->active()
             ->when($search, function ($q) use ($search) {
                 $term = '%'.$search.'%';
@@ -507,15 +547,18 @@ class FeedService
             ->with(['creator:id,name', 'targets'])
             ->orderByDesc('is_pinned')
             ->orderByDesc('published_at')
-            ->limit(10)
-            ->get();
+            ->lazy(50)
+            ->filter(fn (HrAnnouncement $announcement) => $this->announcementAudiences
+                ->includesCurrentUser($announcement, $viewer))
+            ->take(10)
+            ->collect();
 
         $ids = $announcements->pluck('id')->all();
         $reactions = $this->feedReactionSummaries('announcement', $ids, $viewerId);
         $replies = $this->feedReplyThreads('announcement', $ids);
 
         return $announcements
-            ->map(function (HrAnnouncement $a) use ($tenantId, $viewerId, $reactions, $replies) {
+            ->map(function (HrAnnouncement $a) use ($viewerId, $reactions, $replies) {
                 $acknowledged = $a->acknowledgements()->where('user_id', $viewerId)->exists();
 
                 return [
@@ -532,7 +575,7 @@ class FeedService
                         'name' => $a->creator->name,
                     ] : null,
                     'acknowledged_count' => $a->acknowledgements_count,
-                    'audience_count' => $this->announcementAudienceCount($a, $tenantId),
+                    'audience_count' => $this->announcementAudienceCount($a),
                     'viewer_acknowledged' => $acknowledged,
                     'reactions' => $reactions[$a->id] ?? ['counts' => array_fill_keys(self::REACTION_EMOJIS, 0), 'mine' => []],
                     'replies' => $replies[$a->id] ?? [],
@@ -549,10 +592,9 @@ class FeedService
      * recipient list and the Tracking roster can never drift apart. Floored at 1
      * so the progress bar never divides by zero.
      */
-    private function announcementAudienceCount(HrAnnouncement $announcement, ?int $tenantId): int
+    private function announcementAudienceCount(HrAnnouncement $announcement): int
     {
-        return app(AnnouncementAudienceResolver::class)
-            ->countForAnnouncement($announcement, $tenantId);
+        return $this->announcementAudiences->countForAnnouncement($announcement);
     }
 
     /**
@@ -560,13 +602,14 @@ class FeedService
      * maths is whole-day and direction-agnostic so it is correct under Carbon 3
      * (where `diffIn*` returns a signed float).
      */
-    public function getMilestones(?int $tenantId): array
+    public function getMilestones(): array
     {
         $today = now()->startOfDay();
+        $currentUserIds = $this->currentStaff->currentUserIds();
 
         // Work anniversaries — ≥ 1 year of service, next anniversary within 30 days.
-        $anniversaries = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
+        $anniversaries = HrEmployeeProfile::query()
+            ->whereIn('user_id', $currentUserIds)
             ->whereNotNull('start_date')
             ->where('start_date', '<', $today->copy()->subYear())
             ->with('user:id,name')
@@ -589,14 +632,14 @@ class FeedService
             ->all();
 
         // Birthdays — date_of_birth is encrypted; decrypt, find next birthday ≤ 30 days.
-        $birthdays = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
+        $birthdays = HrEmployeeProfile::query()
+            ->whereIn('user_id', $currentUserIds)
             ->whereNotNull('date_of_birth')
             ->with('user:id,name')
             ->get()
             ->map(function ($profile) use ($today) {
                 try {
-                    $dob = \Carbon\Carbon::parse($profile->date_of_birth)->startOfDay();
+                    $dob = Carbon::parse($profile->date_of_birth)->startOfDay();
                 } catch (\Exception) {
                     return null;
                 }
@@ -615,8 +658,8 @@ class FeedService
             ->all();
 
         // New hires — started in the last 30 days (days_away negative = days since start).
-        $newHires = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
+        $newHires = HrEmployeeProfile::query()
+            ->whereIn('user_id', $currentUserIds)
             ->whereNotNull('start_date')
             ->where('start_date', '>=', $today->copy()->subDays(30))
             ->with('user:id,name')
@@ -665,11 +708,11 @@ class FeedService
     /**
      * Get kudos leaderboard — top recipients by count this month.
      */
-    public function getKudosLeaderboard(?int $tenantId, ?Carbon $since = null): Collection
+    public function getKudosLeaderboard(?Carbon $since = null): Collection
     {
         $since ??= now()->startOfMonth();
 
-        return HrKudos::forTenant($tenantId)
+        return HrKudos::query()
             ->where('created_at', '>=', $since)
             ->select('to_user_id', DB::raw('COUNT(*) as kudos_count'))
             ->with('toUser:id,name')
@@ -690,9 +733,9 @@ class FeedService
      *
      * @return array<int, array{key:string, label:string, count:int}>
      */
-    public function getValueBreakdown(?int $tenantId): array
+    public function getValueBreakdown(): array
     {
-        $counts = HrKudos::forTenant($tenantId)
+        $counts = HrKudos::query()
             ->where('created_at', '>=', now()->startOfMonth())
             ->select('category', DB::raw('COUNT(*) as total'))
             ->groupBy('category')
@@ -715,11 +758,11 @@ class FeedService
      *
      * @return array<int, array{label:string, count:int}>
      */
-    public function getKudosTrend(?int $tenantId, int $weeks = 8): array
+    public function getKudosTrend(int $weeks = 8): array
     {
         $firstWeek = now()->startOfWeek()->subWeeks($weeks - 1);
 
-        $byWeek = HrKudos::forTenant($tenantId)
+        $byWeek = HrKudos::query()
             ->where('created_at', '>=', $firstWeek)
             ->get(['created_at'])
             ->groupBy(fn ($kudos) => $kudos->created_at->copy()->startOfWeek()->format('Y-m-d'));

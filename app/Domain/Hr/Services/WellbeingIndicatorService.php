@@ -2,7 +2,6 @@
 
 namespace App\Domain\Hr\Services;
 
-use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrWellbeingCheckin;
@@ -18,6 +17,11 @@ use Illuminate\Support\Facades\Schema;
 
 class WellbeingIndicatorService
 {
+    public function __construct(
+        private readonly HrPerformanceAccessService $access,
+        private readonly HrCurrentStaffService $currentStaff,
+    ) {}
+
     /**
      * Flag level thresholds.
      */
@@ -116,7 +120,6 @@ class WellbeingIndicatorService
 
         return HrWellbeingIndicator::updateOrCreate(
             [
-                'tenant_id' => $user->tenant_id ?? null,
                 'user_id' => $user->id,
                 'period_start' => $periodStart->toDateString(),
                 'period_end' => $periodEnd->toDateString(),
@@ -129,26 +132,16 @@ class WellbeingIndicatorService
         );
     }
 
-    public function calculateAllIndicators(?int $tenantId, Carbon $periodStart, Carbon $periodEnd): int
+    public function calculateAllIndicators(Carbon $periodStart, Carbon $periodEnd): int
     {
-        $profiles = HrEmployeeProfile::query()
-            ->where('is_active', true)
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->with('user:id,name,email')
-            ->get();
-
         $count = 0;
-        foreach ($profiles as $profile) {
-            if (! $profile->user) {
-                continue;
-            }
-
+        foreach ($this->currentStaff->currentUsers() as $user) {
             try {
-                $this->calculateIndicators($profile->user, $periodStart, $periodEnd);
+                $this->calculateIndicators($user, $periodStart, $periodEnd);
                 $count++;
             } catch (\Throwable $exception) {
                 Log::warning('Wellbeing calculation failed', [
-                    'user_id' => $profile->user_id,
+                    'user_id' => $user->id,
                     'error' => $exception->getMessage(),
                 ]);
             }
@@ -157,15 +150,32 @@ class WellbeingIndicatorService
         return $count;
     }
 
-    public function getFlaggedStaff(?int $tenantId, ?string $flagLevel = null): Collection
+    public function getFlaggedStaff(User $viewer, ?string $flagLevel = null): Collection
     {
+        $userIds = $this->access->currentUserIds($viewer)->get()->pluck('id');
+
+        return $this->flaggedStaffForUserIds($userIds, $flagLevel);
+    }
+
+    public function getApplicationFlaggedStaff(?string $flagLevel = null): Collection
+    {
+        return $this->flaggedStaffForUserIds(collect($this->currentStaff->currentUserIds()), $flagLevel);
+    }
+
+    /** @param Collection<int, int> $userIds */
+    private function flaggedStaffForUserIds(Collection $userIds, ?string $flagLevel = null): Collection
+    {
+        if ($userIds->isEmpty()) {
+            return collect();
+        }
+
         $query = HrWellbeingIndicator::query()
             ->where('flag_level', '!=', 'none')
-            ->when($tenantId !== null, fn ($builder) => $builder->where('tenant_id', $tenantId))
-            ->whereIn('id', function ($sub) use ($tenantId) {
+            ->whereIn('user_id', $userIds)
+            ->whereIn('id', function ($sub) use ($userIds) {
                 $sub->select(DB::raw('MAX(id)'))
                     ->from('hr_wellbeing_indicators')
-                    ->when($tenantId !== null, fn ($inner) => $inner->where('tenant_id', $tenantId))
+                    ->whereIn('user_id', $userIds->all())
                     ->groupBy('user_id');
             })
             ->with(['user.hrEmployeeProfile.primarySite:id,name']);
@@ -180,8 +190,8 @@ class WellbeingIndicatorService
 
         $userIds = $indicators->pluck('user_id')->filter()->unique()->values();
         $latestActions = $this->latestFlagActionsFor($userIds);
-        $lastCheckins = $this->lastCheckinDatesFor($tenantId, $userIds);
-        $openPlanCounts = $this->openPlanCountsFor($tenantId, $userIds);
+        $lastCheckins = $this->lastCheckinDatesFor($userIds);
+        $openPlanCounts = $this->openPlanCountsFor($userIds);
         $today = now()->startOfDay();
 
         return $indicators
@@ -260,7 +270,7 @@ class WellbeingIndicatorService
     /**
      * @return Collection<int, Carbon>
      */
-    protected function lastCheckinDatesFor(?int $tenantId, Collection $userIds): Collection
+    protected function lastCheckinDatesFor(Collection $userIds): Collection
     {
         if ($userIds->isEmpty() || ! Schema::hasTable('hr_wellbeing_checkins')) {
             return collect();
@@ -268,7 +278,6 @@ class WellbeingIndicatorService
 
         return HrWellbeingCheckin::query()
             ->whereIn('staff_user_id', $userIds)
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->selectRaw('staff_user_id, MAX(created_at) as last_at')
             ->groupBy('staff_user_id')
             ->get()
@@ -278,7 +287,7 @@ class WellbeingIndicatorService
     /**
      * @return Collection<int, int>
      */
-    protected function openPlanCountsFor(?int $tenantId, Collection $userIds): Collection
+    protected function openPlanCountsFor(Collection $userIds): Collection
     {
         if ($userIds->isEmpty() || ! Schema::hasColumn('hr_engagement_action_plans', 'staff_user_id')) {
             return collect();
@@ -287,7 +296,6 @@ class WellbeingIndicatorService
         return HrEngagementActionPlan::query()
             ->whereIn('staff_user_id', $userIds)
             ->whereIn('status', ['open', 'in_progress'])
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->selectRaw('staff_user_id, COUNT(*) as plan_count')
             ->groupBy('staff_user_id')
             ->get()
@@ -299,11 +307,12 @@ class WellbeingIndicatorService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getStaffTrend(?int $tenantId, int $userId, int $limit = 12): array
+    public function getStaffTrend(User $viewer, int $userId, int $limit = 12): array
     {
+        $this->access->currentStaff($viewer, $userId);
+
         return HrWellbeingIndicator::query()
             ->where('user_id', $userId)
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->orderByDesc('period_end')
             ->limit($limit)
             ->get()
@@ -320,19 +329,20 @@ class WellbeingIndicatorService
     }
 
     /**
-     * Tenant-wide red/amber counts over recent periods (oldest → newest) for the
-     * Overview trend.
+     * Site-scoped red/amber counts over recent periods (oldest to newest) for
+     * the Overview trend.
      *
      * @return array<int, array{period_end: string|null, red: int, amber: int, total: int}>
      */
-    public function getTenantTrend(?int $tenantId, int $points = 8): array
+    public function getTrend(User $viewer, int $points = 8): array
     {
+        $userIds = $this->access->currentUserIds($viewer);
         $rows = HrWellbeingIndicator::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->selectRaw("period_end, "
-                . "SUM(CASE WHEN flag_level = 'red' THEN 1 ELSE 0 END) as red, "
-                . "SUM(CASE WHEN flag_level = 'amber' THEN 1 ELSE 0 END) as amber, "
-                . "COUNT(*) as total")
+            ->whereIn('user_id', $userIds)
+            ->selectRaw('period_end, '
+                ."SUM(CASE WHEN flag_level = 'red' THEN 1 ELSE 0 END) as red, "
+                ."SUM(CASE WHEN flag_level = 'amber' THEN 1 ELSE 0 END) as amber, "
+                .'COUNT(*) as total')
             ->groupBy('period_end')
             ->orderByDesc('period_end')
             ->limit($points)
@@ -351,14 +361,19 @@ class WellbeingIndicatorService
     /**
      * @return array{total_staff: int, flagged_red: int, flagged_amber: int, healthy: int}
      */
-    public function getSummary(?int $tenantId): array
+    public function getSummary(User $viewer): array
     {
+        $userIds = $this->access->currentUserIds($viewer)->get()->pluck('id');
+        if ($userIds->isEmpty()) {
+            return ['total_staff' => 0, 'flagged_red' => 0, 'flagged_amber' => 0, 'healthy' => 0];
+        }
+
         $latest = HrWellbeingIndicator::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
-            ->whereIn('id', function ($sub) use ($tenantId) {
+            ->whereIn('user_id', $userIds)
+            ->whereIn('id', function ($sub) use ($userIds) {
                 $sub->select(DB::raw('MAX(id)'))
                     ->from('hr_wellbeing_indicators')
-                    ->when($tenantId !== null, fn ($inner) => $inner->where('tenant_id', $tenantId))
+                    ->whereIn('user_id', $userIds->all())
                     ->groupBy('user_id');
             });
 
@@ -523,7 +538,7 @@ class WellbeingIndicatorService
         }
 
         $totalHours = $timesheets->sum(fn (Timesheet $timesheet) => $timesheet->total_hours);
+
         return round($totalHours / max($timesheets->count(), 1), 2);
     }
 }
-

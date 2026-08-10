@@ -4,16 +4,16 @@ namespace App\Models;
 
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientLedgerEntry extends Model
 {
-    use AuditableChanges, SoftDeletes;
+    use AuditableChanges, SoftDeletes, WritesLegacyStorageContext;
 
     protected $fillable = [
-        'tenant_id',
         'client_id',
         'site_id',
         'type',
@@ -70,11 +70,6 @@ class ClientLedgerEntry extends Model
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeForClient($query, int $clientId)
     {

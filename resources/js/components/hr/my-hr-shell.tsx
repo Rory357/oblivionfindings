@@ -61,7 +61,10 @@ export function MyHrShell({
                     hero={
                         <MyHrHero
                             myHr={myHr}
-                            handlers={{ onSendKudos: openKudos, ...heroHandlers }}
+                            handlers={{
+                                onSendKudos: openKudos,
+                                ...heroHandlers,
+                            }}
                         />
                     }
                     tabs={<MyHrTabs active={active} badges={badges} />}

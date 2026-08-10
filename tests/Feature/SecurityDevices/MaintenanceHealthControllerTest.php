@@ -18,7 +18,9 @@ class MaintenanceHealthControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
+
     private User $noPerms;
 
     protected function setUp(): void
@@ -141,6 +143,56 @@ class MaintenanceHealthControllerTest extends TestCase
         );
     }
 
+    public function test_maintenance_health_data_covers_the_single_application_registry_for_all_sites_users(): void
+    {
+
+        $primaryDevice = Device::factory()->create([
+            'name' => 'Primary sensor',
+            'health_status' => HealthStatus::Critical,
+            'status' => DeviceStatus::Active,
+            'battery_level' => 10,
+            'battery_updated_at' => now(),
+        ]);
+        $unrelatedDevice = Device::factory()->create([
+            'name' => 'Unrelated sensor',
+            'health_status' => HealthStatus::Critical,
+            'status' => DeviceStatus::Active,
+            'battery_level' => 10,
+            'battery_updated_at' => now(),
+        ]);
+
+        foreach ([$primaryDevice, $unrelatedDevice] as $device) {
+            DeviceMaintenanceRecord::create([
+                'device_id' => $device->id,
+                'type' => 'inspection',
+                'status' => 'scheduled',
+                'description' => $device->name.' maintenance',
+                'scheduled_for' => now()->subDay(),
+            ]);
+        }
+
+        $response = $this->actingAs($this->admin)->get('/security-devices/maintenance-health');
+
+        $response->assertInertia(function ($page) {
+            $props = $page->toArray()['props'];
+
+            $this->assertSame(2, $props['stats']['overdue']);
+            $this->assertSame(2, $props['stats']['critical']);
+            $this->assertEqualsCanonicalizing(
+                ['Primary sensor maintenance', 'Unrelated sensor maintenance'],
+                collect($props['records']['data'])->pluck('description')->all(),
+            );
+            $this->assertEqualsCanonicalizing(
+                ['Primary sensor', 'Unrelated sensor'],
+                collect($props['attentionDevices'])->pluck('name')->all(),
+            );
+            $this->assertEqualsCanonicalizing(
+                ['Primary sensor', 'Unrelated sensor'],
+                collect($props['lowBatteryDevices'])->pluck('name')->all(),
+            );
+        });
+    }
+
     public function test_index_filters_by_status(): void
     {
         $device = Device::factory()->create();
@@ -234,6 +286,61 @@ class MaintenanceHealthControllerTest extends TestCase
             ->assertSessionHasErrors(['type']);
     }
 
+    public function test_non_completed_records_cannot_claim_completion_evidence(): void
+    {
+        $device = Device::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$device->id}/maintenance", [
+                'type' => 'inspection',
+                'status' => 'scheduled',
+                'description' => 'Contradictory completion evidence',
+                'completed_at' => now()->subHour()->toIso8601String(),
+            ])
+            ->assertSessionHasErrors('completed_at');
+
+        $this->assertDatabaseMissing('device_maintenance_records', [
+            'description' => 'Contradictory completion evidence',
+        ]);
+    }
+
+    public function test_maintenance_mutations_allow_authorized_unassigned_stock(): void
+    {
+
+        $unrelatedDevice = Device::factory()->create([]);
+        $unrelatedRecord = DeviceMaintenanceRecord::create([
+            'device_id' => $unrelatedDevice->id,
+            'type' => 'inspection',
+            'status' => 'scheduled',
+            'description' => 'Unrelated maintenance',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$unrelatedDevice->id}/maintenance", [
+                'type' => 'inspection',
+                'description' => 'Should not be created',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($this->admin)
+            ->put("/security-devices/maintenance/{$unrelatedRecord->id}", [
+                'description' => 'Should not be updated',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/maintenance/{$unrelatedRecord->id}/complete")
+            ->assertRedirect();
+
+        $unrelatedRecord->refresh();
+        $this->assertSame('Should not be updated', $unrelatedRecord->description);
+        $this->assertSame('completed', $unrelatedRecord->status);
+        $this->assertDatabaseHas('device_maintenance_records', [
+            'device_id' => $unrelatedDevice->id,
+            'description' => 'Should not be created',
+        ]);
+    }
+
     // ── Update ────────────────────────────────────────────────────
 
     public function test_update_modifies_record(): void
@@ -294,6 +401,57 @@ class MaintenanceHealthControllerTest extends TestCase
         $this->assertEquals('completed', $record->status);
         $this->assertNotNull($record->completed_at);
         $this->assertEquals($this->admin->id, $record->performed_by_user_id);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'security_devices.maintenance.completed',
+            'auditable_id' => $record->id,
+        ]);
+    }
+
+    public function test_completed_and_cancelled_maintenance_history_is_terminal_and_immutable(): void
+    {
+        $device = Device::factory()->create();
+        $completed = DeviceMaintenanceRecord::create([
+            'device_id' => $device->id,
+            'type' => 'inspection',
+            'status' => 'completed',
+            'description' => 'Completed evidence',
+            'completed_at' => now()->subHour(),
+            'performed_by_user_id' => $this->admin->id,
+        ]);
+        $completedAt = $completed->completed_at;
+        $cancelled = DeviceMaintenanceRecord::create([
+            'device_id' => $device->id,
+            'type' => 'repair',
+            'status' => 'cancelled',
+            'description' => 'Cancelled evidence',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->put("/security-devices/maintenance/{$completed->id}", [
+                'status' => 'scheduled',
+                'description' => 'Rewritten evidence',
+            ])
+            ->assertSessionHasErrors('status');
+        $this->actingAs($this->admin)
+            ->post("/security-devices/maintenance/{$completed->id}/complete")
+            ->assertSessionHasErrors('status');
+        $this->actingAs($this->admin)
+            ->put("/security-devices/maintenance/{$cancelled->id}", [
+                'status' => 'in_progress',
+            ])
+            ->assertSessionHasErrors('status');
+
+        $this->assertSame('Completed evidence', $completed->fresh()->description);
+        $this->assertTrue($completedAt->equalTo($completed->fresh()->completed_at));
+        $this->assertSame('cancelled', $cancelled->fresh()->status);
+
+        $mutationBlocked = false;
+        try {
+            $completed->refresh()->update(['notes' => 'Direct rewrite']);
+        } catch (\UnexpectedValueException $exception) {
+            $mutationBlocked = str_contains($exception->getMessage(), 'immutable');
+        }
+        $this->assertTrue($mutationBlocked);
     }
 
     public function test_complete_requires_manage_permission(): void

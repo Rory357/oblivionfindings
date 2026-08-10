@@ -51,9 +51,12 @@ export {
 type BadgeTone = 'success' | 'warning' | 'critical';
 
 const CHIP_CLASS: Record<BadgeTone, string> = {
-    success: 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90',
-    warning: 'border-status-warning/50 bg-status-warning/25 text-primary-foreground',
-    critical: 'border-status-critical/50 bg-status-critical/25 text-primary-foreground',
+    success:
+        'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90',
+    warning:
+        'border-status-warning/50 bg-status-warning/25 text-primary-foreground',
+    critical:
+        'border-status-critical/50 bg-status-critical/25 text-primary-foreground',
 };
 const CHIP_ICON: Record<BadgeTone, string> = {
     success: 'text-primary-foreground/80',
@@ -114,7 +117,8 @@ export function FleetComplianceBadges({
     hrefs?: FleetComplianceHrefs;
     className?: string;
 }) {
-    const wofTone: BadgeTone = wofExpired > 0 ? 'critical' : wofDue > 0 ? 'warning' : 'success';
+    const wofTone: BadgeTone =
+        wofExpired > 0 ? 'critical' : wofDue > 0 ? 'warning' : 'success';
     const wofLabel =
         wofExpired > 0
             ? `WOF · ${wofExpired} expired`
@@ -122,7 +126,8 @@ export function FleetComplianceBadges({
               ? `WOF · ${wofDue} due 30d`
               : 'WOF · Current';
 
-    const regoTone: BadgeTone = regoExpired > 0 ? 'critical' : regoDue > 0 ? 'warning' : 'success';
+    const regoTone: BadgeTone =
+        regoExpired > 0 ? 'critical' : regoDue > 0 ? 'warning' : 'success';
     const regoLabel =
         regoExpired > 0
             ? `Rego · ${regoExpired} expired`
@@ -130,7 +135,8 @@ export function FleetComplianceBadges({
               ? `Rego · ${regoDue} due 30d`
               : 'Rego · Current';
 
-    const cofTone: BadgeTone = cofExpired > 0 ? 'critical' : cofDue > 0 ? 'warning' : 'success';
+    const cofTone: BadgeTone =
+        cofExpired > 0 ? 'critical' : cofDue > 0 ? 'warning' : 'success';
     const cofLabel =
         cofExpired > 0
             ? `CoF · ${cofExpired} expired`
@@ -138,11 +144,16 @@ export function FleetComplianceBadges({
               ? `CoF · ${cofDue} due 30d`
               : 'CoF · Current';
 
-    const insuranceSupported = insuranceExpiring !== null || insuranceExpired !== null;
+    const insuranceSupported =
+        insuranceExpiring !== null || insuranceExpired !== null;
     const insuranceExpiredCount = insuranceExpired ?? 0;
     const insuranceExpiringCount = insuranceExpiring ?? 0;
     const insuranceTone: BadgeTone =
-        insuranceExpiredCount > 0 ? 'critical' : insuranceExpiringCount > 0 ? 'warning' : 'success';
+        insuranceExpiredCount > 0
+            ? 'critical'
+            : insuranceExpiringCount > 0
+              ? 'warning'
+              : 'success';
     const insuranceLabel =
         insuranceExpiredCount > 0
             ? `Insurance · ${insuranceExpiredCount} expired`
@@ -150,7 +161,12 @@ export function FleetComplianceBadges({
               ? `Insurance · ${insuranceExpiringCount} expiring`
               : 'Insurance · Current';
 
-    const alertTone: BadgeTone = criticalAlerts > 0 ? 'critical' : openAlerts > 0 ? 'warning' : 'success';
+    const alertTone: BadgeTone =
+        criticalAlerts > 0
+            ? 'critical'
+            : openAlerts > 0
+              ? 'warning'
+              : 'success';
 
     const badges: (FleetBadge | null)[] = [
         {
@@ -187,7 +203,10 @@ export function FleetComplianceBadges({
             key: 'alerts',
             icon: alertTone === 'success' ? ShieldCheck : Bell,
             tone: alertTone,
-            label: openAlerts > 0 ? `Alerts · ${openAlerts} open` : 'Alerts · All clear',
+            label:
+                openAlerts > 0
+                    ? `Alerts · ${openAlerts} open`
+                    : 'Alerts · All clear',
             href: hrefs.alerts,
         },
     ];
@@ -200,11 +219,14 @@ export function FleetComplianceBadges({
                     const chipClass = cn(
                         'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
                         CHIP_CLASS[b.tone],
-                        b.href && 'transition-colors hover:bg-primary-foreground/20',
+                        b.href &&
+                            'transition-colors hover:bg-primary-foreground/20',
                     );
                     const inner = (
                         <>
-                            <b.icon className={cn('h-3.5 w-3.5', CHIP_ICON[b.tone])} />
+                            <b.icon
+                                className={cn('h-3.5 w-3.5', CHIP_ICON[b.tone])}
+                            />
                             {b.label}
                         </>
                     );
@@ -310,7 +332,9 @@ export function FleetAttentionStrip({
                             CHIP_CLASS[chip.tone],
                         )}
                     >
-                        <chip.icon className={cn('h-3.5 w-3.5', CHIP_ICON[chip.tone])} />
+                        <chip.icon
+                            className={cn('h-3.5 w-3.5', CHIP_ICON[chip.tone])}
+                        />
                         {chip.label}
                     </Link>
                 ))}
@@ -326,7 +350,13 @@ export function FleetAttentionStrip({
 /** Monospace reference-number chip (e.g. WO-2026-0001) — the single canonical
  *  rendering for stored fleet reference numbers on light surfaces. Renders '—'
  *  when the record has no reference. */
-export function RefChip({ value, className }: { value: string | null | undefined; className?: string }) {
+export function RefChip({
+    value,
+    className,
+}: {
+    value: string | null | undefined;
+    className?: string;
+}) {
     return (
         <span
             className={cn(
@@ -368,7 +398,7 @@ type FleetHeroActionProps = {
 export function FleetHeroAction(props: FleetHeroActionProps) {
     const { icon: Icon, children, emphasis = false } = props;
     const className = cn(
-        'inline-flex h-[34px] items-center gap-2 rounded-lg px-3.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/40',
+        'inline-flex h-[34px] items-center gap-2 rounded-lg px-3.5 text-[12.5px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none',
         emphasis
             ? 'bg-primary-foreground font-extrabold text-primary shadow-sm hover:bg-primary-foreground/90'
             : 'border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',

@@ -2,7 +2,12 @@ import { Link } from '@inertiajs/react';
 import { ArrowLeft, Bell, ChevronDown, Search } from 'lucide-react';
 import { type ComponentType, type ReactNode, useEffect, useState } from 'react';
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 export type StaffHeaderGlobalLink = {
@@ -87,11 +92,16 @@ export function StaffHeader({
     liveIndicator,
     notifications,
 }: StaffHeaderProps) {
-    const hasDesktopChrome = !!(globalLinks?.length || search || liveIndicator || notifications);
+    const hasDesktopChrome = !!(
+        globalLinks?.length ||
+        search ||
+        liveIndicator ||
+        notifications
+    );
 
     const titleInner = (
         <div className="min-w-0 flex-1">
-            <h1 className="flex items-center gap-1.5 truncate text-base font-semibold leading-tight tracking-tight">
+            <h1 className="flex items-center gap-1.5 truncate text-base leading-tight font-semibold tracking-tight">
                 <span className="truncate">{title}</span>
                 {titleChevron ? (
                     <ChevronDown
@@ -103,7 +113,9 @@ export function StaffHeader({
                 ) : null}
             </h1>
             {subtitle ? (
-                <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                    {subtitle}
+                </p>
             ) : null}
         </div>
     );
@@ -152,29 +164,43 @@ export function StaffHeader({
             </div>
 
             {globalLinks && globalLinks.length > 0 ? (
-                <nav className="ml-3 hidden gap-0.5 md:flex" aria-label="Global links">
+                <nav
+                    className="ml-3 hidden gap-0.5 md:flex"
+                    aria-label="Global links"
+                >
                     <TooltipProvider delayDuration={200}>
                         {globalLinks.map((link) => (
-                            <StaffHeaderGlobalLinkButton key={link.href} link={link} />
+                            <StaffHeaderGlobalLinkButton
+                                key={link.href}
+                                link={link}
+                            />
                         ))}
                     </TooltipProvider>
                 </nav>
             ) : null}
 
-            {search ? (
-                <StaffHeaderSearchInput search={search} />
-            ) : null}
+            {search ? <StaffHeaderSearchInput search={search} /> : null}
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
                 {action}
-                {liveIndicator ? <StaffHeaderLiveChip indicator={liveIndicator} /> : null}
-                {notifications ? <StaffHeaderNotificationsBell notifications={notifications} /> : null}
+                {liveIndicator ? (
+                    <StaffHeaderLiveChip indicator={liveIndicator} />
+                ) : null}
+                {notifications ? (
+                    <StaffHeaderNotificationsBell
+                        notifications={notifications}
+                    />
+                ) : null}
             </div>
         </header>
     );
 }
 
-function StaffHeaderGlobalLinkButton({ link }: { link: StaffHeaderGlobalLink }) {
+function StaffHeaderGlobalLinkButton({
+    link,
+}: {
+    link: StaffHeaderGlobalLink;
+}) {
     const Icon = link.icon;
     return (
         <Tooltip>
@@ -212,13 +238,19 @@ function StaffHeaderSearchInput({ search }: { search: StaffHeaderSearch }) {
                 aria-label={search.placeholder ?? 'Search'}
             />
             {search.hint ? (
-                <span className="text-[10.5px] text-text-faint">{search.hint}</span>
+                <span className="text-[10.5px] text-text-faint">
+                    {search.hint}
+                </span>
             ) : null}
         </form>
     );
 }
 
-function StaffHeaderLiveChip({ indicator }: { indicator: StaffHeaderLiveIndicator }) {
+function StaffHeaderLiveChip({
+    indicator,
+}: {
+    indicator: StaffHeaderLiveIndicator;
+}) {
     const age = useFreshness(indicator.lastUpdatedAt);
     const label = indicator.lastUpdatedAt ? `Live · ${age}` : 'Live';
     const body = (
@@ -239,7 +271,7 @@ function StaffHeaderLiveChip({ indicator }: { indicator: StaffHeaderLiveIndicato
                 type="button"
                 onClick={indicator.onRefresh}
                 aria-label="Refresh now"
-                className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="rounded-full focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:outline-none"
             >
                 {body}
             </button>
@@ -248,7 +280,11 @@ function StaffHeaderLiveChip({ indicator }: { indicator: StaffHeaderLiveIndicato
     return body;
 }
 
-function StaffHeaderNotificationsBell({ notifications }: { notifications: StaffHeaderNotifications }) {
+function StaffHeaderNotificationsBell({
+    notifications,
+}: {
+    notifications: StaffHeaderNotifications;
+}) {
     return (
         <Link
             href={notifications.href}
@@ -257,7 +293,7 @@ function StaffHeaderNotificationsBell({ notifications }: { notifications: StaffH
         >
             <Bell className="h-4 w-4" />
             {notifications.count > 0 ? (
-                <span className="absolute right-1 top-1 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full border-2 border-background bg-status-critical px-1 text-[9px] font-bold text-status-critical-foreground">
+                <span className="absolute top-1 right-1 inline-flex h-3.5 min-w-[14px] items-center justify-center rounded-full border-2 border-background bg-status-critical px-1 text-[9px] font-bold text-status-critical-foreground">
                     {notifications.count}
                 </span>
             ) : null}
@@ -278,7 +314,10 @@ function useFreshness(lastUpdatedAt: Date | null): string {
     }, [lastUpdatedAt]);
 
     if (!lastUpdatedAt) return '—';
-    const seconds = Math.max(0, Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000));
+    const seconds = Math.max(
+        0,
+        Math.floor((Date.now() - lastUpdatedAt.getTime()) / 1000),
+    );
     if (seconds < 60) return `${seconds}s`;
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}m`;

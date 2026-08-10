@@ -13,10 +13,13 @@ use App\Models\Role;
 use App\Models\SafeguardingAlert;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Incidents\IncidentJourneyService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 /**
@@ -32,7 +35,7 @@ class FleetIncidentTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -46,7 +49,7 @@ class FleetIncidentTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
-    /*  Report (store) + regulatory derivation                         */
+    /*  Report (store) + regulatory derivation */
     /* -------------------------------------------------------------- */
 
     public function test_report_vehicle_incident_creates_record_and_derives_s22_and_worksafe(): void
@@ -64,6 +67,7 @@ class FleetIncidentTest extends TestCase
                 'occurred_at' => $occurred->toDateTimeString(),
                 'location' => 'SH1, Penrose',
                 'description' => 'Rear-ended at the lights.',
+                'immediate_action_taken' => 'Stopped the vehicle, checked everyone for injuries, and called emergency services.',
                 'injury_involved' => true,
                 'injury_severity' => 'hospitalisation',
             ]);
@@ -114,7 +118,7 @@ class FleetIncidentTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
-    /*  Observer (Gap F4 fix): severity mapping + alert               */
+    /*  Observer (Gap F4 fix): severity mapping + alert */
     /* -------------------------------------------------------------- */
 
     public function test_major_incident_records_high_hs_event_and_raises_control_room_alert(): void
@@ -147,18 +151,74 @@ class FleetIncidentTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
-    /*  Transport cascade (Gap F1 direct FK)                          */
+    /*  Transport cascade (Gap F1 direct FK) */
     /* -------------------------------------------------------------- */
 
     public function test_transport_incident_cascades_to_client_incident_with_direct_fk(): void
     {
         Notification::fake();
         $asset = $this->vehicle();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $asset->site_id]);
         $booking = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id]);
         FleetResidentTransport::query()->create([
             'asset_id' => $asset->id,
             'booking_id' => $booking->id,
+            'site_id' => $asset->site_id,
+            'driver_user_id' => $this->admin->id,
+            'resident_id' => $client->id,
+            'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
+            'transport_type' => 'medical',
+            'departed_at' => now(),
+            'status' => 'in_progress',
+        ]);
+
+        $immediateActionTaken = 'Stopped the vehicle, moved residents to a safe area, and called the on-call manager.';
+
+        $this->actingAs($this->admin)
+            ->from('/fleet-assets/incidents')
+            ->post('/fleet-assets/incidents', [
+                'asset_id' => $asset->id,
+                'booking_id' => $booking->id,
+                'incident_type' => 'collision',
+                'severity' => 'major',
+                'occurred_at' => now()->subHour()->toDateTimeString(),
+                'description' => 'Collision with two residents aboard.',
+                'immediate_action_taken' => $immediateActionTaken,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $incident = FleetIncident::latest('id')->first();
+
+        $clientIncident = ClientIncident::where('fleet_incident_id', $incident->id)->first();
+        $this->assertNotNull($clientIncident, 'A transport incident must cascade to a client incident.');
+        $this->assertSame('transport_incident', $clientIncident->type);
+        $this->assertSame($client->id, $clientIncident->client_id);
+        $this->assertSame($asset->site_id, $clientIncident->site_id);
+        $this->assertNotNull($clientIncident->hs_event_id);
+        $this->assertNotNull($clientIncident->control_room_alert_id);
+        $this->assertSame($immediateActionTaken, $clientIncident->immediate_action_taken);
+        // Reverse relation resolves (Gap F1).
+        $this->assertSame($incident->id, $clientIncident->fleetIncident->id);
+
+        // Major/critical also raises a safeguarding alert per resident (severity
+        // mapped major->high to satisfy the alert enum).
+        $this->assertDatabaseHas('safeguarding_alerts', [
+            'alert_type' => 'requires_monitoring',
+            'alertable_id' => $client->id,
+            'severity' => 'high',
+        ]);
+    }
+
+    public function test_serious_transport_incident_requires_explicit_immediate_action_before_any_record_is_created(): void
+    {
+        Notification::fake();
+        $asset = $this->vehicle();
+        $client = Client::factory()->create(['site_id' => $asset->site_id]);
+        $booking = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id]);
+        FleetResidentTransport::query()->create([
+            'asset_id' => $asset->id,
+            'booking_id' => $booking->id,
+            'site_id' => $asset->site_id,
             'driver_user_id' => $this->admin->id,
             'resident_id' => $client->id,
             'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
@@ -175,30 +235,140 @@ class FleetIncidentTest extends TestCase
                 'incident_type' => 'collision',
                 'severity' => 'major',
                 'occurred_at' => now()->subHour()->toDateTimeString(),
-                'description' => 'Collision with two residents aboard.',
+                'description' => 'Collision with a resident aboard.',
             ])
-            ->assertSessionHasNoErrors();
+            ->assertRedirect('/fleet-assets/incidents')
+            ->assertSessionHasErrors('immediate_action_taken');
 
-        $incident = FleetIncident::latest('id')->first();
+        $this->assertDatabaseCount('fleet_incidents', 0);
+        $this->assertDatabaseCount('client_incidents', 0);
+    }
 
-        $clientIncident = ClientIncident::where('fleet_incident_id', $incident->id)->first();
-        $this->assertNotNull($clientIncident, 'A transport incident must cascade to a client incident.');
-        $this->assertSame('transport_incident', $clientIncident->type);
-        $this->assertSame($client->id, $clientIncident->client_id);
-        // Reverse relation resolves (Gap F1).
-        $this->assertSame($incident->id, $clientIncident->fleetIncident->id);
-
-        // Major/critical also raises a safeguarding alert per resident (severity
-        // mapped major->high to satisfy the alert enum).
-        $this->assertDatabaseHas('safeguarding_alerts', [
-            'alert_type' => 'requires_monitoring',
-            'alertable_id' => $client->id,
-            'severity' => 'high',
+    public function test_transport_site_disagreement_rolls_back_the_fleet_and_canonical_incident_chain(): void
+    {
+        Notification::fake();
+        $asset = $this->vehicle();
+        $client = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+        $booking = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id]);
+        FleetResidentTransport::query()->create([
+            'asset_id' => $asset->id,
+            'booking_id' => $booking->id,
+            'site_id' => $asset->site_id,
+            'driver_user_id' => $this->admin->id,
+            'resident_id' => $client->id,
+            'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
+            'transport_type' => 'medical',
+            'departed_at' => now(),
+            'status' => 'in_progress',
         ]);
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->admin)->post('/fleet-assets/incidents', [
+                'asset_id' => $asset->id,
+                'booking_id' => $booking->id,
+                'incident_type' => 'collision',
+                'severity' => 'major',
+                'occurred_at' => now()->subHour()->toDateTimeString(),
+                'description' => 'Resident transport collision with conflicting Site provenance.',
+                'immediate_action_taken' => 'Stopped the vehicle and checked the resident for injury.',
+            ]);
+            $this->fail('A resident transport Site disagreement must fail closed.');
+        } catch (\DomainException $exception) {
+            $this->assertSame(
+                'Transport incident Site provenance must agree before creating a resident incident.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertNoPartialResidentIncidentJourney();
+    }
+
+    public function test_resident_incident_journey_failure_rolls_back_the_fleet_and_client_incident(): void
+    {
+        Notification::fake();
+        $asset = $this->vehicle();
+        $client = Client::factory()->create(['site_id' => $asset->site_id]);
+        $booking = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id]);
+        FleetResidentTransport::query()->create([
+            'asset_id' => $asset->id,
+            'booking_id' => $booking->id,
+            'site_id' => $asset->site_id,
+            'driver_user_id' => $this->admin->id,
+            'resident_id' => $client->id,
+            'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
+            'transport_type' => 'medical',
+            'departed_at' => now(),
+            'status' => 'in_progress',
+        ]);
+        $this->mock(IncidentJourneyService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('ensureForSubmittedIncident')
+                ->once()
+                ->andThrow(new \RuntimeException('Forced resident journey failure.'));
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->admin)->post('/fleet-assets/incidents', [
+                'asset_id' => $asset->id,
+                'booking_id' => $booking->id,
+                'incident_type' => 'collision',
+                'severity' => 'major',
+                'occurred_at' => now()->subHour()->toDateTimeString(),
+                'description' => 'Resident transport collision requiring a canonical journey.',
+                'immediate_action_taken' => 'Stopped the vehicle and called emergency services.',
+            ]);
+            $this->fail('A resident incident journey failure must fail closed.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Forced resident journey failure.', $exception->getMessage());
+        }
+
+        $this->assertNoPartialResidentIncidentJourney();
+    }
+
+    public function test_safeguarding_cascade_failure_rolls_back_every_canonical_incident_record(): void
+    {
+        Notification::fake();
+        $asset = $this->vehicle();
+        $client = Client::factory()->create(['site_id' => $asset->site_id]);
+        $booking = FleetVehicleBooking::factory()->create(['asset_id' => $asset->id]);
+        FleetResidentTransport::query()->create([
+            'asset_id' => $asset->id,
+            'booking_id' => $booking->id,
+            'site_id' => $asset->site_id,
+            'driver_user_id' => $this->admin->id,
+            'resident_id' => $client->id,
+            'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
+            'transport_type' => 'medical',
+            'departed_at' => now(),
+            'status' => 'in_progress',
+        ]);
+        SafeguardingAlert::creating(
+            fn (): never => throw new \RuntimeException('Forced safeguarding cascade failure.'),
+        );
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($this->admin)->post('/fleet-assets/incidents', [
+                'asset_id' => $asset->id,
+                'booking_id' => $booking->id,
+                'incident_type' => 'collision',
+                'severity' => 'major',
+                'occurred_at' => now()->subHour()->toDateTimeString(),
+                'description' => 'Resident transport collision requiring safeguarding escalation.',
+                'immediate_action_taken' => 'Stopped the vehicle, checked the resident, and called emergency services.',
+            ]);
+            $this->fail('A safeguarding cascade failure must fail closed.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Forced safeguarding cascade failure.', $exception->getMessage());
+        }
+
+        $this->assertNoPartialResidentIncidentJourney();
     }
 
     /* -------------------------------------------------------------- */
-    /*  Lifecycle + closure gate                                       */
+    /*  Lifecycle + closure gate */
     /* -------------------------------------------------------------- */
 
     public function test_closing_requires_resolution_notes(): void
@@ -223,7 +393,7 @@ class FleetIncidentTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
-    /*  Follow-ups                                                     */
+    /*  Follow-ups */
     /* -------------------------------------------------------------- */
 
     public function test_add_and_complete_followup(): void
@@ -252,7 +422,7 @@ class FleetIncidentTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
-    /*  Evidence                                                       */
+    /*  Evidence */
     /* -------------------------------------------------------------- */
 
     public function test_upload_attachment(): void
@@ -280,7 +450,7 @@ class FleetIncidentTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
-    /*  Police report (TCR) clears the s22 worklist                    */
+    /*  Police report (TCR) clears the s22 worklist */
     /* -------------------------------------------------------------- */
 
     public function test_logging_police_report_clears_the_due_flag(): void
@@ -312,7 +482,7 @@ class FleetIncidentTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
-    /*  VOR (off-road) round-trip + claim                              */
+    /*  VOR (off-road) round-trip + claim */
     /* -------------------------------------------------------------- */
 
     public function test_mark_off_road_then_back_in_service(): void
@@ -357,7 +527,7 @@ class FleetIncidentTest extends TestCase
     }
 
     /* -------------------------------------------------------------- */
-    /*  Worklist scopes + read surfaces                                */
+    /*  Worklist scopes + read surfaces */
     /* -------------------------------------------------------------- */
 
     public function test_worklist_scopes(): void
@@ -400,5 +570,17 @@ class FleetIncidentTest extends TestCase
         $this->actingAs($plain)
             ->post("/fleet-assets/incidents/{$incident->id}/status", ['status' => 'investigating'])
             ->assertForbidden();
+    }
+
+    private function assertNoPartialResidentIncidentJourney(): void
+    {
+        $this->assertDatabaseCount('fleet_incidents', 0);
+        $this->assertDatabaseCount('client_incidents', 0);
+        $this->assertDatabaseCount('hs_events', 0);
+        $this->assertDatabaseCount('control_room_alerts', 0);
+        $this->assertDatabaseCount('safeguarding_alerts', 0);
+        $this->assertDatabaseCount('fleet_signals', 0);
+        $this->assertDatabaseCount('fleet_signal_outbox', 0);
+        Notification::assertNothingSent();
     }
 }

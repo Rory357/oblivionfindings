@@ -1,5 +1,4 @@
 import { FLEET_COLORS, MiniBarChart } from '@/components/fleet-charts';
-import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +22,7 @@ import {
     HeroStatusPill,
     RefChip,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { HeroActionButton } from '@/pages/fleet-assets/maintenance/components/hero-action-button';
 import {
     WorkOrderCreateWizard,
@@ -31,15 +31,15 @@ import {
 } from '@/pages/fleet-assets/maintenance/work-orders/create-wizard';
 import {
     mergeWorkOrderFilters,
-    type WorkOrderFilters,
     workOrderStatusFilterUpdate,
     workOrderStatusFilterValue,
+    type WorkOrderFilters,
 } from '@/pages/fleet-assets/maintenance/work-orders/work-order-filters';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ChevronDown,
-    ChevronUp,
     ChevronsUpDown,
+    ChevronUp,
     Download,
     Plus,
     User,
@@ -297,14 +297,20 @@ export default function WorkOrdersIndex({
                                 label="Open"
                                 value={fmt(heroStats.open)}
                                 caption="awaiting action"
-                                tone={heroStats.open > 0 ? 'warning' : 'success'}
+                                tone={
+                                    heroStats.open > 0 ? 'warning' : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/maintenance/work-orders?overdue=1"
                                 label="Overdue"
                                 value={fmt(heroStats.overdue)}
                                 caption="past due date"
-                                tone={heroStats.overdue > 0 ? 'critical' : 'success'}
+                                tone={
+                                    heroStats.overdue > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
                             />
                             <HeroClusterTile
                                 href="/fleet-assets/maintenance/work-orders?status=in_progress"
@@ -401,150 +407,162 @@ export default function WorkOrdersIndex({
                 {/* Table with priority left borders */}
                 <div className="overflow-hidden rounded-lg border">
                     <FleetResponsiveTable>
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
-                                <th className="w-8 px-4 py-3 text-left font-medium">
-                                    <input
-                                        type="checkbox"
-                                        checked={
-                                            safeData.length > 0 &&
-                                            selectedIds.length ===
-                                                safeData.length
-                                        }
-                                        onChange={toggleSelectAll}
-                                        className="h-3.5 w-3.5 rounded border-border"
-                                    />
-                                </th>
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Title
-                                </th>
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Asset
-                                </th>
-                                {renderSortHeader('priority', 'Priority')}
-                                {renderSortHeader('status', 'Status')}
-                                <th className="px-4 py-3 text-left font-medium">
-                                    Assigned To
-                                </th>
-                                {renderSortHeader('created_at', 'Created')}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {safeData.length > 0 ? (
-                                safeData.map((wo) => (
-                                    <tr
-                                        key={wo.id}
-                                        className={`cursor-pointer border-b transition-colors hover:bg-muted/30 ${PRIORITY_BORDER[wo.priority] ?? ''}`}
-                                        onClick={() =>
-                                            router.visit(
-                                                `/fleet-assets/maintenance/work-orders/${wo.id}`,
-                                            )
-                                        }
-                                    >
-                                        <td
-                                            className="px-4 py-3"
-                                            onClick={(e) => e.stopPropagation()}
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-muted/50 text-xs tracking-wider text-muted-foreground uppercase">
+                                    <th className="w-8 px-4 py-3 text-left font-medium">
+                                        <input
+                                            type="checkbox"
+                                            checked={
+                                                safeData.length > 0 &&
+                                                selectedIds.length ===
+                                                    safeData.length
+                                            }
+                                            onChange={toggleSelectAll}
+                                            className="h-3.5 w-3.5 rounded border-border"
+                                        />
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Title
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Asset
+                                    </th>
+                                    {renderSortHeader('priority', 'Priority')}
+                                    {renderSortHeader('status', 'Status')}
+                                    <th className="px-4 py-3 text-left font-medium">
+                                        Assigned To
+                                    </th>
+                                    {renderSortHeader('created_at', 'Created')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {safeData.length > 0 ? (
+                                    safeData.map((wo) => (
+                                        <tr
+                                            key={wo.id}
+                                            className={`cursor-pointer border-b transition-colors hover:bg-muted/30 ${PRIORITY_BORDER[wo.priority] ?? ''}`}
+                                            onClick={() =>
+                                                router.visit(
+                                                    `/fleet-assets/maintenance/work-orders/${wo.id}`,
+                                                )
+                                            }
                                         >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(
-                                                    wo.id,
-                                                )}
-                                                onChange={() =>
-                                                    toggleSelect(wo.id)
+                                            <td
+                                                className="px-4 py-3"
+                                                onClick={(e) =>
+                                                    e.stopPropagation()
                                                 }
-                                                className="h-3.5 w-3.5 rounded border-border"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.includes(
+                                                        wo.id,
+                                                    )}
+                                                    onChange={() =>
+                                                        toggleSelect(wo.id)
+                                                    }
+                                                    className="h-3.5 w-3.5 rounded border-border"
+                                                />
+                                            </td>
+                                            <td
+                                                data-fleet-row-identity
+                                                className="px-4 py-3"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Wrench className="h-4 w-4 text-muted-foreground" />
+                                                    <RefChip
+                                                        value={
+                                                            wo.reference_number ??
+                                                            `#${wo.id}`
+                                                        }
+                                                    />
+                                                    <span className="font-medium">
+                                                        {wo.title}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {wo.asset ? (
+                                                    <Link
+                                                        href={`/fleet-assets/assets/${wo.asset.id}`}
+                                                        className="text-primary hover:underline"
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
+                                                    >
+                                                        {wo.asset.name}
+                                                    </Link>
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        ---
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <Badge
+                                                    variant={priorityVariant(
+                                                        wo.priority,
+                                                    )}
+                                                >
+                                                    {wo.priority}
+                                                </Badge>
+                                            </td>
+                                            <td
+                                                data-fleet-row-status
+                                                data-fleet-row-action
+                                                className="px-4 py-3"
+                                            >
+                                                <Badge
+                                                    variant={statusVariant(
+                                                        wo.status,
+                                                    )}
+                                                >
+                                                    {(wo.status ?? '').replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {wo.assigned_to ? (
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <User className="h-3 w-3" />
+                                                        {wo.assigned_to.name}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        Unassigned
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td
+                                                data-fleet-row-time
+                                                className="px-4 py-3 text-muted-foreground"
+                                            >
+                                                {wo.created_at
+                                                    ? formatDate(wo.created_at)
+                                                    : '---'}
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={7} className="px-4 py-12">
+                                            <FleetEmptyState
+                                                icon={Wrench}
+                                                title="No work orders"
+                                                description="Create a work order to track vehicle and asset maintenance tasks."
+                                                actionLabel="Create Work Order"
+                                                onAction={() =>
+                                                    setWizardOpen(true)
+                                                }
                                             />
                                         </td>
-                                        <td data-fleet-row-identity className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <Wrench className="h-4 w-4 text-muted-foreground" />
-                                                <RefChip
-                                                    value={
-                                                        wo.reference_number ??
-                                                        `#${wo.id}`
-                                                    }
-                                                />
-                                                <span className="font-medium">
-                                                    {wo.title}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {wo.asset ? (
-                                                <Link
-                                                    href={`/fleet-assets/assets/${wo.asset.id}`}
-                                                    className="text-primary hover:underline"
-                                                    onClick={(e) =>
-                                                        e.stopPropagation()
-                                                    }
-                                                >
-                                                    {wo.asset.name}
-                                                </Link>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    ---
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Badge
-                                                variant={priorityVariant(
-                                                    wo.priority,
-                                                )}
-                                            >
-                                                {wo.priority}
-                                            </Badge>
-                                        </td>
-                                        <td data-fleet-row-status data-fleet-row-action className="px-4 py-3">
-                                            <Badge
-                                                variant={statusVariant(
-                                                    wo.status,
-                                                )}
-                                            >
-                                                {(wo.status ?? '').replace(
-                                                    /_/g,
-                                                    ' ',
-                                                )}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {wo.assigned_to ? (
-                                                <span className="inline-flex items-center gap-1">
-                                                    <User className="h-3 w-3" />
-                                                    {wo.assigned_to.name}
-                                                </span>
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    Unassigned
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td data-fleet-row-time className="px-4 py-3 text-muted-foreground">
-                                            {wo.created_at
-                                                ? formatDate(wo.created_at)
-                                                : '---'}
-                                        </td>
                                     </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan={7} className="px-4 py-12">
-                                        <FleetEmptyState
-                                            icon={Wrench}
-                                            title="No work orders"
-                                            description="Create a work order to track vehicle and asset maintenance tasks."
-                                            actionLabel="Create Work Order"
-                                            onAction={() =>
-                                                setWizardOpen(true)
-                                            }
-                                        />
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                                )}
+                            </tbody>
+                        </table>
                     </FleetResponsiveTable>
                 </div>
 

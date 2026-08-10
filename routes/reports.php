@@ -1,20 +1,19 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\AssetReportController;
-use App\Http\Controllers\ModuleReportController;
-use App\Http\Controllers\CombinedReportController;
-use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuditExportController;
+use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\CombinedReportController;
+use App\Http\Controllers\ModuleReportController;
+use App\Http\Controllers\ReportsController;
 use App\Support\ReportCatalog;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Reporting & Audit Routes
  *
  * Handles reports, analytics, audit logs, and exports.
  */
-
 Route::middleware(['auth'])->group(function () {
     Route::redirect('/reports/shifts', '/operations/reports/shifts', 301)
         ->middleware('permission:operations.reports.view|reports.viewAny|shifts.viewAny')
@@ -45,9 +44,19 @@ Route::middleware(['auth'])->group(function () {
 
     // Audit exports (zip bundles)
     Route::get('/audit-exports/incidents/{incident}', [AuditExportController::class, 'exportIncident'])
-        ->middleware('permission:audit.viewAny')
+        ->middleware([
+            'permission:audit.viewAny',
+            'permission:clients.viewAny',
+            'permission:incidents.viewAny',
+            'permission:incidents.export',
+        ])
         ->name('audit.exports.incident');
     Route::get('/audit-exports/clients/{client}', [AuditExportController::class, 'exportClient'])
-        ->middleware('permission:audit.viewAny')
+        ->middleware([
+            'permission:audit.viewAny',
+            'permission:clients.viewAny',
+            'permission:incidents.viewAny',
+            'permission:incidents.export',
+        ])
         ->name('audit.exports.client');
 });

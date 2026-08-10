@@ -7,15 +7,19 @@ use App\Domain\Roadmap\Models\InitiativeCategory;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\GovernancePermissionsSeeder;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\RoadmapPermissionsSeeder;
+use Database\Seeders\RoadmapSeeder;
 
 trait RoadmapTestHelpers
 {
     protected function seedRoadmapModule(): void
     {
-        $this->seed(\Database\Seeders\RbacSeeder::class);
-        $this->seed(\Database\Seeders\GovernancePermissionsSeeder::class);
-        $this->seed(\Database\Seeders\RoadmapPermissionsSeeder::class);
-        $this->seed(\Database\Seeders\RoadmapSeeder::class);
+        $this->seed(RbacSeeder::class);
+        $this->seed(GovernancePermissionsSeeder::class);
+        $this->seed(RoadmapPermissionsSeeder::class);
+        $this->seed(RoadmapSeeder::class);
 
         $adminRole = Role::where('name', 'admin')->first();
         if ($adminRole) {
@@ -47,7 +51,6 @@ trait RoadmapTestHelpers
     {
         return InitiativeCategory::query()
             ->where('key', $key)
-            ->orderByRaw('tenant_id IS NULL')
             ->firstOrFail();
     }
 

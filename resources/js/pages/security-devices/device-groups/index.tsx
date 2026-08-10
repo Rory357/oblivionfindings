@@ -1,15 +1,15 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyList, EmptySearch } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { PageHero } from '@/components/page';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { GitBranch, LayoutGrid, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 
-import { type FilterOption, type Paginated, FilterSelect } from '../devices/shared';
+import { type Paginated, FilterSelect } from '../devices/shared';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -28,16 +28,29 @@ type Props = {
 };
 
 function typeLabel(type: string): string {
-    return { location: 'Location', functional: 'Functional', vendor: 'Vendor', maintenance: 'Maintenance', custom: 'Custom' }[type] ?? type;
+    return (
+        {
+            location: 'Location',
+            functional: 'Functional',
+            vendor: 'Vendor',
+            maintenance: 'Maintenance',
+            custom: 'Custom',
+        }[type] ?? type
+    );
 }
 
 function typeVariant(type: string): 'default' | 'secondary' | 'outline' {
     switch (type) {
-        case 'location': return 'default';
-        case 'functional': return 'default';
-        case 'vendor': return 'secondary';
-        case 'maintenance': return 'outline';
-        default: return 'outline';
+        case 'location':
+            return 'default';
+        case 'functional':
+            return 'default';
+        case 'vendor':
+            return 'secondary';
+        case 'maintenance':
+            return 'outline';
+        default:
+            return 'outline';
     }
 }
 
@@ -48,7 +61,11 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
     const pageUrl = '/security-devices/device-groups';
 
     const applyFilters = (newFilters: Record<string, string>) => {
-        router.get(pageUrl, { ...filters, ...newFilters, page: '1' }, { preserveState: true });
+        router.get(
+            pageUrl,
+            { ...filters, ...newFilters, page: '1' },
+            { preserveState: true },
+        );
     };
 
     const clearFilters = () => {
@@ -56,7 +73,9 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
         setSearch('');
     };
 
-    const hasActiveFilters = Object.values(filters).some((v) => v && v !== 'all');
+    const hasActiveFilters = Object.values(filters).some(
+        (v) => v && v !== 'all',
+    );
 
     return (
         <AppLayout
@@ -74,7 +93,13 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
                     description="Organise devices into logical groups for management, reporting, and operational visibility."
                     stats={[
                         { label: 'Groups', value: groups.meta.total },
-                        { label: 'Devices', value: groups.data.reduce((sum, g) => sum + g.devices_count, 0) },
+                        {
+                            label: 'Devices',
+                            value: groups.data.reduce(
+                                (sum, g) => sum + g.devices_count,
+                                0,
+                            ),
+                        },
                     ]}
                     actions={
                         <Button asChild size="sm">
@@ -88,12 +113,14 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
                 {/* Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search groups..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && applyFilters({ search })}
+                            onKeyDown={(e) =>
+                                e.key === 'Enter' && applyFilters({ search })
+                            }
                             className="pl-9"
                         />
                     </div>
@@ -110,7 +137,13 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
                         ]}
                     />
                     {hasActiveFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters}>Clear</Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                        >
+                            Clear
+                        </Button>
                     )}
                 </div>
 
@@ -126,25 +159,36 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2">
-                                            <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
-                                            <span className="text-sm font-semibold truncate">{group.name}</span>
+                                            <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <span className="truncate text-sm font-semibold">
+                                                {group.name}
+                                            </span>
                                         </div>
                                         {group.description && (
-                                            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{group.description}</p>
+                                            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                                                {group.description}
+                                            </p>
                                         )}
                                     </div>
-                                    <Badge variant={typeVariant(group.type)} className="text-[10px] shrink-0">
+                                    <Badge
+                                        variant={typeVariant(group.type)}
+                                        className="shrink-0 text-[10px]"
+                                    >
                                         {typeLabel(group.type)}
                                     </Badge>
                                 </div>
                                 <div className="mt-3 text-xs text-muted-foreground">
-                                    {group.devices_count} device{group.devices_count !== 1 ? 's' : ''}
+                                    {group.devices_count} device
+                                    {group.devices_count !== 1 ? 's' : ''}
                                 </div>
                             </Link>
                         ))}
                     </div>
                 ) : hasActiveFilters ? (
-                    <EmptySearch onClear={clearFilters} title="No matching groups" />
+                    <EmptySearch
+                        onClear={clearFilters}
+                        title="No matching groups"
+                    />
                 ) : (
                     <EmptyList
                         icon={GitBranch}
@@ -164,7 +208,14 @@ export default function DeviceGroupsIndex({ groups, filters }: Props) {
                                 variant={link.active ? 'default' : 'outline'}
                                 size="sm"
                                 disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                onClick={() =>
+                                    link.url &&
+                                    router.get(
+                                        link.url,
+                                        {},
+                                        { preserveState: true },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: link.label }}
                             />
                         ))}

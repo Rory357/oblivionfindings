@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrExpenseItem extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'expense_claim_id',
@@ -22,8 +22,6 @@ class HrExpenseItem extends Model
         'receipt_path',
         'tax_amount',
         'notes',
-        'source_type',
-        'source_id',
     ];
 
     protected $casts = [
@@ -33,7 +31,7 @@ class HrExpenseItem extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function expenseClaim(): BelongsTo

@@ -8,6 +8,7 @@ use App\Domain\Governance\Services\IncidentEscalationService;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\SafeguardingConcern;
+use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\GovernanceTestHelpers;
@@ -35,13 +36,16 @@ class GovernanceCrossModuleEscalationTest extends TestCase
     public function test_critical_client_incident_creates_governance_escalation(): void
     {
         $reporter = $this->createAdminUser();
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
 
         ClientIncident::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $reporter->id,
             'severity' => 'critical',
             'status' => 'submitted',
+            'immediate_action_taken' => 'Resident assessed and immediate hazards controlled.',
         ]);
 
         $this->assertDatabaseHas('incident_governance_escalations', [
@@ -53,10 +57,12 @@ class GovernanceCrossModuleEscalationTest extends TestCase
     public function test_low_severity_incident_does_not_escalate(): void
     {
         $reporter = $this->createAdminUser();
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
 
         ClientIncident::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $reporter->id,
             'severity' => 'low',
             'status' => 'submitted',
@@ -68,12 +74,15 @@ class GovernanceCrossModuleEscalationTest extends TestCase
     public function test_escalation_is_idempotent(): void
     {
         $reporter = $this->createAdminUser();
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'reported_by' => $reporter->id,
             'severity' => 'critical',
             'status' => 'submitted',
+            'immediate_action_taken' => 'Resident assessed and immediate hazards controlled.',
         ]));
 
         $service = app(IncidentEscalationService::class);

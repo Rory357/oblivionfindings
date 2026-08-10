@@ -58,7 +58,7 @@ Canonical list of PRs to land the Security & Devices restructure end-to-end. Ord
 #### Phase 1 — Foundation + fix-up ✅ (all landed)
 
 1. ✅ **PR A — Integrations hub (S).** Add `integrations` to `config.ts` union, new `IntegrationsHubController` + `security-devices/integrations` page, sidebar entry, hub summary + provider cards. Fixes the broken `/integrations` runtime crash. Chrome-verified.
-2. ✅ **PR B — UniFi migration into module (M).** Rename `UnifiSettingsController` → `App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController`, move page to `resources/js/pages/security-devices/integrations/unifi.tsx`, move 10 routes to `/security-devices/integrations/unifi/*`, dual-key permission (`securityDevices.integrations.manage` OR legacy `integrations.manage_tenant_secrets`), 301 redirect from old URL, update hub `docs_href`, drop UniFi entry from settings sidebar, migrate 3 test files. Chrome-verified.
+2. ✅ **PR B — UniFi migration into module (M).** Rename `UnifiSettingsController` → `App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController`, move page to `resources/js/pages/security-devices/integrations/unifi.tsx`, move 10 routes to `/security-devices/integrations/unifi/*`, retain the legacy secret-management permission during transition, add a 301 redirect from the old URL, update hub `docs_href`, drop the UniFi entry from the settings sidebar, and migrate three test files. Chrome-verified.
 3. ✅ **PR E — Slim sites hardware page (M).** Strip UniFi card, Active Integrations section, dead sync handlers. Controller from 307 → 192 lines; page from 1654 → 848 lines. Read-only context view with ownership banner, stat strip, filter bar, device table (inline room dropdown only), Rooms management. Chrome-verified.
 
 #### Phase 2 — Provider coverage ✅ (scaffold tier landed)
@@ -80,14 +80,14 @@ Canonical list of PRs to land the Security & Devices restructure end-to-end. Ord
 
 8. ✅ **PR F — Device detail asset-link UI (S).** Added `linkAsset` + `unlinkAsset` methods to `DeviceController` with dual-path safety (duplicate detection via `DeviceLinkService::link()` throws, caught at controller). 2 routes under `/security-devices/devices/{device}/asset-links` gated by `securityDevices.devices.update`. `show.tsx` extended with `availableAssets` + `linkTypes` props, a link dialog (asset picker + link type + notes), and per-row unlink button with confirm. History preserved via `unlinked_at`. Chrome-verified — link creation, duplicate prevention (302 redirect-back with error), unlink (history retained).
 
-9. ✅ **PR G — Reports page content (M).** New `ReportsController` replacing the section-shell placeholder. Three streamed CSV exports (devices / events 90-day / maintenance) with UTF-8 BOM for Excel compatibility, cursor-based streaming so large tenants don't buffer everything in memory, tenant scoping, and `securityDevices.reports.view` gate. 4 routes wired. `reports.tsx` page with 3 download cards showing live counts + a "what's out of scope" note (no scheduling / PDF / pivot — belongs in a dedicated Reporting module). Chrome-verified — CSV download returns HTTP 200, BOM + header + my test alarm_trigger row present.
+9. ✅ **PR G — Reports page content (M).** New `ReportsController` replacing the section-shell placeholder. Three streamed CSV exports (devices / events 90-day / maintenance) with UTF-8 BOM for Excel compatibility, cursor-based streaming so large estates do not buffer everything in memory, canonical Site/visibility scoping, and the `securityDevices.reports.view` gate. Four routes are wired. `reports.tsx` provides three download cards with live counts plus a clear scope note (no scheduling / PDF / pivot — those belong in Reporting). Chrome-verified — the CSV returns HTTP 200, BOM + header + the test alarm event row.
 
 10. ✅ **PR H — Signal rule seed + DeviceEventObserver (S).** Two migrations: one seeds `security_devices` SignalSource + 13 `device_*` SignalTypes with default severities; the other seeds 13 SignalRules mapping types to tier/dedup/maintenance-suppression. New `App\Observers\DeviceEventObserver` registered in `AppServiceProvider::boot()` — bridges DeviceEvent inserts into `SignalProcessingService::ingest() → process()`, routes the resulting Signal through any matching rule, creates a `ControlRoomAlert`, and marks `DeviceEvent.processed_at`. Heartbeat suppression handled at the observer level to avoid signal-row spam. Chrome-verified end-to-end — inserting a critical `alarm_trigger` DeviceEvent produces a "Device Alarm Triggered" alert in `/control-room` with severity=critical, source=security_devices. **This was the critical path PR** unblocking all downstream care/alerting integrations.
 
     **PR H regression test:** `tests/Feature/SecurityDevices/DeviceEventSignalPipelineTest.php` — 4 assertions covering seed presence, critical-alarm-trigger end-to-end, heartbeat suppression, and unknown event_type → generic catch-all routing. Runs under `RefreshDatabase`; executes in CI with dev dependencies installed (this session skipped `--dev` install for speed).
 
     **Test-coverage expansion (this session):** Four additional Feature test files landed alongside the regression test, covering 21 assertions across the biggest surfaces:
-    - `IntegrationsHubTest.php` — guest redirect, support-worker 403, admin 200 + full props shape + roll-ups for a mixed connected/errored tenant-secret state.
+    - `IntegrationsHubTest.php` — guest redirect, support-worker 403, admin 200 + full props shape + roll-ups for a mixed connected/errored provider-connection state.
     - `DeviceAssetLinkTest.php` — permission gating, successful link creation, duplicate-pair rejection, unlink preserves history (`unlinked_at` set, row retained), cross-device unlink → 404.
     - `DeviceGroupAutoRulesTest.php` — empty-conditions footgun guard, `match=all` AND, `match=any` OR, `applyToGroup` add/remove/kept counts, idempotency, JSON preview endpoint, sync flash-messaging.
     - `ReportsExportTest.php` — permission gating on both index and each CSV, BOM prefix, Content-Type header, header-row includes `next_service_due`, row-count matches seeded devices.
@@ -101,7 +101,7 @@ Canonical list of PRs to land the Security & Devices restructure end-to-end. Ord
 **Audit result (this session):** all 6 tabs (Overview / Assignments / Events / Maintenance / Topology / Documents) already exist on `devices/show.tsx`. The outstanding work is **feature completeness within each existing tab**, not creating missing tabs. Rescoped:
 
 12. ✅ **PR J — Device Detail: Configuration polish (S).** New `DeviceController::patchFields()` method separate from the existing full-record `update()` (which requires the full taxonomy set). PATCH endpoint accepts a narrow whitelist: `notes`, `asset_tag`, `location_description`. `PATCH /security-devices/devices/{device}/fields` route gated by `securityDevices.devices.update`. Overview tab in `show.tsx` now has inline-edit affordances: a pencil button beside the Asset Tag field opens an inline input with save/cancel, and the Notes card gets an Edit button that opens a textarea form. Chrome-verified — PATCH updates DB and reloads to reflect new values; compliance_flags deferred as it's a structured JSON editor that belongs in a future polish round.
-13. ✅ **PR K — Device Detail: Relationships interactivity (M).** `DeviceController::linkRelated` + `unlinkRelated` methods with direction-aware logic (upstream / downstream), duplicate prevention via `parent_device_id + child_device_id + relationship_type` check, and tenant-boundary guard. 2 new routes gated by `securityDevices.devices.update`. `show.tsx` extended with `relationshipTypes` + `otherDevices` props, a dialog (direction / type / device picker / optional port / optional notes), and per-row unlink button. Chrome-verified — create / duplicate prevention (302 redirect-back with error) / unlink.
+13. ✅ **PR K — Device Detail: Relationships interactivity (M).** `DeviceController::linkRelated` + `unlinkRelated` methods use direction-aware logic (upstream / downstream), prevent duplicates through `parent_device_id + child_device_id + relationship_type`, and enforce the canonical visibility/ownership boundary. Two new routes are gated by `securityDevices.devices.update`. `show.tsx` adds `relationshipTypes` + `otherDevices`, a direction/type/device/port/notes dialog, and per-row unlink. Chrome-verified — create, duplicate prevention (302 redirect-back with error), and unlink.
 14. ✅ **PR L — Device Detail: Documents upload (S).** New `DeviceDocumentController` (store / download / destroy) with 20 MB cap, 7 category whitelist (manual / install_photo / compliance_cert / firmware_notes / configuration / network_diagram / other), disk-and-row atomic delete. Stored under `device_documents/{device_id}/` on the `local` disk following the ClientDocumentController pattern. 3 new routes. `show.tsx` Documents tab replaced with: header upload button, document list showing title / category badge / version badge / expiry warning / file size / notes / download link / delete action, and a multi-step upload dialog (file, title, category, version, effective/expiry dates, notes). Chrome-verified — document list rendering, download (HTTP 200 streaming back exact file contents), delete (302 redirect-back + disk + row cleanup).
 
 15. ✅ **PR M — Device-level `next_service_due` (S).** Migration `2026_04_18_000004_add_next_service_due_to_devices.php` adds a nullable `DATE` column with a dedicated index for dashboard rollups. Device model `$fillable` + `$casts` updated. `DeviceController::patchFields` whitelist extended so the Overview inline-edit covers this field. New Dashboard stats: `serviceDueOverdue` (count of devices with `next_service_due < today`) and `serviceDueIn30d` (within the next 30 days) — surfaced as two new StatCards. `next_service_due` column added to the Devices CSV export. Overview tab shows the date with an `Overdue` badge when the date has passed and an inline date-picker edit. Chrome-verified: setting `2026-03-15` (in the past) shows on the Dashboard as **Service Due (overdue): 1**, passes through the CSV, and renders on Device Detail with the Overdue badge.
@@ -122,7 +122,7 @@ _Note: distinct from `DeviceMaintenanceRecord.scheduled_for` (per-job) — this 
 #### Phase 5 — Consolidation + hygiene
 
 16. ⬜ **PR N — Alert consolidation finish-line (L).** Coordinate with upstream PR16 to remove deprecated `ControlRoom\Alert` (integration_alerts) once all reads migrate. Single `ControlRoomAlert` table. Freeze legacy writes → data migrate → cut reads → drop. Test browser flows end-to-end.
-17. ✅ **PR O — Permission reconciliation (S).** Migration `2026_04_18_000003_grant_security_devices_integrations_manage_to_legacy_roles.php` idempotently grants `securityDevices.integrations.manage` to every role that currently has `integrations.manage_tenant_secrets` (caught `provider_manager` alongside existing admin/it_manager). Fallback removed from all 3 provider controllers (`UnifiController` / `QueclinkController` / `MilesightController`) and from 3 route-group middleware strings — now just `permission:securityDevices.integrations.manage`. Chrome-verified — admin still reaches all provider pages after fallback removal.
+17. ✅ **PR O — Permission reconciliation (S).** Migration `2026_04_18_000003_grant_security_devices_integrations_manage_to_legacy_roles.php` idempotently grants `securityDevices.integrations.manage` to every role holding the former secret-management permission (including `provider_manager`, admin, and `it_manager`). The fallback was removed from all three provider controllers and route groups; they now use only `permission:securityDevices.integrations.manage`. Chrome-verified — admin still reaches all provider pages.
 18. 🟡 **PR P — Retire `location_hardware` table (M).** Audit completed this session. Full retirement is **not safe in a single PR**; it's a multi-phase sequence:
     - ✅ **Phase 1 (this session):** `UnifiOperationalBridgeService::upsertLegacyShadow()` reduced to a single-log-per-device debug no-op. Removed the `legacy_location_hardware_id` back-write after sync. Deleted `syncRoomAssignment`'s `syncLegacyShadowPlacement` calls and `applyHealthUpdate`'s shadow-writing block. Pruned 5 now-dead private helpers. Preserved **read-only** fallbacks in `findCanonicalDevice`, `resolveCanonicalDeviceForHealth`, `resolveSiteId`, `findLegacyShadowForDevice` — safe because `integration_events.canonical_device_id` already provides provenance (migration 2026_04_14_000004). Updated 3 tests in `UnifiOperationalBridgeMigrationTest.php` — renamed one, added `assertSame(0, LocationHardware::query()->count())`, captured shadow `updated_at` before sync and asserted immutability. `php -l` clean.
     - ⬜ **Phase 2** — Migrate `PullIntegrationHealthJob` non-UniFi branch (lines 109–119) off direct `LocationHardware::find()` + update onto the canonical `Device` path.
@@ -138,7 +138,7 @@ _Note: distinct from `DeviceMaintenanceRecord.scheduled_for` (per-job) — this 
 20. ✅ **PR R — Additional provider parsers (L).** Underlying infrastructure was already in place: `WebhookReceiverController` handles auth / HMAC / dedup / routing. This session landed parsers for 6 new providers — the full alarm-panel and camera lineup from the original roadmap.
     - ✅ **R-slice (Queclink + Milesight):** parsers for the PR C/D providers so webhook deliveries from live Queclink/Milesight accounts classify correctly.
     - ✅ **R-remainder (Axis + Paradox + DSC + Bosch):** Four new parsers, 14 synthetic test cases, all pass. Axis: `TamperAlarm → tamper_detected critical`, `MotionTrigger → motion_detected info`, `DayNightMode → mode_change info`. Paradox: `event_group=Alarm → alarm_triggered critical`, `Tamper → tamper_detected warn`, `Arm → panel_armed info`. DSC: TPI codes 601-610 → `zone_alarm critical`, 621-624 → `tamper_detected warn`, 650-657 → `panel_state_change info`, 800s → `panic_triggered critical`. Bosch: documented `eventType` mapping + priority-range fallback (`<50 critical`, `<=100 warn`) for unknown types. Synthesised `source_event_id` from `code + timestamp` for DSC since no natural dedup key exists.
-    - ⬜ Remaining: provider-specific hub UI entries (currently the hub catalogue lists 3 providers; operators can still receive webhooks from Gallagher / Hikvision / Axis / Paradox / DSC / Bosch without a dedicated provider page — the webhook receiver handles them as "unregistered integrations" via the tenant-secret lookup). Adding a UI tab for these is pure catalogue work, not architectural.
+    - ⬜ Remaining: provider-specific hub UI entries (the hub catalogue lists three providers; operators can still receive webhooks from Gallagher / Hikvision / Axis / Paradox / DSC / Bosch without a dedicated provider page because the webhook receiver resolves the global provider connection). Adding a UI tab for these is catalogue work, not architectural.
 21. ✅ **PR S — Device Groups auto-rules (M).** New `DeviceGroupAutoRuleService` with a strict rule schema: `match: all|any`, whitelisted fields (domain, category, subcategory, provider, status, health_status), whitelisted ops (equals, not_equals, in). Empty-conditions arrays deliberately match nothing (footgun guard). Service exposes `queryFromRules`, `preview`, and `applyToGroup` (returns added/removed/kept/total delta and is idempotent). `DeviceGroupController` extended to accept `auto_rules` on store/update, plus `previewAutoRules` (JSON) and `syncAutoRules` (redirect-back) endpoints. `show.tsx` shows an "Auto-rules: N conditions" badge next to the members count and a "Sync auto-rules" button that prompts for confirmation. Chrome-verified — seeded a test group with `provider=unifi AND domain=security`, sync picked up both seeded devices, second sync added 0 / kept 2 (idempotent).
 22. ⬜ **PR T — Assignments workbench (M).** Cross-site bulk reassignment view. Only build when volume justifies it.
 23. ⬜ **PR U — Maintenance WO integration (XL).** When a Maintenance module exists, convert the notes log into a WO list.
@@ -224,7 +224,7 @@ For every PR above, require:
 
 1. **One device, one system of record.** The `devices` registry (formerly `location_hardware`) is authoritative. Any other module referencing a device does so by ID, never by copying.
 2. **One alert system.** The two alert tables (`control_room_alerts` legacy + `integration_alerts` new) must be consolidated into a single alert table owned by Control Room. Security & Devices emits signals; it does not maintain an alert queue.
-3. **Credentials never touch a site page.** Provider credentials (tenant-wide or site-scoped) live in APIs & Integrations. Site pages can *reference* a connection, but cannot create, edit, or delete one.
+3. **Credentials never touch a site page.** Global provider connections and Site capability credentials live in APIs & Integrations. Site pages can *reference* a connection, but cannot create, edit, or delete one.
 4. **Assignment is reversible and audited.** Moving a device from Site A Room 2 to Site B Van 3 is a first-class operation with a history row, not an in-place column mutation.
 5. **Imported data is read-only in the field it came from.** If UniFi says a camera’s MAC is `aa:bb:cc:…`, Oblivion never lets a user overwrite that. OF-managed metadata (asset tag, NZ compliance notes, maintenance log, assigned person) lives in separate columns.
 
@@ -358,7 +358,7 @@ Each provider page has the same skeleton so the operator mental model transfers:
 │ # of devices imported · # of errors in last 24h       │
 └────────────────────────────────────────────────────────┘
 ┌─ Connection tab ───────────────────────────────────────┐
-│ Credentials (tenant-level or per-site), test button,  │
+│ Global connection and per-Site credentials, test,     │
 │ base URLs, capability toggles                          │
 └────────────────────────────────────────────────────────┘
 ┌─ Site Mapping tab ─────────────────────────────────────┐
@@ -385,7 +385,7 @@ Each provider page has the same skeleton so the operator mental model transfers:
 
 #### UniFi (already partially functional)
 
-- **Connection:** tenant-wide `UI Site Manager` credential (existing `IntegrationTenantSecret`), plus per-site capability credentials for Protect, Access, Network, AI Ports (existing `IntegrationSiteSecret`, capability column). Generalise capability list; do not hardcode UniFi-only values.
+- **Connection:** one global `UI Site Manager` provider connection, plus per-Site capability credentials for Protect, Access, Network, and AI Ports (`IntegrationSiteSecret`, capability column). Generalise the capability list; do not hardcode UniFi-only values.
 - **Site Mapping:** Oblivion Site → UniFi controller site (e.g., `"Auckland North"`).
 - **Import rules:** UniFi device type → OF category. `UVC-*` → camera, `UAP-*` → ap (infrastructure), `UA-*` → door, `USW-*` → switch, etc. Provide a default mapping JSON the operator can override.
 - **Duplicate handling:** match on MAC (primary), serial (secondary). If a device exists with same MAC in another site, flag as "moved" not "duplicate" and require operator acknowledgement before reassigning.
@@ -395,7 +395,7 @@ Each provider page has the same skeleton so the operator mental model transfers:
 #### Queclink (GPS trackers — GV/GL series)
 
 - **Overlap warning:** Queclink is already in the Fleet module (`app/Services/Fleet/Telemetry/QueclinkAdapter.php`) for vehicle telemetry. Security & Devices and Fleet share the adapter but own *different* bounded contexts: Security & Devices owns the tracker **hardware** (IMEI, SIM, firmware, assignment). Fleet owns the **telemetry stream** (positions, trips, driver behaviour). Decision: extract Queclink adapter into a provider-neutral `app/Services/Integration/Adapters/QueclinkAdapter.php` and let Fleet consume tracker positions via an event bus or read-through of `Device` + `DeviceTelemetrySnapshot`, rather than owning the credential.
-- **Connection:** per-account Queclink server credentials (host, port, auth). In NZ context, most customers will use a Queclink cloud tenant; expose both.
+- **Connection:** per-account Queclink server credentials (host, port, auth). In NZ context, most deployments use a Queclink cloud account; expose both.
 - **Import rules:** IMEI is primary key. SIM ICCID stored separately. Category auto-mapped to `tracker`. Subcategory (`vehicle_tracker` / `personal_tracker` / `asset_tracker`) inferred from device model, operator-overridable.
 - **Assignment:** on import, tracker is unassigned. Operator assigns to Vehicle (Fleet), Person (client/staff via HR), or Asset. Personal trackers for NZ supported-living clients are a primary use case — make assignment to a Client profile first-class.
 - **Field mapping:** IMEI, model, firmware authoritative. SIM ICCID & carrier are OF-editable (SIMs swap without the tracker moving).
@@ -425,7 +425,7 @@ Operationally equivalent to UniFi’s "Devices" list, but multi-provider, multi-
 
 Five cards, all filter-clickable:
 
-1. **All devices** — total count (tenant-scoped).
+1. **All devices** — total visible count, reconciled through Site access and explicit all-Sites authority.
 2. **Online** — `n · %` with green dot. Clicking filters to `status:online`.
 3. **Needs attention** — count. Clicking filters to attention devices (rules below).
 4. **Unassigned** — devices with no room, no vehicle, no person, no asset.
@@ -714,7 +714,6 @@ This section describes the target state. Migrations should be additive where pos
 | Column | Notes |
 |---|---|
 | id | PK |
-| tenant_id | |
 | name | OF-editable |
 | category | enum: camera · door · alarm · tracker · smart_iot · infrastructure · other |
 | subcategory | string (e.g., `personal_tracker`, `bed_sensor`, `door_reader`, `ap`, `switch`) |
@@ -739,7 +738,7 @@ This section describes the target state. Migrations should be additive where pos
 | meta | JSON |
 | created_at / updated_at / deleted_at | |
 
-Unique composite where applicable: `(tenant_id, provider, external_ref->primary_key)`.
+Unique provider identity where applicable: `(provider, external_ref->primary_key)`.
 
 #### `device_assignments`
 
@@ -803,7 +802,7 @@ Polymorphic if the codebase already has a media/attachments table, use that inst
 ### 9.2 Integration tables (keep existing, extend)
 
 - **`integrations`** — keep.
-- **`integration_tenant_secrets`** — keep.
+- **`integration_provider_connections`** — one global provider connection per provider; secret material stays write-only.
 - **`integration_site_configs`** — keep.
 - **`integration_site_secrets`** — keep; generalise `capability` from hardcoded UniFi values to a per-provider capability catalogue (stored as string, validated against provider metadata in code, not DB enum).
 - **`integration_events`** — keep.
@@ -811,8 +810,8 @@ Polymorphic if the codebase already has a media/attachments table, use that inst
 
 ### 9.3 New integration tables
 
-- **`integration_ignored_devices`** — `(tenant_id, provider, external_primary_key, ignored_by, ignored_at, reason)`.
-- **`integration_exceptions`** — `(tenant_id, provider, type: duplicate|moved|unmapped|conflict, payload JSON, status: open|resolved|dismissed, resolved_by, resolved_at, resolution JSON)`. This backs the Exceptions tab.
+- **`integration_ignored_devices`** — `(provider, external_primary_key, ignored_by, ignored_at, reason)` with approved-Site discovery provenance.
+- **`integration_exceptions`** — `(provider, site_id, type: duplicate|moved|unmapped|conflict, payload JSON, status: open|resolved|dismissed, resolved_by, resolved_at, resolution JSON)`. This backs the Exceptions tab and preserves the affected Site boundary.
 - **`integration_field_mappings`** — optional for v1; hardcode the defaults. Only materialise this table if operators actually need to override, to avoid empty-config sprawl.
 
 ### 9.4 Signal and alert tables — the consolidation decision
@@ -973,7 +972,7 @@ Each PR is sized to land in a few days without blocking the others beyond stated
 - **Scope:** UniFi end-to-end inside new home; credentials move out of site pages.
 - **Out of scope:** Queclink, Milesight; any adapter refactor beyond what’s required for the move.
 - **Deps:** PR 5 (so we can remove from sites).
-- **Risks:** existing UniFi credentials during migration — backfill migration copies `integration_tenant_secrets` and `integration_site_secrets` rows if they changed shape; otherwise just point the new UI at existing tables.
+- **Risks:** existing UniFi credentials during migration — the backfill copies legacy global-provider and Site-secret rows if they changed shape; otherwise point the new UI at the current connection stores.
 - **Acceptance:** UniFi connect → discover sites → map → sync devices → see imported devices in Global Devices, all without touching any site page.
 
 ### PR 9 — Queclink integration page + hardware registration path

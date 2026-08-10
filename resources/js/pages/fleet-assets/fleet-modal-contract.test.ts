@@ -22,7 +22,8 @@ describe('Fleet workflow dialog contract', () => {
                     `resources/js/pages/fleet-assets/${relativePath}`,
                     'utf8',
                 );
-                const count = source.match(/<DialogContent(?:\s|>)/g)?.length ?? 0;
+                const count =
+                    source.match(/<DialogContent(?:\s|>)/g)?.length ?? 0;
 
                 expect(
                     count,

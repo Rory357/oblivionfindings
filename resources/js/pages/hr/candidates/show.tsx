@@ -4,11 +4,13 @@ import {
     type OfferRole,
     type OfferSite,
 } from '@/components/hr';
-import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
+import {
+    PageHero,
+    type PageHeroBadge,
+    type PageHeroMetaItem,
+} from '@/components/page';
 import { ActivityItem } from '@/components/recruitment/activity-item';
 import { PipelineStepper } from '@/components/recruitment/pipeline-stepper';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,6 +21,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
@@ -280,7 +284,12 @@ export default function CandidateShow({
         applicationId: number;
         positionTitle: string;
         positionRole: string | null;
-    }>({ open: false, applicationId: 0, positionTitle: '', positionRole: null });
+    }>({
+        open: false,
+        applicationId: 0,
+        positionTitle: '',
+        positionRole: null,
+    });
     const [respondOffer, setRespondOffer] = useState<{
         open: boolean;
         offerId: number;
@@ -370,7 +379,8 @@ export default function CandidateShow({
     function rejectApplication(applicationId: number) {
         setConfirmState({
             title: 'Reject application?',
-            description: 'This moves the candidate out of the active pipeline. You can re-activate them later from the talent pool.',
+            description:
+                'This moves the candidate out of the active pipeline. You can re-activate them later from the talent pool.',
             confirmLabel: 'Reject',
             destructive: true,
             action: () =>
@@ -430,7 +440,9 @@ export default function CandidateShow({
         );
     }
     function declineOfferApproval(offerId: number) {
-        const reason = window.prompt('Decline this offer for changes. Reason (optional):');
+        const reason = window.prompt(
+            'Decline this offer for changes. Reason (optional):',
+        );
         if (reason === null) return; // cancelled — don't decline
         router.post(
             `/hr/recruitment/offers/${offerId}/decline-approval`,
@@ -460,7 +472,8 @@ export default function CandidateShow({
     function deleteDocument(docId: number) {
         setConfirmState({
             title: 'Delete document?',
-            description: 'This permanently removes the document from the candidate record.',
+            description:
+                'This permanently removes the document from the candidate record.',
             confirmLabel: 'Delete',
             destructive: true,
             action: () =>
@@ -977,7 +990,8 @@ export default function CandidateShow({
                                     })
                                 }
                             >
-                                <Gift className="mr-1 h-3.5 w-3.5" /> Create Offer
+                                <Gift className="mr-1 h-3.5 w-3.5" /> Create
+                                Offer
                             </Button>
                         </div>
                     )}
@@ -1063,11 +1077,15 @@ export default function CandidateShow({
                     ];
                     if (candidate.source_detail)
                         heroBadges.push({ label: candidate.source_detail });
-                    candidate.tags.forEach((t) => heroBadges.push({ label: t }));
+                    candidate.tags.forEach((t) =>
+                        heroBadges.push({ label: t }),
+                    );
 
                     const heroMeta: PageHeroMetaItem[] = [];
                     if (candidate.preferred_name)
-                        heroMeta.push({ label: `Goes by "${candidate.preferred_name}"` });
+                        heroMeta.push({
+                            label: `Goes by "${candidate.preferred_name}"`,
+                        });
                     heroMeta.push({
                         icon: Mail,
                         label: candidate.personal_email,
@@ -1083,31 +1101,43 @@ export default function CandidateShow({
                     const daysInPipeline =
                         totalDaysInPipeline ??
                         Math.round(
-                            (Date.now() - new Date(candidate.created_at).getTime()) /
+                            (Date.now() -
+                                new Date(candidate.created_at).getTime()) /
                                 86400000,
                         );
 
                     return (
-                        <PageHero category="hr"
+                        <PageHero
+                            category="hr"
                             avatar={{ fallback: initials }}
                             title={fullName}
                             meta={heroMeta}
                             badges={heroBadges}
                             stats={[
-                                { label: 'Days in Pipeline', value: daysInPipeline },
-                                { label: 'Applications', value: candidate.applications.length },
+                                {
+                                    label: 'Days in Pipeline',
+                                    value: daysInPipeline,
+                                },
+                                {
+                                    label: 'Applications',
+                                    value: candidate.applications.length,
+                                },
                                 { label: 'Interviews', value: totalInterviews },
                             ]}
                             actions={
                                 can.manage &&
-                                candidate.applications[0]?.status === 'active' ? (
+                                candidate.applications[0]?.status ===
+                                    'active' ? (
                                     <>
                                         <Button
                                             size="sm"
                                             className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                             variant="outline"
                                             onClick={() =>
-                                                advanceStage(candidate.applications[0].id)
+                                                advanceStage(
+                                                    candidate.applications[0]
+                                                        .id,
+                                                )
                                             }
                                         >
                                             Advance{' '}
@@ -1119,7 +1149,8 @@ export default function CandidateShow({
                                             variant="outline"
                                             onClick={() =>
                                                 rejectApplication(
-                                                    candidate.applications[0].id,
+                                                    candidate.applications[0]
+                                                        .id,
                                                 )
                                             }
                                         >
@@ -1135,17 +1166,24 @@ export default function CandidateShow({
                 {/* Tags - segmentation labels (manager-editable) */}
                 <Card>
                     <CardContent className="flex flex-wrap items-center gap-2 py-3">
-                        <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                        <span className="text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
                             Tags
                         </span>
                         {candidate.tags.length === 0 ? (
-                            <span className="text-[13px] text-muted-foreground">None yet</span>
+                            <span className="text-[13px] text-muted-foreground">
+                                None yet
+                            </span>
                         ) : (
                             candidate.tags.map((tag) => (
-                                <Badge key={tag} variant="secondary" className="gap-1">
+                                <Badge
+                                    key={tag}
+                                    variant="secondary"
+                                    className="gap-1"
+                                >
                                     {tag}
                                     {can.manage ? (
-                                        <Button unstyled
+                                        <Button
+                                            unstyled
                                             type="button"
                                             aria-label={`Remove ${tag}`}
                                             onClick={() => removeTag(tag)}
@@ -1162,7 +1200,9 @@ export default function CandidateShow({
                                 <input
                                     type="text"
                                     value={tagInput}
-                                    onChange={(e) => setTagInput(e.target.value)}
+                                    onChange={(e) =>
+                                        setTagInput(e.target.value)
+                                    }
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
@@ -1173,7 +1213,12 @@ export default function CandidateShow({
                                     maxLength={100}
                                     className="h-8 w-40 rounded-md border border-border bg-background px-2.5 text-[13px] outline-none focus:border-primary"
                                 />
-                                <Button size="sm" variant="outline" onClick={addTag} disabled={!tagInput.trim()}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={addTag}
+                                    disabled={!tagInput.trim()}
+                                >
                                     Add
                                 </Button>
                             </div>
@@ -1341,16 +1386,22 @@ export default function CandidateShow({
                                                                         size="sm"
                                                                         variant="outline"
                                                                         onClick={() =>
-                                                                            setOfferWizard({
-                                                                                open: true,
-                                                                                applicationId: app.id,
-                                                                                positionTitle: app.position_title,
-                                                                                positionRole: app.position_role,
-                                                                            })
+                                                                            setOfferWizard(
+                                                                                {
+                                                                                    open: true,
+                                                                                    applicationId:
+                                                                                        app.id,
+                                                                                    positionTitle:
+                                                                                        app.position_title,
+                                                                                    positionRole:
+                                                                                        app.position_role,
+                                                                                },
+                                                                            )
                                                                         }
                                                                     >
                                                                         <Gift className="mr-1 h-3 w-3" />{' '}
-                                                                        Create Offer
+                                                                        Create
+                                                                        Offer
                                                                     </Button>
                                                                 )}
                                                         </>
@@ -1892,7 +1943,9 @@ export default function CandidateShow({
                                                                                 )
                                                                             }
                                                                         >
-                                                                            Submit for approval
+                                                                            Submit
+                                                                            for
+                                                                            approval
                                                                         </Button>
                                                                     )}
                                                                     {app.offer
@@ -1963,7 +2016,8 @@ export default function CandidateShow({
                                                                         )
                                                                     }
                                                                 >
-                                                                    Record Response
+                                                                    Record
+                                                                    Response
                                                                 </Button>
                                                             )}
                                                         {app.offer.response ===
@@ -2457,16 +2511,27 @@ export default function CandidateShow({
                 />
             )}
 
-            <AlertDialog open={confirmState !== null} onOpenChange={(o) => !o && setConfirmState(null)}>
+            <AlertDialog
+                open={confirmState !== null}
+                onOpenChange={(o) => !o && setConfirmState(null)}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
-                        <AlertDialogDescription>{confirmState?.description}</AlertDialogDescription>
+                        <AlertDialogTitle>
+                            {confirmState?.title}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {confirmState?.description}
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
-                            className={confirmState?.destructive ? 'bg-status-critical text-white hover:bg-status-critical/90' : undefined}
+                            className={
+                                confirmState?.destructive
+                                    ? 'bg-status-critical text-white hover:bg-status-critical/90'
+                                    : undefined
+                            }
                             onClick={() => {
                                 confirmState?.action();
                                 setConfirmState(null);

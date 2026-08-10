@@ -11,7 +11,6 @@ import {
     CalendarClock,
     CalendarDays,
     CalendarRange,
-    Check,
     ClipboardCheck,
     Leaf,
     MessageSquare,
@@ -26,7 +25,13 @@ import {
     UserPlus,
     Users,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+    useEffect,
+    useMemo,
+    useState,
+    type CSSProperties,
+    type ReactNode,
+} from 'react';
 import { toast } from 'sonner';
 
 import { Textarea } from '@/components/ui/textarea';
@@ -70,9 +75,24 @@ type LeavePreview = {
 };
 
 const STEPS: readonly WizardStep[] = [
-    { key: 'type', label: 'Type & dates', blurb: 'What & when', icon: CalendarRange },
-    { key: 'note', label: 'Note & docs', blurb: 'Add context', icon: MessageSquare },
-    { key: 'review', label: 'Review', blurb: 'Confirm & send', icon: ClipboardCheck },
+    {
+        key: 'type',
+        label: 'Type & dates',
+        blurb: 'What & when',
+        icon: CalendarRange,
+    },
+    {
+        key: 'note',
+        label: 'Note & docs',
+        blurb: 'Add context',
+        icon: MessageSquare,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & send',
+        icon: ClipboardCheck,
+    },
 ];
 
 const PERIOD_OPTIONS: LeaveTypeOption[] = [
@@ -85,15 +105,51 @@ const PERIOD_OPTIONS: LeaveTypeOption[] = [
 type TileMeta = { icon: IconType; accent: string; sub: string };
 const TILE_META: Record<string, TileMeta> = {
     annual: { icon: Sun, accent: 'var(--primary)', sub: 'Holiday & rest' },
-    sick: { icon: Activity, accent: 'var(--status-warning)', sub: 'Unwell or caring' },
-    bereavement: { icon: Leaf, accent: 'var(--status-success)', sub: 'Loss of someone' },
-    family_violence: { icon: ShieldCheck, accent: 'var(--status-critical)', sub: 'Safety & support' },
-    parental: { icon: UserPlus, accent: 'var(--chart-4)', sub: 'New family time' },
-    public_holiday: { icon: CalendarDays, accent: 'var(--primary)', sub: 'Statutory day' },
-    alternative: { icon: CalendarClock, accent: 'var(--status-success)', sub: 'Day in lieu' },
-    unpaid: { icon: MinusCircle, accent: 'var(--muted-foreground)', sub: 'Time without pay' },
-    toil: { icon: Timer, accent: 'var(--muted-foreground)', sub: 'Time off in lieu' },
-    other: { icon: MoreHorizontal, accent: 'var(--muted-foreground)', sub: 'Anything else' },
+    sick: {
+        icon: Activity,
+        accent: 'var(--status-warning)',
+        sub: 'Unwell or caring',
+    },
+    bereavement: {
+        icon: Leaf,
+        accent: 'var(--status-success)',
+        sub: 'Loss of someone',
+    },
+    family_violence: {
+        icon: ShieldCheck,
+        accent: 'var(--status-critical)',
+        sub: 'Safety & support',
+    },
+    parental: {
+        icon: UserPlus,
+        accent: 'var(--chart-4)',
+        sub: 'New family time',
+    },
+    public_holiday: {
+        icon: CalendarDays,
+        accent: 'var(--primary)',
+        sub: 'Statutory day',
+    },
+    alternative: {
+        icon: CalendarClock,
+        accent: 'var(--status-success)',
+        sub: 'Day in lieu',
+    },
+    unpaid: {
+        icon: MinusCircle,
+        accent: 'var(--muted-foreground)',
+        sub: 'Time without pay',
+    },
+    toil: {
+        icon: Timer,
+        accent: 'var(--muted-foreground)',
+        sub: 'Time off in lieu',
+    },
+    other: {
+        icon: MoreHorizontal,
+        accent: 'var(--muted-foreground)',
+        sub: 'Anything else',
+    },
 };
 const FALLBACK_TILE: TileMeta = {
     icon: CalendarRange,
@@ -125,7 +181,11 @@ function toIso(d: Date): string {
 /** "Wed 8 Jul" — short weekday + day + month for the range line. */
 function shortDayMonth(iso: string): string {
     const d = parseIso(iso);
-    return d.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('en-NZ', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+    });
 }
 
 /**
@@ -138,8 +198,13 @@ function estimateWork(
     end: string,
     period: string,
     holidays: Record<string, string>,
-): { workingDays: number; hours: number; holidaysInRange: { iso: string; name: string }[] } {
-    if (!start || !end) return { workingDays: 0, hours: 0, holidaysInRange: [] };
+): {
+    workingDays: number;
+    hours: number;
+    holidaysInRange: { iso: string; name: string }[];
+} {
+    if (!start || !end)
+        return { workingDays: 0, hours: 0, holidaysInRange: [] };
     let workingDays = 0;
     const holidaysInRange: { iso: string; name: string }[] = [];
     const a = parseIso(start);
@@ -229,14 +294,20 @@ export function LeaveRequestDialog({
     };
 
     const people: PersonOption[] = useMemo(
-        () => staff.map((s) => ({ value: String(s.id), label: s.name, sub: s.email })),
+        () =>
+            staff.map((s) => ({
+                value: String(s.id),
+                label: s.name,
+                sub: s.email,
+            })),
         [staff],
     );
 
     // Seed from `initial` (the "Duplicate" action) each time the dialog opens.
     useEffect(() => {
         if (open && initial) {
-            if (initial.leave_type) form.setData('leave_type', initial.leave_type);
+            if (initial.leave_type)
+                form.setData('leave_type', initial.leave_type);
             if (initial.starts_at) form.setData('starts_at', initial.starts_at);
             if (initial.ends_at) form.setData('ends_at', initial.ends_at);
         }
@@ -289,7 +360,8 @@ export function LeaveRequestDialog({
             starts_at: form.data.starts_at,
             ends_at: form.data.ends_at,
         });
-        if (!isSelf && form.data.user_id) params.set('user_id', form.data.user_id);
+        if (!isSelf && form.data.user_id)
+            params.set('user_id', form.data.user_id);
 
         let cancelled = false;
         setPreviewLoading(true);
@@ -334,9 +406,12 @@ export function LeaveRequestDialog({
             forceFormData: true,
             preserveScroll: true,
             onSuccess: (page) => {
-                const flash = (page.props as { flash?: { error?: string } }).flash;
+                const flash = (page.props as { flash?: { error?: string } })
+                    .flash;
                 if (flash?.error) {
-                    toast.error('Could not submit leave', { description: flash.error });
+                    toast.error('Could not submit leave', {
+                        description: flash.error,
+                    });
                     return;
                 }
                 if (isSelf) {
@@ -385,7 +460,9 @@ export function LeaveRequestDialog({
             maxHeight="min(86vh, 724px)"
             railExtra={
                 <BalanceCard
-                    typeLabel={form.data.leave_type ? typeLabel : 'Leave balance'}
+                    typeLabel={
+                        form.data.leave_type ? typeLabel : 'Leave balance'
+                    }
                     icon={TypeIcon}
                     accent={meta.accent}
                     preview={preview}
@@ -396,7 +473,11 @@ export function LeaveRequestDialog({
             success={
                 submitted ? (
                     <WizardSuccessPane
-                        title={isSelf ? 'Enjoy your time off 🌴' : 'Request submitted'}
+                        title={
+                            isSelf
+                                ? 'Enjoy your time off 🌴'
+                                : 'Request submitted'
+                        }
                         blurb={
                             isSelf
                                 ? `Your ${typeLabel.toLowerCase()} for ${form.data.starts_at ? shortDayMonth(form.data.starts_at) : ''}${form.data.ends_at && form.data.ends_at !== form.data.starts_at ? ` – ${shortDayMonth(form.data.ends_at)}` : ''} is on its way${preview?.approver ? ` to ${preview.approver}` : ''}. We'll let you know the moment it's approved.`
@@ -461,7 +542,9 @@ export function LeaveRequestDialog({
                                 : isSelf
                                   ? 'Submit request'
                                   : 'Send for approval'}
-                            {!form.processing && <ArrowRight className="h-[15px] w-[15px]" />}
+                            {!form.processing && (
+                                <ArrowRight className="h-[15px] w-[15px]" />
+                            )}
                         </button>
                     ) : (
                         <button
@@ -484,7 +567,11 @@ export function LeaveRequestDialog({
                 <WizardStepPane>
                     <StepHead
                         icon={CalendarRange}
-                        title={isSelf ? 'When are you away?' : "Who's away, and when?"}
+                        title={
+                            isSelf
+                                ? 'When are you away?'
+                                : "Who's away, and when?"
+                        }
                         blurb={
                             isSelf
                                 ? "Pick a leave type and your dates — we'll add up the working hours for you."
@@ -513,19 +600,26 @@ export function LeaveRequestDialog({
                         {/* ── Leave-type tiles ── */}
                         <div>
                             <div className="mb-2.5 text-[13px] font-semibold">
-                                Leave type <span className="text-status-critical">*</span>
+                                Leave type{' '}
+                                <span className="text-status-critical">*</span>
                             </div>
                             <div className="flex flex-col gap-2">
                                 {leaveTypes.map((t) => {
                                     const m = tileMeta(t.value);
                                     const Icon = m.icon;
-                                    const active = form.data.leave_type === t.value;
+                                    const active =
+                                        form.data.leave_type === t.value;
                                     return (
                                         <button
                                             key={t.value}
                                             type="button"
                                             aria-pressed={active}
-                                            onClick={() => form.setData('leave_type', t.value)}
+                                            onClick={() =>
+                                                form.setData(
+                                                    'leave_type',
+                                                    t.value,
+                                                )
+                                            }
                                             style={
                                                 active
                                                     ? ({
@@ -585,7 +679,8 @@ export function LeaveRequestDialog({
                             {(form.errors.starts_at || form.errors.ends_at) && (
                                 <p className="mt-1.5 flex items-center gap-1 text-xs text-status-critical">
                                     <AlertTriangle className="h-3 w-3 shrink-0" />
-                                    {form.errors.starts_at || form.errors.ends_at}
+                                    {form.errors.starts_at ||
+                                        form.errors.ends_at}
                                 </p>
                             )}
 
@@ -605,16 +700,19 @@ export function LeaveRequestDialog({
                             >
                                 <div className="shrink-0 text-center">
                                     <div className="text-[23px] leading-none font-bold tracking-tight text-primary">
-                                        {previewLoading && !preview ? '…' : displayHours}
+                                        {previewLoading && !preview
+                                            ? '…'
+                                            : displayHours}
                                     </div>
-                                    <div className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground">
+                                    <div className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                                         Hours
                                     </div>
                                 </div>
                                 <div className="h-9 w-px shrink-0 bg-border" />
                                 <div className="min-w-0">
                                     <div className="text-[13.5px] font-semibold">
-                                        {form.data.starts_at && form.data.ends_at
+                                        {form.data.starts_at &&
+                                        form.data.ends_at
                                             ? `${shortDayMonth(form.data.starts_at)} – ${shortDayMonth(form.data.ends_at)}`
                                             : form.data.starts_at
                                               ? `${shortDayMonth(form.data.starts_at)} — pick an end date`
@@ -637,7 +735,9 @@ export function LeaveRequestDialog({
                                     >
                                         <SelectInput
                                             value={form.data.period}
-                                            onChange={(v) => form.setData('period', v)}
+                                            onChange={(v) =>
+                                                form.setData('period', v)
+                                            }
                                             placeholder="Full day"
                                             options={PERIOD_OPTIONS}
                                         />
@@ -649,8 +749,9 @@ export function LeaveRequestDialog({
                                 <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-status-warning/40 bg-status-warning-bg px-2.5 py-1 text-[11.5px] font-semibold text-status-warning">
                                     <Sun className="h-3 w-3" />
                                     {work.holidaysInRange[0].name} (
-                                    {shortDay(work.holidaysInRange[0].iso)}) is a public
-                                    holiday — it won&apos;t come off the balance.
+                                    {shortDay(work.holidaysInRange[0].iso)}) is
+                                    a public holiday — it won&apos;t come off
+                                    the balance.
                                 </div>
                             )}
                         </div>
@@ -670,11 +771,17 @@ export function LeaveRequestDialog({
                         }
                     />
                     <div className="max-w-[560px]">
-                        <Field label="Note" hint="— optional" error={form.errors.reason}>
+                        <Field
+                            label="Note"
+                            hint="— optional"
+                            error={form.errors.reason}
+                        >
                             <Textarea
                                 rows={4}
                                 value={form.data.reason}
-                                onChange={(e) => form.setData('reason', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('reason', e.target.value)
+                                }
                                 placeholder={
                                     isSelf
                                         ? 'A line or two for your manager (optional)…'
@@ -695,7 +802,7 @@ export function LeaveRequestDialog({
                                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-primary/10 text-primary">
                                     <Upload className="h-5 w-5" />
                                 </span>
-                                <span className="flex-1 min-w-0">
+                                <span className="min-w-0 flex-1">
                                     <span className="block truncate text-[13.5px] font-semibold">
                                         {form.data.supporting_doc
                                             ? form.data.supporting_doc.name
@@ -760,7 +867,8 @@ export function LeaveRequestDialog({
                                         {typeLabel}
                                     </div>
                                     <div className="text-[13px] text-muted-foreground">
-                                        {form.data.starts_at && form.data.ends_at
+                                        {form.data.starts_at &&
+                                        form.data.ends_at
                                             ? `${shortDayMonth(form.data.starts_at)} – ${shortDayMonth(form.data.ends_at)}`
                                             : '—'}{' '}
                                         · {displayHours}h
@@ -771,12 +879,15 @@ export function LeaveRequestDialog({
                                     onClick={() => wizard.goTo(0)}
                                     className="inline-flex items-center gap-1.5 rounded-[9px] border border-primary/40 bg-card px-[11px] py-1.5 text-[12.5px] font-semibold text-primary hover:bg-primary/5"
                                 >
-                                    <Pencil className="h-[13px] w-[13px]" /> Edit
+                                    <Pencil className="h-[13px] w-[13px]" />{' '}
+                                    Edit
                                 </button>
                             </div>
 
                             <div className="px-[18px] py-1.5">
-                                <HeroRow label={isSelf ? 'You' : 'Staff member'}>
+                                <HeroRow
+                                    label={isSelf ? 'You' : 'Staff member'}
+                                >
                                     <span className="inline-flex items-center gap-2">
                                         <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">
                                             {initials(staffName)}
@@ -785,7 +896,8 @@ export function LeaveRequestDialog({
                                     </span>
                                 </HeroRow>
                                 <HeroRow label="Working time">
-                                    {displayHours}h · {work.workingDays} working day
+                                    {displayHours}h · {work.workingDays} working
+                                    day
                                     {work.workingDays === 1 ? '' : 's'}
                                 </HeroRow>
                                 <div className="border-b border-muted py-3">
@@ -796,7 +908,8 @@ export function LeaveRequestDialog({
                                         <span className="text-[13px] font-semibold">
                                             {preview ? (
                                                 <>
-                                                    {preview.available_before}h →{' '}
+                                                    {preview.available_before}h
+                                                    →{' '}
                                                     <span
                                                         className={
                                                             preview.insufficient
@@ -804,7 +917,10 @@ export function LeaveRequestDialog({
                                                                 : 'text-status-success'
                                                         }
                                                     >
-                                                        {preview.projected_remaining}h
+                                                        {
+                                                            preview.projected_remaining
+                                                        }
+                                                        h
                                                     </span>
                                                 </>
                                             ) : previewLoading ? (
@@ -815,14 +931,21 @@ export function LeaveRequestDialog({
                                         </span>
                                     </div>
                                     <BalanceBar
-                                        available={preview?.available_before ?? 0}
-                                        requested={preview?.hours ?? displayHours}
+                                        available={
+                                            preview?.available_before ?? 0
+                                        }
+                                        requested={
+                                            preview?.hours ?? displayHours
+                                        }
                                         insufficient={!!preview?.insufficient}
                                     />
                                 </div>
-                                <HeroRow label="Note">{form.data.reason || '—'}</HeroRow>
+                                <HeroRow label="Note">
+                                    {form.data.reason || '—'}
+                                </HeroRow>
                                 <HeroRow label="Document" last>
-                                    {form.data.supporting_doc?.name || 'None attached'}
+                                    {form.data.supporting_doc?.name ||
+                                        'None attached'}
                                 </HeroRow>
                             </div>
                         </div>
@@ -842,16 +965,17 @@ export function LeaveRequestDialog({
                         {preview?.has_roster_conflict ? (
                             <div className="mt-2.5 flex items-center gap-2.5 rounded-[12px] border border-status-warning/40 bg-status-warning-bg px-3.5 py-2.5 text-[12.5px] font-semibold text-status-warning">
                                 <CalendarRange className="h-4 w-4 shrink-0" />
-                                Heads up — {isSelf ? 'you are' : `${staffFirst} is`} rostered
-                                on a shift during these dates.
+                                Heads up —{' '}
+                                {isSelf ? 'you are' : `${staffFirst} is`}{' '}
+                                rostered on a shift during these dates.
                             </div>
                         ) : null}
 
                         {preview?.insufficient ? (
                             <div className="mt-2.5 flex items-center gap-2.5 rounded-[12px] border border-status-critical/40 bg-status-critical-bg px-3.5 py-2.5 text-[12.5px] font-semibold text-status-critical">
                                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                                Not enough balance — this will go negative. A manager can
-                                still approve with escalation.
+                                Not enough balance — this will go negative. A
+                                manager can still approve with escalation.
                             </div>
                         ) : null}
                     </div>
@@ -878,8 +1002,12 @@ function HeroRow({
                 last ? '' : 'border-b border-muted',
             )}
         >
-            <span className="shrink-0 text-[13px] text-muted-foreground">{label}</span>
-            <span className="min-w-0 text-right text-[13px] font-medium">{children}</span>
+            <span className="shrink-0 text-[13px] text-muted-foreground">
+                {label}
+            </span>
+            <span className="min-w-0 text-right text-[13px] font-medium">
+                {children}
+            </span>
         </div>
     );
 }
@@ -949,15 +1077,27 @@ function BalanceCard({
             >
                 <circle cx="88" cy="34" r="13" stroke="var(--status-warning)" />
                 <path d="M42 118 C44 96 46 72 50 56" stroke="var(--primary)" />
-                <path d="M50 56 C40 50 28 50 18 58" stroke="var(--status-success)" />
-                <path d="M50 56 C44 44 34 38 22 38" stroke="var(--status-success)" />
-                <path d="M50 56 C56 46 66 42 78 44" stroke="var(--status-success)" />
-                <path d="M50 56 C58 52 70 52 80 60" stroke="var(--status-success)" />
+                <path
+                    d="M50 56 C40 50 28 50 18 58"
+                    stroke="var(--status-success)"
+                />
+                <path
+                    d="M50 56 C44 44 34 38 22 38"
+                    stroke="var(--status-success)"
+                />
+                <path
+                    d="M50 56 C56 46 66 42 78 44"
+                    stroke="var(--status-success)"
+                />
+                <path
+                    d="M50 56 C58 52 70 52 80 60"
+                    stroke="var(--status-success)"
+                />
             </svg>
 
             <div className="relative rounded-[14px] border border-border bg-card p-3.5 shadow-[0_2px_10px_-4px_color-mix(in_oklch,var(--primary)_25%,transparent)]">
                 <div className="flex items-center justify-between">
-                    <span className="truncate text-[11px] font-bold tracking-wide uppercase text-muted-foreground">
+                    <span className="truncate text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
                         {typeLabel}
                     </span>
                     <span

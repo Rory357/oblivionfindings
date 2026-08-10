@@ -2,13 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CoverageReservation extends Model
 {
+    use WritesLegacyOrganizationStorageContext;
+
     protected $fillable = [
-        'organization_id',
         'site_id',
         'coverage_requirement_id',
         'shift_id',

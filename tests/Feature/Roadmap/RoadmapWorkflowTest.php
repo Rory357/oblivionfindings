@@ -5,9 +5,14 @@ namespace Tests\Feature\Roadmap;
 use App\Domain\Roadmap\Models\Initiative;
 use App\Domain\Roadmap\Models\InitiativeCategory;
 use App\Domain\Roadmap\Models\InitiativeSuggestion;
+use App\Domain\Roadmap\Models\QuarterlyRoadmapPlan;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\GovernancePermissionsSeeder;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\RoadmapPermissionsSeeder;
+use Database\Seeders\RoadmapSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,10 +26,10 @@ class RoadmapWorkflowTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
-        $this->seed(\Database\Seeders\GovernancePermissionsSeeder::class);
-        $this->seed(\Database\Seeders\RoadmapPermissionsSeeder::class);
-        $this->seed(\Database\Seeders\RoadmapSeeder::class);
+        $this->seed(RbacSeeder::class);
+        $this->seed(GovernancePermissionsSeeder::class);
+        $this->seed(RoadmapPermissionsSeeder::class);
+        $this->seed(RoadmapSeeder::class);
 
         $adminRole = Role::where('name', 'admin')->firstOrFail();
         $adminRole->permissions()->sync(Permission::pluck('id')->all());
@@ -289,7 +294,7 @@ class RoadmapWorkflowTest extends TestCase
             'status' => 'published',
         ]);
 
-        $plan = \App\Domain\Roadmap\Models\QuarterlyRoadmapPlan::findOrFail($planId);
+        $plan = QuarterlyRoadmapPlan::findOrFail($planId);
         $this->assertNotNull($plan->snapshot_hash);
         $this->assertNotNull($plan->snapshot_payload);
 
@@ -348,21 +353,21 @@ class RoadmapWorkflowTest extends TestCase
         $detail->assertJsonPath('item.items.0.initiative.id', $initiative->id);
     }
 
-    public function test_quarterly_plan_detail_endpoint_enforces_tenant_scope(): void
+    public function test_quarterly_plan_detail_endpoint_requires_roadmap_permission(): void
     {
         $generate = $this->actingAs($this->admin)
             ->postJson('/roadmap/quarterly-plans/generate', [
                 'fiscal_year' => now()->year,
                 'quarter' => now()->quarter,
                 'preset' => 'board_ceo',
-                'tenant_id' => 1,
             ]);
 
         $generate->assertCreated();
         $planId = $generate->json('item.id');
+        $unprivileged = User::factory()->create(['approved_at' => now()]);
 
-        $this->actingAs($this->admin)
-            ->getJson("/roadmap/quarterly-plans/{$planId}?tenant_id=2")
+        $this->actingAs($unprivileged)
+            ->getJson("/roadmap/quarterly-plans/{$planId}")
             ->assertForbidden();
     }
 

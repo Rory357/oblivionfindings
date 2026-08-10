@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentRequest;
@@ -7,6 +8,7 @@ use App\Models\ConsentType;
 use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\Operations\ConsentRequestReminderNotification;
 use App\Notifications\Operations\ConsentRequestRespondedNotification;
@@ -39,13 +41,28 @@ function grantConsentIntegrityPermissions(User $user, array $permissionKeys): vo
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
+function assignConsentIntegrityPortalRole(User $user, string $roleName): void
+{
+    $role = Role::query()->firstOrCreate(
+        ['name' => $roleName],
+        [
+            'label' => $roleName === 'client' ? 'Client Portal' : 'Next of Kin / Guardian (Portal)',
+            'level' => 15,
+            'type' => 'system',
+        ],
+    );
+
+    $user->update(['role' => $roleName]);
+    $user->roles()->sync([$role->id]);
+}
+
 /**
- * @return array{staff: User, recipient: User, client: Client, consentType: ConsentType}
+ * @return array{staff: User, recipient: User, client: Client, site: Site, consentType: ConsentType}
  */
 function makeConsentIntegrityContext(): array
 {
+    $site = Site::factory()->create();
     $staff = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'manager',
     ]);
     grantConsentIntegrityPermissions($staff, [
@@ -53,19 +70,32 @@ function makeConsentIntegrityContext(): array
         'consents.request',
         'consents.withdraw',
     ]);
-    $recipient = User::factory()->create(['organization_id' => 1]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $staff->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $staff->id,
+        'updated_by' => $staff->id,
+    ]);
+
+    $recipient = User::factory()->create();
+    assignConsentIntegrityPortalRole($recipient, 'next_of_kin');
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $client->portalUsers()->attach($recipient->id, ['relation' => 'next_of_kin']);
 
     return [
         'staff' => $staff,
         'recipient' => $recipient,
         'client' => $client,
+        'site' => $site,
         'consentType' => ConsentType::factory()->create(['active' => true]),
     ];
 }
 
-/** @param array{staff: User, recipient: User, client: Client, consentType: ConsentType} $context */
+/** @param array{staff: User, recipient: User, client: Client, site: Site, consentType: ConsentType} $context */
 function consentIntegrityPayload(array $context, array $overrides = []): array
 {
     return [
@@ -82,7 +112,7 @@ function consentIntegrityPayload(array $context, array $overrides = []): array
     ];
 }
 
-/** @param array{staff: User, recipient: User, client: Client, consentType: ConsentType} $context */
+/** @param array{staff: User, recipient: User, client: Client, site: Site, consentType: ConsentType} $context */
 function makeConsentIntegrityRequest(array $context, array $overrides = []): ConsentRequest
 {
     return ConsentRequest::factory()->create([
@@ -108,7 +138,7 @@ function consentIntegrityHttpRequest(User $user): HttpRequest
     return $request;
 }
 
-/** @param array{staff: User, recipient: User, client: Client, consentType: ConsentType} $context */
+/** @param array{staff: User, recipient: User, client: Client, site: Site, consentType: ConsentType} $context */
 function makeVerifiedConsentAuthority(
     array $context,
     string $authorityType = ConsentRequest::RELATION_WELFARE_GUARDIAN,
@@ -262,6 +292,7 @@ it('preserves ordinary next-of-kin approval without fabricating incapacity', fun
 
 it('preserves client self-consent without substitute-capacity fields', function () {
     $context = makeConsentIntegrityContext();
+    assignConsentIntegrityPortalRole($context['recipient'], 'client');
     $context['client']->update(['user_id' => $context['recipient']->id]);
     $context['client']->portalUsers()->detach($context['recipient']->id);
     $context['client']->portalUsers()->attach($context['recipient']->id, ['relation' => 'self']);
@@ -662,18 +693,21 @@ it('locks the portal authorization link while creating and responding', function
         ->and($hasLockedPortalRead($responseQueries))->toBeTrue();
 });
 
-it('rejects a cross-organisation recipient on the direct approval path', function () {
+it('rejects a recipient linked only to another Client at a different Site on the direct approval path', function () {
     $context = makeConsentIntegrityContext();
-    $staleRecipient = User::query()->findOrFail($context['recipient']->id);
-    $context['recipient']->update(['organization_id' => 2]);
+    $recipient = User::query()->findOrFail($context['recipient']->id);
+    $otherSite = Site::factory()->create();
+    $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $context['client']->portalUsers()->detach($recipient->id);
+    $otherClient->portalUsers()->attach($recipient->id, ['relation' => 'next_of_kin']);
     $consentRequest = makeConsentIntegrityRequest($context);
 
     $conflicted = false;
     try {
         app(ConsentRequestService::class)->approve(
             $consentRequest,
-            $staleRecipient,
-            consentIntegrityHttpRequest($staleRecipient),
+            $recipient,
+            consentIntegrityHttpRequest($recipient),
         );
     } catch (ConflictHttpException) {
         $conflicted = true;
@@ -684,42 +718,60 @@ it('rejects a cross-organisation recipient on the direct approval path', functio
         ->and(ClientConsent::query()->exists())->toBeFalse();
 });
 
-it('rejects a cross-organisation requester on the direct create and cancel paths', function () {
+it('rejects a Site-scoped requester on inaccessible direct create and cancel paths', function () {
     $context = makeConsentIntegrityContext();
-    $foreignClient = Client::factory()->create(['organization_id' => 2]);
-    $foreignRecipient = User::factory()->create(['organization_id' => 2]);
-    $foreignClient->portalUsers()->attach($foreignRecipient->id, ['relation' => 'next_of_kin']);
+    $scopedStaff = User::factory()->create(['role' => 'manager']);
+    grantConsentIntegrityPermissions($scopedStaff, [
+        'clients.viewAssigned',
+        'consents.request',
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $scopedStaff->id,
+        'primary_site_id' => $context['site']->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $scopedStaff->id,
+        'updated_by' => $scopedStaff->id,
+    ]);
+
+    $otherSite = Site::factory()->create();
+    $inaccessibleClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $portalRecipient = User::factory()->create();
+    assignConsentIntegrityPortalRole($portalRecipient, 'next_of_kin');
+    $inaccessibleClient->portalUsers()->attach($portalRecipient->id, ['relation' => 'next_of_kin']);
     $service = app(ConsentRequestService::class);
     $payload = consentIntegrityPayload($context, [
-        'client_id' => $foreignClient->id,
-        'recipient_user_id' => $foreignRecipient->id,
+        'client_id' => $inaccessibleClient->id,
+        'recipient_user_id' => $portalRecipient->id,
     ]);
     unset($payload['expires_in_days']);
 
     $createRejected = false;
     try {
-        $service->create($payload, $context['staff']);
+        $service->create($payload, $scopedStaff);
     } catch (ValidationException) {
         $createRejected = true;
     }
 
-    $foreignRequest = ConsentRequest::factory()->create([
-        'client_id' => $foreignClient->id,
+    $inaccessibleRequest = ConsentRequest::factory()->create([
+        'client_id' => $inaccessibleClient->id,
         'consent_type_id' => $context['consentType']->id,
-        'requested_by_user_id' => $context['staff']->id,
-        'recipient_user_id' => $foreignRecipient->id,
+        'requested_by_user_id' => $scopedStaff->id,
+        'recipient_user_id' => $portalRecipient->id,
         'recipient_relationship' => ConsentRequest::RELATION_NEXT_OF_KIN,
     ]);
     $cancelRejected = false;
     try {
-        $service->cancel($foreignRequest, $context['staff'], 'Cross-organisation attempt.');
+        $service->cancel($inaccessibleRequest, $scopedStaff, 'Cross-Site direct-object attempt.');
     } catch (ConflictHttpException) {
         $cancelRejected = true;
     }
 
     expect($createRejected)->toBeTrue()
         ->and($cancelRejected)->toBeTrue()
-        ->and($foreignRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING);
+        ->and($inaccessibleRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING);
 });
 
 it('refuses to roll back verified authority columns while authority data is populated', function () {

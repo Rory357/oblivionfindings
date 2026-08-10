@@ -85,9 +85,15 @@ export function PostingPreview({
             <table className="w-full text-sm">
                 <thead>
                     <tr className="text-xs text-muted-foreground">
-                        <th className="px-4 py-1.5 text-left font-medium">Account</th>
-                        <th className="px-4 py-1.5 text-right font-medium">Debit</th>
-                        <th className="px-4 py-1.5 text-right font-medium">Credit</th>
+                        <th className="px-4 py-1.5 text-left font-medium">
+                            Account
+                        </th>
+                        <th className="px-4 py-1.5 text-right font-medium">
+                            Debit
+                        </th>
+                        <th className="px-4 py-1.5 text-right font-medium">
+                            Credit
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -95,7 +101,9 @@ export function PostingPreview({
                         <tr key={i} className="border-t border-border/60">
                             <td className="px-4 py-1.5">
                                 <span className="font-medium">
-                                    {line.accountCode ? `${line.accountCode} · ` : ''}
+                                    {line.accountCode
+                                        ? `${line.accountCode} · `
+                                        : ''}
                                     {line.accountName}
                                 </span>
                                 {line.memo ? (
@@ -105,17 +113,21 @@ export function PostingPreview({
                                 ) : null}
                             </td>
                             <td className="px-4 py-1.5 text-right tabular-nums">
-                                {line.debit ? formatMoney(line.debit, { currency }) : ''}
+                                {line.debit
+                                    ? formatMoney(line.debit, { currency })
+                                    : ''}
                             </td>
                             <td className="px-4 py-1.5 text-right tabular-nums">
-                                {line.credit ? formatMoney(line.credit, { currency }) : ''}
+                                {line.credit
+                                    ? formatMoney(line.credit, { currency })
+                                    : ''}
                             </td>
                         </tr>
                     ))}
                 </tbody>
                 <tfoot>
                     <tr className="border-t border-border bg-muted/40 font-semibold">
-                        <td className="px-4 py-1.5 text-right text-xs uppercase text-muted-foreground">
+                        <td className="px-4 py-1.5 text-right text-xs text-muted-foreground uppercase">
                             Totals
                         </td>
                         <td className="px-4 py-1.5 text-right tabular-nums">

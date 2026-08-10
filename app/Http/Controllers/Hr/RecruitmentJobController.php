@@ -2,46 +2,51 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Domain\Hr\Models\HrInterviewKit;
+use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrInterviewKit;
 use App\Domain\Hr\Models\HrJobRequisition;
+use App\Domain\Hr\Notifications\RequisitionApprovalRequestNotification;
+use App\Domain\Hr\Services\HrRecruitmentAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class RecruitmentJobController extends Controller
 {
-    use ResolvesHrTenant;
-
     private const POSTING_CHANNELS = ['career_page', 'linkedin', 'seek', 'indeed', 'facebook'];
+
+    public function __construct(
+        private readonly HrRecruitmentAccessService $recruitmentAccess,
+    ) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $scope = $this->recruitmentAccess->scope($user);
         $search = trim((string) $request->query('search', ''));
         $status = $request->query('status');
         $hiringManagerUserId = $request->query('hiring_manager_user_id');
         $staleStageDays = (int) config('hr.recruitment.stale_stage_days', 14);
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $jobsQuery = HrJobRequisition::query()
+        $jobsQuery = $this->recruitmentAccess->visibleRequisitions($user)
             ->with([
                 'site:id,name',
                 'defaultInterviewKit:id,name',
                 'hiringManager:id,name',
-                'applications:id,requisition_id,candidate_id,status',
+                'applications' => fn ($applications) => $applications
+                    ->whereIn('id', $scope['application_ids'])
+                    ->select('id', 'requisition_id', 'candidate_id', 'status'),
                 'applications.candidate:id,status,current_stage_entered_at',
             ])
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->when($search !== '', fn ($query) => $query->where('title', 'like', "%{$search}%"))
             ->when($status, fn ($query, $value) => $query->where('status', $value))
             ->when($hiringManagerUserId !== null && $hiringManagerUserId !== '', function ($query) use ($hiringManagerUserId) {
@@ -70,21 +75,22 @@ class RecruitmentJobController extends Controller
         );
 
         $sites = Site::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereIn('id', $scope['site_ids'])
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
             ->orderBy('name')
             ->get(['id', 'name']);
 
         $interviewKits = HrInterviewKit::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'role']);
 
-        $hiringManagers = User::query()
-            ->when($tenantStaffIds !== [], fn ($query) => $query->whereIn('id', $tenantStaffIds))
-            ->orderBy('name')
-            ->limit(200)
-            ->get(['id', 'name', 'email']);
+        $hiringManagers = $this->recruitmentAccess->currentUsers($user)
+            ->take(200)
+            ->map->only(['id', 'name', 'email'])
+            ->values();
 
         return Inertia::render('hr/recruitment/jobs', [
             'jobs' => $jobs,
@@ -112,22 +118,11 @@ class RecruitmentJobController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-
-        $siteRule = Rule::exists('sites', 'id');
-        $kitRule = Rule::exists('hr_interview_kits', 'id');
-        $siteRule = $siteRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        $kitRule = $kitRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $managerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
-
-        $positionRule = Rule::exists('hr_positions', 'id')->where(fn ($query) => $query->where('tenant_id', $tenantId));
-
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'position_role' => ['nullable', 'string', 'max:100'],
-            'position_id' => ['nullable', 'integer', $positionRule],
-            'site_id' => ['nullable', 'integer', $siteRule],
+            'position_id' => ['nullable', 'integer', Rule::exists('hr_positions', 'id')],
+            'site_id' => ['required', 'integer'],
             'employment_type' => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
             'salary_range_min' => ['nullable', 'numeric', 'min:0'],
             'salary_range_max' => ['nullable', 'numeric', 'min:0', 'gte:salary_range_min'],
@@ -140,17 +135,23 @@ class RecruitmentJobController extends Controller
             'description' => ['required', 'string', 'max:20000'],
             'requirements' => ['nullable', 'string', 'max:20000'],
             'responsibilities' => ['nullable', 'string', 'max:20000'],
-            'default_interview_kit_id' => ['nullable', 'integer', $kitRule],
-            'hiring_manager_user_id' => ['nullable', 'integer', $managerRule],
+            'default_interview_kit_id' => ['nullable', 'integer', Rule::exists('hr_interview_kits', 'id')],
+            'hiring_manager_user_id' => ['nullable', 'integer'],
             'posting_channels' => ['nullable', 'array'],
             'posting_channels.*' => ['string', Rule::in(self::POSTING_CHANNELS)],
             'closing_at' => ['nullable', 'date', 'after_or_equal:today'],
         ]);
+        $siteId = (int) $validated['site_id'];
+        $this->recruitmentAccess->assertSite($user, $siteId);
+        $this->assertCurrentHiringManagerForSite(
+            $user,
+            isset($validated['hiring_manager_user_id']) ? (int) $validated['hiring_manager_user_id'] : null,
+            $siteId,
+        );
 
         HrJobRequisition::create([
             ...$validated,
-            'tenant_id' => $tenantId,
-            'slug' => $this->generateUniqueSlug((string) $validated['title'], $tenantId),
+            'slug' => $this->generateUniqueSlug((string) $validated['title']),
             'status' => 'draft',
             'external_posting_status' => 'not_posted',
             'created_by' => $user->id,
@@ -164,23 +165,13 @@ class RecruitmentJobController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
-
-        $siteRule = Rule::exists('sites', 'id');
-        $kitRule = Rule::exists('hr_interview_kits', 'id');
-        $siteRule = $siteRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        $kitRule = $kitRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $managerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
-
-        $positionRule = Rule::exists('hr_positions', 'id')->where(fn ($query) => $query->where('tenant_id', $tenantId));
+        $job = $this->recruitmentAccess->visibleRequisition($user, $job);
 
         $validated = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
             'position_role' => ['nullable', 'string', 'max:100'],
-            'position_id' => ['nullable', 'integer', $positionRule],
-            'site_id' => ['nullable', 'integer', $siteRule],
+            'position_id' => ['nullable', 'integer', Rule::exists('hr_positions', 'id')],
+            'site_id' => ['sometimes', 'required', 'integer'],
             'employment_type' => ['sometimes', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
             'salary_range_min' => ['nullable', 'numeric', 'min:0'],
             'salary_range_max' => ['nullable', 'numeric', 'min:0', 'gte:salary_range_min'],
@@ -193,16 +184,28 @@ class RecruitmentJobController extends Controller
             'description' => ['sometimes', 'string', 'max:20000'],
             'requirements' => ['nullable', 'string', 'max:20000'],
             'responsibilities' => ['nullable', 'string', 'max:20000'],
-            'default_interview_kit_id' => ['nullable', 'integer', $kitRule],
-            'hiring_manager_user_id' => ['nullable', 'integer', $managerRule],
+            'default_interview_kit_id' => ['nullable', 'integer', Rule::exists('hr_interview_kits', 'id')],
+            'hiring_manager_user_id' => ['nullable', 'integer'],
             'posting_channels' => ['nullable', 'array'],
             'posting_channels.*' => ['string', Rule::in(self::POSTING_CHANNELS)],
             'closing_at' => ['nullable', 'date'],
             'status' => ['sometimes', 'string', Rule::in(['draft', 'published', 'paused', 'closed', 'pending_approval'])],
         ]);
 
+        $siteId = isset($validated['site_id']) ? (int) $validated['site_id'] : (int) $job->site_id;
+        $this->recruitmentAccess->assertSite($user, $siteId);
+        if ($siteId !== (int) $job->site_id && $job->applications()->exists()) {
+            throw ValidationException::withMessages([
+                'site_id' => 'Move or close existing applications before changing the requisition Site.',
+            ]);
+        }
+        $managerId = array_key_exists('hiring_manager_user_id', $validated)
+            ? ($validated['hiring_manager_user_id'] !== null ? (int) $validated['hiring_manager_user_id'] : null)
+            : ($job->hiring_manager_user_id ? (int) $job->hiring_manager_user_id : null);
+        $this->assertCurrentHiringManagerForSite($user, $managerId, $siteId);
+
         if (array_key_exists('title', $validated) && $validated['title'] !== $job->title) {
-            $validated['slug'] = $this->generateUniqueSlug((string) $validated['title'], $job->tenant_id, $job->id);
+            $validated['slug'] = $this->generateUniqueSlug((string) $validated['title'], $job->id);
         }
 
         $validated['updated_by'] = $user->id;
@@ -215,8 +218,11 @@ class RecruitmentJobController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+        $job = $this->recruitmentAccess->visibleRequisition($user, $job);
+
+        if ($job->requires_approval && $job->status !== 'published') {
+            return redirect()->back()->with('error', 'This requisition requires approval before publishing.');
+        }
 
         $job->update([
             'status' => 'published',
@@ -231,8 +237,7 @@ class RecruitmentJobController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+        $job = $this->recruitmentAccess->visibleRequisition($user, $job);
 
         $job->update([
             'status' => 'closed',
@@ -247,22 +252,24 @@ class RecruitmentJobController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+        $job = $this->recruitmentAccess->visibleRequisition($user, $job);
 
         if (! in_array($job->status, ['draft', 'paused'], true)) {
             return redirect()->back()->with('error', 'Only a draft requisition can be submitted for approval.');
         }
 
+        $manager = $job->hiringManager()->first();
+        if (! $manager) {
+            return redirect()->back()->with('error', 'Assign a current hiring manager before requesting approval.');
+        }
+        $this->assertCurrentHiringManagerForSite($user, (int) $manager->id, (int) $job->site_id);
+
         $job->update(['status' => 'pending_approval', 'updated_by' => $user->id]);
 
-        $manager = $job->hiringManager()->first();
-        if ($manager) {
-            try {
-                $manager->notify(new \App\Domain\Hr\Notifications\RequisitionApprovalRequestNotification($job, $user));
-            } catch (\Throwable $exception) {
-                report($exception);
-            }
+        try {
+            $manager->notify(new RequisitionApprovalRequestNotification($job, $user));
+        } catch (\Throwable $exception) {
+            report($exception);
         }
 
         return redirect()->back()->with('success', 'Requisition submitted for approval.');
@@ -273,8 +280,11 @@ class RecruitmentJobController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+        $job = $this->recruitmentAccess->visibleRequisition($user, $job);
+
+        if ($job->hiring_manager_user_id) {
+            abort_unless((int) $job->hiring_manager_user_id === (int) $user->id, 403);
+        }
 
         if ($job->status !== 'pending_approval') {
             return redirect()->back()->with('error', 'Only a requisition pending approval can be approved.');
@@ -294,8 +304,11 @@ class RecruitmentJobController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+        $job = $this->recruitmentAccess->visibleRequisition($user, $job);
+
+        if ($job->hiring_manager_user_id) {
+            abort_unless((int) $job->hiring_manager_user_id === (int) $user->id, 403);
+        }
 
         if ($job->status !== 'pending_approval') {
             return redirect()->back()->with('error', 'Only a requisition pending approval can be rejected.');
@@ -310,8 +323,7 @@ class RecruitmentJobController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+        $job = $this->recruitmentAccess->visibleRequisition($user, $job);
 
         if ($job->status !== 'published') {
             return redirect()->back()->withErrors([
@@ -352,8 +364,7 @@ class RecruitmentJobController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $job->tenant_id);
+        $job = $this->recruitmentAccess->visibleRequisition($user, $job);
 
         $job->update([
             'external_posting_status' => 'not_posted',
@@ -366,22 +377,31 @@ class RecruitmentJobController extends Controller
         return redirect()->back()->with('success', 'External posting channels removed.');
     }
 
-    private function generateUniqueSlug(string $title, ?int $tenantId, ?int $ignoreId = null): string
+    private function generateUniqueSlug(string $title, ?int $ignoreId = null): string
     {
         $base = Str::slug($title);
         $slug = $base !== '' ? $base : 'job';
         $counter = 1;
 
         while (HrJobRequisition::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId), fn ($query) => $query->whereNull('tenant_id'))
             ->when($ignoreId !== null, fn ($query) => $query->where('id', '!=', $ignoreId))
             ->where('slug', $slug)
             ->exists()) {
             $counter++;
-            $slug = $base . '-' . $counter;
+            $slug = $base.'-'.$counter;
         }
 
         return $slug;
+    }
+
+    private function assertCurrentHiringManagerForSite(User $viewer, ?int $managerId, int $siteId): void
+    {
+        if ($managerId === null) {
+            return;
+        }
+
+        $manager = $this->recruitmentAccess->currentUsersAtSite($viewer, $siteId)->firstWhere('id', $managerId);
+        abort_unless($manager instanceof User && $manager->hrEmployeeProfile, 404);
     }
 
     private function transformJob(HrJobRequisition $job, int $staleStageDays): array
@@ -467,7 +487,7 @@ class RecruitmentJobController extends Controller
     }
 
     /**
-     * @param Collection<int, \App\Domain\Hr\Models\HrApplication> $applications
+     * @param  Collection<int, HrApplication>  $applications
      * @return array<string, int|float>
      */
     private function calculateMetrics(Collection $applications, int $staleStageDays): array
@@ -518,4 +538,3 @@ class RecruitmentJobController extends Controller
         return $candidate->current_stage_entered_at->lte(now()->subDays($staleStageDays));
     }
 }
-

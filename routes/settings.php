@@ -203,19 +203,19 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:integrations.view')
         ->name('settings.api');
     Route::post('settings/api/keys', [ApiSettingsController::class, 'storeKey'])
-        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->middleware('permission:integrations.manage_secrets')
         ->name('settings.api.keys.store');
     Route::post('settings/api/keys/{keyId}/revoke', [ApiSettingsController::class, 'revokeKey'])
-        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->middleware('permission:integrations.manage_secrets')
         ->name('settings.api.keys.revoke');
     Route::post('settings/api/webhooks', [ApiSettingsController::class, 'storeWebhook'])
-        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->middleware('permission:integrations.manage_secrets')
         ->name('settings.api.webhooks.store');
     Route::post('settings/api/webhooks/{webhookId}/test', [ApiSettingsController::class, 'testWebhook'])
-        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->middleware('permission:integrations.manage_secrets')
         ->name('settings.api.webhooks.test');
     Route::delete('settings/api/webhooks/{webhookId}', [ApiSettingsController::class, 'destroyWebhook'])
-        ->middleware('permission:integrations.manage_tenant_secrets')
+        ->middleware('permission:integrations.manage_secrets')
         ->name('settings.api.webhooks.destroy');
 
     // Data & Privacy
@@ -300,15 +300,15 @@ Route::middleware('auth')->group(function () {
 
     // Audit Logs
     Route::get('settings/audit-logs', [AuditLogSettingsController::class, 'index'])
-        ->middleware('permission:audit.viewAny|settings.access.manage')
+        ->middleware('permission:audit.viewAny')
         ->name('settings.audit_logs');
     Route::get('settings/audit-logs/export', [AuditLogSettingsController::class, 'export'])
-        ->middleware('permission:audit.viewAny|settings.access.manage')
+        ->middleware('permission:audit.viewAny')
         ->name('settings.audit_logs.export');
 
     // Calendar sync (admin): connect Google Workspace / Microsoft 365 and map each
     // house to a resource calendar. Gated on the existing integrations-manage permission.
-    Route::middleware('permission:integrations.manage_tenant_secrets')->group(function () {
+    Route::middleware('permission:integrations.manage_secrets')->group(function () {
         Route::get('settings/calendar-sync', [CalendarSyncSettingsController::class, 'index'])
             ->name('settings.calendar-sync');
         Route::put('settings/calendar-sync/mapping', [CalendarSyncSettingsController::class, 'updateMapping'])
@@ -320,6 +320,7 @@ Route::middleware('auth')->group(function () {
         Route::post('settings/calendar-sync/sync-now', [CalendarSyncSettingsController::class, 'syncNow'])
             ->name('settings.calendar-sync.sync-now');
         Route::post('settings/calendar-sync/mapping/{mapping}/reset-feed', [CalendarSyncSettingsController::class, 'resetFeed'])
+            ->whereNumber('mapping')
             ->name('settings.calendar-sync.reset-feed');
 
         // Admin OAuth connect/callback/disconnect for the org calendar connection.
@@ -334,7 +335,7 @@ Route::middleware('auth')->group(function () {
     // IT support mailbox (email-to-ticket): connect the Exchange/Gmail account
     // the hourly PollItMailboxJob reads. Same admin gate as calendar-sync;
     // the OAuth flow mirrors it (E6).
-    Route::middleware('permission:integrations.manage_tenant_secrets')->group(function () {
+    Route::middleware('permission:integrations.manage_secrets')->group(function () {
         Route::get('settings/it-mailbox', [ItMailboxSettingsController::class, 'index'])
             ->name('settings.it-mailbox');
         Route::put('settings/it-mailbox/mailbox/{provider}', [ItMailboxSettingsController::class, 'updateMailbox'])

@@ -1,8 +1,22 @@
 /* eslint-disable no-restricted-syntax -- Portal-positioned popover with custom
  * on-surface action buttons (mirrors the rostering context-menu pattern); these
  * are intentional raw <button>/<div> layout cases, token-coloured throughout. */
-import { Archive, CalendarClock, Copy, ExternalLink, MapPin, Pencil, Users } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+    Archive,
+    CalendarClock,
+    Copy,
+    ExternalLink,
+    MapPin,
+    Pencil,
+    Users,
+} from 'lucide-react';
+import {
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+    type CSSProperties,
+} from 'react';
 import { createPortal } from 'react-dom';
 
 import { LAYER_META, type CalendarLayer } from '@/lib/calendar/layer-feed';
@@ -27,7 +41,11 @@ const DEEP_LINK_LABEL: Partial<Record<CalendarLayer, string>> = {
     milestone: 'Open profile',
 };
 
-function formatWhen(start: string | null, end: string | null, allDay: boolean): string {
+function formatWhen(
+    start: string | null,
+    end: string | null,
+    allDay: boolean,
+): string {
     if (!start) return '';
     const fmt = (v: string) =>
         new Date(v).toLocaleDateString('en-NZ', {
@@ -65,7 +83,10 @@ export function CalendarDetailPopover({
     onDeepLink: (href: string) => void;
 }) {
     const ref = useRef<HTMLDivElement>(null);
-    const [pos, setPos] = useState<CSSProperties>({ left: detail.x, top: detail.y });
+    const [pos, setPos] = useState<CSSProperties>({
+        left: detail.x,
+        top: detail.y,
+    });
 
     useLayoutEffect(() => {
         const el = ref.current;
@@ -73,15 +94,18 @@ export function CalendarDetailPopover({
         const r = el.getBoundingClientRect();
         let left = detail.x;
         let top = detail.y;
-        if (left + r.width > window.innerWidth - 8) left = window.innerWidth - r.width - 8;
-        if (top + r.height > window.innerHeight - 8) top = window.innerHeight - r.height - 8;
+        if (left + r.width > window.innerWidth - 8)
+            left = window.innerWidth - r.width - 8;
+        if (top + r.height > window.innerHeight - 8)
+            top = window.innerHeight - r.height - 8;
         setPos({ left: Math.max(8, left), top: Math.max(8, top) });
     }, [detail.x, detail.y]);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
         const onDown = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+            if (ref.current && !ref.current.contains(e.target as Node))
+                onClose();
         };
         window.addEventListener('keydown', onKey);
         window.addEventListener('mousedown', onDown);
@@ -105,10 +129,17 @@ export function CalendarDetailPopover({
             className="w-[280px] rounded-xl border border-border bg-popover p-3 shadow-[var(--shadow-float)]"
         >
             <div className="mb-1.5 flex items-center gap-2">
-                <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: `var(--${meta.color})` }} />
-                <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{meta.label}</span>
+                <span
+                    className="h-2.5 w-2.5 flex-none rounded-full"
+                    style={{ background: `var(--${meta.color})` }}
+                />
+                <span className="text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
+                    {meta.label}
+                </span>
             </div>
-            <div className="text-[15px] font-bold leading-tight">{detail.title}</div>
+            <div className="text-[15px] leading-tight font-bold">
+                {detail.title}
+            </div>
 
             <div className="mt-2 space-y-1 text-[12.5px] text-muted-foreground">
                 <div className="flex items-center gap-1.5">
@@ -139,19 +170,36 @@ export function CalendarDetailPopover({
             <div className="mt-3 flex flex-wrap gap-1.5">
                 {isEvent && canManage ? (
                     <>
-                        <button type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:brightness-95">
+                        <button
+                            type="button"
+                            onClick={onEdit}
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:brightness-95"
+                        >
                             <Pencil className="h-3.5 w-3.5" /> Edit
                         </button>
-                        <button type="button" onClick={onDuplicate} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold hover:bg-muted">
+                        <button
+                            type="button"
+                            onClick={onDuplicate}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold hover:bg-muted"
+                        >
                             <Copy className="h-3.5 w-3.5" /> Duplicate
                         </button>
-                        <button type="button" onClick={onArchive} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-status-warning hover:bg-status-warning-bg">
+                        <button
+                            type="button"
+                            onClick={onArchive}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-status-warning hover:bg-status-warning-bg"
+                        >
                             <Archive className="h-3.5 w-3.5" /> Archive
                         </button>
                     </>
                 ) : detail.deepLink ? (
-                    <button type="button" onClick={() => onDeepLink(detail.deepLink as string)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:brightness-95">
-                        <ExternalLink className="h-3.5 w-3.5" /> {DEEP_LINK_LABEL[detail.layer] ?? 'Open'}
+                    <button
+                        type="button"
+                        onClick={() => onDeepLink(detail.deepLink as string)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:brightness-95"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5" />{' '}
+                        {DEEP_LINK_LABEL[detail.layer] ?? 'Open'}
                     </button>
                 ) : null}
             </div>

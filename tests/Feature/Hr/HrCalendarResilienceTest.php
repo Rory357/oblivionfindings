@@ -5,6 +5,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\HrCalendarAggregator;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -14,16 +15,23 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
 
-    $this->hr = User::factory()->create([
-        'role' => 'hr',
-        'organization_id' => 1,
-        'approved_at' => now(),
-    ]);
+    $this->visibleSite = Site::factory()->create();
+    $this->hiddenSite = Site::factory()->create();
+    $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
     ]);
     $this->hr->roles()->firstOrFail()->permissions()->syncWithoutDetaching([
         Permission::query()->where('key', 'rostering.viewAny')->firstOrFail()->id,
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'employee_number' => 'CAL-MANAGER-'.$this->hr->id,
+        'primary_site_id' => $this->visibleSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
     ]);
 });
 
@@ -61,7 +69,6 @@ test('optional calendar layers fail soft when a source table is absent', functio
         });
 
     $events = app(HrCalendarAggregator::class)->feed(
-        1,
         now()->startOfMonth()->toDateString(),
         now()->endOfMonth()->toDateString(),
         $layers,
@@ -81,12 +88,16 @@ test('optional calendar layers fail soft when a source table is absent', functio
     'people milestones' => ['hr_employee_profiles', ['milestone']],
 ]);
 
-test('a team audience must name an active team in the event tenant', function () {
+test('a team audience must name a current team visible through Site access', function () {
+    $hiddenUser = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 2,
-        'user_id' => User::factory()->create(['organization_id' => 2])->id,
+        'user_id' => $hiddenUser->id,
         'employee_number' => 'FOREIGN-TEAM',
         'team' => 'Foreign Clinical',
+        'primary_site_id' => $this->hiddenSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
         'is_active' => true,
     ]);
 
@@ -105,33 +116,47 @@ test('a team audience must name an active team in the event tenant', function ()
 });
 
 test('an active team member can see a team event while other and inactive profiles cannot', function () {
-    $member = User::factory()->create(['role' => 'hr', 'organization_id' => 1, 'approved_at' => now()]);
-    $member->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->firstOrFail()->id]);
+    $viewPermission = Permission::query()->where('key', 'hr.calendar.view')->firstOrFail();
+    $supportRole = Role::query()->where('name', 'support_worker')->firstOrFail();
+    $member = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $member->roles()->syncWithoutDetaching([$supportRole->id]);
+    $member->permissionOverrides()->syncWithoutDetaching([$viewPermission->id => ['allowed' => true]]);
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $member->id,
         'employee_number' => 'TEAM-ACTIVE',
         'team' => 'Clinical   Support',
+        'primary_site_id' => $this->visibleSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
         'is_active' => true,
     ]);
 
-    $other = User::factory()->create(['role' => 'hr', 'organization_id' => 1, 'approved_at' => now()]);
-    $other->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->firstOrFail()->id]);
+    $other = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $other->roles()->syncWithoutDetaching([$supportRole->id]);
+    $other->permissionOverrides()->syncWithoutDetaching([$viewPermission->id => ['allowed' => true]]);
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $other->id,
         'employee_number' => 'TEAM-OTHER',
         'team' => 'Operations',
+        'primary_site_id' => $this->visibleSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
         'is_active' => true,
     ]);
 
-    $inactive = User::factory()->create(['role' => 'hr', 'organization_id' => 1, 'approved_at' => now()]);
-    $inactive->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->firstOrFail()->id]);
+    $inactive = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $inactive->roles()->syncWithoutDetaching([$supportRole->id]);
+    $inactive->permissionOverrides()->syncWithoutDetaching([$viewPermission->id => ['allowed' => true]]);
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $inactive->id,
         'employee_number' => 'TEAM-INACTIVE',
         'team' => 'Clinical Support',
+        'primary_site_id' => $this->visibleSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
         'is_active' => false,
     ]);
 
@@ -143,6 +168,7 @@ test('an active team member can see a team event while other and inactive profil
             'ends_at' => now()->addWeek()->addHour()->toDateTimeString(),
             'audience_type' => 'team',
             'audience_team' => ' clinical support ',
+            'audience_user_ids' => [],
         ])
         ->assertRedirect();
 
@@ -157,6 +183,7 @@ test('an active team member can see a team event while other and inactive profil
         ->put("/hr/calendar/events/{$event->id}", [
             'audience_type' => 'team',
             'audience_team' => ' CLINICAL   SUPPORT ',
+            'audience_user_ids' => [],
         ])
         ->assertRedirect();
 

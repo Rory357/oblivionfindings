@@ -1,17 +1,20 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
@@ -22,13 +25,24 @@ beforeEach(function () {
     if ($supportRole) {
         $this->staff->roles()->syncWithoutDetaching([$supportRole->id]);
     }
+
+    $this->site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->staff->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 });
 
 test('staff can clock in and clock out to create draft timesheet from attendance session', function () {
     $serviceContext = ServiceContext::factory()->create();
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     $shift = Shift::query()->create([
+        'site_id' => $this->site->id,
         'client_id' => $client->id,
         'service_context_id' => $serviceContext->id,
         'user_id' => $this->staff->id,
@@ -51,6 +65,7 @@ test('staff can clock in and clock out to create draft timesheet from attendance
 
     expect($openSession)->not->toBeNull();
     expect($openSession?->shift_id)->toBe($shift->id);
+    expect((int) $openSession?->site_id)->toBe($this->site->id);
 
     $this->actingAs($this->staff)
         ->post('/attendance/handover', [
@@ -82,11 +97,11 @@ test('staff can clock in and clock out to create draft timesheet from attendance
     expect($timesheet?->status)->toBe('draft');
     expect((int) $timesheet?->shift_id)->toBe($shift->id);
     expect((int) $timesheet?->client_id)->toBe($client->id);
+    expect((int) $timesheet?->shift_site_id)->toBe($this->site->id);
 });
 
 test('staff cannot start a second open attendance session', function () {
     HrAttendanceSession::query()->create([
-        'tenant_id' => null,
         'user_id' => $this->staff->id,
         'clock_in_at' => now()->subHours(2),
         'status' => 'open',
@@ -186,9 +201,10 @@ test('S1 seam: the HrTimeEntry and HrAttendanceSession read paths agree across b
 
 test('clock out reuses an existing draft timesheet for the same shift and staff member', function () {
     $serviceContext = ServiceContext::factory()->create();
-    $client = Client::factory()->create();
+    $client = Client::factory()->create(['site_id' => $this->site->id]);
 
     $shift = Shift::query()->create([
+        'site_id' => $this->site->id,
         'client_id' => $client->id,
         'service_context_id' => $serviceContext->id,
         'user_id' => $this->staff->id,
@@ -202,6 +218,11 @@ test('clock out reuses an existing draft timesheet for the same shift and staff 
         'shift_id' => $shift->id,
         'client_id' => $client->id,
         'user_id' => $this->staff->id,
+        'shift_site_id' => $this->site->id,
+        'shift_service_context_id' => $serviceContext->id,
+        'shift_site_name_snapshot' => $this->site->name,
+        'client_name_snapshot' => $client->full_name,
+        'staff_name_snapshot' => $this->staff->name,
         'break_minutes' => 45,
         'status' => 'draft',
         'created_by' => $this->staff->id,
@@ -218,6 +239,8 @@ test('clock out reuses an existing draft timesheet for the same shift and staff 
         ->where('status', 'open')
         ->latest('id')
         ->first();
+
+    expect((int) $openSession?->site_id)->toBe($this->site->id);
 
     $this->actingAs($this->staff)
         ->post('/attendance/handover', [
@@ -249,6 +272,7 @@ test('clock out reuses an existing draft timesheet for the same shift and staff 
     $existingTimesheet->refresh();
     expect((int) $existingTimesheet->attendance_session_id)->toBe($openSession->id)
         ->and((int) $existingTimesheet->break_minutes)->toBe(45)
+        ->and((int) $existingTimesheet->shift_site_id)->toBe($this->site->id)
         ->and((int) $openSession->fresh()->break_minutes)->toBe(20);
 });
 
@@ -291,7 +315,6 @@ test('clock in without an explicit shift is blocked when multiple eligible shift
 
 test('clock out rejects break_minutes exceeding session duration', function () {
     $session = HrAttendanceSession::query()->create([
-        'tenant_id' => null,
         'user_id' => $this->staff->id,
         'clock_in_at' => now()->subMinutes(60),
         'status' => 'open',
@@ -313,7 +336,6 @@ test('clock out rejects break_minutes exceeding session duration', function () {
 
 test('clock out rejects break_minutes equal to session duration', function () {
     $session = HrAttendanceSession::query()->create([
-        'tenant_id' => null,
         'user_id' => $this->staff->id,
         'clock_in_at' => now()->subMinutes(60),
         'status' => 'open',
@@ -335,7 +357,6 @@ test('clock out rejects break_minutes equal to session duration', function () {
 
 test('clock out accepts valid break shorter than session duration', function () {
     $session = HrAttendanceSession::query()->create([
-        'tenant_id' => null,
         'user_id' => $this->staff->id,
         'clock_in_at' => now()->subMinutes(120),
         'status' => 'open',
@@ -358,7 +379,6 @@ test('clock out accepts valid break shorter than session duration', function () 
 
 test('clock out with zero break on short session succeeds', function () {
     $session = HrAttendanceSession::query()->create([
-        'tenant_id' => null,
         'user_id' => $this->staff->id,
         'clock_in_at' => now()->subMinutes(5),
         'status' => 'open',
@@ -383,7 +403,6 @@ test('clock out rejects break_minutes above the shared 240 cap', function () {
     // validation even on this 6-hour session (so the cap, not the
     // break-vs-duration rule, is what blocks it).
     $session = HrAttendanceSession::query()->create([
-        'tenant_id' => null,
         'user_id' => $this->staff->id,
         'clock_in_at' => now()->subMinutes(360),
         'status' => 'open',

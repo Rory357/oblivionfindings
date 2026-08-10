@@ -7,7 +7,7 @@ test('calendar removal copy describes reversible archival instead of deletion', 
     $detail = file_get_contents($root.'/resources/js/components/hr/calendar/calendar-detail-popover.tsx');
 
     expect($index)->toContain('Archive event?')
-        ->and($index)->toContain('retains attendees, reminders, and attachments')
+        ->and($index)->toMatch('/from active calendars but retains\s+attendees,\s+reminders,\s+and attachments\. It can be restored\s+later\./')
         ->and($index)->toContain('Archived events')
         ->and($index)->toContain('/restore')
         ->and($index)->not->toContain('This permanently removes')

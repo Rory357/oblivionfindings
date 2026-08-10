@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class SiteMealInventoryMovement extends Model
 {
+    use WritesLegacyStorageContext;
+
     public const REASONS = [
         'stocktake',
         'delivery',
@@ -18,7 +21,6 @@ class SiteMealInventoryMovement extends Model
     ];
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'product_id',
         'delta',

@@ -26,6 +26,7 @@ class ReportsExportTest extends TestCase
     use RefreshDatabase;
 
     private User $admin;
+
     private User $viewer;
 
     protected function setUp(): void
@@ -133,6 +134,44 @@ class ReportsExportTest extends TestCase
         }
     }
 
+    public function test_exports_neutralise_spreadsheet_formula_prefixes_in_every_free_text_row(): void
+    {
+        $device = Device::factory()->create(['name' => '=2+3']);
+        DeviceEvent::create([
+            'device_id' => $device->id,
+            'event_type' => 'alarm_trigger',
+            'severity' => 'critical',
+            'source' => '+CMD',
+            'occurred_at' => now(),
+        ]);
+        DeviceMaintenanceRecord::create([
+            'device_id' => $device->id,
+            'type' => 'preventive',
+            'status' => 'scheduled',
+            'description' => '@SUM(1+1)',
+            'scheduled_for' => now()->addDay()->toDateString(),
+            'cost' => -12.5,
+        ]);
+
+        $inventory = $this->actingAs($this->admin)
+            ->get('/security-devices/reports/devices.csv')
+            ->streamedContent();
+        $events = $this->actingAs($this->admin)
+            ->get('/security-devices/reports/events.csv')
+            ->streamedContent();
+        $maintenance = $this->actingAs($this->admin)
+            ->get('/security-devices/reports/maintenance.csv')
+            ->streamedContent();
+
+        $this->assertStringContainsString("'=2+3", $inventory);
+        $this->assertStringContainsString("'=2+3", $events);
+        $this->assertStringContainsString("'+CMD", $events);
+        $this->assertStringContainsString("'=2+3", $maintenance);
+        $this->assertStringContainsString("'@SUM(1+1)", $maintenance);
+        $this->assertStringContainsString('-12.5', $maintenance);
+        $this->assertStringNotContainsString("'-12.5", $maintenance);
+    }
+
     public function test_exports_are_forbidden_without_reports_view_permission(): void
     {
         $this->actingAs($this->viewer)
@@ -146,5 +185,23 @@ class ReportsExportTest extends TestCase
         $this->actingAs($this->viewer)
             ->get('/security-devices/reports/maintenance.csv')
             ->assertForbidden();
+    }
+
+    public function test_selected_device_export_uses_requested_rows_from_the_single_application_registry(): void
+    {
+
+        $selected = Device::factory()->create(['name' => 'Selected device']);
+        Device::factory()->create(['name' => 'Unselected device']);
+        $unrelated = Device::factory()->create(['name' => 'Unrelated device']);
+
+        $response = $this->actingAs($this->admin)
+            ->get("/security-devices/reports/devices.csv?ids={$selected->id},{$unrelated->id}");
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('Selected device', $content);
+        $this->assertStringNotContainsString('Unselected device', $content);
+        $this->assertStringContainsString('Unrelated device', $content);
     }
 }

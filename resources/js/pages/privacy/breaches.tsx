@@ -1,13 +1,19 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Clock, Shield, Plus } from 'lucide-react';
+import { AlertTriangle, Clock, Plus, Shield } from 'lucide-react';
 
 type Props = {
     filters: {
@@ -37,7 +43,11 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
     const can = auth?.can?.privacy ?? {};
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/privacy/breaches', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/privacy/breaches',
+            { ...filters, ...next },
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     const getStatusColor = (status: string) => {
@@ -68,10 +78,12 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[
-            { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Data Breaches', href: '/privacy/breaches' }
-        ]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Privacy', href: '/privacy/dashboard' },
+                { title: 'Data Breaches', href: '/privacy/breaches' },
+            ]}
+        >
             <Head title="Data Breaches" />
 
             <div className="flex flex-col gap-6 p-6">
@@ -80,16 +92,28 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                     title="Data Breach Management"
                     description="Privacy Act 2020 notifiable breach — notify the OPC as soon as practicable"
                     icon={<Shield className="h-7 w-7 text-white" />}
-                    stats={stats ? [
-                        { label: 'Total', value: stats.total },
-                        { label: 'Open', value: stats.open },
-                        { label: 'OPC Required', value: stats.requiring_notification },
-                        { label: 'Resolved (30d)', value: stats.resolved_30_days },
-                    ] : undefined}
+                    stats={
+                        stats
+                            ? [
+                                  { label: 'Total', value: stats.total },
+                                  { label: 'Open', value: stats.open },
+                                  {
+                                      label: 'OPC Required',
+                                      value: stats.requiring_notification,
+                                  },
+                                  {
+                                      label: 'Resolved (30d)',
+                                      value: stats.resolved_30_days,
+                                  },
+                              ]
+                            : undefined
+                    }
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
                             <Link href="/privacy/dashboard">
-                                <Button variant="outline" size="sm">Privacy Dashboard</Button>
+                                <Button variant="outline" size="sm">
+                                    Privacy Dashboard
+                                </Button>
                             </Link>
                             {can.reportBreaches && (
                                 <Link href="/privacy/breaches/create">
@@ -109,40 +133,69 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div>
-                            <Label className="text-xs text-muted-foreground">Search</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Search
+                            </Label>
                             <Input
                                 placeholder="Search by reference or description"
                                 value={filters.q || ''}
-                                onChange={(e) => onFilter({ q: e.target.value })}
+                                onChange={(e) =>
+                                    onFilter({ q: e.target.value })
+                                }
                             />
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">Status</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Status
+                            </Label>
                             <Select
                                 value={filters.status ?? ANY}
-                                onValueChange={(v) => onFilter({ status: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({ status: v === ANY ? null : v })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    {['discovered', 'under_investigation', 'contained', 'notified', 'resolved'].map((s) => (
-                                        <SelectItem key={s} value={s}>{statusLabels[s]}</SelectItem>
+                                    {[
+                                        'discovered',
+                                        'under_investigation',
+                                        'contained',
+                                        'notified',
+                                        'resolved',
+                                    ].map((s) => (
+                                        <SelectItem key={s} value={s}>
+                                            {statusLabels[s]}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">OPC Notification</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                OPC Notification
+                            </Label>
                             <Select
                                 value={filters.requires_notification ?? ANY}
-                                onValueChange={(v) => onFilter({ requires_notification: v === ANY ? null : v })}
+                                onValueChange={(v) =>
+                                    onFilter({
+                                        requires_notification:
+                                            v === ANY ? null : v,
+                                    })
+                                }
                             >
-                                <SelectTrigger><SelectValue placeholder="Notification" /></SelectTrigger>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Notification" />
+                                </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value={ANY}>Any</SelectItem>
-                                    <SelectItem value="1">Pending Notification</SelectItem>
+                                    <SelectItem value="1">
+                                        Pending Notification
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -157,23 +210,38 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2 font-semibold">
-                                                {breach.requires_authority_notification && !breach.authority_notified_at && (
-                                                    <AlertTriangle className="h-4 w-4 text-status-critical" />
-                                                )}
+                                                {breach.requires_authority_notification &&
+                                                    !breach.authority_notified_at && (
+                                                        <AlertTriangle className="h-4 w-4 text-status-critical" />
+                                                    )}
                                                 {breach.breach_reference}
                                             </div>
                                             <div className="mt-2 flex flex-wrap gap-2">
-                                                <Badge className={getStatusColor(breach.status)}>
-                                                    {statusLabels[breach.status] ?? breach.status}
+                                                <Badge
+                                                    className={getStatusColor(
+                                                        breach.status,
+                                                    )}
+                                                >
+                                                    {statusLabels[
+                                                        breach.status
+                                                    ] ?? breach.status}
                                                 </Badge>
-                                                {breach.requires_authority_notification && !breach.authority_notified_at && (
-                                                    <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
-                                                        <Clock className="mr-1 h-3 w-3" />
-                                                        OPC notification required
-                                                    </Badge>
-                                                )}
+                                                {breach.requires_authority_notification &&
+                                                    !breach.authority_notified_at && (
+                                                        <Badge
+                                                            variant="outline"
+                                                            className="border-status-critical/30 bg-status-critical-bg text-status-critical"
+                                                        >
+                                                            <Clock className="mr-1 h-3 w-3" />
+                                                            OPC notification
+                                                            required
+                                                        </Badge>
+                                                    )}
                                                 {breach.authority_notified_at && (
-                                                    <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-status-success/30 bg-status-success-bg text-status-success"
+                                                    >
                                                         OPC notified
                                                     </Badge>
                                                 )}
@@ -182,11 +250,18 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                                 {breach.nature_of_breach}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                Discovered: {formatDate(breach.discovered_at)}
-                                                {breach.approximate_individuals_affected && ` • ~${breach.approximate_individuals_affected} individuals affected`}
+                                                Discovered:{' '}
+                                                {formatDate(
+                                                    breach.discovered_at,
+                                                )}
+                                                {breach.approximate_individuals_affected &&
+                                                    ` • ~${breach.approximate_individuals_affected} individuals affected`}
                                             </div>
                                         </div>
-                                        <Link href={`/privacy/breaches/${breach.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link
+                                            href={`/privacy/breaches/${breach.id}`}
+                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                        >
                                             View
                                         </Link>
                                     </div>
@@ -210,7 +285,17 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                 variant={l.active ? 'secondary' : 'outline'}
                                 size="sm"
                                 disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                onClick={() =>
+                                    l.url &&
+                                    router.get(
+                                        l.url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

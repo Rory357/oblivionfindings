@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,13 +11,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SiteChecklistRun extends Model
 {
+    use AuditableChanges, WritesLegacyStorageContext;
     use HasFactory;
-    use AuditableChanges;
 
     protected $fillable = [
         'assignment_id',
         'site_id',
-        'tenant_id',
         'template_id',
         'scheduled_date',
         'started_at',
@@ -95,7 +95,7 @@ class SiteChecklistRun extends Model
     public function scopeOverdue($query)
     {
         return $query->where('scheduled_date', '<', now()->toDateString())
-                     ->whereIn('status', ['scheduled', 'in_progress']);
+            ->whereIn('status', ['scheduled', 'in_progress']);
     }
 
     public function scopeAwaitingCompletion($query)

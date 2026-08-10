@@ -68,7 +68,9 @@ const FREQ_OPTS = [
 
 /** Flash error carried by an Inertia redirect — `back()->with('error')` fires
  *  onSuccess, not onError (see reference_inertia_flash_error). */
-function pageFlashError(page: { props: Record<string, unknown> }): string | null {
+function pageFlashError(page: {
+    props: Record<string, unknown>;
+}): string | null {
     const flash = page.props.flash as { error?: string } | undefined;
     return flash?.error ?? null;
 }
@@ -93,7 +95,10 @@ export function buildCategoryOptions(
 function acceptPdf(files: File[]): File | null {
     const file = files[0];
     if (!file) return null;
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+    if (
+        file.type !== 'application/pdf' &&
+        !file.name.toLowerCase().endsWith('.pdf')
+    ) {
         toast.error('Please choose a PDF document.');
         return null;
     }
@@ -109,16 +114,51 @@ function acceptPdf(files: File[]): File | null {
 /* ================================================================== */
 
 const CREATE_STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Title & category', icon: BookOpen },
-    { key: 'attestation', label: 'Attestation', blurb: 'Sign-off rules', icon: ShieldCheck },
-    { key: 'document', label: 'Document', blurb: 'PDF & summary', icon: FileText },
-    { key: 'review', label: 'Review', blurb: 'Confirm & create', icon: CheckCircle2 },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Title & category',
+        icon: BookOpen,
+    },
+    {
+        key: 'attestation',
+        label: 'Attestation',
+        blurb: 'Sign-off rules',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'document',
+        label: 'Document',
+        blurb: 'PDF & summary',
+        icon: FileText,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & create',
+        icon: CheckCircle2,
+    },
 ];
 
 const EDIT_STEPS: readonly WizardStep[] = [
-    { key: 'details', label: 'Details', blurb: 'Title & category', icon: BookOpen },
-    { key: 'attestation', label: 'Attestation', blurb: 'Sign-off rules', icon: ShieldCheck },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+    {
+        key: 'details',
+        label: 'Details',
+        blurb: 'Title & category',
+        icon: BookOpen,
+    },
+    {
+        key: 'attestation',
+        label: 'Attestation',
+        blurb: 'Sign-off rules',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: CheckCircle2,
+    },
 ];
 
 export function PolicyWizard({
@@ -148,7 +188,9 @@ export function PolicyWizard({
         custom_category: knownCategory ? '' : (policy?.category ?? ''),
         is_active: policy?.is_active ?? true,
         requires_attestation: policy?.requires_attestation ?? false,
-        attestation_frequency_months: String(policy?.attestation_frequency_months ?? 12),
+        attestation_frequency_months: String(
+            policy?.attestation_frequency_months ?? 12,
+        ),
         content_mode: 'pdf_only' as 'pdf_only' | 'pdf_and_summary',
         content_summary: '',
         effective_from: today(),
@@ -156,12 +198,15 @@ export function PolicyWizard({
     });
 
     const effectiveCategory =
-        categoryMode === 'custom' ? form.data.custom_category.trim() : form.data.category;
+        categoryMode === 'custom'
+            ? form.data.custom_category.trim()
+            : form.data.category;
     const categoryLabel =
         categoryOptions.find((c) => c.value === effectiveCategory)?.label ??
         effectiveCategory.replace(/_/g, ' ');
 
-    const detailsValid = form.data.title.trim() !== '' && effectiveCategory !== '';
+    const detailsValid =
+        form.data.title.trim() !== '' && effectiveCategory !== '';
     const documentValid =
         isEdit ||
         (form.data.document !== null &&
@@ -200,14 +245,20 @@ export function PolicyWizard({
             }
             payload.content_mode = data.content_mode;
             payload.content_summary =
-                data.content_mode === 'pdf_and_summary' ? data.content_summary : '';
+                data.content_mode === 'pdf_and_summary'
+                    ? data.content_summary
+                    : '';
             payload.effective_from = data.effective_from;
             payload.document = data.document;
             return payload;
         });
         const opts = { preserveScroll: true, onSuccess: onResult } as const;
         if (isEdit) form.put(`/hr/documents/policies/${policy!.id}`, opts);
-        else form.post('/hr/documents/policies', { ...opts, forceFormData: true });
+        else
+            form.post('/hr/documents/policies', {
+                ...opts,
+                forceFormData: true,
+            });
     };
 
     return (
@@ -256,7 +307,10 @@ export function PolicyWizard({
                         Cancel
                     </Button>
                     {wizard.isLast ? (
-                        <Button onClick={submit} disabled={form.processing || !canSubmit}>
+                        <Button
+                            onClick={submit}
+                            disabled={form.processing || !canSubmit}
+                        >
                             {form.processing
                                 ? form.progress
                                     ? `Uploading… ${form.progress.percentage ?? 0}%`
@@ -270,7 +324,9 @@ export function PolicyWizard({
                             onClick={wizard.next}
                             disabled={
                                 (wizard.index === 0 && !detailsValid) ||
-                                (!isEdit && wizard.index === documentIndex && !documentValid)
+                                (!isEdit &&
+                                    wizard.index === documentIndex &&
+                                    !documentValid)
                             }
                         >
                             Continue
@@ -286,10 +342,16 @@ export function PolicyWizard({
                         title="Policy details"
                         blurb="What the policy is called and where it sits in the library."
                     />
-                    <Field label="Policy title" required error={form.errors.title}>
+                    <Field
+                        label="Policy title"
+                        required
+                        error={form.errors.title}
+                    >
                         <Input
                             value={form.data.title}
-                            onChange={(e) => form.setData('title', e.target.value)}
+                            onChange={(e) =>
+                                form.setData('title', e.target.value)
+                            }
                             placeholder="e.g. Staff Code of Conduct"
                         />
                     </Field>
@@ -299,7 +361,10 @@ export function PolicyWizard({
                                 value={categoryMode}
                                 onChange={setCategoryMode}
                                 options={[
-                                    { value: 'existing', label: 'Pick a category' },
+                                    {
+                                        value: 'existing',
+                                        label: 'Pick a category',
+                                    },
                                     { value: 'custom', label: 'New category' },
                                 ]}
                             />
@@ -318,7 +383,10 @@ export function PolicyWizard({
                             <Input
                                 value={form.data.custom_category}
                                 onChange={(e) =>
-                                    form.setData('custom_category', e.target.value)
+                                    form.setData(
+                                        'custom_category',
+                                        e.target.value,
+                                    )
                                 }
                                 placeholder="e.g. Vehicle use"
                             />
@@ -330,7 +398,9 @@ export function PolicyWizard({
                             <input
                                 type="checkbox"
                                 checked={form.data.is_active}
-                                onChange={(e) => form.setData('is_active', e.target.checked)}
+                                onChange={(e) =>
+                                    form.setData('is_active', e.target.checked)
+                                }
                                 className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
                             />
                             <span>
@@ -338,8 +408,9 @@ export function PolicyWizard({
                                     Policy is active
                                 </span>
                                 <span className="block text-[12.5px] text-muted-foreground">
-                                    Inactive policies stay on record but drop out of the
-                                    default library view and stop prompting attestation.
+                                    Inactive policies stay on record but drop
+                                    out of the default library view and stop
+                                    prompting attestation.
                                 </span>
                             </span>
                         </label>
@@ -359,7 +430,10 @@ export function PolicyWizard({
                             type="checkbox"
                             checked={form.data.requires_attestation}
                             onChange={(e) =>
-                                form.setData('requires_attestation', e.target.checked)
+                                form.setData(
+                                    'requires_attestation',
+                                    e.target.checked,
+                                )
                             }
                             className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
                         />
@@ -368,8 +442,9 @@ export function PolicyWizard({
                                 Requires staff attestation
                             </span>
                             <span className="block text-[12.5px] text-muted-foreground">
-                                Staff will be asked to attest that they have read and
-                                understood this policy, with each sign-off audit-logged.
+                                Staff will be asked to attest that they have
+                                read and understood this policy, with each
+                                sign-off audit-logged.
                             </span>
                         </span>
                     </label>
@@ -381,9 +456,14 @@ export function PolicyWizard({
                                 error={form.errors.attestation_frequency_months}
                             >
                                 <Segmented
-                                    value={form.data.attestation_frequency_months}
+                                    value={
+                                        form.data.attestation_frequency_months
+                                    }
                                     onChange={(v) =>
-                                        form.setData('attestation_frequency_months', v)
+                                        form.setData(
+                                            'attestation_frequency_months',
+                                            v,
+                                        )
                                     }
                                     options={FREQ_OPTS}
                                 />
@@ -406,22 +486,32 @@ export function PolicyWizard({
                             onChange={(v) => form.setData('content_mode', v)}
                             options={[
                                 { value: 'pdf_only', label: 'PDF only' },
-                                { value: 'pdf_and_summary', label: 'PDF + summary' },
+                                {
+                                    value: 'pdf_and_summary',
+                                    label: 'PDF + summary',
+                                },
                             ]}
                         />
                     </Field>
                     <div className="mt-4">
-                        <Field label="PDF document" required error={form.errors.document}>
+                        <Field
+                            label="PDF document"
+                            required
+                            error={form.errors.document}
+                        >
                             {form.data.document ? (
                                 <StagedFileCard
                                     file={form.data.document}
-                                    onRemove={() => form.setData('document', null)}
+                                    onRemove={() =>
+                                        form.setData('document', null)
+                                    }
                                 />
                             ) : (
                                 <FileDropzone
                                     onFiles={(files) => {
                                         const file = acceptPdf(files);
-                                        if (file) form.setData('document', file);
+                                        if (file)
+                                            form.setData('document', file);
                                     }}
                                     accept=".pdf,application/pdf"
                                     multiple={false}
@@ -443,7 +533,10 @@ export function PolicyWizard({
                                     rows={5}
                                     value={form.data.content_summary}
                                     onChange={(e) =>
-                                        form.setData('content_summary', e.target.value)
+                                        form.setData(
+                                            'content_summary',
+                                            e.target.value,
+                                        )
                                     }
                                     placeholder="Brief summary of the policy content…"
                                 />
@@ -451,12 +544,18 @@ export function PolicyWizard({
                         </div>
                     ) : null}
                     <div className="mt-4">
-                        <Field label="Effective from" error={form.errors.effective_from}>
+                        <Field
+                            label="Effective from"
+                            error={form.errors.effective_from}
+                        >
                             <Input
                                 type="date"
                                 value={form.data.effective_from}
                                 onChange={(e) =>
-                                    form.setData('effective_from', e.target.value)
+                                    form.setData(
+                                        'effective_from',
+                                        e.target.value,
+                                    )
                                 }
                             />
                         </Field>
@@ -468,17 +567,33 @@ export function PolicyWizard({
                 <WizardStepPane>
                     <StepHead
                         icon={ClipboardCheck}
-                        title={isEdit ? 'Review the changes' : 'Review the policy'}
+                        title={
+                            isEdit ? 'Review the changes' : 'Review the policy'
+                        }
                         blurb="Check the details, then confirm below."
                     />
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ReviewCard icon={BookOpen} title="Details" onEdit={() => wizard.goTo(0)}>
-                            <ReviewRow label="Title" value={form.data.title || undefined} />
-                            <ReviewRow label="Category" value={categoryLabel || undefined} />
+                        <ReviewCard
+                            icon={BookOpen}
+                            title="Details"
+                            onEdit={() => wizard.goTo(0)}
+                        >
+                            <ReviewRow
+                                label="Title"
+                                value={form.data.title || undefined}
+                            />
+                            <ReviewRow
+                                label="Category"
+                                value={categoryLabel || undefined}
+                            />
                             {isEdit ? (
                                 <ReviewRow
                                     label="Status"
-                                    value={form.data.is_active ? 'Active' : 'Inactive'}
+                                    value={
+                                        form.data.is_active
+                                            ? 'Active'
+                                            : 'Inactive'
+                                    }
                                 />
                             ) : null}
                         </ReviewCard>
@@ -489,7 +604,11 @@ export function PolicyWizard({
                         >
                             <ReviewRow
                                 label="Required"
-                                value={form.data.requires_attestation ? 'Yes' : 'No'}
+                                value={
+                                    form.data.requires_attestation
+                                        ? 'Yes'
+                                        : 'No'
+                                }
                             />
                             {form.data.requires_attestation ? (
                                 <ReviewRow
@@ -512,14 +631,17 @@ export function PolicyWizard({
                                 <ReviewRow
                                     label="Summary"
                                     value={
-                                        form.data.content_mode === 'pdf_and_summary'
+                                        form.data.content_mode ===
+                                        'pdf_and_summary'
                                             ? 'Included'
                                             : 'PDF only'
                                     }
                                 />
                                 <ReviewRow
                                     label="Effective from"
-                                    value={form.data.effective_from || undefined}
+                                    value={
+                                        form.data.effective_from || undefined
+                                    }
                                 />
                             </ReviewCard>
                         ) : null}
@@ -535,8 +657,18 @@ export function PolicyWizard({
 /* ================================================================== */
 
 const VERSION_STEPS: readonly WizardStep[] = [
-    { key: 'document', label: 'New version', blurb: 'PDF, summary & date', icon: FilePlus2 },
-    { key: 'review', label: 'Review', blurb: 'Confirm & publish', icon: CheckCircle2 },
+    {
+        key: 'document',
+        label: 'New version',
+        blurb: 'PDF, summary & date',
+        icon: FilePlus2,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & publish',
+        icon: CheckCircle2,
+    },
 ];
 
 export function NewVersionWizard({
@@ -595,8 +727,8 @@ export function NewVersionWizard({
                         title="Version published"
                         blurb={
                             <>
-                                v{nextVersion} of “{policyTitle}” is now the current
-                                version.
+                                v{nextVersion} of “{policyTitle}” is now the
+                                current version.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -627,7 +759,10 @@ export function NewVersionWizard({
                                 : 'Publish version'}
                         </Button>
                     ) : (
-                        <Button onClick={wizard.next} disabled={!form.data.document}>
+                        <Button
+                            onClick={wizard.next}
+                            disabled={!form.data.document}
+                        >
                             Continue
                         </Button>
                     )}
@@ -641,7 +776,11 @@ export function NewVersionWizard({
                         title="New version"
                         blurb="Upload the updated PDF — earlier versions stay on record."
                     />
-                    <Field label="PDF document" required error={form.errors.document}>
+                    <Field
+                        label="PDF document"
+                        required
+                        error={form.errors.document}
+                    >
                         {form.data.document ? (
                             <StagedFileCard
                                 file={form.data.document}
@@ -670,19 +809,29 @@ export function NewVersionWizard({
                                 rows={3}
                                 value={form.data.content_summary}
                                 onChange={(e) =>
-                                    form.setData('content_summary', e.target.value)
+                                    form.setData(
+                                        'content_summary',
+                                        e.target.value,
+                                    )
                                 }
                                 placeholder="Brief summary of changes in this version…"
                             />
                         </Field>
                     </div>
                     <div className="mt-4">
-                        <Field label="Effective from" required error={form.errors.effective_from}>
+                        <Field
+                            label="Effective from"
+                            required
+                            error={form.errors.effective_from}
+                        >
                             <Input
                                 type="date"
                                 value={form.data.effective_from}
                                 onChange={(e) =>
-                                    form.setData('effective_from', e.target.value)
+                                    form.setData(
+                                        'effective_from',
+                                        e.target.value,
+                                    )
                                 }
                             />
                         </Field>
@@ -697,15 +846,29 @@ export function NewVersionWizard({
                         title="Confirm the publish"
                         blurb="Check the details, then publish."
                     />
-                    <ReviewCard icon={FilePlus2} title="New version" onEdit={() => wizard.goTo(0)} span>
+                    <ReviewCard
+                        icon={FilePlus2}
+                        title="New version"
+                        onEdit={() => wizard.goTo(0)}
+                        span
+                    >
                         <ReviewRow label="Policy" value={policyTitle} />
-                        <ReviewRow label="Publishes as" value={`v${nextVersion}`} />
-                        <ReviewRow label="PDF" value={form.data.document?.name} />
+                        <ReviewRow
+                            label="Publishes as"
+                            value={`v${nextVersion}`}
+                        />
+                        <ReviewRow
+                            label="PDF"
+                            value={form.data.document?.name}
+                        />
                         <ReviewRow
                             label="Changes"
                             value={form.data.content_summary || undefined}
                         />
-                        <ReviewRow label="Effective from" value={form.data.effective_from} />
+                        <ReviewRow
+                            label="Effective from"
+                            value={form.data.effective_from}
+                        />
                     </ReviewCard>
                 </WizardStepPane>
             )}

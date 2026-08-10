@@ -30,6 +30,7 @@ import { shiftTypeMeta } from '@/lib/shift-types';
 import { show as showShift } from '@/routes/operations/shifts';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
+import { Button as GuardrailButton } from '@/components/ui/button';
 import {
     clientFullName,
     effectiveStatus,
@@ -40,7 +41,6 @@ import {
     type ShiftRow,
 } from './shift-row-types';
 import { StaffAvatar } from './staff-avatar';
-import { Button as GuardrailButton } from '@/components/ui/button';
 
 type Props = {
     open: boolean;
@@ -157,7 +157,8 @@ export function ShiftDetailDialog({
                                 <ShiftStatusBadge
                                     status={effectiveStatus(shift)}
                                 />
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={onClose}
                                     aria-label="Close"
@@ -197,7 +198,8 @@ export function ShiftDetailDialog({
                                         <span className="font-medium">
                                             Unassigned
                                         </span>
-                                        <GuardrailButton unstyled
+                                        <GuardrailButton
+                                            unstyled
                                             type="button"
                                             onClick={() => onAct('assign')}
                                             className="text-xs font-medium text-primary hover:underline"
@@ -297,7 +299,8 @@ export function ShiftDetailDialog({
                             Quick view · open the shift page for full detail
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                            <GuardrailButton unstyled
+                            <GuardrailButton
+                                unstyled
                                 type="button"
                                 onClick={onClose}
                                 className="inline-flex items-center rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
@@ -305,7 +308,8 @@ export function ShiftDetailDialog({
                                 Close
                             </GuardrailButton>
                             {locked ? null : onEdit ? (
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={onEdit}
                                     className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
@@ -321,7 +325,8 @@ export function ShiftDetailDialog({
                                 </Link>
                             )}
                             {primary ? (
-                                <GuardrailButton unstyled
+                                <GuardrailButton
+                                    unstyled
                                     type="button"
                                     onClick={() => onAct(primary.act)}
                                     className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:brightness-95"

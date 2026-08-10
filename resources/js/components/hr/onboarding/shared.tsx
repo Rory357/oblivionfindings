@@ -58,10 +58,14 @@ export function initials(name?: string | null): string {
 }
 
 /** Deterministic soft avatar palette keyed on a name. */
-export function avatarStyle(seed: string): { background: string; color: string } {
+export function avatarStyle(seed: string): {
+    background: string;
+    color: string;
+} {
     const hues = [277, 200, 150, 25, 320, 90];
     let h = 0;
-    for (let i = 0; i < seed.length; i++) h = (h + seed.charCodeAt(i)) % hues.length;
+    for (let i = 0; i < seed.length; i++)
+        h = (h + seed.charCodeAt(i)) % hues.length;
     const hue = hues[h];
     return {
         background: `oklch(0.92 0.05 ${hue})`,
@@ -75,7 +79,8 @@ export function categoryColor(category: string): string {
     if (c.includes('compli')) return 'var(--status-warning)';
     if (c.includes('it') || c.includes('access')) return 'var(--primary)';
     if (c.includes('pay')) return 'var(--status-success)';
-    if (c.includes('induct')) return 'var(--category-hr, var(--status-warning))';
+    if (c.includes('induct'))
+        return 'var(--category-hr, var(--status-warning))';
     return 'var(--muted-foreground)';
 }
 
@@ -89,7 +94,11 @@ export function formatDate(value?: string | null): string {
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
-        : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+        : d.toLocaleDateString('en-NZ', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+          });
 }
 
 export function formatShort(value?: string | null): string {

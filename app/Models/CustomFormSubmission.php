@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CustomFormSubmission extends Model
 {
+    use WritesLegacyOrganizationStorageContext;
+
     protected $table = 'custom_form_submissions';
 
     protected $fillable = [
-        'organization_id',
         'custom_form_id',
         'submitted_by',
         'client_id',

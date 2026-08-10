@@ -1,4 +1,3 @@
-import { useMemo, useRef, useState } from 'react';
 import {
     AlertTriangle,
     Building,
@@ -18,7 +17,15 @@ import {
     Users,
     X,
 } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 
+import { PageHero, type PageHeroBadge } from '@/components/page';
+import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
+import {
+    WeekPicker,
+    weekLabel as isoWeekLabel,
+} from '@/components/rostering/week-picker';
+import { Button } from '@/components/ui/button';
 import {
     Command,
     CommandEmpty,
@@ -32,13 +39,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { PageHero, type PageHeroBadge } from '@/components/page';
-import { Button } from '@/components/ui/button';
-import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
-import {
-    WeekPicker,
-    weekLabel as isoWeekLabel,
-} from '@/components/rostering/week-picker';
 import { cn } from '@/lib/utils';
 
 export type HeroStats = {
@@ -331,7 +331,7 @@ function HeroPillBtn({
             aria-haspopup={ariaHasPopup}
             aria-expanded={ariaExpanded}
             className={[
-                'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition',
+                'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition',
                 solid
                     ? 'border border-primary-foreground/35 bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30'
                     : 'border border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
@@ -351,12 +351,12 @@ function HeroSearchBox({
 }) {
     return (
         <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
+            <Search className="absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
             <input
                 value={value || ''}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder="Search clients, staff, location"
-                className="w-56 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 py-1.5 pl-8 pr-3 text-xs font-semibold text-primary-foreground placeholder:font-normal placeholder:text-primary-foreground/60 focus:bg-primary-foreground/20 focus:outline-none"
+                className="w-56 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 py-1.5 pr-3 pl-8 text-xs font-semibold text-primary-foreground placeholder:font-normal placeholder:text-primary-foreground/60 focus:bg-primary-foreground/20 focus:outline-none"
             />
         </div>
     );
@@ -415,7 +415,10 @@ function StatusChip({
                             aria-expanded={open}
                             className="inline-flex items-center gap-1.5 rounded-full"
                         >
-                            <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+                            <Filter
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                            />
                             <span className="max-w-[200px] truncate">
                                 {triggerLabel}
                             </span>
@@ -467,7 +470,7 @@ function StatusChip({
                                 <span className="flex-1 font-medium">
                                     All statuses
                                 </span>
-                                <span className="text-[10px] tabular-nums text-muted-foreground">
+                                <span className="text-[10px] text-muted-foreground tabular-nums">
                                     {options.length}
                                 </span>
                             </CommandItem>
@@ -501,7 +504,9 @@ function StatusChip({
                                                 <Check className="h-3 w-3" />
                                             ) : null}
                                         </span>
-                                        <span className="flex-1">{o.label}</span>
+                                        <span className="flex-1">
+                                            {o.label}
+                                        </span>
                                     </CommandItem>
                                 );
                             })}

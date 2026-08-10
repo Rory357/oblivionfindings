@@ -64,7 +64,7 @@ class ApiSettingsController extends Controller
                 'successful_tests' => collect($webhooks)->filter(fn (array $webhook) => ! empty($webhook['lastDelivery']))->count(),
             ],
             'can' => [
-                'manage' => $request->user()?->canDo('integrations.manage_tenant_secrets') ?? false,
+                'manage' => $request->user()?->canDo('integrations.manage_secrets') ?? false,
             ],
         ]);
     }
@@ -76,7 +76,7 @@ class ApiSettingsController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'scopes' => ['required', 'array', 'min:1'],
-            'scopes.*' => ['string', 'in:' . implode(',', self::AVAILABLE_SCOPES)],
+            'scopes.*' => ['string', 'in:'.implode(',', self::AVAILABLE_SCOPES)],
         ]);
 
         $plainKey = $this->generateToken('sk_live_', 32);
@@ -136,7 +136,7 @@ class ApiSettingsController extends Controller
         $validated = $request->validate([
             'url' => ['required', 'url', 'max:1000'],
             'events' => ['required', 'array', 'min:1'],
-            'events.*' => ['string', 'in:' . implode(',', self::AVAILABLE_EVENTS)],
+            'events.*' => ['string', 'in:'.implode(',', self::AVAILABLE_EVENTS)],
         ]);
 
         $plainSecret = $this->generateToken('whsec_', 24);
@@ -218,7 +218,7 @@ class ApiSettingsController extends Controller
 
     private function authorizeManage(Request $request): void
     {
-        abort_unless($request->user()?->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($request->user()?->canDo('integrations.manage_secrets'), 403);
     }
 
     /**
@@ -254,7 +254,7 @@ class ApiSettingsController extends Controller
     }
 
     /**
-     * @param array<int, array<string, mixed>> $value
+     * @param  array<int, array<string, mixed>>  $value
      */
     private function storeArray(string $key, array $value): void
     {
@@ -265,7 +265,7 @@ class ApiSettingsController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $record
+     * @param  array<string, mixed>  $record
      * @return array<string, mixed>
      */
     private function mapApiKey(array $record): array
@@ -282,7 +282,7 @@ class ApiSettingsController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $record
+     * @param  array<string, mixed>  $record
      * @return array<string, mixed>
      */
     private function mapWebhook(array $record): array
@@ -310,7 +310,7 @@ class ApiSettingsController extends Controller
 
     private function maskToken(string $token): string
     {
-        return '****' . substr($token, -8);
+        return '****'.substr($token, -8);
     }
 
     private function responseLooksSuccessful(int $status): bool
@@ -370,7 +370,7 @@ class ApiSettingsController extends Controller
         $scheme = parse_url($url, PHP_URL_SCHEME) ?: 'http';
 
         if ($query) {
-            $path .= '?' . $query;
+            $path .= '?'.$query;
         }
 
         $server = [

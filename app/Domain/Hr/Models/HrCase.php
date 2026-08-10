@@ -3,7 +3,9 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
+use Database\Factories\Hr\HrCaseFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,11 +15,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrCase extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Hr\HrCaseFactory::new();
+        return HrCaseFactory::new();
     }
 
     protected $fillable = [
@@ -51,7 +53,7 @@ class HrCase extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function subject(): BelongsTo
@@ -80,13 +82,8 @@ class HrCase extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeOpen(Builder $query): Builder
     {

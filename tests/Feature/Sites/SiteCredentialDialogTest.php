@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -12,6 +13,20 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 
 uses(RefreshDatabase::class);
+
+function assignCredentialDialogSite(User $staff, Site $site): void
+{
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $staff->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $staff->id,
+        'updated_by' => $staff->id,
+    ]);
+}
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -32,7 +47,6 @@ beforeEach(function () {
 test('site show defers credential metadata and never exposes credential secrets', function () {
     SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Door Code',
         'username' => 'reception',
         'url' => 'https://door.example.test',
@@ -79,6 +93,7 @@ test('retired per-site vendors page redirects to the unified vendors view', func
     $teamLead->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
+    assignCredentialDialogSite($teamLead, $this->site);
 
     // A vendors.view-level user is still funnelled to the new page (not 403'd).
     expect($teamLead->canDo('vendors.view'))->toBeTrue();
@@ -142,7 +157,6 @@ test('credential store rejects unsafe url schemes', function () {
 test('credential update rejects unsafe url schemes', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'old name',
         'credential_type' => 'password',
         'url' => 'https://safe.example.test',
@@ -166,7 +180,6 @@ test('credential update rejects unsafe url schemes', function () {
 test('credential update can change metadata without rotating password', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'old name',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('keep-me'),
@@ -203,7 +216,6 @@ test('credential update can change metadata without rotating password', function
 test('site show for a vendor-only user exposes only the deferred vendor register', function () {
     SiteVendor::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
@@ -211,7 +223,6 @@ test('site show for a vendor-only user exposes only the deferred vendor register
     ]);
     SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Should not be visible',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('x'),
@@ -224,6 +235,7 @@ test('site show for a vendor-only user exposes only the deferred vendor register
     $vendorOnly->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
+    assignCredentialDialogSite($vendorOnly, $this->site);
     $vendorOnly->permissionOverrides()->syncWithoutDetaching([
         Permission::query()->where('key', 'credentials.view')->firstOrFail()->id => ['allowed' => false],
     ]);
@@ -245,7 +257,6 @@ test('site show for a vendor-only user exposes only the deferred vendor register
 test('site show for a credential-only user exposes only the deferred credential register', function () {
     SiteVendor::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
@@ -253,7 +264,6 @@ test('site show for a credential-only user exposes only the deferred credential 
     ]);
     SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
         'encrypted_value' => Crypt::encryptString('1234'),
@@ -264,6 +274,7 @@ test('site show for a credential-only user exposes only the deferred credential 
     $credentialOnly->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
+    assignCredentialDialogSite($credentialOnly, $this->site);
     $credentialOnly->permissionOverrides()->syncWithoutDetaching([
         Permission::query()->where('key', 'vendors.view')->firstOrFail()->id => ['allowed' => false],
     ]);
@@ -286,7 +297,6 @@ test('site show for a credential-only user exposes only the deferred credential 
 test('site show for an admin exposes both deferred full registers without secrets', function () {
     SiteVendor::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'service_type' => 'electrician',
         'company_name' => 'Sparks NZ',
         'preferred_contact_method' => 'phone',
@@ -294,7 +304,6 @@ test('site show for an admin exposes both deferred full registers without secret
     ]);
     SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'Door Code',
         'credential_type' => 'pin',
         'encrypted_value' => Crypt::encryptString('1234'),
@@ -312,15 +321,13 @@ test('site show for an admin exposes both deferred full registers without secret
 test('credential destroy returns back(303) and audits delete (audit row survives via nullOnDelete)', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
         'label' => 'to delete',
         'credential_type' => 'password',
         'encrypted_value' => Crypt::encryptString('x'),
     ]);
 
-    $tenantId = $this->site->tenant_id;
     $deleteAuditsBefore = SiteCredentialAuditLog::query()
-        ->where('tenant_id', $tenantId)
+        ->where('site_id', $this->site->id)
         ->where('action', 'delete')
         ->count();
 
@@ -333,7 +340,7 @@ test('credential destroy returns back(303) and audits delete (audit row survives
 
     // FK is nullOnDelete; the audit row survives with credential_id = null.
     $deleteAuditsAfter = SiteCredentialAuditLog::query()
-        ->where('tenant_id', $tenantId)
+        ->where('site_id', $this->site->id)
         ->where('action', 'delete')
         ->count();
     expect($deleteAuditsAfter)->toBe($deleteAuditsBefore + 1);

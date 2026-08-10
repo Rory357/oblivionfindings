@@ -111,14 +111,13 @@ export function MakeRecurringDialog({
                 </DialogHeader>
                 <div className="space-y-3 py-2">
                     <div>
-                        <label className="text-sm font-medium">
-                            Repeat on
-                        </label>
+                        <label className="text-sm font-medium">Repeat on</label>
                         <div className="mt-1 flex flex-wrap gap-1">
                             {WEEKDAYS.map((d) => {
                                 const on = weekdays.includes(d.id);
                                 return (
-                                    <Button unstyled
+                                    <Button
+                                        unstyled
                                         key={d.id}
                                         type="button"
                                         onClick={() => toggleWeekday(d.id)}
@@ -157,10 +156,7 @@ export function MakeRecurringDialog({
                     ) : null}
                 </div>
                 <DialogFooter>
-                    <Button
-                        variant="ghost"
-                        onClick={() => onOpenChange(false)}
-                    >
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
                     <Button

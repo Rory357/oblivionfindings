@@ -1,1305 +1,2443 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
-import { index as budgetsIndex } from '@/routes/governance/budgets';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Wallet,
-  Plus,
-  Pencil,
-  Trash2,
-  Send,
-  BarChart3,
-  ArrowUpDown,
-} from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
-import { cn } from '@/lib/utils';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    TabsRoot as Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import { governanceStatusColor } from '@/lib/governance-status';
-import { useState, FormEvent } from 'react';
+import { cn } from '@/lib/utils';
+import { index as budgetsIndex } from '@/routes/governance/budgets';
+import { PageProps } from '@/types';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    ArrowUpDown,
+    BarChart3,
+    CheckCircle,
+    Clock,
+    DollarSign,
+    Pencil,
+    Plus,
+    Send,
+    Trash2,
+    TrendingDown,
+    TrendingUp,
+    Wallet,
+} from 'lucide-react';
+import { FormEvent, useState } from 'react';
 
 interface LineItem {
-  id: number;
-  category: string;
-  description: string;
-  account_code: string | null;
-  budget_amount: number;
-  forecast_amount: number;
-  actual_amount: number;
-  variance_amount: number;
-  variance_pct: number;
-  variance_explanation: string | null;
-  notes: string | null;
+    id: number;
+    category: string;
+    description: string;
+    account_code: string | null;
+    budget_amount: number;
+    forecast_amount: number;
+    actual_amount: number;
+    variance_amount: number;
+    variance_pct: number;
+    variance_explanation: string | null;
+    notes: string | null;
 }
 
 interface Adjustment {
-  id: number;
-  adjustment_type: string;
-  budget_line_item_id: number | null;
-  line_item: { description: string } | null;
-  amount: number;
-  reason: string;
-  status: string;
-  threshold_applies: boolean;
-  proposed_by: { name: string };
-  approved_by: { name: string } | null;
-  proposed_at: string;
-  approved_at: string | null;
-  review_notes: string | null;
+    id: number;
+    adjustment_type: string;
+    budget_line_item_id: number | null;
+    line_item: { description: string } | null;
+    amount: number;
+    reason: string;
+    status: string;
+    threshold_applies: boolean;
+    proposed_by: { name: string };
+    approved_by: { name: string } | null;
+    proposed_at: string;
+    approved_at: string | null;
+    review_notes: string | null;
 }
 
 interface BudgetAllocation {
-  id: number;
-  budget_line_item_id: number | null;
-  budget_line_item: { description: string; category: string } | null;
-  site_id: number | null;
-  site_budget_line_id: number | null;
-  period_year_month: string;
-  category: string | null;
-  allocated_amount: number;
-  forecast_amount: number | null;
-  actual_amount: number | null;
-  notes: string | null;
-  created_by: { id: number; name: string } | null;
+    id: number;
+    budget_line_item_id: number | null;
+    budget_line_item: { description: string; category: string } | null;
+    site_id: number | null;
+    site_budget_line_id: number | null;
+    period_year_month: string;
+    category: string | null;
+    allocated_amount: number;
+    forecast_amount: number | null;
+    actual_amount: number | null;
+    notes: string | null;
+    created_by: { id: number; name: string } | null;
 }
 
 interface Budget {
-  id: number;
-  fiscal_year: string;
-  title: string;
-  description: string | null;
-  total_budget: number;
-  currency: string;
-  status: string;
-  version_number: number;
-  approval_resolution: { id: number; resolution_reference: string; outcome: string | null; status: string } | null;
-  approved_by_board_at: string | null;
-  proposed_by: { name: string } | null;
-  proposed_at: string | null;
-  created_by: { name: string } | null;
-  line_items: LineItem[];
-  adjustments: Adjustment[];
-  allocations: BudgetAllocation[];
+    id: number;
+    fiscal_year: string;
+    title: string;
+    description: string | null;
+    total_budget: number;
+    currency: string;
+    status: string;
+    version_number: number;
+    approval_resolution: {
+        id: number;
+        resolution_reference: string;
+        outcome: string | null;
+        status: string;
+    } | null;
+    approved_by_board_at: string | null;
+    proposed_by: { name: string } | null;
+    proposed_at: string | null;
+    created_by: { name: string } | null;
+    line_items: LineItem[];
+    adjustments: Adjustment[];
+    allocations: BudgetAllocation[];
 }
 
 interface Props extends PageProps {
-  budget: Budget;
-  categories: Record<string, string>;
-  canEdit: boolean;
-  canPropose: boolean;
-  canApprove: boolean;
+    budget: Budget;
+    categories: Record<string, string>;
+    canEdit: boolean;
+    canPropose: boolean;
+    canApprove: boolean;
 }
 
-export default function BudgetShow({ auth, budget, categories, canEdit, canPropose, canApprove }: Props) {
-  const [lineItemDialogOpen, setLineItemDialogOpen] = useState(false);
-  const [editingLineItem, setEditingLineItem] = useState<LineItem | null>(null);
-  const [editLineItemDialogOpen, setEditLineItemDialogOpen] = useState(false);
-  const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
-  const [actualsDialogOpen, setActualsDialogOpen] = useState(false);
-  const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
-
-  const lineItemForm = useForm({
-    category: 'operations',
-    description: '',
-    account_code: '',
-    budget_amount: '',
-    forecast_amount: '',
-    notes: '',
-  });
-
-  const editLineItemForm = useForm({
-    category: '',
-    description: '',
-    account_code: '',
-    budget_amount: '',
-    forecast_amount: '',
-    actual_amount: '',
-    variance_explanation: '',
-    notes: '',
-  });
-
-  const adjustmentForm = useForm({
-    budget_line_item_id: '',
-    adjustment_type: 'increase',
-    amount: '',
-    reason: '',
-  });
-
-  const allocationForm = useForm({
-    budget_line_item_id: '',
-    period_year_month: '',
-    category: '',
-    allocated_amount: '',
-    forecast_amount: '',
-    notes: '',
-  });
-
-  const submitAllocation = (e: FormEvent) => {
-    e.preventDefault();
-    allocationForm.post(`/governance/budgets/${budget.id}/allocations`, {
-      preserveScroll: true,
-      onSuccess: () => {
-        setAllocationDialogOpen(false);
-        allocationForm.reset();
-      },
-    });
-  };
-
-  const deleteAllocation = (allocationId: number) => {
-    router.delete(`/governance/budgets/${budget.id}/allocations/${allocationId}`, {
-      preserveScroll: true,
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NZ', {
-      style: 'currency',
-      currency: budget.currency || 'NZD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const getStatusColor = (status: string) => governanceStatusColor(status);
-
-  const getCategoryLabel = (category: string) => {
-    return categories?.[category] || category;
-  };
-
-  const groupLineItemsByCategory = () => {
-    const grouped: Record<string, LineItem[]> = {};
-    (budget.line_items || []).forEach((item) => {
-      if (!grouped[item.category]) grouped[item.category] = [];
-      grouped[item.category].push(item);
-    });
-    return grouped;
-  };
-
-  const calculateTotals = () => {
-    const items = budget.line_items || [];
-    const lineItemTotals = items.reduce(
-      (acc, item) => ({
-        allocated: acc.allocated + Number(item.budget_amount),
-        forecast: acc.forecast + Number(item.forecast_amount),
-        actual: acc.actual + Number(item.actual_amount),
-      }),
-      { allocated: 0, forecast: 0, actual: 0 }
+export default function BudgetShow({
+    auth,
+    budget,
+    categories,
+    canEdit,
+    canPropose,
+    canApprove,
+}: Props) {
+    const [lineItemDialogOpen, setLineItemDialogOpen] = useState(false);
+    const [editingLineItem, setEditingLineItem] = useState<LineItem | null>(
+        null,
     );
-    const envelope = Number(budget.total_budget) || lineItemTotals.allocated;
-    return {
-      budget: envelope,
-      allocated: lineItemTotals.allocated,
-      forecast: lineItemTotals.forecast,
-      actual: lineItemTotals.actual,
-      variance: lineItemTotals.actual - envelope,
-      variancePercent: envelope > 0 ? ((lineItemTotals.actual - envelope) / envelope) * 100 : 0,
-      utilization: envelope > 0 ? (lineItemTotals.actual / envelope) * 100 : 0,
-      remaining: envelope - lineItemTotals.actual,
+    const [editLineItemDialogOpen, setEditLineItemDialogOpen] = useState(false);
+    const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
+    const [actualsDialogOpen, setActualsDialogOpen] = useState(false);
+    const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
+
+    const lineItemForm = useForm({
+        category: 'operations',
+        description: '',
+        account_code: '',
+        budget_amount: '',
+        forecast_amount: '',
+        notes: '',
+    });
+
+    const editLineItemForm = useForm({
+        category: '',
+        description: '',
+        account_code: '',
+        budget_amount: '',
+        forecast_amount: '',
+        actual_amount: '',
+        variance_explanation: '',
+        notes: '',
+    });
+
+    const adjustmentForm = useForm({
+        budget_line_item_id: '',
+        adjustment_type: 'increase',
+        amount: '',
+        reason: '',
+    });
+
+    const allocationForm = useForm({
+        budget_line_item_id: '',
+        period_year_month: '',
+        category: '',
+        allocated_amount: '',
+        forecast_amount: '',
+        notes: '',
+    });
+
+    const submitAllocation = (e: FormEvent) => {
+        e.preventDefault();
+        allocationForm.post(`/governance/budgets/${budget.id}/allocations`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setAllocationDialogOpen(false);
+                allocationForm.reset();
+            },
+        });
     };
-  };
 
-  const totals = calculateTotals();
+    const deleteAllocation = (allocationId: number) => {
+        router.delete(
+            `/governance/budgets/${budget.id}/allocations/${allocationId}`,
+            {
+                preserveScroll: true,
+            },
+        );
+    };
 
-  const getCategoryTotals = (items: LineItem[]) => {
-    return items.reduce(
-      (acc, item) => ({
-        budget: acc.budget + Number(item.budget_amount),
-        actual: acc.actual + Number(item.actual_amount),
-        variance: acc.variance + Number(item.variance_amount || 0),
-      }),
-      { budget: 0, actual: 0, variance: 0 }
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-NZ', {
+            style: 'currency',
+            currency: budget.currency || 'NZD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(amount);
+    };
+
+    const getStatusColor = (status: string) => governanceStatusColor(status);
+
+    const getCategoryLabel = (category: string) => {
+        return categories?.[category] || category;
+    };
+
+    const groupLineItemsByCategory = () => {
+        const grouped: Record<string, LineItem[]> = {};
+        (budget.line_items || []).forEach((item) => {
+            if (!grouped[item.category]) grouped[item.category] = [];
+            grouped[item.category].push(item);
+        });
+        return grouped;
+    };
+
+    const calculateTotals = () => {
+        const items = budget.line_items || [];
+        const lineItemTotals = items.reduce(
+            (acc, item) => ({
+                allocated: acc.allocated + Number(item.budget_amount),
+                forecast: acc.forecast + Number(item.forecast_amount),
+                actual: acc.actual + Number(item.actual_amount),
+            }),
+            { allocated: 0, forecast: 0, actual: 0 },
+        );
+        const envelope =
+            Number(budget.total_budget) || lineItemTotals.allocated;
+        return {
+            budget: envelope,
+            allocated: lineItemTotals.allocated,
+            forecast: lineItemTotals.forecast,
+            actual: lineItemTotals.actual,
+            variance: lineItemTotals.actual - envelope,
+            variancePercent:
+                envelope > 0
+                    ? ((lineItemTotals.actual - envelope) / envelope) * 100
+                    : 0,
+            utilization:
+                envelope > 0 ? (lineItemTotals.actual / envelope) * 100 : 0,
+            remaining: envelope - lineItemTotals.actual,
+        };
+    };
+
+    const totals = calculateTotals();
+
+    const getCategoryTotals = (items: LineItem[]) => {
+        return items.reduce(
+            (acc, item) => ({
+                budget: acc.budget + Number(item.budget_amount),
+                actual: acc.actual + Number(item.actual_amount),
+                variance: acc.variance + Number(item.variance_amount || 0),
+            }),
+            { budget: 0, actual: 0, variance: 0 },
+        );
+    };
+
+    const submitLineItem = (e: FormEvent) => {
+        e.preventDefault();
+        lineItemForm.post(`/governance/budgets/${budget.id}/line-items`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setLineItemDialogOpen(false);
+                lineItemForm.reset();
+            },
+        });
+    };
+
+    const openEditLineItem = (item: LineItem) => {
+        setEditingLineItem(item);
+        editLineItemForm.setData({
+            category: item.category,
+            description: item.description,
+            account_code: item.account_code || '',
+            budget_amount: String(item.budget_amount),
+            forecast_amount: String(item.forecast_amount),
+            actual_amount: String(item.actual_amount),
+            variance_explanation: item.variance_explanation || '',
+            notes: item.notes || '',
+        });
+        setEditLineItemDialogOpen(true);
+    };
+
+    const submitEditLineItem = (e: FormEvent) => {
+        e.preventDefault();
+        if (!editingLineItem) return;
+        editLineItemForm.put(
+            `/governance/budgets/${budget.id}/line-items/${editingLineItem.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditLineItemDialogOpen(false);
+                    setEditingLineItem(null);
+                },
+            },
+        );
+    };
+
+    const deleteLineItem = (itemId: number) => {
+        router.delete(`/governance/budgets/${budget.id}/line-items/${itemId}`, {
+            preserveScroll: true,
+        });
+    };
+
+    const submitAdjustment = (e: FormEvent) => {
+        e.preventDefault();
+        adjustmentForm.post(`/governance/budgets/${budget.id}/adjust`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setAdjustmentDialogOpen(false);
+                adjustmentForm.reset();
+            },
+        });
+    };
+
+    const proposeBudget = () => {
+        router.post(
+            `/governance/budgets/${budget.id}/propose`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
+    };
+
+    const approveBudget = () => {
+        router.post(
+            `/governance/budgets/${budget.id}/approve`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
+    };
+
+    const approveAdjustment = (adjustmentId: number) => {
+        router.post(
+            `/governance/budgets/${budget.id}/adjustments/${adjustmentId}/approve`,
+            {},
+            {
+                preserveScroll: true,
+            },
+        );
+    };
+
+    const pendingAdjustments = (budget.adjustments || []).filter(
+        (a) => a.status === 'submitted',
     );
-  };
+    const resolvedAdjustments = (budget.adjustments || []).filter(
+        (a) => a.status !== 'submitted',
+    );
 
-  const submitLineItem = (e: FormEvent) => {
-    e.preventDefault();
-    lineItemForm.post(`/governance/budgets/${budget.id}/line-items`, {
-      preserveScroll: true,
-      onSuccess: () => {
-        setLineItemDialogOpen(false);
-        lineItemForm.reset();
-      },
-    });
-  };
-
-  const openEditLineItem = (item: LineItem) => {
-    setEditingLineItem(item);
-    editLineItemForm.setData({
-      category: item.category,
-      description: item.description,
-      account_code: item.account_code || '',
-      budget_amount: String(item.budget_amount),
-      forecast_amount: String(item.forecast_amount),
-      actual_amount: String(item.actual_amount),
-      variance_explanation: item.variance_explanation || '',
-      notes: item.notes || '',
-    });
-    setEditLineItemDialogOpen(true);
-  };
-
-  const submitEditLineItem = (e: FormEvent) => {
-    e.preventDefault();
-    if (!editingLineItem) return;
-    editLineItemForm.put(`/governance/budgets/${budget.id}/line-items/${editingLineItem.id}`, {
-      preserveScroll: true,
-      onSuccess: () => {
-        setEditLineItemDialogOpen(false);
-        setEditingLineItem(null);
-      },
-    });
-  };
-
-  const deleteLineItem = (itemId: number) => {
-    router.delete(`/governance/budgets/${budget.id}/line-items/${itemId}`, {
-      preserveScroll: true,
-    });
-  };
-
-  const submitAdjustment = (e: FormEvent) => {
-    e.preventDefault();
-    adjustmentForm.post(`/governance/budgets/${budget.id}/adjust`, {
-      preserveScroll: true,
-      onSuccess: () => {
-        setAdjustmentDialogOpen(false);
-        adjustmentForm.reset();
-      },
-    });
-  };
-
-  const proposeBudget = () => {
-    router.post(`/governance/budgets/${budget.id}/propose`, {}, {
-      preserveScroll: true,
-    });
-  };
-
-  const approveBudget = () => {
-    router.post(`/governance/budgets/${budget.id}/approve`, {}, {
-      preserveScroll: true,
-    });
-  };
-
-  const approveAdjustment = (adjustmentId: number) => {
-    router.post(`/governance/budgets/${budget.id}/adjustments/${adjustmentId}/approve`, {}, {
-      preserveScroll: true,
-    });
-  };
-
-  const pendingAdjustments = (budget.adjustments || []).filter(a => a.status === 'submitted');
-  const resolvedAdjustments = (budget.adjustments || []).filter(a => a.status !== 'submitted');
-
-  return (
-    <AppLayout
-      user={auth.user}
-      breadcrumbs={[
-        { title: 'Governance', href: '/governance/dashboard' },
-        { title: 'Budgets', href: '/governance/budgets' },
-        { title: budget.title || `FY${budget.fiscal_year}`, href: `/governance/budgets/${budget.id}` },
-      ]}
-    >
-      <Head title={`Budget - ${budget.title || budget.fiscal_year}`} />
-
-      <PageLayout
-        hero={
-          <PageHero
-            category="governance"
-            backHref={budgetsIndex.url()}
-            icon={Wallet}
-            title={
-              <span className="flex flex-wrap items-center gap-3" dusk="budget-heading">
-                {budget.title || `FY${budget.fiscal_year} Budget`}
-                <Badge className={getStatusColor(budget.status)}>{budget.status.replace('_', ' ')}</Badge>
-                <Badge variant="outline">v{budget.version_number}</Badge>
-              </span>
-            }
-            description={
-              <>
-                Fiscal Year {budget.fiscal_year}
-                {budget.created_by && ` · Created by ${budget.created_by.name}`}
-                {budget.description && <span className="mt-2 block text-sm">{budget.description}</span>}
-              </>
-            }
-            stats={[
-              { label: 'Fiscal year', value: budget.fiscal_year },
-              { label: 'Allocated', value: formatCurrency(totals.allocated) },
-              { label: 'Actual', value: formatCurrency(totals.actual) },
-              { label: 'Status', value: budget.status.replace('_', ' ') },
+    return (
+        <AppLayout
+            user={auth.user}
+            breadcrumbs={[
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Budgets', href: '/governance/budgets' },
+                {
+                    title: budget.title || `FY${budget.fiscal_year}`,
+                    href: `/governance/budgets/${budget.id}`,
+                },
             ]}
-            actions={
-              <>
-                {canEdit && (
-              <Button variant="outline" asChild>
-                <Link href={`/governance/budgets/${budget.id}/edit`}>
-                  <Pencil className="w-4 h-4 mr-1" />
-                  Edit
-                </Link>
-              </Button>
-            )}
-            {canPropose && (budget.line_items || []).length > 0 && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button>
-                    <Send className="w-4 h-4 mr-1" />
-                    Submit for Approval
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Submit Budget for Approval</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will submit the budget ({formatCurrency(totals.budget)} across {(budget.line_items || []).length} line items) to the board for review and approval. Are you sure?
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={proposeBudget}>Submit</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            {canApprove && budget.approval_resolution && (
-              budget.approval_resolution.outcome === 'carried' ? (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button className="bg-status-success hover:bg-status-success">
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      Approve Budget
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Approve Budget</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Resolution {budget.approval_resolution.resolution_reference} has been carried by the board.
-                        This will mark the budget ({formatCurrency(totals.budget)}) as approved.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={approveBudget} className="bg-status-success hover:bg-status-success">
-                        Confirm Approval
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              ) : (
-                <Button variant="outline" disabled>
-                  <Clock className="w-4 h-4 mr-1" />
-                  Awaiting Board Vote
-                </Button>
-              )
-            )}
-              </>
-            }
-          />
-        }
-      >
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Budget</p>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(totals.budget)}</p>
-                </div>
-                <DollarSign className="w-8 h-8 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Actual Spend</p>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(totals.actual)}</p>
-                </div>
-                <Wallet className="w-8 h-8 text-status-info" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Remaining</p>
-                  <p className={cn(
-                    'text-2xl font-bold',
-                    totals.remaining >= 0 ? 'text-status-success' : 'text-status-critical',
-                  )}>{formatCurrency(totals.remaining)}</p>
-                </div>
-                <BarChart3 className="w-8 h-8 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Utilization</p>
-                  <p className="text-2xl font-bold text-foreground">{totals.utilization.toFixed(1)}%</p>
-                </div>
-                <Progress value={Math.min(totals.utilization, 100)} className="w-16" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className={cn(
-            totals.variance > 0 && 'border-status-critical/30',
-            totals.variance < 0 && 'border-status-success/30',
-          )}>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Variance</p>
-                  <p className={cn(
-                    'text-2xl font-bold',
-                    totals.variance > 0 ? 'text-status-critical' : totals.variance < 0 ? 'text-status-success' : 'text-foreground',
-                  )}>
-                    {totals.variance > 0 ? '+' : ''}{formatCurrency(totals.variance)}
-                  </p>
-                </div>
-                {totals.variance > 0 ? (
-                  <TrendingUp className="w-8 h-8 text-status-critical" />
-                ) : (
-                  <TrendingDown className="w-8 h-8 text-status-success" />
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        >
+            <Head title={`Budget - ${budget.title || budget.fiscal_year}`} />
 
-        {/* Approval / Resolution Banner */}
-        {budget.status === 'approved' && budget.approval_resolution && (
-          <Card className="mb-6 border-status-success/30 bg-status-success-bg">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-6 h-6 text-status-success" />
-                <div>
-                  <p className="font-medium text-status-success">Board Approved</p>
-                  <p className="text-sm text-status-success">
-                    Resolution {budget.approval_resolution.resolution_reference}
-                    {budget.approved_by_board_at && ` on ${new Date(budget.approved_by_board_at).toLocaleDateString('en-NZ')}`}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        {budget.status === 'proposed' && budget.approval_resolution && (
-          <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Clock className="w-6 h-6 text-status-warning" />
-                  <div>
-                    <p className="font-medium text-status-warning">Pending Board Vote</p>
-                    <p className="text-sm text-status-warning">
-                      Resolution {budget.approval_resolution.resolution_reference} — {budget.approval_resolution.outcome ? `Outcome: ${budget.approval_resolution.outcome}` : 'Voting not yet completed'}
-                    </p>
-                  </div>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/governance/resolutions/${budget.approval_resolution.id}`}>
-                    View Resolution
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Tabs */}
-        <Tabs defaultValue="line-items" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="line-items">Line Items ({(budget.line_items || []).length})</TabsTrigger>
-            <TabsTrigger value="adjustments">
-              Adjustments
-              {pendingAdjustments.length > 0 && (
-                <Badge variant="destructive" className="ml-2 h-5 min-w-5 text-xs">{pendingAdjustments.length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="summary">Category Summary</TabsTrigger>
-            <TabsTrigger value="allocations">Allocations ({(budget.allocations || []).length})</TabsTrigger>
-          </TabsList>
-
-          {/* ========== LINE ITEMS TAB ========== */}
-          <TabsContent value="line-items">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Budget Line Items</CardTitle>
-                  <CardDescription>
-                    {(budget.line_items || []).length} items totaling {formatCurrency(totals.allocated)}
-                  </CardDescription>
-                </div>
-                {canEdit && (
-                  <Dialog open={lineItemDialogOpen} onOpenChange={setLineItemDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm">
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Line Item
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-lg" aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle>Add Budget Line Item</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={submitLineItem} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Category</Label>
-                            <Select
-                              value={lineItemForm.data.category}
-                              onValueChange={v => lineItemForm.setData('category', v)}
+            <PageLayout
+                hero={
+                    <PageHero
+                        category="governance"
+                        backHref={budgetsIndex.url()}
+                        icon={Wallet}
+                        title={
+                            <span
+                                className="flex flex-wrap items-center gap-3"
+                                dusk="budget-heading"
                             >
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {Object.entries(categories || {}).map(([key, label]) => (
-                                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label>Account Code</Label>
-                            <Input
-                              value={lineItemForm.data.account_code}
-                              onChange={e => lineItemForm.setData('account_code', e.target.value)}
-                              placeholder="e.g., 4100"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label>Description</Label>
-                          <Input
-                            value={lineItemForm.data.description}
-                            onChange={e => lineItemForm.setData('description', e.target.value)}
-                            placeholder="e.g., Staff salaries"
-                            required
-                          />
-                          {lineItemForm.errors.description && <p className="text-sm text-status-critical mt-1">{lineItemForm.errors.description}</p>}
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Budget Amount ($)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={lineItemForm.data.budget_amount}
-                              onChange={e => lineItemForm.setData('budget_amount', e.target.value)}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label>Forecast Amount ($)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={lineItemForm.data.forecast_amount}
-                              onChange={e => lineItemForm.setData('forecast_amount', e.target.value)}
-                              placeholder="Same as budget if blank"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label>Notes</Label>
-                          <Textarea
-                            value={lineItemForm.data.notes}
-                            onChange={e => lineItemForm.setData('notes', e.target.value)}
-                            rows={2}
-                            placeholder="Optional notes..."
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => setLineItemDialogOpen(false)}>Cancel</Button>
-                          <Button type="submit" disabled={lineItemForm.processing}>
-                            {lineItemForm.processing ? 'Adding...' : 'Add Line Item'}
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </CardHeader>
-              <CardContent>
-                {(budget.line_items || []).length === 0 ? (
-                  <div className="text-center py-12">
-                    <DollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-2 text-sm font-semibold text-foreground">No line items</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Get started by adding budget line items to track allocations and spending.</p>
-                    {canEdit && (
-                      <div className="mt-6">
-                        <Button size="sm" onClick={() => setLineItemDialogOpen(true)}>
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add First Line Item
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2 font-medium">Category</th>
-                          <th className="text-left py-2 font-medium">Description</th>
-                          <th className="text-right py-2 font-medium">Budget</th>
-                          <th className="text-right py-2 font-medium">Forecast</th>
-                          <th className="text-right py-2 font-medium">Actual</th>
-                          <th className="text-right py-2 font-medium">Variance</th>
-                          <th className="text-right py-2 font-medium">%</th>
-                          {canEdit && <th className="text-right py-2 font-medium w-24">Actions</th>}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(budget.line_items || []).map((item) => {
-                          const variancePct = Number(item.budget_amount) > 0
-                            ? (Number(item.variance_amount) / Number(item.budget_amount)) * 100
-                            : 0;
-                          return (
-                            <tr key={item.id} className="border-b last:border-0 hover:bg-muted">
-                              <td className="py-2">
-                                <Badge variant="outline" className="text-xs">{getCategoryLabel(item.category)}</Badge>
-                              </td>
-                              <td className="py-2">
-                                <div>
-                                  <p className="font-medium">{item.description}</p>
-                                  {item.account_code && <p className="text-xs text-muted-foreground">{item.account_code}</p>}
-                                </div>
-                              </td>
-                              <td className="text-right py-2">{formatCurrency(Number(item.budget_amount))}</td>
-                              <td className="text-right py-2 text-muted-foreground">{formatCurrency(Number(item.forecast_amount))}</td>
-                              <td className="text-right py-2">{formatCurrency(Number(item.actual_amount))}</td>
-                              <td className={cn(
-                                'text-right py-2 font-medium',
-                                Number(item.variance_amount) > 0 && 'text-status-critical',
-                                Number(item.variance_amount) < 0 && 'text-status-success',
-                              )}>
-                                {Number(item.variance_amount) > 0 ? '+' : ''}{formatCurrency(Number(item.variance_amount || 0))}
-                              </td>
-                              <td className={cn(
-                                'text-right py-2',
-                                Math.abs(variancePct) > 10 && 'font-medium',
-                                variancePct > 10 && 'text-status-critical',
-                                variancePct < -10 && 'text-status-success',
-                              )}>
-                                {variancePct > 0 ? '+' : ''}{variancePct.toFixed(1)}%
-                                {Math.abs(variancePct) > 10 && (
-                                  <AlertTriangle className="inline w-3 h-3 ml-1" />
-                                )}
-                              </td>
-                              {canEdit && (
-                                <td className="text-right py-2">
-                                  <div className="flex justify-end gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => openEditLineItem(item)}
-                                    >
-                                      <Pencil className="w-3 h-3" />
-                                    </Button>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="text-status-critical hover:text-status-critical">
-                                          <Trash2 className="w-3 h-3" />
-                                        </Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>Delete Line Item</AlertDialogTitle>
-                                          <AlertDialogDescription>
-                                            Are you sure you want to remove "{item.description}" ({formatCurrency(Number(item.budget_amount))})? This cannot be undone.
-                                          </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                          <AlertDialogAction
-                                            onClick={() => deleteLineItem(item.id)}
-                                            className="bg-status-critical hover:bg-status-critical"
-                                          >
-                                            Delete
-                                          </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
-                                  </div>
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 font-semibold">
-                          <td className="py-2" colSpan={2}>Totals</td>
-                          <td className="text-right py-2">{formatCurrency(totals.allocated)}</td>
-                          <td className="text-right py-2 text-muted-foreground">{formatCurrency(totals.forecast)}</td>
-                          <td className="text-right py-2">{formatCurrency(totals.actual)}</td>
-                          <td className={cn(
-                            'text-right py-2',
-                            totals.variance > 0 && 'text-status-critical',
-                            totals.variance < 0 && 'text-status-success',
-                          )}>
-                            {totals.variance > 0 ? '+' : ''}{formatCurrency(totals.variance)}
-                          </td>
-                          <td className="text-right py-2">
-                            {totals.variancePercent > 0 ? '+' : ''}{totals.variancePercent.toFixed(1)}%
-                          </td>
-                          {canEdit && <td />}
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* ========== ADJUSTMENTS TAB ========== */}
-          <TabsContent value="adjustments">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Budget Adjustments</CardTitle>
-                  <CardDescription>Requests to modify the approved budget</CardDescription>
-                </div>
-                {canEdit && (
-                  <Dialog open={adjustmentDialogOpen} onOpenChange={setAdjustmentDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm">
-                        <ArrowUpDown className="w-4 h-4 mr-1" />
-                        Request Adjustment
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-lg" aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle>Request Budget Adjustment</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={submitAdjustment} className="space-y-4">
-                        <div>
-                          <Label>Adjustment Type</Label>
-                          <Select
-                            value={adjustmentForm.data.adjustment_type}
-                            onValueChange={v => adjustmentForm.setData('adjustment_type', v)}
-                          >
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="increase">Increase</SelectItem>
-                              <SelectItem value="decrease">Decrease</SelectItem>
-                              <SelectItem value="reallocate">Reallocate</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {(budget.line_items || []).length > 0 && (
-                          <div>
-                            <Label>Line Item (optional)</Label>
-                            <Select
-                              value={adjustmentForm.data.budget_line_item_id || undefined}
-                              onValueChange={v => adjustmentForm.setData('budget_line_item_id', v)}
-                            >
-                              <SelectTrigger><SelectValue placeholder="Select line item..." /></SelectTrigger>
-                              <SelectContent>
-                                {(budget.line_items || []).map(item => (
-                                  <SelectItem key={item.id} value={String(item.id)}>{item.description}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                        <div>
-                          <Label>Amount ($)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            value={adjustmentForm.data.amount}
-                            onChange={e => adjustmentForm.setData('amount', e.target.value)}
-                            required
-                          />
-                          {adjustmentForm.errors.amount && <p className="text-sm text-status-critical mt-1">{adjustmentForm.errors.amount}</p>}
-                        </div>
-                        <div>
-                          <Label>Reason</Label>
-                          <Textarea
-                            value={adjustmentForm.data.reason}
-                            onChange={e => adjustmentForm.setData('reason', e.target.value)}
-                            rows={3}
-                            required
-                            placeholder="Explain why this adjustment is needed..."
-                          />
-                          {adjustmentForm.errors.reason && <p className="text-sm text-status-critical mt-1">{adjustmentForm.errors.reason}</p>}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Adjustments exceeding 5% of total budget will require board resolution.
-                        </p>
-                        <div className="flex justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => setAdjustmentDialogOpen(false)}>Cancel</Button>
-                          <Button type="submit" disabled={adjustmentForm.processing}>
-                            {adjustmentForm.processing ? 'Submitting...' : 'Submit Request'}
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </CardHeader>
-              <CardContent>
-                {(budget.adjustments || []).length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No budget adjustments have been requested.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingAdjustments.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-semibold text-foreground mb-2">Pending Approvals</h4>
-                        {pendingAdjustments.map((adj) => (
-                          <div key={adj.id} className="p-4 border rounded-lg border-status-warning/30 bg-status-warning-bg mb-2">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="outline" className="capitalize">{adj.adjustment_type}</Badge>
-                                  <span className="font-semibold">{formatCurrency(Number(adj.amount))}</span>
-                                  {adj.threshold_applies && (
-                                    <Badge variant="destructive" className="text-xs">Board Approval Required</Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground">{adj.reason}</p>
-                                {adj.line_item && (
-                                  <p className="text-xs text-muted-foreground mt-1">Line item: {adj.line_item.description}</p>
-                                )}
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Requested by {adj.proposed_by?.name} on {new Date(adj.proposed_at).toLocaleDateString('en-NZ')}
-                                </p>
-                              </div>
-                              <div className="flex gap-2 ml-4">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-status-success border-status-success/30 hover:bg-status-success-bg"
-                                  onClick={() => approveAdjustment(adj.id)}
+                                {budget.title ||
+                                    `FY${budget.fiscal_year} Budget`}
+                                <Badge
+                                    className={getStatusColor(budget.status)}
                                 >
-                                  Approve
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {resolvedAdjustments.length > 0 && (
-                      <div>
-                        {pendingAdjustments.length > 0 && (
-                          <h4 className="text-sm font-semibold text-foreground mb-2">Resolved</h4>
-                        )}
-                        {resolvedAdjustments.map((adj) => (
-                          <div key={adj.id} className="p-4 border rounded-lg mb-2">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Badge variant="outline" className="capitalize">{adj.adjustment_type}</Badge>
-                                  <span className="font-medium">{formatCurrency(Number(adj.amount))}</span>
-                                </div>
-                                <p className="text-sm text-muted-foreground">{adj.reason}</p>
-                                {adj.review_notes && (
-                                  <p className="text-xs text-muted-foreground mt-1 italic">Review: {adj.review_notes}</p>
+                                    {budget.status.replace('_', ' ')}
+                                </Badge>
+                                <Badge variant="outline">
+                                    v{budget.version_number}
+                                </Badge>
+                            </span>
+                        }
+                        description={
+                            <>
+                                Fiscal Year {budget.fiscal_year}
+                                {budget.created_by &&
+                                    ` · Created by ${budget.created_by.name}`}
+                                {budget.description && (
+                                    <span className="mt-2 block text-sm">
+                                        {budget.description}
+                                    </span>
                                 )}
-                              </div>
-                              <Badge className={cn(
-                                adj.status === 'approved' && 'bg-status-success-bg text-status-success',
-                                adj.status === 'rejected' && 'bg-status-critical-bg text-status-critical',
-                              )}>
-                                {adj.status}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* ========== CATEGORY SUMMARY TAB ========== */}
-          <TabsContent value="summary">
-            <div className="space-y-4">
-              {Object.entries(groupLineItemsByCategory()).map(([category, items]) => {
-                const categoryTotals = getCategoryTotals(items);
-                const pct = totals.budget > 0 ? (categoryTotals.budget / totals.budget) * 100 : 0;
-                return (
-                  <Card key={category}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{getCategoryLabel(category)}</CardTitle>
-                          <CardDescription>{items.length} line items &middot; {pct.toFixed(1)}% of total budget</CardDescription>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-semibold">{formatCurrency(categoryTotals.budget)}</p>
-                          <p className={cn(
-                            'text-sm font-medium',
-                            categoryTotals.variance > 0 && 'text-status-critical',
-                            categoryTotals.variance < 0 && 'text-status-success',
-                          )}>
-                            Variance: {categoryTotals.variance > 0 ? '+' : ''}{formatCurrency(categoryTotals.variance)}
-                          </p>
-                        </div>
-                      </div>
-                      <Progress value={totals.budget > 0 ? (categoryTotals.actual / categoryTotals.budget) * 100 : 0} className="mt-2" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b">
-                              <th className="text-left py-2 font-medium">Description</th>
-                              <th className="text-right py-2 font-medium">Budget</th>
-                              <th className="text-right py-2 font-medium">Actual</th>
-                              <th className="text-right py-2 font-medium">Variance</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {items.map((item) => (
-                              <tr key={item.id} className="border-b last:border-0">
-                                <td className="py-2">
-                                  <p className="font-medium">{item.description}</p>
-                                  {item.account_code && <p className="text-xs text-muted-foreground">{item.account_code}</p>}
-                                </td>
-                                <td className="text-right py-2">{formatCurrency(Number(item.budget_amount))}</td>
-                                <td className="text-right py-2">{formatCurrency(Number(item.actual_amount))}</td>
-                                <td className={cn(
-                                  'text-right py-2 font-medium',
-                                  Number(item.variance_amount) > 0 && 'text-status-critical',
-                                  Number(item.variance_amount) < 0 && 'text-status-success',
-                                )}>
-                                  {Number(item.variance_amount) > 0 ? '+' : ''}{formatCurrency(Number(item.variance_amount || 0))}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-              {Object.keys(groupLineItemsByCategory()).length === 0 && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <p className="text-muted-foreground text-center py-8">No line items to summarize. Add line items first.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* ========== ALLOCATIONS TAB ========== */}
-          <TabsContent value="allocations">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Period Allocations</CardTitle>
-                  <CardDescription>
-                    Distribute this annual budget across sites and months. Each allocation links to a monthly site budget line (Finance side).
-                  </CardDescription>
-                </div>
-                {canEdit && (
-                  <Dialog open={allocationDialogOpen} onOpenChange={setAllocationDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Allocation
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent aria-describedby={undefined}>
-                      <DialogHeader>
-                        <DialogTitle>New Allocation</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={submitAllocation} className="space-y-3">
-                        <div>
-                          <Label htmlFor="alloc-period">Period (YYYY-MM)</Label>
-                          <Input
-                            id="alloc-period"
-                            placeholder="2026-07"
-                            pattern="\d{4}-(0[1-9]|1[0-2])"
-                            value={allocationForm.data.period_year_month}
-                            onChange={(e) => allocationForm.setData('period_year_month', e.target.value)}
-                            required
-                          />
-                          {allocationForm.errors.period_year_month && (
-                            <p className="mt-1 text-xs text-status-critical">{allocationForm.errors.period_year_month}</p>
-                          )}
-                        </div>
-                        <div>
-                          <Label htmlFor="alloc-line">Budget line (optional)</Label>
-                          <Select
-                            value={allocationForm.data.budget_line_item_id || 'none'}
-                            onValueChange={(v) => allocationForm.setData('budget_line_item_id', v === 'none' ? '' : v)}
-                          >
-                            <SelectTrigger id="alloc-line"><SelectValue placeholder="No line" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">No line</SelectItem>
-                              {(budget.line_items || []).map((li) => (
-                                <SelectItem key={li.id} value={String(li.id)}>
-                                  {getCategoryLabel(li.category)} — {li.description}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Label htmlFor="alloc-amount">Allocated (NZD)</Label>
-                            <Input
-                              id="alloc-amount"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={allocationForm.data.allocated_amount}
-                              onChange={(e) => allocationForm.setData('allocated_amount', e.target.value)}
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="alloc-forecast">Forecast (optional)</Label>
-                            <Input
-                              id="alloc-forecast"
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={allocationForm.data.forecast_amount}
-                              onChange={(e) => allocationForm.setData('forecast_amount', e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label htmlFor="alloc-category">Category (optional)</Label>
-                          <Input
-                            id="alloc-category"
-                            placeholder="payroll, rent, utilities..."
-                            value={allocationForm.data.category}
-                            onChange={(e) => allocationForm.setData('category', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="alloc-notes">Notes</Label>
-                          <Textarea
-                            id="alloc-notes"
-                            rows={2}
-                            value={allocationForm.data.notes}
-                            onChange={(e) => allocationForm.setData('notes', e.target.value)}
-                          />
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          <Button type="button" variant="outline" onClick={() => setAllocationDialogOpen(false)}>Cancel</Button>
-                          <Button type="submit" disabled={allocationForm.processing}>
-                            {allocationForm.processing ? 'Saving…' : 'Save Allocation'}
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </CardHeader>
-              <CardContent>
-                {(budget.allocations || []).length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    No allocations yet. Add allocations to link this annual budget to specific months and sites.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                          <th className="px-3 py-2">Period</th>
-                          <th className="px-3 py-2">Budget line</th>
-                          <th className="px-3 py-2">Category</th>
-                          <th className="px-3 py-2 text-right">Allocated</th>
-                          <th className="px-3 py-2 text-right">Actual</th>
-                          <th className="px-3 py-2 text-right">Variance</th>
-                          <th className="px-3 py-2 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(budget.allocations || []).map((alloc) => {
-                          const variance = (Number(alloc.actual_amount) || 0) - Number(alloc.allocated_amount);
-                          return (
-                            <tr key={alloc.id} className="border-b">
-                              <td className="px-3 py-2 font-mono">{alloc.period_year_month}</td>
-                              <td className="px-3 py-2">
-                                {alloc.budget_line_item?.description ?? <span className="text-muted-foreground">—</span>}
-                              </td>
-                              <td className="px-3 py-2">{alloc.category ?? '—'}</td>
-                              <td className="px-3 py-2 text-right font-medium">{formatCurrency(Number(alloc.allocated_amount))}</td>
-                              <td className="px-3 py-2 text-right">
-                                {alloc.actual_amount !== null ? formatCurrency(Number(alloc.actual_amount)) : '—'}
-                              </td>
-                              <td className={cn(
-                                'px-3 py-2 text-right',
-                                variance > 0 ? 'text-status-critical' : variance < 0 ? 'text-status-success' : 'text-muted-foreground',
-                              )}>
-                                {alloc.actual_amount !== null ? formatCurrency(variance) : '—'}
-                              </td>
-                              <td className="px-3 py-2 text-right">
+                            </>
+                        }
+                        stats={[
+                            { label: 'Fiscal year', value: budget.fiscal_year },
+                            {
+                                label: 'Allocated',
+                                value: formatCurrency(totals.allocated),
+                            },
+                            {
+                                label: 'Actual',
+                                value: formatCurrency(totals.actual),
+                            },
+                            {
+                                label: 'Status',
+                                value: budget.status.replace('_', ' '),
+                            },
+                        ]}
+                        actions={
+                            <>
                                 {canEdit && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => deleteAllocation(alloc.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                    <Button variant="outline" asChild>
+                                        <Link
+                                            href={`/governance/budgets/${budget.id}/edit`}
+                                        >
+                                            <Pencil className="mr-1 h-4 w-4" />
+                                            Edit
+                                        </Link>
+                                    </Button>
                                 )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-muted/50 font-semibold">
-                          <td className="px-3 py-2" colSpan={3}>Total allocated</td>
-                          <td className="px-3 py-2 text-right">
-                            {formatCurrency((budget.allocations || []).reduce((s, a) => s + Number(a.allocated_amount), 0))}
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            {formatCurrency((budget.allocations || []).reduce((s, a) => s + (Number(a.actual_amount) || 0), 0))}
-                          </td>
-                          <td className="px-3 py-2 text-right"></td>
-                          <td className="px-3 py-2 text-right"></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                                {canPropose &&
+                                    (budget.line_items || []).length > 0 && (
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button>
+                                                    <Send className="mr-1 h-4 w-4" />
+                                                    Submit for Approval
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>
+                                                        Submit Budget for
+                                                        Approval
+                                                    </AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        This will submit the
+                                                        budget (
+                                                        {formatCurrency(
+                                                            totals.budget,
+                                                        )}{' '}
+                                                        across{' '}
+                                                        {
+                                                            (
+                                                                budget.line_items ||
+                                                                []
+                                                            ).length
+                                                        }{' '}
+                                                        line items) to the board
+                                                        for review and approval.
+                                                        Are you sure?
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>
+                                                        Cancel
+                                                    </AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={proposeBudget}
+                                                    >
+                                                        Submit
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    )}
+                                {canApprove &&
+                                    budget.approval_resolution &&
+                                    (budget.approval_resolution.outcome ===
+                                    'carried' ? (
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button className="bg-status-success hover:bg-status-success">
+                                                    <CheckCircle className="mr-1 h-4 w-4" />
+                                                    Approve Budget
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>
+                                                        Approve Budget
+                                                    </AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Resolution{' '}
+                                                        {
+                                                            budget
+                                                                .approval_resolution
+                                                                .resolution_reference
+                                                        }{' '}
+                                                        has been carried by the
+                                                        board. This will mark
+                                                        the budget (
+                                                        {formatCurrency(
+                                                            totals.budget,
+                                                        )}
+                                                        ) as approved.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>
+                                                        Cancel
+                                                    </AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={approveBudget}
+                                                        className="bg-status-success hover:bg-status-success"
+                                                    >
+                                                        Confirm Approval
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    ) : (
+                                        <Button variant="outline" disabled>
+                                            <Clock className="mr-1 h-4 w-4" />
+                                            Awaiting Board Vote
+                                        </Button>
+                                    ))}
+                            </>
+                        }
+                    />
+                }
+            >
+                {/* Summary Cards */}
+                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-5">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Total Budget
+                                    </p>
+                                    <p className="text-2xl font-bold text-foreground">
+                                        {formatCurrency(totals.budget)}
+                                    </p>
+                                </div>
+                                <DollarSign className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Actual Spend
+                                    </p>
+                                    <p className="text-2xl font-bold text-foreground">
+                                        {formatCurrency(totals.actual)}
+                                    </p>
+                                </div>
+                                <Wallet className="h-8 w-8 text-status-info" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Remaining
+                                    </p>
+                                    <p
+                                        className={cn(
+                                            'text-2xl font-bold',
+                                            totals.remaining >= 0
+                                                ? 'text-status-success'
+                                                : 'text-status-critical',
+                                        )}
+                                    >
+                                        {formatCurrency(totals.remaining)}
+                                    </p>
+                                </div>
+                                <BarChart3 className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Utilization
+                                    </p>
+                                    <p className="text-2xl font-bold text-foreground">
+                                        {totals.utilization.toFixed(1)}%
+                                    </p>
+                                </div>
+                                <Progress
+                                    value={Math.min(totals.utilization, 100)}
+                                    className="w-16"
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card
+                        className={cn(
+                            totals.variance > 0 && 'border-status-critical/30',
+                            totals.variance < 0 && 'border-status-success/30',
+                        )}
+                    >
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Variance
+                                    </p>
+                                    <p
+                                        className={cn(
+                                            'text-2xl font-bold',
+                                            totals.variance > 0
+                                                ? 'text-status-critical'
+                                                : totals.variance < 0
+                                                  ? 'text-status-success'
+                                                  : 'text-foreground',
+                                        )}
+                                    >
+                                        {totals.variance > 0 ? '+' : ''}
+                                        {formatCurrency(totals.variance)}
+                                    </p>
+                                </div>
+                                {totals.variance > 0 ? (
+                                    <TrendingUp className="h-8 w-8 text-status-critical" />
+                                ) : (
+                                    <TrendingDown className="h-8 w-8 text-status-success" />
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
-        {/* Edit Line Item Dialog */}
-        <Dialog open={editLineItemDialogOpen} onOpenChange={setEditLineItemDialogOpen}>
-          <DialogContent className="max-w-lg" aria-describedby={undefined}>
-            <DialogHeader>
-              <DialogTitle>Edit Line Item</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={submitEditLineItem} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Category</Label>
-                  <Select
-                    value={editLineItemForm.data.category}
-                    onValueChange={v => editLineItemForm.setData('category', v)}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(categories || {}).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Account Code</Label>
-                  <Input
-                    value={editLineItemForm.data.account_code}
-                    onChange={e => editLineItemForm.setData('account_code', e.target.value)}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Description</Label>
-                <Input
-                  value={editLineItemForm.data.description}
-                  onChange={e => editLineItemForm.setData('description', e.target.value)}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Budget ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editLineItemForm.data.budget_amount}
-                    onChange={e => editLineItemForm.setData('budget_amount', e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label>Forecast ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editLineItemForm.data.forecast_amount}
-                    onChange={e => editLineItemForm.setData('forecast_amount', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label>Actual ($)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editLineItemForm.data.actual_amount}
-                    onChange={e => editLineItemForm.setData('actual_amount', e.target.value)}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Variance Explanation</Label>
-                <Textarea
-                  value={editLineItemForm.data.variance_explanation}
-                  onChange={e => editLineItemForm.setData('variance_explanation', e.target.value)}
-                  rows={2}
-                  placeholder="Explain any significant variance..."
-                />
-              </div>
-              <div>
-                <Label>Notes</Label>
-                <Textarea
-                  value={editLineItemForm.data.notes}
-                  onChange={e => editLineItemForm.setData('notes', e.target.value)}
-                  rows={2}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setEditLineItemDialogOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={editLineItemForm.processing}>
-                  {editLineItemForm.processing ? 'Saving...' : 'Update Line Item'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </PageLayout>
-    </AppLayout>
-  );
+                {/* Approval / Resolution Banner */}
+                {budget.status === 'approved' && budget.approval_resolution && (
+                    <Card className="mb-6 border-status-success/30 bg-status-success-bg">
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <CheckCircle className="h-6 w-6 text-status-success" />
+                                <div>
+                                    <p className="font-medium text-status-success">
+                                        Board Approved
+                                    </p>
+                                    <p className="text-sm text-status-success">
+                                        Resolution{' '}
+                                        {
+                                            budget.approval_resolution
+                                                .resolution_reference
+                                        }
+                                        {budget.approved_by_board_at &&
+                                            ` on ${new Date(budget.approved_by_board_at).toLocaleDateString('en-NZ')}`}
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+                {budget.status === 'proposed' && budget.approval_resolution && (
+                    <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <Clock className="h-6 w-6 text-status-warning" />
+                                    <div>
+                                        <p className="font-medium text-status-warning">
+                                            Pending Board Vote
+                                        </p>
+                                        <p className="text-sm text-status-warning">
+                                            Resolution{' '}
+                                            {
+                                                budget.approval_resolution
+                                                    .resolution_reference
+                                            }{' '}
+                                            —{' '}
+                                            {budget.approval_resolution.outcome
+                                                ? `Outcome: ${budget.approval_resolution.outcome}`
+                                                : 'Voting not yet completed'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link
+                                        href={`/governance/resolutions/${budget.approval_resolution.id}`}
+                                    >
+                                        View Resolution
+                                    </Link>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Tabs */}
+                <Tabs defaultValue="line-items" className="space-y-6">
+                    <TabsList>
+                        <TabsTrigger value="line-items">
+                            Line Items ({(budget.line_items || []).length})
+                        </TabsTrigger>
+                        <TabsTrigger value="adjustments">
+                            Adjustments
+                            {pendingAdjustments.length > 0 && (
+                                <Badge
+                                    variant="destructive"
+                                    className="ml-2 h-5 min-w-5 text-xs"
+                                >
+                                    {pendingAdjustments.length}
+                                </Badge>
+                            )}
+                        </TabsTrigger>
+                        <TabsTrigger value="summary">
+                            Category Summary
+                        </TabsTrigger>
+                        <TabsTrigger value="allocations">
+                            Allocations ({(budget.allocations || []).length})
+                        </TabsTrigger>
+                    </TabsList>
+
+                    {/* ========== LINE ITEMS TAB ========== */}
+                    <TabsContent value="line-items">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle>Budget Line Items</CardTitle>
+                                    <CardDescription>
+                                        {(budget.line_items || []).length} items
+                                        totaling{' '}
+                                        {formatCurrency(totals.allocated)}
+                                    </CardDescription>
+                                </div>
+                                {canEdit && (
+                                    <Dialog
+                                        open={lineItemDialogOpen}
+                                        onOpenChange={setLineItemDialogOpen}
+                                    >
+                                        <DialogTrigger asChild>
+                                            <Button size="sm">
+                                                <Plus className="mr-1 h-4 w-4" />
+                                                Add Line Item
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent
+                                            className="max-w-lg"
+                                            aria-describedby={undefined}
+                                        >
+                                            <DialogHeader>
+                                                <DialogTitle>
+                                                    Add Budget Line Item
+                                                </DialogTitle>
+                                            </DialogHeader>
+                                            <form
+                                                onSubmit={submitLineItem}
+                                                className="space-y-4"
+                                            >
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <Label>Category</Label>
+                                                        <Select
+                                                            value={
+                                                                lineItemForm
+                                                                    .data
+                                                                    .category
+                                                            }
+                                                            onValueChange={(
+                                                                v,
+                                                            ) =>
+                                                                lineItemForm.setData(
+                                                                    'category',
+                                                                    v,
+                                                                )
+                                                            }
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {Object.entries(
+                                                                    categories ||
+                                                                        {},
+                                                                ).map(
+                                                                    ([
+                                                                        key,
+                                                                        label,
+                                                                    ]) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                key
+                                                                            }
+                                                                            value={
+                                                                                key
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                label
+                                                                            }
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div>
+                                                        <Label>
+                                                            Account Code
+                                                        </Label>
+                                                        <Input
+                                                            value={
+                                                                lineItemForm
+                                                                    .data
+                                                                    .account_code
+                                                            }
+                                                            onChange={(e) =>
+                                                                lineItemForm.setData(
+                                                                    'account_code',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="e.g., 4100"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <Label>Description</Label>
+                                                    <Input
+                                                        value={
+                                                            lineItemForm.data
+                                                                .description
+                                                        }
+                                                        onChange={(e) =>
+                                                            lineItemForm.setData(
+                                                                'description',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="e.g., Staff salaries"
+                                                        required
+                                                    />
+                                                    {lineItemForm.errors
+                                                        .description && (
+                                                        <p className="mt-1 text-sm text-status-critical">
+                                                            {
+                                                                lineItemForm
+                                                                    .errors
+                                                                    .description
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <Label>
+                                                            Budget Amount ($)
+                                                        </Label>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={
+                                                                lineItemForm
+                                                                    .data
+                                                                    .budget_amount
+                                                            }
+                                                            onChange={(e) =>
+                                                                lineItemForm.setData(
+                                                                    'budget_amount',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <Label>
+                                                            Forecast Amount ($)
+                                                        </Label>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={
+                                                                lineItemForm
+                                                                    .data
+                                                                    .forecast_amount
+                                                            }
+                                                            onChange={(e) =>
+                                                                lineItemForm.setData(
+                                                                    'forecast_amount',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Same as budget if blank"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <Label>Notes</Label>
+                                                    <Textarea
+                                                        value={
+                                                            lineItemForm.data
+                                                                .notes
+                                                        }
+                                                        onChange={(e) =>
+                                                            lineItemForm.setData(
+                                                                'notes',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        rows={2}
+                                                        placeholder="Optional notes..."
+                                                    />
+                                                </div>
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setLineItemDialogOpen(
+                                                                false,
+                                                            )
+                                                        }
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        type="submit"
+                                                        disabled={
+                                                            lineItemForm.processing
+                                                        }
+                                                    >
+                                                        {lineItemForm.processing
+                                                            ? 'Adding...'
+                                                            : 'Add Line Item'}
+                                                    </Button>
+                                                </div>
+                                            </form>
+                                        </DialogContent>
+                                    </Dialog>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                {(budget.line_items || []).length === 0 ? (
+                                    <div className="py-12 text-center">
+                                        <DollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
+                                        <h3 className="mt-2 text-sm font-semibold text-foreground">
+                                            No line items
+                                        </h3>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Get started by adding budget line
+                                            items to track allocations and
+                                            spending.
+                                        </p>
+                                        {canEdit && (
+                                            <div className="mt-6">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        setLineItemDialogOpen(
+                                                            true,
+                                                        )
+                                                    }
+                                                >
+                                                    <Plus className="mr-1 h-4 w-4" />
+                                                    Add First Line Item
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b">
+                                                    <th className="py-2 text-left font-medium">
+                                                        Category
+                                                    </th>
+                                                    <th className="py-2 text-left font-medium">
+                                                        Description
+                                                    </th>
+                                                    <th className="py-2 text-right font-medium">
+                                                        Budget
+                                                    </th>
+                                                    <th className="py-2 text-right font-medium">
+                                                        Forecast
+                                                    </th>
+                                                    <th className="py-2 text-right font-medium">
+                                                        Actual
+                                                    </th>
+                                                    <th className="py-2 text-right font-medium">
+                                                        Variance
+                                                    </th>
+                                                    <th className="py-2 text-right font-medium">
+                                                        %
+                                                    </th>
+                                                    {canEdit && (
+                                                        <th className="w-24 py-2 text-right font-medium">
+                                                            Actions
+                                                        </th>
+                                                    )}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {(budget.line_items || []).map(
+                                                    (item) => {
+                                                        const variancePct =
+                                                            Number(
+                                                                item.budget_amount,
+                                                            ) > 0
+                                                                ? (Number(
+                                                                      item.variance_amount,
+                                                                  ) /
+                                                                      Number(
+                                                                          item.budget_amount,
+                                                                      )) *
+                                                                  100
+                                                                : 0;
+                                                        return (
+                                                            <tr
+                                                                key={item.id}
+                                                                className="border-b last:border-0 hover:bg-muted"
+                                                            >
+                                                                <td className="py-2">
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="text-xs"
+                                                                    >
+                                                                        {getCategoryLabel(
+                                                                            item.category,
+                                                                        )}
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="py-2">
+                                                                    <div>
+                                                                        <p className="font-medium">
+                                                                            {
+                                                                                item.description
+                                                                            }
+                                                                        </p>
+                                                                        {item.account_code && (
+                                                                            <p className="text-xs text-muted-foreground">
+                                                                                {
+                                                                                    item.account_code
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="py-2 text-right">
+                                                                    {formatCurrency(
+                                                                        Number(
+                                                                            item.budget_amount,
+                                                                        ),
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 text-right text-muted-foreground">
+                                                                    {formatCurrency(
+                                                                        Number(
+                                                                            item.forecast_amount,
+                                                                        ),
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 text-right">
+                                                                    {formatCurrency(
+                                                                        Number(
+                                                                            item.actual_amount,
+                                                                        ),
+                                                                    )}
+                                                                </td>
+                                                                <td
+                                                                    className={cn(
+                                                                        'py-2 text-right font-medium',
+                                                                        Number(
+                                                                            item.variance_amount,
+                                                                        ) > 0 &&
+                                                                            'text-status-critical',
+                                                                        Number(
+                                                                            item.variance_amount,
+                                                                        ) < 0 &&
+                                                                            'text-status-success',
+                                                                    )}
+                                                                >
+                                                                    {Number(
+                                                                        item.variance_amount,
+                                                                    ) > 0
+                                                                        ? '+'
+                                                                        : ''}
+                                                                    {formatCurrency(
+                                                                        Number(
+                                                                            item.variance_amount ||
+                                                                                0,
+                                                                        ),
+                                                                    )}
+                                                                </td>
+                                                                <td
+                                                                    className={cn(
+                                                                        'py-2 text-right',
+                                                                        Math.abs(
+                                                                            variancePct,
+                                                                        ) >
+                                                                            10 &&
+                                                                            'font-medium',
+                                                                        variancePct >
+                                                                            10 &&
+                                                                            'text-status-critical',
+                                                                        variancePct <
+                                                                            -10 &&
+                                                                            'text-status-success',
+                                                                    )}
+                                                                >
+                                                                    {variancePct >
+                                                                    0
+                                                                        ? '+'
+                                                                        : ''}
+                                                                    {variancePct.toFixed(
+                                                                        1,
+                                                                    )}
+                                                                    %
+                                                                    {Math.abs(
+                                                                        variancePct,
+                                                                    ) > 10 && (
+                                                                        <AlertTriangle className="ml-1 inline h-3 w-3" />
+                                                                    )}
+                                                                </td>
+                                                                {canEdit && (
+                                                                    <td className="py-2 text-right">
+                                                                        <div className="flex justify-end gap-1">
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                onClick={() =>
+                                                                                    openEditLineItem(
+                                                                                        item,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                <Pencil className="h-3 w-3" />
+                                                                            </Button>
+                                                                            <AlertDialog>
+                                                                                <AlertDialogTrigger
+                                                                                    asChild
+                                                                                >
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        className="text-status-critical hover:text-status-critical"
+                                                                                    >
+                                                                                        <Trash2 className="h-3 w-3" />
+                                                                                    </Button>
+                                                                                </AlertDialogTrigger>
+                                                                                <AlertDialogContent>
+                                                                                    <AlertDialogHeader>
+                                                                                        <AlertDialogTitle>
+                                                                                            Delete
+                                                                                            Line
+                                                                                            Item
+                                                                                        </AlertDialogTitle>
+                                                                                        <AlertDialogDescription>
+                                                                                            Are
+                                                                                            you
+                                                                                            sure
+                                                                                            you
+                                                                                            want
+                                                                                            to
+                                                                                            remove
+                                                                                            "
+                                                                                            {
+                                                                                                item.description
+                                                                                            }
+
+                                                                                            "
+                                                                                            (
+                                                                                            {formatCurrency(
+                                                                                                Number(
+                                                                                                    item.budget_amount,
+                                                                                                ),
+                                                                                            )}
+                                                                                            )?
+                                                                                            This
+                                                                                            cannot
+                                                                                            be
+                                                                                            undone.
+                                                                                        </AlertDialogDescription>
+                                                                                    </AlertDialogHeader>
+                                                                                    <AlertDialogFooter>
+                                                                                        <AlertDialogCancel>
+                                                                                            Cancel
+                                                                                        </AlertDialogCancel>
+                                                                                        <AlertDialogAction
+                                                                                            onClick={() =>
+                                                                                                deleteLineItem(
+                                                                                                    item.id,
+                                                                                                )
+                                                                                            }
+                                                                                            className="bg-status-critical hover:bg-status-critical"
+                                                                                        >
+                                                                                            Delete
+                                                                                        </AlertDialogAction>
+                                                                                    </AlertDialogFooter>
+                                                                                </AlertDialogContent>
+                                                                            </AlertDialog>
+                                                                        </div>
+                                                                    </td>
+                                                                )}
+                                                            </tr>
+                                                        );
+                                                    },
+                                                )}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr className="border-t-2 font-semibold">
+                                                    <td
+                                                        className="py-2"
+                                                        colSpan={2}
+                                                    >
+                                                        Totals
+                                                    </td>
+                                                    <td className="py-2 text-right">
+                                                        {formatCurrency(
+                                                            totals.allocated,
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 text-right text-muted-foreground">
+                                                        {formatCurrency(
+                                                            totals.forecast,
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 text-right">
+                                                        {formatCurrency(
+                                                            totals.actual,
+                                                        )}
+                                                    </td>
+                                                    <td
+                                                        className={cn(
+                                                            'py-2 text-right',
+                                                            totals.variance >
+                                                                0 &&
+                                                                'text-status-critical',
+                                                            totals.variance <
+                                                                0 &&
+                                                                'text-status-success',
+                                                        )}
+                                                    >
+                                                        {totals.variance > 0
+                                                            ? '+'
+                                                            : ''}
+                                                        {formatCurrency(
+                                                            totals.variance,
+                                                        )}
+                                                    </td>
+                                                    <td className="py-2 text-right">
+                                                        {totals.variancePercent >
+                                                        0
+                                                            ? '+'
+                                                            : ''}
+                                                        {totals.variancePercent.toFixed(
+                                                            1,
+                                                        )}
+                                                        %
+                                                    </td>
+                                                    {canEdit && <td />}
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* ========== ADJUSTMENTS TAB ========== */}
+                    <TabsContent value="adjustments">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle>Budget Adjustments</CardTitle>
+                                    <CardDescription>
+                                        Requests to modify the approved budget
+                                    </CardDescription>
+                                </div>
+                                {canEdit && (
+                                    <Dialog
+                                        open={adjustmentDialogOpen}
+                                        onOpenChange={setAdjustmentDialogOpen}
+                                    >
+                                        <DialogTrigger asChild>
+                                            <Button size="sm">
+                                                <ArrowUpDown className="mr-1 h-4 w-4" />
+                                                Request Adjustment
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent
+                                            className="max-w-lg"
+                                            aria-describedby={undefined}
+                                        >
+                                            <DialogHeader>
+                                                <DialogTitle>
+                                                    Request Budget Adjustment
+                                                </DialogTitle>
+                                            </DialogHeader>
+                                            <form
+                                                onSubmit={submitAdjustment}
+                                                className="space-y-4"
+                                            >
+                                                <div>
+                                                    <Label>
+                                                        Adjustment Type
+                                                    </Label>
+                                                    <Select
+                                                        value={
+                                                            adjustmentForm.data
+                                                                .adjustment_type
+                                                        }
+                                                        onValueChange={(v) =>
+                                                            adjustmentForm.setData(
+                                                                'adjustment_type',
+                                                                v,
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="increase">
+                                                                Increase
+                                                            </SelectItem>
+                                                            <SelectItem value="decrease">
+                                                                Decrease
+                                                            </SelectItem>
+                                                            <SelectItem value="reallocate">
+                                                                Reallocate
+                                                            </SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                {(budget.line_items || [])
+                                                    .length > 0 && (
+                                                    <div>
+                                                        <Label>
+                                                            Line Item (optional)
+                                                        </Label>
+                                                        <Select
+                                                            value={
+                                                                adjustmentForm
+                                                                    .data
+                                                                    .budget_line_item_id ||
+                                                                undefined
+                                                            }
+                                                            onValueChange={(
+                                                                v,
+                                                            ) =>
+                                                                adjustmentForm.setData(
+                                                                    'budget_line_item_id',
+                                                                    v,
+                                                                )
+                                                            }
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder="Select line item..." />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {(
+                                                                    budget.line_items ||
+                                                                    []
+                                                                ).map(
+                                                                    (item) => (
+                                                                        <SelectItem
+                                                                            key={
+                                                                                item.id
+                                                                            }
+                                                                            value={String(
+                                                                                item.id,
+                                                                            )}
+                                                                        >
+                                                                            {
+                                                                                item.description
+                                                                            }
+                                                                        </SelectItem>
+                                                                    ),
+                                                                )}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <Label>Amount ($)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0.01"
+                                                        value={
+                                                            adjustmentForm.data
+                                                                .amount
+                                                        }
+                                                        onChange={(e) =>
+                                                            adjustmentForm.setData(
+                                                                'amount',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        required
+                                                    />
+                                                    {adjustmentForm.errors
+                                                        .amount && (
+                                                        <p className="mt-1 text-sm text-status-critical">
+                                                            {
+                                                                adjustmentForm
+                                                                    .errors
+                                                                    .amount
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <Label>Reason</Label>
+                                                    <Textarea
+                                                        value={
+                                                            adjustmentForm.data
+                                                                .reason
+                                                        }
+                                                        onChange={(e) =>
+                                                            adjustmentForm.setData(
+                                                                'reason',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        rows={3}
+                                                        required
+                                                        placeholder="Explain why this adjustment is needed..."
+                                                    />
+                                                    {adjustmentForm.errors
+                                                        .reason && (
+                                                        <p className="mt-1 text-sm text-status-critical">
+                                                            {
+                                                                adjustmentForm
+                                                                    .errors
+                                                                    .reason
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Adjustments exceeding 5% of
+                                                    total budget will require
+                                                    board resolution.
+                                                </p>
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setAdjustmentDialogOpen(
+                                                                false,
+                                                            )
+                                                        }
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        type="submit"
+                                                        disabled={
+                                                            adjustmentForm.processing
+                                                        }
+                                                    >
+                                                        {adjustmentForm.processing
+                                                            ? 'Submitting...'
+                                                            : 'Submit Request'}
+                                                    </Button>
+                                                </div>
+                                            </form>
+                                        </DialogContent>
+                                    </Dialog>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                {(budget.adjustments || []).length === 0 ? (
+                                    <p className="py-8 text-center text-muted-foreground">
+                                        No budget adjustments have been
+                                        requested.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {pendingAdjustments.length > 0 && (
+                                            <div className="mb-4">
+                                                <h4 className="mb-2 text-sm font-semibold text-foreground">
+                                                    Pending Approvals
+                                                </h4>
+                                                {pendingAdjustments.map(
+                                                    (adj) => (
+                                                        <div
+                                                            key={adj.id}
+                                                            className="mb-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4"
+                                                        >
+                                                            <div className="flex items-start justify-between">
+                                                                <div className="flex-1">
+                                                                    <div className="mb-1 flex items-center gap-2">
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className="capitalize"
+                                                                        >
+                                                                            {
+                                                                                adj.adjustment_type
+                                                                            }
+                                                                        </Badge>
+                                                                        <span className="font-semibold">
+                                                                            {formatCurrency(
+                                                                                Number(
+                                                                                    adj.amount,
+                                                                                ),
+                                                                            )}
+                                                                        </span>
+                                                                        {adj.threshold_applies && (
+                                                                            <Badge
+                                                                                variant="destructive"
+                                                                                className="text-xs"
+                                                                            >
+                                                                                Board
+                                                                                Approval
+                                                                                Required
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        {
+                                                                            adj.reason
+                                                                        }
+                                                                    </p>
+                                                                    {adj.line_item && (
+                                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                                            Line
+                                                                            item:{' '}
+                                                                            {
+                                                                                adj
+                                                                                    .line_item
+                                                                                    .description
+                                                                            }
+                                                                        </p>
+                                                                    )}
+                                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                                        Requested
+                                                                        by{' '}
+                                                                        {
+                                                                            adj
+                                                                                .proposed_by
+                                                                                ?.name
+                                                                        }{' '}
+                                                                        on{' '}
+                                                                        {new Date(
+                                                                            adj.proposed_at,
+                                                                        ).toLocaleDateString(
+                                                                            'en-NZ',
+                                                                        )}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="ml-4 flex gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="border-status-success/30 text-status-success hover:bg-status-success-bg"
+                                                                        onClick={() =>
+                                                                            approveAdjustment(
+                                                                                adj.id,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Approve
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
+                                        {resolvedAdjustments.length > 0 && (
+                                            <div>
+                                                {pendingAdjustments.length >
+                                                    0 && (
+                                                    <h4 className="mb-2 text-sm font-semibold text-foreground">
+                                                        Resolved
+                                                    </h4>
+                                                )}
+                                                {resolvedAdjustments.map(
+                                                    (adj) => (
+                                                        <div
+                                                            key={adj.id}
+                                                            className="mb-2 rounded-lg border p-4"
+                                                        >
+                                                            <div className="flex items-start justify-between">
+                                                                <div>
+                                                                    <div className="mb-1 flex items-center gap-2">
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className="capitalize"
+                                                                        >
+                                                                            {
+                                                                                adj.adjustment_type
+                                                                            }
+                                                                        </Badge>
+                                                                        <span className="font-medium">
+                                                                            {formatCurrency(
+                                                                                Number(
+                                                                                    adj.amount,
+                                                                                ),
+                                                                            )}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-sm text-muted-foreground">
+                                                                        {
+                                                                            adj.reason
+                                                                        }
+                                                                    </p>
+                                                                    {adj.review_notes && (
+                                                                        <p className="mt-1 text-xs text-muted-foreground italic">
+                                                                            Review:{' '}
+                                                                            {
+                                                                                adj.review_notes
+                                                                            }
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <Badge
+                                                                    className={cn(
+                                                                        adj.status ===
+                                                                            'approved' &&
+                                                                            'bg-status-success-bg text-status-success',
+                                                                        adj.status ===
+                                                                            'rejected' &&
+                                                                            'bg-status-critical-bg text-status-critical',
+                                                                    )}
+                                                                >
+                                                                    {adj.status}
+                                                                </Badge>
+                                                            </div>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* ========== CATEGORY SUMMARY TAB ========== */}
+                    <TabsContent value="summary">
+                        <div className="space-y-4">
+                            {Object.entries(groupLineItemsByCategory()).map(
+                                ([category, items]) => {
+                                    const categoryTotals =
+                                        getCategoryTotals(items);
+                                    const pct =
+                                        totals.budget > 0
+                                            ? (categoryTotals.budget /
+                                                  totals.budget) *
+                                              100
+                                            : 0;
+                                    return (
+                                        <Card key={category}>
+                                            <CardHeader>
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <CardTitle className="text-lg">
+                                                            {getCategoryLabel(
+                                                                category,
+                                                            )}
+                                                        </CardTitle>
+                                                        <CardDescription>
+                                                            {items.length} line
+                                                            items &middot;{' '}
+                                                            {pct.toFixed(1)}% of
+                                                            total budget
+                                                        </CardDescription>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-lg font-semibold">
+                                                            {formatCurrency(
+                                                                categoryTotals.budget,
+                                                            )}
+                                                        </p>
+                                                        <p
+                                                            className={cn(
+                                                                'text-sm font-medium',
+                                                                categoryTotals.variance >
+                                                                    0 &&
+                                                                    'text-status-critical',
+                                                                categoryTotals.variance <
+                                                                    0 &&
+                                                                    'text-status-success',
+                                                            )}
+                                                        >
+                                                            Variance:{' '}
+                                                            {categoryTotals.variance >
+                                                            0
+                                                                ? '+'
+                                                                : ''}
+                                                            {formatCurrency(
+                                                                categoryTotals.variance,
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Progress
+                                                    value={
+                                                        totals.budget > 0
+                                                            ? (categoryTotals.actual /
+                                                                  categoryTotals.budget) *
+                                                              100
+                                                            : 0
+                                                    }
+                                                    className="mt-2"
+                                                />
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-sm">
+                                                        <thead>
+                                                            <tr className="border-b">
+                                                                <th className="py-2 text-left font-medium">
+                                                                    Description
+                                                                </th>
+                                                                <th className="py-2 text-right font-medium">
+                                                                    Budget
+                                                                </th>
+                                                                <th className="py-2 text-right font-medium">
+                                                                    Actual
+                                                                </th>
+                                                                <th className="py-2 text-right font-medium">
+                                                                    Variance
+                                                                </th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {items.map(
+                                                                (item) => (
+                                                                    <tr
+                                                                        key={
+                                                                            item.id
+                                                                        }
+                                                                        className="border-b last:border-0"
+                                                                    >
+                                                                        <td className="py-2">
+                                                                            <p className="font-medium">
+                                                                                {
+                                                                                    item.description
+                                                                                }
+                                                                            </p>
+                                                                            {item.account_code && (
+                                                                                <p className="text-xs text-muted-foreground">
+                                                                                    {
+                                                                                        item.account_code
+                                                                                    }
+                                                                                </p>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="py-2 text-right">
+                                                                            {formatCurrency(
+                                                                                Number(
+                                                                                    item.budget_amount,
+                                                                                ),
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="py-2 text-right">
+                                                                            {formatCurrency(
+                                                                                Number(
+                                                                                    item.actual_amount,
+                                                                                ),
+                                                                            )}
+                                                                        </td>
+                                                                        <td
+                                                                            className={cn(
+                                                                                'py-2 text-right font-medium',
+                                                                                Number(
+                                                                                    item.variance_amount,
+                                                                                ) >
+                                                                                    0 &&
+                                                                                    'text-status-critical',
+                                                                                Number(
+                                                                                    item.variance_amount,
+                                                                                ) <
+                                                                                    0 &&
+                                                                                    'text-status-success',
+                                                                            )}
+                                                                        >
+                                                                            {Number(
+                                                                                item.variance_amount,
+                                                                            ) >
+                                                                            0
+                                                                                ? '+'
+                                                                                : ''}
+                                                                            {formatCurrency(
+                                                                                Number(
+                                                                                    item.variance_amount ||
+                                                                                        0,
+                                                                                ),
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                ),
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                },
+                            )}
+                            {Object.keys(groupLineItemsByCategory()).length ===
+                                0 && (
+                                <Card>
+                                    <CardContent className="pt-6">
+                                        <p className="py-8 text-center text-muted-foreground">
+                                            No line items to summarize. Add line
+                                            items first.
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    {/* ========== ALLOCATIONS TAB ========== */}
+                    <TabsContent value="allocations">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle>Period Allocations</CardTitle>
+                                    <CardDescription>
+                                        Distribute this annual budget across
+                                        sites and months. Each allocation links
+                                        to a monthly site budget line (Finance
+                                        side).
+                                    </CardDescription>
+                                </div>
+                                {canEdit && (
+                                    <Dialog
+                                        open={allocationDialogOpen}
+                                        onOpenChange={setAllocationDialogOpen}
+                                    >
+                                        <DialogTrigger asChild>
+                                            <Button size="sm">
+                                                <Plus className="mr-2 h-4 w-4" />
+                                                Add Allocation
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent
+                                            aria-describedby={undefined}
+                                        >
+                                            <DialogHeader>
+                                                <DialogTitle>
+                                                    New Allocation
+                                                </DialogTitle>
+                                            </DialogHeader>
+                                            <form
+                                                onSubmit={submitAllocation}
+                                                className="space-y-3"
+                                            >
+                                                <div>
+                                                    <Label htmlFor="alloc-period">
+                                                        Period (YYYY-MM)
+                                                    </Label>
+                                                    <Input
+                                                        id="alloc-period"
+                                                        placeholder="2026-07"
+                                                        pattern="\d{4}-(0[1-9]|1[0-2])"
+                                                        value={
+                                                            allocationForm.data
+                                                                .period_year_month
+                                                        }
+                                                        onChange={(e) =>
+                                                            allocationForm.setData(
+                                                                'period_year_month',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        required
+                                                    />
+                                                    {allocationForm.errors
+                                                        .period_year_month && (
+                                                        <p className="mt-1 text-xs text-status-critical">
+                                                            {
+                                                                allocationForm
+                                                                    .errors
+                                                                    .period_year_month
+                                                            }
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="alloc-line">
+                                                        Budget line (optional)
+                                                    </Label>
+                                                    <Select
+                                                        value={
+                                                            allocationForm.data
+                                                                .budget_line_item_id ||
+                                                            'none'
+                                                        }
+                                                        onValueChange={(v) =>
+                                                            allocationForm.setData(
+                                                                'budget_line_item_id',
+                                                                v === 'none'
+                                                                    ? ''
+                                                                    : v,
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger id="alloc-line">
+                                                            <SelectValue placeholder="No line" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">
+                                                                No line
+                                                            </SelectItem>
+                                                            {(
+                                                                budget.line_items ||
+                                                                []
+                                                            ).map((li) => (
+                                                                <SelectItem
+                                                                    key={li.id}
+                                                                    value={String(
+                                                                        li.id,
+                                                                    )}
+                                                                >
+                                                                    {getCategoryLabel(
+                                                                        li.category,
+                                                                    )}{' '}
+                                                                    —{' '}
+                                                                    {
+                                                                        li.description
+                                                                    }
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <Label htmlFor="alloc-amount">
+                                                            Allocated (NZD)
+                                                        </Label>
+                                                        <Input
+                                                            id="alloc-amount"
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={
+                                                                allocationForm
+                                                                    .data
+                                                                    .allocated_amount
+                                                            }
+                                                            onChange={(e) =>
+                                                                allocationForm.setData(
+                                                                    'allocated_amount',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <Label htmlFor="alloc-forecast">
+                                                            Forecast (optional)
+                                                        </Label>
+                                                        <Input
+                                                            id="alloc-forecast"
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={
+                                                                allocationForm
+                                                                    .data
+                                                                    .forecast_amount
+                                                            }
+                                                            onChange={(e) =>
+                                                                allocationForm.setData(
+                                                                    'forecast_amount',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="alloc-category">
+                                                        Category (optional)
+                                                    </Label>
+                                                    <Input
+                                                        id="alloc-category"
+                                                        placeholder="payroll, rent, utilities..."
+                                                        value={
+                                                            allocationForm.data
+                                                                .category
+                                                        }
+                                                        onChange={(e) =>
+                                                            allocationForm.setData(
+                                                                'category',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="alloc-notes">
+                                                        Notes
+                                                    </Label>
+                                                    <Textarea
+                                                        id="alloc-notes"
+                                                        rows={2}
+                                                        value={
+                                                            allocationForm.data
+                                                                .notes
+                                                        }
+                                                        onChange={(e) =>
+                                                            allocationForm.setData(
+                                                                'notes',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setAllocationDialogOpen(
+                                                                false,
+                                                            )
+                                                        }
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        type="submit"
+                                                        disabled={
+                                                            allocationForm.processing
+                                                        }
+                                                    >
+                                                        {allocationForm.processing
+                                                            ? 'Saving…'
+                                                            : 'Save Allocation'}
+                                                    </Button>
+                                                </div>
+                                            </form>
+                                        </DialogContent>
+                                    </Dialog>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                {(budget.allocations || []).length === 0 ? (
+                                    <p className="py-8 text-center text-muted-foreground">
+                                        No allocations yet. Add allocations to
+                                        link this annual budget to specific
+                                        months and sites.
+                                    </p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b text-left text-xs tracking-wider text-muted-foreground uppercase">
+                                                    <th className="px-3 py-2">
+                                                        Period
+                                                    </th>
+                                                    <th className="px-3 py-2">
+                                                        Budget line
+                                                    </th>
+                                                    <th className="px-3 py-2">
+                                                        Category
+                                                    </th>
+                                                    <th className="px-3 py-2 text-right">
+                                                        Allocated
+                                                    </th>
+                                                    <th className="px-3 py-2 text-right">
+                                                        Actual
+                                                    </th>
+                                                    <th className="px-3 py-2 text-right">
+                                                        Variance
+                                                    </th>
+                                                    <th className="px-3 py-2 text-right">
+                                                        Actions
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {(budget.allocations || []).map(
+                                                    (alloc) => {
+                                                        const variance =
+                                                            (Number(
+                                                                alloc.actual_amount,
+                                                            ) || 0) -
+                                                            Number(
+                                                                alloc.allocated_amount,
+                                                            );
+                                                        return (
+                                                            <tr
+                                                                key={alloc.id}
+                                                                className="border-b"
+                                                            >
+                                                                <td className="px-3 py-2 font-mono">
+                                                                    {
+                                                                        alloc.period_year_month
+                                                                    }
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    {alloc
+                                                                        .budget_line_item
+                                                                        ?.description ?? (
+                                                                        <span className="text-muted-foreground">
+                                                                            —
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-3 py-2">
+                                                                    {alloc.category ??
+                                                                        '—'}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-right font-medium">
+                                                                    {formatCurrency(
+                                                                        Number(
+                                                                            alloc.allocated_amount,
+                                                                        ),
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-right">
+                                                                    {alloc.actual_amount !==
+                                                                    null
+                                                                        ? formatCurrency(
+                                                                              Number(
+                                                                                  alloc.actual_amount,
+                                                                              ),
+                                                                          )
+                                                                        : '—'}
+                                                                </td>
+                                                                <td
+                                                                    className={cn(
+                                                                        'px-3 py-2 text-right',
+                                                                        variance >
+                                                                            0
+                                                                            ? 'text-status-critical'
+                                                                            : variance <
+                                                                                0
+                                                                              ? 'text-status-success'
+                                                                              : 'text-muted-foreground',
+                                                                    )}
+                                                                >
+                                                                    {alloc.actual_amount !==
+                                                                    null
+                                                                        ? formatCurrency(
+                                                                              variance,
+                                                                          )
+                                                                        : '—'}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-right">
+                                                                    {canEdit && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            onClick={() =>
+                                                                                deleteAllocation(
+                                                                                    alloc.id,
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </Button>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    },
+                                                )}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr className="bg-muted/50 font-semibold">
+                                                    <td
+                                                        className="px-3 py-2"
+                                                        colSpan={3}
+                                                    >
+                                                        Total allocated
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right">
+                                                        {formatCurrency(
+                                                            (
+                                                                budget.allocations ||
+                                                                []
+                                                            ).reduce(
+                                                                (s, a) =>
+                                                                    s +
+                                                                    Number(
+                                                                        a.allocated_amount,
+                                                                    ),
+                                                                0,
+                                                            ),
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right">
+                                                        {formatCurrency(
+                                                            (
+                                                                budget.allocations ||
+                                                                []
+                                                            ).reduce(
+                                                                (s, a) =>
+                                                                    s +
+                                                                    (Number(
+                                                                        a.actual_amount,
+                                                                    ) || 0),
+                                                                0,
+                                                            ),
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2 text-right"></td>
+                                                    <td className="px-3 py-2 text-right"></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+
+                {/* Edit Line Item Dialog */}
+                <Dialog
+                    open={editLineItemDialogOpen}
+                    onOpenChange={setEditLineItemDialogOpen}
+                >
+                    <DialogContent
+                        className="max-w-lg"
+                        aria-describedby={undefined}
+                    >
+                        <DialogHeader>
+                            <DialogTitle>Edit Line Item</DialogTitle>
+                        </DialogHeader>
+                        <form
+                            onSubmit={submitEditLineItem}
+                            className="space-y-4"
+                        >
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label>Category</Label>
+                                    <Select
+                                        value={editLineItemForm.data.category}
+                                        onValueChange={(v) =>
+                                            editLineItemForm.setData(
+                                                'category',
+                                                v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(
+                                                categories || {},
+                                            ).map(([key, label]) => (
+                                                <SelectItem
+                                                    key={key}
+                                                    value={key}
+                                                >
+                                                    {label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Account Code</Label>
+                                    <Input
+                                        value={
+                                            editLineItemForm.data.account_code
+                                        }
+                                        onChange={(e) =>
+                                            editLineItemForm.setData(
+                                                'account_code',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <Label>Description</Label>
+                                <Input
+                                    value={editLineItemForm.data.description}
+                                    onChange={(e) =>
+                                        editLineItemForm.setData(
+                                            'description',
+                                            e.target.value,
+                                        )
+                                    }
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <Label>Budget ($)</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={
+                                            editLineItemForm.data.budget_amount
+                                        }
+                                        onChange={(e) =>
+                                            editLineItemForm.setData(
+                                                'budget_amount',
+                                                e.target.value,
+                                            )
+                                        }
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Forecast ($)</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={
+                                            editLineItemForm.data
+                                                .forecast_amount
+                                        }
+                                        onChange={(e) =>
+                                            editLineItemForm.setData(
+                                                'forecast_amount',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Actual ($)</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={
+                                            editLineItemForm.data.actual_amount
+                                        }
+                                        onChange={(e) =>
+                                            editLineItemForm.setData(
+                                                'actual_amount',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <Label>Variance Explanation</Label>
+                                <Textarea
+                                    value={
+                                        editLineItemForm.data
+                                            .variance_explanation
+                                    }
+                                    onChange={(e) =>
+                                        editLineItemForm.setData(
+                                            'variance_explanation',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={2}
+                                    placeholder="Explain any significant variance..."
+                                />
+                            </div>
+                            <div>
+                                <Label>Notes</Label>
+                                <Textarea
+                                    value={editLineItemForm.data.notes}
+                                    onChange={(e) =>
+                                        editLineItemForm.setData(
+                                            'notes',
+                                            e.target.value,
+                                        )
+                                    }
+                                    rows={2}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setEditLineItemDialogOpen(false)
+                                    }
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={editLineItemForm.processing}
+                                >
+                                    {editLineItemForm.processing
+                                        ? 'Saving...'
+                                        : 'Update Line Item'}
+                                </Button>
+                            </div>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+            </PageLayout>
+        </AppLayout>
+    );
 }

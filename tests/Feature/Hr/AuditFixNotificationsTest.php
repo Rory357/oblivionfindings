@@ -17,6 +17,7 @@ use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\Hr\Services\TrainingService;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Notification;
@@ -25,22 +26,25 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     Notification::fake();
 
+    $this->site = Site::factory()->create([
+        'name' => 'Notification Site',
+    ]);
+
     $this->manager = User::factory()->create([
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
+
+    auditFixProfile($this->manager, $this->site);
 });
 
-function auditFixProfile(User $user): HrEmployeeProfile
+function auditFixProfile(User $user, Site $site): HrEmployeeProfile
 {
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-AF-'.$user->id,
         'work_email' => $user->email,
@@ -49,16 +53,18 @@ function auditFixProfile(User $user): HrEmployeeProfile
         'employment_type' => 'full_time',
         'start_date' => now()->subMonth()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $site->id,
     ]);
 }
 
 test('creating a training assignment notifies the assigned employee', function () {
+    auditFixProfile($this->worker, $this->site);
+
     $course = HrCourse::factory()->create([
-        'tenant_id' => 1,
         'title' => 'Medication Competency',
     ]);
 
-    $count = app(TrainingService::class)->createAssignments(1, [
+    $count = app(TrainingService::class)->createAssignments([
         'audience_type' => 'individuals',
         'user_ids' => [$this->worker->id],
         'course_ids' => [$course->id],
@@ -83,10 +89,9 @@ test('creating a training assignment notifies the assigned employee', function (
 });
 
 test('bulk signature requests notify each signer on creation', function () {
-    $profile = auditFixProfile($this->worker);
+    $profile = auditFixProfile($this->worker, $this->site);
 
     $document = HrDocument::query()->create([
-        'tenant_id' => 1,
         'employee_profile_id' => $profile->id,
         'title' => 'Employment Agreement',
         'category' => 'contract',
@@ -119,8 +124,9 @@ test('bulk signature requests notify each signer on creation', function () {
 });
 
 test('declining a leave request sends the real mail notification class with the reason', function () {
+    auditFixProfile($this->worker, $this->site);
+
     $request = HrLeaveRequest::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'leave_type' => 'annual',
         'status' => 'pending',
@@ -145,8 +151,9 @@ test('declining a leave request sends the real mail notification class with the 
 });
 
 test('rejecting an expense claim notifies the claimant and the claim can be resubmitted', function () {
+    auditFixProfile($this->worker, $this->site);
+
     $claim = HrExpenseClaim::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'status' => 'submitted',
         'title' => 'Mileage — client visits',
@@ -184,7 +191,6 @@ test('rejecting an expense claim notifies the claimant and the claim can be resu
 
 test('an approved or paid claim still cannot be submitted', function () {
     $claim = HrExpenseClaim::factory()->create([
-        'tenant_id' => 1,
         'user_id' => $this->worker->id,
         'status' => 'approved',
     ]);
@@ -200,7 +206,6 @@ test('an approved or paid claim still cannot be submitted', function () {
 
 test('completing an induction enrolment auto-completes the linked onboarding task', function () {
     $course = HrCourse::factory()->create([
-        'tenant_id' => 1,
         'title' => 'Health & Safety Induction',
         'code' => 'HS-IND',
         'is_mandatory' => true,
@@ -208,7 +213,6 @@ test('completing an induction enrolment auto-completes the linked onboarding tas
     ]);
 
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'support_worker',
         'site_type' => 'all',
         'is_active' => true,
@@ -223,7 +227,7 @@ test('completing an induction enrolment auto-completes the linked onboarding tas
         ],
     ]);
 
-    $profile = auditFixProfile($this->worker);
+    $profile = auditFixProfile($this->worker, $this->site);
 
     // Generating the checklist auto-enrols the hire (existing cross-loop).
     $checklist = app(OnboardingService::class)->generateChecklist($profile, $this->manager->id);
@@ -246,7 +250,6 @@ test('completing an induction enrolment auto-completes the linked onboarding tas
 
 test('a sign-off induction task is left for manual completion', function () {
     $course = HrCourse::factory()->create([
-        'tenant_id' => 1,
         'title' => 'Safeguarding Induction',
         'code' => 'SG-IND',
         'is_mandatory' => true,
@@ -254,7 +257,6 @@ test('a sign-off induction task is left for manual completion', function () {
     ]);
 
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => 'support_worker',
         'site_type' => 'all',
         'is_active' => true,
@@ -270,7 +272,7 @@ test('a sign-off induction task is left for manual completion', function () {
         ],
     ]);
 
-    $profile = auditFixProfile($this->worker);
+    $profile = auditFixProfile($this->worker, $this->site);
     $checklist = app(OnboardingService::class)->generateChecklist($profile, $this->manager->id);
 
     $enrollment = HrCourseEnrollment::query()

@@ -1,29 +1,47 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
-use App\Models\Role;
 use App\Models\Shift;
 use App\Models\ShiftTask;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Tasks\Providers\ShiftTaskProvider;
 use Database\Seeders\RbacSeeder;
 
-test('shift tasks expose the rostered staff assignee through the canonical shift relation', function () {
+test('shift tasks expose the rostered staff assignee while enforcing canonical Site access', function () {
     $this->seed(RbacSeeder::class);
 
-    $admin = User::factory()->create([
-        'role' => 'admin',
-        'organization_id' => 1,
+    $visibleSite = Site::factory()->create(['name' => 'Visible Roster Site']);
+    $hiddenSite = Site::factory()->create(['name' => 'Hidden Roster Site']);
+    $viewer = User::factory()->create([
+        'role' => 'coordinator',
         'approved_at' => now(),
     ]);
-    $admin->roles()->syncWithoutDetaching([
-        Role::query()->where('name', 'admin')->firstOrFail()->id,
+    $permission = Permission::query()->where('key', 'shifts.manageAny')->firstOrFail();
+    $viewer->permissionOverrides()->syncWithoutDetaching([
+        $permission->id => ['allowed' => true],
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $viewer->id,
+        'position_role' => 'coordinator',
+        'primary_site_id' => $visibleSite->id,
+        'secondary_site_ids' => [],
     ]);
 
-    $worker = User::factory()->create(['organization_id' => 1]);
-    $shift = Shift::factory()->create([
+    $worker = User::factory()->create(['approved_at' => now()]);
+    HrEmployeeProfile::factory()->create([
         'user_id' => $worker->id,
+        'primary_site_id' => $visibleSite->id,
+        'secondary_site_ids' => [],
+    ]);
+    $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
+    $shift = Shift::factory()->create([
+        'site_id' => $visibleSite->id,
+        'client_id' => $visibleClient->id,
+        'user_id' => $worker->id,
+        'created_by' => $viewer->id,
         'starts_at' => now()->addDay(),
         'ends_at' => now()->addDay()->addHours(4),
         'status' => 'scheduled',
@@ -35,27 +53,37 @@ test('shift tasks expose the rostered staff assignee through the canonical shift
         'sort_order' => 1,
     ]);
 
-    $foreignWorker = User::factory()->create(['organization_id' => 2]);
-    $foreignShift = Shift::factory()->create([
-        'organization_id' => 2,
-        'client_id' => Client::factory()->create(['organization_id' => 2])->id,
-        'user_id' => $foreignWorker->id,
-        'created_by' => $foreignWorker->id,
+    $hiddenWorker = User::factory()->create(['approved_at' => now()]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $hiddenWorker->id,
+        'primary_site_id' => $hiddenSite->id,
+        'secondary_site_ids' => [],
+    ]);
+    $hiddenClient = Client::factory()->create(['site_id' => $hiddenSite->id]);
+    $hiddenShift = Shift::factory()->create([
+        'site_id' => $hiddenSite->id,
+        'client_id' => $hiddenClient->id,
+        'user_id' => $hiddenWorker->id,
+        'created_by' => $hiddenWorker->id,
         'starts_at' => now()->addDay(),
         'ends_at' => now()->addDay()->addHours(4),
         'status' => 'scheduled',
     ]);
-    ShiftTask::query()->create([
-        'shift_id' => $foreignShift->id,
-        'label' => 'Foreign tenant task',
+    $hiddenTask = ShiftTask::query()->create([
+        'shift_id' => $hiddenShift->id,
+        'label' => 'Hidden Site task',
         'is_completed' => false,
         'sort_order' => 1,
     ]);
 
-    $tasks = app(ShiftTaskProvider::class)->tasks($admin);
+    $tasks = app(ShiftTaskProvider::class)->tasks($viewer);
+    $directHiddenLookup = app(ShiftTaskProvider::class)->tasks($viewer, [
+        'id' => $hiddenTask->id,
+    ]);
 
     expect($tasks)->toHaveCount(1)
-        ->and(collect($tasks)->pluck('title'))->not->toContain('Foreign tenant task')
+        ->and(collect($tasks)->pluck('title'))->not->toContain('Hidden Site task')
+        ->and($directHiddenLookup)->toBeEmpty()
         ->and($tasks[0]->assignee)->toBe([
             'id' => $worker->id,
             'name' => $worker->name,
@@ -69,7 +97,16 @@ it('renders the rostered worker without loading an undefined shift relationship'
     $worker->permissionOverrides()->syncWithoutDetaching([
         $permission->id => ['allowed' => true],
     ]);
+    $site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $shift = Shift::factory()->create([
+        'site_id' => $site->id,
+        'client_id' => $client->id,
         'user_id' => $worker->id,
         'starts_at' => now()->addHour(),
         'status' => 'scheduled',

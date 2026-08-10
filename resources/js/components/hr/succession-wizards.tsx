@@ -38,6 +38,22 @@ export type SuccessionHolderOption = {
     id: number;
     name: string;
     email?: string | null;
+    site_ids: number[];
+};
+
+export type SuccessionSiteOption = {
+    id: number;
+    name: string;
+};
+
+export type SuccessionPlanPrefill = {
+    site_id: number;
+    source_review_id: number;
+    candidate: {
+        employee_profile_id: number;
+        name: string;
+        readiness: string;
+    };
 };
 
 export type ExistingSuccessionPlan = {
@@ -45,6 +61,7 @@ export type ExistingSuccessionPlan = {
     role_title: string;
     department: string | null;
     risk_level: string;
+    site: SuccessionSiteOption;
     current_holder: { id: number; name: string } | null;
     position: { id: number; title: string } | null;
     notes: string | null;
@@ -55,8 +72,18 @@ const NONE = 'none';
 
 const STEPS: readonly WizardStep[] = [
     { key: 'role', label: 'Role', blurb: 'Title & seat', icon: Briefcase },
-    { key: 'risk', label: 'Risk & holder', blurb: 'Exposure & incumbent', icon: ShieldAlert },
-    { key: 'review', label: 'Review', blurb: 'Confirm & save', icon: CheckCircle2 },
+    {
+        key: 'risk',
+        label: 'Risk & holder',
+        blurb: 'Exposure & incumbent',
+        icon: ShieldAlert,
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        blurb: 'Confirm & save',
+        icon: CheckCircle2,
+    },
 ];
 
 const RISK_OPTIONS: { value: string; label: string }[] = [
@@ -84,11 +111,15 @@ export function SuccessionPlanWizard({
     onClose,
     positions,
     holders,
+    sites,
+    prefill,
     plan,
 }: {
     onClose: () => void;
     positions: SuccessionPositionOption[];
     holders: SuccessionHolderOption[];
+    sites: SuccessionSiteOption[];
+    prefill?: SuccessionPlanPrefill | null;
     plan?: ExistingSuccessionPlan | null;
 }) {
     const isEdit = !!plan;
@@ -96,6 +127,11 @@ export function SuccessionPlanWizard({
     const [done, setDone] = useState(false);
 
     const form = useForm({
+        site_id: plan
+            ? String(plan.site.id)
+            : prefill
+              ? String(prefill.site_id)
+              : '',
         role_title: plan?.role_title ?? '',
         department: plan?.department ?? '',
         risk_level: plan?.risk_level ?? 'medium',
@@ -104,11 +140,25 @@ export function SuccessionPlanWizard({
             ? String(plan.current_holder.id)
             : NONE,
         notes: plan?.notes ?? '',
+        candidates: prefill
+            ? [
+                  {
+                      employee_profile_id:
+                          prefill.candidate.employee_profile_id,
+                      readiness: prefill.candidate.readiness,
+                  },
+              ]
+            : [],
+        source_review_id: prefill?.source_review_id ?? null,
     });
 
+    const selectedSiteId = Number(form.data.site_id);
+    const availableHolders = holders.filter((holder) =>
+        holder.site_ids.includes(selectedSiteId),
+    );
     const people: PersonOption[] = [
         { value: NONE, label: 'Vacant — no current holder' },
-        ...holders.map((h) => ({
+        ...availableHolders.map((h) => ({
             value: String(h.id),
             label: h.name,
             sub: h.email ?? undefined,
@@ -118,8 +168,28 @@ export function SuccessionPlanWizard({
     const pickedPosition =
         positions.find((p) => String(p.id) === form.data.position_id) ?? null;
     const pickedHolder =
-        holders.find((h) => String(h.id) === form.data.current_holder_user_id) ??
-        null;
+        holders.find(
+            (h) => String(h.id) === form.data.current_holder_user_id,
+        ) ?? null;
+    const pickedSite = sites.find((site) => site.id === selectedSiteId) ?? null;
+
+    const pickSite = (value: string) => {
+        const nextSiteId = Number(value);
+        form.setData((data) => ({
+            ...data,
+            site_id: value,
+            current_holder_user_id:
+                data.current_holder_user_id === NONE ||
+                holders
+                    .find(
+                        (holder) =>
+                            String(holder.id) === data.current_holder_user_id,
+                    )
+                    ?.site_ids.includes(nextSiteId)
+                    ? data.current_holder_user_id
+                    : NONE,
+        }));
+    };
 
     const pickPosition = (v: string) => {
         const pos = positions.find((p) => String(p.id) === v) ?? null;
@@ -134,7 +204,8 @@ export function SuccessionPlanWizard({
         }));
     };
 
-    const roleValid = form.data.role_title.trim() !== '';
+    const roleValid =
+        form.data.site_id !== '' && form.data.role_title.trim() !== '';
 
     const submit = () => {
         form.transform((d) => ({
@@ -149,9 +220,8 @@ export function SuccessionPlanWizard({
         const opts = {
             preserveScroll: true,
             onSuccess: (page: unknown) => {
-                const err = (
-                    page as { props?: { flash?: { error?: string } } }
-                ).props?.flash?.error;
+                const err = (page as { props?: { flash?: { error?: string } } })
+                    .props?.flash?.error;
                 if (err) {
                     toast.error(err);
                     return;
@@ -165,12 +235,21 @@ export function SuccessionPlanWizard({
                 fireConfetti();
             },
             onError: (errors: Record<string, string>) => {
-                if (errors.role_title || errors.department || errors.position_id) {
+                if (
+                    errors.site_id ||
+                    errors.role_title ||
+                    errors.department ||
+                    errors.position_id
+                ) {
                     wizard.goTo(0);
                 } else if (
                     errors.risk_level ||
                     errors.current_holder_user_id ||
-                    errors.notes
+                    errors.notes ||
+                    errors.source_review_id ||
+                    Object.keys(errors).some((key) =>
+                        key.startsWith('candidates.'),
+                    )
                 ) {
                     wizard.goTo(1);
                 }
@@ -207,9 +286,9 @@ export function SuccessionPlanWizard({
                         title="Succession plan created"
                         blurb={
                             <>
-                                “{form.data.role_title}” is now on the succession
-                                board. Open it to add candidates and readiness
-                                assessments.
+                                “{form.data.role_title}” is now on the
+                                succession board. Open it to add candidates and
+                                readiness assessments.
                             </>
                         }
                         actions={<Button onClick={onClose}>Done</Button>}
@@ -258,6 +337,31 @@ export function SuccessionPlanWizard({
                         blurb="The key role you need succession cover for — link an establishment seat where one exists."
                     />
                     <div className="grid gap-3.5 sm:grid-cols-2">
+                        <Field
+                            label="Site"
+                            required
+                            error={form.errors.site_id}
+                            span
+                        >
+                            {isEdit || prefill ? (
+                                <Input
+                                    value={
+                                        pickedSite?.name ?? 'Unavailable Site'
+                                    }
+                                    disabled
+                                />
+                            ) : (
+                                <SelectInput
+                                    value={form.data.site_id}
+                                    onChange={pickSite}
+                                    placeholder="Choose the Site this plan covers…"
+                                    options={sites.map((site) => ({
+                                        value: String(site.id),
+                                        label: site.name,
+                                    }))}
+                                />
+                            )}
+                        </Field>
                         {positions.length > 0 ? (
                             <Field
                                 label="Establishment seat"
@@ -270,7 +374,10 @@ export function SuccessionPlanWizard({
                                     onChange={pickPosition}
                                     placeholder="Link a position…"
                                     options={[
-                                        { value: NONE, label: 'No linked position' },
+                                        {
+                                            value: NONE,
+                                            label: 'No linked position',
+                                        },
                                         ...positions.map((p) => ({
                                             value: String(p.id),
                                             label: p.department
@@ -319,7 +426,11 @@ export function SuccessionPlanWizard({
                         blurb="How exposed is the organisation if this role empties out, and who holds it today?"
                     />
                     <div className="space-y-4">
-                        <Field label="Risk level" required error={form.errors.risk_level}>
+                        <Field
+                            label="Risk level"
+                            required
+                            error={form.errors.risk_level}
+                        >
                             <Segmented
                                 value={form.data.risk_level}
                                 onChange={(v) => form.setData('risk_level', v)}
@@ -340,7 +451,11 @@ export function SuccessionPlanWizard({
                                 placeholder="Vacant — no current holder"
                             />
                         </Field>
-                        <Field label="Notes" hint="optional" error={form.errors.notes}>
+                        <Field
+                            label="Notes"
+                            hint="optional"
+                            error={form.errors.notes}
+                        >
                             <Textarea
                                 rows={3}
                                 value={form.data.notes}
@@ -367,7 +482,11 @@ export function SuccessionPlanWizard({
                             title="Role"
                             onEdit={() => wizard.goTo(0)}
                         >
-                            <ReviewRow label="Title" value={form.data.role_title} />
+                            <ReviewRow label="Site" value={pickedSite?.name} />
+                            <ReviewRow
+                                label="Title"
+                                value={form.data.role_title}
+                            />
                             <ReviewRow
                                 label="Department"
                                 value={form.data.department || undefined}
@@ -393,6 +512,12 @@ export function SuccessionPlanWizard({
                                 label="Holder"
                                 value={pickedHolder?.name ?? 'Vacant'}
                             />
+                            {prefill ? (
+                                <ReviewRow
+                                    label="Initial candidate"
+                                    value={`${prefill.candidate.name} · from signed-off review #${prefill.source_review_id}`}
+                                />
+                            ) : null}
                             <ReviewRow
                                 label="Notes"
                                 value={form.data.notes || undefined}

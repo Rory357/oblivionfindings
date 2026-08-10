@@ -2,20 +2,18 @@
 
 namespace App\Domain\Hr\Services;
 
-use App\Domain\Hr\Models\HrApplication;
-use App\Domain\Hr\Models\HrCandidate;
-use App\Domain\Hr\Models\HrOffer;
 use Illuminate\Support\Facades\DB;
 
 class RecruitmentAnalyticsService
 {
-    public function getTimeToHire(?int $tenantId, int $months = 12): array
+    /** @param list<int> $applicationIds */
+    public function getTimeToHire(array $applicationIds, int $months = 12): array
     {
         $since = now()->subMonths($months)->startOfMonth();
 
         $results = DB::table('hr_offers')
             ->join('hr_applications', 'hr_offers.application_id', '=', 'hr_applications.id')
-            ->when($tenantId !== null, fn ($q) => $q->where('hr_applications.tenant_id', $tenantId))
+            ->whereIn('hr_applications.id', $applicationIds)
             ->where('hr_offers.created_at', '>=', $since)
             ->whereNotNull('hr_offers.created_at')
             ->selectRaw("
@@ -34,10 +32,11 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    public function getSourceEffectiveness(?int $tenantId, ?string $from = null, ?string $to = null): array
+    /** @param list<int> $candidateIds */
+    public function getSourceEffectiveness(array $candidateIds, ?string $from = null, ?string $to = null): array
     {
         $results = DB::table('hr_candidates')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $candidateIds)
             ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
             ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
             ->selectRaw("
@@ -59,12 +58,13 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    public function getPipelineConversion(?int $tenantId, ?string $from = null, ?string $to = null): array
+    /** @param list<int> $candidateIds */
+    public function getPipelineConversion(array $candidateIds, ?string $from = null, ?string $to = null): array
     {
         $stages = RecruitmentService::STAGES;
 
         $counts = DB::table('hr_candidates')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $candidateIds)
             ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
             ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
             ->selectRaw('status, COUNT(*) as count')
@@ -102,21 +102,22 @@ class RecruitmentAnalyticsService
      * created-at date window. COALESCE keeps legacy applications without a linked
      * requisition visible under their stored title.
      */
-    public function getOpenPositionsSummary(?int $tenantId, ?string $from = null, ?string $to = null): array
+    /** @param list<int> $applicationIds */
+    public function getOpenPositionsSummary(array $applicationIds, ?string $from = null, ?string $to = null): array
     {
         $results = DB::table('hr_applications')
             ->leftJoin('hr_job_requisitions as r', 'r.id', '=', 'hr_applications.requisition_id')
-            ->when($tenantId !== null, fn ($q) => $q->where('hr_applications.tenant_id', $tenantId))
+            ->whereIn('hr_applications.id', $applicationIds)
             ->whereNotIn('hr_applications.status', ['rejected', 'withdrawn'])
             ->when($from, fn ($q) => $q->where('hr_applications.created_at', '>=', $from))
             ->when($to, fn ($q) => $q->where('hr_applications.created_at', '<=', $to))
-            ->selectRaw("
+            ->selectRaw('
                 hr_applications.requisition_id,
                 COALESCE(r.title, hr_applications.position_title) as title,
                 COUNT(*) as applications,
                 MIN(hr_applications.created_at) as first_application,
                 DATEDIFF(NOW(), MIN(hr_applications.created_at)) as days_open
-            ")
+            ')
             // Group by the raw columns inside COALESCE (not the alias) so MySQL's
             // ONLY_FULL_GROUP_BY is satisfied — grouping by the alias leaves
             // position_title non-functionally-dependent and 500s the page.
@@ -133,13 +134,14 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    public function getHiringVelocity(?int $tenantId, int $months = 12): array
+    /** @param list<int> $applicationIds */
+    public function getHiringVelocity(array $applicationIds, int $months = 12): array
     {
         $since = now()->subMonths($months)->startOfMonth();
 
         $results = DB::table('hr_offers')
             ->join('hr_applications', 'hr_offers.application_id', '=', 'hr_applications.id')
-            ->when($tenantId !== null, fn ($q) => $q->where('hr_applications.tenant_id', $tenantId))
+            ->whereIn('hr_applications.id', $applicationIds)
             ->where('hr_offers.response', 'accepted')
             ->where('hr_offers.response_at', '>=', $since)
             ->selectRaw("
@@ -156,17 +158,18 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    public function getStageBottlenecks(?int $tenantId): array
+    /** @param list<int> $candidateIds */
+    public function getStageBottlenecks(array $candidateIds): array
     {
         $results = DB::table('hr_candidates')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $candidateIds)
             ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
             ->whereNotNull('current_stage_entered_at')
-            ->selectRaw("
+            ->selectRaw('
                 status,
                 AVG(DATEDIFF(NOW(), current_stage_entered_at)) as avg_days,
                 COUNT(*) as count
-            ")
+            ')
             ->groupBy('status')
             ->orderByDesc('avg_days')
             ->get();
@@ -178,12 +181,13 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    public function getMonthlyApplicationTrend(?int $tenantId, int $months = 12): array
+    /** @param list<int> $candidateIds */
+    public function getMonthlyApplicationTrend(array $candidateIds, int $months = 12): array
     {
         $since = now()->subMonths($months)->startOfMonth();
 
         $results = DB::table('hr_candidates')
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereIn('id', $candidateIds)
             ->where('created_at', '>=', $since)
             ->selectRaw("
                 DATE_FORMAT(created_at, '%Y-%m') as month,

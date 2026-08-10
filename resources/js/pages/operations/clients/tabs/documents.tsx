@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import {
@@ -380,10 +380,7 @@ export function DocumentsTab({
                             <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                 {folder}
                             </span>
-                            <Badge
-                                variant="secondary"
-                                className="text-[10px]"
-                            >
+                            <Badge variant="secondary" className="text-[10px]">
                                 {docs.length}
                             </Badge>
                         </div>
@@ -411,7 +408,10 @@ export function DocumentsTab({
                                             )}
                                         >
                                             <Icon
-                                                className={cn('h-6 w-6', fi.color)}
+                                                className={cn(
+                                                    'h-6 w-6',
+                                                    fi.color,
+                                                )}
                                             />
                                         </div>
                                         <p className="line-clamp-2 text-xs leading-tight font-medium">

@@ -5,15 +5,24 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Site;
-use App\Models\SiteInspectionSchedule;
-use App\Models\SiteInspectionRecord;
 use App\Models\SiteCalendarEvent;
+use App\Models\SiteInspectionRecord;
+use App\Models\SiteInspectionSchedule;
 use App\Services\Facility\FacilitySignalService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SiteInspectionController extends Controller
 {
     use ResolvesAllowedSiteTypes;
+
+    private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     public function index(Request $request, Site $site)
     {
         $this->authorize('view', $site);
@@ -57,7 +66,6 @@ class SiteInspectionController extends Controller
         $schedule = SiteInspectionSchedule::create([
             ...$validated,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'next_due_date' => $validated['first_due_date'],
             'is_active' => true,
         ]);
@@ -65,9 +73,8 @@ class SiteInspectionController extends Controller
         // Create calendar event if requested
         if ($validated['auto_create_calendar_event'] ?? true) {
             SiteCalendarEvent::create([
-            'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
-            'event_type' => 'inspection',
+                'site_id' => $site->id,
+                'event_type' => 'inspection',
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? 'Scheduled inspection',
                 'start_at' => $validated['first_due_date'] . ' 09:00:00',
@@ -94,13 +101,18 @@ class SiteInspectionController extends Controller
             'findings' => 'nullable|string',
             'corrective_actions' => 'nullable|string',
             'evidence_photos' => 'nullable|array',
-            'linked_hazard_id' => 'nullable|exists:site_hazards,id',
+            'linked_hazard_id' => [
+                'nullable',
+                Rule::exists('site_hazards', 'id')
+                    ->where(fn ($query) => $query
+                        ->where('site_id', $site->id)
+                        ->whereNull('deleted_at')),
+            ],
         ]);
 
         $record = SiteInspectionRecord::create([
             'schedule_id' => $schedule->id,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'due_date' => $schedule->next_due_date,
             'completed_at' => now(),
             'completed_by_user_id' => $request->user()->id,
@@ -141,11 +153,24 @@ class SiteInspectionController extends Controller
     public function globalIndex(Request $request)
     {
         abort_unless($request->user()?->canDo('checklists.view'), 403);
+        $this->authorize('viewAny', Site::class);
 
         $allowedSiteTypes = $this->allowedSiteTypes($request);
+        if ($request->filled('site_id')) {
+            $this->siteAccess->assertCanAccessSiteId(
+                $request->user(),
+                (int) $request->query('site_id'),
+                self::SITE_BYPASS_PERMISSIONS,
+            );
+        }
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
 
         $schedules = SiteInspectionSchedule::query()
             ->with(['site:id,name,type', 'assignedTo:id,name'])
+            ->whereIn('site_id', $accessibleSiteIds)
             ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
             ->when($request->inspection_type, fn ($q) => $q->where('inspection_type', $request->inspection_type))
@@ -172,6 +197,7 @@ class SiteInspectionController extends Controller
 
         $records = SiteInspectionRecord::query()
             ->with(['site:id,name,type', 'completedBy:id,name', 'schedule:id,title'])
+            ->whereIn('site_id', $accessibleSiteIds)
             ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
             ->when($request->result, fn ($q) => $q->where('result', $request->result))
@@ -197,10 +223,15 @@ class SiteInspectionController extends Controller
             ->active()
             ->whereIn('type', $allowedSiteTypes)
             ->select(['id', 'name', 'type'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+        $this->siteAccess->applySiteScope(
+            $sites,
+            $request->user(),
+            self::SITE_BYPASS_PERMISSIONS,
+        );
 
         $inspectionTypes = SiteInspectionSchedule::query()
+            ->whereIn('site_id', $accessibleSiteIds)
             ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             ->select('inspection_type')
             ->distinct()
@@ -211,7 +242,7 @@ class SiteInspectionController extends Controller
         return inertia('sites/inspections/global', [
             'schedules' => $schedules,
             'records' => $records,
-            'sites' => $sites,
+            'sites' => $sites->get(),
             'inspectionTypes' => $inspectionTypes,
             'filters' => $request->only(['site_id', 'inspection_type', 'status', 'due_state', 'result']),
         ]);

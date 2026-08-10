@@ -1,5 +1,5 @@
-import 'react';
 import '@inertiajs/core';
+import 'react';
 
 declare module 'react' {
     interface HTMLAttributes<T> {
@@ -14,7 +14,8 @@ declare module 'react' {
 declare module '@inertiajs/core' {
     interface Router {
         reload<T extends RequestPayload = RequestPayload>(
-            options?: ReloadOptions<T> & Pick<VisitOptions<T>, 'preserveScroll'>,
+            options?: ReloadOptions<T> &
+                Pick<VisitOptions<T>, 'preserveScroll'>,
         ): void;
     }
 }

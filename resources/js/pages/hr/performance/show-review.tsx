@@ -1,6 +1,3 @@
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EvidenceAttachment } from '@/components/hr/performance/evidence-attachment';
 import { PerformanceSatelliteHero } from '@/components/hr/performance/performance-hero';
 import {
@@ -10,8 +7,11 @@ import {
     type WizardSupport,
 } from '@/components/hr/performance/performance-wizards';
 import { PageLayout } from '@/components/page';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Award,
     Calendar,
@@ -67,9 +67,7 @@ type ReviewGoal = {
 
 type NextSteps = {
     action: 'pip' | 'succession';
-    employee_profile_id?: number;
     staff: Opt[];
-    successionEmployees?: Opt[];
 };
 
 type Props = {
@@ -86,7 +84,12 @@ const GOAL_STATUS_STYLE: Record<string, string> = {
     missed: 'bg-status-critical-bg text-status-critical',
 };
 
-export default function ShowReview({ review, reviewGoals = [], nextSteps = null, can }: Props) {
+export default function ShowReview({
+    review,
+    reviewGoals = [],
+    nextSteps = null,
+    can,
+}: Props) {
     const [wizard, setWizard] = useState<WizardState | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -172,7 +175,6 @@ export default function ShowReview({ review, reviewGoals = [], nextSteps = null,
         sessionTypes: [],
         reviewTypes: [],
         competencyOptions: [],
-        successionEmployees: nextSteps?.successionEmployees ?? [],
     };
 
     const openNextStep = () => {
@@ -189,14 +191,9 @@ export default function ShowReview({ review, reviewGoals = [], nextSteps = null,
                 },
             });
         } else {
-            setWizard({
-                kind: 'succession',
-                context: {
-                    reviewId: review.id,
-                    prefill: nextSteps.employee_profile_id
-                        ? { candidates: [nextSteps.employee_profile_id] }
-                        : {},
-                },
+            router.get('/hr/succession', {
+                new: 1,
+                source_review_id: review.id,
             });
         }
     };

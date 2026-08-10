@@ -2,19 +2,23 @@
 
 namespace App\Http\Controllers\System;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Enums\NextOfKinRelationship;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\NextOfKin;
 use App\Models\Role;
-use App\Models\Staff;
 use App\Models\User;
 use App\Models\UserLoginLog;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class UsersController extends Controller
@@ -35,7 +39,12 @@ class UsersController extends Controller
         $activity = $request->query('activity', 'all'); // all, today, week, inactive
 
         $query = User::query()
-            ->with(['roles:id,name,label,level', 'staffProfile:id,user_id,job_title,status'])
+            ->with([
+                'roles:id,name,label,level',
+                'hrEmployeeProfile' => function (Relation $profileRelation) use ($user): void {
+                    $this->scopeCurrentEmployeeProfiles($profileRelation->getQuery(), $user);
+                },
+            ])
             ->when($search, fn ($q) => $q
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
@@ -59,7 +68,7 @@ class UsersController extends Controller
         // User Type filter
         switch ($typeFilter) {
             case 'staff':
-                $query->whereHas('staffProfile');
+                $query->whereIn('users.id', $this->currentEmployeeProfiles($user)->select('user_id'));
                 break;
             case 'client':
                 $query->whereHas('client');
@@ -111,10 +120,7 @@ class UsersController extends Controller
                     'level' => $r->level,
                 ]),
                 'user_type' => $this->getUserType($user),
-                'staff_profile' => $user->staffProfile ? [
-                    'job_title' => $user->staffProfile->job_title,
-                    'status' => $user->staffProfile->status,
-                ] : null,
+                'staff_profile' => $this->serializeEmployeeProfile($user->hrEmployeeProfile),
                 'last_login_at' => $user->last_login_at,
                 'last_login_ip' => $user->last_login_ip,
                 'login_count' => $user->login_count ?? 0,
@@ -140,7 +146,7 @@ class UsersController extends Controller
                 'total' => User::count(),
                 'active' => User::whereNotNull('approved_at')->count(),
                 'pending' => User::whereNull('approved_at')->count(),
-                'staff' => Staff::distinct('user_id')->count(),
+                'staff' => $this->currentEmployeeProfiles($user)->count(),
             ],
         ]);
     }
@@ -168,9 +174,11 @@ class UsersController extends Controller
             'clients' => $clients,
             'roles' => $roles,
             'can' => [
-                'createStaff' => $user->canDo('staff.create'),
+                'createStaff' => false,
                 'createClient' => $user->canDo('clients.create'),
+                'manageEmployees' => $user->canDo('hr.employees.manage'),
             ],
+            'staffLifecycleHref' => route('hr.people.index', absolute: false),
         ]);
     }
 
@@ -182,6 +190,14 @@ class UsersController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('settings.access.manage'), 403);
 
+        if ($request->input('user_type') === 'staff') {
+            throw ValidationException::withMessages([
+                'user_type' => 'Create staff in HR People so their Site, employee number, employment dates, and role provenance are recorded together.',
+            ]);
+        }
+
+        abort_unless($user->canDo('clients.create'), 403);
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
@@ -189,10 +205,6 @@ class UsersController extends Controller
             'user_type' => ['required', 'in:staff,client,next_of_kin'],
             'role_ids' => ['array'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
-            // Staff specific
-            'staff.job_title' => ['required_if:user_type,staff', 'nullable', 'string'],
-            'staff.department' => ['nullable', 'string'],
-            'staff.employee_id' => ['nullable', 'string', Rule::unique('staff', 'employee_id')],
             // Client specific
             'client.nhi_number' => ['required_if:user_type,client', 'nullable', 'string', Rule::unique('clients', 'nhi_number')],
             'client.first_name' => ['required_if:user_type,client', 'nullable', 'string'],
@@ -205,49 +217,28 @@ class UsersController extends Controller
             'next_of_kin.is_emergency_contact' => ['boolean'],
         ]);
 
-        // Create user
-        $newUser = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'approved_at' => now(),
-            'approved_by' => $user->id,
-        ]);
+        DB::transaction(function () use ($data, $user): void {
+            $newUser = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'approved_at' => now(),
+                'approved_by' => $user->id,
+            ]);
 
-        // Assign roles
-        if (! empty($data['role_ids'])) {
-            $newUser->roles()->sync($data['role_ids']);
-            $primaryRole = $newUser->roles()->orderByDesc('level')->first();
-            $newUser->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
-        } elseif ($data['user_type'] === 'staff') {
-            // Default role for staff is support_worker
-            $supportWorkerRole = Role::where('name', 'support_worker')->first();
-            if ($supportWorkerRole) {
-                $newUser->roles()->sync([$supportWorkerRole->id]);
-                $newUser->forceFill(['role' => 'support_worker'])->save();
+            if (! empty($data['role_ids'])) {
+                $newUser->roles()->sync($data['role_ids']);
+                $primaryRole = $newUser->roles()->orderByDesc('level')->first();
+                $newUser->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
+            } elseif ($data['user_type'] === 'next_of_kin') {
+                $nokRole = Role::where('name', 'next_of_kin')->first();
+                if ($nokRole) {
+                    $newUser->roles()->sync([$nokRole->id]);
+                    $newUser->forceFill(['role' => 'next_of_kin'])->save();
+                }
             }
-        } elseif ($data['user_type'] === 'next_of_kin') {
-            // Default role for next of kin
-            $nokRole = Role::where('name', 'next_of_kin')->first();
-            if ($nokRole) {
-                $newUser->roles()->sync([$nokRole->id]);
-                $newUser->forceFill(['role' => 'next_of_kin'])->save();
-            }
-        }
 
-        // Create entity record based on type
-        switch ($data['user_type']) {
-            case 'staff':
-                Staff::create([
-                    'user_id' => $newUser->id,
-                    'employee_id' => $data['staff']['employee_id'] ?? null,
-                    'job_title' => $data['staff']['job_title'] ?? null,
-                    'department' => $data['staff']['department'] ?? null,
-                    'status' => 'active',
-                ]);
-                break;
-
-            case 'client':
+            if ($data['user_type'] === 'client') {
                 Client::create([
                     'user_id' => $newUser->id,
                     'nhi_number' => $data['client']['nhi_number'] ?? null,
@@ -257,9 +248,7 @@ class UsersController extends Controller
                     'email' => $data['email'],
                     'status' => 'active',
                 ]);
-                break;
-
-            case 'next_of_kin':
+            } else {
                 NextOfKin::create([
                     'user_id' => $newUser->id,
                     'client_id' => $data['next_of_kin']['client_id'] ?? null,
@@ -267,14 +256,15 @@ class UsersController extends Controller
                     'is_primary_contact' => $data['next_of_kin']['is_primary_contact'] ?? false,
                     'is_emergency_contact' => $data['next_of_kin']['is_emergency_contact'] ?? true,
                 ]);
-                break;
-        }
+            }
 
-        AuditLogger::log('user.created', $newUser, [
-            'created_by' => $user->id,
-            'user_type' => $data['user_type'],
-            'role_ids' => $data['role_ids'] ?? [],
-        ]);
+            AuditLogger::log('user.created', $newUser, [
+                'created_by' => $user->id,
+                'user_type' => $data['user_type'],
+                'role_ids' => $data['role_ids'] ?? [],
+            ]);
+
+        });
 
         return redirect()->route('system.users.index')
             ->with('success', 'User created successfully.');
@@ -288,7 +278,12 @@ class UsersController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('settings.access.manage'), 403);
 
-        $target->load(['roles.permissions', 'staffProfile']);
+        $target->load([
+            'roles.permissions',
+            'hrEmployeeProfile' => function (Relation $profileRelation) use ($user): void {
+                $this->scopeCurrentEmployeeProfiles($profileRelation->getQuery(), $user);
+            },
+        ]);
 
         $allRoles = Role::query()->orderBy('label')->get(['id', 'name', 'label']);
 
@@ -303,7 +298,7 @@ class UsersController extends Controller
                 'created_at' => $target->created_at,
                 'roles' => $target->roles,
                 'user_type' => $this->getUserType($target),
-                'staff_profile' => $target->staffProfile,
+                'staff_profile' => $this->serializeEmployeeProfile($target->hrEmployeeProfile, detailed: true),
                 'last_login_at' => $target->last_login_at,
                 'last_login_ip' => $target->last_login_ip,
                 'login_count' => $target->login_count ?? 0,
@@ -344,6 +339,7 @@ class UsersController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('settings.access.manage'), 403);
+        $employeeProfile = $this->accessibleEmployeeProfileOrFail($target, $user);
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
@@ -352,16 +348,25 @@ class UsersController extends Controller
             'role_ids.*' => ['integer', 'exists:roles,id'],
         ]);
 
-        $target->update([
-            'name' => $data['name'] ?? $target->name,
-            'email' => $data['email'] ?? $target->email,
-        ]);
+        DB::transaction(function () use ($data, $employeeProfile, $target, $user): void {
+            $target->update([
+                'name' => $data['name'] ?? $target->name,
+                'email' => $data['email'] ?? $target->email,
+            ]);
 
-        if (isset($data['role_ids'])) {
-            $target->roles()->sync($data['role_ids']);
-            $primaryRole = $target->roles()->orderByDesc('level')->first();
-            $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
-        }
+            if ($employeeProfile && array_key_exists('email', $data)) {
+                $employeeProfile->forceFill([
+                    'work_email' => $target->email,
+                    'updated_by' => $user->id,
+                ])->save();
+            }
+
+            if (isset($data['role_ids'])) {
+                $target->roles()->sync($data['role_ids']);
+                $primaryRole = $target->roles()->orderByDesc('level')->first();
+                $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
+            }
+        });
 
         AuditLogger::log('user.updated', $target, [
             'changed_by' => $user->id,
@@ -383,9 +388,10 @@ class UsersController extends Controller
         // Cannot delete self
         abort_if($user->id === $target->id, 403, 'You cannot delete your own account.');
 
-        // Soft delete related records first
-        if ($target->staffProfile) {
-            $target->staffProfile->delete();
+        if ($this->accessibleEmployeeProfileOrFail($target, $user)) {
+            throw ValidationException::withMessages([
+                'user' => 'Staff accounts must be offboarded in HR People so employment history and Site provenance are retained.',
+            ]);
         }
 
         AuditLogger::log('user.deleted', $target, [
@@ -440,13 +446,9 @@ class UsersController extends Controller
         abort_unless($user && $user->canDo('settings.access.manage'), 403);
 
         abort_if($user->id === $target->id, 403, 'You cannot suspend your own account.');
+        $this->accessibleEmployeeProfileOrFail($target, $user);
 
         $target->update(['approved_at' => null]);
-
-        // Also update staff status if applicable
-        if ($target->staffProfile) {
-            $target->staffProfile->update(['status' => 'suspended']);
-        }
 
         AuditLogger::log('user.suspended', $target, [
             'suspended_by' => $user->id,
@@ -550,7 +552,7 @@ class UsersController extends Controller
      */
     private function getUserType(User $user): string
     {
-        if ($user->staffProfile) {
+        if ($user->hrEmployeeProfile) {
             return 'staff';
         }
 
@@ -572,5 +574,56 @@ class UsersController extends Controller
         }
 
         return 'user';
+    }
+
+    private function currentEmployeeProfiles(User $viewer): Builder
+    {
+        return $this->scopeCurrentEmployeeProfiles(HrEmployeeProfile::query(), $viewer);
+    }
+
+    private function scopeCurrentEmployeeProfiles(Builder $query, User $viewer): Builder
+    {
+        return app(UserSiteAccessService::class)->applyCurrentStaffProfileScope(
+            $query,
+            $viewer,
+            ['sites.viewAll'],
+        );
+    }
+
+    private function accessibleEmployeeProfileOrFail(User $target, User $viewer): ?HrEmployeeProfile
+    {
+        if (! HrEmployeeProfile::withTrashed()->where('user_id', $target->id)->exists()) {
+            return null;
+        }
+
+        return $this->currentEmployeeProfiles($viewer)
+            ->where('user_id', $target->id)
+            ->firstOrFail();
+    }
+
+    /** @return array<string, mixed>|null */
+    private function serializeEmployeeProfile(?HrEmployeeProfile $profile, bool $detailed = false): ?array
+    {
+        if (! $profile) {
+            return null;
+        }
+
+        $serialized = [
+            'job_title' => $profile->position_title,
+            'status' => $profile->is_active ? 'active' : 'inactive',
+        ];
+
+        if (! $detailed) {
+            return $serialized;
+        }
+
+        return [
+            ...$serialized,
+            'id' => $profile->id,
+            'employee_id' => $profile->employee_number,
+            'department' => $profile->department,
+            'hire_date' => $profile->start_date?->toDateString(),
+            'work_phone' => $profile->work_phone,
+        ];
     }
 }

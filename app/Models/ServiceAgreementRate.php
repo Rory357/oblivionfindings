@@ -2,15 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ServiceAgreementRate extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyOrganizationStorageContext;
 
     protected $fillable = [
-        'organization_id',
         'service_agreement_id',
         'rate_type',
         'rate',

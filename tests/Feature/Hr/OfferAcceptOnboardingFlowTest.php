@@ -23,13 +23,21 @@ beforeEach(function () {
         Role::query()->where('name', 'hr')->first()->id,
     ]);
 
-    $this->site = Site::factory()->create(['tenant_id' => 1, 'type' => 'house']);
+    $this->site = Site::factory()->create(['type' => 'house']);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'position_role' => 'hr',
+        'is_active' => true,
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+    ]);
 });
 
 function seedOnboardingTemplate(int $hrId, string $role = 'support_worker'): void
 {
     HrOnboardingTemplate::query()->create([
-        'tenant_id' => 1,
         'role' => $role,
         'site_type' => 'all',
         'tasks' => [
@@ -43,7 +51,6 @@ function seedOnboardingTemplate(int $hrId, string $role = 'support_worker'): voi
 function makeSentOffer(User $hr, Site $site, string $email, string $role = 'support_worker'): HrOffer
 {
     $candidate = HrCandidate::factory()->create([
-        'tenant_id' => 1,
         'personal_email' => $email,
         'source' => 'direct',
         'status' => 'offer_sent',
@@ -51,7 +58,6 @@ function makeSentOffer(User $hr, Site $site, string $email, string $role = 'supp
     ]);
 
     $application = HrApplication::factory()->create([
-        'tenant_id' => 1,
         'candidate_id' => $candidate->id,
         'position_title' => 'Support Worker',
         'position_role' => $role,

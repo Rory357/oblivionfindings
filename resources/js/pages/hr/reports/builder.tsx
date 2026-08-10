@@ -1,3 +1,6 @@
+import { ReportsTabs } from '@/components/hr';
+import { PageHero, PageLayout } from '@/components/page';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,11 +21,16 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { PageHero, PageLayout } from '@/components/page';
-import { ReportsTabs } from '@/components/hr';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Eye, BarChart3, Plus, Save, Trash2 } from 'lucide-react';
+import {
+    AlertTriangle,
+    BarChart3,
+    Eye,
+    Plus,
+    Save,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type ReportSource = {
@@ -63,7 +71,6 @@ export default function ReportBuilder({ sources }: Props) {
     const [reportType, setReportType] = useState<string>('');
     const [selectedFields, setSelectedFields] = useState<string[]>([]);
     const [filters, setFilters] = useState<Filter[]>([]);
-    const [groupBy, setGroupBy] = useState('');
     const [sortBy, setSortBy] = useState('');
     const [sortDirection, setSortDirection] = useState('asc');
     const [previewData, setPreviewData] = useState<
@@ -71,6 +78,7 @@ export default function ReportBuilder({ sources }: Props) {
     >(null);
     const [previewTotal, setPreviewTotal] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [previewError, setPreviewError] = useState<string | null>(null);
     const [reportName, setReportName] = useState('');
     const [reportDescription, setReportDescription] = useState('');
     const [showSave, setShowSave] = useState(false);
@@ -83,9 +91,9 @@ export default function ReportBuilder({ sources }: Props) {
         setReportType(value);
         setSelectedFields([]);
         setFilters([]);
-        setGroupBy('');
         setSortBy('');
         setPreviewData(null);
+        setPreviewError(null);
     };
 
     const toggleField = (field: string) => {
@@ -120,6 +128,7 @@ export default function ReportBuilder({ sources }: Props) {
     const handlePreview = async () => {
         if (!reportType || selectedFields.length === 0) return;
         setLoading(true);
+        setPreviewError(null);
 
         try {
             const response = await fetch('/hr/reports/builder/preview', {
@@ -136,17 +145,27 @@ export default function ReportBuilder({ sources }: Props) {
                     report_type: reportType,
                     fields: selectedFields,
                     filters: filters.length > 0 ? filters : null,
-                    group_by: groupBy || null,
                     sort_by: sortBy || null,
                     sort_direction: sortDirection,
                 }),
             });
 
             const result = await response.json();
+            if (!response.ok) {
+                throw new Error(
+                    result.message ||
+                        'The report preview could not be generated. Review the selected fields and filters.',
+                );
+            }
             setPreviewData(result.data || []);
             setPreviewTotal(result.total || 0);
-        } catch {
-            // Handle error silently
+        } catch (error) {
+            setPreviewData(null);
+            setPreviewError(
+                error instanceof Error
+                    ? error.message
+                    : 'The report preview could not be generated. Please try again.',
+            );
         } finally {
             setLoading(false);
         }
@@ -161,7 +180,6 @@ export default function ReportBuilder({ sources }: Props) {
             report_type: reportType,
             fields: selectedFields,
             filters: filters.length > 0 ? filters : null,
-            group_by: groupBy || null,
             sort_by: sortBy || null,
             sort_direction: sortDirection,
         });
@@ -178,10 +196,11 @@ export default function ReportBuilder({ sources }: Props) {
             <Head title="Report Builder" />
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={BarChart3}
                         title="Report Builder"
-                        description="Build and save custom HR reports with selected data sources and fields."
+                        description="Build reusable HR reports from the Sites and data fields you are currently allowed to access."
                         actions={
                             selectedFields.length > 0 ? (
                                 <Button
@@ -198,6 +217,14 @@ export default function ReportBuilder({ sources }: Props) {
                 }
             >
                 <ReportsTabs active="builder" />
+
+                {previewError && (
+                    <Alert variant="destructive">
+                        <AlertTriangle />
+                        <AlertTitle>Preview could not be generated</AlertTitle>
+                        <AlertDescription>{previewError}</AlertDescription>
+                    </Alert>
+                )}
 
                 {/* Step 1: Select Report Type */}
                 <Card>
@@ -280,6 +307,7 @@ export default function ReportBuilder({ sources }: Props) {
                                     variant="outline"
                                     size="sm"
                                     onClick={addFilter}
+                                    disabled={filters.length >= 25}
                                 >
                                     <Plus className="mr-1 h-3 w-3" />
                                     Add Filter

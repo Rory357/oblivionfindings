@@ -11,6 +11,7 @@ use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Domain\Hr\Notifications\TrainingAssignedNotification;
+use App\Models\Site;
 use App\Models\StaffTrainingRecord;
 use App\Models\TrainingCourse;
 use App\Models\User;
@@ -18,9 +19,14 @@ use Illuminate\Support\Carbon as SupportCarbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class TrainingService
 {
+    public function __construct(
+        private readonly HrAudienceAccessService $audiences,
+    ) {}
+
     /** Columns the create/edit wizard may write to hr_courses. */
     private const COURSE_FIELDS = [
         'title', 'code', 'description', 'learning_outcomes', 'prerequisites',
@@ -33,18 +39,21 @@ class TrainingService
     ];
 
     /* ================================================================== */
-    /*  Courses                                                            */
+    /*  Courses */
     /* ================================================================== */
 
     public function createCourse(array $data): HrCourse
     {
         return DB::transaction(function () use ($data) {
-            $payload = ['tenant_id' => $data['tenant_id']]
-                + array_intersect_key($data, array_flip(self::COURSE_FIELDS));
+            $payload = array_intersect_key($data, array_flip(self::COURSE_FIELDS));
+            $payload = $this->normalizeCourseData($payload);
 
             $payload['delivery_method'] = $data['delivery_method'] ?? 'online';
             $payload['duration_hours'] = $data['duration_hours'] ?? 0;
             $payload['is_active'] = $data['is_active'] ?? true;
+
+            $this->assertAssessmentPolicy($payload);
+            $this->assertCourseCodeAvailable($payload['code'] ?? null);
 
             return HrCourse::create($payload);
         });
@@ -53,10 +62,61 @@ class TrainingService
     public function updateCourse(HrCourse $course, array $data): HrCourse
     {
         return DB::transaction(function () use ($course, $data) {
-            $course->update(array_intersect_key($data, array_flip(self::COURSE_FIELDS)));
+            $lockedCourse = HrCourse::query()->lockForUpdate()->findOrFail($course->getKey());
+            $changes = $this->normalizeCourseData(
+                array_intersect_key($data, array_flip(self::COURSE_FIELDS)),
+            );
+            $this->assertAssessmentPolicy([
+                'requires_assessment' => $changes['requires_assessment'] ?? $lockedCourse->requires_assessment,
+                'pass_mark_percentage' => array_key_exists('pass_mark_percentage', $changes)
+                    ? $changes['pass_mark_percentage']
+                    : $lockedCourse->pass_mark_percentage,
+            ]);
+            if (array_key_exists('code', $changes)) {
+                $this->assertCourseCodeAvailable($changes['code'], (int) $lockedCourse->getKey());
+            }
+            $lockedCourse->update($changes);
 
-            return $course->fresh();
+            return $lockedCourse->fresh();
         });
+    }
+
+    /** @param array<string, mixed> $data */
+    private function normalizeCourseData(array $data): array
+    {
+        if (! array_key_exists('code', $data)) {
+            return $data;
+        }
+
+        $data['code'] = trim((string) $data['code']);
+        if ($data['code'] === '') {
+            throw ValidationException::withMessages([
+                'code' => 'Enter a course code.',
+            ]);
+        }
+
+        return $data;
+    }
+
+    private function assertCourseCodeAvailable(mixed $code, ?int $exceptId = null): void
+    {
+        $normalized = mb_strtolower(trim((string) $code));
+        if ($normalized === '') {
+            throw ValidationException::withMessages([
+                'code' => 'Enter a course code.',
+            ]);
+        }
+
+        $duplicate = HrCourse::query()
+            ->when($exceptId !== null, fn ($query) => $query->whereKeyNot($exceptId))
+            ->whereRaw('LOWER(TRIM(code)) = ?', [$normalized])
+            ->lockForUpdate()
+            ->exists();
+        if ($duplicate) {
+            throw ValidationException::withMessages([
+                'code' => 'That course code is already in use.',
+            ]);
+        }
     }
 
     public function setCourseActive(HrCourse $course, bool $active): HrCourse
@@ -67,13 +127,12 @@ class TrainingService
     }
 
     /* ================================================================== */
-    /*  Sessions                                                          */
+    /*  Sessions */
     /* ================================================================== */
 
     public function createSession(HrCourse $course, array $data): HrCourseSession
     {
         return $course->sessions()->create([
-            'tenant_id' => $course->tenant_id,
             'session_date' => $data['session_date'],
             'start_time' => $data['start_time'] ?? null,
             'end_time' => $data['end_time'] ?? null,
@@ -110,15 +169,52 @@ class TrainingService
         return $session->fresh();
     }
 
+    /**
+     * A session is owned by exactly one course. Keep the invariant in the
+     * domain service as well as request validation so jobs and future API
+     * callers cannot create cross-course enrollment or assignment links.
+     *
+     * @param  array<int, mixed>  $courseIds
+     */
+    public function assertSessionMatchesCourses(?int $sessionId, array $courseIds): void
+    {
+        if (! $sessionId) {
+            return;
+        }
+
+        $courses = collect($courseIds)
+            ->map(fn ($courseId) => (int) $courseId)
+            ->filter(fn (int $courseId) => $courseId > 0)
+            ->unique()
+            ->values();
+
+        if ($courses->count() !== 1) {
+            throw ValidationException::withMessages([
+                'session_id' => 'Select a session only when assigning one course.',
+            ]);
+        }
+
+        $matches = HrCourseSession::query()
+            ->whereKey($sessionId)
+            ->where('course_id', $courses->first())
+            ->exists();
+        if (! $matches) {
+            throw ValidationException::withMessages([
+                'session_id' => 'The selected session does not belong to the selected course.',
+            ]);
+        }
+    }
+
     /* ================================================================== */
-    /*  Enrollments                                                       */
+    /*  Enrollments */
     /* ================================================================== */
 
-    public function enroll(?int $tenantId, int $userId, int $courseId, ?int $sessionId = null, ?string $notes = null): HrCourseEnrollment
+    public function enroll(int $userId, int $courseId, ?int $sessionId = null, ?string $notes = null): HrCourseEnrollment
     {
-        return DB::transaction(function () use ($tenantId, $userId, $courseId, $sessionId, $notes) {
+        $this->assertSessionMatchesCourses($sessionId, [$courseId]);
+
+        return DB::transaction(function () use ($userId, $courseId, $sessionId, $notes) {
             return HrCourseEnrollment::create([
-                'tenant_id' => $tenantId,
                 'user_id' => $userId,
                 'course_id' => $courseId,
                 'session_id' => $sessionId,
@@ -135,11 +231,24 @@ class TrainingService
      * @param  array<int>  $userIds
      * @return Collection<int, HrCourseEnrollment>
      */
-    public function enrollMany(?int $tenantId, array $userIds, int $courseId, ?int $sessionId = null, ?string $notes = null): Collection
+    public function enrollMany(array $userIds, int $courseId, ?int $sessionId = null, ?string $notes = null): Collection
     {
-        return DB::transaction(function () use ($tenantId, $userIds, $courseId, $sessionId, $notes) {
-            return collect($userIds)->unique()->map(function ($userId) use ($tenantId, $courseId, $sessionId, $notes) {
-                $existing = HrCourseEnrollment::where('tenant_id', $tenantId)
+        $this->assertSessionMatchesCourses($sessionId, [$courseId]);
+        $userIds = collect($userIds)
+            ->map(fn ($userId) => (int) $userId)
+            ->filter(fn (int $userId) => $userId > 0)
+            ->unique()
+            ->values()
+            ->all();
+        if (count($userIds) > 500) {
+            throw ValidationException::withMessages([
+                'user_ids' => 'Enroll no more than 500 people at a time.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($userIds, $courseId, $sessionId, $notes) {
+            return collect($userIds)->map(function ($userId) use ($courseId, $sessionId, $notes) {
+                $existing = HrCourseEnrollment::query()
                     ->where('user_id', $userId)
                     ->where('course_id', $courseId)
                     ->whereNotIn('status', ['completed'])
@@ -154,7 +263,6 @@ class TrainingService
                 }
 
                 return HrCourseEnrollment::create([
-                    'tenant_id' => $tenantId,
                     'user_id' => (int) $userId,
                     'course_id' => $courseId,
                     'session_id' => $sessionId,
@@ -174,21 +282,46 @@ class TrainingService
     public function completeEnrollment(HrCourseEnrollment $enrollment, array $data = []): HrCourseEnrollment
     {
         $completed = DB::transaction(function () use ($enrollment, $data) {
+            $lockedEnrollment = HrCourseEnrollment::query()
+                ->with('course')
+                ->lockForUpdate()
+                ->findOrFail($enrollment->getKey());
+            $this->assertSessionMatchesCourses(
+                $lockedEnrollment->session_id ? (int) $lockedEnrollment->session_id : null,
+                [(int) $lockedEnrollment->course_id],
+            );
+
             $completedAt = isset($data['completed_at'])
                 ? SupportCarbon::parse($data['completed_at'])
                 : now();
+            if ($completedAt->isFuture()) {
+                throw ValidationException::withMessages([
+                    'completed_at' => 'Completion evidence cannot be dated in the future.',
+                ]);
+            }
 
-            $enrollment->update([
-                'status' => 'completed',
+            $score = array_key_exists('score', $data) ? $data['score'] : $lockedEnrollment->score;
+            if ($score !== null && (! is_numeric($score) || (float) $score < 0 || (float) $score > 100)) {
+                throw ValidationException::withMessages([
+                    'score' => 'The assessment score must be between 0 and 100.',
+                ]);
+            }
+            $assessmentPassed = $this->assessmentPassed($lockedEnrollment->course, $score);
+
+            $lockedEnrollment->update([
+                'status' => $assessmentPassed ? 'completed' : 'failed',
                 'completed_at' => $completedAt,
-                'score' => $data['score'] ?? $enrollment->score,
-                'certificate_path' => $data['certificate_path'] ?? $enrollment->certificate_path,
-                'notes' => $data['notes'] ?? $enrollment->notes,
+                'score' => $score,
+                'certificate_number' => $data['certificate_number'] ?? $lockedEnrollment->certificate_number,
+                'certificate_path' => $data['certificate_path'] ?? $lockedEnrollment->certificate_path,
+                'notes' => $data['notes'] ?? $lockedEnrollment->notes,
             ]);
 
-            $freshEnrollment = $enrollment->fresh();
+            $freshEnrollment = $lockedEnrollment->fresh();
             $this->syncComplianceTrainingRecord($freshEnrollment);
-            $this->closeAssignmentFor($freshEnrollment, $data['score'] ?? null);
+            if ($assessmentPassed) {
+                $this->closeAssignmentFor($freshEnrollment, $score);
+            }
 
             return $freshEnrollment;
         });
@@ -196,9 +329,40 @@ class TrainingService
         // Cross-loop (best-effort, after commit): completing an induction
         // course ticks off the matching pending onboarding task so the
         // new-hire checklist stays in sync automatically.
-        $this->completeLinkedOnboardingTask($completed);
+        if ($completed->status === 'completed') {
+            $this->completeLinkedOnboardingTask($completed);
+        }
 
         return $completed;
+    }
+
+    private function assessmentPassed(?HrCourse $course, mixed $score): bool
+    {
+        if (! $course?->requires_assessment) {
+            return true;
+        }
+        if ($course->pass_mark_percentage === null) {
+            throw ValidationException::withMessages([
+                'score' => 'Configure the course pass mark before recording an assessed completion.',
+            ]);
+        }
+        if ($score === null) {
+            throw ValidationException::withMessages([
+                'score' => 'Enter the assessment score before recording this completion.',
+            ]);
+        }
+
+        return (float) $score >= (float) $course->pass_mark_percentage;
+    }
+
+    /** @param array<string, mixed> $course */
+    private function assertAssessmentPolicy(array $course): void
+    {
+        if (($course['requires_assessment'] ?? false) && ($course['pass_mark_percentage'] ?? null) === null) {
+            throw ValidationException::withMessages([
+                'pass_mark_percentage' => 'Enter a pass mark for a course that requires assessment.',
+            ]);
+        }
     }
 
     /**
@@ -220,7 +384,6 @@ class TrainingService
             }
 
             $profileIds = HrEmployeeProfile::query()
-                ->where('tenant_id', $enrollment->tenant_id)
                 ->where('user_id', $enrollment->user_id)
                 ->pluck('id');
             if ($profileIds->isEmpty()) {
@@ -228,7 +391,6 @@ class TrainingService
             }
 
             $checklists = HrOnboardingChecklist::query()
-                ->where('tenant_id', $enrollment->tenant_id)
                 ->whereIn('employee_profile_id', $profileIds)
                 ->whereIn('status', ['pending', 'in_progress'])
                 ->with(['tasks' => fn ($q) => $q->orderBy('sort_order')])
@@ -278,7 +440,6 @@ class TrainingService
         if ($course->code && str_contains((string) $checklist->template_key, ':')) {
             [$role, $siteType] = explode(':', (string) $checklist->template_key, 2);
             $template = HrOnboardingTemplate::query()
-                ->where('tenant_id', $checklist->tenant_id)
                 ->where('role', $role)
                 ->where('site_type', $siteType)
                 ->first();
@@ -312,7 +473,7 @@ class TrainingService
 
     private function closeAssignmentFor(HrCourseEnrollment $enrollment, $score): void
     {
-        HrCourseAssignment::where('tenant_id', $enrollment->tenant_id)
+        HrCourseAssignment::query()
             ->where('user_id', $enrollment->user_id)
             ->where('hr_course_id', $enrollment->course_id)
             ->whereNotIn('status', ['completed', 'waived'])
@@ -351,6 +512,10 @@ class TrainingService
         $validityMonths = $course->validity_period_months
             ?: ($requirement?->validity_months ?: $legacyCourse?->validity_period_months);
         $expiresAt = $validityMonths ? $completedAt->copy()->addMonths((int) $validityMonths) : null;
+        $assessmentPassed = ! $course->requires_assessment
+            || ($course->pass_mark_percentage !== null
+                && $enrollment->score !== null
+                && (float) $enrollment->score >= (float) $course->pass_mark_percentage);
 
         StaffTrainingRecord::query()->updateOrCreate(
             [
@@ -359,15 +524,14 @@ class TrainingService
             ],
             [
                 'training_course_id' => $legacyCourse?->id,
-                'status' => 'completed',
+                'status' => $assessmentPassed ? 'completed' : 'failed',
                 'enrolled_at' => $enrollment->enrolled_at,
                 'completed_at' => $completedAt,
                 'completion_date' => $completedAt->toDateString(),
-                'expires_at' => $expiresAt,
+                'expires_at' => $assessmentPassed ? $expiresAt : null,
                 'assessment_score' => $enrollment->score,
-                'assessment_passed' => $course->pass_mark_percentage
-                    ? ((float) $enrollment->score >= (float) $course->pass_mark_percentage)
-                    : true,
+                'assessment_passed' => $assessmentPassed,
+                'certificate_number' => $enrollment->certificate_number,
                 'certificate_path' => $enrollment->certificate_path,
                 'provider' => $course->provider ?? $legacyCourse?->provider,
                 'notes' => $enrollment->notes,
@@ -377,7 +541,7 @@ class TrainingService
     }
 
     /* ================================================================== */
-    /*  Assignments                                                       */
+    /*  Assignments */
     /* ================================================================== */
 
     /**
@@ -385,31 +549,44 @@ class TrainingService
      *
      * @return array<int>
      */
-    public function resolveAudience(int $tenantId, array $form): array
+    public function resolveAudience(array $form, ?array $allowedUserIds = null): array
     {
         $type = $form['audience_type'] ?? 'individuals';
 
-        if ($type === 'individuals') {
-            return collect($form['user_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $targets = match ($type) {
+            'individuals' => collect($form['user_ids'] ?? [])
+                ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+                ->map(fn ($id) => ['type' => 'user', 'value' => (string) (int) $id])
+                ->values()
+                ->all(),
+            'role' => trim((string) ($form['role'] ?? '')) !== ''
+                ? [['type' => 'role', 'value' => trim((string) $form['role'])]]
+                : [],
+            'site' => is_numeric($form['site_id'] ?? null) && (int) $form['site_id'] > 0
+                ? [['type' => 'site', 'value' => (string) (int) $form['site_id']]]
+                : [],
+            'cohort' => [['type' => 'all', 'value' => null]],
+            default => [],
+        };
+
+        $users = $this->audiences->resolveUsers($targets);
+        if ($type === 'role' && trim((string) ($form['role'] ?? '')) !== '') {
+            $role = trim((string) $form['role']);
+            $users = $users->filter(fn (User $user) => $user->hrEmployeeProfile()
+                ->where('position_role', $role)
+                ->exists());
+        }
+        if ($allowedUserIds !== null) {
+            $allowed = collect($allowedUserIds)
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn (int $id) => $id > 0)
+                ->unique();
+            $users = $users->filter(fn (User $user) => $allowed->contains((int) $user->id));
         }
 
-        $query = HrEmployeeProfile::query()->where('tenant_id', $tenantId);
-
-        if ($type === 'role' && ! empty($form['role'])) {
-            $query->where('position_role', $form['role']);
-        } elseif ($type === 'site' && ! empty($form['site_id'])) {
-            $siteId = (int) $form['site_id'];
-            $query->where(function ($q) use ($siteId) {
-                $q->where('primary_site_id', $siteId)
-                    ->orWhereJsonContains('secondary_site_ids', $siteId);
-            });
-        }
-        // 'cohort' (and role/site with no value) falls through to all tenant staff.
-
-        return $query->pluck('user_id')
-            ->filter(fn ($id) => is_numeric($id))
+        return $users
+            ->pluck('id')
             ->map(fn ($id) => (int) $id)
-            ->unique()
             ->values()
             ->all();
     }
@@ -420,14 +597,20 @@ class TrainingService
      *
      * @return array{count:int, conflicts:int}
      */
-    public function previewAudience(int $tenantId, array $form): array
+    public function previewAudience(array $form, ?array $allowedUserIds = null): array
     {
-        $userIds = $this->resolveAudience($tenantId, $form);
-        $courseIds = collect($form['course_ids'] ?? [])->map(fn ($id) => (int) $id)->all();
+        $userIds = $this->resolveAudience($form, $allowedUserIds);
+        $courseIds = collect($form['course_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $this->assertSessionMatchesCourses($form['session_id'] ?? null, $courseIds);
 
         $conflicts = 0;
         if ($userIds && $courseIds) {
-            $conflicts = HrCourseAssignment::where('tenant_id', $tenantId)
+            $conflicts = HrCourseAssignment::query()
                 ->whereIn('user_id', $userIds)
                 ->whereIn('hr_course_id', $courseIds)
                 ->whereNotIn('status', ['completed', 'waived'])
@@ -441,12 +624,32 @@ class TrainingService
     /**
      * Create assignment rows for the cross-product of resolved audience × courses.
      *
-     * @return int  number of rows created/updated
+     * @return int number of rows created/updated
      */
-    public function createAssignments(int $tenantId, array $form, ?int $assignedBy = null): int
-    {
-        $userIds = $this->resolveAudience($tenantId, $form);
-        $courseIds = collect($form['course_ids'] ?? [])->map(fn ($id) => (int) $id)->filter()->all();
+    public function createAssignments(
+        array $form,
+        ?int $assignedBy = null,
+        ?array $allowedUserIds = null,
+    ): int {
+        $userIds = $this->resolveAudience($form, $allowedUserIds);
+        $courseIds = collect($form['course_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $this->assertSessionMatchesCourses($form['session_id'] ?? null, $courseIds);
+
+        if (count($courseIds) > 100) {
+            throw ValidationException::withMessages([
+                'course_ids' => 'Assign no more than 100 courses at a time.',
+            ]);
+        }
+        if (count($userIds) > 500) {
+            throw ValidationException::withMessages([
+                'user_ids' => 'Assign training to no more than 500 people at a time.',
+            ]);
+        }
 
         if (! $userIds || ! $courseIds) {
             return 0;
@@ -462,7 +665,7 @@ class TrainingService
         /** @var array<int, HrCourseAssignment> $written */
         $written = [];
 
-        $count = DB::transaction(function () use ($tenantId, $userIds, $courseIds, $source, $dueAt, $sessionId, $assignedBy, $form, &$written) {
+        $count = DB::transaction(function () use ($userIds, $courseIds, $source, $dueAt, $sessionId, $assignedBy, $form, &$written) {
             $count = 0;
             foreach ($courseIds as $courseId) {
                 foreach ($userIds as $userId) {
@@ -470,7 +673,7 @@ class TrainingService
                     // status BEFORE the write — after updateOrCreate's save(),
                     // getOriginal() reflects the just-written value (syncOriginal),
                     // so it can't be used to detect the pre-update state.
-                    $existing = HrCourseAssignment::where('tenant_id', $tenantId)
+                    $existing = HrCourseAssignment::query()
                         ->where('user_id', $userId)
                         ->where('hr_course_id', $courseId)
                         ->first();
@@ -480,7 +683,7 @@ class TrainingService
                     }
 
                     $written[] = HrCourseAssignment::updateOrCreate(
-                        ['tenant_id' => $tenantId, 'user_id' => $userId, 'hr_course_id' => $courseId],
+                        ['user_id' => $userId, 'hr_course_id' => $courseId],
                         [
                             'session_id' => $sessionId,
                             'source' => $source,
@@ -560,19 +763,24 @@ class TrainingService
     }
 
     /* ================================================================== */
-    /*  Summaries / dashboard                                             */
+    /*  Summaries / dashboard */
     /* ================================================================== */
 
-    public function getTrainingSummary(?int $tenantId): array
+    public function getTrainingSummary(?array $staffUserIds = null): array
     {
-        $totalCourses = HrCourse::forTenant($tenantId)->active()->count();
-        $mandatoryCourses = HrCourse::forTenant($tenantId)->active()->mandatory()->count();
-        $totalEnrollments = HrCourseEnrollment::forTenant($tenantId)->count();
-        $completedEnrollments = HrCourseEnrollment::forTenant($tenantId)->completed()->count();
-        $upcomingSessions = HrCourseSession::forTenant($tenantId)->upcoming()->count();
+        $totalCourses = HrCourse::query()->active()->count();
+        $mandatoryCourses = HrCourse::query()->active()->mandatory()->count();
+        $enrollments = HrCourseEnrollment::query()
+            ->when($staffUserIds !== null, fn ($query) => $query->whereIn('user_id', $staffUserIds ?: [0]));
+        $totalEnrollments = (clone $enrollments)->count();
+        $completedEnrollments = (clone $enrollments)->completed()->count();
+        $upcomingSessions = HrCourseSession::query()->upcoming()->count();
 
-        $overdue = HrCourseAssignment::forTenant($tenantId)->overdue()->count();
-        $expiring = $this->expiringEnrollmentCount($tenantId, 90);
+        $overdue = HrCourseAssignment::query()
+            ->when($staffUserIds !== null, fn ($query) => $query->whereIn('user_id', $staffUserIds ?: [0]))
+            ->overdue()
+            ->count();
+        $expiring = $this->expiringEnrollmentCount(90, $staffUserIds);
 
         return [
             'total_courses' => $totalCourses,
@@ -590,11 +798,14 @@ class TrainingService
      * Count of completed enrollments whose computed expiry (completed_at +
      * course validity months) falls within the next $days days.
      */
-    public function expiringEnrollmentCount(?int $tenantId, int $days = 90): int
-    {
+    public function expiringEnrollmentCount(
+        int $days = 90,
+        ?array $staffUserIds = null,
+    ): int {
         $horizon = now()->addDays($days);
 
-        return HrCourseEnrollment::forTenant($tenantId)
+        return HrCourseEnrollment::query()
+            ->when($staffUserIds !== null, fn ($query) => $query->whereIn('user_id', $staffUserIds ?: [0]))
             ->completed()
             ->whereNotNull('completed_at')
             ->with('course:id,validity_period_months,requires_renewal')
@@ -614,14 +825,15 @@ class TrainingService
     /**
      * Per-course catalog metrics used by the Catalog tab cards/table.
      *
-     * @return array<int, array<string, int>>  keyed by course id
+     * @return array<int, array<string, int>> keyed by course id
      */
-    public function courseMetrics(?int $tenantId): array
+    public function courseMetrics(?array $staffUserIds = null): array
     {
-        $enrollments = HrCourseEnrollment::forTenant($tenantId)
+        $enrollments = HrCourseEnrollment::query()
+            ->when($staffUserIds !== null, fn ($query) => $query->whereIn('user_id', $staffUserIds ?: [0]))
             ->get(['id', 'course_id', 'status', 'completed_at']);
 
-        $courses = HrCourse::forTenant($tenantId)->get(['id', 'validity_period_months'])->keyBy('id');
+        $courses = HrCourse::query()->get(['id', 'validity_period_months'])->keyBy('id');
         $horizon = now()->addDays(90);
 
         return $enrollments->groupBy('course_id')->map(function (Collection $rows) use ($courses, $horizon) {
@@ -647,18 +859,22 @@ class TrainingService
     /**
      * Assemble the Dashboard tab payload.
      */
-    public function getDashboardData(int $tenantId, array $staffUserIds): array
+    public function getDashboardData(array $staffUserIds): array
     {
         // Renewal pressure by course + site, from assignments.
-        $assignments = HrCourseAssignment::forTenant($tenantId)
+        $assignments = HrCourseAssignment::query()
             ->with(['course:id,title,is_mandatory', 'user:id,name'])
+            ->whereIn('user_id', $staffUserIds ?: [0])
             ->whereNotIn('status', ['waived'])
             ->get();
 
-        $profiles = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $profiles = HrEmployeeProfile::query()
+            ->whereIn('user_id', $staffUserIds ?: [0])
             ->get(['user_id', 'primary_site_id'])
             ->keyBy('user_id');
-        $siteNames = \App\Models\Site::pluck('name', 'id');
+        $siteNames = Site::query()
+            ->whereIn('id', $profiles->pluck('primary_site_id')->filter()->unique())
+            ->pluck('name', 'id');
 
         $now = now();
         // Overdue == strictly past-due: compare against the start of today so a
@@ -693,7 +909,9 @@ class TrainingService
             ->all();
 
         // Completion by site (completed enrollments / total enrollments per site).
-        $enrollments = HrCourseEnrollment::forTenant($tenantId)->get(['user_id', 'status']);
+        $enrollments = HrCourseEnrollment::query()
+            ->whereIn('user_id', $staffUserIds ?: [0])
+            ->get(['user_id', 'status']);
         $siteAgg = [];
         foreach ($enrollments as $e) {
             $siteId = $profiles->get($e->user_id)?->primary_site_id;
@@ -710,7 +928,7 @@ class TrainingService
         ])->sortByDesc('completion')->values()->all();
 
         // Upcoming sessions with remaining seats.
-        $upcoming = HrCourseSession::forTenant($tenantId)
+        $upcoming = HrCourseSession::query()
             ->upcoming()
             ->with('course:id,title')
             ->withCount('enrollments')
@@ -724,10 +942,9 @@ class TrainingService
                 'seats' => $s->max_participants ? max(0, $s->max_participants - $s->enrollments_count) : null,
             ])->all();
 
-        // Training spend YTD (completed enrollments × course cost). Qualify the
-        // tenant column — both joined tables carry tenant_id.
+        // Training spend YTD (completed enrollments × course cost).
         $spend = HrCourseEnrollment::query()
-            ->where('hr_course_enrollments.tenant_id', $tenantId)
+            ->whereIn('hr_course_enrollments.user_id', $staffUserIds ?: [0])
             ->where('hr_course_enrollments.status', 'completed')
             ->whereYear('hr_course_enrollments.completed_at', $now->year)
             ->join('hr_courses', 'hr_courses.id', '=', 'hr_course_enrollments.course_id')
@@ -741,7 +958,7 @@ class TrainingService
         return [
             'mandatoryCurrentPct' => $totalMand > 0 ? (int) round(($currentMand / $totalMand) * 100) : 100,
             'overdueCount' => $assignments->filter(fn ($a) => $a->status !== 'completed' && $a->due_at && $a->due_at->lt($today))->count(),
-            'expiringCount' => $this->expiringEnrollmentCount($tenantId, 90),
+            'expiringCount' => $this->expiringEnrollmentCount(90, $staffUserIds),
             'spendYtd' => (float) $spend,
             'renewals' => $renewals,
             'completionBySite' => $completionBySite,

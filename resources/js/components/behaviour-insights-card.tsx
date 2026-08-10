@@ -81,7 +81,12 @@ function MiniStat({
             className="flex min-w-[150px] flex-1 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3"
             title={title}
         >
-            <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', TONES[tone])}>
+            <span
+                className={cn(
+                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                    TONES[tone],
+                )}
+            >
                 <Icon className="h-[18px] w-[18px]" />
             </span>
             <div className="min-w-0 leading-tight">
@@ -105,17 +110,22 @@ function MonthBars({
         // eslint-disable-next-line no-restricted-syntax -- wider stat card with the entries-by-month sparkline.
         <div className="flex min-w-[280px] flex-[2] flex-col rounded-xl border border-border bg-card px-4 py-3">
             <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <span className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                     Entries by month
                 </span>
-                <span className="text-[11px] text-muted-foreground">{range}</span>
+                <span className="text-[11px] text-muted-foreground">
+                    {range}
+                </span>
             </div>
             {months.length === 0 ? (
-                <div className="flex flex-1 items-center text-xs italic text-muted-foreground">
+                <div className="flex flex-1 items-center text-xs text-muted-foreground italic">
                     No entries yet
                 </div>
             ) : (
-                <div className="flex flex-1 items-end gap-2" style={{ minHeight: 38 }}>
+                <div
+                    className="flex flex-1 items-end gap-2"
+                    style={{ minHeight: 38 }}
+                >
                     {months.map((m) => (
                         <div
                             key={m.key}
@@ -126,9 +136,13 @@ function MonthBars({
                             <div
                                 className={cn(
                                     'w-full rounded-md',
-                                    m.count > 0 ? 'bg-primary/80' : 'bg-primary/15',
+                                    m.count > 0
+                                        ? 'bg-primary/80'
+                                        : 'bg-primary/15',
                                 )}
-                                style={{ height: `${m.count > 0 ? Math.max(16, (m.count / peak) * 100) : 12}%` }}
+                                style={{
+                                    height: `${m.count > 0 ? Math.max(16, (m.count / peak) * 100) : 12}%`,
+                                }}
                             />
                         </div>
                     ))}
@@ -138,7 +152,11 @@ function MonthBars({
     );
 }
 
-export function BehaviourStatStrip({ patterns }: { patterns?: BehaviourPattern }) {
+export function BehaviourStatStrip({
+    patterns,
+}: {
+    patterns?: BehaviourPattern;
+}) {
     const s = patterns?.summary ?? {};
     const entries = s.entries_90d ?? 0;
     const trend = s.trend_pct ?? null;
@@ -164,7 +182,9 @@ export function BehaviourStatStrip({ patterns }: { patterns?: BehaviourPattern }
             />
             <MiniStat
                 icon={trendUp ? TrendingUp : TrendingDown}
-                tone={trend == null ? 'neutral' : trendUp ? 'warning' : 'success'}
+                tone={
+                    trend == null ? 'neutral' : trendUp ? 'warning' : 'success'
+                }
                 value={trendLabel}
                 label="vs last quarter"
             />
@@ -211,7 +231,10 @@ function FrequencyTrend({
                             className="flex flex-1 flex-col-reverse"
                             title={`${point.date}: ${point.entries} entries · ${point.concerns} concern notes`}
                         >
-                            <span className="block w-full bg-primary/70" style={{ height: `${e}%` }} />
+                            <span
+                                className="block w-full bg-primary/70"
+                                style={{ height: `${e}%` }}
+                            />
                             <span
                                 className="block w-full bg-status-warning/70"
                                 style={{ height: `${c}%` }}
@@ -231,7 +254,7 @@ function FunctionBreakdown({
 }) {
     if (!rows || rows.length === 0) {
         return (
-            <p className="text-sm italic text-muted-foreground">
+            <p className="text-sm text-muted-foreground italic">
                 No function recorded yet.
             </p>
         );
@@ -267,13 +290,25 @@ function IntensityMix({
     const total = mix.low + mix.medium + mix.high;
     if (total === 0) {
         return (
-            <p className="text-sm italic text-muted-foreground">No entries yet.</p>
+            <p className="text-sm text-muted-foreground italic">
+                No entries yet.
+            </p>
         );
     }
     const seg = [
         { key: 'low', label: 'Low', value: mix.low, cls: 'bg-status-success' },
-        { key: 'medium', label: 'Moderate', value: mix.medium, cls: 'bg-status-warning' },
-        { key: 'high', label: 'High', value: mix.high, cls: 'bg-status-critical' },
+        {
+            key: 'medium',
+            label: 'Moderate',
+            value: mix.medium,
+            cls: 'bg-status-warning',
+        },
+        {
+            key: 'high',
+            label: 'High',
+            value: mix.high,
+            cls: 'bg-status-critical',
+        },
     ];
     return (
         <div>
@@ -291,8 +326,16 @@ function IntensityMix({
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                 {seg.map((s) => (
-                    <span key={s.key} className="inline-flex items-center gap-1.5">
-                        <span className={cn('inline-block h-2 w-2 rounded-sm', s.cls)} />
+                    <span
+                        key={s.key}
+                        className="inline-flex items-center gap-1.5"
+                    >
+                        <span
+                            className={cn(
+                                'inline-block h-2 w-2 rounded-sm',
+                                s.cls,
+                            )}
+                        />
                         {s.label} {s.value}
                     </span>
                 ))}
@@ -311,12 +354,15 @@ function ChipList({
     empty: string;
 }) {
     if (!items || items.length === 0) {
-        return <p className="text-sm italic text-muted-foreground">{empty}</p>;
+        return <p className="text-sm text-muted-foreground italic">{empty}</p>;
     }
     return (
         <ul className="space-y-1.5">
             {items.map((item) => (
-                <li key={item.label} className="flex items-center justify-between gap-2 text-sm">
+                <li
+                    key={item.label}
+                    className="flex items-center justify-between gap-2 text-sm"
+                >
                     <span className="truncate">{item.label}</span>
                     <Badge variant="outline" className={cn('shrink-0', accent)}>
                         {item.count}
@@ -359,7 +405,9 @@ export function BehaviourInsightsCard({
                     </Badge>
                 </CardTitle>
                 {description ? (
-                    <p className="text-xs text-muted-foreground">{description}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {description}
+                    </p>
                 ) : null}
             </CardHeader>
             <CardContent className="space-y-5">
@@ -372,7 +420,9 @@ export function BehaviourInsightsCard({
                         <p className="mb-2 text-xs font-medium text-muted-foreground">
                             Function of behaviour
                         </p>
-                        <FunctionBreakdown rows={data.function_breakdown ?? []} />
+                        <FunctionBreakdown
+                            rows={data.function_breakdown ?? []}
+                        />
                     </div>
                     <div>
                         <p className="mb-2 text-xs font-medium text-muted-foreground">

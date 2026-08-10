@@ -69,23 +69,52 @@ const MODULE_DEFINITIONS: {
         label: 'Operations',
         icon: ClipboardList,
         prefixes: [
-            'clients', 'shifts', 'timesheets', 'care_plans', 'care_notes',
-            'medications', 'service_agreements', 'funding', 'rosters',
-            'appointments', 'goals', 'progress_notes', 'support_plans',
-            'contacts', 'documents', 'portal',
+            'clients',
+            'shifts',
+            'timesheets',
+            'care_plans',
+            'care_notes',
+            'medications',
+            'service_agreements',
+            'funding',
+            'rosters',
+            'appointments',
+            'goals',
+            'progress_notes',
+            'support_plans',
+            'contacts',
+            'documents',
+            'portal',
         ],
     },
     {
         key: 'sites',
         label: 'Sites & Locations',
         icon: Building2,
-        prefixes: ['sites', 'hazards', 'checklists', 'rooms', 'inspections', 'locations', 'maintenance'],
+        prefixes: [
+            'sites',
+            'hazards',
+            'checklists',
+            'rooms',
+            'inspections',
+            'locations',
+            'maintenance',
+        ],
     },
     {
         key: 'hr',
         label: 'HR & People',
         icon: Users,
-        prefixes: ['staff', 'leave', 'training', 'qualifications', 'certifications', 'payroll', 'onboarding', 'competencies'],
+        prefixes: [
+            'staff',
+            'leave',
+            'training',
+            'qualifications',
+            'certifications',
+            'payroll',
+            'onboarding',
+            'competencies',
+        ],
     },
     {
         key: 'fleet',
@@ -103,13 +132,26 @@ const MODULE_DEFINITIONS: {
         key: 'incidents',
         label: 'Incidents & Safety',
         icon: ShieldAlert,
-        prefixes: ['incidents', 'risks', 'investigations', 'notifications', 'safety'],
+        prefixes: [
+            'incidents',
+            'risks',
+            'investigations',
+            'notifications',
+            'safety',
+        ],
     },
     {
         key: 'settings',
         label: 'Settings',
         icon: Settings,
-        prefixes: ['settings', 'integrations', 'roles', 'permissions', 'billing', 'organisation'],
+        prefixes: [
+            'settings',
+            'integrations',
+            'roles',
+            'permissions',
+            'billing',
+            'organisation',
+        ],
     },
     {
         key: 'system',
@@ -137,12 +179,20 @@ export default function RoleEdit(props: Props) {
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
 
     const [filter, setFilter] = useState('');
-    const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+    const [expandedModules, setExpandedModules] = useState<Set<string>>(
+        new Set(),
+    );
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Settings', href: '/settings/profile' },
         { title: 'Roles', href: '/settings/roles' },
-        { title: props.mode === 'create' ? 'New Role' : `Edit: ${props.role?.label ?? 'Role'}`, href: '#' },
+        {
+            title:
+                props.mode === 'create'
+                    ? 'New Role'
+                    : `Edit: ${props.role?.label ?? 'Role'}`,
+            href: '#',
+        },
     ];
 
     const form = useForm<{
@@ -197,9 +247,7 @@ export default function RoleEdit(props: Props) {
             if (matching.length > 0) {
                 result.push({
                     key: mod.key,
-                    label: mod.key === 'operations'
-                        ? mod.label
-                        : mod.label,
+                    label: mod.key === 'operations' ? mod.label : mod.label,
                     icon: mod.icon,
                     permissions: matching,
                 });
@@ -275,13 +323,24 @@ export default function RoleEdit(props: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={props.mode === 'create' ? 'New Role' : `Edit: ${props.role?.label ?? 'Role'}`} />
+            <Head
+                title={
+                    props.mode === 'create'
+                        ? 'New Role'
+                        : `Edit: ${props.role?.label ?? 'Role'}`
+                }
+            />
 
             <SettingsLayout>
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            asChild
+                        >
                             <Link href="/settings/roles">
                                 <ArrowLeft className="h-4 w-4" />
                             </Link>
@@ -314,14 +373,22 @@ export default function RoleEdit(props: Props) {
                                     <Input
                                         id="name"
                                         value={form.data.name}
-                                        onChange={(e) => form.setData('name', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData('name', e.target.value)
+                                        }
                                         placeholder="e.g. quality_coordinator"
                                         readOnly={props.mode === 'edit'}
-                                        className={props.mode === 'edit' ? 'bg-muted font-mono text-sm' : 'font-mono text-sm'}
+                                        className={
+                                            props.mode === 'edit'
+                                                ? 'bg-muted font-mono text-sm'
+                                                : 'font-mono text-sm'
+                                        }
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                        Lowercase letters, numbers, and underscores only.
-                                        {props.mode === 'edit' && ' Cannot be changed after creation.'}
+                                        Lowercase letters, numbers, and
+                                        underscores only.
+                                        {props.mode === 'edit' &&
+                                            ' Cannot be changed after creation.'}
                                     </p>
                                     <InputError message={form.errors.name} />
                                 </div>
@@ -331,67 +398,107 @@ export default function RoleEdit(props: Props) {
                                     <Input
                                         id="label"
                                         value={form.data.label}
-                                        onChange={(e) => form.setData('label', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'label',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="e.g. Quality Coordinator"
                                     />
                                     <InputError message={form.errors.label} />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="description">Description</Label>
+                                    <Label htmlFor="description">
+                                        Description
+                                    </Label>
                                     <Textarea
                                         id="description"
                                         value={form.data.description}
-                                        onChange={(e) => form.setData('description', e.target.value)}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'description',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Brief description of this role's purpose..."
                                         rows={3}
                                     />
-                                    <InputError message={(form.errors as any).description} />
+                                    <InputError
+                                        message={
+                                            (form.errors as any).description
+                                        }
+                                    />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="landing_route">Default Landing Page</Label>
+                                    <Label htmlFor="landing_route">
+                                        Default Landing Page
+                                    </Label>
                                     <select
                                         id="landing_route"
                                         value={form.data.landing_route ?? ''}
                                         onChange={(e) =>
                                             form.setData(
                                                 'landing_route',
-                                                e.target.value === '' ? null : e.target.value,
+                                                e.target.value === ''
+                                                    ? null
+                                                    : e.target.value,
                                             )
                                         }
-                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                                     >
-                                        <option value="">System default (Dashboard)</option>
+                                        <option value="">
+                                            System default (Dashboard)
+                                        </option>
                                         {props.landingRoutes.map((opt) => (
-                                            <option key={opt.key} value={opt.key}>
+                                            <option
+                                                key={opt.key}
+                                                value={opt.key}
+                                            >
                                                 {opt.label}
                                             </option>
                                         ))}
                                     </select>
                                     <p className="text-xs text-muted-foreground">
-                                        Where users with this role land after login. Users with multiple roles can pick which one wins on their profile.
+                                        Where users with this role land after
+                                        login. Users with multiple roles can
+                                        pick which one wins on their profile.
                                     </p>
-                                    <InputError message={(form.errors as any).landing_route} />
+                                    <InputError
+                                        message={
+                                            (form.errors as any).landing_route
+                                        }
+                                    />
                                 </div>
 
-                                {props.mode === 'edit' && props.role?.users_count != null && (
-                                    <div className="rounded-lg border bg-muted/50 p-3">
-                                        <div className="flex items-center gap-2">
-                                            <Users className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-sm font-medium">
-                                                {props.role.users_count} user{props.role.users_count !== 1 ? 's' : ''} assigned
-                                            </span>
+                                {props.mode === 'edit' &&
+                                    props.role?.users_count != null && (
+                                        <div className="rounded-lg border bg-muted/50 p-3">
+                                            <div className="flex items-center gap-2">
+                                                <Users className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-sm font-medium">
+                                                    {props.role.users_count}{' '}
+                                                    user
+                                                    {props.role.users_count !==
+                                                    1
+                                                        ? 's'
+                                                        : ''}{' '}
+                                                    assigned
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
                                 {/* Permission summary */}
                                 <div className="rounded-lg border bg-muted/50 p-3">
                                     <div className="flex items-center gap-2">
                                         <BookOpen className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-sm font-medium">
-                                            {form.data.permission_keys.length} of {props.permissions.length} permissions selected
+                                            {form.data.permission_keys.length}{' '}
+                                            of {props.permissions.length}{' '}
+                                            permissions selected
                                         </span>
                                     </div>
                                 </div>
@@ -402,10 +509,16 @@ export default function RoleEdit(props: Props) {
                                     className="w-full"
                                 >
                                     <Check className="mr-1.5 h-4 w-4" />
-                                    {props.mode === 'create' ? 'Create Role' : 'Save Changes'}
+                                    {props.mode === 'create'
+                                        ? 'Create Role'
+                                        : 'Save Changes'}
                                 </Button>
 
-                                <Button variant="outline" className="w-full" asChild>
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    asChild
+                                >
                                     <Link href="/settings/roles">Cancel</Link>
                                 </Button>
                             </CardContent>
@@ -421,13 +534,17 @@ export default function RoleEdit(props: Props) {
                                     Permissions
                                 </CardTitle>
                                 <p className="text-sm text-muted-foreground">
-                                    Select the permissions this role should have. Users inherit permissions from all assigned roles.
+                                    Select the permissions this role should
+                                    have. Users inherit permissions from all
+                                    assigned roles.
                                 </p>
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
                                         value={filter}
-                                        onChange={(e) => setFilter(e.target.value)}
+                                        onChange={(e) =>
+                                            setFilter(e.target.value)
+                                        }
                                         placeholder="Search permissions..."
                                         className="pl-9"
                                     />
@@ -435,13 +552,19 @@ export default function RoleEdit(props: Props) {
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {moduleGroups.map((mod) => {
-                                    const keys = mod.permissions.map((p) => p.key);
+                                    const keys = mod.permissions.map(
+                                        (p) => p.key,
+                                    );
                                     const selected = keys.filter((k) =>
                                         form.data.permission_keys.includes(k),
                                     );
-                                    const allSelected = selected.length === keys.length && keys.length > 0;
+                                    const allSelected =
+                                        selected.length === keys.length &&
+                                        keys.length > 0;
                                     const noneSelected = selected.length === 0;
-                                    const isExpanded = isFiltering || expandedModules.has(mod.key);
+                                    const isExpanded =
+                                        isFiltering ||
+                                        expandedModules.has(mod.key);
                                     const Icon = mod.icon;
 
                                     return (
@@ -453,20 +576,29 @@ export default function RoleEdit(props: Props) {
                                             <Button
                                                 type="button"
                                                 variant="ghost"
-                                                onClick={() => toggleModule(mod.key)}
-                                                className="h-auto w-full justify-start gap-3 whitespace-normal px-4 py-3 text-left hover:bg-muted/50"
+                                                onClick={() =>
+                                                    toggleModule(mod.key)
+                                                }
+                                                className="h-auto w-full justify-start gap-3 px-4 py-3 text-left whitespace-normal hover:bg-muted/50"
                                             >
                                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 dark:bg-primary/30">
                                                     <Icon className="h-4 w-4 text-primary dark:text-primary" />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                    <div className="text-sm font-semibold">{mod.label}</div>
+                                                    <div className="text-sm font-semibold">
+                                                        {mod.label}
+                                                    </div>
                                                     <div className="text-xs text-muted-foreground">
-                                                        {selected.length} / {keys.length} selected
+                                                        {selected.length} /{' '}
+                                                        {keys.length} selected
                                                     </div>
                                                 </div>
                                                 <Badge
-                                                    variant={allSelected ? 'default' : 'secondary'}
+                                                    variant={
+                                                        allSelected
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
                                                     className={`text-xs ${allSelected ? 'bg-primary' : ''}`}
                                                 >
                                                     {keys.length}
@@ -480,7 +612,7 @@ export default function RoleEdit(props: Props) {
 
                                             {/* Module body */}
                                             {isExpanded && (
-                                                <div className="border-t bg-muted/20 px-4 pb-4 pt-3">
+                                                <div className="border-t bg-muted/20 px-4 pt-3 pb-4">
                                                     {/* Select all / clear buttons */}
                                                     <div className="mb-3 flex items-center gap-2">
                                                         <Button
@@ -488,8 +620,15 @@ export default function RoleEdit(props: Props) {
                                                             variant="outline"
                                                             type="button"
                                                             className="h-7 text-xs"
-                                                            onClick={() => setGroup(keys, true)}
-                                                            disabled={allSelected}
+                                                            onClick={() =>
+                                                                setGroup(
+                                                                    keys,
+                                                                    true,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                allSelected
+                                                            }
                                                         >
                                                             Select All
                                                         </Button>
@@ -498,8 +637,15 @@ export default function RoleEdit(props: Props) {
                                                             variant="outline"
                                                             type="button"
                                                             className="h-7 text-xs"
-                                                            onClick={() => setGroup(keys, false)}
-                                                            disabled={noneSelected}
+                                                            onClick={() =>
+                                                                setGroup(
+                                                                    keys,
+                                                                    false,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                noneSelected
+                                                            }
                                                         >
                                                             Deselect All
                                                         </Button>
@@ -507,41 +653,60 @@ export default function RoleEdit(props: Props) {
 
                                                     {/* Permission checkboxes */}
                                                     <div className="space-y-1">
-                                                        {mod.permissions.map((p) => {
-                                                            const isChecked = form.data.permission_keys.includes(p.key);
+                                                        {mod.permissions.map(
+                                                            (p) => {
+                                                                const isChecked =
+                                                                    form.data.permission_keys.includes(
+                                                                        p.key,
+                                                                    );
 
-                                                            return (
-                                                                <label
-                                                                    key={p.key}
-                                                                    className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-background"
-                                                                >
-                                                                    <Checkbox
-                                                                        checked={isChecked}
-                                                                        onCheckedChange={() => toggle(p.key)}
-                                                                    />
-                                                                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                                                                        {isChecked ? (
-                                                                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-status-success" />
-                                                                        ) : (
-                                                                            <Circle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
-                                                                        )}
-                                                                        <div className="min-w-0">
-                                                                            <span className="text-sm">
-                                                                                {friendlyLabel(p.key)}
-                                                                            </span>
-                                                                            <span className="ml-2 font-mono text-xs text-muted-foreground">
-                                                                                {p.key}
-                                                                            </span>
-                                                                            {p.description && (
-                                                                                <p className="text-xs text-muted-foreground">
-                                                                                    {p.description}
-                                                                                </p>
+                                                                return (
+                                                                    <label
+                                                                        key={
+                                                                            p.key
+                                                                        }
+                                                                        className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-background"
+                                                                    >
+                                                                        <Checkbox
+                                                                            checked={
+                                                                                isChecked
+                                                                            }
+                                                                            onCheckedChange={() =>
+                                                                                toggle(
+                                                                                    p.key,
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                                                                            {isChecked ? (
+                                                                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-status-success" />
+                                                                            ) : (
+                                                                                <Circle className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
                                                                             )}
+                                                                            <div className="min-w-0">
+                                                                                <span className="text-sm">
+                                                                                    {friendlyLabel(
+                                                                                        p.key,
+                                                                                    )}
+                                                                                </span>
+                                                                                <span className="ml-2 font-mono text-xs text-muted-foreground">
+                                                                                    {
+                                                                                        p.key
+                                                                                    }
+                                                                                </span>
+                                                                                {p.description && (
+                                                                                    <p className="text-xs text-muted-foreground">
+                                                                                        {
+                                                                                            p.description
+                                                                                        }
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                </label>
-                                                            );
-                                                        })}
+                                                                    </label>
+                                                                );
+                                                            },
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}

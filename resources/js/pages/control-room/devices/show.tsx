@@ -1,7 +1,6 @@
 import { CommandCentrePage } from '@/components/command-centre/command-centre-page';
 import { AlertStatusChip } from '@/components/control-room/alert-worklist/alert-status';
 import { PageLayout } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -17,10 +16,13 @@ import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
+    AlertTriangle,
     Battery,
     BatteryLow,
     BatteryWarning,
     Camera,
+    CircleCheck,
+    CircleX,
     Clock,
     Cpu,
     DoorOpen,
@@ -30,6 +32,7 @@ import {
     Network,
     Radio,
     Shield,
+    ShieldCheck,
     Thermometer,
 } from 'lucide-react';
 
@@ -39,7 +42,12 @@ interface SignalItem {
     severity_hint: string | null;
     occurred_at: string | null;
     status: string | null;
-    payload: Record<string, unknown> | null;
+    outcome: {
+        label: string;
+        tone: 'success' | 'critical' | 'warning' | 'muted';
+        alert_reference: string | null;
+        href: string | null;
+    };
 }
 
 interface AlertItem {
@@ -48,6 +56,7 @@ interface AlertItem {
     alert_type: string;
     severity: string;
     status: string;
+    health_status: string | null;
     triggered_at: string | null;
 }
 
@@ -59,15 +68,28 @@ interface DeviceDetail {
     type_label: string;
     vendor: string | null;
     model: string | null;
-    status: string;
-    battery_level: number | null;
-    last_seen_at: string | null;
+    reported_battery_level: number | null;
     last_signal_at: string | null;
-    is_stale: boolean;
+    signal_activity: {
+        state: 'recent' | 'quiet' | 'never';
+        label: string;
+        tone: 'success' | 'muted';
+    };
     latitude: number | null;
     longitude: number | null;
     location_description: string | null;
-    config: Record<string, unknown> | null;
+    identity_source: 'canonical' | 'signal_projection';
+    canonical: {
+        id: number;
+        domain: string;
+        category: string;
+        subcategory: string | null;
+        status: string | null;
+        health_status: string | null;
+        battery_level: number | null;
+        last_seen_at: string | null;
+        detail_url: string;
+    } | null;
     signal_source: {
         id: number;
         name: string;
@@ -85,15 +107,6 @@ interface Props {
     alerts: AlertItem[];
 }
 
-const statusBadgeColors: Record<string, string> = {
-    online: 'bg-status-success-bg text-status-success border-status-success/30',
-    offline:
-        'bg-status-critical-bg text-status-critical border-status-critical/30',
-    maintenance:
-        'bg-status-warning-bg text-status-warning border-status-warning/30',
-    retired: 'bg-muted text-foreground border-border',
-};
-
 const typeIcons: Record<string, React.ReactNode> = {
     camera: <Camera className="h-5 w-5" />,
     door: <DoorOpen className="h-5 w-5" />,
@@ -106,7 +119,13 @@ const typeIcons: Record<string, React.ReactNode> = {
     network: <Network className="h-5 w-5" />,
 };
 
-function BatteryGauge({ level }: { level: number | null }) {
+function BatteryGauge({
+    level,
+    label,
+}: {
+    level: number | null;
+    label: string;
+}) {
     if (level === null || level === undefined) {
         return (
             <div className="flex flex-col items-center justify-center">
@@ -114,7 +133,7 @@ function BatteryGauge({ level }: { level: number | null }) {
                     <Battery className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <span className="mt-2 text-xs text-muted-foreground">
-                    No data
+                    {label}: no data
                 </span>
             </div>
         );
@@ -162,7 +181,7 @@ function BatteryGauge({ level }: { level: number | null }) {
                     <span className="text-lg font-bold">{level}%</span>
                 </div>
             </div>
-            <span className="mt-1 text-xs text-muted-foreground">Battery</span>
+            <span className="mt-1 text-xs text-muted-foreground">{label}</span>
         </div>
     );
 }
@@ -186,16 +205,55 @@ function InfoRow({
     );
 }
 
+const outcomeToneClasses: Record<SignalItem['outcome']['tone'], string> = {
+    success:
+        'border-status-success/30 bg-status-success-bg text-status-success',
+    critical:
+        'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    warning:
+        'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    muted: 'border-border bg-muted text-muted-foreground',
+};
+
+function SignalOutcome({ outcome }: { outcome: SignalItem['outcome'] }) {
+    const Icon =
+        outcome.tone === 'success'
+            ? CircleCheck
+            : outcome.tone === 'critical'
+              ? CircleX
+              : outcome.tone === 'warning'
+                ? AlertTriangle
+                : Shield;
+    const content = (
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium ${outcomeToneClasses[outcome.tone]}`}
+        >
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{outcome.label}</span>
+            {outcome.alert_reference ? (
+                <span className="font-mono">{outcome.alert_reference}</span>
+            ) : null}
+        </span>
+    );
+
+    return outcome.href ? <Link href={outcome.href}>{content}</Link> : content;
+}
+
 export default function DeviceShow({ device, signals, alerts }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
                 { title: 'Control Room', href: '/control-room' },
-                { title: 'Devices', href: '/control-room/devices' },
-                { title: device.device_uid, href: '#' },
+                { title: 'Device signals', href: '/control-room/devices' },
+                {
+                    title: device.device_uid,
+                    href: `/control-room/devices/${device.id}`,
+                },
             ]}
         >
-            <Head title={`Device: ${device.name || device.device_uid}`} />
+            <Head
+                title={`Signal source: ${device.name || device.device_uid}`}
+            />
 
             <PageLayout>
                 <CommandCentrePage
@@ -204,52 +262,99 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                     icon={Cpu}
                     title={device.name || device.device_uid}
                     description={`${device.type_label}${device.vendor || device.model ? ` · ${[device.vendor, device.model].filter(Boolean).join(' ')}` : ''}`}
-                    status={`Device ${device.status}${device.is_stale ? ' · stale data' : ''}`}
-                    freshness={`Last seen ${formatRelative(device.last_seen_at)}`}
+                    status={device.signal_activity.label}
+                    freshness={`Last signal ${formatRelative(device.last_signal_at)}`}
                     actions={
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                        >
-                            <Link href="/control-room/devices">
-                                All devices
-                            </Link>
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="frontline-tap border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href="/control-room/devices">
+                                    All signal sources
+                                </Link>
+                            </Button>
+                            {device.canonical ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                    className="frontline-tap border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href={device.canonical.detail_url}>
+                                        <ShieldCheck
+                                            className="h-4 w-4"
+                                            aria-hidden="true"
+                                        />
+                                        Open in Security &amp; Devices
+                                    </Link>
+                                </Button>
+                            ) : null}
+                        </div>
                     }
                 >
+                    <Card
+                        className={
+                            device.canonical
+                                ? 'border-status-success/40 bg-status-success-bg'
+                                : 'border-status-warning/40 bg-status-warning-bg'
+                        }
+                    >
+                        <CardContent className="flex items-start gap-3 pt-4 pb-4">
+                            {device.canonical ? (
+                                <ShieldCheck
+                                    className="mt-0.5 h-5 w-5 flex-none text-status-success"
+                                    aria-hidden="true"
+                                />
+                            ) : (
+                                <AlertTriangle
+                                    className="mt-0.5 h-5 w-5 flex-none text-status-warning"
+                                    aria-hidden="true"
+                                />
+                            )}
+                            <div className="space-y-1">
+                                <p className="text-sm font-semibold">
+                                    {device.canonical
+                                        ? 'Canonical Security & Devices identity'
+                                        : 'Signal-only Control Room projection'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    {device.canonical
+                                        ? `Identity, assignment, monitoring and management remain owned by Security & Devices. Device status is ${device.canonical.status ?? 'unknown'} and health is ${device.canonical.health_status ?? 'unknown'}. This page shows the Control Room signal journey.`
+                                        : 'No authorised canonical Device is linked. Reconcile this signal source in Security & Devices before treating it as managed inventory.'}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* Info Grid */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        {/* Device Info Card */}
+                        {/* Signal context card */}
                         <Card className="md:col-span-2">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-base">
-                                    Device Information
+                                    Signal source context
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="grid grid-cols-1 gap-0 sm:grid-cols-2 sm:gap-x-8">
                                     <div>
-                                        <InfoRow label="Device UID">
+                                        <InfoRow label="Projection UID">
                                             <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
                                                 {device.device_uid}
                                             </code>
                                         </InfoRow>
-                                        <InfoRow label="Last Seen">
+                                        <InfoRow label="Last Signal">
                                             <span className="flex items-center gap-1">
                                                 <Clock className="h-3 w-3" />
                                                 {formatRelative(
-                                                    device.last_seen_at,
+                                                    device.last_signal_at,
                                                 )}
                                             </span>
                                         </InfoRow>
-                                        <InfoRow label="Last Signal">
-                                            {formatRelative(
-                                                device.last_signal_at,
-                                            )}
-                                        </InfoRow>
-                                        <InfoRow label="Site">
+                                        <InfoRow label="Signal Site">
                                             {device.site?.name ?? '-'}
                                         </InfoRow>
                                     </div>
@@ -299,15 +404,28 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                             </CardContent>
                         </Card>
 
-                        {/* Battery Gauge Card */}
+                        {/* Explicitly sourced battery context */}
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-base">
-                                    Battery
+                                    {device.canonical
+                                        ? 'Canonical Device battery'
+                                        : 'Reported battery'}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="flex items-center justify-center pt-2">
-                                <BatteryGauge level={device.battery_level} />
+                                <BatteryGauge
+                                    level={
+                                        device.canonical
+                                            ? device.canonical.battery_level
+                                            : device.reported_battery_level
+                                    }
+                                    label={
+                                        device.canonical
+                                            ? 'Security & Devices'
+                                            : 'Signal report'
+                                    }
+                                />
                             </CardContent>
                         </Card>
                     </div>
@@ -361,8 +479,7 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                                 </TableHead>
                                                 <TableHead>Severity</TableHead>
                                                 <TableHead>Occurred</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead>Payload</TableHead>
+                                                <TableHead>Outcome</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -390,34 +507,11 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                                         )}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-[10px]"
-                                                        >
-                                                            {signal.status ??
-                                                                '-'}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="max-w-[200px]">
-                                                        {signal.payload ? (
-                                                            <code className="block truncate text-[10px] text-muted-foreground">
-                                                                {JSON.stringify(
-                                                                    signal.payload,
-                                                                ).substring(
-                                                                    0,
-                                                                    80,
-                                                                )}
-                                                                {JSON.stringify(
-                                                                    signal.payload,
-                                                                ).length > 80
-                                                                    ? '...'
-                                                                    : ''}
-                                                            </code>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                -
-                                                            </span>
-                                                        )}
+                                                        <SignalOutcome
+                                                            outcome={
+                                                                signal.outcome
+                                                            }
+                                                        />
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -425,6 +519,11 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                     </Table>
                                 </div>
                             )}
+                            <p className="border-t px-4 py-3 text-xs text-muted-foreground">
+                                Raw provider payloads are kept out of this
+                                operational view. Use the linked alert or the
+                                canonical Device profile for governed evidence.
+                            </p>
                         </CardContent>
                     </Card>
 

@@ -13,6 +13,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -42,7 +43,7 @@ class TimesheetControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         $this->travelTo(Carbon::parse('2026-04-12 09:00:00'));
 
         $this->site = Site::factory()->create([
@@ -314,14 +315,13 @@ class TimesheetControllerTest extends TestCase
         ]);
     }
 
-    public function test_payroll_lock_uses_employee_profile_tenant_for_edit_blocking(): void
+    public function test_payroll_lock_blocks_employee_timesheet_edits(): void
     {
         $timesheet = $this->makeDraftTimesheet($this->staff, [
             'notes' => 'Locked note',
         ]);
 
         HrPayrollRun::query()->create([
-            'tenant_id' => 1,
             'period_start' => '2026-04-01',
             'period_end' => '2026-04-30',
             'status' => 'locked',
@@ -672,12 +672,71 @@ class TimesheetControllerTest extends TestCase
             ->assertRedirect("/operations/timesheets?view={$timesheet->id}");
     }
 
+    public function test_non_modal_show_and_edit_deny_a_foreign_owner(): void
+    {
+        $this->grantPermissions($this->otherStaff, [
+            'timesheets.viewAssigned',
+            'timesheets.update',
+        ]);
+        $timesheet = $this->makeDraftTimesheet($this->staff);
+
+        $this->actingAs($this->otherStaff)
+            ->get(route('operations.timesheets.show', $timesheet))
+            ->assertForbidden();
+        $this->get(route('operations.timesheets.edit', $timesheet))
+            ->assertForbidden();
+    }
+
+    public function test_non_modal_show_and_edit_deny_an_owner_outside_their_current_site(): void
+    {
+        $foreignSite = Site::factory()->create([
+            'name' => 'Foreign House',
+            'type' => 'house',
+        ]);
+        $foreignClient = Client::factory()->create([
+            'site_id' => $foreignSite->id,
+            'service_context_id' => $this->serviceContext->id,
+            'status' => 'active',
+        ]);
+        $timesheet = $this->makeDraftTimesheet($this->staff, [
+            'shift_overrides' => [
+                'client_id' => $foreignClient->id,
+                'site_id' => $foreignSite->id,
+            ],
+            'shift_site_name_snapshot' => $foreignSite->name,
+            'client_name_snapshot' => trim($foreignClient->first_name.' '.$foreignClient->last_name),
+        ]);
+
+        $this->actingAs($this->staff)
+            ->get(route('operations.timesheets.show', $timesheet))
+            ->assertForbidden();
+        $this->get(route('operations.timesheets.edit', $timesheet))
+            ->assertForbidden();
+    }
+
     public function test_edit_route_redirects_to_unified_edit_dialog(): void
     {
         $timesheet = $this->makeDraftTimesheet($this->staff);
 
         $this->actingAs($this->staff)
             ->get(route('operations.timesheets.edit', $timesheet))
+            ->assertRedirect("/operations/timesheets?edit={$timesheet->id}");
+    }
+
+    public function test_manager_can_open_view_and_edit_dialog_redirects(): void
+    {
+        $manager = $this->finance;
+        $this->grantPermissions($manager, [
+            'timesheets.viewAny',
+            'timesheets.update',
+            'timesheets.manageAny',
+        ]);
+        $timesheet = $this->makeDraftTimesheet($this->staff);
+
+        $this->actingAs($manager)
+            ->get(route('operations.timesheets.show', $timesheet))
+            ->assertRedirect("/operations/timesheets?view={$timesheet->id}");
+        $this->get(route('operations.timesheets.edit', $timesheet))
             ->assertRedirect("/operations/timesheets?edit={$timesheet->id}");
     }
 
@@ -701,7 +760,6 @@ class TimesheetControllerTest extends TestCase
         HrEmployeeProfile::query()->updateOrCreate(
             ['user_id' => $user->id],
             [
-                'tenant_id' => 1,
                 'employee_number' => 'EMP-TS-'.$user->id,
                 'work_email' => $user->email,
                 'position_title' => 'Operations',
@@ -766,7 +824,6 @@ class TimesheetControllerTest extends TestCase
         ], $overrides));
 
         $attendance = HrAttendanceSession::query()->create([
-            'tenant_id' => 1,
             'user_id' => $staff->id,
             'shift_id' => $shift->id,
             'site_id' => $shift->site_id,

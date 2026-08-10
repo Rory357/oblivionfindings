@@ -41,9 +41,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 function roleBorderColour(name: string): string {
     const n = name.toLowerCase();
     if (n.includes('admin') || n === 'superadmin') return 'border-l-violet-500';
-    if (n.includes('staff') || n.includes('worker') || n.includes('coordinator')) return 'border-l-blue-500';
-    if (n.includes('readonly') || n.includes('viewer') || n.includes('read_only')) return 'border-l-emerald-500';
-    if (n.includes('portal') || n.includes('family') || n.includes('external')) return 'border-l-amber-500';
+    if (
+        n.includes('staff') ||
+        n.includes('worker') ||
+        n.includes('coordinator')
+    )
+        return 'border-l-blue-500';
+    if (
+        n.includes('readonly') ||
+        n.includes('viewer') ||
+        n.includes('read_only')
+    )
+        return 'border-l-emerald-500';
+    if (n.includes('portal') || n.includes('family') || n.includes('external'))
+        return 'border-l-amber-500';
     return 'border-l-slate-400';
 }
 
@@ -72,7 +83,10 @@ export default function RolesIndex(props: Props) {
     const stats = useMemo(() => {
         const totalRoles = props.roles.length;
         const totalPermissions = props.permissions.length;
-        const totalUsers = props.roles.reduce((sum, r) => sum + (r.users_count ?? 0), 0);
+        const totalUsers = props.roles.reduce(
+            (sum, r) => sum + (r.users_count ?? 0),
+            0,
+        );
         return { totalRoles, totalPermissions, totalUsers };
     }, [props.roles, props.permissions]);
 
@@ -117,8 +131,12 @@ export default function RolesIndex(props: Props) {
                                 <Shield className="h-5 w-5 text-primary dark:text-primary" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.totalRoles}</p>
-                                <p className="text-xs text-muted-foreground">Total Roles</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.totalRoles}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Total Roles
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -128,8 +146,12 @@ export default function RolesIndex(props: Props) {
                                 <KeyRound className="h-5 w-5 text-status-info dark:text-status-info" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.totalPermissions}</p>
-                                <p className="text-xs text-muted-foreground">Total Permissions</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.totalPermissions}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Total Permissions
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -139,8 +161,12 @@ export default function RolesIndex(props: Props) {
                                 <Users className="h-5 w-5 text-status-success dark:text-status-success" />
                             </div>
                             <div>
-                                <p className="text-2xl font-bold">{stats.totalUsers}</p>
-                                <p className="text-xs text-muted-foreground">Users Assigned</p>
+                                <p className="text-2xl font-bold">
+                                    {stats.totalUsers}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Users Assigned
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -150,7 +176,9 @@ export default function RolesIndex(props: Props) {
                 {props.roles.length > 0 ? (
                     <div className="grid gap-4 md:grid-cols-2">
                         {props.roles.map((role) => {
-                            const topGroups = topPermissionGroups(role.permission_keys);
+                            const topGroups = topPermissionGroups(
+                                role.permission_keys,
+                            );
                             const borderClass = roleBorderColour(role.name);
 
                             return (
@@ -162,7 +190,7 @@ export default function RolesIndex(props: Props) {
                                         {/* Top row: label + actions */}
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0 flex-1">
-                                                <h3 className="text-lg font-semibold leading-tight">
+                                                <h3 className="text-lg leading-tight font-semibold">
                                                     {role.label}
                                                 </h3>
                                                 <p className="mt-0.5 font-mono text-xs text-muted-foreground">
@@ -176,7 +204,9 @@ export default function RolesIndex(props: Props) {
                                                     className="h-8 gap-1.5"
                                                     asChild
                                                 >
-                                                    <Link href={`/settings/roles/${role.id}/edit`}>
+                                                    <Link
+                                                        href={`/settings/roles/${role.id}/edit`}
+                                                    >
                                                         <Pencil className="h-3.5 w-3.5" />
                                                         Edit
                                                     </Link>
@@ -187,9 +217,14 @@ export default function RolesIndex(props: Props) {
                                                     className="h-8 w-8 p-0"
                                                     title="Clone role"
                                                     onClick={() =>
-                                                        router.visit('/settings/roles/create', {
-                                                            data: { clone: role.id },
-                                                        })
+                                                        router.visit(
+                                                            '/settings/roles/create',
+                                                            {
+                                                                data: {
+                                                                    clone: role.id,
+                                                                },
+                                                            },
+                                                        )
                                                     }
                                                 >
                                                     <Copy className="h-3.5 w-3.5" />
@@ -198,26 +233,43 @@ export default function RolesIndex(props: Props) {
                                         </div>
 
                                         {/* Description */}
-                                        <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
-                                            {role.description || 'No description'}
+                                        <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                                            {role.description ||
+                                                'No description'}
                                         </p>
 
                                         {/* Badges row */}
                                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                                            <Badge variant="secondary" className="gap-1">
+                                            <Badge
+                                                variant="secondary"
+                                                className="gap-1"
+                                            >
                                                 <Users className="h-3 w-3" />
-                                                {role.users_count ?? 0} user{(role.users_count ?? 0) !== 1 ? 's' : ''}
+                                                {role.users_count ?? 0} user
+                                                {(role.users_count ?? 0) !== 1
+                                                    ? 's'
+                                                    : ''}
                                             </Badge>
-                                            <Badge variant="secondary" className="gap-1">
+                                            <Badge
+                                                variant="secondary"
+                                                className="gap-1"
+                                            >
                                                 <ShieldCheck className="h-3 w-3" />
-                                                {role.permission_keys.length} permission{role.permission_keys.length !== 1 ? 's' : ''}
+                                                {role.permission_keys.length}{' '}
+                                                permission
+                                                {role.permission_keys.length !==
+                                                1
+                                                    ? 's'
+                                                    : ''}
                                             </Badge>
                                         </div>
 
                                         {/* Permission groups summary */}
                                         {topGroups.length > 0 && (
                                             <div className="mt-3 flex items-center gap-1.5">
-                                                <span className="text-xs text-muted-foreground">Top areas:</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Top areas:
+                                                </span>
                                                 {topGroups.map((g) => (
                                                     <Badge
                                                         key={g}
@@ -227,9 +279,20 @@ export default function RolesIndex(props: Props) {
                                                         {g}
                                                     </Badge>
                                                 ))}
-                                                {role.permission_keys.length > 0 && (
+                                                {role.permission_keys.length >
+                                                    0 && (
                                                     <span className="text-xs text-muted-foreground">
-                                                        +{new Set(role.permission_keys.map((k) => k.split('.')[0])).size - topGroups.length > 0
+                                                        +
+                                                        {new Set(
+                                                            role.permission_keys.map(
+                                                                (k) =>
+                                                                    k.split(
+                                                                        '.',
+                                                                    )[0],
+                                                            ),
+                                                        ).size -
+                                                            topGroups.length >
+                                                        0
                                                             ? `${new Set(role.permission_keys.map((k) => k.split('.')[0])).size - topGroups.length} more`
                                                             : ''}
                                                     </span>
@@ -247,11 +310,16 @@ export default function RolesIndex(props: Props) {
                             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                                 <Shield className="h-6 w-6 text-muted-foreground" />
                             </div>
-                            <h3 className="mt-4 text-sm font-medium">No roles found</h3>
+                            <h3 className="mt-4 text-sm font-medium">
+                                No roles found
+                            </h3>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 Get started by creating your first role.
                             </p>
-                            <Button className="mt-4 bg-primary hover:bg-primary" asChild>
+                            <Button
+                                className="mt-4 bg-primary hover:bg-primary"
+                                asChild
+                            >
                                 <Link href="/settings/roles/create">
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     New Role

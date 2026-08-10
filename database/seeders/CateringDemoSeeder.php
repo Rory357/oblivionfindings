@@ -245,8 +245,8 @@ class CateringDemoSeeder extends Seeder
         ];
 
         foreach ($more as $row) {
-            $recipe = MealRecipe::firstOrCreate(
-                ['slug' => Str::slug($row['name']), 'tenant_id' => null],
+            $recipe = MealRecipe::withTrashed()->firstOrCreate(
+                ['slug' => Str::slug($row['name'])],
                 [
                     'name' => $row['name'],
                     'description' => $row['description'],
@@ -257,6 +257,10 @@ class CateringDemoSeeder extends Seeder
                     'is_active' => true,
                 ]
             );
+
+            if ($recipe->trashed()) {
+                continue;
+            }
 
             $tagIds = collect($row['tags'] ?? [])->map(fn ($k) => $tags->get($k)?->id)->filter()->all();
             if ($tagIds) {
@@ -325,7 +329,6 @@ class CateringDemoSeeder extends Seeder
                 $item = \App\Models\SiteMealInventoryItem::firstOrCreate(
                     ['site_id' => $site->id, 'product_id' => $product->id],
                     [
-                        'tenant_id' => $site->tenant_id,
                         'unit' => $product->default_unit,
                         'current_qty' => 0,
                         'par_level' => $par,
@@ -394,7 +397,6 @@ class CateringDemoSeeder extends Seeder
                 $recipe = $pool->values()->get($recipeIndex);
                 if (!$recipe) continue;
                 SiteMealPlanEntry::create([
-                    'tenant_id' => $site->tenant_id,
                     'site_id' => $site->id,
                     'plan_date' => $date->toDateString(),
                     'meal_slot' => $slot,
@@ -549,7 +551,6 @@ class CateringDemoSeeder extends Seeder
             ?? User::first();
 
         $entry->fill([
-            'tenant_id' => $site->tenant_id,
             'recipe_id' => $glutenRecipe->id,
             'servings' => 4,
             'client_ids' => array_filter([$mila->id]),
@@ -591,7 +592,6 @@ class CateringDemoSeeder extends Seeder
         }
 
         $entry->fill([
-            'tenant_id' => $site->tenant_id,
             'source_type' => 'takeaway',
             'recipe_id' => null,
             'ad_hoc_name' => null,
@@ -612,7 +612,6 @@ class CateringDemoSeeder extends Seeder
             'meal_slot' => $slot,
         ]);
         $entry->fill([
-            'tenant_id' => $site->tenant_id,
             'recipe_id' => $recipe->id,
             'servings' => max(2, count($clientIds)),
             'client_ids' => array_values($clientIds),

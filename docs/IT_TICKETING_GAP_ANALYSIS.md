@@ -1,5 +1,7 @@
 # IT & Provisioning → Full IT Ticketing System — Gap Analysis & Build Checklist
 
+> **Single-tenant correction (2026-07-21):** Oblivion Findings serves one operating organisation across its sites. Historical `tenant` terminology below describes legacy organisation-context fields and executed evidence, not a multi-tenant product boundary. New work must follow [`docs/architecture/single-tenant-application.md`](architecture/single-tenant-application.md) and use roles, approved sites, canonical ownership, direct-object denial, and privacy rules.
+
 > Seeded by pass 0 of the loop (2026-07-07). Loop protocol: take the **first unchecked item**,
 > implement it as one small verifiable slice, verify, tick with a one-line note, commit, stop.
 > Schema only from §P of the loop prompt; anything beyond → `IT_TICKETING_QUESTIONS.md` (repo root).
@@ -24,7 +26,7 @@
 10. **Tests:** 4 happy-path tests in `tests/Feature/It/ItProvisioningTest.php` (gate, checklist bridge, fulfil→task-complete, ticket lifecycle). No policy/authz matrix, no SLA, no comment coverage. These 4 stay green forever.
 11. **Attachment infra answer (§P.4):** NO generic polymorphic attachment table exists — every module has its own model (`HsAttachment`, `PrivacyAttachment`, `ClientIncidentAttachment`, `ClinicalAttachment`, …). The shared piece is the controller concern `app/Http/Controllers/Concerns/ServesPrivateAttachments.php` (private disk, mime allowlist, CSP sandbox — closes stored-XSS) + frontend `components/ui/file-dropzone.tsx`. **Decision: build `it_attachments` (morphs: ticket|comment|kb_article) per §P.4 and serve downloads via `ServesPrivateAttachments`.**
 12. **Cross-loop bridge (sacred):** `OnboardingService::createItProvisioningRequests()` (L524–568) — IT-category tasks, equipment excluded (asset path), idempotent per task, Schema::hasTable-guarded, never blocks checklist creation. `fulfil` completes the linked task via `completeTask()` in a DB transaction (controller L114–137); `cancel` annotates the task + notifies the checklist creator best-effort (L163–183).
-13. **Tenancy pattern:** `ResolvesHrTenant` trait (`resolveHrTenantIdForUser`, `assertHrTenantAccess`, `rejectForeignTenantRecipient`) + `forTenant` scopes on both models. Keep on every new query/mutation.
+13. **Legacy organisation-context pattern:** `ResolvesHrTenant` and `forTenant` remain compatibility mechanisms where mature IT/HR tables require their existing column. Do not propagate them into new schemas or treat them as product tenancy. New authorization is proved through roles, approved sites, canonical ownership, direct-object denial, and privacy rules.
 14. **No FormRequests in the module** — all inline `$request->validate()`. New mutations get FormRequests per the non-negotiables.
 
 ## Build order (master checklist)

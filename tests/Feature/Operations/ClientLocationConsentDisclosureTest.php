@@ -1,13 +1,16 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -39,10 +42,8 @@ function makeClientLocationConsentPortalUser(
     Client $client,
     string $roleName = 'next_of_kin',
     string $relation = 'next_of_kin',
-    ?int $organizationId = null,
 ): User {
     $user = User::factory()->create([
-        'organization_id' => $organizationId ?? $client->organization_id,
         'role' => $roleName,
         'approved_at' => now(),
     ]);
@@ -60,25 +61,62 @@ function makeClientLocationConsentPortalUser(
     return $user;
 }
 
+function makeClientLocationConsentClient(string $siteName): Client
+{
+    $site = Site::factory()->create([
+        'name' => $siteName,
+        'is_active' => true,
+    ]);
+
+    return Client::factory()->create([
+        'site_id' => $site->id,
+        'status' => 'active',
+    ]);
+}
+
+function makeClientLocationConsentStaff(
+    Site $site,
+    string $roleName,
+    array $permissionKeys,
+): User {
+    $user = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    grantClientLocationConsentRole($user, $roleName, $permissionKeys);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'position_role' => 'support_worker',
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
+
+    return $user;
+}
+
 function clientLocationTrackingConsentType(): ConsentType
 {
     return ConsentType::query()->firstOrCreate(
         ['name' => 'Asset Location Tracking (Safety)'],
-        ConsentType::factory()->make()->only([
-            'category',
-            'description',
-            'purpose',
-            'legal_basis',
-            'is_mandatory',
-            'requires_capacity_assessment',
-            'allows_withdrawal',
-            'withdrawal_notice_days',
-            'validity_period_days',
-            'renewal_required',
-            'renewal_reminder_days',
-            'version',
-            'active',
-        ]),
+        [
+            'category' => 'safety',
+            'description' => 'Consent to location monitoring of a personal tracker for safety.',
+            'purpose' => 'Client personal safety location tracking',
+            'legal_basis' => 'consent',
+            'is_mandatory' => false,
+            'requires_capacity_assessment' => false,
+            'allows_withdrawal' => true,
+            'validity_period_days' => 365,
+            'renewal_required' => true,
+            'renewal_reminder_days' => 30,
+            'version' => 1,
+            'active' => true,
+        ],
     );
 }
 
@@ -102,10 +140,11 @@ function recordClientLocationTrackingConsent(
     ]);
 }
 
-function assignClientLocationConsentTracker(Client $client): Device
-{
+function assignClientLocationConsentTracker(
+    Client $client,
+    ?ClientConsent $consent = null,
+): Device {
     $device = Device::factory()->tracking()->create([
-        'tenant_id' => $client->organization_id ?? 1,
         'name' => 'Consent-gated tracker',
         'latitude' => -36.8485,
         'longitude' => 174.7633,
@@ -115,14 +154,22 @@ function assignClientLocationConsentTracker(Client $client): Device
         'device_id' => $device->id,
         'assignable_type' => DeviceAssignment::TARGET_CLIENT,
         'assignable_id' => $client->id,
+        'assignment_type' => 'permanent',
         'assigned_at' => now(),
+        'assigned_by_user_id' => $consent?->given_by_user_id,
+        'consent_id' => $consent?->id,
+        'tracking_purpose' => 'Client personal safety location tracking',
+        'authority_basis' => 'assignment_linked_client_consent',
+        'access_audience' => ['authorised_client_care', 'control_room', 'health_and_safety'],
+        'retention_days' => 90,
+        'collection_started_at' => now(),
     ]);
 
     return $device;
 }
 
 it('hard denies portal current and history location without active tracking consent for NOK and self identities', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeClientLocationConsentClient('Portal Consent Denial Home');
     assignClientLocationConsentTracker($client);
     $nok = makeClientLocationConsentPortalUser($client);
 
@@ -132,7 +179,7 @@ it('hard denies portal current and history location without active tracking cons
     $this->getJson(route('portal.clients.location.history', $client, false))
         ->assertForbidden();
 
-    $selfClient = Client::factory()->create(['organization_id' => 1]);
+    $selfClient = makeClientLocationConsentClient('Self Consent Denial Home');
     assignClientLocationConsentTracker($selfClient);
     $portalClient = makeClientLocationConsentPortalUser(
         $selfClient,
@@ -148,13 +195,13 @@ it('hard denies portal current and history location without active tracking cons
 });
 
 it('allows linked portal current and history location only while tracking consent is active', function () {
-    $client = Client::factory()->create(['organization_id' => 2]);
-    $device = assignClientLocationConsentTracker($client);
+    $client = makeClientLocationConsentClient('Portal Consent Lifecycle Home');
     $nok = makeClientLocationConsentPortalUser($client);
 
-    recordClientLocationTrackingConsent($client, $nok, [
+    $expired = recordClientLocationTrackingConsent($client, $nok, [
         'expires_at' => now()->subMinute(),
     ]);
+    $device = assignClientLocationConsentTracker($client, $expired);
 
     $this->actingAs($nok)
         ->get(route('portal.clients.location', $client, false))
@@ -163,6 +210,11 @@ it('allows linked portal current and history location only while tracking consen
         ->assertForbidden();
 
     $active = recordClientLocationTrackingConsent($client, $nok);
+    app(PersonalTrackingPrivacyService::class)->resumeClientAssignment(
+        $device->assignments()->firstOrFail(),
+        $active,
+        $nok->id,
+    );
 
     $this->get(route('portal.clients.location', $client, false))
         ->assertOk()
@@ -188,14 +240,17 @@ it('allows linked portal current and history location only while tracking consen
         ->assertForbidden();
 });
 
-it('denies unlinked and cross-organization portal identities even when the client has tracking consent', function () {
-    $client = Client::factory()->create(['organization_id' => 2]);
-    assignClientLocationConsentTracker($client);
-    $staff = User::factory()->create(['organization_id' => 2]);
-    recordClientLocationTrackingConsent($client, $staff);
+it('denies unlinked and other-client portal identities even when the client has tracking consent', function () {
+    $client = makeClientLocationConsentClient('Target Portal Home');
+    $staff = makeClientLocationConsentStaff(
+        $client->site,
+        'location_consent_recorder_'.$client->id,
+        [],
+    );
+    $consent = recordClientLocationTrackingConsent($client, $staff);
+    assignClientLocationConsentTracker($client, $consent);
 
     $unlinked = User::factory()->create([
-        'organization_id' => 2,
         'role' => 'next_of_kin',
         'approved_at' => now(),
     ]);
@@ -207,11 +262,9 @@ it('denies unlinked and cross-organization portal identities even when the clien
     $this->getJson(route('portal.clients.location.history', $client, false))
         ->assertForbidden();
 
-    $crossOrganization = makeClientLocationConsentPortalUser(
-        $client,
-        organizationId: 1,
-    );
-    $this->actingAs($crossOrganization)
+    $otherClient = makeClientLocationConsentClient('Other Portal Home');
+    $otherClientPortalUser = makeClientLocationConsentPortalUser($otherClient);
+    $this->actingAs($otherClientPortalUser)
         ->get(route('portal.clients.location', $client, false))
         ->assertForbidden();
     $this->getJson(route('portal.clients.location.history', $client, false))
@@ -219,10 +272,9 @@ it('denies unlinked and cross-organization portal identities even when the clien
 });
 
 it('redacts staff profile location and forbids staff history and commands without active tracking consent', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = makeClientLocationConsentClient('Staff Consent Denial Home');
     assignClientLocationConsentTracker($client);
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationConsentRole($manager, 'location_consent_manager_'.$manager->id, [
+    $manager = makeClientLocationConsentStaff($client->site, 'location_consent_manager', [
         'clients.viewAny',
         'assets.viewAny',
         'assets.telemetry.view',
@@ -249,15 +301,14 @@ it('redacts staff profile location and forbids staff history and commands withou
 });
 
 it('preserves staff profile and history location access with active tracking consent', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $device = assignClientLocationConsentTracker($client);
-    $viewer = User::factory()->create(['organization_id' => 1]);
-    grantClientLocationConsentRole($viewer, 'location_consent_viewer_'.$viewer->id, [
+    $client = makeClientLocationConsentClient('Staff Consent Access Home');
+    $viewer = makeClientLocationConsentStaff($client->site, 'location_consent_viewer', [
         'clients.viewAny',
         'assets.viewAny',
         'assets.telemetry.view',
     ]);
-    recordClientLocationTrackingConsent($client, $viewer);
+    $consent = recordClientLocationTrackingConsent($client, $viewer);
+    $device = assignClientLocationConsentTracker($client, $consent);
 
     $this->actingAs($viewer)
         ->get(route('operations.clients.show', $client, false))
@@ -265,10 +316,58 @@ it('preserves staff profile and history location access with active tracking con
         ->assertInertia(fn (Assert $page) => $page
             ->where('location.canManage', false)
             ->where('location.tracker.id', $device->id)
+            ->where('location.tracker.detail_url', null)
+            ->where('location.tracker.detail_access.state', 'restricted')
+            ->where('location.tracker.detail_access.label', 'Device Profile access required')
+            ->where('location.tracker.tracking_workspace_url', null)
+            ->where('location.tracker.tracking_workspace_access.state', 'restricted')
             ->where('location.currentLocation.lat', -36.8485)
             ->where('location.trackingConsent.status', 'given'));
 
     $this->getJson(route('operations.clients.location.history', $client, false))
         ->assertOk()
         ->assertJsonStructure(['locations']);
+
+    $this->get("/security-devices/devices/{$device->id}")->assertForbidden();
+
+    $otherSite = Site::factory()->create(['is_active' => true]);
+    $otherSiteViewer = makeClientLocationConsentStaff($otherSite, 'location_other_site_device_viewer', [
+        'clients.viewAny',
+        'assets.viewAny',
+        'assets.telemetry.view',
+        'securityDevices.viewAny',
+        'securityDevices.devices.view',
+    ]);
+
+    $this->actingAs($otherSiteViewer)
+        ->get(route('operations.clients.show', $client, false))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('location.tracker.id', $device->id)
+            ->where('location.tracker.detail_url', null)
+            ->where('location.tracker.detail_access.state', 'restricted')
+            ->where('location.tracker.tracking_workspace_url', null)
+            ->where('location.tracker.tracking_workspace_access.state', 'restricted'));
+
+    $this->get("/security-devices/devices/{$device->id}")->assertNotFound();
+
+    $deviceViewer = makeClientLocationConsentStaff($client->site, 'location_device_viewer', [
+        'clients.viewAny',
+        'assets.viewAny',
+        'assets.telemetry.view',
+        'securityDevices.viewAny',
+        'securityDevices.devices.view',
+    ]);
+
+    $this->actingAs($deviceViewer)
+        ->get(route('operations.clients.show', $client, false))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('location.tracker.id', $device->id)
+            ->where('location.tracker.detail_url', "/security-devices/devices/{$device->id}")
+            ->where('location.tracker.detail_access.state', 'available')
+            ->where('location.tracker.tracking_workspace_url', '/security-devices/tracking?tab=personal-safety')
+            ->where('location.tracker.tracking_workspace_access.state', 'available'));
+
+    $this->get("/security-devices/devices/{$device->id}")->assertOk();
 });

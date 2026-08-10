@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +11,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { PageHero, PageLayout } from '@/components/page';
 import { useI18n } from '@/lib/i18n';
 import { Head, router } from '@inertiajs/react';
 import { CheckCircle2, RotateCcw } from 'lucide-react';
@@ -119,14 +119,21 @@ export default function Diff({ period, summary, changes }: Props) {
                     <PageHero
                         variant="compact"
                         backHref={`/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`}
-                        backLabel={t('rostering.publish.back_to_roster', 'Back to roster')}
-                        title={t('rostering.publish.diff_title', 'Publish diff')}
+                        backLabel={t(
+                            'rostering.publish.back_to_roster',
+                            'Back to roster',
+                        )}
+                        title={t(
+                            'rostering.publish.diff_title',
+                            'Publish diff',
+                        )}
                         description={`${period.site_name ?? t('rostering.publish.selected_site', 'Selected site')} · ${t('rostering.publish.week_of', 'Week of')} ${period.week_start} · ${t('rostering.publish.version', 'Version')} ${period.version}`}
                         actions={
                             <>
                                 <Badge
                                     variant={
-                                        period.status === 'changed_after_publish'
+                                        period.status ===
+                                        'changed_after_publish'
                                             ? 'destructive'
                                             : 'outline'
                                     }
@@ -143,22 +150,29 @@ export default function Diff({ period, summary, changes }: Props) {
                                     onClick={() => postPeriodAction('review')}
                                 >
                                     <RotateCcw className="mr-1 h-4 w-4" />
-                                    {t('rostering.publish.re_review', 'Re-review')}
+                                    {t(
+                                        'rostering.publish.re_review',
+                                        'Re-review',
+                                    )}
                                 </Button>
                                 <Button
                                     size="sm"
                                     disabled={period.status === 'archived'}
-                                    onClick={() => postPeriodAction('republish')}
+                                    onClick={() =>
+                                        postPeriodAction('republish')
+                                    }
                                 >
                                     <CheckCircle2 className="mr-1 h-4 w-4" />
-                                    {t('rostering.publish.republish', 'Re-publish')}
+                                    {t(
+                                        'rostering.publish.republish',
+                                        'Re-publish',
+                                    )}
                                 </Button>
                             </>
                         }
                     />
                 }
             >
-
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                     <Card>
                         <CardHeader className="pb-2">

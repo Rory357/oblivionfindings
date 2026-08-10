@@ -1,13 +1,20 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
     MyHrShell,
     type MyHrShellData,
     StaffDetailsModal,
 } from '@/components/hr';
-import { Building2, Flame, HeartPulse, MapPin, Search, Users } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    Building2,
+    Flame,
+    HeartPulse,
+    MapPin,
+    Search,
+    Users,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 interface Person {
@@ -49,9 +56,9 @@ function avatarColor(id: number): string {
  */
 export default function MyDirectory({ myHr, people }: Props) {
     const [q, setQ] = useState('');
-    const [filter, setFilter] = useState<'all' | 'first_aiders' | 'fire_wardens'>(
-        'all',
-    );
+    const [filter, setFilter] = useState<
+        'all' | 'first_aiders' | 'fire_wardens'
+    >('all');
     const [selectedId, setSelectedId] = useState<number | null>(null);
 
     const firstAiderCount = useMemo(
@@ -81,14 +88,14 @@ export default function MyDirectory({ myHr, people }: Props) {
                 {/* Search + emergency-role quick filters */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="relative w-full sm:max-w-sm">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                         <input
                             type="search"
                             value={q}
                             onChange={(e) => setQ(e.target.value)}
                             placeholder="Search by name, role or site…"
                             aria-label="Search the staff directory"
-                            className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="h-10 w-full rounded-lg border border-input bg-background pr-3 pl-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         />
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -96,12 +103,16 @@ export default function MyDirectory({ myHr, people }: Props) {
                             <Button
                                 type="button"
                                 variant={
-                                    filter === 'first_aiders' ? 'default' : 'outline'
+                                    filter === 'first_aiders'
+                                        ? 'default'
+                                        : 'outline'
                                 }
                                 size="sm"
                                 onClick={() =>
                                     setFilter((f) =>
-                                        f === 'first_aiders' ? 'all' : 'first_aiders',
+                                        f === 'first_aiders'
+                                            ? 'all'
+                                            : 'first_aiders',
                                     )
                                 }
                             >
@@ -113,12 +124,16 @@ export default function MyDirectory({ myHr, people }: Props) {
                             <Button
                                 type="button"
                                 variant={
-                                    filter === 'fire_wardens' ? 'default' : 'outline'
+                                    filter === 'fire_wardens'
+                                        ? 'default'
+                                        : 'outline'
                                 }
                                 size="sm"
                                 onClick={() =>
                                     setFilter((f) =>
-                                        f === 'fire_wardens' ? 'all' : 'fire_wardens',
+                                        f === 'fire_wardens'
+                                            ? 'all'
+                                            : 'fire_wardens',
                                     )
                                 }
                             >
@@ -130,7 +145,8 @@ export default function MyDirectory({ myHr, people }: Props) {
                 </div>
 
                 <p className="text-sm text-muted-foreground">
-                    {filtered.length} {filtered.length === 1 ? 'person' : 'people'}
+                    {filtered.length}{' '}
+                    {filtered.length === 1 ? 'person' : 'people'}
                 </p>
 
                 {filtered.length > 0 ? (
@@ -201,7 +217,8 @@ export default function MyDirectory({ myHr, people }: Props) {
                                             )}
                                         </div>
 
-                                        {(p.is_first_aider || p.is_fire_warden) && (
+                                        {(p.is_first_aider ||
+                                            p.is_fire_warden) && (
                                             <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
                                                 {p.is_first_aider && (
                                                     <Badge
@@ -239,7 +256,9 @@ export default function MyDirectory({ myHr, people }: Props) {
                                 <Users className="size-8 text-muted-foreground/40" />
                             </div>
                             <div className="text-center">
-                                <p className="text-lg font-medium">No people found</p>
+                                <p className="text-lg font-medium">
+                                    No people found
+                                </p>
                                 <p className="mt-1 text-sm text-muted-foreground">
                                     Try a different search or clear the filters.
                                 </p>

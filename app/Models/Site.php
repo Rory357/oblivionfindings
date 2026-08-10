@@ -380,13 +380,4 @@ class Site extends Model
                 ->orWhere('is_high_needs', true);
         });
     }
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
-    }
 }

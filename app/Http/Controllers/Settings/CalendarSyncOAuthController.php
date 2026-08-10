@@ -9,10 +9,10 @@ use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
 
 /**
- * Admin OAuth connect/disconnect for the org-level calendar-sync connection.
+ * Admin OAuth connect/disconnect for the application-level calendar-sync connection.
  *
  * Distinct from the user-login Auth\GoogleController / Auth\MicrosoftController:
- * this never creates or logs in a user — it stores an org-level
+ * this never creates or logs in a user — it stores an application-level
  * {@see CalendarSyncConnection} whose tokens can read/write house resource calendars.
  */
 class CalendarSyncOAuthController extends Controller
@@ -76,10 +76,7 @@ class CalendarSyncOAuthController extends Controller
         }
 
         CalendarSyncConnection::updateOrCreate(
-            [
-                'tenant_id' => $this->tenantId($request),
-                'provider' => $provider,
-            ],
+            ['provider' => $provider],
             [
                 'status' => CalendarSyncConnection::STATUS_CONNECTED,
                 'access_token' => $oauthUser->token,
@@ -103,7 +100,6 @@ class CalendarSyncOAuthController extends Controller
         $this->driver($provider); // validates provider
 
         CalendarSyncConnection::query()
-            ->where('tenant_id', $this->tenantId($request))
             ->where('provider', $provider)
             ->delete();
 
@@ -129,13 +125,8 @@ class CalendarSyncOAuthController extends Controller
             && ! empty(config("services.{$provider}.client_secret"));
     }
 
-    private function tenantId(Request $request): int
-    {
-        return (int) ($request->user()->tenant_id ?? 0);
-    }
-
     private function authorizeManage(Request $request): void
     {
-        abort_unless($request->user()?->canDo('integrations.manage_tenant_secrets'), 403);
+        abort_unless($request->user()?->canDo('integrations.manage_secrets'), 403);
     }
 }

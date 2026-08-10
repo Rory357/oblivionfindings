@@ -22,9 +22,11 @@ const READINESS_TABS: Record<string, string> = {
 export function SiteProfileReadiness({
     readiness,
     onNavigate,
+    onConfigureGeofence,
 }: {
     readiness: SiteReadinessData;
     onNavigate: (tab: string) => void;
+    onConfigureGeofence: () => void;
 }) {
     const groups = [
         { title: 'Critical setup', items: readiness.critical },
@@ -55,6 +57,7 @@ export function SiteProfileReadiness({
                             {group.items.map((item) => (
                                 <div
                                     key={item.key}
+                                    data-test={`readiness-item-${item.key}`}
                                     className="flex min-h-11 items-center gap-3 py-2.5"
                                 >
                                     <CheckCircle2
@@ -79,13 +82,22 @@ export function SiteProfileReadiness({
                                             variant="ghost"
                                             size="sm"
                                             className="min-h-11"
-                                            onClick={() =>
+                                            data-test={`readiness-fix-${item.key}`}
+                                            onClick={() => {
+                                                if (
+                                                    item.action ===
+                                                    'configure_geofence'
+                                                ) {
+                                                    onConfigureGeofence();
+                                                    return;
+                                                }
+
                                                 onNavigate(
                                                     READINESS_TABS[
                                                         item.action
                                                     ] ?? 'overview',
-                                                )
-                                            }
+                                                );
+                                            }}
                                         >
                                             Fix
                                         </Button>

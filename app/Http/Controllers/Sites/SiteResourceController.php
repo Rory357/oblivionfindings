@@ -22,7 +22,7 @@ class SiteResourceController extends Controller
                 'id' => $site->id,
                 'name' => $site->name,
             ],
-            'resources' => $resources->map(fn($r) => [
+            'resources' => $resources->map(fn ($r) => [
                 'id' => $r->id,
                 'name' => $r->name,
                 'resource_type' => $r->resource_type,
@@ -50,7 +50,6 @@ class SiteResourceController extends Controller
         SiteHoResource::create([
             ...$validated,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'is_active' => true,
             'is_bookable' => true,
         ]);

@@ -1,8 +1,8 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 
@@ -41,7 +41,8 @@ export default function StaffEdit({ user, roles }: Props) {
             <Head title={`Edit ${staffLabel}`} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    variant="compact"
                     title={`Edit ${staffLabel}`}
                     description="Update staff profile and access."
                 />

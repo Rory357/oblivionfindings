@@ -1,7 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import SiteCalendar, { type EventTypeOption } from '@/pages/sites/calendar/SiteCalendar';
+import SiteCalendar, {
+    type EventTypeOption,
+} from '@/pages/sites/calendar/SiteCalendar';
 import { type SourceDef } from '@/pages/sites/calendar/_parts';
+import { Head } from '@inertiajs/react';
 
 type SiteLite = { id: number; name: string; type: string };
 

@@ -1,3 +1,4 @@
+import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +19,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { MyHrShell, type MyHrShellData } from '@/components/hr';
 import { useForm } from '@inertiajs/react';
 import { ChevronDown, Target } from 'lucide-react';
 import { useState } from 'react';
@@ -147,7 +147,8 @@ function ObjectiveCard({ objective }: { objective: Objective }) {
         })),
     });
 
-    const cc = confidenceConfig[objective.confidence] ?? confidenceConfig.on_track;
+    const cc =
+        confidenceConfig[objective.confidence] ?? confidenceConfig.on_track;
 
     const submitCheckin = () => {
         form.transform((data) => ({
@@ -604,31 +605,28 @@ export default function MyGoals({ myHr, goals, objectives = [] }: Props) {
             )}
 
             {goals.data.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-                            <Target className="h-8 w-8 text-muted-foreground/40" />
-                            <div className="text-sm font-semibold">
-                                No development goals yet
-                            </div>
-                            <p className="max-w-sm text-[13px] text-muted-foreground">
-                                Development goals are set with your manager —
-                                usually during a review or 1:1. Once one is
-                                created for you, you can track and update it
-                                here.
-                            </p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <div className="space-y-4">
-                        {goals.data.map((goal) => (
-                            <GoalCard key={goal.id} goal={goal} />
-                        ))}
-                    </div>
-                )}
+                <Card>
+                    <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+                        <Target className="h-8 w-8 text-muted-foreground/40" />
+                        <div className="text-sm font-semibold">
+                            No development goals yet
+                        </div>
+                        <p className="max-w-sm text-[13px] text-muted-foreground">
+                            Development goals are set with your manager —
+                            usually during a review or 1:1. Once one is created
+                            for you, you can track and update it here.
+                        </p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="space-y-4">
+                    {goals.data.map((goal) => (
+                        <GoalCard key={goal.id} goal={goal} />
+                    ))}
+                </div>
+            )}
 
-                {goals.last_page > 1 && (
-                    <LaravelPagination links={goals.links} />
-                )}
+            {goals.last_page > 1 && <LaravelPagination links={goals.links} />}
         </MyHrShell>
     );
 }

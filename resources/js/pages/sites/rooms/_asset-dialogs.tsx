@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card as GuardrailCard } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -15,7 +16,6 @@ import { router } from '@inertiajs/react';
 import { Loader2, Package } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { type RoomRecord } from './_dialogs';
-import { Card as GuardrailCard } from '@/components/ui/card';
 
 export type AssetForPicker = {
     id: number;
@@ -73,7 +73,8 @@ function AssignAssetBody({
         const q = query.trim().toLowerCase();
         if (!q) return assets;
         return assets.filter((a) => {
-            const hay = `${a.name} ${a.asset_tag ?? ''} ${a.category ?? ''}`.toLowerCase();
+            const hay =
+                `${a.name} ${a.asset_tag ?? ''} ${a.category ?? ''}`.toLowerCase();
             return hay.includes(q);
         });
     }, [assets, query]);
@@ -101,9 +102,9 @@ function AssignAssetBody({
                     Attach an asset to {room.name}
                 </DialogTitle>
                 <DialogDescription>
-                    Pick from assets at this site that aren't already in a
-                    room. Detach from this room by clicking the bin icon in the
-                    asset list.
+                    Pick from assets at this site that aren't already in a room.
+                    Detach from this room by clicking the bin icon in the asset
+                    list.
                 </DialogDescription>
             </DialogHeader>
 
@@ -118,7 +119,10 @@ function AssignAssetBody({
                     />
                 </div>
 
-                <GuardrailCard unstyled className="max-h-72 overflow-y-auto rounded-xl border bg-card/40">
+                <GuardrailCard
+                    unstyled
+                    className="max-h-72 overflow-y-auto rounded-xl border bg-card/40"
+                >
                     {filtered.length === 0 ? (
                         <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                             {assets.length === 0
@@ -131,7 +135,8 @@ function AssignAssetBody({
                                 const active = selectedId === a.id;
                                 return (
                                     <li key={a.id}>
-                                        <Button unstyled
+                                        <Button
+                                            unstyled
                                             type="button"
                                             onClick={() => setSelectedId(a.id)}
                                             className={cn(

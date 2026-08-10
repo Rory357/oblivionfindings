@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SiteMealPlanEntry extends Model
 {
-    use AuditableChanges;
+    use AuditableChanges, WritesLegacyStorageContext;
 
     public const MEAL_SLOTS = [
         'breakfast',
@@ -22,7 +23,6 @@ class SiteMealPlanEntry extends Model
     public const SOURCE_TYPES = ['recipe', 'ad_hoc', 'takeaway'];
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'plan_date',
         'meal_slot',

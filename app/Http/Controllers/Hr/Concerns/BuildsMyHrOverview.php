@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Hr\Concerns;
 
-use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrKudosReply;
@@ -14,8 +13,10 @@ use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\ESignatureService;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
@@ -27,22 +28,22 @@ use Illuminate\Support\Str;
  */
 trait BuildsMyHrOverview
 {
-    protected function myHrOverviewProps(User $user, int $tenantId): array
+    protected function myHrOverviewProps(User $user): array
     {
         $now = now();
         $weekStart = $now->copy()->startOfWeek();
         $weekEnd = $now->copy()->endOfWeek();
 
         return [
-            'latestKudos' => $this->overviewLatestKudos($user, $tenantId),
-            'shoutouts' => $this->myHrShoutouts($user, $tenantId, 'received', 12),
-            'celebrations' => $this->overviewCelebrations($user, $tenantId, $now, $weekStart, $weekEnd),
-            'whosOut' => $this->overviewWhosOut($user, $tenantId, $weekStart, $weekEnd),
-            'leaveBalance' => $this->overviewLeaveBalance($user, $tenantId),
+            'latestKudos' => $this->overviewLatestKudos($user),
+            'shoutouts' => $this->myHrShoutouts($user, 'received', 12),
+            'celebrations' => $this->overviewCelebrations($user, $now, $weekStart, $weekEnd),
+            'whosOut' => $this->overviewWhosOut($user, $weekStart, $weekEnd),
+            'leaveBalance' => $this->overviewLeaveBalance($user),
             'todayShift' => $this->overviewTodayShift($user, $now),
-            'shiftColleagues' => $this->overviewShiftColleagues($user, $tenantId, $now),
-            'streak' => $this->overviewClockStreak($user, $tenantId, $now),
-            'attention' => $this->overviewAttention($user, $tenantId, $now),
+            'shiftColleagues' => $this->overviewShiftColleagues($user, $now),
+            'streak' => $this->overviewClockStreak($user, $now),
+            'attention' => $this->overviewAttention($user, $now),
         ];
     }
 
@@ -56,11 +57,11 @@ trait BuildsMyHrOverview
      * @param  'received'|'given'  $box
      * @return list<array<string, mixed>>
      */
-    protected function myHrShoutouts(User $user, int $tenantId, string $box = 'received', ?int $limit = null): array
+    protected function myHrShoutouts(User $user, string $box = 'received', ?int $limit = null): array
     {
         $column = $box === 'given' ? 'from_user_id' : 'to_user_id';
 
-        $query = HrKudos::where('tenant_id', $tenantId)
+        $query = HrKudos::query()
             ->where($column, $user->id)
             ->with([
                 'fromUser:id,name',
@@ -83,7 +84,7 @@ trait BuildsMyHrOverview
             ->filter()
             ->unique()
             ->all();
-        $roles = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $roles = HrEmployeeProfile::query()
             ->whereIn('user_id', $userIds)
             ->pluck('position_title', 'user_id');
 
@@ -137,9 +138,9 @@ trait BuildsMyHrOverview
         })->values()->all();
     }
 
-    private function overviewLatestKudos(User $user, int $tenantId): ?array
+    private function overviewLatestKudos(User $user): ?array
     {
-        $kudos = HrKudos::where('tenant_id', $tenantId)
+        $kudos = HrKudos::query()
             ->where('to_user_id', $user->id)
             ->with('fromUser:id,name')
             ->orderByDesc('created_at')
@@ -160,10 +161,13 @@ trait BuildsMyHrOverview
         ];
     }
 
-    private function overviewCelebrations(User $user, int $tenantId, Carbon $now, Carbon $weekStart, Carbon $weekEnd): array
+    private function overviewCelebrations(User $user, Carbon $now, Carbon $weekStart, Carbon $weekEnd): array
     {
-        $profiles = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('is_active', true)
+        $visibleCurrentStaff = app(UserSiteAccessService::class)
+            ->applyStaffScope($this->currentStaff->currentUsersQuery()->select('users.id'), $user);
+
+        $profiles = HrEmployeeProfile::query()
+            ->whereIn('user_id', $visibleCurrentStaff)
             ->whereNotNull('user_id')
             ->where('user_id', '!=', $user->id)
             ->with('user:id,name')
@@ -242,14 +246,18 @@ trait BuildsMyHrOverview
      * Mon–Fri who's-out columns for the Leave tab's team calendar — each
      * weekday with the teammates whose approved leave covers that day.
      */
-    protected function myHrWhosOutByDay(User $user, int $tenantId): array
+    protected function myHrWhosOutByDay(User $user): array
     {
         $now = now();
         $weekStart = $now->copy()->startOfWeek();
 
-        $leave = HrLeaveRequest::where('tenant_id', $tenantId)
+        $visibleCurrentStaff = app(UserSiteAccessService::class)
+            ->applyStaffScope(User::query()->select('users.id'), $user);
+
+        $leave = HrLeaveRequest::query()
             ->where('status', 'approved')
             ->where('user_id', '!=', $user->id)
+            ->whereIn('user_id', $visibleCurrentStaff)
             ->whereDate('starts_at', '<=', $weekStart->copy()->addDays(4)->toDateString())
             ->whereDate('ends_at', '>=', $weekStart->toDateString())
             ->with('user:id,name')
@@ -280,11 +288,15 @@ trait BuildsMyHrOverview
         return $cols;
     }
 
-    private function overviewWhosOut(User $user, int $tenantId, Carbon $weekStart, Carbon $weekEnd): array
+    private function overviewWhosOut(User $user, Carbon $weekStart, Carbon $weekEnd): array
     {
-        $leave = HrLeaveRequest::where('tenant_id', $tenantId)
+        $visibleCurrentStaff = app(UserSiteAccessService::class)
+            ->applyStaffScope($this->currentStaff->currentUsersQuery()->select('users.id'), $user);
+
+        $leave = HrLeaveRequest::query()
             ->where('status', 'approved')
             ->where('user_id', '!=', $user->id)
+            ->whereIn('user_id', $visibleCurrentStaff)
             ->whereDate('starts_at', '<=', $weekEnd->toDateString())
             ->whereDate('ends_at', '>=', $weekStart->toDateString())
             ->with('user:id,name')
@@ -293,7 +305,7 @@ trait BuildsMyHrOverview
             ->get();
 
         // Roles + sites for everyone away, in one query (for the "See all" modal).
-        $profiles = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $profiles = HrEmployeeProfile::query()
             ->whereIn('user_id', $leave->pluck('user_id')->filter()->unique()->all())
             ->with('primarySite:id,name')
             ->get(['id', 'user_id', 'position_title', 'primary_site_id'])
@@ -341,11 +353,11 @@ trait BuildsMyHrOverview
      *
      * @return list<array<string, mixed>>
      */
-    private function overviewLeaveBalance(User $user, int $tenantId): array
+    private function overviewLeaveBalance(User $user): array
     {
         $order = ['annual' => 0, 'sick' => 1, 'alternative' => 2, 'time_in_lieu' => 2, 'lieu' => 2];
 
-        return HrLeaveBalance::where('tenant_id', $tenantId)
+        return HrLeaveBalance::query()
             ->where('user_id', $user->id)
             ->where('year', now()->year)
             ->get()
@@ -411,7 +423,7 @@ trait BuildsMyHrOverview
     private function overviewTodayShift(User $user, Carbon $now): ?array
     {
         $shift = Shift::where('user_id', $user->id)
-            ->visibleToFrontline($user->organization_id)
+            ->visibleToFrontline()
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->whereDate('starts_at', $now->toDateString())
             ->orderBy('starts_at')
@@ -438,10 +450,10 @@ trait BuildsMyHrOverview
      *
      * @return list<array<string, mixed>>
      */
-    private function overviewShiftColleagues(User $user, int $tenantId, Carbon $now): array
+    private function overviewShiftColleagues(User $user, Carbon $now): array
     {
         $shift = Shift::where('user_id', $user->id)
-            ->visibleToFrontline($user->organization_id)
+            ->visibleToFrontline()
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->whereDate('starts_at', $now->toDateString())
             ->orderBy('starts_at')
@@ -454,7 +466,7 @@ trait BuildsMyHrOverview
         $end = $shift->ends_at ?: $shift->starts_at->copy()->addHours(8);
 
         $colleagueIds = Shift::where('user_id', '!=', $user->id)
-            ->visibleToFrontline($user->organization_id)
+            ->visibleToFrontline()
             ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
             ->when(
                 $shift->service_context_id,
@@ -473,7 +485,8 @@ trait BuildsMyHrOverview
             return [];
         }
 
-        return User::whereIn('id', $colleagueIds)
+        return $this->currentStaff->currentUsersQuery()
+            ->whereIn('id', $colleagueIds)
             ->get(['id', 'name'])
             ->map(fn (User $u) => [
                 'id' => $u->id,
@@ -485,9 +498,9 @@ trait BuildsMyHrOverview
             ->all();
     }
 
-    private function overviewClockStreak(User $user, int $tenantId, Carbon $now): int
+    private function overviewClockStreak(User $user, Carbon $now): int
     {
-        $dates = HrTimeEntry::forTenant($tenantId)
+        $dates = HrTimeEntry::query()
             ->forUser($user->id)
             ->where('entry_date', '>=', $now->copy()->subDays(45)->toDateString())
             ->pluck('entry_date')
@@ -510,16 +523,13 @@ trait BuildsMyHrOverview
         return $streak;
     }
 
-    private function overviewAttention(User $user, int $tenantId, Carbon $now): array
+    private function overviewAttention(User $user, Carbon $now): array
     {
         $items = [];
 
         // 0. An active improvement plan waiting on the employee's acknowledgement.
         //    The subject can open their own plan read-only (PipController::show).
         $pip = HrPerformanceImprovementPlan::query()
-            // Legacy plans were stored with a NULL tenant (users carry no
-            // tenant_id column) — match those too so they still surface.
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
             ->where('employee_user_id', $user->id)
             ->whereIn('status', ['active', 'in_progress'])
             ->where('employee_acknowledged', false)
@@ -540,11 +550,7 @@ trait BuildsMyHrOverview
         }
 
         // 1. Documents awaiting signature.
-        $pendingSigs = HrDocumentSignature::forSigner($user->id)
-            ->pending()
-            ->with('document:id,title')
-            ->orderBy('requested_at')
-            ->get();
+        $pendingSigs = app(ESignatureService::class)->getPendingForUser($user);
         if ($pendingSigs->count() > 0) {
             $titles = $pendingSigs->pluck('document.title')->filter()->take(2)->implode(' · ');
             $items[] = [
@@ -563,13 +569,12 @@ trait BuildsMyHrOverview
         //     ones the subject can actually action — assigned to them, or
         //     unassigned and not sign-off). Deep-links to the Overview's
         //     "Getting started" card.
-        $profileId = HrEmployeeProfile::where('tenant_id', $tenantId)
+        $profileId = HrEmployeeProfile::query()
             ->where('user_id', $user->id)
             ->value('id');
         if ($profileId) {
             $overdueOnboarding = HrOnboardingTask::query()
                 ->whereHas('checklist', fn ($q) => $q
-                    ->where('tenant_id', $tenantId)
                     ->where('employee_profile_id', $profileId)
                     ->whereIn('status', ['pending', 'in_progress']))
                 ->where('status', '!=', 'completed')
@@ -598,13 +603,11 @@ trait BuildsMyHrOverview
 
         // 2. Policy attestation due.
         $policy = HrPolicy::active()
-            ->where('tenant_id', $tenantId)
             ->where('requires_attestation', true)
             ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
             ->orderBy('title')
             ->first(['id', 'title']);
         $policyCount = HrPolicy::active()
-            ->where('tenant_id', $tenantId)
             ->where('requires_attestation', true)
             ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
             ->count();
@@ -622,8 +625,7 @@ trait BuildsMyHrOverview
         }
 
         // 3. Prep your next 1:1.
-        $note = HrSupervisionNote::forTenant($tenantId)
-            ->forEmployee($user->id)
+        $note = HrSupervisionNote::forEmployee($user->id)
             ->where('is_visible_to_employee', true)
             ->whereNotNull('next_session_date')
             ->whereDate('next_session_date', '>=', $now->toDateString())
@@ -644,7 +646,7 @@ trait BuildsMyHrOverview
         }
 
         // 4. Certificate expiring soon.
-        $cert = HrStaffComplianceStatus::where('tenant_id', $tenantId)
+        $cert = HrStaffComplianceStatus::query()
             ->where('user_id', $user->id)
             ->where('status', 'expiring_soon')
             ->with('requirement:id,name')

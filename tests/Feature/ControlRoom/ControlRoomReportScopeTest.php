@@ -102,6 +102,7 @@ class ControlRoomReportScopeTest extends TestCase
 
         $permission = Permission::query()->where('key', 'controlRoom.reports.view')->firstOrFail();
         $reportViewer->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+        $this->scopeUserToSite($reportViewer, $this->visibleSite);
 
         $this->actingAs($reportViewer)
             ->get('/control-room/reports')
@@ -142,11 +143,9 @@ class ControlRoomReportScopeTest extends TestCase
     public function test_report_site_scope_uses_alert_site_before_client_site(): void
     {
         $visibleClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $this->visibleSite->id,
         ]);
         $hiddenClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $this->hiddenSite->id,
         ]);
 
@@ -173,17 +172,11 @@ class ControlRoomReportScopeTest extends TestCase
             ->assertJsonPath('open', 2);
     }
 
-    public function test_playbook_performance_is_limited_to_the_report_viewers_tenant(): void
+    public function test_playbook_performance_is_limited_to_the_report_viewers_accessible_sites(): void
     {
-        $tenantManager = $this->makeRoleUser('provider_manager');
-        $tenantManager->update(['organization_id' => 1]);
-        $foreignSite = Site::factory()->create([
-            'tenant_id' => 2,
-            'type' => 'house',
-        ]);
         $playbook = Playbook::query()->create([
-            'name' => 'Tenant-scoped response',
-            'code' => 'tenant-scoped-response',
+            'name' => 'Site-scoped response',
+            'code' => 'site-scoped-response',
             'category' => Playbook::CATEGORY_SAFETY,
             'is_active' => true,
         ]);
@@ -192,7 +185,7 @@ class ControlRoomReportScopeTest extends TestCase
             'triggered_at' => now()->subDay(),
         ]);
         $foreignAlert = ControlRoomAlert::factory()->open()->create([
-            'site_id' => $foreignSite->id,
+            'site_id' => $this->hiddenSite->id,
             'triggered_at' => now()->subDay(),
         ]);
 
@@ -212,7 +205,7 @@ class ControlRoomReportScopeTest extends TestCase
             'created_at' => now()->subDay(),
         ]);
 
-        $this->actingAs($tenantManager)
+        $this->actingAs($this->coordinator)
             ->get('/control-room/reports?period=7d')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
@@ -223,12 +216,11 @@ class ControlRoomReportScopeTest extends TestCase
             );
     }
 
-    public function test_platform_report_site_filter_does_not_let_client_site_override_alert_site(): void
+    public function test_application_wide_report_site_filter_does_not_let_client_site_override_alert_site(): void
     {
-        $platformAdmin = $this->makeRoleUser('admin');
-        $platformAdmin->update(['organization_id' => null]);
+        $reportsPermission = Permission::query()->where('key', 'reports.viewAny')->firstOrFail();
+        $this->coordinator->permissionOverrides()->attach($reportsPermission->id, ['allowed' => true]);
         $visibleClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $this->visibleSite->id,
         ]);
 
@@ -245,7 +237,7 @@ class ControlRoomReportScopeTest extends TestCase
             'notes' => 'CLIENT-SITE-FALLBACK',
         ]);
 
-        $response = $this->actingAs($platformAdmin)
+        $response = $this->actingAs($this->coordinator)
             ->get("/control-room/reports/export?period=7d&site_id={$this->visibleSite->id}")
             ->assertOk();
         $content = $response->getContent();
@@ -259,7 +251,6 @@ class ControlRoomReportScopeTest extends TestCase
         $user = User::factory()->create([
             'role' => $roleName,
             'approved_at' => now(),
-            'organization_id' => 1,
         ]);
 
         $role = Role::query()->where('name', $roleName)->first();
@@ -272,20 +263,20 @@ class ControlRoomReportScopeTest extends TestCase
 
     protected function scopeUserToSite(User $user, Site $site): void
     {
-        HrEmployeeProfile::query()->updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'tenant_id' => 1,
-                'employee_number' => 'EMP-REPORT-'.$user->id,
-                'work_email' => $user->email,
-                'position_title' => 'Control Room',
-                'position_role' => $user->role,
-                'employment_type' => 'full_time',
-                'start_date' => now()->subMonth()->toDateString(),
-                'is_active' => true,
-                'primary_site_id' => $site->id,
-                'secondary_site_ids' => [],
-            ],
-        );
+        $profile = HrEmployeeProfile::query()->where('user_id', $user->id)->first()
+            ?? HrEmployeeProfile::factory()->make(['user_id' => $user->id]);
+
+        $profile->fill([
+            'employee_number' => 'EMP-REPORT-'.$user->id,
+            'work_email' => $user->email,
+            'position_title' => 'Control Room',
+            'position_role' => $user->role ?: 'coordinator',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'end_date' => null,
+            'is_active' => true,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+        ])->save();
     }
 }

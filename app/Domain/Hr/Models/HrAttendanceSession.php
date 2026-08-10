@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\Timesheet;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrAttendanceSession extends Model
 {
-    use AuditableChanges, HasFactory;
+    use AuditableChanges, HasFactory, WritesLegacyStorageContext;
 
     protected $fillable = [
         'tenant_id',
@@ -92,11 +93,6 @@ class HrAttendanceSession extends Model
     public function scopeOpen(Builder $query): Builder
     {
         return $query->where('status', 'open')->whereNull('clock_out_at');
-    }
-
-    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
-    {
-        return $query->where('tenant_id', $tenantId);
     }
 
     public function getWorkedHoursAttribute(): float

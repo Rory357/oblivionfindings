@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -8,16 +9,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { PageHero } from '@/components/page';
 import WizardStepper from '@/components/wizard-stepper';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    ArrowRight,
-    Check,
-    Loader2,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import {
     SITE_TYPES,
@@ -89,8 +84,13 @@ const initialData: WizardData = {
 };
 
 export default function CreateSite() {
-    const { users, checklistTemplates, availableAssets, regionOptions, labels } =
-        usePage<PageProps>().props;
+    const {
+        users,
+        checklistTemplates,
+        availableAssets,
+        regionOptions,
+        labels,
+    } = usePage<PageProps>().props;
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
 
@@ -173,9 +173,7 @@ export default function CreateSite() {
     const updateContact = (index: number, patch: Partial<Contact>) =>
         setData(
             'contacts',
-            data.contacts.map((c, i) =>
-                i === index ? { ...c, ...patch } : c,
-            ),
+            data.contacts.map((c, i) => (i === index ? { ...c, ...patch } : c)),
         );
     const removeContact = (index: number) =>
         setData(
@@ -237,9 +235,14 @@ export default function CreateSite() {
                     <div className="min-w-0 space-y-6 lg:space-y-8">
                         <WizardStepper steps={STEPS} current={step} />
                         <p className="sr-only" aria-live="polite">
-                            Step {step + 1} of {STEPS.length}: {STEPS[step].label}
+                            Step {step + 1} of {STEPS.length}:{' '}
+                            {STEPS[step].label}
                         </p>
-                        <p className="sr-only" role="alert" aria-live="assertive">
+                        <p
+                            className="sr-only"
+                            role="alert"
+                            aria-live="assertive"
+                        >
                             {Object.values(errors).filter(Boolean).join('. ')}
                         </p>
 
@@ -364,11 +367,15 @@ export default function CreateSite() {
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Changes are saved when you finish the wizard. Documents you add are uploaded straight away.
+                            Changes are saved when you finish the wizard.
+                            Documents you add are uploaded straight away.
                         </p>
                     </div>
 
-                    <aside aria-label="Site summary" className="hidden lg:block">
+                    <aside
+                        aria-label="Site summary"
+                        className="hidden lg:block"
+                    >
                         <Card className="sticky top-4 space-y-6 p-5">
                             <div className="space-y-1">
                                 <p className="text-xs font-medium text-muted-foreground">
@@ -387,9 +394,7 @@ export default function CreateSite() {
                                     </span>
                                 </SummaryRow>
                                 <SummaryRow label="Name">
-                                    {data.name || (
-                                        <Empty>Not set</Empty>
-                                    )}
+                                    {data.name || <Empty>Not set</Empty>}
                                 </SummaryRow>
                                 <SummaryRow label="Address">
                                     {summaryAddress ?? <Empty>Not set</Empty>}
@@ -433,8 +438,7 @@ export default function CreateSite() {
                                     )}
                                 </SummaryRow>
                                 <SummaryRow label="Risk level">
-                                    {data.is_high_risk ||
-                                    data.is_high_needs ? (
+                                    {data.is_high_risk || data.is_high_needs ? (
                                         <RiskPill warning>
                                             {data.is_high_risk &&
                                             data.is_high_needs
@@ -472,7 +476,10 @@ export default function CreateSite() {
                 </div>
             </div>
 
-            <Dialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+            <Dialog
+                open={confirmCancelOpen}
+                onOpenChange={setConfirmCancelOpen}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Discard this draft?</DialogTitle>
@@ -512,7 +519,10 @@ function buildFormData(
 
     const scalar = (key: string, value: string | number | boolean | null) => {
         if (value === null || value === undefined || value === '') return;
-        fd.append(key, typeof value === 'boolean' ? (value ? '1' : '0') : String(value));
+        fd.append(
+            key,
+            typeof value === 'boolean' ? (value ? '1' : '0') : String(value),
+        );
     };
 
     scalar('name', data.name);

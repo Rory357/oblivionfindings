@@ -1,11 +1,17 @@
-import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
+import RespiteSubnav from '@/components/respite-subnav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageHero, PageLayout } from '@/components/page';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import RespiteSubnav from '@/components/respite-subnav';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 
 type Template = {
@@ -29,12 +35,17 @@ const SUBJECT_TYPES = [
     { value: 'App\\Models\\RespiteReferral', label: 'Referral' },
 ];
 
-export default function ProcedureRunCreate({ templates, subjectType, subjectId }: Props) {
-    const templateOptions = Object.entries(templates ?? {}).flatMap(([domain, items]) =>
-        (items ?? []).map((item) => ({
-            ...item,
-            domain,
-        })),
+export default function ProcedureRunCreate({
+    templates,
+    subjectType,
+    subjectId,
+}: Props) {
+    const templateOptions = Object.entries(templates ?? {}).flatMap(
+        ([domain, items]) =>
+            (items ?? []).map((item) => ({
+                ...item,
+                domain,
+            })),
     );
     const hasTemplates = templateOptions.length > 0;
 
@@ -44,11 +55,21 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
         subject_id: subjectId || '',
     });
 
-    const selectedTemplate = templateOptions.find((template) => String(template.id) === data.procedure_template_id);
-    const stepCount = Array.isArray(selectedTemplate?.steps_json) ? selectedTemplate.steps_json.length : 0;
+    const selectedTemplate = templateOptions.find(
+        (template) => String(template.id) === data.procedure_template_id,
+    );
+    const stepCount = Array.isArray(selectedTemplate?.steps_json)
+        ? selectedTemplate.steps_json.length
+        : 0;
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Procedure Runs', href: '/respite/procedure-runs' }, { title: 'New Run', href: '/respite/procedure-runs/create' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Respite', href: '/respite' },
+                { title: 'Procedure Runs', href: '/respite/procedure-runs' },
+                { title: 'New Run', href: '/respite/procedure-runs/create' },
+            ]}
+        >
             <Head title="New Procedure Run" />
 
             <PageLayout
@@ -72,40 +93,78 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                 >
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Run Setup</CardTitle>
+                            <CardTitle className="text-base">
+                                Run Setup
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="grid gap-4 sm:grid-cols-2">
                             {!hasTemplates && (
-                                <div className="sm:col-span-2 rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning">
-                                    No active procedure templates are available yet. Create or activate a template before starting a procedure run.
+                                <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning sm:col-span-2">
+                                    No active procedure templates are available
+                                    yet. Create or activate a template before
+                                    starting a procedure run.
                                 </div>
                             )}
                             <div className="sm:col-span-2">
                                 <Label>Procedure Template *</Label>
-                                <Select value={data.procedure_template_id} onValueChange={(value) => setData('procedure_template_id', value)} disabled={!hasTemplates}>
-                                    <SelectTrigger><SelectValue placeholder="Select a template" /></SelectTrigger>
+                                <Select
+                                    value={data.procedure_template_id}
+                                    onValueChange={(value) =>
+                                        setData('procedure_template_id', value)
+                                    }
+                                    disabled={!hasTemplates}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a template" />
+                                    </SelectTrigger>
                                     <SelectContent>
                                         {templateOptions.map((template) => (
-                                            <SelectItem key={template.id} value={String(template.id)}>
-                                                {template.name}{template.domain ? ` (${template.domain})` : ''}
+                                            <SelectItem
+                                                key={template.id}
+                                                value={String(template.id)}
+                                            >
+                                                {template.name}
+                                                {template.domain
+                                                    ? ` (${template.domain})`
+                                                    : ''}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.procedure_template_id && <div className="mt-1 text-xs text-status-critical">{errors.procedure_template_id}</div>}
+                                {errors.procedure_template_id && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.procedure_template_id}
+                                    </div>
+                                )}
                             </div>
 
                             <div>
                                 <Label>Subject Type *</Label>
-                                <Select value={data.subject_type} onValueChange={(value) => setData('subject_type', value)}>
-                                    <SelectTrigger><SelectValue placeholder="Select subject type" /></SelectTrigger>
+                                <Select
+                                    value={data.subject_type}
+                                    onValueChange={(value) =>
+                                        setData('subject_type', value)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select subject type" />
+                                    </SelectTrigger>
                                     <SelectContent>
                                         {SUBJECT_TYPES.map((type) => (
-                                            <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                                            <SelectItem
+                                                key={type.value}
+                                                value={type.value}
+                                            >
+                                                {type.label}
+                                            </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                {errors.subject_type && <div className="mt-1 text-xs text-status-critical">{errors.subject_type}</div>}
+                                {errors.subject_type && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.subject_type}
+                                    </div>
+                                )}
                             </div>
 
                             <div>
@@ -114,10 +173,19 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                                     type="number"
                                     min="1"
                                     value={data.subject_id}
-                                    onChange={(event) => setData('subject_id', event.target.value)}
+                                    onChange={(event) =>
+                                        setData(
+                                            'subject_id',
+                                            event.target.value,
+                                        )
+                                    }
                                     placeholder="Enter the related record ID"
                                 />
-                                {errors.subject_id && <div className="mt-1 text-xs text-status-critical">{errors.subject_id}</div>}
+                                {errors.subject_id && (
+                                    <div className="mt-1 text-xs text-status-critical">
+                                        {errors.subject_id}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -125,18 +193,30 @@ export default function ProcedureRunCreate({ templates, subjectType, subjectId }
                     {selectedTemplate && (
                         <Card>
                             <CardHeader>
-                                <CardTitle className="text-base">Template Preview</CardTitle>
+                                <CardTitle className="text-base">
+                                    Template Preview
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm text-muted-foreground">
-                                <div className="font-medium text-foreground">{selectedTemplate.name}</div>
-                                {selectedTemplate.description && <p>{selectedTemplate.description}</p>}
-                                <div>{stepCount} step{stepCount === 1 ? '' : 's'} will be created for this run.</div>
+                                <div className="font-medium text-foreground">
+                                    {selectedTemplate.name}
+                                </div>
+                                {selectedTemplate.description && (
+                                    <p>{selectedTemplate.description}</p>
+                                )}
+                                <div>
+                                    {stepCount} step{stepCount === 1 ? '' : 's'}{' '}
+                                    will be created for this run.
+                                </div>
                             </CardContent>
                         </Card>
                     )}
 
                     <div className="flex justify-end">
-                        <Button type="submit" disabled={processing || !hasTemplates}>
+                        <Button
+                            type="submit"
+                            disabled={processing || !hasTemplates}
+                        >
                             {processing ? 'Starting...' : 'Start Procedure Run'}
                         </Button>
                     </div>

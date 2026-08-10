@@ -2,15 +2,37 @@
    panes and the read-only detail grid are custom-layout bordered surfaces inside the wizard shell
    (not Card/Button); all colours are semantic tokens. */
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
-import { Field, SelectInput, Segmented, StepHead } from '@/components/wizard/primitives';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    Field,
+    Segmented,
+    SelectInput,
+    StepHead,
+} from '@/components/wizard/primitives';
 import { router } from '@inertiajs/react';
-import { CheckCircle2, ClipboardCheck, FileSignature, Gauge, Package, Pill, RotateCcw, ShieldCheck, User, XCircle } from 'lucide-react';
+import {
+    CheckCircle2,
+    ClipboardCheck,
+    FileSignature,
+    Gauge,
+    Package,
+    Pill,
+    RotateCcw,
+    ShieldCheck,
+    User,
+    XCircle,
+} from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
-export type MedItem = { id: number; name: string; dosage: string | null; controlled: boolean; scope: string | null };
+export type MedItem = {
+    id: number;
+    name: string;
+    dosage: string | null;
+    controlled: boolean;
+    scope: string | null;
+};
 export type MedScopeEntry = { med_id: number; med_name: string; scope: string };
 export type SelfAdminRow = {
     id: number;
@@ -57,11 +79,31 @@ export type SelfAdminRow = {
 export type ClientOpt = { id: number; first_name: string; last_name: string };
 
 const SCORES = [
-    { key: 'cognitive_capacity', label: 'Cognitive capacity', help: 'Understands what each medicine is for.' },
-    { key: 'physical_dexterity', label: 'Physical dexterity', help: 'Can handle packaging and devices.' },
-    { key: 'vision_ability', label: 'Vision', help: 'Can read labels and dosing.' },
-    { key: 'swallowing_ability', label: 'Swallowing', help: 'Can take the formulation safely.' },
-    { key: 'understanding_score', label: 'Understands the regimen', help: 'Knows when and how much to take.' },
+    {
+        key: 'cognitive_capacity',
+        label: 'Cognitive capacity',
+        help: 'Understands what each medicine is for.',
+    },
+    {
+        key: 'physical_dexterity',
+        label: 'Physical dexterity',
+        help: 'Can handle packaging and devices.',
+    },
+    {
+        key: 'vision_ability',
+        label: 'Vision',
+        help: 'Can read labels and dosing.',
+    },
+    {
+        key: 'swallowing_ability',
+        label: 'Swallowing',
+        help: 'Can take the formulation safely.',
+    },
+    {
+        key: 'understanding_score',
+        label: 'Understands the regimen',
+        help: 'Knows when and how much to take.',
+    },
 ] as const;
 const CAPABILITIES = [
     { key: 'can_identify_medications', label: 'Identify medicines' },
@@ -71,60 +113,198 @@ const CAPABILITIES = [
     { key: 'can_store_safely', label: 'Store safely' },
     { key: 'willing_to_self_admin', label: 'Willing & engaged' },
 ] as const;
-const PEOPLE = ['Person', 'Family / whānau', 'GP', 'Pharmacist', 'Registered nurse', 'Key worker'];
-const SUPPORTS = ['Large-print labels', 'Easy-open caps', 'Dosette / blister', 'Reminder chart', 'Alarm', 'Liquid form', 'Inhaler aid', 'Colour-code'];
-const STORAGE = [{ value: 'lockable_drawer', label: 'Lockable drawer in room' }, { value: 'own_room', label: 'Own room (low risk)' }, { value: 'staff_cabinet', label: 'Staff cabinet' }, { value: 'cd_cabinet', label: 'CD cabinet' }];
-const TRIGGERS = ['Hospital admission', 'Medication error', 'Condition change', 'New medication', 'Decline in function', 'Person request'].map((t) => ({ value: t, label: t }));
-const INTERVALS = [{ value: '3', label: '3 months' }, { value: '6', label: '6 months' }, { value: '12', label: '12 months' }];
-const ORDERING = [{ value: 'self', label: 'Self' }, { value: 'service', label: 'Service' }, { value: 'pharmacy', label: 'Pharmacy' }];
-const SCOPE_OPTS = [{ value: 'self_managed', label: 'Self-managed' }, { value: 'prompted', label: 'Prompted' }, { value: 'staff_given', label: 'Staff-given' }];
+const PEOPLE = [
+    'Person',
+    'Family / whānau',
+    'GP',
+    'Pharmacist',
+    'Registered nurse',
+    'Key worker',
+];
+const SUPPORTS = [
+    'Large-print labels',
+    'Easy-open caps',
+    'Dosette / blister',
+    'Reminder chart',
+    'Alarm',
+    'Liquid form',
+    'Inhaler aid',
+    'Colour-code',
+];
+const STORAGE = [
+    { value: 'lockable_drawer', label: 'Lockable drawer in room' },
+    { value: 'own_room', label: 'Own room (low risk)' },
+    { value: 'staff_cabinet', label: 'Staff cabinet' },
+    { value: 'cd_cabinet', label: 'CD cabinet' },
+];
+const TRIGGERS = [
+    'Hospital admission',
+    'Medication error',
+    'Condition change',
+    'New medication',
+    'Decline in function',
+    'Person request',
+].map((t) => ({ value: t, label: t }));
+const INTERVALS = [
+    { value: '3', label: '3 months' },
+    { value: '6', label: '6 months' },
+    { value: '12', label: '12 months' },
+];
+const ORDERING = [
+    { value: 'self', label: 'Self' },
+    { value: 'service', label: 'Service' },
+    { value: 'pharmacy', label: 'Pharmacy' },
+];
+const SCOPE_OPTS = [
+    { value: 'self_managed', label: 'Self-managed' },
+    { value: 'prompted', label: 'Prompted' },
+    { value: 'staff_given', label: 'Staff-given' },
+];
 
-export function categoryMeta(o: string): { num: number; label: string; cls: string } {
-    return ({
-        independent: { num: 1, label: 'Cat 1 · Independent', cls: 'bg-status-success-bg text-status-success' },
-        prompted: { num: 2, label: 'Cat 2 · Prompted', cls: 'bg-status-info-bg text-status-info' },
-        supervised: { num: 3, label: 'Cat 3 · Supervised', cls: 'bg-status-warning-bg text-status-warning' },
-        administered: { num: 4, label: 'Cat 4 · Staff-administered', cls: 'bg-status-critical-bg text-status-critical' },
-    } as Record<string, { num: number; label: string; cls: string }>)[o] ?? { num: 0, label: 'Not assessed', cls: 'bg-muted text-muted-foreground' };
+export function categoryMeta(o: string): {
+    num: number;
+    label: string;
+    cls: string;
+} {
+    return (
+        (
+            {
+                independent: {
+                    num: 1,
+                    label: 'Cat 1 · Independent',
+                    cls: 'bg-status-success-bg text-status-success',
+                },
+                prompted: {
+                    num: 2,
+                    label: 'Cat 2 · Prompted',
+                    cls: 'bg-status-info-bg text-status-info',
+                },
+                supervised: {
+                    num: 3,
+                    label: 'Cat 3 · Supervised',
+                    cls: 'bg-status-warning-bg text-status-warning',
+                },
+                administered: {
+                    num: 4,
+                    label: 'Cat 4 · Staff-administered',
+                    cls: 'bg-status-critical-bg text-status-critical',
+                },
+            } as Record<string, { num: number; label: string; cls: string }>
+        )[o] ?? {
+            num: 0,
+            label: 'Not assessed',
+            cls: 'bg-muted text-muted-foreground',
+        }
+    );
 }
 export function scopeMeta(s: string | null): { label: string; cls: string } {
-    return s === 'self_managed' ? { label: 'Self-managed', cls: 'bg-status-success-bg text-status-success' } : s === 'prompted' ? { label: 'Prompted', cls: 'bg-status-warning-bg text-status-warning' } : { label: 'Staff-given', cls: 'bg-status-critical-bg text-status-critical' };
+    return s === 'self_managed'
+        ? {
+              label: 'Self-managed',
+              cls: 'bg-status-success-bg text-status-success',
+          }
+        : s === 'prompted'
+          ? {
+                label: 'Prompted',
+                cls: 'bg-status-warning-bg text-status-warning',
+            }
+          : {
+                label: 'Staff-given',
+                cls: 'bg-status-critical-bg text-status-critical',
+            };
 }
-const computeOutcome = (wishes: boolean, willing: boolean, total: number) => (!wishes || !willing ? 'administered' : total >= 21 ? 'independent' : total >= 16 ? 'prompted' : total >= 11 ? 'supervised' : 'administered');
+const computeOutcome = (wishes: boolean, willing: boolean, total: number) =>
+    !wishes || !willing
+        ? 'administered'
+        : total >= 21
+          ? 'independent'
+          : total >= 16
+            ? 'prompted'
+            : total >= 11
+              ? 'supervised'
+              : 'administered';
 
-function ChipMulti({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
-    const toggle = (o: string) => onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o]);
+function ChipMulti({
+    options,
+    value,
+    onChange,
+}: {
+    options: string[];
+    value: string[];
+    onChange: (v: string[]) => void;
+}) {
+    const toggle = (o: string) =>
+        onChange(
+            value.includes(o) ? value.filter((x) => x !== o) : [...value, o],
+        );
     return (
         <div className="flex flex-wrap gap-2">
             {options.map((o) => (
-                <button key={o} type="button" onClick={() => toggle(o)} className={`rounded-full border px-3 py-1 text-xs font-medium transition ${value.includes(o) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}>{o}</button>
+                <button
+                    key={o}
+                    type="button"
+                    onClick={() => toggle(o)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition ${value.includes(o) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
+                >
+                    {o}
+                </button>
             ))}
         </div>
     );
 }
 
 // ── New / Reassess assessment (5-step) ───────────────────────────────────────
-export function AssessmentWizardDialog({ clients, assessment, mode, onClose }: { clients: ClientOpt[]; assessment?: SelfAdminRow | null; mode: 'new' | 'reassess'; onClose: () => void }) {
+export function AssessmentWizardDialog({
+    clients,
+    assessment,
+    mode,
+    onClose,
+}: {
+    clients: ClientOpt[];
+    assessment?: SelfAdminRow | null;
+    mode: 'new' | 'reassess';
+    onClose: () => void;
+}) {
     const [step, setStep] = useState(0);
     const [busy, setBusy] = useState(false);
-    const [clientId, setClientId] = useState(assessment ? String(assessment.client_id) : '');
-    const [wishes, setWishes] = useState(assessment ? assessment.wishes_to_self_administer : true);
-    const [people, setPeople] = useState<string[]>(assessment?.people_involved ?? []);
+    const [clientId, setClientId] = useState(
+        assessment ? String(assessment.client_id) : '',
+    );
+    const [wishes, setWishes] = useState(
+        assessment ? assessment.wishes_to_self_administer : true,
+    );
+    const [people, setPeople] = useState<string[]>(
+        assessment?.people_involved ?? [],
+    );
     const [scores, setScores] = useState<Record<string, number>>(() => {
         const o: Record<string, number> = {};
-        SCORES.forEach((s) => { o[s.key] = (assessment?.[s.key] as number | null) ?? 3; });
+        SCORES.forEach((s) => {
+            o[s.key] = (assessment?.[s.key] as number | null) ?? 3;
+        });
         return o;
     });
     const [caps, setCaps] = useState<Record<string, boolean>>(() => {
         const o: Record<string, boolean> = {};
-        CAPABILITIES.forEach((c) => { o[c.key] = assessment ? !!assessment[c.key] : true; });
+        CAPABILITIES.forEach((c) => {
+            o[c.key] = assessment ? !!assessment[c.key] : true;
+        });
         return o;
     });
-    const [supports, setSupports] = useState<string[]>(assessment?.support_adjustments ?? []);
+    const [supports, setSupports] = useState<string[]>(
+        assessment?.support_adjustments ?? [],
+    );
     const [storage, setStorage] = useState(assessment?.storage_location ?? '');
-    const [storageNotes, setStorageNotes] = useState(assessment?.safe_storage_notes ?? '');
-    const [interval, setInterval] = useState(assessment?.reassessment_interval_months ? String(assessment.reassessment_interval_months) : '6');
-    const [trigger, setTrigger] = useState(assessment?.reassessment_trigger ?? '');
+    const [storageNotes, setStorageNotes] = useState(
+        assessment?.safe_storage_notes ?? '',
+    );
+    const [interval, setInterval] = useState(
+        assessment?.reassessment_interval_months
+            ? String(assessment.reassessment_interval_months)
+            : '6',
+    );
+    const [trigger, setTrigger] = useState(
+        assessment?.reassessment_trigger ?? '',
+    );
     const [risks, setRisks] = useState(assessment?.risk_factors ?? '');
     const [confirmed, setConfirmed] = useState(false);
 
@@ -140,86 +320,348 @@ export function AssessmentWizardDialog({ clients, assessment, mode, onClose }: {
             wishes_to_self_administer: wishes,
             people_involved: people,
             ...Object.fromEntries(SCORES.map((s) => [s.key, scores[s.key]])),
-            ...Object.fromEntries(CAPABILITIES.map((c) => [c.key, caps[c.key]])),
+            ...Object.fromEntries(
+                CAPABILITIES.map((c) => [c.key, caps[c.key]]),
+            ),
             support_adjustments: supports,
             storage_location: storage || null,
             safe_storage_notes: storageNotes || null,
             reassessment_interval_months: Number(interval),
             reassessment_trigger: trigger || null,
             risk_factors: risks || null,
-            supersedes_id: mode === 'reassess' && assessment ? assessment.id : null,
+            supersedes_id:
+                mode === 'reassess' && assessment ? assessment.id : null,
         };
-        router.post('/emar/self-admin', payload as Parameters<typeof router.post>[1], { preserveScroll: true, onSuccess: () => { toast.success(mode === 'reassess' ? 'Reassessment saved' : 'Assessment saved'); onClose(); }, onError: () => toast.error('Please check the assessment'), onFinish: () => setBusy(false) });
+        router.post(
+            '/emar/self-admin',
+            payload as Parameters<typeof router.post>[1],
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(
+                        mode === 'reassess'
+                            ? 'Reassessment saved'
+                            : 'Assessment saved',
+                    );
+                    onClose();
+                },
+                onError: () => toast.error('Please check the assessment'),
+                onFinish: () => setBusy(false),
+            },
+        );
     };
     const valid = [!!clientId, true, true, true, confirmed];
     return (
-        <MedsWizardDialog open onClose={onClose} title={mode === 'reassess' ? 'Reassessment' : 'New assessment'} description="Assess capacity, consent and support for self-administration." railIcon={ClipboardCheck} railTitle={mode === 'reassess' ? 'Reassessment' : 'New assessment'} railSubtitle={clientName ? `${clientName.first_name} ${clientName.last_name} · ${cat.label}` : cat.label} steps={[{ key: 'consent', label: 'Person & consent', blurb: 'Wishes', icon: User }, { key: 'capacity', label: 'Capacity scores', blurb: '/25', icon: Gauge }, { key: 'capability', label: 'Capability', blurb: '6 checks', icon: ShieldCheck }, { key: 'support', label: 'Support & storage', blurb: 'Adjustments', icon: Package }, { key: 'review', label: 'Review & sign', blurb: 'Confirm', icon: CheckCircle2 }]} stepIndex={step} onStepClick={(i) => i < step && setStep(i)} footer={<><Button variant="ghost" onClick={step === 0 ? onClose : () => setStep(step - 1)} disabled={busy}>{step === 0 ? 'Cancel' : 'Back'}</Button>{step < 4 ? <Button onClick={() => setStep(step + 1)} disabled={!valid[step]}>Continue</Button> : <Button onClick={submit} disabled={busy || !confirmed}>Sign &amp; save assessment</Button>}</>}>
+        <MedsWizardDialog
+            open
+            onClose={onClose}
+            title={mode === 'reassess' ? 'Reassessment' : 'New assessment'}
+            description="Assess capacity, consent and support for self-administration."
+            railIcon={ClipboardCheck}
+            railTitle={mode === 'reassess' ? 'Reassessment' : 'New assessment'}
+            railSubtitle={
+                clientName
+                    ? `${clientName.first_name} ${clientName.last_name} · ${cat.label}`
+                    : cat.label
+            }
+            steps={[
+                {
+                    key: 'consent',
+                    label: 'Person & consent',
+                    blurb: 'Wishes',
+                    icon: User,
+                },
+                {
+                    key: 'capacity',
+                    label: 'Capacity scores',
+                    blurb: '/25',
+                    icon: Gauge,
+                },
+                {
+                    key: 'capability',
+                    label: 'Capability',
+                    blurb: '6 checks',
+                    icon: ShieldCheck,
+                },
+                {
+                    key: 'support',
+                    label: 'Support & storage',
+                    blurb: 'Adjustments',
+                    icon: Package,
+                },
+                {
+                    key: 'review',
+                    label: 'Review & sign',
+                    blurb: 'Confirm',
+                    icon: CheckCircle2,
+                },
+            ]}
+            stepIndex={step}
+            onStepClick={(i) => i < step && setStep(i)}
+            footer={
+                <>
+                    <Button
+                        variant="ghost"
+                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
+                        disabled={busy}
+                    >
+                        {step === 0 ? 'Cancel' : 'Back'}
+                    </Button>
+                    {step < 4 ? (
+                        <Button
+                            onClick={() => setStep(step + 1)}
+                            disabled={!valid[step]}
+                        >
+                            Continue
+                        </Button>
+                    ) : (
+                        <Button onClick={submit} disabled={busy || !confirmed}>
+                            Sign &amp; save assessment
+                        </Button>
+                    )}
+                </>
+            }
+        >
             {step === 0 && (
                 <>
-                    <StepHead icon={User} title="Person & consent" blurb="Independence first — staff step in only where the risk assessment says so." />
+                    <StepHead
+                        icon={User}
+                        title="Person & consent"
+                        blurb="Independence first — staff step in only where the risk assessment says so."
+                    />
                     <Field label="Client" required span>
-                        <SelectInput value={clientId} onChange={setClientId} placeholder="Select client…" options={clients.map((c) => ({ value: String(c.id), label: `${c.first_name} ${c.last_name}` }))} />
+                        <SelectInput
+                            value={clientId}
+                            onChange={setClientId}
+                            placeholder="Select client…"
+                            options={clients.map((c) => ({
+                                value: String(c.id),
+                                label: `${c.first_name} ${c.last_name}`,
+                            }))}
+                        />
                     </Field>
                     <div className="mt-4 grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => setWishes(true)} className={`rounded-xl border-2 p-4 text-left ${wishes ? 'border-primary bg-primary/5' : 'border-border'}`}><div className="font-semibold">Wishes to self-administer</div><div className="text-xs text-muted-foreground">The person wants to manage their own medicines.</div></button>
-                        <button type="button" onClick={() => setWishes(false)} className={`rounded-xl border-2 p-4 text-left ${!wishes ? 'border-primary bg-primary/5' : 'border-border'}`}><div className="font-semibold">Does not wish to</div><div className="text-xs text-muted-foreground">Prefers staff to administer — Category 4.</div></button>
+                        <button
+                            type="button"
+                            onClick={() => setWishes(true)}
+                            className={`rounded-xl border-2 p-4 text-left ${wishes ? 'border-primary bg-primary/5' : 'border-border'}`}
+                        >
+                            <div className="font-semibold">
+                                Wishes to self-administer
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                The person wants to manage their own medicines.
+                            </div>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setWishes(false)}
+                            className={`rounded-xl border-2 p-4 text-left ${!wishes ? 'border-primary bg-primary/5' : 'border-border'}`}
+                        >
+                            <div className="font-semibold">
+                                Does not wish to
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Prefers staff to administer — Category 4.
+                            </div>
+                        </button>
                     </div>
-                    <div className="mt-4"><div className="mb-1.5 text-sm font-medium">Who was involved?</div><ChipMulti options={PEOPLE} value={people} onChange={setPeople} /></div>
+                    <div className="mt-4">
+                        <div className="mb-1.5 text-sm font-medium">
+                            Who was involved?
+                        </div>
+                        <ChipMulti
+                            options={PEOPLE}
+                            value={people}
+                            onChange={setPeople}
+                        />
+                    </div>
                 </>
             )}
             {step === 1 && (
                 <>
-                    <StepHead icon={Gauge} title="Capacity scores" blurb="Rate each 1 (low) to 5 (high)." />
+                    <StepHead
+                        icon={Gauge}
+                        title="Capacity scores"
+                        blurb="Rate each 1 (low) to 5 (high)."
+                    />
                     <div className="flex flex-col gap-3">
                         {SCORES.map((s) => (
                             <div key={s.key} className="rounded-lg border p-3">
-                                <div className="mb-1.5 flex items-center justify-between"><span className="text-sm font-medium">{s.label}</span><span className="text-xs text-muted-foreground">{s.help}</span></div>
-                                <Segmented value={String(scores[s.key])} onChange={(v) => setScores((o) => ({ ...o, [s.key]: Number(v) }))} options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))} />
+                                <div className="mb-1.5 flex items-center justify-between">
+                                    <span className="text-sm font-medium">
+                                        {s.label}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {s.help}
+                                    </span>
+                                </div>
+                                <Segmented
+                                    value={String(scores[s.key])}
+                                    onChange={(v) =>
+                                        setScores((o) => ({
+                                            ...o,
+                                            [s.key]: Number(v),
+                                        }))
+                                    }
+                                    options={[1, 2, 3, 4, 5].map((n) => ({
+                                        value: String(n),
+                                        label: String(n),
+                                    }))}
+                                />
                             </div>
                         ))}
                     </div>
-                    <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${cat.cls}`}>Total {total}/25 · {cat.label}</div>
+                    <div
+                        className={`mt-4 rounded-lg border px-4 py-3 text-sm ${cat.cls}`}
+                    >
+                        Total {total}/25 · {cat.label}
+                    </div>
                 </>
             )}
             {step === 2 && (
                 <>
-                    <StepHead icon={ShieldCheck} title="Capability checks" blurb="Tap each capability the person demonstrates." />
+                    <StepHead
+                        icon={ShieldCheck}
+                        title="Capability checks"
+                        blurb="Tap each capability the person demonstrates."
+                    />
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                         {CAPABILITIES.map((c) => (
-                            <button key={c.key} type="button" onClick={() => setCaps((o) => ({ ...o, [c.key]: !o[c.key] }))} className={`rounded-xl border-2 p-3 text-left text-sm ${caps[c.key] ? 'border-status-success bg-status-success-bg/50' : 'border-border'}`}>
-                                {caps[c.key] ? <CheckCircle2 className="mb-1 h-4 w-4 text-status-success" /> : <span className="mb-1 block h-4 w-4 rounded-full border" />}
+                            <button
+                                key={c.key}
+                                type="button"
+                                onClick={() =>
+                                    setCaps((o) => ({
+                                        ...o,
+                                        [c.key]: !o[c.key],
+                                    }))
+                                }
+                                className={`rounded-xl border-2 p-3 text-left text-sm ${caps[c.key] ? 'border-status-success bg-status-success-bg/50' : 'border-border'}`}
+                            >
+                                {caps[c.key] ? (
+                                    <CheckCircle2 className="mb-1 h-4 w-4 text-status-success" />
+                                ) : (
+                                    <span className="mb-1 block h-4 w-4 rounded-full border" />
+                                )}
                                 {c.label}
                             </button>
                         ))}
                     </div>
-                    {!caps.willing_to_self_admin && <div className="mt-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/60 px-3 py-2 text-xs text-status-critical">Not willing/engaged — the person will be Category 4 (staff-administered) regardless of score.</div>}
+                    {!caps.willing_to_self_admin && (
+                        <div className="mt-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/60 px-3 py-2 text-xs text-status-critical">
+                            Not willing/engaged — the person will be Category 4
+                            (staff-administered) regardless of score.
+                        </div>
+                    )}
                 </>
             )}
             {step === 3 && (
                 <>
-                    <StepHead icon={Package} title="Support & storage" blurb="Adjustments, storage and the reassessment cadence." />
-                    <div className="mb-3"><div className="mb-1.5 text-sm font-medium">Support adjustments</div><ChipMulti options={SUPPORTS} value={supports} onChange={setSupports} /></div>
+                    <StepHead
+                        icon={Package}
+                        title="Support & storage"
+                        blurb="Adjustments, storage and the reassessment cadence."
+                    />
+                    <div className="mb-3">
+                        <div className="mb-1.5 text-sm font-medium">
+                            Support adjustments
+                        </div>
+                        <ChipMulti
+                            options={SUPPORTS}
+                            value={supports}
+                            onChange={setSupports}
+                        />
+                    </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <Field label="Storage location"><SelectInput value={storage} onChange={setStorage} placeholder="Where stored…" options={STORAGE} /></Field>
-                        <Field label="Storage notes"><Input value={storageNotes} onChange={(e) => setStorageNotes(e.target.value)} placeholder="Optional" /></Field>
-                        <Field label="Reassess interval"><Segmented value={interval} onChange={setInterval} options={INTERVALS} /></Field>
-                        <Field label="Early-review trigger"><SelectInput value={trigger} onChange={setTrigger} placeholder="Optional…" options={TRIGGERS} /></Field>
-                        <Field label="Risk factors" span><Input value={risks} onChange={(e) => setRisks(e.target.value)} placeholder="Anything that raises risk" /></Field>
+                        <Field label="Storage location">
+                            <SelectInput
+                                value={storage}
+                                onChange={setStorage}
+                                placeholder="Where stored…"
+                                options={STORAGE}
+                            />
+                        </Field>
+                        <Field label="Storage notes">
+                            <Input
+                                value={storageNotes}
+                                onChange={(e) =>
+                                    setStorageNotes(e.target.value)
+                                }
+                                placeholder="Optional"
+                            />
+                        </Field>
+                        <Field label="Reassess interval">
+                            <Segmented
+                                value={interval}
+                                onChange={setInterval}
+                                options={INTERVALS}
+                            />
+                        </Field>
+                        <Field label="Early-review trigger">
+                            <SelectInput
+                                value={trigger}
+                                onChange={setTrigger}
+                                placeholder="Optional…"
+                                options={TRIGGERS}
+                            />
+                        </Field>
+                        <Field label="Risk factors" span>
+                            <Input
+                                value={risks}
+                                onChange={(e) => setRisks(e.target.value)}
+                                placeholder="Anything that raises risk"
+                            />
+                        </Field>
                     </div>
                 </>
             )}
             {step === 4 && (
                 <>
-                    <StepHead icon={CheckCircle2} title="Review & sign" blurb="Confirm the assessment outcome." />
+                    <StepHead
+                        icon={CheckCircle2}
+                        title="Review & sign"
+                        blurb="Confirm the assessment outcome."
+                    />
                     <div className="rounded-lg border px-4">
-                        <SummaryRow label="Client" value={clientName ? `${clientName.first_name} ${clientName.last_name}` : '—'} />
-                        <SummaryRow label="Wishes to self-administer" value={wishes ? 'Yes' : 'No'} />
-                        <SummaryRow label="Capacity total" value={`${total}/25`} />
-                        <SummaryRow label="Capability" value={`${CAPABILITIES.filter((c) => caps[c.key]).length}/6`} />
-                        <SummaryRow label="Computed category" value={cat.label} />
-                        <SummaryRow label="Reassess" value={`${interval} months${trigger ? ` · ${trigger}` : ''}`} />
+                        <SummaryRow
+                            label="Client"
+                            value={
+                                clientName
+                                    ? `${clientName.first_name} ${clientName.last_name}`
+                                    : '—'
+                            }
+                        />
+                        <SummaryRow
+                            label="Wishes to self-administer"
+                            value={wishes ? 'Yes' : 'No'}
+                        />
+                        <SummaryRow
+                            label="Capacity total"
+                            value={`${total}/25`}
+                        />
+                        <SummaryRow
+                            label="Capability"
+                            value={`${CAPABILITIES.filter((c) => caps[c.key]).length}/6`}
+                        />
+                        <SummaryRow
+                            label="Computed category"
+                            value={cat.label}
+                        />
+                        <SummaryRow
+                            label="Reassess"
+                            value={`${interval} months${trigger ? ` · ${trigger}` : ''}`}
+                        />
                     </div>
-                    <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="h-4 w-4 rounded border-border" />I confirm this assessment was completed with the person.</label>
+                    <label className="mt-4 flex items-center gap-2 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={confirmed}
+                            onChange={(e) => setConfirmed(e.target.checked)}
+                            className="h-4 w-4 rounded border-border"
+                        />
+                        I confirm this assessment was completed with the person.
+                    </label>
                 </>
             )}
         </MedsWizardDialog>
@@ -227,49 +669,214 @@ export function AssessmentWizardDialog({ clients, assessment, mode, onClose }: {
 }
 
 // ── Sign agreement (1-step) ──────────────────────────────────────────────────
-export function SignAgreementDialog({ assessment, onClose }: { assessment: SelfAdminRow; onClose: () => void }) {
-    const [ordering, setOrdering] = useState(assessment.ordering_responsibility ?? 'service');
-    const [responsibilities, setResponsibilities] = useState(assessment.agreement_responsibilities ?? '');
+export function SignAgreementDialog({
+    assessment,
+    onClose,
+}: {
+    assessment: SelfAdminRow;
+    onClose: () => void;
+}) {
+    const [ordering, setOrdering] = useState(
+        assessment.ordering_responsibility ?? 'service',
+    );
+    const [responsibilities, setResponsibilities] = useState(
+        assessment.agreement_responsibilities ?? '',
+    );
     const [confirmed, setConfirmed] = useState(false);
     const [busy, setBusy] = useState(false);
     const submit = () => {
         setBusy(true);
-        router.put(`/emar/self-admin/${assessment.id}`, { sign_agreement: true, ordering_responsibility: ordering, agreement_responsibilities: responsibilities || null } as Parameters<typeof router.put>[1], { preserveScroll: true, onSuccess: () => { toast.success('Agreement signed'); onClose(); }, onError: () => toast.error('Could not sign agreement'), onFinish: () => setBusy(false) });
+        router.put(
+            `/emar/self-admin/${assessment.id}`,
+            {
+                sign_agreement: true,
+                ordering_responsibility: ordering,
+                agreement_responsibilities: responsibilities || null,
+            } as Parameters<typeof router.put>[1],
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Agreement signed');
+                    onClose();
+                },
+                onError: () => toast.error('Could not sign agreement'),
+                onFinish: () => setBusy(false),
+            },
+        );
     };
     return (
-        <MedsWizardDialog open onClose={onClose} title="Self-administration agreement" description={`Record the signed agreement for ${assessment.client_name}.`} railIcon={FileSignature} railTitle="Sign agreement" railSubtitle={assessment.client_name} steps={[{ key: 'sign', label: 'Agreement', blurb: 'Responsibilities', icon: FileSignature }]} stepIndex={0} onStepClick={() => {}} footer={<><Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button><Button onClick={submit} disabled={busy || !confirmed}>Sign agreement</Button></>}>
-            <StepHead icon={FileSignature} title="Self-administration agreement" blurb="Confirm who orders the medicines and the agreed responsibilities." />
+        <MedsWizardDialog
+            open
+            onClose={onClose}
+            title="Self-administration agreement"
+            description={`Record the signed agreement for ${assessment.client_name}.`}
+            railIcon={FileSignature}
+            railTitle="Sign agreement"
+            railSubtitle={assessment.client_name}
+            steps={[
+                {
+                    key: 'sign',
+                    label: 'Agreement',
+                    blurb: 'Responsibilities',
+                    icon: FileSignature,
+                },
+            ]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            footer={
+                <>
+                    <Button variant="ghost" onClick={onClose} disabled={busy}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={busy || !confirmed}>
+                        Sign agreement
+                    </Button>
+                </>
+            }
+        >
+            <StepHead
+                icon={FileSignature}
+                title="Self-administration agreement"
+                blurb="Confirm who orders the medicines and the agreed responsibilities."
+            />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Ordering responsibility"><SelectInput value={ordering} onChange={setOrdering} placeholder="Who orders…" options={ORDERING} /></Field>
+                <Field label="Ordering responsibility">
+                    <SelectInput
+                        value={ordering}
+                        onChange={setOrdering}
+                        placeholder="Who orders…"
+                        options={ORDERING}
+                    />
+                </Field>
             </div>
-            <Field label="Agreed responsibilities" span><Input value={responsibilities} onChange={(e) => setResponsibilities(e.target.value)} placeholder="What the person and service each agree to" /></Field>
-            <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="h-4 w-4 rounded border-border" />The person has read and signed the agreement.</label>
+            <Field label="Agreed responsibilities" span>
+                <Input
+                    value={responsibilities}
+                    onChange={(e) => setResponsibilities(e.target.value)}
+                    placeholder="What the person and service each agree to"
+                />
+            </Field>
+            <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(e) => setConfirmed(e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                />
+                The person has read and signed the agreement.
+            </label>
         </MedsWizardDialog>
     );
 }
 
 // ── Per-medication scope (1-step) ────────────────────────────────────────────
-export function MedScopeDialog({ assessment, onClose }: { assessment: SelfAdminRow; onClose: () => void }) {
+export function MedScopeDialog({
+    assessment,
+    onClose,
+}: {
+    assessment: SelfAdminRow;
+    onClose: () => void;
+}) {
     const [scopes, setScopes] = useState<Record<number, string>>(() => {
         const o: Record<number, string> = {};
-        assessment.client_medications.forEach((m) => { o[m.id] = m.scope ?? 'staff_given'; });
+        assessment.client_medications.forEach((m) => {
+            o[m.id] = m.scope ?? 'staff_given';
+        });
         return o;
     });
     const [busy, setBusy] = useState(false);
     const submit = () => {
         setBusy(true);
-        const med_scope = assessment.client_medications.map((m) => ({ med_id: m.id, med_name: m.name, scope: scopes[m.id] ?? 'staff_given' }));
-        router.put(`/emar/self-admin/${assessment.id}`, { med_scope } as Parameters<typeof router.put>[1], { preserveScroll: true, onSuccess: () => { toast.success('Scope saved'); onClose(); }, onError: () => toast.error('Could not save scope'), onFinish: () => setBusy(false) });
+        const med_scope = assessment.client_medications.map((m) => ({
+            med_id: m.id,
+            med_name: m.name,
+            scope: scopes[m.id] ?? 'staff_given',
+        }));
+        router.put(
+            `/emar/self-admin/${assessment.id}`,
+            { med_scope } as Parameters<typeof router.put>[1],
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Scope saved');
+                    onClose();
+                },
+                onError: () => toast.error('Could not save scope'),
+                onFinish: () => setBusy(false),
+            },
+        );
     };
     return (
-        <MedsWizardDialog open onClose={onClose} title="Per-medication scope" description={`Set the self-administration scope for each of ${assessment.client_name}'s medicines.`} railIcon={Pill} railTitle="Medication scope" railSubtitle={assessment.client_name} steps={[{ key: 'scope', label: 'Scope', blurb: 'Per medicine', icon: Pill }]} stepIndex={0} onStepClick={() => {}} footer={<><Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button><Button onClick={submit} disabled={busy}>Save scope</Button></>}>
-            <StepHead icon={Pill} title="Per-medication scope" blurb="Self-administration is not all-or-nothing — set each medicine individually." />
-            {assessment.client_medications.length === 0 ? <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">No active medications for this client.</div> : (
+        <MedsWizardDialog
+            open
+            onClose={onClose}
+            title="Per-medication scope"
+            description={`Set the self-administration scope for each of ${assessment.client_name}'s medicines.`}
+            railIcon={Pill}
+            railTitle="Medication scope"
+            railSubtitle={assessment.client_name}
+            steps={[
+                {
+                    key: 'scope',
+                    label: 'Scope',
+                    blurb: 'Per medicine',
+                    icon: Pill,
+                },
+            ]}
+            stepIndex={0}
+            onStepClick={() => {}}
+            footer={
+                <>
+                    <Button variant="ghost" onClick={onClose} disabled={busy}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit} disabled={busy}>
+                        Save scope
+                    </Button>
+                </>
+            }
+        >
+            <StepHead
+                icon={Pill}
+                title="Per-medication scope"
+                blurb="Self-administration is not all-or-nothing — set each medicine individually."
+            />
+            {assessment.client_medications.length === 0 ? (
+                <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+                    No active medications for this client.
+                </div>
+            ) : (
                 <div className="flex flex-col gap-2">
                     {assessment.client_medications.map((m) => (
-                        <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                            <div><span className="text-sm font-medium">{m.name}</span>{m.controlled && <span className="ml-2 rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">CD</span>}{m.dosage && <div className="text-xs text-muted-foreground">{m.dosage}</div>}</div>
-                            <div className="w-40"><SelectInput value={scopes[m.id] ?? 'staff_given'} onChange={(v) => setScopes((o) => ({ ...o, [m.id]: v }))} placeholder="Scope…" options={SCOPE_OPTS} /></div>
+                        <div
+                            key={m.id}
+                            className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                        >
+                            <div>
+                                <span className="text-sm font-medium">
+                                    {m.name}
+                                </span>
+                                {m.controlled && (
+                                    <span className="ml-2 rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">
+                                        CD
+                                    </span>
+                                )}
+                                {m.dosage && (
+                                    <div className="text-xs text-muted-foreground">
+                                        {m.dosage}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="w-40">
+                                <SelectInput
+                                    value={scopes[m.id] ?? 'staff_given'}
+                                    onChange={(v) =>
+                                        setScopes((o) => ({ ...o, [m.id]: v }))
+                                    }
+                                    placeholder="Scope…"
+                                    options={SCOPE_OPTS}
+                                />
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -282,7 +889,13 @@ export function MedScopeDialog({ assessment, onClose }: { assessment: SelfAdminR
 // Footer Options bar (Reassess · Sign agreement · Set scope · View client + Close)
 // mirrors components/emar/prn-detail-dialog.tsx — the wizard actions open in place;
 // View client navigates to the care page. Body surfaces the full assessment.
-export function ViewSelfAdminDialog({ assessment: a, onClose, onReassess, onSignAgreement, onSetScope }: {
+export function ViewSelfAdminDialog({
+    assessment: a,
+    onClose,
+    onReassess,
+    onSignAgreement,
+    onSetScope,
+}: {
     assessment: SelfAdminRow;
     onClose: () => void;
     onReassess: () => void;
@@ -290,9 +903,11 @@ export function ViewSelfAdminDialog({ assessment: a, onClose, onReassess, onSign
     onSetScope: () => void;
 }) {
     const cat = categoryMeta(a.outcome);
-    const selfManaging = a.outcome === 'independent' || a.outcome === 'prompted';
+    const selfManaging =
+        a.outcome === 'independent' || a.outcome === 'prompted';
     const canSign = selfManaging && !a.agreement_signed_at;
-    const canScope = a.outcome !== 'administered' && a.client_medications.length > 0;
+    const canScope =
+        a.outcome !== 'administered' && a.client_medications.length > 0;
     const capCount = CAPABILITIES.filter((c) => a[c.key]).length;
     return (
         <MedsWizardDialog
@@ -303,44 +918,109 @@ export function ViewSelfAdminDialog({ assessment: a, onClose, onReassess, onSign
             railIcon={ClipboardCheck}
             railTitle={a.client_name}
             railSubtitle={`${cat.label}${a.nhi ? ` · NHI ${a.nhi}` : ''}`}
-            steps={[{ key: 'detail', label: 'Summary', blurb: 'Read-only', icon: ClipboardCheck }]}
+            steps={[
+                {
+                    key: 'detail',
+                    label: 'Summary',
+                    blurb: 'Read-only',
+                    icon: ClipboardCheck,
+                },
+            ]}
             stepIndex={0}
             onStepClick={() => {}}
             footer={
                 <>
-                    <Button variant="outline" onClick={onClose}>Close</Button>
+                    <Button variant="outline" onClick={onClose}>
+                        Close
+                    </Button>
                     <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        <Button onClick={onReassess}><RotateCcw className="h-4 w-4" /> Reassess</Button>
-                        {canSign && <Button variant="outline" onClick={onSignAgreement}><FileSignature className="h-4 w-4" /> Sign agreement</Button>}
-                        {canScope && <Button variant="outline" onClick={onSetScope}><Pill className="h-4 w-4" /> Set scope</Button>}
-                        <Button variant="ghost" onClick={() => router.visit(`/operations/clients/${a.client_id}?tab=mar`)}><User className="h-4 w-4" /> Client</Button>
+                        <Button onClick={onReassess}>
+                            <RotateCcw className="h-4 w-4" /> Reassess
+                        </Button>
+                        {canSign && (
+                            <Button variant="outline" onClick={onSignAgreement}>
+                                <FileSignature className="h-4 w-4" /> Sign
+                                agreement
+                            </Button>
+                        )}
+                        {canScope && (
+                            <Button variant="outline" onClick={onSetScope}>
+                                <Pill className="h-4 w-4" /> Set scope
+                            </Button>
+                        )}
+                        <Button
+                            variant="ghost"
+                            onClick={() =>
+                                router.visit(
+                                    `/operations/clients/${a.client_id}?tab=mar`,
+                                )
+                            }
+                        >
+                            <User className="h-4 w-4" /> Client
+                        </Button>
                     </div>
                 </>
             }
         >
             <div className="rounded-lg border px-4">
                 <SummaryRow label="Category" value={cat.label} />
-                <SummaryRow label="Wishes to self-administer" value={a.wishes_to_self_administer ? 'Yes' : 'No'} />
-                <SummaryRow label="Capacity total" value={`${a.total_score}/25`} />
+                <SummaryRow
+                    label="Wishes to self-administer"
+                    value={a.wishes_to_self_administer ? 'Yes' : 'No'}
+                />
+                <SummaryRow
+                    label="Capacity total"
+                    value={`${a.total_score}/25`}
+                />
                 <SummaryRow label="Capability" value={`${capCount}/6`} />
-                <SummaryRow label="Storage" value={STORAGE.find((s) => s.value === a.storage_location)?.label ?? '—'} />
+                <SummaryRow
+                    label="Storage"
+                    value={
+                        STORAGE.find((s) => s.value === a.storage_location)
+                            ?.label ?? '—'
+                    }
+                />
                 <SummaryRow
                     label="Reassessment"
-                    value={<span className="inline-flex items-center gap-1.5">{a.reassessment_date ?? '—'}{a.reassessment_due && <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">Due</span>}</span>}
+                    value={
+                        <span className="inline-flex items-center gap-1.5">
+                            {a.reassessment_date ?? '—'}
+                            {a.reassessment_due && (
+                                <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">
+                                    Due
+                                </span>
+                            )}
+                        </span>
+                    }
                 />
                 <SummaryRow label="Assessor" value={a.assessor_name ?? '—'} />
             </div>
 
-            <DetailSection title="Capacity sub-scores" hint={`${a.total_score}/25`}>
+            <DetailSection
+                title="Capacity sub-scores"
+                hint={`${a.total_score}/25`}
+            >
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                     {SCORES.map((s) => {
                         const v = (a[s.key] as number | null) ?? null;
                         return (
-                            <div key={s.key} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                            <div
+                                key={s.key}
+                                className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                            >
                                 <span className="text-sm">{s.label}</span>
                                 <span className="flex items-center gap-2">
-                                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${((v ?? 0) / 5) * 100}%` }} /></span>
-                                    <span className="tabular-nums text-xs font-semibold">{v ?? '—'}/5</span>
+                                    <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                                        <span
+                                            className="block h-full rounded-full bg-primary"
+                                            style={{
+                                                width: `${((v ?? 0) / 5) * 100}%`,
+                                            }}
+                                        />
+                                    </span>
+                                    <span className="text-xs font-semibold tabular-nums">
+                                        {v ?? '—'}/5
+                                    </span>
                                 </span>
                             </div>
                         );
@@ -353,8 +1033,15 @@ export function ViewSelfAdminDialog({ assessment: a, onClose, onReassess, onSign
                     {CAPABILITIES.map((c) => {
                         const ok = !!a[c.key];
                         return (
-                            <div key={c.key} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${ok ? 'border-status-success/40 bg-status-success-bg/30' : 'border-border'}`}>
-                                {ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" /> : <XCircle className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                            <div
+                                key={c.key}
+                                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${ok ? 'border-status-success/40 bg-status-success-bg/30' : 'border-border'}`}
+                            >
+                                {ok ? (
+                                    <CheckCircle2 className="h-4 w-4 shrink-0 text-status-success" />
+                                ) : (
+                                    <XCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                )}
                                 {c.label}
                             </div>
                         );
@@ -362,27 +1049,80 @@ export function ViewSelfAdminDialog({ assessment: a, onClose, onReassess, onSign
                 </div>
             </DetailSection>
 
-            {a.people_involved.length > 0 && <Detail label="Involved" value={a.people_involved.join(', ')} />}
-            {a.support_adjustments.length > 0 && <Detail label="Support adjustments" value={a.support_adjustments.join(', ')} />}
-            {a.safe_storage_notes && <Detail label="Storage notes" value={a.safe_storage_notes} />}
-            {a.risk_factors && <Detail label="Risk factors" value={a.risk_factors} />}
-            {a.reassessment_trigger && <Detail label="Early-review trigger" value={a.reassessment_trigger} />}
+            {a.people_involved.length > 0 && (
+                <Detail label="Involved" value={a.people_involved.join(', ')} />
+            )}
+            {a.support_adjustments.length > 0 && (
+                <Detail
+                    label="Support adjustments"
+                    value={a.support_adjustments.join(', ')}
+                />
+            )}
+            {a.safe_storage_notes && (
+                <Detail label="Storage notes" value={a.safe_storage_notes} />
+            )}
+            {a.risk_factors && (
+                <Detail label="Risk factors" value={a.risk_factors} />
+            )}
+            {a.reassessment_trigger && (
+                <Detail
+                    label="Early-review trigger"
+                    value={a.reassessment_trigger}
+                />
+            )}
 
             {a.agreement_signed_at ? (
-                <div className="mt-4 rounded-lg border border-status-success/30 bg-status-success-bg/40 px-3 py-2 text-sm text-status-success">Agreement signed{a.agreement_signed_by_name ? ` by ${a.agreement_signed_by_name}` : ''}{a.ordering_responsibility ? ` · ordering: ${a.ordering_responsibility}` : ''}.{a.agreement_responsibilities ? ` ${a.agreement_responsibilities}` : ''}</div>
+                <div className="mt-4 rounded-lg border border-status-success/30 bg-status-success-bg/40 px-3 py-2 text-sm text-status-success">
+                    Agreement signed
+                    {a.agreement_signed_by_name
+                        ? ` by ${a.agreement_signed_by_name}`
+                        : ''}
+                    {a.ordering_responsibility
+                        ? ` · ordering: ${a.ordering_responsibility}`
+                        : ''}
+                    .
+                    {a.agreement_responsibilities
+                        ? ` ${a.agreement_responsibilities}`
+                        : ''}
+                </div>
             ) : selfManaging ? (
-                <div className="mt-4 rounded-lg border border-status-critical/30 bg-status-critical-bg/50 px-3 py-2 text-sm text-status-critical">Self-administration agreement not yet signed.</div>
+                <div className="mt-4 rounded-lg border border-status-critical/30 bg-status-critical-bg/50 px-3 py-2 text-sm text-status-critical">
+                    Self-administration agreement not yet signed.
+                </div>
             ) : null}
 
             {a.client_medications.length > 0 && (
                 <DetailSection title="Per-medication scope">
                     <div className="flex flex-col gap-1.5">
-                        {a.client_medications.map((m) => { const sm = scopeMeta(m.scope); return (
-                            <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                                <span className="flex items-center gap-2 text-sm"><Pill className="h-4 w-4 text-muted-foreground" />{m.name}{m.controlled && <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">CD</span>}{m.dosage && <span className="text-xs text-muted-foreground">{m.dosage}</span>}</span>
-                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sm.cls}`}>{sm.label}</span>
-                            </div>
-                        ); })}
+                        {a.client_medications.map((m) => {
+                            const sm = scopeMeta(m.scope);
+                            return (
+                                <div
+                                    key={m.id}
+                                    className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+                                >
+                                    <span className="flex items-center gap-2 text-sm">
+                                        <Pill className="h-4 w-4 text-muted-foreground" />
+                                        {m.name}
+                                        {m.controlled && (
+                                            <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">
+                                                CD
+                                            </span>
+                                        )}
+                                        {m.dosage && (
+                                            <span className="text-xs text-muted-foreground">
+                                                {m.dosage}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span
+                                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sm.cls}`}
+                                    >
+                                        {sm.label}
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </div>
                 </DetailSection>
             )}
@@ -391,15 +1131,34 @@ export function ViewSelfAdminDialog({ assessment: a, onClose, onReassess, onSign
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
-    return <div className="mt-3"><div className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div><p className="text-sm">{value}</p></div>;
+    return (
+        <div className="mt-3">
+            <div className="mb-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                {label}
+            </div>
+            <p className="text-sm">{value}</p>
+        </div>
+    );
 }
 
-function DetailSection({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+function DetailSection({
+    title,
+    hint,
+    children,
+}: {
+    title: string;
+    hint?: string;
+    children: ReactNode;
+}) {
     return (
         <div className="mt-4">
             <div className="mb-1.5 flex items-baseline justify-between">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
-                {hint ? <div className="text-xs text-muted-foreground">{hint}</div> : null}
+                <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                    {title}
+                </div>
+                {hint ? (
+                    <div className="text-xs text-muted-foreground">{hint}</div>
+                ) : null}
             </div>
             {children}
         </div>

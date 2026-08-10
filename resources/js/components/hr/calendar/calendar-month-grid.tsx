@@ -52,7 +52,10 @@ function lastDay(e: CalendarLayerFeed): Date {
 
 function coversDay(e: CalendarLayerFeed, d: Date): boolean {
     const ds = dayStart(d).getTime();
-    return ds >= dayStart(new Date(e.start)).getTime() && ds <= lastDay(e).getTime();
+    return (
+        ds >= dayStart(new Date(e.start)).getTime() &&
+        ds <= lastDay(e).getTime()
+    );
 }
 
 export function CalendarMonthGrid({
@@ -199,17 +202,26 @@ function WeekRow({
         const isToday = sameDay(d, today);
         const weekend = d.getDay() === 0 || d.getDay() === 6;
         const key = isoKey(d);
-        const holiday = bars.some((e) => e.layer === 'holiday' && coversDay(e, d));
+        const holiday = bars.some(
+            (e) => e.layer === 'holiday' && coversDay(e, d),
+        );
         const gap = showCoverage && gapDays.has(key);
-        const worked = showCoverage && !gap && workedDays.has(key) && !weekend && inMonth;
-        let bg = inMonth ? 'transparent' : 'color-mix(in oklch, var(--muted) 35%, transparent)';
-        if (holiday) bg = 'color-mix(in oklch, var(--status-warning) 9%, transparent)';
+        const worked =
+            showCoverage && !gap && workedDays.has(key) && !weekend && inMonth;
+        let bg = inMonth
+            ? 'transparent'
+            : 'color-mix(in oklch, var(--muted) 35%, transparent)';
+        if (holiday)
+            bg = 'color-mix(in oklch, var(--status-warning) 9%, transparent)';
         if (isToday) bg = 'color-mix(in oklch, var(--primary) 5%, transparent)';
         let strip = '';
         if (gap) strip = 'inset 0 -3px 0 0 var(--status-critical)';
-        else if (worked) strip = 'inset 0 -3px 0 0 color-mix(in oklch, var(--live) 55%, transparent)';
+        else if (worked)
+            strip =
+                'inset 0 -3px 0 0 color-mix(in oklch, var(--live) 55%, transparent)';
         const style: CSSProperties = {
-            borderRight: '1px dotted color-mix(in oklch, var(--primary) 9%, transparent)',
+            borderRight:
+                '1px dotted color-mix(in oklch, var(--primary) 9%, transparent)',
             background: bg,
         };
         if (strip) style.boxShadow = strip;
@@ -221,31 +233,43 @@ function WeekRow({
         .filter(
             (e) =>
                 lastDay(e).getTime() >= dayStart(wStart).getTime() &&
-                dayStart(new Date(e.start)).getTime() <= dayStart(wEnd).getTime(),
+                dayStart(new Date(e.start)).getTime() <=
+                    dayStart(wEnd).getTime(),
         )
         .sort(
             (a, b) =>
                 new Date(a.start).getTime() - new Date(b.start).getTime() ||
                 lastDay(b).getTime() -
                     dayStart(new Date(b.start)).getTime() -
-                    (lastDay(a).getTime() - dayStart(new Date(a.start)).getTime()),
+                    (lastDay(a).getTime() -
+                        dayStart(new Date(a.start)).getTime()),
         );
     const lanes: [number, number][][] = [];
     const placed: Bar[] = [];
     for (const e of spanning) {
         const startCol = Math.max(
             0,
-            Math.round((dayStart(new Date(e.start)).getTime() - dayStart(wStart).getTime()) / DAY_MS),
+            Math.round(
+                (dayStart(new Date(e.start)).getTime() -
+                    dayStart(wStart).getTime()) /
+                    DAY_MS,
+            ),
         );
         const endCol = Math.min(
             6,
-            Math.round((lastDay(e).getTime() - dayStart(wStart).getTime()) / DAY_MS),
+            Math.round(
+                (lastDay(e).getTime() - dayStart(wStart).getTime()) / DAY_MS,
+            ),
         );
         const col = Math.max(0, startCol);
         const span = Math.min(6, endCol) - col + 1;
         if (span <= 0) continue;
         let lane = 0;
-        while (lanes[lane] && lanes[lane].some((r) => !(endCol < r[0] || col > r[1]))) lane++;
+        while (
+            lanes[lane] &&
+            lanes[lane].some((r) => !(endCol < r[0] || col > r[1]))
+        )
+            lane++;
         if (!lanes[lane]) lanes[lane] = [];
         lanes[lane].push([col, Math.min(6, endCol)]);
         placed.push({
@@ -263,7 +287,8 @@ function WeekRow({
         <div
             style={{
                 position: 'relative',
-                borderTop: '1px solid color-mix(in oklch, var(--border) 70%, transparent)',
+                borderTop:
+                    '1px solid color-mix(in oklch, var(--border) 70%, transparent)',
             }}
         >
             {/* bg cells */}
@@ -291,7 +316,12 @@ function WeekRow({
                 }}
             >
                 {/* numbers */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(7,1fr)',
+                    }}
+                >
                     {cells.map((c, i) => (
                         <div
                             key={i}
@@ -307,7 +337,11 @@ function WeekRow({
                                 onClick={() => handlers.onDayNum(c.d)}
                                 onContextMenu={(ev) => {
                                     ev.preventDefault();
-                                    handlers.onDayMenu(c.d, ev.clientX, ev.clientY);
+                                    handlers.onDayMenu(
+                                        c.d,
+                                        ev.clientX,
+                                        ev.clientY,
+                                    );
                                 }}
                                 style={
                                     c.isToday
@@ -344,19 +378,37 @@ function WeekRow({
                             >
                                 {c.d.getDate()}
                             </button>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                }}
+                            >
                                 {c.holiday ? (
-                                    <span style={{ fontSize: 14, lineHeight: 1 }}>🎉</span>
+                                    <span
+                                        style={{ fontSize: 14, lineHeight: 1 }}
+                                    >
+                                        🎉
+                                    </span>
                                 ) : null}
                                 <button
                                     type="button"
                                     onClick={(ev) => {
                                         ev.stopPropagation();
-                                        handlers.onAdd(c.d, ev.clientX, ev.clientY);
+                                        handlers.onAdd(
+                                            c.d,
+                                            ev.clientX,
+                                            ev.clientY,
+                                        );
                                     }}
                                     onContextMenu={(ev) => {
                                         ev.preventDefault();
-                                        handlers.onDayMenu(c.d, ev.clientX, ev.clientY);
+                                        handlers.onDayMenu(
+                                            c.d,
+                                            ev.clientX,
+                                            ev.clientY,
+                                        );
                                     }}
                                     aria-label="New event"
                                     className="hrcal-add"
@@ -372,7 +424,16 @@ function WeekRow({
                                         cursor: 'pointer',
                                     }}
                                 >
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg
+                                        width="13"
+                                        height="13"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2.2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    >
                                         <path d="M5 12h14M12 5v14" />
                                     </svg>
                                 </button>
@@ -399,15 +460,31 @@ function WeekRow({
                                     type="button"
                                     onClick={(ev) => {
                                         ev.stopPropagation();
-                                        handlers.onEntryClick(b.e, ev.clientX, ev.clientY);
+                                        handlers.onEntryClick(
+                                            b.e,
+                                            ev.clientX,
+                                            ev.clientY,
+                                        );
                                     }}
                                     onContextMenu={(ev) => {
                                         ev.preventDefault();
                                         ev.stopPropagation();
-                                        handlers.onEntryCtx(b.e, ev.clientX, ev.clientY);
+                                        handlers.onEntryCtx(
+                                            b.e,
+                                            ev.clientX,
+                                            ev.clientY,
+                                        );
                                     }}
-                                    onMouseEnter={(ev) => handlers.onEntryHover?.(b.e, ev.clientX, ev.clientY)}
-                                    onMouseLeave={() => handlers.onEntryHoverEnd?.()}
+                                    onMouseEnter={(ev) =>
+                                        handlers.onEntryHover?.(
+                                            b.e,
+                                            ev.clientX,
+                                            ev.clientY,
+                                        )
+                                    }
+                                    onMouseLeave={() =>
+                                        handlers.onEntryHoverEnd?.()
+                                    }
                                     title={b.e.title}
                                     style={barStyle(c, b.dashed, {
                                         gridColumn: `${b.col + 1} / span ${b.span}`,
@@ -416,17 +493,56 @@ function WeekRow({
                                     })}
                                 >
                                     <span style={dotStyle(c)} />
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <span
+                                        style={{
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
                                         {b.e.title}
                                     </span>
                                     {b.e.extendedProps.recurring ? (
-                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none', opacity: 0.7 }}>
+                                        <svg
+                                            width="11"
+                                            height="11"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2.2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            style={{
+                                                flex: 'none',
+                                                opacity: 0.7,
+                                            }}
+                                        >
                                             <path d="m17 2 4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3" />
                                         </svg>
                                     ) : null}
                                     {b.locked ? (
-                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none', opacity: 0.55, marginLeft: 'auto' }}>
-                                            <rect width="14" height="10" x="5" y="11" rx="2" />
+                                        <svg
+                                            width="10"
+                                            height="10"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2.4"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            style={{
+                                                flex: 'none',
+                                                opacity: 0.55,
+                                                marginLeft: 'auto',
+                                            }}
+                                        >
+                                            <rect
+                                                width="14"
+                                                height="10"
+                                                x="5"
+                                                y="11"
+                                                rx="2"
+                                            />
                                             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
                                         </svg>
                                     ) : null}
@@ -437,11 +553,21 @@ function WeekRow({
                 ) : null}
 
                 {/* timed chips */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginTop: 2 }}>
+                <div
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(7,1fr)',
+                        marginTop: 2,
+                    }}
+                >
                     {days.map((d, i) => {
                         const dayChips = timed
                             .filter((e) => coversDay(e, d))
-                            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+                            .sort(
+                                (a, b) =>
+                                    new Date(a.start).getTime() -
+                                    new Date(b.start).getTime(),
+                            );
                         const shown = dayChips.slice(0, CHIP_CAP);
                         const more = dayChips.length - shown.length;
                         return (
@@ -463,15 +589,31 @@ function WeekRow({
                                             type="button"
                                             onClick={(ev) => {
                                                 ev.stopPropagation();
-                                                handlers.onEntryClick(e, ev.clientX, ev.clientY);
+                                                handlers.onEntryClick(
+                                                    e,
+                                                    ev.clientX,
+                                                    ev.clientY,
+                                                );
                                             }}
                                             onContextMenu={(ev) => {
                                                 ev.preventDefault();
                                                 ev.stopPropagation();
-                                                handlers.onEntryCtx(e, ev.clientX, ev.clientY);
+                                                handlers.onEntryCtx(
+                                                    e,
+                                                    ev.clientX,
+                                                    ev.clientY,
+                                                );
                                             }}
-                                            onMouseEnter={(ev) => handlers.onEntryHover?.(e, ev.clientX, ev.clientY)}
-                                            onMouseLeave={() => handlers.onEntryHoverEnd?.()}
+                                            onMouseEnter={(ev) =>
+                                                handlers.onEntryHover?.(
+                                                    e,
+                                                    ev.clientX,
+                                                    ev.clientY,
+                                                )
+                                            }
+                                            onMouseLeave={() =>
+                                                handlers.onEntryHoverEnd?.()
+                                            }
                                             title={e.title}
                                             style={{
                                                 display: 'flex',
@@ -490,10 +632,24 @@ function WeekRow({
                                             }}
                                         >
                                             <span style={dotStyle(c)} />
-                                            <span style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums', flex: 'none', opacity: 0.85 }}>
+                                            <span
+                                                style={{
+                                                    fontWeight: 700,
+                                                    fontVariantNumeric:
+                                                        'tabular-nums',
+                                                    flex: 'none',
+                                                    opacity: 0.85,
+                                                }}
+                                            >
                                                 {fmtTime(new Date(e.start))}
                                             </span>
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            <span
+                                                style={{
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
                                                 {e.title}
                                             </span>
                                         </button>

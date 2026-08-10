@@ -125,7 +125,6 @@ class SiteChecklistTemplateController extends Controller
 
         foreach (array_values($items) as $index => $item) {
             $payload = [
-                'tenant_id' => $template->tenant_id,
                 'sort_order' => $index,
                 'question' => $item['question'],
                 'response_type' => $item['response_type'],

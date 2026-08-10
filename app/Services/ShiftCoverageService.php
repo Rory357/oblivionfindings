@@ -678,6 +678,7 @@ class ShiftCoverageService
 
         $acknowledgements = CoverageGapAcknowledgement::query()
             ->with('actor:id,name')
+            ->whereIn('site_id', $windows->pluck('site_id')->map(fn ($siteId) => (int) $siteId)->unique()->all())
             ->whereIn('coverage_window_key', $windows->pluck('coverage_window_key')->all())
             ->whereNull('cleared_at')
             ->orderBy('created_at')

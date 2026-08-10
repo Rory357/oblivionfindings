@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ClientAppointment;
@@ -60,11 +61,29 @@ function grantClientProfileFoundationRole(
     $user->roles()->syncWithoutDetaching([$role->id]);
 }
 
+function scopeClientProfileFoundationUserToSite(
+    User $user,
+    Site $site,
+    string $positionRole = 'support_worker',
+): void {
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'position_role' => $positionRole,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+}
+
 it('hydrates every Add Client step when completing an existing profile', function () {
-    $user = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $user = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
     grantClientProfileFoundationPermissions($user, ['clients.update']);
+    scopeClientProfileFoundationUserToSite($user, $site, 'coordinator');
     $client = Client::factory()->create([
-        'organization_id' => 1,
+        'site_id' => $site->id,
         'ethnicity' => 'Māori',
         'languages' => ['English', 'Te Reo Māori'],
         'mobility_needs' => 'Walking frame',
@@ -118,16 +137,17 @@ it('hydrates every Add Client step when completing an existing profile', functio
 });
 
 it('round trips the complete profile wizard payload through update and edit hydration', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileFoundationPermissions($manager, ['clients.update']);
+    $site = Site::factory()->create(['is_active' => true]);
+    $manager = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
     $worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
+        'approved_at' => now(),
     ]);
-    $site = Site::factory()->create(['tenant_id' => 1]);
+    grantClientProfileFoundationPermissions($manager, ['clients.update']);
+    scopeClientProfileFoundationUserToSite($manager, $site, 'coordinator');
+    scopeClientProfileFoundationUserToSite($worker, $site);
     $room = SiteHouseRoom::query()->create([
         'site_id' => $site->id,
-        'tenant_id' => 1,
         'name' => 'Kōwhai Room',
         'is_active' => true,
         'is_assignable' => true,
@@ -146,7 +166,7 @@ it('round trips the complete profile wizard payload through update and edit hydr
         'breach_type' => 'both',
         'is_active' => true,
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
 
     $payload = [
         '_modal' => true,
@@ -339,18 +359,75 @@ it('round trips the complete profile wizard payload through update and edit hydr
         ->assertJsonPath('initialValues.funding_type', 'EGL');
 });
 
-it('scopes edit wizard option lists to the client organization', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+it('does not serialize Add Client geofences outside the available Site options', function () {
+    $manager = User::factory()->create();
+    grantClientProfileFoundationPermissions($manager, ['clients.create']);
+    $availableSite = Site::factory()->create(['is_active' => true, 'name' => 'Available home']);
+    $hiddenSite = Site::factory()->create(['is_active' => false, 'name' => 'Inactive home']);
+    $availableFence = AssetGeofence::query()->create([
+        'site_id' => $availableSite->id,
+        'name' => 'AVAILABLE-GEOFENCE-SENTINEL',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 1, 'lng' => 1, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
+    $hiddenFence = AssetGeofence::query()->create([
+        'site_id' => $hiddenSite->id,
+        'name' => 'HIDDEN-GEOFENCE-SENTINEL',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 2, 'lng' => 2, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
+    $globalContext = ServiceContext::factory()->create([
+        'site_id' => null,
+        'name' => 'APPLICATION-CONTEXT-SENTINEL',
+    ]);
+    $availableContext = ServiceContext::factory()->create([
+        'site_id' => $availableSite->id,
+        'name' => 'AVAILABLE-CONTEXT-SENTINEL',
+    ]);
+    $hiddenContext = ServiceContext::factory()->create([
+        'site_id' => $hiddenSite->id,
+        'name' => 'HIDDEN-CONTEXT-SENTINEL',
+    ]);
+
+    $this->actingAs($manager)
+        ->get('/operations/clients/create')
+        ->assertOk()
+        ->assertInertia(function (Assert $page) use ($availableContext, $availableFence, $availableSite, $globalContext, $hiddenContext, $hiddenFence, $hiddenSite): void {
+            $props = $page->toArray()['props'];
+
+            expect(collect($props['sites'])->pluck('id')->all())
+                ->toBe([$availableSite->id])
+                ->not->toContain($hiddenSite->id)
+                ->and(collect($props['geofences'])->pluck('id')->all())
+                ->toBe([$availableFence->id])
+                ->not->toContain($hiddenFence->id)
+                ->and(json_encode($props['geofences'], JSON_THROW_ON_ERROR))
+                ->not->toContain('HIDDEN-GEOFENCE-SENTINEL')
+                ->and(collect($props['serviceContexts'])->pluck('id')->all())
+                ->toContain($globalContext->id, $availableContext->id)
+                ->not->toContain($hiddenContext->id);
+        });
+});
+
+it('scopes edit wizard options to the canonical client Site and clears ineligible history', function () {
+    $manager = User::factory()->create();
     grantClientProfileFoundationPermissions($manager, ['clients.update']);
-    $ownSite = Site::factory()->create(['tenant_id' => 1, 'name' => 'Own house']);
-    $foreignSite = Site::factory()->create(['tenant_id' => 2, 'name' => 'Foreign house']);
+    $ownSite = Site::factory()->create(['name' => 'Own house']);
+    $otherSite = Site::factory()->create(['name' => 'Other house']);
+    $thirdSite = Site::factory()->create(['name' => 'Third house']);
     $ownContext = ServiceContext::factory()->create([
         'site_id' => $ownSite->id,
         'name' => 'Own context',
     ]);
-    $foreignContext = ServiceContext::factory()->create([
-        'site_id' => $foreignSite->id,
-        'name' => 'Foreign context',
+    $otherContext = ServiceContext::factory()->create([
+        'site_id' => $otherSite->id,
+        'name' => 'Other Site context',
     ]);
     $globalContext = ServiceContext::factory()->create([
         'site_id' => null,
@@ -374,17 +451,25 @@ it('scopes edit wizard option lists to the client organization', function () {
         'breach_type' => 'both',
         'is_active' => false,
     ]);
-    $foreignGeofence = AssetGeofence::query()->create([
-        'site_id' => $foreignSite->id,
-        'name' => 'Foreign active fence',
+    $otherGeofence = AssetGeofence::query()->create([
+        'site_id' => $otherSite->id,
+        'name' => 'Other Site active fence',
         'type' => 'circle',
         'scope' => 'house',
         'shape' => ['lat' => 3, 'lng' => 3, 'radius_m' => 50],
         'breach_type' => 'both',
         'is_active' => true,
     ]);
+    $thirdSiteGeofence = AssetGeofence::query()->create([
+        'site_id' => $thirdSite->id,
+        'name' => 'Third Site active fence',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 4, 'lng' => 4, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
     $client = Client::factory()->create([
-        'organization_id' => 1,
         'site_id' => $ownSite->id,
         'service_context_id' => $ownContext->id,
         'house_geofence_id' => $currentInactiveGeofence->id,
@@ -392,34 +477,98 @@ it('scopes edit wizard option lists to the client organization', function () {
 
     $response = $this->actingAs($manager)
         ->getJson("/operations/clients/{$client->id}/edit?modal=1")
-        ->assertOk();
+        ->assertOk()
+        ->assertJsonPath('initialValues.house_geofence_id', '');
 
     expect(collect($response->json('sites'))->pluck('id')->all())
-        ->toContain($ownSite->id)
-        ->not->toContain($foreignSite->id);
+        ->toContain($ownSite->id, $otherSite->id, $thirdSite->id);
     expect(collect($response->json('serviceContexts'))->pluck('id')->all())
         ->toContain($ownContext->id, $globalContext->id)
-        ->not->toContain($foreignContext->id);
+        ->not->toContain($otherContext->id);
     expect(collect($response->json('geofences'))->pluck('id')->all())
-        ->toContain($ownGeofence->id, $currentInactiveGeofence->id)
-        ->not->toContain($foreignGeofence->id);
+        ->toBe([$ownGeofence->id])
+        ->not->toContain($currentInactiveGeofence->id, $otherGeofence->id, $thirdSiteGeofence->id);
+
+    $this->from("/operations/clients/{$client->id}")
+        ->put("/operations/clients/{$client->id}", [
+            'first_name' => $client->first_name,
+            'last_name' => $client->last_name,
+            'status' => $client->status,
+            'site_id' => $ownSite->id,
+            'phone' => '021 555 0199',
+            'house_geofence_id' => '',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($client->fresh()->phone)->toBe('021 555 0199')
+        ->and($client->fresh()->house_geofence_id)->toBeNull();
 });
 
-it('rejects foreign organization location options on profile update', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+it('rejects cross-Site geofences on client create and update', function () {
+    $manager = User::factory()->create();
+    grantClientProfileFoundationPermissions($manager, ['clients.create', 'clients.update']);
+    $clientSite = Site::factory()->create(['name' => 'Client home']);
+    $otherSite = Site::factory()->create(['name' => 'Other home']);
+    $otherFence = AssetGeofence::query()->create([
+        'site_id' => $otherSite->id,
+        'name' => 'Other home fence',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 5, 'lng' => 5, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($manager)
+        ->from('/operations/clients')
+        ->post('/operations/clients', [
+            'first_name' => 'Create',
+            'last_name' => 'Boundary',
+            'status' => 'active',
+            'site_id' => $clientSite->id,
+            'house_geofence_id' => $otherFence->id,
+        ])
+        ->assertSessionHasErrors('house_geofence_id');
+
+    expect(Client::query()->count())->toBe(0);
+
+    $client = Client::factory()->create([
+        'site_id' => $clientSite->id,
+        'house_geofence_id' => null,
+    ]);
+
+    $this->from("/operations/clients/{$client->id}")
+        ->put("/operations/clients/{$client->id}", [
+            'first_name' => $client->first_name,
+            'last_name' => $client->last_name,
+            'status' => $client->status,
+            'site_id' => $clientSite->id,
+            'house_geofence_id' => $otherFence->id,
+        ])
+        ->assertSessionHasErrors('house_geofence_id');
+
+    expect($client->fresh()->house_geofence_id)->toBeNull();
+});
+
+it('validates Site-bound options when legacy client storage is null', function () {
+    $manager = User::factory()->create();
     grantClientProfileFoundationPermissions($manager, ['clients.update']);
-    $foreignSite = Site::factory()->create(['tenant_id' => 2]);
-    $foreignContext = ServiceContext::factory()->create(['site_id' => $foreignSite->id]);
-    $foreignGeofence = AssetGeofence::query()->create([
-        'site_id' => $foreignSite->id,
-        'name' => 'Foreign fence',
+    $currentSite = Site::factory()->create(['name' => 'Current Site']);
+    $selectedSite = Site::factory()->create(['name' => 'Selected Site']);
+    $otherSite = Site::factory()->create(['name' => 'Other Site']);
+    $otherContext = ServiceContext::factory()->create(['site_id' => $otherSite->id]);
+    $otherGeofence = AssetGeofence::query()->create([
+        'site_id' => $otherSite->id,
+        'name' => 'Other Site fence',
         'type' => 'circle',
         'scope' => 'house',
         'shape' => ['lat' => 4, 'lng' => 4, 'radius_m' => 50],
         'breach_type' => 'both',
         'is_active' => true,
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create([
+        'site_id' => $currentSite->id,
+    ]);
 
     $this->actingAs($manager)
         ->from("/operations/clients/{$client->id}")
@@ -427,28 +576,116 @@ it('rejects foreign organization location options on profile update', function (
             'first_name' => $client->first_name,
             'last_name' => $client->last_name,
             'status' => $client->status,
-            'site_id' => $foreignSite->id,
-            'service_context_id' => $foreignContext->id,
-            'house_geofence_id' => $foreignGeofence->id,
+            'site_id' => $selectedSite->id,
+            'service_context_id' => $otherContext->id,
+            'house_geofence_id' => $otherGeofence->id,
         ])
         ->assertRedirect("/operations/clients/{$client->id}")
         ->assertSessionHasErrors([
-            'site_id',
             'service_context_id',
             'house_geofence_id',
         ]);
+
+    expect($client->fresh()->site_id)->toBe($currentSite->id)
+        ->and($client->fresh()->service_context_id)->toBeNull()
+        ->and($client->fresh()->house_geofence_id)->toBeNull();
+});
+
+it('requires retained Site-bound options to be cleared when the Site is cleared', function () {
+    $manager = User::factory()->create();
+    grantClientProfileFoundationPermissions($manager, ['clients.update']);
+    $site = Site::factory()->create(['name' => 'Current Site']);
+    $context = ServiceContext::factory()->create(['site_id' => $site->id]);
+    $geofence = AssetGeofence::query()->create([
+        'site_id' => $site->id,
+        'name' => 'Current Site fence',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 4, 'lng' => 4, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => true,
+    ]);
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'service_context_id' => $context->id,
+        'house_geofence_id' => $geofence->id,
+    ]);
+    $base = [
+        'first_name' => $client->first_name,
+        'last_name' => $client->last_name,
+        'status' => $client->status,
+        'site_id' => '',
+    ];
+
+    $this->actingAs($manager)
+        ->from("/operations/clients/{$client->id}")
+        ->put("/operations/clients/{$client->id}", $base)
+        ->assertSessionHasErrors(['service_context_id', 'house_geofence_id']);
+
+    expect($client->fresh()->site_id)->toBe($site->id)
+        ->and($client->fresh()->service_context_id)->toBe($context->id)
+        ->and($client->fresh()->house_geofence_id)->toBe($geofence->id);
+
+    $this->from("/operations/clients/{$client->id}")
+        ->put("/operations/clients/{$client->id}", [
+            ...$base,
+            'service_context_id' => '',
+            'house_geofence_id' => '',
+        ])
+        ->assertSessionHasNoErrors();
 
     expect($client->fresh()->site_id)->toBeNull()
         ->and($client->fresh()->service_context_id)->toBeNull()
         ->and($client->fresh()->house_geofence_id)->toBeNull();
 });
 
+it('preserves omitted Site-bound fields on an unrelated profile update', function () {
+    $manager = User::factory()->create();
+    grantClientProfileFoundationPermissions($manager, ['clients.update']);
+    $site = Site::factory()->create(['name' => 'Current Site']);
+    $historicalSite = Site::factory()->create(['name' => 'Historical Site']);
+    $historicalContext = ServiceContext::factory()->create([
+        'site_id' => $historicalSite->id,
+        'is_active' => false,
+    ]);
+    $historicalGeofence = AssetGeofence::query()->create([
+        'site_id' => $historicalSite->id,
+        'name' => 'Historical Site fence',
+        'type' => 'circle',
+        'scope' => 'house',
+        'shape' => ['lat' => 4, 'lng' => 4, 'radius_m' => 50],
+        'breach_type' => 'both',
+        'is_active' => false,
+    ]);
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'service_context_id' => $historicalContext->id,
+        'house_geofence_id' => $historicalGeofence->id,
+    ]);
+
+    $this->actingAs($manager)
+        ->from("/operations/clients/{$client->id}")
+        ->put("/operations/clients/{$client->id}", [
+            'first_name' => 'Updated',
+            'last_name' => $client->last_name,
+            'status' => $client->status,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($client->fresh()->first_name)->toBe('Updated')
+        ->and($client->fresh()->site_id)->toBe($site->id)
+        ->and($client->fresh()->service_context_id)->toBe($historicalContext->id)
+        ->and($client->fresh()->house_geofence_id)->toBe($historicalGeofence->id);
+});
+
 it('omits restricted section props when an assigned worker lacks their capabilities', function () {
-    $worker = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $worker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     grantClientProfileFoundationRole($worker, 'support_worker', [
         'clients.viewAssigned',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    scopeClientProfileFoundationUserToSite($worker, $site);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $client->supportWorkers()->attach($worker->id);
     $client->medicalProfile()->create([
         'allergies' => ['peanut'],
@@ -471,7 +708,6 @@ it('omits restricted section props when an assigned worker lacks their capabilit
         'ceased_at' => null,
     ]);
     ClientNote::query()->create([
-        'organization_id' => 1,
         'client_id' => $client->id,
         'user_id' => $worker->id,
         'type' => 'daily_note',
@@ -528,11 +764,12 @@ it('omits restricted section props when an assigned worker lacks their capabilit
 });
 
 it('redirects linked portal users away from the legacy staff profile route', function () {
-    $portalUser = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $portalUser = User::factory()->create(['role' => 'next_of_kin', 'approved_at' => now()]);
     grantClientProfileFoundationRole($portalUser, 'next_of_kin', [
         'clients.viewPortal',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $client->portalUsers()->attach($portalUser->id, [
         'relation' => 'next_of_kin',
     ]);
@@ -543,15 +780,18 @@ it('redirects linked portal users away from the legacy staff profile route', fun
 });
 
 it('requires granular consent authority and parent client access', function () {
-    $sameOrgUpdater = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileFoundationRole($sameOrgUpdater, 'manager', [
+    $accessibleSite = Site::factory()->create(['is_active' => true]);
+    $otherSite = Site::factory()->create(['is_active' => true]);
+    $updater = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+    grantClientProfileFoundationRole($updater, 'manager', [
         'clients.update',
     ]);
-    $sameOrgClient = Client::factory()->create(['organization_id' => 1]);
+    scopeClientProfileFoundationUserToSite($updater, $accessibleSite, 'coordinator');
+    $client = Client::factory()->create(['site_id' => $accessibleSite->id]);
     $consentType = ConsentType::factory()->create(['active' => true]);
 
-    $this->actingAs($sameOrgUpdater)
-        ->post("/operations/clients/{$sameOrgClient->id}/consents", [
+    $this->actingAs($updater)
+        ->post("/operations/clients/{$client->id}/consents", [
             'consent_type_id' => $consentType->id,
             'status' => 'given',
             'given_method' => 'written',
@@ -559,31 +799,35 @@ it('requires granular consent authority and parent client access', function () {
         ])
         ->assertForbidden();
 
-    $crossOrgViewer = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileFoundationRole($crossOrgViewer, 'coordinator', [
-        'clients.viewAny',
+    $otherSiteViewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    grantClientProfileFoundationRole($otherSiteViewer, 'support_worker', [
+        'clients.viewAssigned',
         'consents.viewAny',
         'consents.request',
     ]);
-    $otherOrgClient = Client::factory()->create(['organization_id' => 2]);
+    scopeClientProfileFoundationUserToSite($otherSiteViewer, $accessibleSite);
+    $otherSiteClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $otherSiteClient->supportWorkers()->attach($otherSiteViewer->id);
 
-    $this->actingAs($crossOrgViewer)
-        ->get("/operations/clients/{$otherOrgClient->id}/consents")
+    $this->actingAs($otherSiteViewer)
+        ->get("/operations/clients/{$otherSiteClient->id}/consents")
         ->assertForbidden();
-    $this->actingAs($crossOrgViewer)
-        ->get("/operations/clients/{$otherOrgClient->id}/consent-requests")
+    $this->actingAs($otherSiteViewer)
+        ->get("/operations/clients/{$otherSiteClient->id}/consent-requests")
         ->assertForbidden();
 });
 
 it('enforces consent nesting and only withdraws a currently given consent once', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $manager = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
     grantClientProfileFoundationRole($manager, 'manager', [
         'clients.viewAny',
         'consents.record',
         'consents.withdraw',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $otherClient = Client::factory()->create(['organization_id' => 1]);
+    scopeClientProfileFoundationUserToSite($manager, $site, 'coordinator');
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $otherClient = Client::factory()->create(['site_id' => $site->id]);
     $consentType = ConsentType::factory()->create(['active' => true]);
     $given = ClientConsent::query()->create([
         'client_id' => $client->id,
@@ -632,9 +876,11 @@ it('enforces consent nesting and only withdraws a currently given consent once',
 });
 
 it('requires appointment mutation capabilities and emits one canonical timeline event', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
-    $viewer = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $viewer = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
     grantClientProfileFoundationRole($viewer, 'manager', ['clients.viewAny']);
+    scopeClientProfileFoundationUserToSite($viewer, $site, 'coordinator');
     $payload = [
         'title' => 'GP review',
         'appointment_type' => 'gp_visit',
@@ -648,11 +894,12 @@ it('requires appointment mutation capabilities and emits one canonical timeline 
     expect(ClientAppointment::query()->where('client_id', $client->id)->exists())
         ->toBeFalse();
 
-    $creator = User::factory()->create(['organization_id' => 1]);
+    $creator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
     grantClientProfileFoundationRole($creator, 'appointment_coordinator', [
         'clients.viewAny',
         'calendar.create',
     ]);
+    scopeClientProfileFoundationUserToSite($creator, $site, 'coordinator');
 
     $response = $this->actingAs($creator)
         ->postJson("/clients/{$client->id}/calendar/appointments", $payload)
@@ -665,35 +912,45 @@ it('requires appointment mutation capabilities and emits one canonical timeline 
         ->count())->toBe(1);
 });
 
-it('prevents quick updates across organisations and rejects foreign key workers', function () {
-    $manager = User::factory()->create(['organization_id' => 1]);
-    grantClientProfileFoundationRole($manager, 'manager', ['clients.update']);
-    $otherOrgClient = Client::factory()->create(['organization_id' => 2]);
+it('prevents quick updates without mutation authority and rejects key workers from another Site', function () {
+    $accessibleSite = Site::factory()->create(['is_active' => true]);
+    $otherSite = Site::factory()->create(['is_active' => true]);
+    $viewer = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    grantClientProfileFoundationRole($viewer, 'support_worker', ['clients.viewAssigned']);
+    scopeClientProfileFoundationUserToSite($viewer, $accessibleSite);
+    $otherSiteClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $otherSiteClient->supportWorkers()->attach($viewer->id);
 
-    $this->actingAs($manager)
-        ->patch("/operations/clients/{$otherOrgClient->id}/quick-update", [
+    $this->actingAs($viewer)
+        ->patch("/operations/clients/{$otherSiteClient->id}/quick-update", [
             'risk_level' => 'critical',
         ])
         ->assertForbidden();
 
-    $sameOrgClient = Client::factory()->create(['organization_id' => 1]);
-    $foreignWorker = User::factory()->create([
-        'organization_id' => 2,
+    $manager = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+    grantClientProfileFoundationRole($manager, 'manager', ['clients.update']);
+    scopeClientProfileFoundationUserToSite($manager, $accessibleSite, 'coordinator');
+    $client = Client::factory()->create(['site_id' => $accessibleSite->id]);
+    $otherSiteWorker = User::factory()->create([
         'role' => 'support_worker',
+        'approved_at' => now(),
     ]);
+    scopeClientProfileFoundationUserToSite($otherSiteWorker, $otherSite);
 
     $this->actingAs($manager)
-        ->from("/operations/clients/{$sameOrgClient->id}")
-        ->patch("/operations/clients/{$sameOrgClient->id}/quick-update", [
-            'key_worker_id' => $foreignWorker->id,
+        ->from("/operations/clients/{$client->id}")
+        ->patch("/operations/clients/{$client->id}/quick-update", [
+            'key_worker_id' => $otherSiteWorker->id,
         ])
         ->assertSessionHasErrors('key_worker_id');
 });
 
 it('applies the sensitive section capability matrix without broad profile leakage', function () {
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $otherSite = Site::factory()->create(['is_active' => true]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
 
-    $manager = User::factory()->create(['organization_id' => 1]);
+    $manager = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
     grantClientProfileFoundationRole($manager, 'manager', [
         'clients.viewAny',
         'clients.update',
@@ -709,6 +966,7 @@ it('applies the sensitive section capability matrix without broad profile leakag
         'privacy.viewRequests',
         'respite.viewAny',
     ]);
+    scopeClientProfileFoundationUserToSite($manager, $site, 'coordinator');
 
     $this->actingAs($manager)
         ->get("/operations/clients/{$client->id}")
@@ -728,11 +986,12 @@ it('applies the sensitive section capability matrix without broad profile leakag
             ->has('data_subject_requests')
             ->has('respite'));
 
-    $financeOnly = User::factory()->create(['organization_id' => 1]);
+    $financeOnly = User::factory()->create(['role' => 'finance', 'approved_at' => now()]);
     grantClientProfileFoundationRole($financeOnly, 'finance', [
         'clients.viewAny',
         'client_funds.manage',
     ]);
+    scopeClientProfileFoundationUserToSite($financeOnly, $site, 'finance');
 
     $this->actingAs($financeOnly)
         ->get("/operations/clients/{$client->id}")
@@ -745,11 +1004,12 @@ it('applies the sensitive section capability matrix without broad profile leakag
             ->missing('audit_history')
             ->missing('data_subject_requests'));
 
-    $auditor = User::factory()->create(['organization_id' => 1]);
+    $auditor = User::factory()->create(['role' => 'auditor', 'approved_at' => now()]);
     grantClientProfileFoundationRole($auditor, 'auditor', [
         'clients.viewAny',
         'audit.viewAny',
     ]);
+    scopeClientProfileFoundationUserToSite($auditor, $site, 'auditor');
 
     $this->actingAs($auditor)
         ->get("/operations/clients/{$client->id}")
@@ -761,7 +1021,7 @@ it('applies the sensitive section capability matrix without broad profile leakag
             ->missing('documents')
             ->missing('portal_users'));
 
-    $assignedClinicalWorker = User::factory()->create(['organization_id' => 1]);
+    $assignedClinicalWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     grantClientProfileFoundationRole($assignedClinicalWorker, 'support_worker', [
         'clients.viewAssigned',
         'medications.view',
@@ -770,6 +1030,7 @@ it('applies the sensitive section capability matrix without broad profile leakag
         'incidents.viewAssigned',
         'hazards.view',
     ]);
+    scopeClientProfileFoundationUserToSite($assignedClinicalWorker, $site);
     $client->supportWorkers()->attach($assignedClinicalWorker->id);
 
     $this->actingAs($assignedClinicalWorker)
@@ -785,27 +1046,31 @@ it('applies the sensitive section capability matrix without broad profile leakag
             ->missing('documents')
             ->missing('audit_history'));
 
-    $unassignedWorker = User::factory()->create(['organization_id' => 1]);
+    $unassignedWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
     grantClientProfileFoundationPermissions($unassignedWorker, ['clients.viewAssigned']);
+    scopeClientProfileFoundationUserToSite($unassignedWorker, $site);
     $this->actingAs($unassignedWorker)
         ->get("/operations/clients/{$client->id}")
         ->assertForbidden();
 
-    $crossOrgManager = User::factory()->create(['organization_id' => 2]);
-    grantClientProfileFoundationRole($crossOrgManager, 'cross_org_manager', [
-        'clients.viewAny',
+    $otherSiteWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    grantClientProfileFoundationRole($otherSiteWorker, 'support_worker', [
+        'clients.viewAssigned',
     ]);
-    $this->actingAs($crossOrgManager)
+    scopeClientProfileFoundationUserToSite($otherSiteWorker, $otherSite);
+    $client->supportWorkers()->attach($otherSiteWorker->id);
+    $this->actingAs($otherSiteWorker)
         ->get("/operations/clients/{$client->id}")
         ->assertForbidden();
 });
 
 it('redirects linked portal clients away from every legacy staff profile variant', function () {
-    $portalClient = User::factory()->create(['organization_id' => 1]);
+    $site = Site::factory()->create(['is_active' => true]);
+    $portalClient = User::factory()->create(['role' => 'client', 'approved_at' => now()]);
     grantClientProfileFoundationRole($portalClient, 'client', [
         'clients.viewPortal',
     ]);
-    $client = Client::factory()->create(['organization_id' => 1]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $client->portalUsers()->attach($portalClient->id, [
         'relation' => 'self',
     ]);

@@ -5,12 +5,13 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteMealPlanEntry;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function siteCalendarUser(string $roleName): User
@@ -41,7 +42,6 @@ test('global site calendar only returns sites within the users assigned site sco
     ]);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-CALENDAR-'.$user->id,
         'work_email' => $user->email,
@@ -72,7 +72,6 @@ test('global calendar items feed returns unified items scoped to the users sites
     $blockedSite = Site::factory()->create(['name' => 'Bravo House', 'type' => 'house']);
 
     HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'employee_number' => 'EMP-CALFEED-'.$user->id,
         'work_email' => $user->email,
@@ -87,7 +86,6 @@ test('global calendar items feed returns unified items scoped to the users sites
 
     $allowedMeal = SiteMealPlanEntry::create([
         'site_id' => $allowedSite->id,
-        'tenant_id' => $allowedSite->tenant_id,
         'plan_date' => now()->startOfMonth()->addDays(3)->toDateString(),
         'meal_slot' => 'lunch',
         'source_type' => 'ad_hoc',
@@ -97,7 +95,6 @@ test('global calendar items feed returns unified items scoped to the users sites
 
     $blockedMeal = SiteMealPlanEntry::create([
         'site_id' => $blockedSite->id,
-        'tenant_id' => $blockedSite->tenant_id,
         'plan_date' => now()->startOfMonth()->addDays(3)->toDateString(),
         'meal_slot' => 'lunch',
         'source_type' => 'ad_hoc',

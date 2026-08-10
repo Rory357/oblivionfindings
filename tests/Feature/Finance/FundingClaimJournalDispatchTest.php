@@ -7,6 +7,7 @@ use App\Domain\Finance\Models\FinJournal;
 use App\Models\Client;
 use App\Models\FundingClaim;
 use App\Models\ServiceAgreement;
+use App\Models\Site;
 use Database\Seeders\FinanceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -15,16 +16,16 @@ class FundingClaimJournalDispatchTest extends TestCase
 {
     use RefreshDatabase;
 
-    private int $orgId = 1;
+    private int $storageContextId = 1;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        app(FinanceSeeder::class)->run($this->orgId);
+        app(FinanceSeeder::class)->run($this->storageContextId);
 
         FinFiscalPeriod::create([
-            'organization_id' => $this->orgId,
+            'organization_id' => $this->storageContextId,
             'name' => 'FY2026',
             'start_date' => now()->startOfYear()->toDateString(),
             'end_date' => now()->endOfYear()->toDateString(),
@@ -34,18 +35,17 @@ class FundingClaimJournalDispatchTest extends TestCase
 
     public function test_submitted_funding_claim_posts_journal_once(): void
     {
-        $client = Client::factory()->create(['organization_id' => $this->orgId]);
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $agreement = ServiceAgreement::factory()
             ->for($client)
             ->create([
-                'organization_id' => $this->orgId,
                 'status' => 'active',
                 'funding_body' => 'private',
                 'total_budget' => 1000,
             ]);
 
         $claim = FundingClaim::create([
-            'organization_id' => $this->orgId,
             'service_agreement_id' => $agreement->id,
             'client_id' => $client->id,
             'claim_reference' => 'FC-TEST-001',

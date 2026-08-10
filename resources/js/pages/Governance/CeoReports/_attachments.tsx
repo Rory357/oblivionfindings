@@ -41,7 +41,8 @@ export function AttachmentsPanel({
             onChanged={onChanged}
             emptyText={{
                 managed: 'No attachments yet. Drop files above to add one.',
-                readOnly: 'The CEO has not attached any documents to this report.',
+                readOnly:
+                    'The CEO has not attached any documents to this report.',
             }}
         />
     );

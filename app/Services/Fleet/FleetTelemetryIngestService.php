@@ -3,6 +3,7 @@
 namespace App\Services\Fleet;
 
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Events\FleetVehiclePositionUpdated;
 use App\Jobs\ReverseGeocodeFleetTelemetryEvent;
@@ -21,6 +22,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Fleet\Telemetry\AdapterRegistry;
 use App\Services\HealthSafety\LoneWorkerSignalService;
+use App\Services\UserSiteAccessService;
 use Closure;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -119,10 +121,11 @@ class FleetTelemetryIngestService
         protected FleetSignalService $signals,
         protected FleetTripService $trips,
         protected FleetDrivingMetricsService $metrics,
-        protected FleetDeviceRuntimeService $deviceRuntime
+        protected FleetDeviceRuntimeService $deviceRuntime,
+        protected UserSiteAccessService $siteAccess,
     ) {}
 
-    public function ingest(string $vendor, array $payload): array
+    public function ingest(string $vendor, array $payload, ?int $expectedCanonicalDeviceId = null): array
     {
         $adapter = $this->adapters->adapterFor($vendor);
         $normalized = $adapter->normalize($payload);
@@ -131,25 +134,35 @@ class FleetTelemetryIngestService
             return ['ok' => false, 'error' => 'device_uid missing', 'status' => 422];
         }
 
-        $tracker = AssetTracker::query()
-            ->where('vendor', $vendor)
-            ->where('device_uid', $normalized['device_uid'])
-            ->where('status', 'paired')
-            ->first();
-
-        if (! $tracker) {
-            return ['ok' => false, 'error' => 'tracker not found', 'status' => 404];
+        $device = $this->deviceRuntime->resolveCanonicalDevice($vendor, $normalized);
+        if (! $device) {
+            return ['ok' => false, 'error' => 'canonical device not found', 'status' => 404];
+        }
+        if ($expectedCanonicalDeviceId !== null
+            && (int) $device->id !== $expectedCanonicalDeviceId) {
+            return ['ok' => false, 'error' => 'provider device binding does not match canonical identity', 'status' => 409];
         }
 
-        $asset = $tracker->asset;
-        $device = $this->deviceRuntime->resolveCanonicalDevice($vendor, $normalized, $tracker);
+        $assetLinks = $device->activeAssetLinks()
+            ->with('asset')
+            ->orderBy('id')
+            ->limit(2)
+            ->get();
+        if ($assetLinks->count() !== 1 || ! $assetLinks->first()->asset) {
+            return ['ok' => false, 'error' => 'canonical device asset link unavailable or ambiguous', 'status' => 409];
+        }
+
+        $assetLink = $assetLinks->first();
+        $asset = $assetLink->asset;
+        $tracker = $this->compatibleHistoricalTracker($device, $asset, $vendor, $normalized);
 
         $idempotencyKey = $this->buildIdempotencyKey($vendor, $normalized, $payload);
         $expectedAssetId = (int) $asset->id;
-        $expectedTrackerId = (int) $tracker->id;
-        $expectedDeviceId = $device ? (int) $device->id : null;
+        $expectedAssetLinkId = (int) $assetLink->id;
+        $expectedTrackerId = $tracker ? (int) $tracker->id : null;
+        $expectedDeviceId = (int) $device->id;
 
-        return $this->withinIngestTransaction(function () use ($expectedAssetId, $expectedTrackerId, $expectedDeviceId, $vendor, $normalized, $payload, $idempotencyKey) {
+        return $this->withinIngestTransaction(function () use ($expectedAssetId, $expectedAssetLinkId, $expectedTrackerId, $expectedDeviceId, $vendor, $normalized, $payload, $idempotencyKey) {
             $existing = FleetTelemetryEvent::query()
                 ->where('idempotency_key', $idempotencyKey)
                 ->lockForUpdate()
@@ -160,50 +173,45 @@ class FleetTelemetryIngestService
             }
 
             // Shared worker order: idempotency event -> DeviceAssignment history ->
-            // Device -> AssetTracker -> Asset -> LoneWorkerSession -> User -> session
+            // Device -> DeviceAssetLink -> Asset -> optional historical AssetTracker -> LoneWorkerSession -> User -> session
             // Client -> Shift -> distinct shift Client -> resolved Site. Resident-only
             // routing deliberately keeps its separate Asset -> Site -> Client path.
             $staffAssignment = null;
             $staffAttributionAttempted = false;
             $clientAssignment = null;
             $clientAttributionAttempted = false;
-            if ($expectedDeviceId !== null) {
-                if (! empty($normalized['sos_flag'])) {
-                    $assignments = DeviceAssignment::query()
-                        ->where('device_id', $expectedDeviceId)
-                        ->whereIn('assignable_type', [
-                            DeviceAssignment::TARGET_STAFF,
-                            DeviceAssignment::TARGET_CLIENT,
-                        ])
-                        ->orderBy('id')
-                        ->lockForUpdate()
-                        ->get();
-
-                    $staffAssignments = $assignments
-                        ->where('assignable_type', DeviceAssignment::TARGET_STAFF);
-                    $staffAttributionAttempted = $staffAssignments->isNotEmpty();
-                    $staffAssignment = $staffAssignments
-                        ->whereNull('released_at')
-                        ->last();
-
-                    $clientAssignments = $assignments
-                        ->where('assignable_type', DeviceAssignment::TARGET_CLIENT);
-                    $clientAttributionAttempted = $clientAssignments->isNotEmpty();
-                    $clientAssignment = $clientAssignments
-                        ->whereNull('released_at')
-                        ->last();
-                }
-
-                $device = Device::query()
-                    ->whereKey($expectedDeviceId)
+            if (! empty($normalized['sos_flag'])) {
+                $assignments = DeviceAssignment::query()
+                    ->where('device_id', $expectedDeviceId)
+                    ->whereIn('assignable_type', [
+                        DeviceAssignment::TARGET_STAFF,
+                        DeviceAssignment::TARGET_CLIENT,
+                    ])
+                    ->orderBy('id')
                     ->lockForUpdate()
-                    ->first();
-            } else {
-                $device = null;
+                    ->get();
+
+                $staffAssignments = $assignments
+                    ->where('assignable_type', DeviceAssignment::TARGET_STAFF);
+                $staffAttributionAttempted = $staffAssignments->isNotEmpty();
+                $staffAssignment = $staffAssignments
+                    ->whereNull('released_at')
+                    ->last();
+
+                $clientAssignments = $assignments
+                    ->where('assignable_type', DeviceAssignment::TARGET_CLIENT);
+                $clientAttributionAttempted = $clientAssignments->isNotEmpty();
+                $clientAssignment = $clientAssignments
+                    ->whereNull('released_at')
+                    ->last();
             }
 
-            $tracker = AssetTracker::query()
-                ->whereKey($expectedTrackerId)
+            $device = Device::query()
+                ->whereKey($expectedDeviceId)
+                ->lockForUpdate()
+                ->first();
+            $assetLink = DeviceAssetLink::query()
+                ->whereKey($expectedAssetLinkId)
                 ->lockForUpdate()
                 ->first();
             $asset = Asset::query()
@@ -211,19 +219,19 @@ class FleetTelemetryIngestService
                 ->lockForUpdate()
                 ->first();
 
-            if (! $this->lockedLineageMatches($tracker, $asset, $vendor, $normalized)) {
+            if (! $this->lockedCanonicalLineageMatches($device, $assetLink, $asset, $vendor, $normalized)) {
                 return [
                     'ok' => false,
-                    'error' => 'Telemetry tracker binding changed; retry with the current pairing.',
+                    'error' => 'Canonical telemetry binding changed; retry with the current pairing.',
                     'status' => 409,
                 ];
             }
 
-            if (! $device
-                || ! $this->lockedDeviceMatchesLineage($device, $tracker, $vendor, $normalized)) {
-                // Keep the fleet/tracker SOS lineage, but do not attach a stale,
-                // foreign, or no-longer-tracking canonical device to the frame.
-                $device = null;
+            $tracker = $expectedTrackerId === null
+                ? null
+                : AssetTracker::query()->whereKey($expectedTrackerId)->lockForUpdate()->first();
+            if ($tracker && ! $this->historicalTrackerMatches($tracker, $asset, $vendor, $normalized)) {
+                $tracker = null;
             }
 
             $loneWorkerRoute = null;
@@ -244,24 +252,16 @@ class FleetTelemetryIngestService
                         $workerResolution = $this->resolveLockedLoneWorkerRoute(
                             $candidateWorkerId,
                             $device,
-                            $tracker,
+                            $assetLink,
                             $asset,
                         );
                         $assetSite = $workerResolution['site'];
                         $loneWorkerRoute = $workerResolution['route'];
 
-                        if ($this->deviceAndSiteTenantsContradict($device, $assetSite)) {
-                            $device = null;
-                            $loneWorkerRoute = null;
-                        }
                     }
                 } elseif ($this->isResidentSafetyTracker($asset)) {
                     $personAttributionAttempted = true;
                     $assetSite = $this->lockAuthoritativeAssetSite($asset);
-
-                    if ($this->deviceAndSiteTenantsContradict($device, $assetSite)) {
-                        $device = null;
-                    }
 
                     $residentClient = $this->resolveLockedResidentClient(
                         $clientAssignment,
@@ -279,22 +279,14 @@ class FleetTelemetryIngestService
                     }
                 } else {
                     $assetSite = $this->lockAuthoritativeAssetSite($asset);
-
-                    if ($this->deviceAndSiteTenantsContradict($device, $assetSite)) {
-                        $device = null;
-                    }
                 }
             } else {
                 $assetSite = $this->lockAuthoritativeAssetSite($asset);
-
-                if ($this->deviceAndSiteTenantsContradict($device, $assetSite)) {
-                    $device = null;
-                }
             }
 
             $personAttributionSucceeded = $loneWorkerRoute !== null || $residentClient !== null;
             $failedPersonAttribution = $personAttributionAttempted && ! $personAttributionSucceeded;
-            $consentBlocked = $this->consentBlockedForLockedLineage($device, $tracker, $asset);
+            $consentBlocked = $this->consentBlockedForLockedLineage($device, $asset);
             $privacyBlocked = $consentBlocked || $failedPersonAttribution;
             $persistedRawPayload = $normalized['raw_payload'] ?? $payload;
             if ($privacyBlocked) {
@@ -305,7 +297,7 @@ class FleetTelemetryIngestService
 
             $event = FleetTelemetryEvent::create([
                 'asset_id' => $asset->id,
-                'asset_tracker_id' => $tracker->id,
+                'asset_tracker_id' => $tracker?->id,
                 'device_id' => $device?->id,
                 'vendor' => $vendor,
                 'vendor_message_id' => $normalized['vendor_message_id'] ?? null,
@@ -332,7 +324,7 @@ class FleetTelemetryIngestService
                 ['vendor_payload_hash' => $idempotencyKey],
                 [
                     'asset_id' => $asset->id,
-                    'asset_tracker_id' => $tracker->id,
+                    'asset_tracker_id' => $tracker?->id,
                     'device_id' => $device?->id,
                     'occurred_at' => $occurredAt,
                     'received_at' => now(),
@@ -350,8 +342,6 @@ class FleetTelemetryIngestService
                     'consent_blocked' => $privacyBlocked,
                 ]
             );
-
-            $tracker->update(['last_seen_at' => now()]);
 
             if ($device) {
                 $deviceUpdates = [
@@ -477,7 +467,7 @@ class FleetTelemetryIngestService
             if (! empty($normalized['sos_flag'])) {
                 $vehicleSignal = $this->signals->emit([
                     'asset_id' => $asset->id,
-                    'asset_tracker_id' => $tracker->id,
+                    'asset_tracker_id' => $tracker?->id,
                     'device_id' => $device?->id,
                     'signal_type' => 'vehicle.sos',
                     'severity_hint' => 'critical',
@@ -495,7 +485,7 @@ class FleetTelemetryIngestService
                     $loneWorkerRoute,
                     $residentClient,
                     $device,
-                    $tracker,
+                    $assetLink,
                     $asset,
                     $vendor,
                     $normalized,
@@ -540,7 +530,7 @@ class FleetTelemetryIngestService
                 } elseif ($residentClient !== null && $finalRoute['resident_client'] !== null) {
                     $residentSignal = $this->signals->emit([
                         'asset_id' => $asset->id,
-                        'asset_tracker_id' => $tracker->id,
+                        'asset_tracker_id' => $tracker?->id,
                         'device_id' => $device?->id,
                         'signal_type' => 'resident.sos',
                         'severity_hint' => 'critical',
@@ -589,7 +579,7 @@ class FleetTelemetryIngestService
             if (! empty($normalized['tamper_flag'])) {
                 $this->signals->emit([
                     'asset_id' => $asset->id,
-                    'asset_tracker_id' => $tracker->id,
+                    'asset_tracker_id' => $tracker?->id,
                     'device_id' => $device?->id,
                     'signal_type' => 'device.tamper',
                     'severity_hint' => 'high',
@@ -605,7 +595,7 @@ class FleetTelemetryIngestService
             if (($normalized['event_type'] ?? null) === 'battery_low') {
                 $this->signals->emit([
                     'asset_id' => $asset->id,
-                    'asset_tracker_id' => $tracker->id,
+                    'asset_tracker_id' => $tracker?->id,
                     'device_id' => $device?->id,
                     'signal_type' => 'device.low_battery',
                     'severity_hint' => 'warning',
@@ -705,14 +695,14 @@ class FleetTelemetryIngestService
      * Worker routing follows the H&S lock order exactly: candidate Session first,
      * then post-session User re-fetch, session Client, Shift, distinct Shift Client,
      * and finally the resolved Site. Nothing person-attributed is mutated or emitted
-     * until the complete locked device/tracker/asset/site/user/session tuple agrees.
+     * until the complete locked device/link/asset/site/user/session tuple agrees.
      *
      * @return array{route: ?array{worker: User, session: LoneWorkerSession, site: Site}, site: ?Site}
      */
     protected function resolveLockedLoneWorkerRoute(
         int $candidateUserId,
         Device $device,
-        AssetTracker $tracker,
+        DeviceAssetLink $assetLink,
         Asset $asset,
     ): array {
         $session = LoneWorkerSession::query()
@@ -727,6 +717,8 @@ class FleetTelemetryIngestService
         }
 
         $worker = User::query()
+            ->staff()
+            ->whereNotNull('approved_at')
             ->whereKey($candidateUserId)
             ->lockForUpdate()
             ->first();
@@ -741,7 +733,7 @@ class FleetTelemetryIngestService
                 $site,
                 $provenance,
                 $device,
-                $tracker,
+                $assetLink,
                 $asset,
             )) {
             return ['route' => null, 'site' => $site];
@@ -754,7 +746,7 @@ class FleetTelemetryIngestService
     }
 
     /**
-     * Resolve resident attribution only from a complete locked device/tracker/
+     * Resolve resident attribution only from a complete locked device/link/
      * asset/site/client tuple. Assignment history without a current exact client
      * binding is intentionally fail-closed.
      */
@@ -781,14 +773,7 @@ class FleetTelemetryIngestService
             ->whereKey($assetClientId)
             ->lockForUpdate()
             ->first();
-        $deviceTenantId = $this->positiveId($device->tenant_id);
-        $siteTenantId = $this->positiveId($site->tenant_id);
-
         if (! $client
-            || $deviceTenantId === null
-            || $siteTenantId === null
-            || $deviceTenantId !== $siteTenantId
-            || $this->positiveId($client->organization_id) !== $deviceTenantId
             || $this->positiveId($client->site_id) !== (int) $site->id) {
             return null;
         }
@@ -800,7 +785,7 @@ class FleetTelemetryIngestService
      * Route a tracker panic / man-down to the Lone Worker Safety emergency pipeline.
      * The base vehicle.sos has already been persisted. A person-attributed emergency
      * is added only when the locked session's worker and complete site provenance
-     * match the same locked device/site/tenant tuple.
+     * match the same locked Device/Site tuple.
      */
     protected function routeLoneWorkerPanic(
         LoneWorkerSession $session,
@@ -840,7 +825,7 @@ class FleetTelemetryIngestService
     /**
      * A sync fleet-signal listener runs before the person alarm is emitted and
      * may change rows on this same transaction connection. Re-read the complete
-     * device/tracker/asset/assignment/site/consent tuple without adding locks,
+     * device/link/asset/assignment/site/consent tuple without adding locks,
      * and never silently reroute an accepted person alarm to another person.
      *
      * @param  null|array{worker: User, session: LoneWorkerSession, site: Site}  $loneWorkerRoute
@@ -856,33 +841,29 @@ class FleetTelemetryIngestService
         ?array $loneWorkerRoute,
         ?Client $residentClient,
         ?Device $device,
-        AssetTracker $tracker,
+        DeviceAssetLink $assetLink,
         Asset $asset,
         string $vendor,
         array $normalized,
     ): array {
         $personRouteInitiallyAccepted = $loneWorkerRoute !== null || $residentClient !== null;
-        $freshTracker = AssetTracker::query()->find($tracker->id);
+        $freshAssetLink = DeviceAssetLink::query()->find($assetLink->id);
         $freshAsset = Asset::query()->find($asset->id);
-        $lineageValid = $freshTracker !== null
-            && $freshAsset !== null
-            && $this->lockedLineageMatches($freshTracker, $freshAsset, $vendor, $normalized);
-
         $freshDevice = $device === null
             ? null
             : Device::query()->find($device->id);
-        $deviceValid = $lineageValid
-            && $freshDevice !== null
-            && $this->lockedDeviceMatchesLineage($freshDevice, $freshTracker, $vendor, $normalized);
+        $lineageValid = $this->lockedCanonicalLineageMatches(
+            $freshDevice,
+            $freshAssetLink,
+            $freshAsset,
+            $vendor,
+            $normalized,
+        );
         $freshSite = $lineageValid
             ? $this->readAuthoritativeAssetSite($freshAsset)
             : null;
 
-        if ($deviceValid && $this->deviceAndSiteTenantsContradict($freshDevice, $freshSite)) {
-            $deviceValid = false;
-        }
-
-        $canonicalDevice = $deviceValid ? $freshDevice : null;
+        $canonicalDevice = $lineageValid ? $freshDevice : null;
         $assignments = $freshDevice === null
             ? collect()
             : DeviceAssignment::query()
@@ -907,7 +888,7 @@ class FleetTelemetryIngestService
         $freshSession = null;
         $freshResidentClient = null;
 
-        if ($loneWorkerRoute !== null && $canonicalDevice && $freshTracker && $freshAsset) {
+        if ($loneWorkerRoute !== null && $canonicalDevice && $freshAssetLink && $freshAsset) {
             [$candidateWorkerId, $staffIntent] = $this->resolveLoneWorkerCandidateId(
                 $activeStaffAssignment,
                 $staffAssignments->isNotEmpty(),
@@ -919,13 +900,13 @@ class FleetTelemetryIngestService
                 $freshSession = $this->revalidateLockedLoneWorkerRoute(
                     $loneWorkerRoute,
                     $canonicalDevice,
-                    $freshTracker,
+                    $freshAssetLink,
                     $freshAsset,
                 );
             }
         } elseif ($residentClient !== null
             && $canonicalDevice
-            && $freshTracker
+            && $freshAssetLink
             && $freshAsset
             && $staffAssignments->isEmpty()) {
             $candidateResident = $this->readResidentClientForRoute(
@@ -943,10 +924,9 @@ class FleetTelemetryIngestService
         }
 
         $consentBlocked = false;
-        if ($lineageValid && $freshTracker && $freshAsset) {
+        if ($lineageValid && $freshAsset) {
             $consentBlocked = $this->consentBlockedForLockedLineage(
                 $canonicalDevice,
-                $freshTracker,
                 $freshAsset,
             );
         } elseif ($personRouteInitiallyAccepted) {
@@ -983,14 +963,8 @@ class FleetTelemetryIngestService
         }
 
         $client = Client::query()->find($assetClientId);
-        $deviceTenantId = $this->positiveId($device->tenant_id);
-        $siteTenantId = $this->positiveId($site->tenant_id);
 
         return $client
-            && $deviceTenantId !== null
-            && $siteTenantId !== null
-            && $deviceTenantId === $siteTenantId
-            && $this->positiveId($client->organization_id) === $deviceTenantId
             && $this->positiveId($client->site_id) === (int) $site->id
                 ? $client
                 : null;
@@ -1014,11 +988,14 @@ class FleetTelemetryIngestService
     protected function revalidateLockedLoneWorkerRoute(
         array $route,
         Device $device,
-        AssetTracker $tracker,
+        DeviceAssetLink $assetLink,
         Asset $asset,
     ): ?LoneWorkerSession {
         $session = LoneWorkerSession::query()->find($route['session']->id);
-        $worker = User::query()->find($route['worker']->id);
+        $worker = User::query()
+            ->staff()
+            ->whereNotNull('approved_at')
+            ->find($route['worker']->id);
         if (! $session || ! $worker) {
             return null;
         }
@@ -1033,7 +1010,7 @@ class FleetTelemetryIngestService
                 $site,
                 $provenance,
                 $device,
-                $tracker,
+                $assetLink,
                 $asset,
             )
                 ? $session
@@ -1171,18 +1148,70 @@ class FleetTelemetryIngestService
         }
     }
 
-    protected function lockedLineageMatches(
-        ?AssetTracker $tracker,
+    protected function lockedCanonicalLineageMatches(
+        ?Device $device,
+        ?DeviceAssetLink $assetLink,
         ?Asset $asset,
         string $vendor,
         array $normalized,
     ): bool {
-        if (! $tracker || ! $asset) {
+        if (! $device || ! $assetLink || ! $asset) {
             return false;
         }
 
+        return (int) $assetLink->device_id === (int) $device->id
+            && (int) $assetLink->asset_id === (int) $asset->id
+            && $assetLink->unlinked_at === null
+            && $this->lockedDeviceMatchesLineage($device, $vendor, $normalized);
+    }
+
+    /**
+     * Carry an existing provider row only as an optional FK for historical
+     * telemetry continuity. Device and Asset have already been resolved from
+     * canonical identity and the active DeviceAssetLink; this lookup must never
+     * select or veto ownership.
+     */
+    protected function compatibleHistoricalTracker(
+        Device $device,
+        Asset $asset,
+        string $vendor,
+        array $normalized,
+    ): ?AssetTracker {
+        $incomingIdentifier = trim((string) ($normalized['device_uid'] ?? ''));
+        if ($incomingIdentifier === '') {
+            return null;
+        }
+
+        $tracker = AssetTracker::query()
+            ->where(function ($query) use ($device, $vendor, $incomingIdentifier): void {
+                if ($device->legacy_asset_tracker_id !== null) {
+                    $query->whereKey($device->legacy_asset_tracker_id)
+                        ->orWhere(function ($providerIdentity) use ($vendor, $incomingIdentifier): void {
+                            $providerIdentity->where('vendor', $vendor)
+                                ->where('device_uid', $incomingIdentifier);
+                        });
+
+                    return;
+                }
+
+                $query->where('vendor', $vendor)
+                    ->where('device_uid', $incomingIdentifier);
+            })
+            ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [(int) ($device->legacy_asset_tracker_id ?? 0)])
+            ->first();
+
+        return $tracker && $this->historicalTrackerMatches($tracker, $asset, $vendor, $normalized)
+            ? $tracker
+            : null;
+    }
+
+    protected function historicalTrackerMatches(
+        AssetTracker $tracker,
+        Asset $asset,
+        string $vendor,
+        array $normalized,
+    ): bool {
         return (int) $tracker->asset_id === (int) $asset->id
-            && $tracker->status === 'paired'
             && trim((string) $tracker->vendor) === trim($vendor)
             && trim((string) $tracker->device_uid) === trim((string) ($normalized['device_uid'] ?? ''));
     }
@@ -1198,7 +1227,6 @@ class FleetTelemetryIngestService
 
     protected function lockedDeviceMatchesLineage(
         Device $device,
-        AssetTracker $tracker,
         string $vendor,
         array $normalized,
     ): bool {
@@ -1213,35 +1241,23 @@ class FleetTelemetryIngestService
 
         return $device->domain === 'tracking'
             && trim((string) $device->provider) === trim($vendor)
-            && (int) $device->legacy_asset_tracker_id === (int) $tracker->id
             && $incomingIdentifier !== ''
             && $deviceIdentifiers;
     }
 
-    protected function deviceAndSiteTenantsContradict(?Device $device, ?Site $site): bool
-    {
-        $deviceTenantId = $this->positiveId($device?->tenant_id);
-        $siteTenantId = $this->positiveId($site?->tenant_id);
-
-        return $deviceTenantId !== null
-            && $siteTenantId !== null
-            && $deviceTenantId !== $siteTenantId;
-    }
-
     /**
-     * Re-evaluate consent only after the canonical device, tracker, and asset have
+     * Re-evaluate consent only after the canonical device, link, and asset have
      * all been re-fetched under the ingest transaction. This deliberately avoids
      * capturing a pre-lock consent decision for person-linked telemetry.
      */
     protected function consentBlockedForLockedLineage(
         ?Device $device,
-        AssetTracker $tracker,
         Asset $asset,
     ): bool {
         $consentContext = $device
             ? $this->deviceRuntime->resolveConsentContext($device)
             : null;
-        $consent = $consentContext['consent'] ?? $tracker->consent()->first();
+        $consent = $consentContext['consent'] ?? null;
 
         return ! ($consent?->isValid() ?? false)
             && ! $this->isFleetOwnedVehicle($asset);
@@ -1437,22 +1453,18 @@ class FleetTelemetryIngestService
         Site $site,
         array $provenance,
         Device $device,
-        AssetTracker $tracker,
+        DeviceAssetLink $assetLink,
         Asset $asset,
     ): bool {
-        $tenantId = $this->positiveId($worker->organization_id);
-        $deviceTenantId = $this->positiveId($device->tenant_id);
         $assetSiteId = $this->authoritativeAssetSiteId($asset);
-        if ($tenantId === null
-            || $deviceTenantId === null
-            || $assetSiteId === null
+        if ($assetSiteId === null
             || $asset->client_id !== null
-            || (int) $tracker->asset_id !== (int) $asset->id
-            || (int) $device->legacy_asset_tracker_id !== (int) $tracker->id
+            || (int) $assetLink->device_id !== (int) $device->id
+            || (int) $assetLink->asset_id !== (int) $asset->id
+            || $assetLink->unlinked_at !== null
             || (int) $session->user_id !== (int) $worker->id
-            || $deviceTenantId !== $tenantId
-            || $this->positiveId($site->tenant_id) !== $tenantId
             || (int) $site->id !== $assetSiteId
+            || ! in_array($assetSiteId, $this->siteAccess->accessibleSiteIds($worker), true)
             || ! in_array($session->status, ['active', 'overdue', 'emergency'], true)) {
             return false;
         }
@@ -1465,8 +1477,7 @@ class FleetTelemetryIngestService
         $sessionSiteId = $this->positiveId($session->site_id);
         if ($sessionSiteId !== null
             && (! $resolvedSite
-                || (int) $resolvedSite->id !== $sessionSiteId
-                || $this->positiveId($resolvedSite->tenant_id) !== $tenantId)) {
+                || (int) $resolvedSite->id !== $sessionSiteId)) {
             return false;
         }
 
@@ -1475,7 +1486,6 @@ class FleetTelemetryIngestService
             $clientSiteId = $this->positiveId($sessionClient?->site_id);
             if (! $sessionClient
                 || (int) $sessionClient->id !== $this->positiveId($session->client_id)
-                || $this->positiveId($sessionClient->organization_id) !== $tenantId
                 || $clientSiteId === null) {
                 return false;
             }
@@ -1486,7 +1496,6 @@ class FleetTelemetryIngestService
         if ($session->shift_id !== null) {
             if (! $shift
                 || (int) $shift->id !== $this->positiveId($session->shift_id)
-                || $this->positiveId($shift->organization_id) !== $tenantId
                 || $this->positiveId($shift->user_id) !== (int) $worker->id
                 || ! $this->nullableIdMatches($shift->client_id, $this->positiveId($session->client_id))) {
                 return false;
@@ -1496,7 +1505,6 @@ class FleetTelemetryIngestService
                 $shiftClientSiteId = $this->positiveId($shiftClient?->site_id);
                 if (! $shiftClient
                     || (int) $shiftClient->id !== $this->positiveId($shift->client_id)
-                    || $this->positiveId($shiftClient->organization_id) !== $tenantId
                     || $shiftClientSiteId === null) {
                     return false;
                 }
@@ -1523,7 +1531,6 @@ class FleetTelemetryIngestService
         ])->filter()->unique()->values();
 
         return $resolvedSite !== null
-            && $this->positiveId($resolvedSite->tenant_id) === $tenantId
             && $siteIds->count() === 1
             && (int) $siteIds->first() === (int) $resolvedSite->id
             && (int) $resolvedSite->id === (int) $site->id;

@@ -6,19 +6,20 @@ use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Notifications\BonusStatusNotification;
 use App\Domain\Hr\Services\CompensationService;
+use App\Domain\Hr\Services\HrPerformanceAccessService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class BonusController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         protected CompensationService $compensationService,
+        private readonly HrPerformanceAccessService $access,
     ) {}
 
     /**
@@ -26,12 +27,10 @@ class BonusController extends Controller
      */
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->viewer($request);
 
-        $bonuses = HrBonusPayment::query()
-            ->where('tenant_id', $tenantId)
+        $bonuses = $this->access
+            ->applyBonusScope(HrBonusPayment::query(), $user)
             ->with([
                 'employeeProfile.user:id,name,email',
                 'approver:id,name',
@@ -61,18 +60,20 @@ class BonusController extends Controller
             'created_at' => $bonus->created_at?->toDateTimeString(),
         ]);
 
-        $employees = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->with('user:id,name,email')
-            ->orderBy('user_id')
-            ->get(['id', 'user_id', 'position_title', 'department']);
+        $employees = $user->canDo('hr.compensation.manage')
+            ? $this->access
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
+                ->with('user:id,name,email')
+                ->orderBy('user_id')
+                ->get(['id', 'user_id', 'position_title', 'department'])
+            : [];
 
         return Inertia::render('hr/compensation/bonuses', [
             'bonuses' => $bonuses,
             'employees' => $employees,
             'filters' => $request->only(['bonus_type', 'status', 'date_from', 'date_to']),
-            'stats' => $this->compensationService->heroStats($tenantId, $user),
-            'tabCounts' => $this->compensationService->tabCounts($tenantId),
+            'stats' => $this->compensationService->heroStatsFor($user),
+            'tabCounts' => $this->compensationService->tabCountsFor($user),
             'can' => [
                 'manage' => $user->canDo('hr.compensation.manage'),
             ],
@@ -84,13 +85,10 @@ class BonusController extends Controller
      */
     public function store(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $user = $this->manager($request);
 
         $data = $request->validate([
-            'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
+            'employee_profile_id' => ['required', 'integer'],
             'bonus_type' => ['required', Rule::in(['performance', 'signing', 'retention', 'spot', 'holiday', 'other'])],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'currency' => ['sometimes', 'string', 'max:3'],
@@ -98,20 +96,23 @@ class BonusController extends Controller
             'payment_date' => ['required', 'date'],
         ]);
 
-        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)->find($data['employee_profile_id']);
-        abort_unless($profile !== null, 422, 'That employee does not belong to this organisation.');
+        DB::transaction(function () use ($data, $user): void {
+            $profile = $this->access
+                ->applyCurrentProfileScope(HrEmployeeProfile::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($data['employee_profile_id']);
 
-        HrBonusPayment::create([
-            'tenant_id' => $tenantId,
-            'employee_profile_id' => $data['employee_profile_id'],
-            'bonus_type' => $data['bonus_type'],
-            'amount' => $data['amount'],
-            'currency' => $data['currency'] ?? 'NZD',
-            'reason' => $data['reason'] ?? null,
-            'payment_date' => $data['payment_date'],
-            'status' => 'pending',
-            'created_by' => $user->id,
-        ]);
+            HrBonusPayment::create([
+                'employee_profile_id' => $profile->id,
+                'bonus_type' => $data['bonus_type'],
+                'amount' => $data['amount'],
+                'currency' => $data['currency'] ?? 'NZD',
+                'reason' => $data['reason'] ?? null,
+                'payment_date' => $data['payment_date'],
+                'status' => 'pending',
+                'created_by' => $user->id,
+            ]);
+        }, attempts: 1);
 
         return redirect()->back()->with('success', 'Bonus payment created.');
     }
@@ -121,21 +122,29 @@ class BonusController extends Controller
      */
     public function approve(Request $request, HrBonusPayment $bonus)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $bonus->tenant_id);
+        $user = $this->manager($request);
 
-        if ($bonus->status !== 'pending') {
+        $approved = DB::transaction(function () use ($bonus, $user): ?HrBonusPayment {
+            $locked = $this->access
+                ->applyBonusScope(HrBonusPayment::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($bonus->getKey());
+            if ($locked->status !== 'pending') {
+                return null;
+            }
+            $locked->update([
+                'status' => 'approved',
+                'approved_by' => $user->id,
+                'approved_at' => now(),
+            ]);
+
+            return $locked->fresh();
+        }, attempts: 1);
+        if (! $approved) {
             return redirect()->back()->with('error', 'Only pending bonuses can be approved.');
         }
 
-        $bonus->update([
-            'status' => 'approved',
-            'approved_by' => $user->id,
-            'approved_at' => now(),
-        ]);
-
-        $this->notifyRecipient($bonus->fresh(), 'approved');
+        $this->notifyRecipient($approved, 'approved');
 
         return redirect()->back()->with('success', 'Bonus payment approved.');
     }
@@ -147,22 +156,30 @@ class BonusController extends Controller
      */
     public function cancel(Request $request, HrBonusPayment $bonus)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
-        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $bonus->tenant_id);
+        $user = $this->manager($request);
 
-        if (! in_array($bonus->status, ['pending', 'approved'], true)) {
+        $result = DB::transaction(function () use ($bonus, $user): ?array {
+            $locked = $this->access
+                ->applyBonusScope(HrBonusPayment::query(), $user)
+                ->lockForUpdate()
+                ->findOrFail($bonus->getKey());
+            if (! in_array($locked->status, ['pending', 'approved'], true)) {
+                return null;
+            }
+            $wasApproved = $locked->status === 'approved';
+            $locked->update(['status' => 'cancelled']);
+
+            return [$locked->fresh(), $wasApproved];
+        }, attempts: 1);
+        if ($result === null) {
             return redirect()->back()->with('error', 'Only pending or approved (unpaid) bonuses can be cancelled.');
         }
-
-        $wasApproved = $bonus->status === 'approved';
-
-        $bonus->update(['status' => 'cancelled']);
+        [$cancelled, $wasApproved] = $result;
 
         // Only tell the recipient if they had already been told it was
         // approved — cancelling a pending bonus they never knew about is noise.
         if ($wasApproved) {
-            $this->notifyRecipient($bonus->fresh(), 'cancelled');
+            $this->notifyRecipient($cancelled, 'cancelled');
         }
 
         return redirect()->back()->with('success', 'Bonus payment cancelled.');
@@ -184,5 +201,21 @@ class BonusController extends Controller
                 'error' => $exception->getMessage(),
             ]);
         }
+    }
+
+    private function viewer(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.view'), 403);
+
+        return $this->access->currentStaff($user, $user);
+    }
+
+    private function manager(Request $request): User
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.compensation.manage'), 403);
+
+        return $this->access->currentStaff($user, $user);
     }
 }

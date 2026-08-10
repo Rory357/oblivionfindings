@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
 type KeyCombo = {
     key: string;
@@ -29,7 +29,7 @@ function matchesCombo(event: KeyboardEvent, combo: KeyCombo): boolean {
 export function useKeyboardShortcut(
     combo: KeyCombo,
     handler: ShortcutHandler,
-    options: { preventDefault?: boolean; enabled?: boolean } = {}
+    options: { preventDefault?: boolean; enabled?: boolean } = {},
 ) {
     const { preventDefault = true, enabled = true } = options;
 
@@ -44,7 +44,7 @@ export function useKeyboardShortcut(
                 handler(event);
             }
         },
-        [combo, handler, preventDefault, enabled]
+        [combo, handler, preventDefault, enabled],
     );
 
     useEffect(() => {
@@ -55,7 +55,7 @@ export function useKeyboardShortcut(
 
 export function useKeyboardShortcuts(
     shortcuts: ShortcutConfig[],
-    options: { enabled?: boolean } = {}
+    options: { enabled?: boolean } = {},
 ) {
     const { enabled = true } = options;
 
@@ -115,7 +115,7 @@ export function useAppShortcuts(
         onGoToIncidents?: () => void;
         onHelp?: () => void;
     },
-    options: { enabled?: boolean } = {}
+    options: { enabled?: boolean } = {},
 ) {
     const shortcuts: ShortcutConfig[] = [
         handlers.onSearch && {

@@ -90,7 +90,9 @@ export function Donut({
                             r={r}
                             fill="none"
                             stroke={a.color}
-                            strokeWidth={hover === a.idx ? thickness + 3 : thickness}
+                            strokeWidth={
+                                hover === a.idx ? thickness + 3 : thickness
+                            }
                             strokeDasharray={a.dash}
                             strokeDashoffset={a.offset}
                             strokeLinecap="butt"
@@ -100,7 +102,9 @@ export function Donut({
                                 transition:
                                     'stroke-width 160ms ease, opacity 160ms ease',
                                 opacity:
-                                    hover !== null && hover !== a.idx ? 0.55 : 1,
+                                    hover !== null && hover !== a.idx
+                                        ? 0.55
+                                        : 1,
                                 cursor: 'pointer',
                             }}
                         />
@@ -108,10 +112,10 @@ export function Donut({
                 </g>
                 <foreignObject x={0} y={0} width={size} height={size}>
                     <div className="flex h-full w-full flex-col items-center justify-center text-center leading-none">
-                        <div className="text-[26px] font-extrabold tracking-tight tabular-nums text-muted-foreground">
+                        <div className="text-[26px] font-extrabold tracking-tight text-muted-foreground tabular-nums">
                             {centerValue}
                         </div>
-                        <div className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                        <div className="mt-1 text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
                             {centerLabel}
                         </div>
                     </div>
@@ -152,7 +156,7 @@ export function DonutLegend({
                             {formatValue ? formatValue(s.value) : s.value}
                         </span>
                         {showPercent ? (
-                            <span className="w-9 shrink-0 text-right tabular-nums text-muted-foreground/60">
+                            <span className="w-9 shrink-0 text-right text-muted-foreground/60 tabular-nums">
                                 {Math.round((s.value / total) * 100)}%
                             </span>
                         ) : null}

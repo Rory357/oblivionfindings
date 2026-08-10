@@ -51,6 +51,7 @@ class SiteClientController extends Controller
     ) {
         $this->authorize('update', $site);
         abort_unless($client->site_id === $site->id, 404);
+        abort_unless($request->user()?->canDo('clients.assignments.update'), 403);
 
         $client = $placement->unlink($site, $client, $request->user());
 

@@ -6,20 +6,25 @@ import { router } from '@inertiajs/react';
 import {
     Award,
     Check,
-    GitBranch,
+    Gauge,
+    MessageSquare,
     Sparkles,
+    Sprout,
     Target,
     TrendingUp,
-    MessageSquare,
-    Gauge,
-    Sprout,
     UserCheck,
     type LucideIcon,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { MedsWizardDialog, SummaryRow, type MedsWizardStep } from '@/components/meds/wizard-shell';
+import {
+    MedsWizardDialog,
+    SummaryRow,
+    type MedsWizardStep,
+} from '@/components/meds/wizard-shell';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Field,
     Segmented,
@@ -27,8 +32,6 @@ import {
     StepHead,
     type IconType,
 } from '@/components/wizard/primitives';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 export type Opt = { value: number | string; label: string };
@@ -41,7 +44,6 @@ export type WizardKind =
     | 'assess'
     | 'feedback'
     | 'pip'
-    | 'succession'
     | 'signoff';
 
 export type WizardContext = {
@@ -56,7 +58,6 @@ export type WizardSupport = {
     sessionTypes: Opt[];
     reviewTypes: Opt[];
     competencyOptions: Opt[];
-    successionEmployees: Opt[];
 };
 
 type FieldType =
@@ -78,10 +79,15 @@ type WizField = {
     span?: boolean;
     placeholder?: string;
     options?: Opt[];
-    optionsFrom?: 'staff' | 'reviewTypes' | 'competencyOptions' | 'successionEmployees';
+    optionsFrom?: 'staff' | 'reviewTypes' | 'competencyOptions';
 };
 
-type WizStep = { label: string; blurb: string; icon: IconType; fields?: WizField[] };
+type WizStep = {
+    label: string;
+    blurb: string;
+    icon: IconType;
+    fields?: WizField[];
+};
 
 type WizDef = {
     title: string;
@@ -89,7 +95,10 @@ type WizDef = {
     icon: LucideIcon;
     steps: WizStep[];
     /** Build the request payload from collected field data. */
-    build: (d: Record<string, unknown>, ctx?: WizardContext) => { url: string; method: 'post'; data: Record<string, unknown> };
+    build: (
+        d: Record<string, unknown>,
+        ctx?: WizardContext,
+    ) => { url: string; method: 'post'; data: Record<string, unknown> };
     successNoun: string;
 };
 
@@ -128,11 +137,40 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Who & when',
                     icon: Award,
                     fields: [
-                        { key: 'employee', label: 'Staff member', type: 'people-single', optionsFrom: 'staff', required: true, span: true },
-                        { key: 'review_type', label: 'Review type', type: 'select', optionsFrom: 'reviewTypes', required: true },
-                        { key: 'overall_rating', label: 'Overall rating', type: 'select', hint: 'optional', options: ratingOpts },
-                        { key: 'start', label: 'Period start', type: 'date', required: true },
-                        { key: 'end', label: 'Period end', type: 'date', required: true },
+                        {
+                            key: 'employee',
+                            label: 'Staff member',
+                            type: 'people-single',
+                            optionsFrom: 'staff',
+                            required: true,
+                            span: true,
+                        },
+                        {
+                            key: 'review_type',
+                            label: 'Review type',
+                            type: 'select',
+                            optionsFrom: 'reviewTypes',
+                            required: true,
+                        },
+                        {
+                            key: 'overall_rating',
+                            label: 'Overall rating',
+                            type: 'select',
+                            hint: 'optional',
+                            options: ratingOpts,
+                        },
+                        {
+                            key: 'start',
+                            label: 'Period start',
+                            type: 'date',
+                            required: true,
+                        },
+                        {
+                            key: 'end',
+                            label: 'Period end',
+                            type: 'date',
+                            required: true,
+                        },
                     ],
                 },
                 {
@@ -140,9 +178,27 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Strengths & goals',
                     icon: Sparkles,
                     fields: [
-                        { key: 'strengths', label: 'Strengths', type: 'textarea', span: true, placeholder: 'What this person does well…' },
-                        { key: 'dev', label: 'Development areas', type: 'textarea', span: true, placeholder: 'Where they can grow…' },
-                        { key: 'goals', label: 'Goals', type: 'lines', span: true, hint: 'one per line' },
+                        {
+                            key: 'strengths',
+                            label: 'Strengths',
+                            type: 'textarea',
+                            span: true,
+                            placeholder: 'What this person does well…',
+                        },
+                        {
+                            key: 'dev',
+                            label: 'Development areas',
+                            type: 'textarea',
+                            span: true,
+                            placeholder: 'Where they can grow…',
+                        },
+                        {
+                            key: 'goals',
+                            label: 'Goals',
+                            type: 'lines',
+                            span: true,
+                            hint: 'one per line',
+                        },
                     ],
                 },
                 { label: 'Review', blurb: 'Confirm & save', icon: Check },
@@ -153,7 +209,9 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                 data: {
                     employee_user_id: Number(d.employee),
                     review_type: d.review_type,
-                    overall_rating: d.overall_rating ? Number(d.overall_rating) : null,
+                    overall_rating: d.overall_rating
+                        ? Number(d.overall_rating)
+                        : null,
                     review_period_start: d.start,
                     review_period_end: d.end,
                     strengths: d.strengths || null,
@@ -173,10 +231,32 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: '1:1 details',
                     icon: UserCheck,
                     fields: [
-                        { key: 'employee', label: 'Staff member', type: 'people-single', optionsFrom: 'staff', required: true, span: true },
-                        { key: 'session_date', label: 'Session date', type: 'date', required: true },
-                        { key: 'next_session_date', label: 'Next session', type: 'date' },
-                        { key: 'session_type', label: 'Session type', type: 'select', options: support.sessionTypes, required: true },
+                        {
+                            key: 'employee',
+                            label: 'Staff member',
+                            type: 'people-single',
+                            optionsFrom: 'staff',
+                            required: true,
+                            span: true,
+                        },
+                        {
+                            key: 'session_date',
+                            label: 'Session date',
+                            type: 'date',
+                            required: true,
+                        },
+                        {
+                            key: 'next_session_date',
+                            label: 'Next session',
+                            type: 'date',
+                        },
+                        {
+                            key: 'session_type',
+                            label: 'Session type',
+                            type: 'select',
+                            options: support.sessionTypes,
+                            required: true,
+                        },
                         {
                             key: 'cadence',
                             label: 'Cadence',
@@ -194,8 +274,20 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Notes & actions',
                     icon: Sparkles,
                     fields: [
-                        { key: 'topics', label: 'Topics discussed', type: 'textarea', span: true, required: true },
-                        { key: 'actions', label: 'Agreed actions', type: 'lines', span: true, hint: 'one per line' },
+                        {
+                            key: 'topics',
+                            label: 'Topics discussed',
+                            type: 'textarea',
+                            span: true,
+                            required: true,
+                        },
+                        {
+                            key: 'actions',
+                            label: 'Agreed actions',
+                            type: 'lines',
+                            span: true,
+                            hint: 'one per line',
+                        },
                         {
                             key: 'visible',
                             label: 'Visible to employee (require acknowledgement)',
@@ -235,8 +327,22 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'What & who',
                     icon: Target,
                     fields: [
-                        { key: 'title', label: 'Objective', type: 'text', required: true, span: true, placeholder: 'e.g. Lift medication competency to 95%' },
-                        { key: 'owner', label: 'Owner', type: 'people-single', optionsFrom: 'staff', required: true },
+                        {
+                            key: 'title',
+                            label: 'Objective',
+                            type: 'text',
+                            required: true,
+                            span: true,
+                            placeholder:
+                                'e.g. Lift medication competency to 95%',
+                        },
+                        {
+                            key: 'owner',
+                            label: 'Owner',
+                            type: 'people-single',
+                            optionsFrom: 'staff',
+                            required: true,
+                        },
                         {
                             key: 'goal_type',
                             label: 'Type',
@@ -247,7 +353,12 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                                 { value: 'company', label: 'Company' },
                             ],
                         },
-                        { key: 'due', label: 'Target date', type: 'date', required: true },
+                        {
+                            key: 'due',
+                            label: 'Target date',
+                            type: 'date',
+                            required: true,
+                        },
                     ],
                 },
                 {
@@ -255,7 +366,13 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Measures of success',
                     icon: Sparkles,
                     fields: [
-                        { key: 'krs', label: 'Key results', type: 'lines', span: true, hint: 'one per line · metric · baseline → target' },
+                        {
+                            key: 'krs',
+                            label: 'Key results',
+                            type: 'lines',
+                            span: true,
+                            hint: 'one per line · metric · baseline → target',
+                        },
                     ],
                 },
                 { label: 'Review', blurb: 'Confirm & save', icon: Check },
@@ -288,10 +405,35 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Area & levels',
                     icon: Sprout,
                     fields: [
-                        { key: 'employee', label: 'Staff member', type: 'people-single', optionsFrom: 'staff', required: true, span: true },
-                        { key: 'area', label: 'Competency area', type: 'text', required: true, span: true },
-                        { key: 'cur', label: 'Current level', type: 'select', options: levelOpts, required: true },
-                        { key: 'tgt', label: 'Target level', type: 'select', options: levelOpts, required: true },
+                        {
+                            key: 'employee',
+                            label: 'Staff member',
+                            type: 'people-single',
+                            optionsFrom: 'staff',
+                            required: true,
+                            span: true,
+                        },
+                        {
+                            key: 'area',
+                            label: 'Competency area',
+                            type: 'text',
+                            required: true,
+                            span: true,
+                        },
+                        {
+                            key: 'cur',
+                            label: 'Current level',
+                            type: 'select',
+                            options: levelOpts,
+                            required: true,
+                        },
+                        {
+                            key: 'tgt',
+                            label: 'Target level',
+                            type: 'select',
+                            options: levelOpts,
+                            required: true,
+                        },
                     ],
                 },
                 {
@@ -310,7 +452,12 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                                 { value: 'compliance', label: 'Compliance' },
                             ],
                         },
-                        { key: 'course', label: 'Linked course / notes', type: 'text', span: true },
+                        {
+                            key: 'course',
+                            label: 'Linked course / notes',
+                            type: 'text',
+                            span: true,
+                        },
                         { key: 'due', label: 'Target date', type: 'date' },
                     ],
                 },
@@ -344,10 +491,35 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Who & what',
                     icon: Gauge,
                     fields: [
-                        { key: 'employee', label: 'Staff member', type: 'people-single', optionsFrom: 'staff', required: true, span: true },
-                        { key: 'competency', label: 'Competency', type: 'select', optionsFrom: 'competencyOptions', required: true, span: true },
-                        { key: 'cur', label: 'Assessed level', type: 'select', options: levelOpts, required: true },
-                        { key: 'tgt', label: 'Target level', type: 'select', options: levelOpts },
+                        {
+                            key: 'employee',
+                            label: 'Staff member',
+                            type: 'people-single',
+                            optionsFrom: 'staff',
+                            required: true,
+                            span: true,
+                        },
+                        {
+                            key: 'competency',
+                            label: 'Competency',
+                            type: 'select',
+                            optionsFrom: 'competencyOptions',
+                            required: true,
+                            span: true,
+                        },
+                        {
+                            key: 'cur',
+                            label: 'Assessed level',
+                            type: 'select',
+                            options: levelOpts,
+                            required: true,
+                        },
+                        {
+                            key: 'tgt',
+                            label: 'Target level',
+                            type: 'select',
+                            options: levelOpts,
+                        },
                     ],
                 },
                 {
@@ -355,7 +527,12 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Proof & notes',
                     icon: Sparkles,
                     fields: [
-                        { key: 'evidence', label: 'Evidence notes', type: 'textarea', span: true },
+                        {
+                            key: 'evidence',
+                            label: 'Evidence notes',
+                            type: 'textarea',
+                            span: true,
+                        },
                     ],
                 },
                 { label: 'Review', blurb: 'Confirm & save', icon: Check },
@@ -387,7 +564,14 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Type & subject',
                     icon: MessageSquare,
                     fields: [
-                        { key: 'subject', label: 'Subject', type: 'people-single', optionsFrom: 'staff', required: true, span: true },
+                        {
+                            key: 'subject',
+                            label: 'Subject',
+                            type: 'people-single',
+                            optionsFrom: 'staff',
+                            required: true,
+                            span: true,
+                        },
                         {
                             key: 'review_type',
                             label: 'Feedback type',
@@ -395,12 +579,20 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                             options: [
                                 { value: 'peer', label: 'Peer' },
                                 { value: 'manager', label: 'Manager' },
-                                { value: 'direct_report', label: 'Direct report' },
+                                {
+                                    value: 'direct_report',
+                                    label: 'Direct report',
+                                },
                                 { value: 'self', label: 'Self' },
                             ],
                             required: true,
                         },
-                        { key: 'due', label: 'Responses due', type: 'date', required: true },
+                        {
+                            key: 'due',
+                            label: 'Responses due',
+                            type: 'date',
+                            required: true,
+                        },
                     ],
                 },
                 {
@@ -408,7 +600,14 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Who gives feedback',
                     icon: UserCheck,
                     fields: [
-                        { key: 'reviewers', label: 'Reviewers', type: 'people-multi', optionsFrom: 'staff', required: true, span: true },
+                        {
+                            key: 'reviewers',
+                            label: 'Reviewers',
+                            type: 'people-multi',
+                            optionsFrom: 'staff',
+                            required: true,
+                            span: true,
+                        },
                     ],
                 },
                 { label: 'Review', blurb: 'Confirm & send', icon: Check },
@@ -420,7 +619,9 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     subject_user_id: Number(d.subject),
                     review_type: d.review_type,
                     due_date: d.due,
-                    reviewer_user_ids: ((d.reviewers as number[]) ?? []).map(Number),
+                    reviewer_user_ids: ((d.reviewers as number[]) ?? []).map(
+                        Number,
+                    ),
                 },
             }),
         },
@@ -435,9 +636,27 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Reason & dates',
                     icon: TrendingUp,
                     fields: [
-                        { key: 'employee', label: 'Staff member', type: 'people-single', optionsFrom: 'staff', required: true, span: true },
-                        { key: 'reason', label: 'Reason / concern', type: 'text', required: true, span: true },
-                        { key: 'review', label: 'Review date', type: 'date', required: true },
+                        {
+                            key: 'employee',
+                            label: 'Staff member',
+                            type: 'people-single',
+                            optionsFrom: 'staff',
+                            required: true,
+                            span: true,
+                        },
+                        {
+                            key: 'reason',
+                            label: 'Reason / concern',
+                            type: 'text',
+                            required: true,
+                            span: true,
+                        },
+                        {
+                            key: 'review',
+                            label: 'Review date',
+                            type: 'date',
+                            required: true,
+                        },
                     ],
                 },
                 {
@@ -445,8 +664,20 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                     blurb: 'Targets & support',
                     icon: Sparkles,
                     fields: [
-                        { key: 'milestones', label: 'Milestones', type: 'lines', span: true, hint: 'one per line', required: true },
-                        { key: 'support', label: 'Support offered', type: 'textarea', span: true },
+                        {
+                            key: 'milestones',
+                            label: 'Milestones',
+                            type: 'lines',
+                            span: true,
+                            hint: 'one per line',
+                            required: true,
+                        },
+                        {
+                            key: 'support',
+                            label: 'Support offered',
+                            type: 'textarea',
+                            span: true,
+                        },
                     ],
                 },
                 { label: 'Review', blurb: 'Confirm & save', icon: Check },
@@ -466,75 +697,15 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                         start_date: today(),
                         end_date: review,
                         review_date: review,
-                        milestones: ms.map((m) => ({ title: m, due_date: review })),
+                        milestones: ms.map((m) => ({
+                            title: m,
+                            due_date: review,
+                        })),
                         source_review_id: ctx?.reviewId ?? null,
                         stay: true,
                     },
                 };
             },
-        },
-        succession: {
-            title: 'New succession plan',
-            rail: 'Succession',
-            icon: GitBranch,
-            successNoun: 'Succession plan',
-            steps: [
-                {
-                    label: 'Role',
-                    blurb: 'Critical position',
-                    icon: GitBranch,
-                    fields: [
-                        { key: 'role', label: 'Critical role', type: 'text', required: true, span: true, placeholder: 'e.g. Team Leader · Kowhai Lodge' },
-                        { key: 'incumbent', label: 'Current incumbent', type: 'people-single', optionsFrom: 'staff' },
-                        {
-                            key: 'risk',
-                            label: 'Risk level',
-                            type: 'segmented',
-                            options: [
-                                { value: 'low', label: 'Low' },
-                                { value: 'medium', label: 'Medium' },
-                                { value: 'high', label: 'High' },
-                                { value: 'critical', label: 'Critical' },
-                            ],
-                        },
-                    ],
-                },
-                {
-                    label: 'Candidates',
-                    blurb: 'Successors',
-                    icon: UserCheck,
-                    fields: [
-                        { key: 'candidates', label: 'Candidates', type: 'people-multi', optionsFrom: 'successionEmployees', span: true },
-                        {
-                            key: 'readiness',
-                            label: 'Overall readiness',
-                            type: 'segmented',
-                            options: [
-                                { value: 'ready_now', label: 'Ready now' },
-                                { value: 'ready_1_year', label: '1 year' },
-                                { value: 'ready_2_years', label: '2 years' },
-                                { value: 'developing', label: 'Developing' },
-                            ],
-                        },
-                    ],
-                },
-                { label: 'Review', blurb: 'Confirm & save', icon: Check },
-            ],
-            build: (d, ctx) => ({
-                url: '/hr/succession',
-                method: 'post',
-                data: {
-                    role_title: d.role,
-                    risk_level: d.risk || 'medium',
-                    current_holder_user_id: d.incumbent ? Number(d.incumbent) : null,
-                    candidates: ((d.candidates as number[]) ?? []).map((id) => ({
-                        employee_profile_id: Number(id),
-                        readiness: d.readiness || 'developing',
-                    })),
-                    source_review_id: ctx?.reviewId ?? null,
-                    stay: true,
-                },
-            }),
         },
         signoff: {
             title: 'Sign off review',
@@ -557,7 +728,12 @@ function defs(support: WizardSupport): Record<WizardKind, WizDef> {
                                 { value: 'return', label: 'Return for edits' },
                             ],
                         },
-                        { key: 'comment', label: 'Comment', type: 'textarea', span: true },
+                        {
+                            key: 'comment',
+                            label: 'Comment',
+                            type: 'textarea',
+                            span: true,
+                        },
                     ],
                 },
                 { label: 'Review', blurb: 'Confirm', icon: Check },
@@ -584,12 +760,15 @@ export function PerformanceWizards({
     const def = allDefs[state.kind];
 
     const [step, setStep] = useState(0);
-    const [data, setData] = useState<Record<string, unknown>>(state.context?.prefill ?? {});
+    const [data, setData] = useState<Record<string, unknown>>(
+        state.context?.prefill ?? {},
+    );
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [done, setDone] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    const optionsFor = (f: WizField): Opt[] => f.options ?? (f.optionsFrom ? support[f.optionsFrom] : []);
+    const optionsFor = (f: WizField): Opt[] =>
+        f.options ?? (f.optionsFrom ? support[f.optionsFrom] : []);
 
     const set = (k: string, v: unknown) => {
         setData((d) => ({ ...d, [k]: v }));
@@ -605,8 +784,13 @@ export function PerformanceWizards({
             if (!f.required) continue;
             const v = data[f.key];
             if (f.type === 'people-multi') {
-                if (!Array.isArray(v) || v.length === 0) errs[f.key] = 'Pick at least one';
-            } else if (v === undefined || v === null || String(v).trim() === '') {
+                if (!Array.isArray(v) || v.length === 0)
+                    errs[f.key] = 'Pick at least one';
+            } else if (
+                v === undefined ||
+                v === null ||
+                String(v).trim() === ''
+            ) {
                 errs[f.key] = 'Required';
             }
         }
@@ -615,7 +799,8 @@ export function PerformanceWizards({
     };
 
     const next = () => {
-        if (validateStep()) setStep((s) => Math.min(s + 1, def.steps.length - 1));
+        if (validateStep())
+            setStep((s) => Math.min(s + 1, def.steps.length - 1));
     };
     const back = () => setStep((s) => Math.max(0, s - 1));
 
@@ -627,7 +812,10 @@ export function PerformanceWizards({
                 if (!f.required) continue;
                 req++;
                 const v = data[f.key];
-                const ok = f.type === 'people-multi' ? Array.isArray(v) && v.length > 0 : v !== undefined && String(v ?? '').trim() !== '';
+                const ok =
+                    f.type === 'people-multi'
+                        ? Array.isArray(v) && v.length > 0
+                        : v !== undefined && String(v ?? '').trim() !== '';
                 if (ok) fill++;
             }
         }
@@ -655,7 +843,13 @@ export function PerformanceWizards({
                 toast.error('Please fix the highlighted fields.');
                 // Jump to the first step that has an error.
                 const firstBad = Object.keys(errs)[0];
-                const idx = def.steps.findIndex((s) => (s.fields ?? []).some((f) => f.key === firstBad || (errs as Record<string, string>)[f.key]));
+                const idx = def.steps.findIndex((s) =>
+                    (s.fields ?? []).some(
+                        (f) =>
+                            f.key === firstBad ||
+                            (errs as Record<string, string>)[f.key],
+                    ),
+                );
                 if (idx >= 0) setStep(idx);
             },
             onFinish: () => setSaving(false),
@@ -689,11 +883,12 @@ export function PerformanceWizards({
                         <span className="grid h-[76px] w-[76px] place-items-center rounded-full bg-status-success-bg text-status-success">
                             <Check className="h-10 w-10" />
                         </span>
-                        <Sparkles className="absolute -right-3 -top-1.5 h-5 w-5 text-primary" />
+                        <Sparkles className="absolute -top-1.5 -right-3 h-5 w-5 text-primary" />
                     </div>
                     <h2 className="text-2xl font-bold">All done</h2>
                     <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                        {def.successNoun} was saved. It now appears in the list and on the hub.
+                        {def.successNoun} was saved. It now appears in the list
+                        and on the hub.
                     </p>
                     <div className="mt-6 flex gap-2.5">
                         <button
@@ -725,13 +920,21 @@ export function PerformanceWizards({
         <>
             <div>
                 {step > 0 ? (
-                    <button type="button" onClick={back} className="rounded-md px-3 py-2 text-[13px] font-semibold text-muted-foreground hover:text-foreground">
+                    <button
+                        type="button"
+                        onClick={back}
+                        className="rounded-md px-3 py-2 text-[13px] font-semibold text-muted-foreground hover:text-foreground"
+                    >
                         Back
                     </button>
                 ) : null}
             </div>
             <div className="flex gap-2.5">
-                <button type="button" onClick={onClose} className="rounded-md px-3 py-2 text-[13px] font-semibold text-muted-foreground hover:text-foreground">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="rounded-md px-3 py-2 text-[13px] font-semibold text-muted-foreground hover:text-foreground"
+                >
                     Cancel
                 </button>
                 {isLast ? (
@@ -779,10 +982,15 @@ export function PerformanceWizards({
                 <div>
                     <div className="mb-1.5 flex justify-between text-[11px] text-muted-foreground">
                         <span>Completeness</span>
-                        <span className="font-bold text-primary">{completeness}%</span>
+                        <span className="font-bold text-primary">
+                            {completeness}%
+                        </span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                        <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${completeness}%` }} />
+                        <div
+                            className="h-full rounded-full bg-primary transition-[width] duration-500"
+                            style={{ width: `${completeness}%` }}
+                        />
                     </div>
                 </div>
             }
@@ -792,10 +1000,19 @@ export function PerformanceWizards({
             footer={footer}
         >
             {isLast ? (
-                <ReviewStep def={def} data={data} support={support} onEdit={setStep} />
+                <ReviewStep
+                    def={def}
+                    data={data}
+                    support={support}
+                    onEdit={setStep}
+                />
             ) : (
                 <div className="motion-safe:animate-in motion-safe:fade-in-0">
-                    <StepHead icon={def.steps[step].icon} title={def.steps[step].label} blurb={def.steps[step].blurb} />
+                    <StepHead
+                        icon={def.steps[step].icon}
+                        title={def.steps[step].label}
+                        blurb={def.steps[step].blurb}
+                    />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         {stepFields.map((f) => (
                             <FieldControl
@@ -845,7 +1062,10 @@ function FieldControl({
                 onChange={(v) => onChange(v)}
                 placeholder="Select…"
                 ariaLabel={f.label}
-                options={options.map((o) => ({ value: String(o.value), label: o.label }))}
+                options={options.map((o) => ({
+                    value: String(o.value),
+                    label: o.label,
+                }))}
             />
         );
     } else if (f.type === 'date') {
@@ -862,7 +1082,10 @@ function FieldControl({
             <Segmented
                 value={(value as string) ?? ''}
                 onChange={(v) => onChange(v)}
-                options={options.map((o) => ({ value: String(o.value), label: o.label }))}
+                options={options.map((o) => ({
+                    value: String(o.value),
+                    label: o.label,
+                }))}
             />
         );
     } else if (f.type === 'people-multi') {
@@ -876,10 +1099,21 @@ function FieldControl({
                             key={String(o.value)}
                             type="button"
                             aria-pressed={on}
-                            onClick={() => onChange(on ? arr.filter((x) => String(x) !== String(o.value)) : [...arr, o.value])}
+                            onClick={() =>
+                                onChange(
+                                    on
+                                        ? arr.filter(
+                                              (x) =>
+                                                  String(x) !== String(o.value),
+                                          )
+                                        : [...arr, o.value],
+                                )
+                            }
                             className={cn(
                                 'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
-                                on ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-foreground hover:border-primary/50',
+                                on
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border bg-card text-foreground hover:border-primary/50',
                             )}
                         >
                             {on ? <Check className="h-3 w-3" /> : null}
@@ -901,7 +1135,18 @@ function FieldControl({
     }
 
     return (
-        <Field label={f.label} required={f.required} hint={f.hint} error={error} span={f.span || f.type === 'textarea' || f.type === 'lines' || f.type === 'people-multi'}>
+        <Field
+            label={f.label}
+            required={f.required}
+            hint={f.hint}
+            error={error}
+            span={
+                f.span ||
+                f.type === 'textarea' ||
+                f.type === 'lines' ||
+                f.type === 'people-multi'
+            }
+        >
             {control}
         </Field>
     );
@@ -922,9 +1167,16 @@ function ReviewStep({
         const v = data[f.key];
         if (v == null || v === '') return '—';
         if (f.type === 'people-multi') {
-            const opts = f.optionsFrom ? support[f.optionsFrom] : f.options ?? [];
+            const opts = f.optionsFrom
+                ? support[f.optionsFrom]
+                : (f.options ?? []);
             const arr = (v as (number | string)[]).map(String);
-            return opts.filter((o) => arr.includes(String(o.value))).map((o) => o.label).join(', ') || '—';
+            return (
+                opts
+                    .filter((o) => arr.includes(String(o.value)))
+                    .map((o) => o.label)
+                    .join(', ') || '—'
+            );
         }
         const opts = f.options ?? (f.optionsFrom ? support[f.optionsFrom] : []);
         if (opts.length) {
@@ -937,14 +1189,23 @@ function ReviewStep({
 
     return (
         <div className="motion-safe:animate-in motion-safe:fade-in-0">
-            <StepHead icon={Check} title="Review & save" blurb="Confirm the details below — you can edit any step." />
+            <StepHead
+                icon={Check}
+                title="Review & save"
+                blurb="Confirm the details below — you can edit any step."
+            />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {def.steps
                     .filter((s) => s.fields)
                     .map((s, i) => (
-                        <div key={s.label} className="rounded-xl border border-border bg-card/60 p-3.5">
+                        <div
+                            key={s.label}
+                            className="rounded-xl border border-border bg-card/60 p-3.5"
+                        >
                             <div className="mb-1.5 flex items-center justify-between">
-                                <span className="text-[13px] font-bold">{s.label}</span>
+                                <span className="text-[13px] font-bold">
+                                    {s.label}
+                                </span>
                                 <button
                                     type="button"
                                     onClick={() => onEdit(i)}
@@ -954,7 +1215,11 @@ function ReviewStep({
                                 </button>
                             </div>
                             {(s.fields ?? []).map((f) => (
-                                <SummaryRow key={f.key} label={f.label} value={labelFor(f)} />
+                                <SummaryRow
+                                    key={f.key}
+                                    label={f.label}
+                                    value={labelFor(f)}
+                                />
                             ))}
                         </div>
                     ))}

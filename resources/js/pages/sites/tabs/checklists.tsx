@@ -2,11 +2,17 @@ import type { ChecklistsData, SiteRef } from '@/components/checklists/types';
 import { ChecklistsWorkspace } from '@/components/checklists/workspace';
 import { SiteProfileLockedState } from './site-profile-states';
 
-export type SiteProfileChecklistsData = ChecklistsData & {
-    locked?: boolean;
+type SiteProfileChecklistsScope = {
     site: SiteRef;
     backHref: string;
 };
+
+export type SiteProfileChecklistsData =
+    | ({ locked: true } & SiteProfileChecklistsScope)
+    | (ChecklistsData &
+          SiteProfileChecklistsScope & {
+              locked?: false;
+          });
 
 export function SiteProfileChecklists({
     data,

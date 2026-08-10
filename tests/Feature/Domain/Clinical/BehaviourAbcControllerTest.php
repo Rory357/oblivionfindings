@@ -3,10 +3,12 @@
 namespace Tests\Feature\Domain\Clinical;
 
 use App\Domain\Clinical\Enums\BehaviourFunction;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\Client\BehaviourPatternsService;
 use App\Support\WorkerClock;
@@ -21,12 +23,18 @@ class BehaviourAbcControllerTest extends TestCase
 
     protected Client $client;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create(['is_active' => true]);
+        $this->client = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
     }
 
     protected function createUserWithRole(string $roleName): User
@@ -39,6 +47,14 @@ class BehaviourAbcControllerTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'start_date' => today()->subDay(),
+            'end_date' => null,
+        ]);
 
         return $user;
     }
@@ -150,7 +166,10 @@ class BehaviourAbcControllerTest extends TestCase
     public function test_index_lists_entries_for_the_client_only(): void
     {
         $user = $this->createUserWithRole('coordinator');
-        $other = Client::factory()->create();
+        $other = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
 
         BehaviourAbcEntry::factory()->count(2)->create(['client_id' => $this->client->id]);
         BehaviourAbcEntry::factory()->create(['client_id' => $other->id]);
@@ -181,7 +200,10 @@ class BehaviourAbcControllerTest extends TestCase
     public function test_cannot_access_entry_from_another_client(): void
     {
         $user = $this->createUserWithRole('coordinator');
-        $other = Client::factory()->create();
+        $other = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
         $entry = BehaviourAbcEntry::factory()->create(['client_id' => $other->id]);
 
         $response = $this->actingAs($user)

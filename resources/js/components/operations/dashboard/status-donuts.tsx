@@ -2,8 +2,8 @@ import { Link } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { cn } from '@/lib/utils';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 export type DonutSegment = {
     key: string;
@@ -41,11 +41,17 @@ function InteractiveDonut({
     }, [segments, total]);
 
     const activeSeg = hover ? computed.find((s) => s.key === hover) : null;
-    const centerValue = activeSeg ? activeSeg.value.toLocaleString() : total.toLocaleString();
+    const centerValue = activeSeg
+        ? activeSeg.value.toLocaleString()
+        : total.toLocaleString();
     const centerSub = activeSeg ? activeSeg.label : centerLabel;
 
     return (
-        <GuardrailCard unstyled className="rounded-xl border bg-card p-4" style={{ borderColor: 'var(--border)' }}>
+        <GuardrailCard
+            unstyled
+            className="rounded-xl border bg-card p-4"
+            style={{ borderColor: 'var(--border)' }}
+        >
             <div className="flex items-center justify-between">
                 <h3 className="text-[13px] font-semibold">{title}</h3>
                 <Link
@@ -57,7 +63,14 @@ function InteractiveDonut({
             </div>
             <div className="mt-3 flex items-center gap-5">
                 <svg viewBox="0 0 36 36" className="h-28 w-28 shrink-0">
-                    <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--muted)" strokeWidth="3.5" />
+                    <circle
+                        cx="18"
+                        cy="18"
+                        r="15.9155"
+                        fill="none"
+                        stroke="var(--muted)"
+                        strokeWidth="3.5"
+                    />
                     {computed.map((s) => (
                         <Link key={s.key} href={s.href}>
                             <circle
@@ -70,7 +83,10 @@ function InteractiveDonut({
                                 strokeDasharray={s.dashArr}
                                 strokeDashoffset={s.dashOff}
                                 transform="rotate(-90 18 18)"
-                                style={{ cursor: 'pointer', transition: 'stroke-width .15s ease' }}
+                                style={{
+                                    cursor: 'pointer',
+                                    transition: 'stroke-width .15s ease',
+                                }}
                                 onMouseEnter={() => setHover(s.key)}
                                 onMouseLeave={() => setHover(null)}
                             />
@@ -110,10 +126,17 @@ function InteractiveDonut({
                                 hover === s.key && 'bg-muted/60',
                             )}
                         >
-                            <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                            <span className="capitalize text-muted-foreground">{s.label}</span>
-                            <span className="ml-auto font-semibold tabular-nums">{s.value.toLocaleString()}</span>
-                            <span className="w-10 text-right text-[10px] tabular-nums text-muted-foreground">
+                            <span
+                                className="h-2 w-2 rounded-full"
+                                style={{ background: s.color }}
+                            />
+                            <span className="text-muted-foreground capitalize">
+                                {s.label}
+                            </span>
+                            <span className="ml-auto font-semibold tabular-nums">
+                                {s.value.toLocaleString()}
+                            </span>
+                            <span className="w-10 text-right text-[10px] text-muted-foreground tabular-nums">
                                 {s.pct.toFixed(s.pct >= 10 ? 0 : 1)}%
                             </span>
                         </Link>
@@ -162,8 +185,16 @@ function entriesToSegments(
 }
 
 export function StatusDonuts({ clientStatus, shiftStatus }: Props) {
-    const clientSegs = entriesToSegments(clientStatus, CLIENT_COLOR, '/operations/clients');
-    const shiftSegs = entriesToSegments(shiftStatus, SHIFT_COLOR, '/operations/shifts');
+    const clientSegs = entriesToSegments(
+        clientStatus,
+        CLIENT_COLOR,
+        '/operations/clients',
+    );
+    const shiftSegs = entriesToSegments(
+        shiftStatus,
+        SHIFT_COLOR,
+        '/operations/shifts',
+    );
     return (
         <section className="grid gap-4 md:grid-cols-2">
             <InteractiveDonut

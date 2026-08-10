@@ -2,21 +2,19 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrReportExport;
 use App\Domain\Hr\Models\HrReportSubscription;
 use App\Domain\Hr\Services\HrReportingService;
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class HrReportController extends Controller
 {
-    use ResolvesHrTenant;
-
     public function __construct(
         private readonly HrReportingService $reportingService,
     ) {}
@@ -26,18 +24,10 @@ class HrReportController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $reportTypes = $this->reportingService->reportTypes();
-        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
-            ->push($user->id)
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
+        $recipientUsers = $this->reportRecipientUsers($user);
 
         $subscriptions = HrReportSubscription::query()
-            ->forTenant($tenantId)
             ->orderByDesc('is_active')
             ->orderBy('next_run_at')
             ->orderByDesc('id')
@@ -58,7 +48,6 @@ class HrReportController extends Controller
             ->pluck('name', 'id');
 
         $recentExports = HrReportExport::query()
-            ->forTenant($tenantId)
             ->with('generator:id,name')
             ->orderByDesc('generated_at')
             ->limit(25)
@@ -75,11 +64,8 @@ class HrReportController extends Controller
             ])
             ->values();
 
-        $recipientOptions = User::query()
-            ->whereIn('id', $allowedRecipientIds)
-            ->orderBy('name')
-            ->limit(200)
-            ->get(['id', 'name', 'email'])
+        $recipientOptions = $recipientUsers
+            ->take(200)
             ->map(fn (User $recipient) => [
                 'id' => $recipient->id,
                 'name' => $recipient->name,
@@ -143,11 +129,9 @@ class HrReportController extends Controller
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $filters = $this->parseFilters($validated);
         $report = $this->reportingService->generate(
             reportType: $validated['report_type'],
-            tenantId: $tenantId,
             dateFrom: $filters['date_from'] ?? null,
             dateTo: $filters['date_to'] ?? null,
         );
@@ -156,7 +140,6 @@ class HrReportController extends Controller
         if ($user->canDo('hr.reports.export')) {
             $export = $this->reportingService->createExport(
                 reportType: $validated['report_type'],
-                tenantId: $tenantId,
                 filters: $filters,
                 generatedBy: $user->id,
             );
@@ -182,7 +165,6 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'report_type' => ['required', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
@@ -193,7 +175,6 @@ class HrReportController extends Controller
         $filters = $this->parseFilters($validated);
         $export = $this->reportingService->createExport(
             reportType: $validated['report_type'],
-            tenantId: $tenantId,
             filters: $filters,
             generatedBy: $user->id,
         );
@@ -210,9 +191,6 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $export->tenant_id);
-
         $filters = array_merge((array) ($export->filters ?? []), [
             'date_from' => optional($export->period_start)->toDateString(),
             'date_to' => optional($export->period_end)->toDateString(),
@@ -220,7 +198,6 @@ class HrReportController extends Controller
 
         $report = $this->reportingService->generate(
             reportType: $export->report_type,
-            tenantId: $export->tenant_id,
             dateFrom: $filters['date_from'] ?? null,
             dateTo: $filters['date_to'] ?? null,
         );
@@ -245,8 +222,6 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $export->tenant_id);
         abort_unless(Storage::disk('private')->exists($export->storage_path), 404);
 
         $filename = basename($export->storage_path);
@@ -260,14 +235,7 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
-            ->push($user->id)
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
+        $allowedRecipientIds = $this->reportRecipientUsers($user)->pluck('id')->all();
         $recipientRule = Rule::in($allowedRecipientIds);
 
         $validated = $request->validate([
@@ -300,7 +268,6 @@ class HrReportController extends Controller
         }
 
         $subscription = new HrReportSubscription([
-            'tenant_id' => $tenantId,
             'report_type' => $validated['report_type'],
             'cadence' => $validated['cadence'],
             'day_of_week' => $validated['cadence'] === 'weekly' ? (int) ($validated['day_of_week'] ?? 1) : null,
@@ -326,15 +293,7 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $subscription->tenant_id);
-        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
-            ->push($user->id)
-            ->filter(fn ($id) => is_numeric($id))
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
+        $allowedRecipientIds = $this->reportRecipientUsers($user)->pluck('id')->all();
         $recipientRule = Rule::in($allowedRecipientIds);
 
         $validated = $request->validate([
@@ -413,8 +372,6 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $subscription->tenant_id);
 
         $subscription->is_active = ! $subscription->is_active;
         $subscription->next_run_at = $subscription->is_active
@@ -427,7 +384,7 @@ class HrReportController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function parseFilters(array $payload): array
@@ -450,4 +407,25 @@ class HrReportController extends Controller
         return strlen($runAt) === 5 ? "{$runAt}:00" : $runAt;
     }
 
+    /** @return Collection<int, User> */
+    private function reportRecipientUsers(User $actor): Collection
+    {
+        return User::query()
+            ->whereNotNull('approved_at')
+            ->where(function ($query): void {
+                $query
+                    ->whereHas('roles.permissions', fn ($permission) => $permission->where('permissions.key', 'hr.reports.view'))
+                    ->orWhereHas('permissionOverrides', fn ($permission) => $permission
+                        ->where('permissions.key', 'hr.reports.view')
+                        ->where('permission_user.allowed', true));
+            })
+            ->with(['roles.permissions', 'permissionOverrides'])
+            ->orderBy('name')
+            ->get(['users.id', 'users.name', 'users.email', 'users.approved_at'])
+            ->filter(fn (User $candidate): bool => $candidate->canDo('hr.reports.view'))
+            ->push($actor)
+            ->unique('id')
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+    }
 }

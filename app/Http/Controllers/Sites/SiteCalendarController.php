@@ -49,7 +49,7 @@ class SiteCalendarController extends Controller
             // Full accessible-site list so the hero's house selector can switch houses.
             'sites' => $this->resolveGlobalSites($request),
             // Assignable staff for the create dialog's owner + attendee pickers.
-            'people' => User::query()->staff()->orderBy('name')->get(['id', 'name']),
+            'people' => $this->calendarPeople($request),
             'eventTypes' => $this->eventTypeOptions(),
             'sources' => CalendarSources::all(),
             'canCreate' => ($user?->canDo('calendar.create') ?? false)
@@ -102,6 +102,8 @@ class SiteCalendarController extends Controller
     {
         $this->authorize('update', $site);
 
+        $calendarPersonRule = $this->calendarPersonRule($request);
+
         $validated = $request->validate([
             'event_type' => 'required|string|max:50',
             'title' => 'required|string|max:255',
@@ -110,9 +112,9 @@ class SiteCalendarController extends Controller
             'start_at' => 'required|date',
             'end_at' => 'nullable|date|after:start_at',
             'recurrence_rule' => 'nullable|string',
-            'owner_user_id' => 'nullable|exists:users,id',
+            'owner_user_id' => ['nullable', 'integer', $calendarPersonRule],
             'attendee_user_ids' => 'nullable|array',
-            'attendee_user_ids.*' => 'exists:users,id',
+            'attendee_user_ids.*' => ['integer', $calendarPersonRule],
             'reminder_minutes' => 'nullable|array',
             'reminder_minutes.*' => 'integer',
             'all_day' => 'boolean',
@@ -125,7 +127,6 @@ class SiteCalendarController extends Controller
         $event = SiteCalendarEvent::create([
             ...$validated,
             'site_id' => $site->id,
-            'tenant_id' => $site->tenant_id,
             'created_by_user_id' => $request->user()->id,
             'status' => 'draft',
             'approval_status' => $this->requiresApproval($validated['event_type']) ? 'pending' : 'not_required',
@@ -141,6 +142,8 @@ class SiteCalendarController extends Controller
         $this->authorize('update', $site);
         abort_unless($event->site_id === $site->id, 404);
 
+        $calendarPersonRule = $this->calendarPersonRule($request);
+
         // Partial updates supported so drag-to-move / resize can send only times.
         $validated = $request->validate([
             'event_type' => 'sometimes|required|string|max:50',
@@ -149,9 +152,9 @@ class SiteCalendarController extends Controller
             'room' => 'sometimes|nullable|string|max:120',
             'start_at' => 'sometimes|required|date',
             'end_at' => 'sometimes|nullable|date|after:start_at',
-            'owner_user_id' => 'sometimes|nullable|exists:users,id',
+            'owner_user_id' => ['sometimes', 'nullable', 'integer', $calendarPersonRule],
             'attendee_user_ids' => 'sometimes|nullable|array',
-            'attendee_user_ids.*' => 'exists:users,id',
+            'attendee_user_ids.*' => ['integer', $calendarPersonRule],
             'recurrence_rule' => 'sometimes|nullable|string',
             'reminder_minutes' => 'sometimes|nullable|array',
             'reminder_minutes.*' => 'integer',
@@ -225,14 +228,12 @@ class SiteCalendarController extends Controller
     {
         $user = User::query()->where('calendar_feed_token', $token)->first();
         abort_unless($user, 404);
+        abort_unless($user->approved_at !== null && $user->canDo('calendar.view'), 404);
 
         $start = now()->subMonth();
         $end = now()->addMonths(3);
 
         $siteIds = $this->siteAccess()->accessibleSiteIds($user);
-        if ($siteIds === []) {
-            $siteIds = Site::active()->pluck('id')->all();
-        }
 
         // Never re-publish pulled external busy back out (would loop on two-way maps).
         $items = array_values(array_filter(
@@ -285,11 +286,18 @@ class SiteCalendarController extends Controller
      */
     public function houseFeed(Request $request, Site $site, string $token)
     {
-        $mapping = CalendarSyncMapping::query()
+        $mappings = CalendarSyncMapping::query()
             ->where('site_id', $site->id)
-            ->where('ical_feed_token', $token)
-            ->first();
-        abort_unless($mapping, 404);
+            ->active()
+            ->whereHas('site', fn ($siteQuery) => $siteQuery
+                ->active()
+                ->notArchived()
+                ->whereNull('archived_at'))
+            ->get();
+        abort_unless($mappings->count() === 1, 404);
+
+        $mapping = $mappings->firstOrFail();
+        abort_unless(hash_equals((string) $mapping->ical_feed_token, $token), 404);
 
         $filters = ! empty($mapping->sources) ? ['sources' => $mapping->sources] : [];
         $items = array_values(array_filter(
@@ -375,7 +383,7 @@ class SiteCalendarController extends Controller
             'context' => 'page',
             'scope' => 'global',
             'sites' => $sites,
-            'people' => User::query()->staff()->orderBy('name')->get(['id', 'name']),
+            'people' => $this->calendarPeople($request),
             'eventTypes' => $this->eventTypeOptions(),
             'sources' => CalendarSources::all(),
             'canCreate' => $user->canDo('calendar.create'),
@@ -418,15 +426,14 @@ class SiteCalendarController extends Controller
             abort(403);
         }
 
-        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
+        $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user, ['calendar.viewAny']);
 
         $query = Site::active()
+            ->notArchived()
+            ->whereNull('archived_at')
             ->select(['id', 'name', 'type'])
-            ->whereIn('type', $allowedSiteTypes);
-
-        if ($accessibleSiteIds !== []) {
-            $query->whereIn('id', $accessibleSiteIds);
-        }
+            ->whereIn('type', $allowedSiteTypes)
+            ->whereIn('id', $accessibleSiteIds);
 
         if ($siteType) {
             $query->where('type', $siteType);
@@ -564,6 +571,35 @@ class SiteCalendarController extends Controller
     private function siteAccess(): UserSiteAccessService
     {
         return app(UserSiteAccessService::class);
+    }
+
+    private function calendarPeople(Request $request): Collection
+    {
+        $query = User::query()->orderBy('name');
+        $this->siteAccess()->applyStaffScope($query, $request->user(), ['calendar.viewAny']);
+
+        return $query->get(['id', 'name']);
+    }
+
+    /**
+     * Validate event owners and attendees against the same current-staff and
+     * Site-access boundary used by the calendar people picker. An existence-only
+     * rule would let a forged request address hidden, ended or portal identities.
+     */
+    private function calendarPersonRule(Request $request): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
+            if (! is_numeric($value) || (int) $value < 1) {
+                return;
+            }
+
+            $query = User::query()->whereKey((int) $value);
+            $this->siteAccess()->applyStaffScope($query, $request->user(), ['calendar.viewAny']);
+
+            if (! $query->exists()) {
+                $fail('The selected person must be current staff within your allowed Sites.');
+            }
+        };
     }
 
     /**

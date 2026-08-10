@@ -114,7 +114,7 @@ export function AddressAutocomplete({
                 aria-invalid={error}
             />
             {searching ? (
-                <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
+                <Loader2 className="absolute top-2.5 right-2.5 h-4 w-4 animate-spin text-muted-foreground" />
             ) : null}
             {open ? (
                 <div className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-lg">

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\User;
 use Database\Factories\Hr\HrKudosFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrKudos extends Model
 {
-    use HasFactory;
+    use HasFactory, WritesLegacyStorageContext;
 
     protected static function newFactory()
     {
@@ -65,11 +66,6 @@ class HrKudos extends Model
     /* ------------------------------------------------------------------ */
     /*  Scopes */
     /* ------------------------------------------------------------------ */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopePublic($query)
     {

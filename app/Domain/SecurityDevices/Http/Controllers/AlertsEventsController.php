@@ -2,35 +2,41 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
-use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
 
 class AlertsEventsController extends Controller
 {
+    public function __construct(
+        private readonly SecurityDevicesAccessService $access,
+    ) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.events.view'), 403);
+        $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
+        $eventScope = fn () => DeviceEvent::query()
+            ->whereIn('device_id', clone $visibleDeviceIds);
 
         // ── Stats ─────────────────────────────────────────────────
 
         $last24h = now()->subHours(24);
-        $last7d = now()->subDays(7);
 
         $stats = [
-            'total24h' => DeviceEvent::since($last24h)->count(),
-            'critical24h' => DeviceEvent::since($last24h)->bySeverity('critical')->count(),
-            'warning24h' => DeviceEvent::since($last24h)->bySeverity('warning')->count(),
-            'unprocessed' => DeviceEvent::unprocessed()->count(),
+            'total24h' => $eventScope()->since($last24h)->count(),
+            'critical24h' => $eventScope()->since($last24h)->bySeverity('critical')->count(),
+            'warning24h' => $eventScope()->since($last24h)->bySeverity('warning')->count(),
+            'unprocessed' => $eventScope()->unprocessed()->count(),
         ];
 
         // ── Event query ───────────────────────────────────────────
 
-        $query = DeviceEvent::query()
-            ->with(['device:id,name,device_uid,domain,category']);
+        $query = $eventScope()->with(['device:id,name,device_uid,domain,category']);
 
         // Severity filter.
         if ($request->filled('severity') && $request->input('severity') !== 'all') {
@@ -71,7 +77,7 @@ class AlertsEventsController extends Controller
             $query->where('occurred_at', '>=', $request->input('from'));
         }
         if ($request->filled('to')) {
-            $query->where('occurred_at', '<=', $request->input('to') . ' 23:59:59');
+            $query->where('occurred_at', '<=', $request->input('to').' 23:59:59');
         }
 
         // Search across event_type and source.
@@ -89,18 +95,31 @@ class AlertsEventsController extends Controller
 
         // ── Filter options ────────────────────────────────────────
 
-        $eventTypes = DeviceEvent::select('event_type')
+        $eventTypes = $eventScope()
+            ->select('event_type')
             ->distinct()
             ->orderBy('event_type')
             ->pluck('event_type');
 
-        $sources = DeviceEvent::whereNotNull('source')
+        $sources = $eventScope()
+            ->whereNotNull('source')
             ->select('source')
             ->distinct()
             ->orderBy('source')
             ->pluck('source');
 
         return Inertia::render('security-devices/alerts-events', [
+            'pageMeta' => $request->routeIs('security-devices.monitoring')
+                ? [
+                    'title' => 'Monitoring',
+                    'description' => 'Active device events and collection signals. Control Room remains the place for operational triage and escalation.',
+                    'href' => '/security-devices/monitoring',
+                ]
+                : [
+                    'title' => 'Alerts & Events',
+                    'description' => 'Read-only device event stream. For alert triage and escalation, use Control Room.',
+                    'href' => '/security-devices/alerts-events',
+                ],
             'stats' => $stats,
             'events' => [
                 'data' => $events->getCollection()->map(fn (DeviceEvent $e) => [
@@ -114,7 +133,6 @@ class AlertsEventsController extends Controller
                     'source' => $e->source,
                     'occurred_at' => $e->occurred_at?->toISOString(),
                     'processed_at' => $e->processed_at?->toISOString(),
-                    'payload' => $e->payload,
                 ]),
                 'links' => $events->linkCollection()->toArray(),
                 'meta' => [
@@ -127,7 +145,7 @@ class AlertsEventsController extends Controller
             'filterOptions' => [
                 'eventTypes' => $eventTypes,
                 'sources' => $sources,
-                'domains' => collect(\App\Domain\SecurityDevices\Enums\DeviceDomain::cases())
+                'domains' => collect(DeviceDomain::cases())
                     ->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
             ],
         ]);

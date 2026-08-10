@@ -8,6 +8,7 @@ use App\Models\ConsentRequest;
 use App\Models\ConsentType;
 use App\Models\DataBreachLog;
 use App\Models\DataSubjectRequest;
+use App\Models\NextOfKin;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -18,6 +19,19 @@ class GovernancePrivacyConsentsReadinessSeeder extends Seeder
     public function run(): void
     {
         $portalRole = Role::query()->where('name', 'next_of_kin')->first();
+        $siteScopedClient = Client::query()
+            ->whereNotNull('site_id')
+            ->where('site_id', '>', 0)
+            ->whereHas('site', fn ($query) => $query
+                ->where('is_active', true)
+                ->where('archived', false))
+            ->orderBy('id')
+            ->first();
+        $authorityVerifier = User::query()->where('role', 'admin')->first();
+
+        if (! $siteScopedClient || ! $authorityVerifier) {
+            return;
+        }
 
         $client = Client::withTrashed()
             ->where('first_name', 'Playwright')
@@ -35,6 +49,12 @@ class GovernancePrivacyConsentsReadinessSeeder extends Seeder
             'city' => 'Wellington',
             'postcode' => '6011',
             'status' => 'active',
+            // ClientPolicy deliberately denies site-less business records.
+            // Keep this readiness client inside the same canonical Site model
+            // as every production client instead of relying on an admin
+            // authorization bypass.
+            'site_id' => $siteScopedClient->site_id,
+            'service_context_id' => $siteScopedClient->service_context_id,
         ]);
 
         if ($client->trashed()) {
@@ -64,6 +84,27 @@ class GovernancePrivacyConsentsReadinessSeeder extends Seeder
         $client->portalUsers()->syncWithoutDetaching([
             $portalUser->id => ['relation' => ConsentRequest::RELATION_WELFARE_GUARDIAN],
         ]);
+
+        $authority = NextOfKin::withTrashed()
+            ->where('client_id', $client->id)
+            ->where('user_id', $portalUser->id)
+            ->first() ?? new NextOfKin;
+        $authority->forceFill([
+            'client_id' => $client->id,
+            'user_id' => $portalUser->id,
+            'relationship' => 'Welfare Guardian',
+            'legal_authority_type' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+            'legal_authority_verified_at' => now()->subDay(),
+            'legal_authority_verified_by_user_id' => $authorityVerifier->id,
+            'legal_authority_expires_at' => now()->addYear(),
+            'is_primary_contact' => true,
+            'is_emergency_contact' => true,
+            'can_view_medical' => true,
+            'can_view_medications' => true,
+            'can_view_incidents' => true,
+            'can_receive_updates' => true,
+            'deleted_at' => null,
+        ])->save();
 
         ConsentType::query()->updateOrCreate(
             ['name' => 'Playwright Location Tracking Consent'],

@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Models\Asset;
+use Illuminate\Support\Facades\DB;
 
 class DeviceLinkService
 {
@@ -48,7 +49,7 @@ class DeviceLinkService
      */
     public function unlink(DeviceAssetLink $link): DeviceAssetLink
     {
-        if (!$link->isActive()) {
+        if (! $link->isActive()) {
             throw new \InvalidArgumentException('This link is already inactive.');
         }
 
@@ -60,9 +61,36 @@ class DeviceLinkService
     /**
      * Unlink all active links for a device.
      */
-    public function unlinkAllForDevice(Device $device): int
+    public function unlinkAllForDevice(Device $device, ?string $reason = null): int
     {
-        return $device->activeAssetLinks()
-            ->update(['unlinked_at' => now()]);
+        return DB::transaction(function () use ($device, $reason): int {
+            $links = DeviceAssetLink::query()
+                ->where('device_id', $device->id)
+                ->active()
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $unlinkedAt = now();
+
+            foreach ($links as $link) {
+                $attributes = ['unlinked_at' => $unlinkedAt];
+                if ($reason !== null && trim($reason) !== '') {
+                    $attributes['notes'] = $this->notesWithLifecycleReason($link->notes, trim($reason));
+                }
+                $link->update($attributes);
+            }
+
+            return $links->count();
+        });
+    }
+
+    private function notesWithLifecycleReason(?string $notes, string $reason): string
+    {
+        $stamp = "Lifecycle reason: {$reason}.";
+        $notes = trim((string) $notes);
+
+        return str_contains($notes, $stamp)
+            ? $notes
+            : trim($notes.PHP_EOL.$stamp);
     }
 }

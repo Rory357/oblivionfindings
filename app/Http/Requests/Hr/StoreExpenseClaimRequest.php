@@ -20,8 +20,9 @@ class StoreExpenseClaimRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:2000'],
             'currency' => ['nullable', 'string', 'max:3'],
             // Manager-only: file the claim on behalf of another employee. The
-            // controller enforces the manage gate + same-tenant target.
-            'on_behalf_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            // controller resolves the target through the current Site-visible
+            // staff boundary so hidden user IDs are never disclosed by validation.
+            'on_behalf_user_id' => ['nullable', 'integer'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.description' => ['required', 'string', 'max:500'],
             'items.*.category' => ['required', 'string', Rule::in(ExpenseService::CATEGORIES)],

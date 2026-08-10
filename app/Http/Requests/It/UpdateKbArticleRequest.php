@@ -7,9 +7,9 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Edit a knowledge-base article, or flip its publish state. Fields are
- * `sometimes` so the full editor and a status-only Publish/Unpublish toggle
- * share one request. Agent-only (`it.manage`).
+ * Edit knowledge content and governance metadata. Fields are `sometimes` so
+ * partial editor saves remain valid, while lifecycle status is prohibited and
+ * must use the reviewed transition endpoints. Agent-only (`it.manage`).
  */
 class UpdateKbArticleRequest extends FormRequest
 {
@@ -29,7 +29,23 @@ class UpdateKbArticleRequest extends FormRequest
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'category' => ['sometimes', 'required', Rule::in(ItKbArticle::CATEGORIES)],
             'body' => ['sometimes', 'required', 'string', 'max:20000'],
-            'status' => ['sometimes', 'required', Rule::in(ItKbArticle::STATUSES)],
+            'status' => ['prohibited'],
+            'audience' => ['sometimes', 'required', Rule::in(ItKbArticle::AUDIENCES)],
+            'site_scope' => ['nullable', 'array', 'max:100', 'required_if:audience,specific_sites'],
+            'site_scope.*' => [
+                'integer',
+                Rule::exists('sites', 'id')->where(fn ($query) => $query
+                    ->where('is_active', true)
+                    ->where('archived', false)
+                    ->whereNull('archived_at')),
+            ],
+            'owner_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'related_service_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('it_services', 'id')->where(fn ($query) => $query->where('is_active', true)),
+            ],
+            'review_due_at' => ['nullable', 'date'],
         ];
     }
 }

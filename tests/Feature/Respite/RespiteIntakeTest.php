@@ -1,17 +1,20 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\RespiteReferral;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
     $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
     $this->admin->roles()->attach(Role::where('name', 'admin')->first());
 });
@@ -85,7 +88,16 @@ test('intake rejects a funding source outside the NZ list', function () {
 });
 
 test('intake links an existing client without creating a duplicate', function () {
-    $client = Client::factory()->create();
+    $site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->admin->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'is_active' => true,
+        'start_date' => now()->subMonth(),
+        'end_date' => null,
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
     $before = Client::count();
 
     $this->actingAs($this->admin)

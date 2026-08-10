@@ -105,12 +105,20 @@ export function DepartmentViewDialog({
                                 {data?.name ?? 'Department'}
                                 {data ? (
                                     <StatusBadge
-                                        status={data.is_active ? 'active' : 'inactive'}
+                                        status={
+                                            data.is_active
+                                                ? 'active'
+                                                : 'inactive'
+                                        }
                                     />
                                 ) : null}
                             </DialogTitle>
                             <DialogDescription>
-                                {[data?.code, data?.cost_centre && `Cost centre ${data.cost_centre}`]
+                                {[
+                                    data?.code,
+                                    data?.cost_centre &&
+                                        `Cost centre ${data.cost_centre}`,
+                                ]
                                     .filter(Boolean)
                                     .join(' · ') || 'Department detail'}
                             </DialogDescription>
@@ -130,16 +138,35 @@ export function DepartmentViewDialog({
                     <div className="space-y-4">
                         {/* Stats */}
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                            <Stat icon={Users} label="Direct staff" value={data.direct_employee_count} />
-                            <Stat icon={Users} label="Total (incl. sub-depts)" value={data.rolled_up_employee_count} />
-                            <Stat icon={GitBranch} label="Sub-departments" value={data.children.length} />
-                            <Stat icon={Briefcase} label="Linked positions" value={data.linked_positions.length} />
+                            <Stat
+                                icon={Users}
+                                label="Direct staff"
+                                value={data.direct_employee_count}
+                            />
+                            <Stat
+                                icon={Users}
+                                label="Total (incl. sub-depts)"
+                                value={data.rolled_up_employee_count}
+                            />
+                            <Stat
+                                icon={GitBranch}
+                                label="Sub-departments"
+                                value={data.children.length}
+                            />
+                            <Stat
+                                icon={Briefcase}
+                                label="Linked positions"
+                                value={data.linked_positions.length}
+                            />
                         </div>
 
                         {/* Details */}
                         <div className="rounded-xl border border-border bg-card/70 p-4 text-sm">
                             <Row label="Head" value={data.manager?.name} />
-                            <Row label="Parent department" value={data.parent?.name} />
+                            <Row
+                                label="Parent department"
+                                value={data.parent?.name}
+                            />
                             <Row label="Description" value={data.description} />
                         </div>
 
@@ -202,7 +229,8 @@ export function DepartmentViewDialog({
                                                 ) : null}
                                             </span>
                                             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                                                {p.current_headcount}/{p.headcount_budget}
+                                                {p.current_headcount}/
+                                                {p.headcount_budget}
                                             </span>
                                         </div>
                                     ))}
@@ -253,7 +281,11 @@ function Row({ label, value }: { label: string; value?: string | null }) {
         <div className="flex justify-between gap-4 border-b border-border py-1.5 last:border-0">
             <span className="shrink-0 text-muted-foreground">{label}</span>
             <span className="min-w-0 text-right font-medium">
-                {value ? value : <span className="font-normal text-muted-foreground">—</span>}
+                {value ? (
+                    value
+                ) : (
+                    <span className="font-normal text-muted-foreground">—</span>
+                )}
             </span>
         </div>
     );
@@ -268,7 +300,7 @@ function Section({
 }) {
     return (
         <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 {title}
             </div>
             {children}

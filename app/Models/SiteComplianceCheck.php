@@ -13,7 +13,6 @@ class SiteComplianceCheck extends Model
     protected $table = 'site_compliance_checks';
 
     protected $fillable = [
-        'organization_id',
         'site_id',
         'check_type',
         'scheduled_date',
@@ -23,6 +22,7 @@ class SiteComplianceCheck extends Model
         'findings',
         'corrective_actions',
         'risk_rating',
+        'notes',
         'follow_up_date',
         'follow_up_notes',
         'created_by',

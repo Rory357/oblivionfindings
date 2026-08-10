@@ -52,7 +52,9 @@ export function ConfirmDialog({
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={processing}>{cancelLabel}</AlertDialogCancel>
+                    <AlertDialogCancel disabled={processing}>
+                        {cancelLabel}
+                    </AlertDialogCancel>
                     <AlertDialogAction
                         onClick={(event) => {
                             // Keep the dialog under our control: run the action, but

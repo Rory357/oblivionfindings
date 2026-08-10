@@ -84,13 +84,17 @@ export function ShiftContextMenu({
     return createPortal(
         <div
             ref={ref}
-            className="pointer-events-auto fixed z-[60] w-[280px] overflow-y-auto overscroll-contain rounded-[12px] border border-border bg-popover p-1.5 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 duration-100"
-            style={{ top: pos.top, left: pos.left, maxHeight: 'calc(100vh - 16px)' }}
+            className="pointer-events-auto fixed z-[60] w-[280px] animate-in overflow-y-auto overscroll-contain rounded-[12px] border border-border bg-popover p-1.5 text-popover-foreground shadow-lg duration-100 fade-in-0 zoom-in-95"
+            style={{
+                top: pos.top,
+                left: pos.left,
+                maxHeight: 'calc(100vh - 16px)',
+            }}
             role="menu"
         >
-            <div className="mb-1 flex items-center gap-2 px-2 py-1.5 border-b border-border/60">
+            <div className="mb-1 flex items-center gap-2 border-b border-border/60 px-2 py-1.5">
                 <span
-                    className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                    className="rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase"
                     style={tagStyle}
                 >
                     {ctx.tag}
@@ -116,7 +120,7 @@ export function ShiftContextMenu({
                                 onClose();
                             }}
                             className={cn(
-                                'grid grid-cols-[24px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-[12.5px] cursor-pointer transition-colors hover:bg-accent',
+                                'grid cursor-pointer grid-cols-[24px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-[12.5px] transition-colors hover:bg-accent',
                                 it.tone === 'primary' && 'text-primary',
                                 it.tone === 'critical' &&
                                     'text-status-critical',

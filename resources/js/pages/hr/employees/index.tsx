@@ -5,29 +5,29 @@ import {
     DepartmentDialog,
     type DepartmentFilters,
     DepartmentsPane,
-    HrTabs,
     type HrTabItem,
+    HrTabs,
     NeedsTriageDialog,
+    OrgChartPane,
     type OrgNode,
     type OrgPerson,
-    OrgChartPane,
-    PeopleHero,
+    type PaginatedDepartments,
     type PaginatedPeople,
+    type PaginatedPositions,
     type PeopleFilters,
+    PeopleHero,
     PeoplePane,
     type PeopleRow,
-    type PaginatedDepartments,
-    type PaginatedPositions,
+    PositionDialog,
     type PositionFilters,
     type PositionParent,
-    PositionDialog,
     type PositionRow,
     PositionsPane,
     type TriageData,
     type TriageRail,
     useHrTab,
 } from '@/components/hr';
-import { RehireWizard, type RehireTarget } from '@/components/hr/rehire-wizard';
+import { type RehireTarget, RehireWizard } from '@/components/hr/rehire-wizard';
 import { PageLayout } from '@/components/page';
 import {
     ShiftContextMenu,
@@ -37,7 +37,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { Briefcase, Building2, Network, Pin, Star, Users } from 'lucide-react';
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
+import { type MouseEvent, type ReactNode, useEffect, useState } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -344,7 +344,9 @@ export default function EmployeesIndex({
                         canManage={can.manage}
                         needs={needs}
                         handlers={{
-                            onAdd: formData ? () => setAddOpen(true) : undefined,
+                            onAdd: formData
+                                ? () => setAddOpen(true)
+                                : undefined,
                             onImport: can.manage
                                 ? () => router.visit('/hr/import-export')
                                 : undefined,
@@ -355,7 +357,8 @@ export default function EmployeesIndex({
                                     : undefined,
                             onStatActive: () => applyFilter('status', 'active'),
                             onStatNew: () => applyFilter('joined', '30'),
-                            onStatProbation: () => applyFilter('probation', '1'),
+                            onStatProbation: () =>
+                                applyFilter('probation', '1'),
                             onStatCompliance:
                                 summary.compliance_alerts > 0
                                     ? () => openTriage('compliance')
@@ -398,10 +401,13 @@ export default function EmployeesIndex({
                                           startDate: row.start_date,
                                           endDate: row.end_date ?? null,
                                           positionTitle: row.position_title,
-                                          positionRole: row.position_role ?? null,
+                                          positionRole:
+                                              row.position_role ?? null,
                                           employmentType: row.employment_type,
-                                          hoursPerWeek: row.hours_per_week ?? null,
-                                          primarySiteId: row.primary_site?.id ?? null,
+                                          hoursPerWeek:
+                                              row.hours_per_week ?? null,
+                                          primarySiteId:
+                                              row.primary_site?.id ?? null,
                                           employmentHistory:
                                               row.employment_history ?? [],
                                       });

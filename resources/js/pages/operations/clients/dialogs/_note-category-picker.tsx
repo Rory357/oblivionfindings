@@ -124,7 +124,8 @@ export function NoteCategoryPicker({
                 const active = value === category.key;
 
                 return (
-                    <Button unstyled
+                    <Button
+                        unstyled
                         key={category.key}
                         type="button"
                         onClick={() => onChange(category.key)}

@@ -4,11 +4,21 @@
  * the spawned booking so it surfaces in Approved Bookings, the Calendar and Stays.
  */
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { router } from '@inertiajs/react';
-import { CalendarCheck, CheckCircle2, ClipboardCheck, Sparkles } from 'lucide-react';
+import {
+    CalendarCheck,
+    CheckCircle2,
+    ClipboardCheck,
+    Sparkles,
+} from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Avatar, fmtRange } from '../shared';
 import type { RespiteRequestRow } from '../types';
@@ -70,10 +80,18 @@ export function OnboardModal({
 
     const rows: [string, ReactNode][] = request
         ? [
-              ['Dates', `${fmtRange(request.start, request.end)}${request.nights != null ? ` · ${request.nights} nights` : ''}`],
+              [
+                  'Dates',
+                  `${fmtRange(request.start, request.end)}${request.nights != null ? ` · ${request.nights} nights` : ''}`,
+              ],
               ['Funding', request.funding ?? '—'],
               ['Home', request.site ?? '—'],
-              ['From', [request.ref, request.referralRef].filter(Boolean).join(' · ')],
+              [
+                  'From',
+                  [request.ref, request.referralRef]
+                      .filter(Boolean)
+                      .join(' · '),
+              ],
           ]
         : [];
 
@@ -83,10 +101,18 @@ export function OnboardModal({
                 {request ? (
                     <>
                         <div className="flex items-center gap-3">
-                            <Avatar name={request.client} className="h-11 w-11 text-sm" />
+                            <Avatar
+                                name={request.client}
+                                className="h-11 w-11 text-sm"
+                            />
                             <div>
-                                <DialogTitle className="text-left text-lg">Onboard {request.client}</DialogTitle>
-                                <DialogDescription className="text-left">Complete the profile, then confirm consent and the booking.</DialogDescription>
+                                <DialogTitle className="text-left text-lg">
+                                    Onboard {request.client}
+                                </DialogTitle>
+                                <DialogDescription className="text-left">
+                                    Complete the profile, then confirm consent
+                                    and the booking.
+                                </DialogDescription>
                             </div>
                         </div>
 
@@ -94,7 +120,10 @@ export function OnboardModal({
                             <div className="flex items-start gap-2 rounded-[10px] bg-status-info-bg p-3 text-[12.5px] text-status-info">
                                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
-                                    Referral <strong>{request.referralRef}</strong> can prefill the full client wizard with cultural, carer and funding context.
+                                    Referral{' '}
+                                    <strong>{request.referralRef}</strong> can
+                                    prefill the full client wizard with
+                                    cultural, carer and funding context.
                                 </span>
                             </div>
                         ) : null}
@@ -108,18 +137,26 @@ export function OnboardModal({
                                             : 'Complete full client profile'}
                                     </div>
                                     <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
-                                        Capture support needs, health details, contacts and care setup on the existing client record before the stay starts.
+                                        Capture support needs, health details,
+                                        contacts and care setup on the existing
+                                        client record before the stay starts.
                                     </p>
                                 </div>
                                 <Button
                                     type="button"
                                     size="sm"
-                                    variant={request.clientProfileComplete ? 'outline' : 'default'}
+                                    variant={
+                                        request.clientProfileComplete
+                                            ? 'outline'
+                                            : 'default'
+                                    }
                                     onClick={() => onCompleteProfile(request)}
                                     disabled={!request.clientId}
                                 >
                                     <ClipboardCheck className="h-3.5 w-3.5" />
-                                    {request.clientProfileComplete ? 'Review profile' : 'Complete profile'}
+                                    {request.clientProfileComplete
+                                        ? 'Review profile'
+                                        : 'Complete profile'}
                                 </Button>
                             </div>
                         </div>
@@ -130,8 +167,12 @@ export function OnboardModal({
                                     key={i}
                                     className={`flex justify-between gap-4 py-2 text-[13px] ${i < rows.length - 1 ? 'border-b border-border/60' : ''}`}
                                 >
-                                    <dt className="text-muted-foreground">{k}</dt>
-                                    <dd className="text-right font-medium">{v}</dd>
+                                    <dt className="text-muted-foreground">
+                                        {k}
+                                    </dt>
+                                    <dd className="text-right font-medium">
+                                        {v}
+                                    </dd>
                                 </div>
                             ))}
                         </dl>
@@ -139,93 +180,174 @@ export function OnboardModal({
                         <div className="grid gap-3 rounded-xl border border-border p-3.5">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="onboard-authority">Who consents</Label>
+                                    <Label htmlFor="onboard-authority">
+                                        Who consents
+                                    </Label>
                                     <select
                                         id="onboard-authority"
                                         className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                                         value={authority}
-                                        onChange={(event) => setAuthority(event.target.value)}
+                                        onChange={(event) =>
+                                            setAuthority(event.target.value)
+                                        }
                                     >
                                         <option value="self">Self</option>
-                                        <option value="activated_epoa_welfare">Activated EPOA welfare</option>
-                                        <option value="welfare_guardian">Welfare guardian</option>
-                                        <option value="parent_guardian">Parent / guardian</option>
-                                        <option value="other">Other authority</option>
+                                        <option value="activated_epoa_welfare">
+                                            Activated EPOA welfare
+                                        </option>
+                                        <option value="welfare_guardian">
+                                            Welfare guardian
+                                        </option>
+                                        <option value="parent_guardian">
+                                            Parent / guardian
+                                        </option>
+                                        <option value="other">
+                                            Other authority
+                                        </option>
                                     </select>
                                 </div>
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="onboard-capacity">Capacity basis</Label>
+                                    <Label htmlFor="onboard-capacity">
+                                        Capacity basis
+                                    </Label>
                                     <select
                                         id="onboard-capacity"
                                         className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                                         value={capacityBasis}
-                                        onChange={(event) => setCapacityBasis(event.target.value)}
+                                        onChange={(event) =>
+                                            setCapacityBasis(event.target.value)
+                                        }
                                     >
-                                        <option value="has_capacity">Has capacity</option>
-                                        <option value="supported_decision_making">Supported decision-making</option>
-                                        <option value="substitute_decision">Substitute decision-maker</option>
-                                        <option value="best_interests">Best interests decision</option>
-                                        <option value="not_recorded">Not recorded</option>
+                                        <option value="has_capacity">
+                                            Has capacity
+                                        </option>
+                                        <option value="supported_decision_making">
+                                            Supported decision-making
+                                        </option>
+                                        <option value="substitute_decision">
+                                            Substitute decision-maker
+                                        </option>
+                                        <option value="best_interests">
+                                            Best interests decision
+                                        </option>
+                                        <option value="not_recorded">
+                                            Not recorded
+                                        </option>
                                     </select>
                                 </div>
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="onboard-authority-name">Authority name</Label>
+                                    <Label htmlFor="onboard-authority-name">
+                                        Authority name
+                                    </Label>
                                     <Input
                                         id="onboard-authority-name"
                                         value={authorityName}
-                                        onChange={(event) => setAuthorityName(event.target.value)}
+                                        onChange={(event) =>
+                                            setAuthorityName(event.target.value)
+                                        }
                                     />
                                 </div>
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="onboard-authority-contact">Authority contact</Label>
+                                    <Label htmlFor="onboard-authority-contact">
+                                        Authority contact
+                                    </Label>
                                     <Input
                                         id="onboard-authority-contact"
                                         value={authorityContact}
-                                        onChange={(event) => setAuthorityContact(event.target.value)}
+                                        onChange={(event) =>
+                                            setAuthorityContact(
+                                                event.target.value,
+                                            )
+                                        }
                                     />
                                 </div>
                                 <div className="grid gap-1.5 sm:col-span-2">
-                                    <Label htmlFor="onboard-format">Rights format</Label>
+                                    <Label htmlFor="onboard-format">
+                                        Rights format
+                                    </Label>
                                     <select
                                         id="onboard-format"
                                         className="h-9 rounded-md border border-input bg-background px-3 text-sm"
                                         value={formatProvided}
-                                        onChange={(event) => setFormatProvided(event.target.value)}
+                                        onChange={(event) =>
+                                            setFormatProvided(
+                                                event.target.value,
+                                            )
+                                        }
                                     >
                                         <option value="written">Written</option>
-                                        <option value="easy_read">Easy read</option>
+                                        <option value="easy_read">
+                                            Easy read
+                                        </option>
                                         <option value="verbal">Verbal</option>
-                                        <option value="te_reo">Te reo Maori</option>
-                                        <option value="translated">Translated</option>
+                                        <option value="te_reo">
+                                            Te reo Maori
+                                        </option>
+                                        <option value="translated">
+                                            Translated
+                                        </option>
                                         <option value="other">Other</option>
                                     </select>
                                 </div>
                             </div>
                             <label className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" checked={codeProvided} onChange={(event) => setCodeProvided(event.target.checked)} />
+                                <input
+                                    type="checkbox"
+                                    checked={codeProvided}
+                                    onChange={(event) =>
+                                        setCodeProvided(event.target.checked)
+                                    }
+                                />
                                 HDC Code of Rights provided
                             </label>
                             <label className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" checked={consentToRespite} onChange={(event) => setConsentToRespite(event.target.checked)} />
+                                <input
+                                    type="checkbox"
+                                    checked={consentToRespite}
+                                    onChange={(event) =>
+                                        setConsentToRespite(
+                                            event.target.checked,
+                                        )
+                                    }
+                                />
                                 Informed consent to respite recorded
                             </label>
                             <label className="flex items-center gap-2 text-sm">
-                                <input type="checkbox" checked={advocateOffered} onChange={(event) => setAdvocateOffered(event.target.checked)} />
+                                <input
+                                    type="checkbox"
+                                    checked={advocateOffered}
+                                    onChange={(event) =>
+                                        setAdvocateOffered(event.target.checked)
+                                    }
+                                />
                                 Advocacy support offered
                             </label>
                         </div>
 
                         <div className="flex items-start gap-2 rounded-[10px] bg-status-success-bg p-3 text-[12.5px] text-status-success">
                             <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                            <span>On confirm, the booking appears in Approved Bookings and the Calendar, ready to check in as a stay.</span>
+                            <span>
+                                On confirm, the booking appears in Approved
+                                Bookings and the Calendar, ready to check in as
+                                a stay.
+                            </span>
                         </div>
 
                         <div className="flex justify-end gap-2">
                             <Button variant="outline" onClick={onClose}>
                                 Cancel
                             </Button>
-                            <Button onClick={submit} disabled={processing || !request.bookingId || !codeProvided || !consentToRespite}>
-                                <CheckCircle2 className="h-4 w-4" /> Confirm booking &amp; onboard
+                            <Button
+                                onClick={submit}
+                                disabled={
+                                    processing ||
+                                    !request.bookingId ||
+                                    !codeProvided ||
+                                    !consentToRespite
+                                }
+                            >
+                                <CheckCircle2 className="h-4 w-4" /> Confirm
+                                booking &amp; onboard
                             </Button>
                         </div>
                     </>

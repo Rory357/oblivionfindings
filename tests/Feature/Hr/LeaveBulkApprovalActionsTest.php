@@ -4,32 +4,32 @@ use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 
     $this->hr = User::factory()->create([
         'role' => 'hr',
         'approved_at' => now(),
     ]);
-    $this->hr->setAttribute('tenant_id', 1);
 
     $this->staff = User::factory()->create([
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
-    $this->staff->setAttribute('tenant_id', 1);
 
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
         $this->hr->roles()->syncWithoutDetaching([$hrRole->id]);
     }
+    $this->site = ensureCanonicalHrStaffProfile($this->hr);
+    ensureCanonicalHrStaffProfile($this->staff, $this->site);
 });
 
 function ensureLeaveBalance(User $staff, User $actor, string $leaveType): void
 {
     HrLeaveBalance::query()->firstOrCreate([
-        'tenant_id' => 1,
         'user_id' => $staff->id,
         'leave_type' => $leaveType,
         'year' => now()->year,
@@ -49,7 +49,6 @@ test('hr approver can bulk approve and bulk decline pending leave requests', fun
     ensureLeaveBalance($this->staff, $this->hr, 'sick');
 
     $approveA = HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'annual',
         'starts_at' => now()->addDays(5)->toDateString(),
@@ -62,7 +61,6 @@ test('hr approver can bulk approve and bulk decline pending leave requests', fun
     ]);
 
     $approveB = HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'annual',
         'starts_at' => now()->addDays(8)->toDateString(),
@@ -75,7 +73,6 @@ test('hr approver can bulk approve and bulk decline pending leave requests', fun
     ]);
 
     $declineA = HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'sick',
         'starts_at' => now()->addDays(11)->toDateString(),
@@ -115,7 +112,6 @@ test('hr approver can bulk approve and bulk decline pending leave requests', fun
 
 test('hr approver can adjust sla due and trigger immediate escalation', function () {
     $request = HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'annual',
         'starts_at' => now()->addDays(6)->toDateString(),
@@ -138,7 +134,6 @@ test('hr approver can adjust sla due and trigger immediate escalation', function
     expect($request->approval_due_at?->greaterThan(now()->addHours(23)))->toBeTrue();
 
     $overdue = HrLeaveRequest::query()->create([
-        'tenant_id' => 1,
         'user_id' => $this->staff->id,
         'leave_type' => 'annual',
         'starts_at' => now()->addDays(10)->toDateString(),

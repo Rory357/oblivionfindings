@@ -19,7 +19,12 @@ import {
     ShieldCheck,
 } from 'lucide-react';
 
-export type PrivacyTone = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
+export type PrivacyTone =
+    | 'success'
+    | 'warning'
+    | 'critical'
+    | 'info'
+    | 'neutral';
 
 /** Pill background + text (status/type chips). Covers `info` (TONE_BG does not). */
 export const PRIVACY_PILL: Record<PrivacyTone, string> = {
@@ -83,8 +88,14 @@ export const RISK_LEVEL: Record<string, ToneLabel> = {
 
 export const DPIA_OUTCOME: Record<string, ToneLabel> = {
     approved: { tone: 'success', label: 'Approved' },
-    approved_with_conditions: { tone: 'info', label: 'Approved with conditions' },
-    requires_dpo_review: { tone: 'warning', label: 'Requires Privacy Officer review' },
+    approved_with_conditions: {
+        tone: 'info',
+        label: 'Approved with conditions',
+    },
+    requires_dpo_review: {
+        tone: 'warning',
+        label: 'Requires Privacy Officer review',
+    },
     rejected: { tone: 'critical', label: 'Rejected' },
 };
 
@@ -100,14 +111,24 @@ export const HOLD_STATUS: Record<string, ToneLabel> = {
 export const titleCase = (s: string): string =>
     s.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-const lookup = (map: Record<string, ToneLabel>, key: string | null | undefined): ToneLabel =>
-    key && map[key] ? map[key] : { tone: 'neutral', label: key ? titleCase(key) : '—' };
+const lookup = (
+    map: Record<string, ToneLabel>,
+    key: string | null | undefined,
+): ToneLabel =>
+    key && map[key]
+        ? map[key]
+        : { tone: 'neutral', label: key ? titleCase(key) : '—' };
 
-export const requestStatus = (s: string | null | undefined) => lookup(REQUEST_STATUS, s);
-export const requestType = (t: string | null | undefined) => lookup(REQUEST_TYPE, t);
-export const breachStatus = (s: string | null | undefined) => lookup(BREACH_STATUS, s);
-export const riskLevel = (r: string | null | undefined) => lookup(RISK_LEVEL, r);
-export const holdStatus = (s: string | null | undefined) => lookup(HOLD_STATUS, s);
+export const requestStatus = (s: string | null | undefined) =>
+    lookup(REQUEST_STATUS, s);
+export const requestType = (t: string | null | undefined) =>
+    lookup(REQUEST_TYPE, t);
+export const breachStatus = (s: string | null | undefined) =>
+    lookup(BREACH_STATUS, s);
+export const riskLevel = (r: string | null | undefined) =>
+    lookup(RISK_LEVEL, r);
+export const holdStatus = (s: string | null | undefined) =>
+    lookup(HOLD_STATUS, s);
 export const dpiaOutcome = (o: string | null | undefined): ToneLabel =>
     o ? lookup(DPIA_OUTCOME, o) : { tone: 'info', label: 'In review' };
 
@@ -116,7 +137,13 @@ export const dpiaOutcome = (o: string | null | undefined): ToneLabel =>
 /* ------------------------------------------------------------------ */
 
 export const fmtDate = (d?: string | null): string =>
-    d ? new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    d
+        ? new Date(d).toLocaleDateString('en-NZ', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+          })
+        : '—';
 
 export const fmtDateTime = (d?: string | null): string =>
     d
@@ -136,16 +163,51 @@ export const fmtNum = (n?: number | null): string =>
 /*  Wizard option sets (FE = BE; lifted from existing pages + re-skin) */
 /* ------------------------------------------------------------------ */
 
-export type TileOption = { key: string; label: string; description?: string; icon?: IconType };
+export type TileOption = {
+    key: string;
+    label: string;
+    description?: string;
+    icon?: IconType;
+};
 
 /** Request type TilePicker — NZ/IPP, values frozen. */
 export const REQUEST_TYPE_TILES: TileOption[] = [
-    { key: 'access', label: 'Access · IPP 6', description: 'See the personal information we hold', icon: FileText },
-    { key: 'rectification', label: 'Correction · IPP 7', description: 'Correct inaccurate information', icon: RefreshCw },
-    { key: 'erasure', label: 'Deletion', description: 'Delete personal information', icon: Ban },
-    { key: 'portability', label: 'Portability', description: 'Export / transfer to another provider', icon: Database },
-    { key: 'objection', label: 'Objection', description: 'Object to a particular use', icon: ShieldCheck },
-    { key: 'restriction', label: 'Restriction', description: 'Limit how information is used', icon: Scale },
+    {
+        key: 'access',
+        label: 'Access · IPP 6',
+        description: 'See the personal information we hold',
+        icon: FileText,
+    },
+    {
+        key: 'rectification',
+        label: 'Correction · IPP 7',
+        description: 'Correct inaccurate information',
+        icon: RefreshCw,
+    },
+    {
+        key: 'erasure',
+        label: 'Deletion',
+        description: 'Delete personal information',
+        icon: Ban,
+    },
+    {
+        key: 'portability',
+        label: 'Portability',
+        description: 'Export / transfer to another provider',
+        icon: Database,
+    },
+    {
+        key: 'objection',
+        label: 'Objection',
+        description: 'Object to a particular use',
+        icon: ShieldCheck,
+    },
+    {
+        key: 'restriction',
+        label: 'Restriction',
+        description: 'Limit how information is used',
+        icon: Scale,
+    },
 ];
 
 /** Identity verification methods (IPP 6 — confirm before release). */

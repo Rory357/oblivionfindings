@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import MyDay from './index';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import MyDay from './index';
 
 const mocks = vi.hoisted(() => ({
     props: {} as Record<string, unknown>,
@@ -155,7 +155,9 @@ const baseProps = () => ({
     active_round: null,
     shiftChecklists: [],
     checklistConfig: {
-        categories: [{ key: 'quality', label: 'Quality', icon: 'ClipboardCheck' }],
+        categories: [
+            { key: 'quality', label: 'Quality', icon: 'ClipboardCheck' },
+        ],
         frequencyLabels: { daily: 'Daily' },
         typeLabels: {},
         today: '2026-06-08',
@@ -183,14 +185,19 @@ describe('My Day audit wiring', () => {
     it('routes Today timesheet through the ensure-today endpoint when no draft exists', () => {
         render(<MyDay />);
 
-        fireEvent.click(screen.getByRole('button', { name: /today's timesheet/i }));
+        fireEvent.click(
+            screen.getByRole('button', { name: /today's timesheet/i }),
+        );
 
         expect(mocks.routerPost).toHaveBeenCalledWith(
             '/my-tasks/timesheet/ensure-today',
             {},
             // F2 — now carries an onError handler so a "no shift today" response
             // surfaces a toast instead of looking like a dead button.
-            expect.objectContaining({ preserveScroll: true, onError: expect.any(Function) }),
+            expect.objectContaining({
+                preserveScroll: true,
+                onError: expect.any(Function),
+            }),
         );
         expect(mocks.routerVisit).not.toHaveBeenCalledWith(
             expect.stringContaining('/operations/timesheets?create=1'),
@@ -200,14 +207,18 @@ describe('My Day audit wiring', () => {
     it('toasts the server error when ensure-today reports no shift today (F2)', () => {
         render(<MyDay />);
 
-        fireEvent.click(screen.getByRole('button', { name: /today's timesheet/i }));
+        fireEvent.click(
+            screen.getByRole('button', { name: /today's timesheet/i }),
+        );
 
         // Replay the backend's `back()->withErrors(['timesheet' => …])` through
         // the onError handler the page wired onto the request.
         const options = mocks.routerPost.mock.calls.at(-1)?.[2] as {
             onError?: (errors: Record<string, string>) => void;
         };
-        options?.onError?.({ timesheet: 'No shift today to write a timesheet against.' });
+        options?.onError?.({
+            timesheet: 'No shift today to write a timesheet against.',
+        });
 
         expect(mocks.toastError).toHaveBeenCalledWith(
             'No shift today to write a timesheet against.',
@@ -232,10 +243,9 @@ describe('My Day audit wiring', () => {
 
         render(<MyDay />);
 
-        expect(screen.getByRole('link', { name: /resume morning round/i })).toHaveAttribute(
-            'href',
-            '/meds/rounds/12',
-        );
+        expect(
+            screen.getByRole('link', { name: /resume morning round/i }),
+        ).toHaveAttribute('href', '/meds/rounds/12');
         expect(screen.getByText(/4\s+of\s+6\s+done/)).toBeVisible();
     });
 
@@ -279,6 +289,8 @@ describe('My Day audit wiring', () => {
         expect(screen.getByText('Checklists due this shift')).toBeVisible();
         expect(screen.getByText('Kitchen reset')).toBeVisible();
         expect(screen.getByRole('button', { name: /view/i })).toBeVisible();
-        expect(screen.queryByRole('button', { name: /complete/i })).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /complete/i }),
+        ).not.toBeInTheDocument();
     });
 });

@@ -201,7 +201,7 @@ class CareerPortalController extends Controller
                 'source_detail' => $sourceDetail,
                 'privacy_consent_given_at' => now(),
                 'privacy_consent_ip' => $request->ip(),
-            ], $job->tenant_id, null);
+            ], null);
 
             $applicationData = [
                 'position_title' => $job->title,
@@ -227,6 +227,7 @@ class CareerPortalController extends Controller
             return redirect()->back()->withErrors(['application' => $exception->getMessage()]);
         } catch (\Throwable $exception) {
             report($exception);
+
             return redirect()->back()->withErrors(['application' => 'Application could not be submitted.']);
         }
 
@@ -292,7 +293,7 @@ class CareerPortalController extends Controller
                 'site_name' => $offer->primarySite?->name,
             ],
             'candidate' => [
-                'name' => trim(($offer->application?->candidate?->first_name ?? '') . ' ' . ($offer->application?->candidate?->last_name ?? '')),
+                'name' => trim(($offer->application?->candidate?->first_name ?? '').' '.($offer->application?->candidate?->last_name ?? '')),
                 'email' => $offer->application?->candidate?->personal_email,
             ],
             'token' => $token,
@@ -389,7 +390,7 @@ class CareerPortalController extends Controller
         // Same domain event the in-app respondOffer path emits, so both
         // acceptance routes are observable identically by integrations.
         try {
-            $this->webhookService->publish($offer->application?->tenant_id, 'recruitment.offer.responded', [
+            $this->webhookService->publishApplicationEvent('recruitment.offer.responded', [
                 'offer_id' => $offer->id,
                 'application_id' => $application?->id,
                 'candidate_id' => $candidate?->id,
@@ -405,4 +406,3 @@ class CareerPortalController extends Controller
             ->with('success', 'Your response has been recorded. Thank you.');
     }
 }
-

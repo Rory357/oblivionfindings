@@ -16,25 +16,25 @@ class HouseLedgerService
      */
     public function getOrCreateLedger(Site $site): HouseLedger
     {
-        return HouseLedger::firstOrCreate(
-            ['site_id' => $site->id],
-            [
-                'tenant_id' => $site->tenant_id ?? 1,
-                'opening_balance' => 0,
-                'current_balance' => 0,
-                'currency' => 'NZD',
-            ]
-        );
+        return $site->houseLedger()->firstOrCreate([], [
+            'opening_balance' => 0,
+            'current_balance' => 0,
+            'currency' => 'NZD',
+        ]);
     }
 
     /**
      * Add an entry to the ledger and update the running balance.
      */
-    public function addEntry(HouseLedger $ledger, array $data, int $userId): HouseLedgerEntry
+    public function addEntry(Site $site, array $data, int $userId): HouseLedgerEntry
     {
-        return DB::transaction(function () use ($ledger, $data, $userId) {
-            // Lock the ledger row to prevent concurrent balance updates
-            $ledger = HouseLedger::lockForUpdate()->find($ledger->id);
+        $this->getOrCreateLedger($site);
+
+        return DB::transaction(function () use ($site, $data, $userId) {
+            $ledger = HouseLedger::query()
+                ->where('site_id', $site->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
             $entryType = $data['entry_type'];
             $amount = (float) $data['amount'];
@@ -48,9 +48,7 @@ class HouseLedgerService
 
             $newBalance = (float) $ledger->current_balance + $balanceChange;
 
-            $entry = HouseLedgerEntry::create([
-                'tenant_id' => $ledger->tenant_id,
-                'house_ledger_id' => $ledger->id,
+            $entry = $ledger->entries()->create([
                 'entry_type' => $entryType,
                 'category' => $data['category'],
                 'description' => $data['description'],
@@ -64,6 +62,7 @@ class HouseLedgerService
                 'notes' => $data['notes'] ?? null,
                 'attachments' => $data['attachments'] ?? null,
             ]);
+            $entry->setRelation('ledger', $ledger);
 
             $ledger->update(['current_balance' => $newBalance]);
 
@@ -74,8 +73,9 @@ class HouseLedgerService
     /**
      * Get a statement of ledger entries with optional date range filtering.
      */
-    public function getStatement(HouseLedger $ledger, ?Carbon $from = null, ?Carbon $to = null): Collection
+    public function getStatement(Site $site, ?Carbon $from = null, ?Carbon $to = null): Collection
     {
+        $ledger = $this->getOrCreateLedger($site);
         $query = $ledger->entries()->orderBy('entry_date')->orderBy('id');
 
         if ($from) {
@@ -92,11 +92,14 @@ class HouseLedgerService
     /**
      * Mark the ledger as reconciled.
      */
-    public function reconcile(HouseLedger $ledger, int $userId): void
+    public function reconcile(Site $site, int $userId): HouseLedger
     {
+        $ledger = $this->getOrCreateLedger($site);
         $ledger->update([
             'last_reconciled_at' => now(),
             'reconciled_by' => $userId,
         ]);
+
+        return $ledger;
     }
 }

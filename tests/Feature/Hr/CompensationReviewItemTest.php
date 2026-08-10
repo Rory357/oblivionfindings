@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrCompensationReview;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
@@ -10,18 +11,22 @@ use Database\Seeders\SeedHrPermissionsSeeder;
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->seed(SeedHrPermissionsSeeder::class);
+    $this->site = Site::factory()->create(['name' => 'Compensation review item Site']);
 
     $this->hr = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $this->hr->id,
+        'primary_site_id' => $this->site->id,
+        'is_active' => true,
+    ]);
 
     $this->worker = User::factory()->create([
-        'organization_id' => 1,
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
@@ -30,19 +35,18 @@ beforeEach(function () {
 function reviewWithPendingItem(int $createdBy): array
 {
     $profile = HrEmployeeProfile::query()->create([
-        'tenant_id' => 1,
-        'user_id' => User::factory()->create(['organization_id' => 1, 'approved_at' => now()])->id,
+        'user_id' => User::factory()->create(['approved_at' => now()])->id,
         'employee_number' => 'EMP-REV-'.fake()->unique()->numberBetween(1000, 999999),
         'work_email' => 'rev'.fake()->unique()->numberBetween(1000, 999999).'@example.test',
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
+        'primary_site_id' => Site::query()->value('id'),
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
     ]);
 
     $review = HrCompensationReview::query()->create([
-        'tenant_id' => 1,
         'title' => 'FY26 Annual',
         'review_cycle' => 'annual',
         'effective_date' => '2026-07-01',

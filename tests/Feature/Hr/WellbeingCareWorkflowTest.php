@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrWellbeingCheckin;
 use App\Domain\Hr\Models\HrWellbeingFlagAction;
 use App\Domain\Hr\Models\HrWellbeingIndicator;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
@@ -17,6 +18,8 @@ beforeEach(function () {
     $this->seed(RbacSeeder::class);
     Carbon::setTestNow(Carbon::parse('2026-06-29 09:00:00'));
 
+    $this->site = Site::factory()->create(['name' => 'Wellbeing care site']);
+
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $hrRole = Role::query()->where('name', 'hr')->first();
     if ($hrRole) {
@@ -24,6 +27,17 @@ beforeEach(function () {
     }
 
     $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+
+    foreach ([$this->manager, $this->staff] as $user) {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
 });
 
 afterEach(fn () => Carbon::setTestNow());
@@ -31,7 +45,6 @@ afterEach(fn () => Carbon::setTestNow());
 function redFlagFor(User $user): HrWellbeingIndicator
 {
     return HrWellbeingIndicator::query()->create([
-        'tenant_id' => 1,
         'user_id' => $user->id,
         'period_start' => now()->subDays(28)->toDateString(),
         'period_end' => now()->toDateString(),
@@ -77,7 +90,6 @@ test('flagged staff appear, acknowledge keeps them visible, snooze and dismiss h
 
 test('wellbeing undo removes only the acting managers latest triage action', function () {
     $otherManager = User::factory()->create([
-        'organization_id' => $this->manager->organization_id,
         'role' => 'hr',
         'approved_at' => now(),
     ]);
@@ -85,6 +97,14 @@ test('wellbeing undo removes only the acting managers latest triage action', fun
     if ($hrRole) {
         $otherManager->roles()->syncWithoutDetaching([$hrRole->id]);
     }
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $otherManager->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
 
     $this->actingAs($this->manager)
         ->post("/hr/wellbeing/signals/{$this->staff->id}/acknowledge")
@@ -104,27 +124,30 @@ test('wellbeing undo removes only the acting managers latest triage action', fun
         ->and($actions->sole()->actor_user_id)->toBe($otherManager->id);
 });
 
-test('wellbeing undo rejects a foreign tenant subject without deleting actions', function () {
-    $foreignStaff = User::factory()->create([
-        'organization_id' => 2,
+test('wellbeing undo conceals a hidden Site subject without deleting actions', function () {
+    $hiddenSite = Site::factory()->create(['name' => 'Hidden wellbeing care site']);
+    $hiddenStaff = User::factory()->create([
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
     HrEmployeeProfile::factory()->create([
-        'tenant_id' => 2,
-        'user_id' => $foreignStaff->id,
-        'employee_number' => 'WB-FOREIGN-'.$foreignStaff->id,
-        'work_email' => "wb-foreign-{$foreignStaff->id}@example.test",
+        'user_id' => $hiddenStaff->id,
+        'primary_site_id' => $hiddenSite->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+        'employee_number' => 'WB-HIDDEN-'.$hiddenStaff->id,
+        'work_email' => "wb-hidden-{$hiddenStaff->id}@example.test",
     ]);
     $action = HrWellbeingFlagAction::query()->create([
-        'tenant_id' => 2,
-        'staff_user_id' => $foreignStaff->id,
+        'staff_user_id' => $hiddenStaff->id,
         'action' => 'acknowledge',
         'actor_user_id' => $this->manager->id,
     ]);
 
     $this->actingAs($this->manager)
-        ->post("/hr/wellbeing/signals/{$foreignStaff->id}/undo")
+        ->post("/hr/wellbeing/signals/{$hiddenStaff->id}/undo")
         ->assertNotFound();
 
     expect($action->fresh())->not->toBeNull();
@@ -150,7 +173,6 @@ test('manager creates a standalone action plan from a flag with a system note', 
 
 test('action plan reopen and cancel append timeline notes', function () {
     $plan = HrEngagementActionPlan::query()->create([
-        'tenant_id' => 1,
         'owner_user_id' => $this->manager->id,
         'source_type' => 'manual',
         'title' => 'Test plan',
@@ -174,7 +196,6 @@ test('action plan reopen and cancel append timeline notes', function () {
 test('the employee view hides private check-ins and shows shared ones to the subject', function () {
     // Check-ins about the manager (who can load /hr/wellbeing). Private one is hidden.
     HrWellbeingCheckin::query()->create([
-        'tenant_id' => 1,
         'staff_user_id' => $this->manager->id,
         'manager_user_id' => $this->manager->id,
         'type' => 'welfare',
@@ -182,7 +203,6 @@ test('the employee view hides private check-ins and shows shared ones to the sub
         'is_private' => true,
     ]);
     $shared = HrWellbeingCheckin::query()->create([
-        'tenant_id' => 1,
         'staff_user_id' => $this->manager->id,
         'manager_user_id' => $this->manager->id,
         'type' => 'welfare',
@@ -198,7 +218,6 @@ test('the employee view hides private check-ins and shows shared ones to the sub
 
 test('only the subject can acknowledge a shared check-in, never a private one', function () {
     $shared = HrWellbeingCheckin::query()->create([
-        'tenant_id' => 1,
         'staff_user_id' => $this->staff->id,
         'manager_user_id' => $this->manager->id,
         'type' => 'welfare',
@@ -206,7 +225,6 @@ test('only the subject can acknowledge a shared check-in, never a private one', 
         'is_private' => false,
     ]);
     $private = HrWellbeingCheckin::query()->create([
-        'tenant_id' => 1,
         'staff_user_id' => $this->staff->id,
         'manager_user_id' => $this->manager->id,
         'type' => 'welfare',
@@ -219,11 +237,45 @@ test('only the subject can acknowledge a shared check-in, never a private one', 
     expect($shared->fresh()->acknowledged_at)->not->toBeNull();
 
     // Private check-ins can never be acknowledged by the subject.
-    $this->actingAs($this->staff)->post("/hr/wellbeing/checkins/{$private->id}/acknowledge")->assertForbidden();
+    $this->actingAs($this->staff)->post("/hr/wellbeing/checkins/{$private->id}/acknowledge")->assertNotFound();
 
     // A different user may not acknowledge.
     $other = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $this->actingAs($other)->post("/hr/wellbeing/checkins/{$shared->id}/acknowledge")->assertForbidden();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $other->id,
+        'primary_site_id' => $this->site->id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+    $this->actingAs($other)->post("/hr/wellbeing/checkins/{$shared->id}/acknowledge")->assertNotFound();
+});
+
+test('manager can clear optional check-in fields without changing its subject', function () {
+    $checkin = HrWellbeingCheckin::query()->create([
+        'staff_user_id' => $this->staff->id,
+        'manager_user_id' => $this->manager->id,
+        'type' => 'welfare',
+        'notes' => 'Follow-up required',
+        'mood' => 'low',
+        'follow_up_date' => today()->addWeek(),
+        'is_private' => true,
+    ]);
+
+    $this->actingAs($this->manager)->patch("/hr/wellbeing/checkins/{$checkin->id}", [
+        'notes' => null,
+        'mood' => null,
+        'follow_up_date' => null,
+        'is_private' => false,
+    ])->assertRedirect();
+
+    expect($checkin->fresh())
+        ->staff_user_id->toBe($this->staff->id)
+        ->notes->toBeNull()
+        ->mood->toBeNull()
+        ->follow_up_date->toBeNull()
+        ->is_private->toBeFalse();
 });
 
 test('EAP referral is recorded', function () {
@@ -243,7 +295,6 @@ test('EAP referral is recorded', function () {
 
 test('survey can be duplicated and both closed and draft surveys archived', function () {
     $published = HrEngagementSurvey::query()->create([
-        'tenant_id' => 1,
         'title' => 'June pulse',
         'survey_type' => 'pulse',
         'status' => 'published',
@@ -260,7 +311,6 @@ test('survey can be duplicated and both closed and draft surveys archived', func
     expect($copy->questions()->count())->toBe(1);
 
     $closed = HrEngagementSurvey::query()->create([
-        'tenant_id' => 1,
         'title' => 'May pulse',
         'survey_type' => 'pulse',
         'status' => 'closed',
@@ -274,6 +324,37 @@ test('survey can be duplicated and both closed and draft surveys archived', func
     $this->actingAs($this->manager)->delete("/hr/wellbeing/surveys/{$copy->id}")->assertRedirect();
     expect($copy->fresh()->status)->toBe('archived');
     expect($copy->questions()->count())->toBe(1);
+});
+
+test('draft survey optional scheduling and description fields can be cleared', function () {
+    $survey = HrEngagementSurvey::query()->create([
+        'title' => 'Scheduled pulse',
+        'description' => 'Temporary description',
+        'survey_type' => 'pulse',
+        'status' => 'draft',
+        'is_anonymous' => true,
+        'starts_at' => today()->addWeek(),
+        'ends_at' => today()->addWeeks(2),
+        'created_by' => $this->manager->id,
+        'updated_by' => $this->manager->id,
+    ]);
+    $survey->questions()->create([
+        'question_type' => 'scale',
+        'question_text' => 'How are you?',
+        'is_required' => true,
+        'sort_order' => 1,
+    ]);
+
+    $this->actingAs($this->manager)->put("/hr/wellbeing/surveys/{$survey->id}", [
+        'description' => null,
+        'starts_at' => null,
+        'ends_at' => null,
+    ])->assertRedirect();
+
+    expect($survey->fresh())
+        ->description->toBeNull()
+        ->starts_at->toBeNull()
+        ->ends_at->toBeNull();
 });
 
 test('index exposes hero summary, needs and employee view props', function () {

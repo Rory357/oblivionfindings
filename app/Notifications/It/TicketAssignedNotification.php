@@ -2,6 +2,7 @@
 
 namespace App\Notifications\It;
 
+use App\Domain\It\Contracts\TracksItEmailDelivery;
 use App\Models\ItTicket;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,13 +13,22 @@ use Illuminate\Notifications\Notification;
  * Tells an agent a ticket just landed on their plate. Reference + title
  * only (frontline privacy) — the detail lives behind the deep link.
  */
-class TicketAssignedNotification extends Notification implements ShouldQueue
+class TicketAssignedNotification extends Notification implements ShouldQueue, TracksItEmailDelivery
 {
     use Queueable;
 
     public function __construct(
         private ItTicket $ticket,
     ) {}
+
+    public function itEmailDeliveryContext(): array
+    {
+        return [
+            'ticket_id' => (int) $this->ticket->id,
+            'type' => 'ticket_assigned',
+            'subject' => "Assigned to you — {$this->ticket->reference} {$this->ticket->title}",
+        ];
+    }
 
     public function via(object $notifiable): array
     {

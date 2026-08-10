@@ -326,7 +326,10 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                         description="View shifts, appointments, and request visits."
                         stats={[
                             { label: 'Pending visits', value: pendingCount },
-                            { label: 'Total visits', value: visitRequests.length },
+                            {
+                                label: 'Total visits',
+                                value: visitRequests.length,
+                            },
                         ]}
                     />
                 }

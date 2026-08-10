@@ -8,7 +8,6 @@ import {
     loginAsStaff,
     publishCurrentWeek,
     resetRosteringReadinessFixtures,
-    ROSTERING_DEMO_FRONTLINE_TARGET,
 } from './helpers';
 import {
     rosteringFlagsEnabled,
@@ -29,7 +28,7 @@ test.describe('frontline roster — published visibility', () => {
 
         const consoleErrors = collectConsoleErrors(page);
 
-        resetRosteringReadinessFixtures();
+        const { frontlineTarget } = resetRosteringReadinessFixtures();
         await loginAs(page, 'roster-e2e-frontline@demo.test', 'password');
         await gotoMyRoster(page);
         const publishedShift = page.getByRole('button', {
@@ -39,7 +38,7 @@ test.describe('frontline roster — published visibility', () => {
 
         await page.context().clearCookies();
         await loginAsStaff(page);
-        await publishCurrentWeek(page, ROSTERING_DEMO_FRONTLINE_TARGET);
+        await publishCurrentWeek(page, frontlineTarget);
 
         await page.context().clearCookies();
         await loginAs(page, 'roster-e2e-frontline@demo.test', 'password');

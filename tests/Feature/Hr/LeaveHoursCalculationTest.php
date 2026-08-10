@@ -14,10 +14,10 @@ beforeEach(function () {
 
     $this->manager = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->manager->roles()->syncWithoutDetaching([Role::query()->where('name', 'hr')->first()->id]);
-    $this->manager->setAttribute('tenant_id', 1);
+    $this->site = ensureCanonicalHrStaffProfile($this->manager);
 
     $this->staff = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
-    $this->staff->setAttribute('tenant_id', 1);
+    ensureCanonicalHrStaffProfile($this->staff, $this->site);
 });
 
 test('a public holiday inside a leave range is not charged to the balance', function () {
@@ -25,7 +25,6 @@ test('a public holiday inside a leave range is not charged to the balance', func
     $wednesday = $monday->copy()->addDays(2);
 
     HrPublicHoliday::query()->create([
-        'tenant_id' => null,
         'name' => 'Test Stat Day',
         'date' => $wednesday->toDateString(),
         'year' => $wednesday->year,
@@ -37,7 +36,6 @@ test('a public holiday inside a leave range is not charged to the balance', func
         'leave_type' => 'annual',
         'starts_at' => $monday->toDateString(),
         'ends_at' => $monday->copy()->addDays(4)->toDateString(), // Mon–Fri
-        'tenant_id' => 1,
     ]);
 
     // 5 weekdays − 1 stat day = 4 days × 8h
@@ -52,7 +50,6 @@ test('a single-day half-day request charges half the contracted day and stores t
         'starts_at' => $monday->toDateString(),
         'ends_at' => $monday->toDateString(),
         'period' => 'half_day_am',
-        'tenant_id' => 1,
     ]);
 
     expect((float) $request->hours_requested)->toBe(4.0);

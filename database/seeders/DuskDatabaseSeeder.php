@@ -103,7 +103,7 @@ class DuskDatabaseSeeder extends Seeder
         $permissionKeys = collect([
             'assets.alerts.manage', 'assets.alerts.view', 'assets.assignments.manage', 'assets.create', 'assets.delete',
             'assets.documents.manage', 'assets.geofences.manage', 'assets.inspections.record', 'assets.maintenance.record',
-            'assets.ownership.manage', 'assets.scan.record', 'assets.telemetry.ingest', 'assets.trackers.manage',
+            'assets.ownership.manage', 'assets.scan.record', 'assets.telemetry.export', 'assets.telemetry.ingest', 'assets.trackers.manage',
             'assets.update', 'assets.viewAny', 'assets.viewAssigned', 'audit.viewAny', 'billing.viewAny',
             'calendar.create', 'calendar.manage_recurring', 'calendar.view', 'calendar.viewAny',
             'care_note_templates.viewAny', 'care_plans.create', 'care_plans.delete', 'care_plans.update', 'care_plans.viewAny',
@@ -177,8 +177,9 @@ class DuskDatabaseSeeder extends Seeder
             'incidents.followups.complete', 'incidents.followups.manage',
             'incidents.portal.manage', 'incidents.reopen', 'incidents.submit',
             'incidents.templates.manage', 'incidents.update', 'incidents.viewAny', 'incidents.viewAssigned',
-            'integrations.manage_site_secrets', 'integrations.manage_tenant_secrets', 'integrations.view',
+            'integrations.manage_site_secrets', 'integrations.manage_secrets', 'integrations.view',
             'invoices.create', 'invoices.send', 'invoices.update', 'invoices.viewAny', 'invoices.void',
+            'it.manage', 'it.organisationWide', 'it.request', 'it.view', 'it.viewSensitive',
             'medications.administer.correct', 'medications.administer.record', 'medications.audit.view',
             'medications.breakglass', 'medications.controlled.record',
             'medications.orders.manage', 'medications.reports.export', 'medications.stock.update', 'medications.view',
@@ -209,7 +210,7 @@ class DuskDatabaseSeeder extends Seeder
             'settings.access.manage', 'settings.branding.manage', 'settings.service_contexts.manage',
             'settings.templates.manage', 'settings.terminology.manage',
             'shifts.create', 'shifts.manageAny', 'shifts.tasks.updateSelf', 'shifts.update', 'shifts.viewAny', 'shifts.viewAssigned',
-            'siteHardware.manage', 'siteHardware.view', 'sites.create', 'sites.update', 'sites.viewAny',
+            'siteHardware.manage', 'siteHardware.view', 'sites.create', 'sites.update', 'sites.viewAll', 'sites.viewAny',
             'staff.assignments.update', 'staff.availability.updateAny', 'staff.availability.updateSelf',
             'staff.credentials.updateAny', 'staff.credentials.updateSelf', 'staff.credentials.viewAny',
             'staff.update', 'staff.viewAny',
@@ -219,10 +220,14 @@ class DuskDatabaseSeeder extends Seeder
             'training.enrol', 'training.exempt', 'training.manageCourses', 'training.record', 'training.viewAny',
             'securityDevices.viewAny', 'securityDevices.devices.view', 'securityDevices.devices.create',
             'securityDevices.devices.update', 'securityDevices.devices.delete', 'securityDevices.devices.assign',
-            'securityDevices.groups.manage', 'securityDevices.events.view',
+            'securityDevices.groups.manage', 'securityDevices.events.view', 'securityDevices.cctv.media.view',
+            'securityDevices.accessControl.view', 'securityDevices.accessControl.manage',
             'securityDevices.maintenance.view', 'securityDevices.maintenance.manage',
             'securityDevices.integrations.view', 'securityDevices.integrations.manage',
-            'securityDevices.reports.view',
+            'securityDevices.reports.view', 'securityDevices.commands.observe',
+            'securityDevices.commands.operate', 'securityDevices.commands.manage',
+            'securityDevices.commands.control', 'securityDevices.commands.approve',
+            'securityDevices.commands.admin',
             'unifi.manage', 'vendors.manage', 'vendors.view',
             'workers.viewAny',
         ]);
@@ -393,7 +398,6 @@ class DuskDatabaseSeeder extends Seeder
         $site = Site::query()->withoutGlobalScopes()->updateOrCreate(
             ['name' => 'QA Main Site'],
             $this->existingColumns('sites', [
-                'tenant_id' => 1,
                 'type' => 'house',
                 'city' => 'Auckland',
                 'region' => 'Auckland',
@@ -443,7 +447,6 @@ class DuskDatabaseSeeder extends Seeder
             HrEmployeeProfile::firstOrCreate(
                 ['user_id' => $profileData['user']->id],
                 $this->existingColumns('hr_employee_profiles', [
-                    'tenant_id' => 1,
                     'employee_number' => $profileData['employee_number'],
                     'work_email' => $profileData['work_email'],
                     'position_title' => $profileData['position_title'],
@@ -681,7 +684,11 @@ class DuskDatabaseSeeder extends Seeder
         // Skipped: HrOnboardingChecklist requires employee_profile_id FK
         // $this->seed(fn () => \App\Domain\Hr\Models\HrOnboardingChecklist::factory()->create());
         $this->seed(fn () => HrCompensationReview::factory()->create());
-        $this->seed(fn () => HrSuccessionPlan::factory()->create());
+        $this->seed(fn () => HrSuccessionPlan::factory()->create([
+            'site_id' => $site->id,
+            'current_holder_user_id' => $staffUser->id,
+            'created_by' => $admin->id,
+        ]));
 
         // ──────────────────────────────────────────────
         // Finance
@@ -752,10 +759,6 @@ class DuskDatabaseSeeder extends Seeder
      */
     private function seedUser(array $overrides): User
     {
-        if (Schema::hasColumn('users', 'organization_id') && ! array_key_exists('organization_id', $overrides)) {
-            $overrides['organization_id'] = 1;
-        }
-
         $attributes = User::factory()
             ->withoutTwoFactor()
             ->make($overrides)

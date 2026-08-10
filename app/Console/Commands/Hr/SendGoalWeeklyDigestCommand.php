@@ -4,7 +4,7 @@ namespace App\Console\Commands\Hr;
 
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Notifications\GoalWeeklyDigestNotification;
-use App\Models\User;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -18,7 +18,7 @@ class SendGoalWeeklyDigestCommand extends Command
 
     protected $description = 'Send each objective owner a weekly OKR digest.';
 
-    public function handle(): int
+    public function handle(HrCurrentStaffService $currentStaff): int
     {
         $today = Carbon::today();
         $cadence = [
@@ -28,13 +28,16 @@ class SendGoalWeeklyDigestCommand extends Command
             'quarterly' => 90,
         ];
 
-        $goals = HrGoal::query()->where('status', 'active')->get();
+        $goals = HrGoal::query()
+            ->whereIn('user_id', $currentStaff->currentUsersQuery()->select('users.id'))
+            ->where('status', 'active')
+            ->get();
         $byOwner = $goals->groupBy('user_id');
 
         $sent = 0;
 
         foreach ($byOwner as $ownerId => $owned) {
-            $owner = User::find($ownerId);
+            $owner = $currentStaff->currentUsersQuery()->find($ownerId);
             if (! $owner) {
                 continue;
             }

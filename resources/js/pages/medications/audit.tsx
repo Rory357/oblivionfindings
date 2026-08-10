@@ -1,11 +1,15 @@
-import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { Head, router } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
     Table,
     TableBody,
@@ -14,34 +18,25 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
+import { Head, router } from '@inertiajs/react';
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
+    Calendar,
     ChevronDown,
     ChevronRight,
     ClipboardCheck,
     Download,
-    Search,
-    Plus,
-    Pencil,
-    Trash2,
     Eye,
     FileText,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
     User,
-    Calendar,
     X,
 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
-import { cn } from '@/lib/utils';
 
 type AuditLog = {
     id: number;
@@ -61,27 +56,37 @@ type Props = {
 
 function ActionBadge({ action }: { action: string }) {
     const a = action?.toLowerCase?.() ?? '';
-    const config: Record<string, { class: string; icon: React.ReactNode; label: string }> = {
+    const config: Record<
+        string,
+        { class: string; icon: React.ReactNode; label: string }
+    > = {
         created: {
             class: 'bg-status-success-bg text-status-success border-status-success/30',
-            icon: <Plus className="h-3 w-3 mr-1" />,
+            icon: <Plus className="mr-1 h-3 w-3" />,
             label: 'Created',
         },
         updated: {
             class: 'bg-status-warning-bg text-status-warning border-status-warning/30',
-            icon: <Pencil className="h-3 w-3 mr-1" />,
+            icon: <Pencil className="mr-1 h-3 w-3" />,
             label: 'Updated',
         },
         deleted: {
             class: 'bg-status-critical-bg text-status-critical border-status-critical/30',
-            icon: <Trash2 className="h-3 w-3 mr-1" />,
+            icon: <Trash2 className="mr-1 h-3 w-3" />,
             label: 'Deleted',
         },
     };
-    const c = config[a] || { class: 'bg-muted text-foreground border-border', icon: <Eye className="h-3 w-3 mr-1" />, label: action };
-    
+    const c = config[a] || {
+        class: 'bg-muted text-foreground border-border',
+        icon: <Eye className="mr-1 h-3 w-3" />,
+        label: action,
+    };
+
     return (
-        <Badge variant="outline" className={cn('flex items-center w-fit', c.class)}>
+        <Badge
+            variant="outline"
+            className={cn('flex w-fit items-center', c.class)}
+        >
             {c.icon}
             {c.label}
         </Badge>
@@ -100,10 +105,11 @@ function JsonPreview({ data, maxLines = 3 }: { data: any; maxLines?: number }) {
     const json = JSON.stringify(data, null, 2);
     const lines = json.split('\n');
     const hasMore = lines.length > maxLines;
-    const preview = lines.slice(0, maxLines).join('\n') + (hasMore ? '\n...' : '');
-    
+    const preview =
+        lines.slice(0, maxLines).join('\n') + (hasMore ? '\n...' : '');
+
     return (
-        <pre className="text-xs text-muted-foreground font-mono bg-muted/50 rounded p-2 overflow-x-auto">
+        <pre className="overflow-x-auto rounded bg-muted/50 p-2 font-mono text-xs text-muted-foreground">
             {preview}
         </pre>
     );
@@ -141,11 +147,20 @@ export default function MedicationsAudit({ filters, logs }: Props) {
         setUserId('');
         setFrom('');
         setTo('');
-        router.get('/medications/audit', {}, { preserveState: true, preserveScroll: true });
+        router.get(
+            '/medications/audit',
+            {},
+            { preserveState: true, preserveScroll: true },
+        );
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Medications', href: '/medications' }, { title: 'Audit Log', href: '/medications/audit' }]}>
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Medications', href: '/medications' },
+                { title: 'Audit Log', href: '/medications/audit' },
+            ]}
+        >
             <Head title="Medication Audit Log" />
 
             <PageLayout
@@ -157,7 +172,9 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                         actions={
                             <Button
                                 variant="outline"
-                                onClick={() => window.location.href = `/medications/audit/export?${new URLSearchParams(query).toString()}`}
+                                onClick={() =>
+                                    (window.location.href = `/medications/audit/export?${new URLSearchParams(query).toString()}`)
+                                }
                                 className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                             >
                                 <Download className="mr-2 h-4 w-4" />
@@ -170,7 +187,7 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                 {/* Filters */}
                 <Card>
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
+                        <CardTitle className="flex items-center gap-2 text-base">
                             <Search className="h-4 w-4" />
                             Filters
                         </CardTitle>
@@ -178,49 +195,64 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                     <CardContent>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                             <div className="space-y-1.5">
-                                <Label htmlFor="client-id" className="text-xs">Client ID</Label>
-                                <Input 
+                                <Label htmlFor="client-id" className="text-xs">
+                                    Client ID
+                                </Label>
+                                <Input
                                     id="client-id"
-                                    value={clientId} 
-                                    onChange={(e) => setClientId(e.target.value)} 
+                                    value={clientId}
+                                    onChange={(e) =>
+                                        setClientId(e.target.value)
+                                    }
                                     placeholder="e.g. 12"
                                     className="h-9"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label htmlFor="user-id" className="text-xs">User ID</Label>
-                                <Input 
+                                <Label htmlFor="user-id" className="text-xs">
+                                    User ID
+                                </Label>
+                                <Input
                                     id="user-id"
-                                    value={userId} 
-                                    onChange={(e) => setUserId(e.target.value)} 
+                                    value={userId}
+                                    onChange={(e) => setUserId(e.target.value)}
                                     placeholder="e.g. 7"
                                     className="h-9"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label htmlFor="from-date" className="text-xs">From Date</Label>
-                                <Input 
+                                <Label htmlFor="from-date" className="text-xs">
+                                    From Date
+                                </Label>
+                                <Input
                                     id="from-date"
-                                    type="date" 
-                                    value={from} 
+                                    type="date"
+                                    value={from}
                                     onChange={(e) => setFrom(e.target.value)}
                                     className="h-9"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label htmlFor="to-date" className="text-xs">To Date</Label>
-                                <Input 
+                                <Label htmlFor="to-date" className="text-xs">
+                                    To Date
+                                </Label>
+                                <Input
                                     id="to-date"
-                                    type="date" 
-                                    value={to} 
+                                    type="date"
+                                    value={to}
                                     onChange={(e) => setTo(e.target.value)}
                                     className="h-9"
                                 />
                             </div>
                         </div>
                         <div className="mt-4 flex items-center gap-2">
-                            <Button 
-                                onClick={() => router.get('/medications/audit', query, { preserveState: true, preserveScroll: true })}
+                            <Button
+                                onClick={() =>
+                                    router.get('/medications/audit', query, {
+                                        preserveState: true,
+                                        preserveScroll: true,
+                                    })
+                                }
                                 size="sm"
                             >
                                 Apply Filters
@@ -240,7 +272,11 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                 {/* Results Summary */}
                 <div className="flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
-                        Showing <span className="font-medium text-foreground">{logs.length}</span> entries
+                        Showing{' '}
+                        <span className="font-medium text-foreground">
+                            {logs.length}
+                        </span>{' '}
+                        entries
                         {logs.length >= 200 && ' (max 200)'}
                     </div>
                 </div>
@@ -251,7 +287,9 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[100px]">Action</TableHead>
+                                    <TableHead className="w-[100px]">
+                                        Action
+                                    </TableHead>
                                     <TableHead>Record</TableHead>
                                     <TableHead className="w-[180px]">
                                         <div className="flex items-center gap-1.5">
@@ -265,102 +303,146 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                                             User
                                         </div>
                                     </TableHead>
-                                    <TableHead className="w-[100px]">Details</TableHead>
+                                    <TableHead className="w-[100px]">
+                                        Details
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {logs.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                                            <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                                        <TableCell
+                                            colSpan={5}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            <FileText className="mx-auto mb-2 h-8 w-8 opacity-50" />
                                             No audit entries found.
                                         </TableCell>
                                     </TableRow>
                                 )}
                                 {logs.map((log) => {
                                     const isExpanded = expandedRows.has(log.id);
-                                    const hasMeta = log.meta && Object.keys(log.meta).length > 0;
-                                    
+                                    const hasMeta =
+                                        log.meta &&
+                                        Object.keys(log.meta).length > 0;
+
                                     return (
                                         <React.Fragment key={log.id}>
                                             <TableRow
                                                 className={cn(
-                                                    "cursor-pointer transition-colors",
-                                                    isExpanded && "bg-muted/50"
+                                                    'cursor-pointer transition-colors',
+                                                    isExpanded && 'bg-muted/50',
                                                 )}
-                                                onClick={() => hasMeta && toggleRow(log.id)}
+                                                onClick={() =>
+                                                    hasMeta && toggleRow(log.id)
+                                                }
                                             >
                                                 <TableCell>
-                                                    <ActionBadge action={log.action} />
+                                                    <ActionBadge
+                                                        action={log.action}
+                                                    />
                                                 </TableCell>
                                                 <TableCell>
-                                                    <div className="font-medium text-sm">
-                                                        {formatModelName(log.auditable_type)} #{log.auditable_id}
+                                                    <div className="text-sm font-medium">
+                                                        {formatModelName(
+                                                            log.auditable_type,
+                                                        )}{' '}
+                                                        #{log.auditable_id}
                                                     </div>
                                                     {log.client?.name && (
-                                                        <div className="text-xs text-muted-foreground mt-0.5">
-                                                            Client: {log.client.name}
+                                                        <div className="mt-0.5 text-xs text-muted-foreground">
+                                                            Client:{' '}
+                                                            {log.client.name}
                                                         </div>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-sm text-muted-foreground">
-                                                    {log.created_at 
-                                                        ? new Date(log.created_at).toLocaleString('en-NZ', {
-                                                              day: '2-digit',
-                                                              month: 'short',
-                                                              year: 'numeric',
-                                                              hour: '2-digit',
-                                                              minute: '2-digit',
-                                                          })
-                                                        : '-'
-                                                    }
+                                                    {log.created_at
+                                                        ? new Date(
+                                                              log.created_at,
+                                                          ).toLocaleString(
+                                                              'en-NZ',
+                                                              {
+                                                                  day: '2-digit',
+                                                                  month: 'short',
+                                                                  year: 'numeric',
+                                                                  hour: '2-digit',
+                                                                  minute: '2-digit',
+                                                              },
+                                                          )
+                                                        : '-'}
                                                 </TableCell>
                                                 <TableCell>
                                                     {log.user?.name ? (
-                                                        <div className="text-sm">{log.user.name}</div>
+                                                        <div className="text-sm">
+                                                            {log.user.name}
+                                                        </div>
                                                     ) : (
-                                                        <span className="text-sm text-muted-foreground">System</span>
+                                                        <span className="text-sm text-muted-foreground">
+                                                            System
+                                                        </span>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
                                                     {hasMeta ? (
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="sm" 
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
                                                             className="h-8 px-2"
-                                                            onClick={(e) => { e.stopPropagation(); toggleRow(log.id); }}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleRow(
+                                                                    log.id,
+                                                                );
+                                                            }}
                                                         >
                                                             {isExpanded ? (
                                                                 <ChevronDown className="h-4 w-4" />
                                                             ) : (
                                                                 <ChevronRight className="h-4 w-4" />
                                                             )}
-                                                            <span className="ml-1 text-xs">View</span>
+                                                            <span className="ml-1 text-xs">
+                                                                View
+                                                            </span>
                                                         </Button>
                                                     ) : (
-                                                        <span className="text-xs text-muted-foreground">—</span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            —
+                                                        </span>
                                                     )}
                                                 </TableCell>
                                             </TableRow>
                                             {isExpanded && hasMeta && (
                                                 <TableRow className="bg-muted/30">
-                                                    <TableCell colSpan={5} className="p-4">
+                                                    <TableCell
+                                                        colSpan={5}
+                                                        className="p-4"
+                                                    >
                                                         <div className="space-y-3">
                                                             <div className="flex items-center justify-between">
-                                                                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                                                    Changes / Metadata
+                                                                <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                                                    Changes /
+                                                                    Metadata
                                                                 </span>
-                                                                <Button 
-                                                                    variant="ghost" 
-                                                                    size="sm" 
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
                                                                     className="h-7 text-xs"
-                                                                    onClick={() => setSelectedLog(log)}
+                                                                    onClick={() =>
+                                                                        setSelectedLog(
+                                                                            log,
+                                                                        )
+                                                                    }
                                                                 >
                                                                     <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                                                    View Full JSON
+                                                                    View Full
+                                                                    JSON
                                                                 </Button>
                                                             </div>
-                                                            <JsonPreview data={log.meta} maxLines={8} />
+                                                            <JsonPreview
+                                                                data={log.meta}
+                                                                maxLines={8}
+                                                            />
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -375,48 +457,78 @@ export default function MedicationsAudit({ filters, logs }: Props) {
             </PageLayout>
 
             {/* Full JSON Dialog */}
-            <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
-                <DialogContent className="max-w-3xl max-h-[85vh]">
+            <Dialog
+                open={!!selectedLog}
+                onOpenChange={() => setSelectedLog(null)}
+            >
+                <DialogContent className="max-h-[85vh] max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle className="text-base">Audit Entry Details</DialogTitle>
+                        <DialogTitle className="text-base">
+                            Audit Entry Details
+                        </DialogTitle>
                     </DialogHeader>
                     {selectedLog && (
                         <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                                 <div>
-                                    <span className="text-muted-foreground">Action:</span>
-                                    <div className="mt-1"><ActionBadge action={selectedLog.action} /></div>
-                                </div>
-                                <div>
-                                    <span className="text-muted-foreground">Record:</span>
-                                    <div className="mt-1 font-medium">
-                                        {formatModelName(selectedLog.auditable_type)} #{selectedLog.auditable_id}
-                                    </div>
-                                </div>
-                                <div>
-                                    <span className="text-muted-foreground">Timestamp:</span>
+                                    <span className="text-muted-foreground">
+                                        Action:
+                                    </span>
                                     <div className="mt-1">
-                                        {selectedLog.created_at 
-                                            ? new Date(selectedLog.created_at).toLocaleString('en-NZ')
-                                            : '-'
-                                        }
+                                        <ActionBadge
+                                            action={selectedLog.action}
+                                        />
                                     </div>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">User:</span>
-                                    <div className="mt-1">{selectedLog.user?.name || 'System'}</div>
+                                    <span className="text-muted-foreground">
+                                        Record:
+                                    </span>
+                                    <div className="mt-1 font-medium">
+                                        {formatModelName(
+                                            selectedLog.auditable_type,
+                                        )}{' '}
+                                        #{selectedLog.auditable_id}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        Timestamp:
+                                    </span>
+                                    <div className="mt-1">
+                                        {selectedLog.created_at
+                                            ? new Date(
+                                                  selectedLog.created_at,
+                                              ).toLocaleString('en-NZ')
+                                            : '-'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-muted-foreground">
+                                        User:
+                                    </span>
+                                    <div className="mt-1">
+                                        {selectedLog.user?.name || 'System'}
+                                    </div>
                                 </div>
                                 {selectedLog.client?.name && (
                                     <div className="col-span-2">
-                                        <span className="text-muted-foreground">Client:</span>
-                                        <div className="mt-1">{selectedLog.client.name} (#{selectedLog.client.id})</div>
+                                        <span className="text-muted-foreground">
+                                            Client:
+                                        </span>
+                                        <div className="mt-1">
+                                            {selectedLog.client.name} (#
+                                            {selectedLog.client.id})
+                                        </div>
                                     </div>
                                 )}
                             </div>
-                            
+
                             <div>
-                                <span className="text-sm text-muted-foreground">Full Metadata:</span>
-                                <pre className="mt-2 max-h-[400px] overflow-auto rounded-md border bg-muted/50 p-4 text-xs font-mono">
+                                <span className="text-sm text-muted-foreground">
+                                    Full Metadata:
+                                </span>
+                                <pre className="mt-2 max-h-[400px] overflow-auto rounded-md border bg-muted/50 p-4 font-mono text-xs">
                                     {JSON.stringify(selectedLog.meta, null, 2)}
                                 </pre>
                             </div>

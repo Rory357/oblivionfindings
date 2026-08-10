@@ -2,69 +2,95 @@
 
 namespace App\Http\Controllers\It;
 
+use App\Domain\It\Services\ItKbLifecycleService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\It\DeleteKbArticleRequest;
 use App\Http\Requests\It\KbHelpfulRequest;
+use App\Http\Requests\It\RetireKbArticleRequest;
 use App\Http\Requests\It\StoreKbArticleRequest;
 use App\Http\Requests\It\UpdateKbArticleRequest;
 use App\Models\ItKbArticle;
+use DomainException;
 use Illuminate\Http\Request;
 
 /**
  * Knowledge-base authoring (§I). Agents create, edit and publish/unpublish
  * articles; requesters read the published ones (browse/vote lands with 14c).
- * Every write is tenant-scoped and `it.manage`-gated (the FormRequests own
- * the authorize; tenancy is asserted here).
+ * Every write is `it.manage`-gated; Site-specific audiences are bounded by
+ * canonical approved-Site assignments.
  */
 class ItKbController extends Controller
 {
-    use ResolvesHrTenant;
+    public function __construct(
+        private readonly ItKbLifecycleService $lifecycle,
+    ) {}
 
     public function store(StoreKbArticleRequest $request)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
         $data = $request->validated();
-
-        $article = ItKbArticle::query()->create([
-            'tenant_id' => $tenantId,
-            'title' => $data['title'],
-            'slug' => ItKbArticle::uniqueSlug($tenantId, $data['title']),
-            'category' => $data['category'],
-            'body' => $data['body'],
-            'status' => $data['status'],
-            'author_user_id' => $user->id,
-        ]);
+        $article = $this->lifecycle->create($user, $data);
 
         return redirect()->back()
-            ->with('success', "Article “{$article->title}” ".($article->status === 'published' ? 'published.' : 'saved as a draft.'))
+            ->with('success', "Article “{$article->title}” saved as a draft.")
             ->with('it_kb', ['id' => $article->id, 'slug' => $article->slug]);
     }
 
     public function update(UpdateKbArticleRequest $request, ItKbArticle $article)
     {
         $user = $request->user();
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, (int) $article->tenant_id);
 
         // Slug stays stable across edits (a title tweak shouldn't churn a
         // published article's URL); it is only ever generated at create time.
-        $article->fill($request->validated());
-        $article->save();
+        $data = $request->validated();
+        try {
+            $this->lifecycle->update($article, $user, $data);
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Article updated.');
     }
 
-    public function destroy(Request $request, ItKbArticle $article)
+    public function submitReview(Request $request, ItKbArticle $article)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('it.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, (int) $article->tenant_id);
+        return $this->lifecycleAction($request, $article, 'submitForReview', 'Article sent for review.');
+    }
 
-        $article->delete();
+    public function publish(Request $request, ItKbArticle $article)
+    {
+        return $this->lifecycleAction($request, $article, 'publish', 'Article published.');
+    }
 
-        return redirect()->back()->with('success', 'Article deleted.');
+    public function retire(RetireKbArticleRequest $request, ItKbArticle $article)
+    {
+        return $this->lifecycleAction(
+            $request,
+            $article,
+            'retire',
+            'Article retired.',
+            (string) $request->validated('reason'),
+        );
+    }
+
+    public function restore(Request $request, ItKbArticle $article)
+    {
+        return $this->lifecycleAction($request, $article, 'restore', 'Article restored as a draft.');
+    }
+
+    public function destroy(DeleteKbArticleRequest $request, ItKbArticle $article)
+    {
+        try {
+            $this->lifecycle->deleteDraft(
+                $article,
+                $request->user(),
+                (string) $request->validated('reason'),
+            );
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Draft deleted.');
     }
 
     /* ================================================================== */
@@ -73,13 +99,11 @@ class ItKbController extends Controller
 
     /**
      * Count a read of a published article. Drafts 404 (never leak an
-     * unpublished article's existence); cross-tenant 404s the same way.
+     * unpublished article's existence); inaccessible Site audiences 404 too.
      */
     public function view(Request $request, ItKbArticle $article)
     {
-        $this->assertPublishedInTenant($request, $article);
-
-        $article->increment('view_count');
+        $this->lifecycle->recordView($article, $request->user());
 
         return redirect()->back();
     }
@@ -87,18 +111,33 @@ class ItKbController extends Controller
     /** "Was this helpful?" — tally a yes/no on a published article. */
     public function helpful(KbHelpfulRequest $request, ItKbArticle $article)
     {
-        $this->assertPublishedInTenant($request, $article);
+        $helpful = $request->boolean('helpful');
+        $recorded = $this->lifecycle->recordHelpful($article, $request->user(), $helpful);
 
-        $article->increment($request->boolean('helpful') ? 'helpful_yes' : 'helpful_no');
-
-        return redirect()->back()->with('success', 'Thanks — that helps us tune the knowledge base.');
+        return redirect()->back()->with(
+            'success',
+            $recorded
+                ? 'Thanks — that helps us tune the knowledge base.'
+                : 'Your feedback was already recorded.',
+        );
     }
 
-    /** Shared guard for the requester-facing reads: same tenant + published. */
-    private function assertPublishedInTenant(Request $request, ItKbArticle $article): void
-    {
-        $tenantId = $this->resolveHrTenantIdForUser($request->user());
-        $this->assertHrTenantAccess($tenantId, (int) $article->tenant_id);
-        abort_unless($article->status === 'published', 404);
+    private function lifecycleAction(
+        Request $request,
+        ItKbArticle $article,
+        string $method,
+        string $success,
+        ?string $reason = null,
+    ) {
+        abort_unless($request->user()?->canDo('it.manage'), 403);
+        try {
+            $reason === null
+                ? $this->lifecycle->{$method}($article, $request->user())
+                : $this->lifecycle->{$method}($article, $request->user(), $reason);
+        } catch (DomainException $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->back()->with('success', $success);
     }
 }

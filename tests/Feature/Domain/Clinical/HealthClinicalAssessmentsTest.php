@@ -3,8 +3,10 @@
 namespace Tests\Feature\Domain\Clinical;
 
 use App\Domain\Clinical\Models\ClinicalRiskAssessment;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -16,28 +18,39 @@ class HealthClinicalAssessmentsTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
+        $this->site = Site::factory()->create(['is_active' => true]);
     }
 
-    protected function userWithRole(string $role, ?int $orgId = null): User
+    protected function userWithRole(string $role): User
     {
-        $user = User::factory()->create(['role' => $role, 'approved_at' => now(), 'organization_id' => $orgId]);
+        $user = User::factory()->create(['role' => $role, 'approved_at' => now()]);
         $found = Role::where('name', $role)->first();
         if ($found) {
             $user->roles()->attach($found);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
 
         return $user;
     }
 
     public function test_records_a_must_assessment_with_computed_score(): void
     {
-        $user = $this->userWithRole('clinical_lead', 1);
-        $client = Client::factory()->create(['organization_id' => 1]);
+        $user = $this->userWithRole('clinical_lead');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $this->actingAs($user)
             ->post('/health-clinical/assessments', [
@@ -53,7 +66,6 @@ class HealthClinicalAssessmentsTest extends TestCase
             'assessment_type' => 'malnutrition_must',
             'total_score' => 6,
             'risk_band' => 'high',
-            'organization_id' => 1,
         ]);
 
         // The stored breakdown + tool version travel with the record.
@@ -64,8 +76,8 @@ class HealthClinicalAssessmentsTest extends TestCase
 
     public function test_records_a_frat_assessment_high_band(): void
     {
-        $user = $this->userWithRole('clinical_lead', 1);
-        $client = Client::factory()->create(['organization_id' => 1]);
+        $user = $this->userWithRole('clinical_lead');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $this->actingAs($user)
             ->post('/health-clinical/assessments', [
@@ -89,8 +101,8 @@ class HealthClinicalAssessmentsTest extends TestCase
 
     public function test_frat_rejects_an_invalid_option(): void
     {
-        $user = $this->userWithRole('clinical_lead', 1);
-        $client = Client::factory()->create(['organization_id' => 1]);
+        $user = $this->userWithRole('clinical_lead');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $this->actingAs($user)
             ->post('/health-clinical/assessments', [
@@ -105,8 +117,8 @@ class HealthClinicalAssessmentsTest extends TestCase
 
     public function test_must_requires_a_bmi_basis(): void
     {
-        $user = $this->userWithRole('clinical_lead', 1);
-        $client = Client::factory()->create(['organization_id' => 1]);
+        $user = $this->userWithRole('clinical_lead');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         // No BMI and no height/weight → rejected, so a non-measurable BMI can't silently score 0.
         $this->actingAs($user)
@@ -131,10 +143,9 @@ class HealthClinicalAssessmentsTest extends TestCase
 
     public function test_register_renders_with_records_and_stats(): void
     {
-        $user = $this->userWithRole('clinical_lead', 1);
-        $client = Client::factory()->create(['organization_id' => 1]);
+        $user = $this->userWithRole('clinical_lead');
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
         ClinicalRiskAssessment::create([
-            'organization_id' => 1,
             'client_id' => $client->id,
             'assessed_by' => $user->id,
             'assessment_type' => 'pressure_braden',
@@ -163,11 +174,11 @@ class HealthClinicalAssessmentsTest extends TestCase
 
     public function test_forbidden_without_permission(): void
     {
-        $user = $this->userWithRole('support_worker', 1);
+        $user = $this->userWithRole('support_worker');
 
         $this->actingAs($user)->get('/health-clinical/assessments')->assertForbidden();
         $this->actingAs($user)->post('/health-clinical/assessments', [
-            'client_id' => Client::factory()->create()->id,
+            'client_id' => Client::factory()->create(['site_id' => $this->site->id])->id,
             'assessment_type' => 'malnutrition_must',
             'inputs' => ['weight_loss_percent' => 0],
         ])->assertForbidden();

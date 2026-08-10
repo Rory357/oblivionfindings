@@ -8,7 +8,13 @@ interface AnimatedCounterProps {
     decimals?: number;
 }
 
-export function AnimatedCounter({ value, duration = 800, prefix = '', suffix = '', decimals = 0 }: AnimatedCounterProps) {
+export function AnimatedCounter({
+    value,
+    duration = 800,
+    prefix = '',
+    suffix = '',
+    decimals = 0,
+}: AnimatedCounterProps) {
     const [display, setDisplay] = useState(0);
     const frameRef = useRef<number>(0);
     const startRef = useRef<number>(0);
@@ -39,7 +45,16 @@ export function AnimatedCounter({ value, duration = 800, prefix = '', suffix = '
         };
     }, [value, duration]);
 
-    const formatted = decimals > 0 ? display.toFixed(decimals) : Math.round(display).toString();
+    const formatted =
+        decimals > 0
+            ? display.toFixed(decimals)
+            : Math.round(display).toString();
 
-    return <span>{prefix}{formatted}{suffix}</span>;
+    return (
+        <span>
+            {prefix}
+            {formatted}
+            {suffix}
+        </span>
+    );
 }

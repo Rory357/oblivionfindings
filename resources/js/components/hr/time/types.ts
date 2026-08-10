@@ -38,7 +38,11 @@ export interface TimeEntry {
     amendment_reason: string | null;
     amendment_count: number;
     client_name: string | null;
-    shift: { id: number; starts_at: string | null; ends_at: string | null } | null;
+    shift: {
+        id: number;
+        starts_at: string | null;
+        ends_at: string | null;
+    } | null;
 }
 
 export interface TimesheetRow {
@@ -123,7 +127,12 @@ export interface TimeReport {
         mileage_km: number;
     };
     by_site: Array<{ name: string; hours: number }>;
-    by_staff: Array<{ user_id: number; name: string; hours: number; overtime: number }>;
+    by_staff: Array<{
+        user_id: number;
+        name: string;
+        hours: number;
+        overtime: number;
+    }>;
 }
 
 export interface KpiStats {

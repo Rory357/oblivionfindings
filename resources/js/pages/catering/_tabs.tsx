@@ -18,7 +18,13 @@ type Tab = {
 // Recipes / Products / Tags are now managed inside the Meal Planner — only the
 // planner remains in the tab bar to kill the orphaned cross-links (P2-16).
 const TABS: Tab[] = [
-    { key: 'meal-planner', label: 'Meal Planner', href: '/catering', icon: CalendarDays, description: 'Plan meals, inventory & shopping' },
+    {
+        key: 'meal-planner',
+        label: 'Meal Planner',
+        href: '/catering',
+        icon: CalendarDays,
+        description: 'Plan meals, inventory & shopping',
+    },
 ];
 
 /** Deprecation banner shown on the legacy library index pages. */
@@ -27,7 +33,8 @@ export function LibraryDeprecationNotice({ thing }: { thing: string }) {
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
             <Info className="h-4 w-4 shrink-0 text-primary" />
             <span className="flex-1 text-sm text-foreground">
-                {thing} are now managed inside the <strong>Meal Planner</strong> — open the planner to make changes.
+                {thing} are now managed inside the <strong>Meal Planner</strong>{' '}
+                — open the planner to make changes.
             </span>
             <Button asChild size="sm" variant="outline">
                 <Link href="/catering">Open Meal Planner</Link>
@@ -57,11 +64,19 @@ function writeCachedCounts(c: Partial<Record<CateringTabKey, number>>): void {
     }
 }
 
-export function CateringTabs({ active, counts }: { active: CateringTabKey; counts?: Partial<Record<CateringTabKey, number>> }) {
+export function CateringTabs({
+    active,
+    counts,
+}: {
+    active: CateringTabKey;
+    counts?: Partial<Record<CateringTabKey, number>>;
+}) {
     // Pages may pass their own counts; otherwise we read the cache
     // immediately (so the badges show instantly across navigations)
     // and refresh in the background.
-    const [fetched, setFetched] = useState<Partial<Record<CateringTabKey, number>> | null>(() => readCachedCounts());
+    const [fetched, setFetched] = useState<Partial<
+        Record<CateringTabKey, number>
+    > | null>(() => readCachedCounts());
 
     useEffect(() => {
         if (counts) {
@@ -69,14 +84,19 @@ export function CateringTabs({ active, counts }: { active: CateringTabKey; count
             return;
         }
         let cancelled = false;
-        axios.get('/catering/library-counts').then((res) => {
-            if (cancelled || !res.data) return;
-            setFetched(res.data);
-            writeCachedCounts(res.data);
-        }).catch(() => {
-            // Keep showing the cached value if the refresh fails
-        });
-        return () => { cancelled = true; };
+        axios
+            .get('/catering/library-counts')
+            .then((res) => {
+                if (cancelled || !res.data) return;
+                setFetched(res.data);
+                writeCachedCounts(res.data);
+            })
+            .catch(() => {
+                // Keep showing the cached value if the refresh fails
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [counts]);
 
     const effective = counts ?? fetched ?? {};
@@ -101,7 +121,10 @@ export function CateringTabs({ active, counts }: { active: CateringTabKey; count
                         <Icon className="h-4 w-4" />
                         {tab.label}
                         {count !== undefined && count > 0 && (
-                            <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                            <Badge
+                                variant="outline"
+                                className="ml-1 px-1.5 py-0 text-xs"
+                            >
                                 {count}
                             </Badge>
                         )}

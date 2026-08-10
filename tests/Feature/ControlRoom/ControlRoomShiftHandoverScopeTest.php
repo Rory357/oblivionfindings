@@ -43,7 +43,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         Carbon::setTestNow('2026-07-17 10:00:00');
         $this->seed(RbacSeeder::class);
         $this->site = Site::factory()->create([
-            'tenant_id' => 1,
             'type' => 'house',
         ]);
         $this->viewer = $this->coordinatorAt($this->site);
@@ -130,7 +129,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         ]);
 
         $incidentClient = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $this->site->id,
         ]);
         $incidentState = $this->preExistingAlert('medium', [
@@ -205,7 +203,7 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $unchanged = $this->preExistingAlert('high', ['queue_id' => $queue->id]);
         $unchangedCritical = $this->preExistingAlert('critical');
 
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $foreignSite = Site::factory()->create();
         $foreign = $this->activeAlert('critical', ['site_id' => $foreignSite->id]);
 
         $scope = app(ControlRoomHandoverScopeService::class)->build($shift, $this->viewer);
@@ -335,7 +333,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
     {
         $shift = $this->activeShift();
         $client = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $this->site->id,
         ]);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
@@ -351,7 +348,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
             'context' => ['incident_id' => $incident->id],
         ]);
         $event = HsEvent::factory()->forClientIncident($incident)->create([
-            'organization_id' => 1,
             'client_id' => $client->id,
             'site_id' => $this->site->id,
             'control_room_alert_id' => null,
@@ -376,12 +372,11 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $this->assertNull($event->fresh()->control_room_alert_id);
     }
 
-    public function test_review_gap_scope_preserves_a_same_tenant_historical_site_after_the_client_moves(): void
+    public function test_review_gap_scope_preserves_the_historical_site_for_the_same_direct_client_after_a_move(): void
     {
         $shift = $this->activeShift();
-        $currentSite = Site::factory()->create(['tenant_id' => 1]);
+        $currentSite = Site::factory()->create();
         $client = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $currentSite->id,
         ]);
         $alert = $this->preExistingAlert('medium', [
@@ -391,7 +386,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $event = $this->eventFor($alert, [
             'client_id' => $client->id,
             'site_id' => $this->site->id,
-            'organization_id' => 1,
             'accepted_at' => now()->subHour(),
             'accepted_by_user_id' => $this->viewer->id,
         ]);
@@ -412,21 +406,21 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $this->assertSame($currentSite->id, $client->fresh()->site_id);
     }
 
-    public function test_historical_health_safety_tuple_fails_closed_when_the_client_belongs_to_another_tenant(): void
+    public function test_historical_health_safety_tuple_fails_closed_when_the_direct_client_does_not_match(): void
     {
-        $foreignCurrentSite = Site::factory()->create(['tenant_id' => 2]);
         $client = Client::factory()->create([
-            'organization_id' => 2,
-            'site_id' => $foreignCurrentSite->id,
+            'site_id' => $this->site->id,
+        ]);
+        $otherClient = Client::factory()->create([
+            'site_id' => $this->site->id,
         ]);
         $alert = $this->preExistingAlert('medium', [
             'client_id' => $client->id,
             'site_id' => $this->site->id,
         ]);
         $event = $this->eventFor($alert, [
-            'client_id' => $client->id,
+            'client_id' => $otherClient->id,
             'site_id' => $this->site->id,
-            'organization_id' => 1,
             'accepted_at' => now()->subHour(),
             'accepted_by_user_id' => $this->viewer->id,
         ]);
@@ -438,13 +432,13 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
             ->assertHealthSafetyEventTuple($alert, $event);
     }
 
-    public function test_historical_health_safety_tuple_rechecks_current_client_organization_instead_of_a_loaded_snapshot(): void
+    public function test_historical_health_safety_tuple_uses_the_direct_client_id_not_a_stale_loaded_relation(): void
     {
-        $currentSite = Site::factory()->create(['tenant_id' => 1]);
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
         $client = Client::factory()->create([
-            'organization_id' => 1,
-            'site_id' => $currentSite->id,
+            'site_id' => $this->site->id,
+        ]);
+        $otherClient = Client::factory()->create([
+            'site_id' => $this->site->id,
         ]);
         $alert = $this->preExistingAlert('medium', [
             'client_id' => $client->id,
@@ -453,13 +447,12 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $event = $this->eventFor($alert, [
             'client_id' => $client->id,
             'site_id' => $this->site->id,
-            'organization_id' => 1,
         ]);
         $alert->load('client');
-        $client->update([
-            'organization_id' => 2,
-            'site_id' => $foreignSite->id,
-        ]);
+        $alert->update(['client_id' => $otherClient->id]);
+
+        $this->assertTrue($alert->relationLoaded('client'));
+        $this->assertSame($client->id, $alert->client->id);
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('provenance conflict');
@@ -470,9 +463,8 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
 
     public function test_historical_site_exception_rejects_context_only_client_identity(): void
     {
-        $currentSite = Site::factory()->create(['tenant_id' => 1]);
+        $currentSite = Site::factory()->create();
         $client = Client::factory()->create([
-            'organization_id' => 1,
             'site_id' => $currentSite->id,
         ]);
         $alert = $this->preExistingAlert('medium', [
@@ -483,7 +475,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $event = $this->eventFor($alert, [
             'client_id' => $client->id,
             'site_id' => $this->site->id,
-            'organization_id' => 1,
         ]);
 
         $this->expectException(\DomainException::class);
@@ -503,7 +494,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $event = $this->eventFor($alert, [
             'client_id' => null,
             'site_id' => $this->site->id,
-            'organization_id' => 1,
         ]);
 
         app(ControlRoomAlertProvenanceService::class)
@@ -518,7 +508,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $alert = $this->preExistingAlert('medium');
 
         HsEvent::factory()->count(2)->create([
-            'organization_id' => 1,
             'site_id' => $this->site->id,
             'control_room_alert_id' => $alert->id,
             'created_at' => now()->subHours(10),
@@ -535,9 +524,8 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
     {
         $shift = $this->activeShift();
         $alert = $this->preExistingAlert('medium');
-        $foreignSite = Site::factory()->create(['tenant_id' => 2]);
+        $foreignSite = Site::factory()->create();
         HsEvent::factory()->create([
-            'organization_id' => 2,
             'site_id' => $foreignSite->id,
             'control_room_alert_id' => $alert->id,
             'created_at' => now()->subHours(10),
@@ -564,9 +552,9 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $loadedAlerts = ControlRoomAlert::query()
             ->whereIn('id', $alerts->pluck('id'))
             ->with([
-                'site:id,name,tenant_id',
-                'client:id,site_id,organization_id',
-                'client.site:id,tenant_id',
+                'site:id,name',
+                'client:id,site_id',
+                'client.site:id',
             ])
             ->get();
 
@@ -585,12 +573,11 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         );
     }
 
-    public function test_review_gap_batches_current_client_organization_checks_for_an_uncapped_backlog(): void
+    public function test_review_gap_batches_direct_client_and_site_provenance_for_an_uncapped_backlog(): void
     {
         $alerts = collect();
         foreach (range(1, 40) as $index) {
             $client = Client::factory()->create([
-                'organization_id' => 1,
                 'site_id' => $this->site->id,
             ]);
             $alert = $this->preExistingAlert('medium', [
@@ -606,9 +593,9 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         $loadedAlerts = ControlRoomAlert::query()
             ->whereIn('id', $alerts->pluck('id'))
             ->with([
-                'site:id,name,tenant_id',
-                'client:id,site_id,organization_id',
-                'client.site:id,tenant_id',
+                'site:id,name',
+                'client:id,site_id',
+                'client.site:id',
             ])
             ->get();
 
@@ -722,7 +709,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
     private function eventFor(ControlRoomAlert $alert, array $overrides = []): HsEvent
     {
         $event = HsEvent::factory()->create(array_replace([
-            'organization_id' => 1,
             'site_id' => $this->site->id,
             'control_room_alert_id' => $alert->id,
             'created_at' => now()->subHours(10),
@@ -735,7 +721,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
     private function recordAlertAudit(ControlRoomAlert $alert, string $action): void
     {
         $audit = AuditLog::query()->create([
-            'organization_id' => 1,
             'user_id' => $this->viewer->id,
             'action' => $action,
             'auditable_type' => ControlRoomAlert::class,
@@ -762,7 +747,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
     private function coordinatorAt(Site $site): User
     {
         $user = User::factory()->create([
-            'organization_id' => 1,
             'role' => 'coordinator',
             'approved_at' => now(),
         ]);
@@ -771,7 +755,6 @@ class ControlRoomShiftHandoverScopeTest extends TestCase
         ]);
         HrEmployeeProfile::query()->create([
             'user_id' => $user->id,
-            'tenant_id' => 1,
             'employee_number' => 'EMP-HANDOVER-SCOPE-'.$user->id,
             'work_email' => $user->email,
             'position_title' => 'Control Room Coordinator',

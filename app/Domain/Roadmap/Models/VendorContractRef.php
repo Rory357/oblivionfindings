@@ -2,6 +2,7 @@
 
 namespace App\Domain\Roadmap\Models;
 
+use App\Models\Concerns\WritesLegacyStorageContext;
 use App\Models\SiteVendor;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,11 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class VendorContractRef extends Model
 {
     use HasFactory;
+    use WritesLegacyStorageContext;
 
     protected $table = 'roadmap_vendor_contract_refs';
 
     protected $fillable = [
-        'tenant_id',
         'initiative_id',
         'site_vendor_id',
         'vendor_name',

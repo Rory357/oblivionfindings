@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Illuminate\Database\Eloquent\Model;
 
 class NotificationTemplate extends Model
 {
+    use WritesLegacyOrganizationStorageContext;
+
     protected $fillable = [
-        'organization_id',
         'type',
         'key',
         'name',

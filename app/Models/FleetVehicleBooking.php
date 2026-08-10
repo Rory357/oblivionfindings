@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,12 +14,12 @@ class FleetVehicleBooking extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes;
     use Concerns\HasReferenceNumber;
+    use WritesLegacyStorageContext;
 
     public const REFERENCE_PREFIX = 'BK';
 
     protected $fillable = [
         'reference_number',
-        'tenant_id',
         'asset_id',
         'user_id',
         'approved_by_user_id',

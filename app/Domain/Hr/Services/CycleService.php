@@ -4,58 +4,52 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrGoalCycle;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Resolves and manages OKR cycles — the period spine the hero cycle selector
- * and every cycle-scoped stat hang off.
+ * Resolves and manages the one application-wide OKR cycle catalogue.
  */
 class CycleService
 {
-    /** All cycles for a tenant, newest window first. Seeds defaults if empty. */
-    public function cyclesForTenant(?int $tenantId): Collection
-    {
-        $tenantId = $tenantId ?? 1;
+    public function __construct(private readonly HrGoalAccessService $goalAccess) {}
 
-        $cycles = HrGoalCycle::forTenant($tenantId)->orderByDesc('starts_at')->get();
+    /** All application cycles, newest window first. Seeds defaults if empty. */
+    public function cycles(): Collection
+    {
+        $cycles = HrGoalCycle::query()->orderByDesc('starts_at')->get();
 
         if ($cycles->isEmpty()) {
-            $this->seedDefaults($tenantId);
-            $cycles = HrGoalCycle::forTenant($tenantId)->orderByDesc('starts_at')->get();
+            $this->seedDefaults();
+            $cycles = HrGoalCycle::query()->orderByDesc('starts_at')->get();
         }
 
         return $cycles;
     }
 
     /** The cycle whose window contains today, else the most recent active one. */
-    public function currentCycle(?int $tenantId): ?HrGoalCycle
+    public function currentCycle(): ?HrGoalCycle
     {
-        $tenantId = $tenantId ?? 1;
-        $cycles = $this->cyclesForTenant($tenantId)
-            ->where('type', '!=', 'year'); // prefer a quarter/half as the default lens
+        $cycles = $this->cycles()
+            ->where('type', '!=', 'year');
 
         $today = Carbon::today();
 
-        $containing = $cycles->first(fn (HrGoalCycle $c) => $c->contains($today));
-        if ($containing) {
-            return $containing;
-        }
-
-        return $cycles->firstWhere('status', 'active')
+        return $cycles->first(fn (HrGoalCycle $cycle) => $cycle->contains($today))
+            ?? $cycles->firstWhere('status', 'active')
             ?? $cycles->first()
-            ?? HrGoalCycle::forTenant($tenantId)->orderByDesc('starts_at')->first();
+            ?? HrGoalCycle::query()->orderByDesc('starts_at')->first();
     }
 
-    /** Seed FY + four calendar quarters for the year covering today. */
-    public function seedDefaults(?int $tenantId): void
+    /** Seed FY plus four calendar quarters for the year covering today. */
+    public function seedDefaults(): void
     {
-        $tenantId = $tenantId ?? 1;
         $year = (int) Carbon::today()->year;
 
-        $fy = HrGoalCycle::firstOrCreate(
-            ['tenant_id' => $tenantId, 'name' => "FY{$year}"],
+        $fy = HrGoalCycle::query()->firstOrCreate(
+            ['name' => "FY{$year}"],
             [
                 'type' => 'year',
                 'starts_at' => Carbon::create($year, 1, 1),
@@ -64,13 +58,13 @@ class CycleService
             ],
         );
 
-        foreach ([1, 2, 3, 4] as $q) {
-            $startMonth = ($q - 1) * 3 + 1;
+        foreach ([1, 2, 3, 4] as $quarter) {
+            $startMonth = ($quarter - 1) * 3 + 1;
             $starts = Carbon::create($year, $startMonth, 1);
             $ends = (clone $starts)->addMonths(3)->subDay();
 
-            HrGoalCycle::firstOrCreate(
-                ['tenant_id' => $tenantId, 'name' => "FY{$year} Q{$q}"],
+            HrGoalCycle::query()->firstOrCreate(
+                ['name' => "FY{$year} Q{$quarter}"],
                 [
                     'type' => 'quarter',
                     'starts_at' => $starts,
@@ -82,21 +76,20 @@ class CycleService
         }
     }
 
-    /** Assign a cycle to any goal that doesn't yet have one, by its window. */
-    public function backfillGoals(?int $tenantId): void
+    /** Assign a cycle to any objective without one, using its date window. */
+    public function backfillGoals(): void
     {
-        $tenantId = $tenantId ?? 1;
-        $cycles = $this->cyclesForTenant($tenantId);
+        $cycles = $this->cycles();
         $quarters = $cycles->where('type', 'quarter');
         $fy = $cycles->firstWhere('type', 'year');
 
-        HrGoal::forTenant($tenantId)->whereNull('cycle_id')->chunkById(200, function ($goals) use ($quarters, $fy) {
+        HrGoal::query()->whereNull('cycle_id')->chunkById(200, function ($goals) use ($quarters, $fy): void {
             foreach ($goals as $goal) {
                 $anchor = $goal->due_date ?? $goal->start_date;
                 $cycle = null;
 
                 if ($anchor) {
-                    $cycle = $quarters->first(fn (HrGoalCycle $c) => $c->contains($anchor));
+                    $cycle = $quarters->first(fn (HrGoalCycle $candidate) => $candidate->contains($anchor));
                 }
 
                 $cycle = $cycle ?? $fy ?? $quarters->first();
@@ -108,43 +101,75 @@ class CycleService
         });
     }
 
-    /** Clone selected objectives into a target cycle (optionally with KRs). */
-    public function rollover(HrGoalCycle $target, array $goalIds, bool $withKeyResults = true): int
-    {
-        $count = 0;
+    /**
+     * Clone an already-authorised objective selection into a target cycle.
+     * Authorization is rechecked under lock so Site or employment changes
+     * between selection and dispatch fail closed.
+     *
+     * @param  Collection<int, HrGoal>  $goals
+     */
+    public function rollover(
+        User $viewer,
+        HrGoalCycle $target,
+        Collection $goals,
+        bool $withKeyResults = true,
+        ?HrGoalCycle $source = null,
+    ): int {
+        $goalIds = $goals
+            ->map(fn (HrGoal $goal) => (int) $goal->getKey())
+            ->values()
+            ->all();
+        abort_if($goalIds === [] || count($goalIds) !== count(array_unique($goalIds)), 404);
 
-        DB::transaction(function () use ($target, $goalIds, $withKeyResults, &$count) {
-            $goals = HrGoal::with('keyResults')->whereIn('id', $goalIds)->get();
+        return DB::transaction(function () use ($viewer, $target, $goalIds, $withKeyResults, $source): int {
+            $lockedTarget = HrGoalCycle::query()
+                ->lockForUpdate()
+                ->findOrFail($target->getKey());
+            $lockedGoals = $this->goalAccess
+                ->applyCurrentGoalScope(HrGoal::query(), $viewer)
+                ->whereKey($goalIds)
+                ->when($source, fn ($query) => $query->where('cycle_id', $source->id))
+                ->lockForUpdate()
+                ->get();
 
-            foreach ($goals as $goal) {
-                $clone = $goal->replicate(['progress_percentage', 'completed_at', 'last_checkin_at']);
-                $clone->cycle_id = $target->id;
+            abort_unless($lockedGoals->count() === count($goalIds), 404);
+
+            foreach ($lockedGoals as $goal) {
+                $keyResults = $withKeyResults
+                    ? $goal->keyResults()->lockForUpdate()->get()
+                    : collect();
+                $clone = $goal->replicateForApplication([
+                    'progress_percentage',
+                    'completed_at',
+                    'last_checkin_at',
+                ]);
+                $clone->cycle_id = $lockedTarget->id;
                 $clone->status = 'draft';
                 $clone->progress_percentage = 0;
                 $clone->confidence = 'on_track';
                 $clone->completed_at = null;
                 $clone->last_checkin_at = null;
-                $clone->start_date = $target->starts_at;
-                $clone->due_date = $target->ends_at;
+                $clone->start_date = $lockedTarget->starts_at;
+                $clone->due_date = $lockedTarget->ends_at;
                 $clone->save();
 
-                if ($withKeyResults) {
-                    foreach ($goal->keyResults as $kr) {
-                        $krClone = $kr->replicate(['current_value', 'progress_percentage', 'status']);
-                        $krClone->goal_id = $clone->id;
-                        $krClone->current_value = $kr->start_value;
-                        $krClone->progress_percentage = 0;
-                        $krClone->status = 'not_started';
-                        $krClone->confidence = 'on_track';
-                        $krClone->save();
-                    }
+                foreach ($keyResults as $keyResult) {
+                    $keyResultClone = $keyResult->replicateForApplication([
+                        'current_value',
+                        'progress_percentage',
+                        'status',
+                    ]);
+                    $keyResultClone->goal_id = $clone->id;
+                    $keyResultClone->current_value = $keyResult->start_value;
+                    $keyResultClone->progress_percentage = 0;
+                    $keyResultClone->status = 'not_started';
+                    $keyResultClone->confidence = 'on_track';
+                    $keyResultClone->save();
                 }
-
-                $count++;
             }
-        });
 
-        return $count;
+            return $lockedGoals->count();
+        }, attempts: 1);
     }
 
     private function statusForWindow(Carbon $starts, Carbon $ends): string

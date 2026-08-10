@@ -1,7 +1,7 @@
 /* eslint-disable no-restricted-syntax -- The template wizard mirrors the bespoke
  * Add-client modal surface (stepper rail + scroll-contained body + custom footer).
  * Every colour is a semantic design token, per docs/DESIGN_TOKENS.md. */
-import { router, useForm } from '@inertiajs/react';
+import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     CalendarPlus,
@@ -222,7 +222,12 @@ function toWizardRow(shift: RosterTemplateShiftRow): WizardShiftRow {
     };
 }
 
-const WIZARD_STEPS: { key: 'details' | 'shifts' | 'review'; label: string; icon: IconType; blurb: string }[] = [
+const WIZARD_STEPS: {
+    key: 'details' | 'shifts' | 'review';
+    label: string;
+    icon: IconType;
+    blurb: string;
+}[] = [
     {
         key: 'details',
         label: 'Details',
@@ -273,8 +278,8 @@ export function TemplateWizardDialog(props: TemplateWizardDialogProps) {
                     {isEdit ? 'Edit roster template' : 'New roster template'}
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                    Build a reusable weekly roster pattern that can be applied to
-                    any week.
+                    Build a reusable weekly roster pattern that can be applied
+                    to any week.
                 </DialogDescription>
                 {open ? <WizardBody {...props} /> : null}
             </DialogContent>
@@ -381,8 +386,7 @@ function WizardBody({
         }
         data.template_shifts.forEach((row, i) => {
             if (!row.client_id && !row.service_context_id) {
-                e[`row-${i}`] =
-                    'Each row needs a client or a service context.';
+                e[`row-${i}`] = 'Each row needs a client or a service context.';
             } else if (row.start_time === row.end_time) {
                 e[`row-${i}`] = 'Start and end time cannot be the same.';
             }
@@ -466,7 +470,7 @@ function WizardBody({
                         <LayoutTemplate className="h-5 w-5" />
                     </span>
                     <div>
-                        <div className="text-sm font-bold leading-tight">
+                        <div className="text-sm leading-tight font-bold">
                             {isEdit ? 'Edit template' : 'New template'}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
@@ -550,9 +554,9 @@ function WizardBody({
                     />
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-6">
+                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6">
                     {cur.key === 'details' ? (
-                        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+                        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
                             <StepHeading
                                 icon={LayoutTemplate}
                                 title="Template details"
@@ -582,7 +586,10 @@ function WizardBody({
                                         }
                                         placeholder="Weekly"
                                         options={[
-                                            { value: 'weekly', label: 'Weekly' },
+                                            {
+                                                value: 'weekly',
+                                                label: 'Weekly',
+                                            },
                                             {
                                                 value: 'fortnightly',
                                                 label: 'Fortnightly',
@@ -625,7 +632,7 @@ function WizardBody({
                             </div>
                         </div>
                     ) : cur.key === 'shifts' ? (
-                        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+                        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
                             <StepHeading
                                 icon={ListChecks}
                                 title="Shift rows"
@@ -633,10 +640,7 @@ function WizardBody({
                             />
 
                             {serverErrors.length > 0 ? (
-                                <Alert
-                                    variant="destructive"
-                                    className="mb-4"
-                                >
+                                <Alert variant="destructive" className="mb-4">
                                     <AlertTriangle className="h-4 w-4" />
                                     <AlertTitle>
                                         Please fix the following
@@ -1031,7 +1035,7 @@ function ReviewPane({
               : 'Each apply cycle advances 1 week.';
 
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHeading
                 icon={ClipboardCheck}
                 title="Review"
@@ -1051,7 +1055,9 @@ function ReviewPane({
                                     : 'border-border bg-muted/40 text-muted-foreground',
                             )}
                         >
-                            <span className="uppercase tracking-wide">{day}</span>
+                            <span className="tracking-wide uppercase">
+                                {day}
+                            </span>
                             <span className="tabular-nums">{count || '·'}</span>
                         </div>
                     );
@@ -1060,7 +1066,8 @@ function ReviewPane({
 
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
                 <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
-                    {shifts.length} {shifts.length === 1 ? 'shift' : 'shifts'} / week
+                    {shifts.length} {shifts.length === 1 ? 'shift' : 'shifts'} /
+                    week
                 </span>
                 <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
                     {assigned} assigned
@@ -1070,11 +1077,13 @@ function ReviewPane({
                         {open} open
                     </span>
                 ) : null}
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold capitalize text-primary">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary capitalize">
                     {cadence}
                 </span>
             </div>
-            <p className="mt-2 text-[13px] text-muted-foreground">{cadenceNote}</p>
+            <p className="mt-2 text-[13px] text-muted-foreground">
+                {cadenceNote}
+            </p>
 
             <div className="mt-4 space-y-2.5">
                 {DAY_LABELS.map((label, dayIdx) => {
@@ -1090,7 +1099,8 @@ function ReviewPane({
                             <div className="text-sm font-semibold">{label}</div>
                             <ul className="mt-1.5 space-y-1 text-[13px] text-muted-foreground">
                                 {dayRows.map((r, i) => {
-                                    const overnight = r.end_time <= r.start_time;
+                                    const overnight =
+                                        r.end_time <= r.start_time;
                                     return (
                                         <li
                                             key={i}
@@ -1102,7 +1112,9 @@ function ReviewPane({
                                             </span>
                                             <span aria-hidden>·</span>
                                             <span>
-                                                {r.user_id ? 'Assigned' : 'Open'}
+                                                {r.user_id
+                                                    ? 'Assigned'
+                                                    : 'Open'}
                                             </span>
                                             {r.is_sleepover ? (
                                                 <span className="rounded bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">
@@ -1248,15 +1260,15 @@ function DetailBody({
     }, [warningLines.length]);
 
     const postApply = (confirmWarnings: boolean) => {
-        applyForm.transform((d) => ({ ...d, confirm_warnings: confirmWarnings }));
-        applyForm.post(
-            `/operations/rostering/templates/${template.id}/apply`,
-            {
-                preserveScroll: true,
-                onSuccess: () => onOpenChange(false),
-                onFinish: () => applyForm.transform((d) => d),
-            },
-        );
+        applyForm.transform((d) => ({
+            ...d,
+            confirm_warnings: confirmWarnings,
+        }));
+        applyForm.post(`/operations/rostering/templates/${template.id}/apply`, {
+            preserveScroll: true,
+            onSuccess: () => onOpenChange(false),
+            onFinish: () => applyForm.transform((d) => d),
+        });
     };
 
     return (
@@ -1267,7 +1279,7 @@ function DetailBody({
                         {template.name}
                     </h2>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold capitalize text-primary">
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary capitalize">
                             {template.template_type}
                         </span>
                         <span
@@ -1343,7 +1355,7 @@ function DetailBody({
 
                 {/* Apply panel */}
                 <div
-                    className="min-h-0 overflow-y-auto border-t border-border bg-muted/20 px-5 py-4 lg:border-l lg:border-t-0"
+                    className="min-h-0 overflow-y-auto border-t border-border bg-muted/20 px-5 py-4 lg:border-t-0 lg:border-l"
                     data-test="template-apply-card"
                 >
                     <div className="flex items-center gap-2 text-sm font-bold">
@@ -1352,7 +1364,8 @@ function DetailBody({
                     </div>
                     <p className="mt-1 text-[13px] text-muted-foreground">
                         Creates draft shifts for the chosen week (snapped to its
-                        Monday). Apply more than one cycle to stamp several weeks.
+                        Monday). Apply more than one cycle to stamp several
+                        weeks.
                     </p>
 
                     {blockLines.length > 0 ? (
@@ -1505,8 +1518,8 @@ function DetailBody({
                         <AlertDialogDescription>
                             This removes the template and its{' '}
                             {template.template_shifts_count} shift rows. Shifts
-                            already created from it are not affected. This cannot
-                            be undone.
+                            already created from it are not affected. This
+                            cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -1530,7 +1543,8 @@ function DetailBody({
 
 function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
     const overnight = shift.end_time <= shift.start_time;
-    const dayLabel = DAY_LABELS[shift.day_of_week] ?? `Day ${shift.day_of_week}`;
+    const dayLabel =
+        DAY_LABELS[shift.day_of_week] ?? `Day ${shift.day_of_week}`;
     return (
         <div className="rounded-lg border border-border p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1543,7 +1557,7 @@ function DetailRow({ shift }: { shift: RosterTemplateShiftRow }) {
                     ) : null}
                 </div>
                 <div className="flex flex-wrap gap-1.5 text-[11px]">
-                    <span className="rounded-full bg-muted px-2 py-0.5 font-semibold capitalize text-muted-foreground">
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground capitalize">
                         {shift.shift_type ?? 'standard'}
                     </span>
                     {shift.is_sleepover ? (

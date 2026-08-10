@@ -1,8 +1,10 @@
 <?php
 
 use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 
 /**
@@ -10,21 +12,38 @@ use App\Models\User;
  * client_name+funding_body; lines with tax_rate_id 'default'→null→NZ GST 15%).
  * The controller computes line tax + totals with bcmath and stores a draft.
  */
-function invoiceManager(): User
+function invoiceManager(Site $site): User
 {
-    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user = User::factory()->create(['approved_at' => now()]);
     foreach (['finance.ar.view', 'finance.ar.manage'] as $key) {
         $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
     }
 
+    HrEmployeeProfile::query()->create([
+        'user_id' => $user->id,
+        'employee_number' => 'EMP-INVOICE-STORE-'.$user->id,
+        'work_email' => $user->email,
+        'position_title' => 'Accounts Receivable Officer',
+        'position_role' => 'finance',
+        'employment_type' => 'full_time',
+        'start_date' => today()->subMonth(),
+        'end_date' => null,
+        'is_active' => true,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
+
     return $user;
 }
 
 it('creates a draft client invoice with NZ GST applied per line', function () {
-    $client = Client::factory()->create(['organization_id' => 1, 'first_name' => 'Ana', 'last_name' => 'Smith']);
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id, 'first_name' => 'Ana', 'last_name' => 'Smith']);
 
-    $this->actingAs(invoiceManager())
+    $this->actingAs(invoiceManager($site))
         ->post(route('finance.invoices.store'), [
             'client_id' => $client->id,
             'invoice_date' => now()->toDateString(),
@@ -36,7 +55,7 @@ it('creates a draft client invoice with NZ GST applied per line', function () {
         ])
         ->assertRedirect();
 
-    $invoice = FinInvoice::where('organization_id', 1)->latest('id')->firstOrFail()->load('lines');
+    $invoice = FinInvoice::query()->latest('id')->firstOrFail()->load('lines');
 
     expect($invoice->status)->toBe('draft')
         ->and($invoice->client_id)->toBe($client->id)
@@ -48,7 +67,9 @@ it('creates a draft client invoice with NZ GST applied per line', function () {
 });
 
 it('creates a draft funder invoice from client_name without a client_id', function () {
-    $this->actingAs(invoiceManager())
+    $site = Site::factory()->create();
+
+    $this->actingAs(invoiceManager($site))
         ->post(route('finance.invoices.store'), [
             'client_name' => 'Te Whatu Ora',
             'funding_body' => 'NASC',
@@ -60,7 +81,7 @@ it('creates a draft funder invoice from client_name without a client_id', functi
         ])
         ->assertRedirect();
 
-    $invoice = FinInvoice::where('organization_id', 1)->latest('id')->firstOrFail();
+    $invoice = FinInvoice::query()->latest('id')->firstOrFail();
 
     expect($invoice->client_id)->toBeNull()
         ->and($invoice->client_name)->toBe('Te Whatu Ora')

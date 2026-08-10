@@ -64,7 +64,6 @@ class HsInvestigationService
 
             $investigation = HsInvestigation::create([
                 'hs_event_id' => $lockedEvent->id,
-                'organization_id' => $lockedEvent->organization_id,
                 'reference_number' => HsInvestigation::generateReferenceNumber(),
                 'investigation_type' => $data['investigation_type'] ?? $this->inferInvestigationType($lockedEvent),
                 'status' => HsInvestigation::STATUS_DRAFT,

@@ -3,11 +3,13 @@
 namespace App\Models\ControlRoom;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\LocationHardware;
 use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
+use App\Services\Integration\AlertRoutingService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,28 +26,31 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *             emits signals via SignalProcessingService instead.
  *
  *             Scheduled for removal in PR16 after a bake period.
- *
- * @see \App\Models\ControlRoomAlert          — canonical alert model
- * @see \App\Services\Integration\AlertRoutingService — now emits signals
+ * @see ControlRoomAlert          — canonical alert model
+ * @see AlertRoutingService — now emits signals
  */
 class Alert extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     public const STATUS_NEW = 'new';
+
     public const STATUS_ACK = 'ack';
+
     public const STATUS_ASSIGNED = 'assigned';
+
     public const STATUS_CLOSED = 'closed';
 
     public const SEVERITY_INFO = 'info';
+
     public const SEVERITY_WARN = 'warn';
+
     public const SEVERITY_CRITICAL = 'critical';
 
     protected $table = 'integration_alerts';
 
     protected $fillable = [
-        'tenant_id',
         'site_id',
         'room_id',
         'hardware_id',
@@ -116,15 +121,6 @@ class Alert extends Model
     /* ---------------------------------------------------------------
      * Scopes
      * ------------------------------------------------------------- */
-
-    public function scopeForTenant($query, ?int $tenantId)
-    {
-        if ($tenantId === null) {
-            return $query;
-        }
-
-        return $query->where('tenant_id', $tenantId);
-    }
 
     public function scopeOpen($query)
     {

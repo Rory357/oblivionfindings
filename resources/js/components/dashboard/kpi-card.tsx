@@ -8,7 +8,11 @@ type KpiCardProps = {
     label: string;
     value: string | number;
     icon?: ComponentType<{ className?: string }>;
-    trend?: { value: number; label: string; direction: 'up' | 'down' | 'neutral' };
+    trend?: {
+        value: number;
+        label: string;
+        direction: 'up' | 'down' | 'neutral';
+    };
     sparklineData?: number[];
     href?: string;
     className?: string;
@@ -27,13 +31,13 @@ export function KpiCard({
         <div
             className={cn(
                 'relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm transition-colors',
-                href && 'hover:border-primary/50 cursor-pointer',
+                href && 'cursor-pointer hover:border-primary/50',
                 className,
             )}
         >
             {/* icon */}
             {Icon && (
-                <div className="absolute right-4 top-4">
+                <div className="absolute top-4 right-4">
                     <Icon className="h-5 w-5 text-muted-foreground/60" />
                 </div>
             )}
@@ -51,19 +55,30 @@ export function KpiCard({
                         <div
                             className={cn(
                                 'flex items-center gap-1 text-xs font-medium',
-                                trend.direction === 'up' && 'text-status-success',
-                                trend.direction === 'down' && 'text-status-critical',
-                                trend.direction === 'neutral' && 'text-muted-foreground',
+                                trend.direction === 'up' &&
+                                    'text-status-success',
+                                trend.direction === 'down' &&
+                                    'text-status-critical',
+                                trend.direction === 'neutral' &&
+                                    'text-muted-foreground',
                             )}
                         >
-                            {trend.direction === 'up' && <ArrowUp className="h-3 w-3" />}
-                            {trend.direction === 'down' && <ArrowDown className="h-3 w-3" />}
-                            {trend.direction === 'neutral' && <ArrowRight className="h-3 w-3" />}
+                            {trend.direction === 'up' && (
+                                <ArrowUp className="h-3 w-3" />
+                            )}
+                            {trend.direction === 'down' && (
+                                <ArrowDown className="h-3 w-3" />
+                            )}
+                            {trend.direction === 'neutral' && (
+                                <ArrowRight className="h-3 w-3" />
+                            )}
                             <span>
                                 {trend.value > 0 ? '+' : ''}
                                 {trend.value}%
                             </span>
-                            <span className="text-muted-foreground">{trend.label}</span>
+                            <span className="text-muted-foreground">
+                                {trend.label}
+                            </span>
                         </div>
                     )}
 

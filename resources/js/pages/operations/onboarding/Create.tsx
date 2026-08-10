@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
@@ -25,7 +25,8 @@ export default function OnboardingCreate({ clients }: Props) {
     return (
         <AppLayout>
             <Head title="Create Onboarding Workflow" />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title="Create Onboarding Workflow"
                 description="Start a new onboarding workflow for a client who is entering service."
                 backHref="/operations/onboarding"
@@ -39,37 +40,54 @@ export default function OnboardingCreate({ clients }: Props) {
                 >
                     <Card className="max-w-2xl">
                         <CardHeader>
-                            <CardTitle className="text-base">Workflow Setup</CardTitle>
+                            <CardTitle className="text-base">
+                                Workflow Setup
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
                                 <Label>Client</Label>
-                                <Select value={data.client_id} onValueChange={(value) => setData('client_id', value)}>
+                                <Select
+                                    value={data.client_id}
+                                    onValueChange={(value) =>
+                                        setData('client_id', value)
+                                    }
+                                >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select a client" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {clients.map((client) => (
-                                            <SelectItem key={client.id} value={String(client.id)}>
-                                                {client.first_name} {client.last_name}
+                                            <SelectItem
+                                                key={client.id}
+                                                value={String(client.id)}
+                                            >
+                                                {client.first_name}{' '}
+                                                {client.last_name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 {errors.client_id && (
-                                    <p className="text-xs text-destructive">{errors.client_id}</p>
+                                    <p className="text-xs text-destructive">
+                                        {errors.client_id}
+                                    </p>
                                 )}
                             </div>
 
                             <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-                                The workflow will be created with the default onboarding checklist so coordinators can update each step as progress is made.
+                                The workflow will be created with the default
+                                onboarding checklist so coordinators can update
+                                each step as progress is made.
                             </div>
 
                             <div className="flex items-center justify-end gap-2">
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => router.get('/operations/onboarding')}
+                                    onClick={() =>
+                                        router.get('/operations/onboarding')
+                                    }
                                 >
                                     Cancel
                                 </Button>

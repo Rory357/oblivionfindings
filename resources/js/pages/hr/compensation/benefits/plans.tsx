@@ -1,3 +1,5 @@
+import { CompensationTabs } from '@/components/hr';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,8 +28,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { CompensationTabs } from '@/components/hr';
-import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -123,13 +123,18 @@ export default function BenefitPlans({
 
             <PageLayout
                 hero={
-                    <PageHero category="hr"
+                    <PageHero
+                        category="hr"
                         icon={Gift}
                         title="Benefit Plans"
                         description="Manage available benefit plans for employees."
                         stats={[
                             { label: 'Plans', value: plans.data.length },
-                            { label: 'Active', value: plans.data.filter((p) => p.is_active).length },
+                            {
+                                label: 'Active',
+                                value: plans.data.filter((p) => p.is_active)
+                                    .length,
+                            },
                         ]}
                         actions={
                             can.manage ? (

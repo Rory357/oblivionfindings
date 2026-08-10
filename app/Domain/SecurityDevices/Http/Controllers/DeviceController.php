@@ -9,27 +9,35 @@ use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Enums\RelationshipType;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
-use App\Domain\SecurityDevices\Http\Controllers\Concerns\ResolvesDeviceTenant;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
-use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Models\DeviceDocument;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
+use App\Domain\SecurityDevices\Presenters\DeviceProfilePresenter;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Domain\SecurityDevices\Services\DeviceRelationshipLifecycleService;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
+use App\Models\Site;
+use App\Models\SiteRoom;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class DeviceController extends Controller
 {
     use MapsDevicesForList;
-    use ResolvesDeviceTenant;
 
     public function __construct(
         private readonly DeviceRegistryService $registry,
         private readonly DeviceLinkService $linkService,
+        private readonly DeviceRelationshipLifecycleService $relationshipLifecycle,
+        private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceProfilePresenter $profilePresenter,
     ) {}
 
     public function index(Request $request)
@@ -37,10 +45,41 @@ class DeviceController extends Controller
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
 
-        $query = Device::query()
+        $baseQuery = $this->access->visibleDevices($user);
+        $scopeLabel = null;
+        if ($request->filled('site_id')) {
+            $siteId = $request->integer('site_id');
+            abort_unless(
+                $siteId > 0 && in_array($siteId, $this->access->accessibleSiteIds($user), true),
+                404,
+            );
+            $site = Site::query()
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
+                ->findOrFail($siteId);
+            $baseQuery = $this->access->visibleDevicesForSite($user, $siteId);
+            $scopeLabel = $site->name;
+        }
+        $query = (clone $baseQuery)
             ->with([
                 'assignments' => fn ($q) => $q->active(),
+            ])
+            ->withCount([
+                'monitors as enabled_monitors_count' => fn ($monitor) => $monitor->where('is_enabled', true),
+                'monitors as failing_monitors_count' => fn ($monitor) => $monitor
+                    ->where('is_enabled', true)
+                    ->whereIn('current_state', ['failed', 'degraded']),
+                'monitors as uncertain_monitors_count' => fn ($monitor) => $monitor
+                    ->where('is_enabled', true)
+                    ->whereIn('current_state', ['unknown', 'stale', 'pending']),
             ]);
+
+        $view = $request->string('view', 'all')->toString();
+        if (! in_array($view, ['all', 'needs_attention', 'offline', 'unmonitored', 'unassigned', 'stale'], true)) {
+            $view = 'all';
+        }
+        $this->applyInventoryView($query, $view);
 
         // ── Domain/category filters (index-specific, not in trait) ──
 
@@ -62,15 +101,15 @@ class DeviceController extends Controller
         // ── Stats ─────────────────────────────────────────────────
 
         $stats = [
-            'total' => Device::count(),
-            'active' => Device::where('status', DeviceStatus::Active->value)->count(),
-            'offline' => Device::where('status', DeviceStatus::Offline->value)->count(),
-            'attention' => Device::needingAttention()->count(),
+            'total' => (clone $baseQuery)->count(),
+            'active' => (clone $baseQuery)->where('status', DeviceStatus::Active->value)->count(),
+            'offline' => (clone $baseQuery)->where('status', DeviceStatus::Offline->value)->count(),
+            'attention' => (clone $baseQuery)->needingAttention()->count(),
         ];
 
         // ── Filter options ────────────────────────────────────────
 
-        $providers = Device::whereNotNull('provider')
+        $providers = (clone $baseQuery)->whereNotNull('provider')
             ->select('provider')
             ->distinct()
             ->orderBy('provider')
@@ -87,13 +126,24 @@ class DeviceController extends Controller
                 ],
             ],
             'stats' => $stats,
-            'filters' => $request->only(['domain', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction']),
+            'savedViews' => $this->savedViews($baseQuery),
+            'filters' => [
+                ...$request->only(['site_id', 'domain', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction']),
+                'view' => $view,
+            ],
+            'scopeLabel' => $scopeLabel,
             'filterOptions' => [
                 'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => $d->label()]),
                 'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
                 'healthStatuses' => collect(HealthStatus::cases())->map(fn ($h) => ['value' => $h->value, 'label' => $h->label()]),
                 'providers' => $providers,
             ],
+            'can' => [
+                'create' => $user->canDo('securityDevices.devices.create'),
+                'export' => $user->canDo('securityDevices.reports.view'),
+                'bulk_select' => $user->canDo('securityDevices.reports.view'),
+            ],
+            'exportHref' => '/security-devices/reports/devices.csv',
         ]);
     }
 
@@ -101,32 +151,160 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
-        $device->load([
+        $canViewEvents = $user->canDo('securityDevices.events.view');
+        $canViewMaintenance = $user->canDo('securityDevices.maintenance.view');
+        $relations = [
             'assignments' => fn ($q) => $q->with(['assignedBy:id,name', 'releasedBy:id,name'])->latest('assigned_at')->limit(20),
             'activeAssetLinks.asset',
-            'maintenanceRecords' => fn ($q) => $q->latest()->limit(10),
-            'events' => fn ($q) => $q->latest('occurred_at')->limit(20),
+            'activeAssetLinks.asset.categoryRef:id,slug',
             'documents',
+            'documentHistory' => fn ($query) => $query
+                ->with([
+                    'uploadedBy:id,name',
+                    'removedBy:id,name',
+                    'removalRequestedBy:id,name',
+                ])
+                ->latest('updated_at')
+                ->limit(50),
             'parentRelationships.parent',
             'childRelationships.child',
+            'relationshipHistoryAsChild' => fn ($query) => $query
+                ->with(['parent:id,name', 'createdBy:id,name', 'unlinkedBy:id,name'])
+                ->latest('unlinked_at')
+                ->limit(50),
+            'relationshipHistoryAsParent' => fn ($query) => $query
+                ->with(['child:id,name', 'createdBy:id,name', 'unlinkedBy:id,name'])
+                ->latest('unlinked_at')
+                ->limit(50),
             'groups',
             'createdBy',
-        ]);
+        ];
+        if ($canViewEvents) {
+            $relations['events'] = fn ($q) => $q->latest('occurred_at')->limit(20);
+            $relations['monitors'] = fn ($q) => $q
+                ->with([
+                    'profile' => fn ($profile) => $profile
+                        ->select('id', 'name', 'interval_seconds', 'stale_after_seconds'),
+                    'collector' => fn ($collector) => $collector
+                        ->select('id', 'name', 'status', 'last_seen_at'),
+                ])
+                ->orderBy('name');
+        }
+        if ($canViewMaintenance) {
+            $relations['maintenanceRecords'] = fn ($q) => $q->latest()->limit(10);
+        }
+        $device->load($relations);
+
+        $device->setRelation('assignments', $device->assignments
+            ->filter(fn ($assignment): bool => $this->access->canAccessAssignmentTarget(
+                $user,
+                $device,
+                $assignment->assignable_type,
+                (int) $assignment->assignable_id,
+            ))
+            ->values());
+        $accessibleAssetIds = $this->access->accessibleAssetIds($user);
+        $device->setRelation('activeAssetLinks', $device->activeAssetLinks
+            ->filter(fn ($link): bool => in_array((int) $link->asset_id, $accessibleAssetIds, true))
+            ->values());
+        $relatedIds = $device->parentRelationships->pluck('parent_device_id')
+            ->merge($device->childRelationships->pluck('child_device_id'))
+            ->merge($device->relationshipHistoryAsChild->pluck('parent_device_id'))
+            ->merge($device->relationshipHistoryAsParent->pluck('child_device_id'))
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+        $visibleRelatedIds = $relatedIds->isEmpty()
+            ? collect()
+            : $this->access->visibleDevices($user)
+                ->whereIn('id', $relatedIds)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id);
+        $device->setRelation('parentRelationships', $device->parentRelationships
+            ->filter(fn ($relationship): bool => $visibleRelatedIds->contains((int) $relationship->parent_device_id))
+            ->values());
+        $device->setRelation('childRelationships', $device->childRelationships
+            ->filter(fn ($relationship): bool => $visibleRelatedIds->contains((int) $relationship->child_device_id))
+            ->values());
+        $device->setRelation('relationshipHistoryAsChild', $device->relationshipHistoryAsChild
+            ->filter(fn ($relationship): bool => $visibleRelatedIds->contains((int) $relationship->parent_device_id))
+            ->values());
+        $device->setRelation('relationshipHistoryAsParent', $device->relationshipHistoryAsParent
+            ->filter(fn ($relationship): bool => $visibleRelatedIds->contains((int) $relationship->child_device_id))
+            ->values());
 
         $activeAssignment = $device->assignments->first(fn ($a) => $a->released_at === null);
+        $siteIds = $this->access->accessibleSiteIds($user);
+        $canAssign = $user->canDo('securityDevices.devices.assign');
+        $canUpdate = $user->canDo('securityDevices.devices.update');
 
         // Assignment target options for the assign dialog.
-        $assignmentTargets = [
-            'sites' => \App\Models\Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'rooms' => \App\Models\SiteRoom::query()->orderBy('name')->get(['id', 'site_id', 'name']),
-            'staff' => \App\Models\User::query()->whereNotNull('approved_at')->orderBy('name')->get(['id', 'name']),
-            'clients' => \App\Models\Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
-            'vehicles' => \App\Models\Asset::query()->vehicles()->orderBy('name')->get(['id', 'name', 'registration_number']),
+        $assignmentTargets = $canAssign ? [
+            'sites' => Site::query()
+                ->whereIn('id', $siteIds)
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'rooms' => SiteRoom::query()
+                ->whereIn('site_id', $siteIds)
+                ->orderBy('name')
+                ->get(['id', 'site_id', 'name']),
+            'staff' => $this->access->assignableStaff($user)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'clients' => $this->access->assignableClients($user),
+            'vehicles' => $this->access->assignableVehicles($user),
+        ] : [
+            'sites' => [],
+            'rooms' => [],
+            'staff' => [],
+            'clients' => [],
+            'vehicles' => [],
         ];
 
+        $availableAssets = $canUpdate
+            ? $this->access->assignableAssets($user)
+                ->map(fn (Asset $asset) => [
+                    'id' => $asset->id,
+                    'name' => $asset->name,
+                    'asset_tag' => $asset->asset_tag,
+                ])
+            : collect();
+
+        $otherDevices = $canUpdate
+            ? $this->access->visibleDevices($user)
+                ->where('id', '!=', $device->id)
+                ->orderBy('name')
+                ->limit(500)
+                ->get(['id', 'name', 'device_uid', 'category'])
+                ->map(fn (Device $otherDevice) => [
+                    'id' => $otherDevice->id,
+                    'name' => $otherDevice->name,
+                    'device_uid' => $otherDevice->device_uid,
+                    'category' => $otherDevice->category,
+                ])
+            : collect();
+
+        $profile = $this->profilePresenter->present($user, $device, $activeAssignment);
+        $passwordConfirmedAt = $request->session()->get('auth.password_confirmed_at');
+        $profile['management']['stepUpCurrent'] = is_numeric($passwordConfirmedAt)
+            && (int) $passwordConfirmedAt >= now()->subSeconds(
+                max(60, (int) config('security_devices.step_up_max_age_seconds', 900)),
+            )->timestamp;
+
+        $accessibleAssetIds = $this->access->accessibleAssetIds($user);
+
         return Inertia::render('security-devices/devices/show', [
-            'device' => $this->mapDeviceForDetail($device),
+            'device' => [
+                'id' => $device->id,
+                'name' => $device->name,
+                'status' => $device->status?->value,
+            ],
+            'profile' => $profile,
             'activeAssignment' => $activeAssignment ? [
                 'id' => $activeAssignment->id,
                 'assignable_type' => $activeAssignment->assignable_type,
@@ -151,24 +329,29 @@ class DeviceController extends Controller
                 'notes' => $a->notes,
             ]),
             'assignmentTargets' => $assignmentTargets,
-            'assetLinks' => $device->activeAssetLinks->map(fn ($link) => [
-                'id' => $link->id,
-                'asset_id' => $link->asset_id,
-                'asset_name' => $link->asset?->name,
-                'asset_tag' => $link->asset?->asset_tag,
-                'link_type' => $link->link_type?->value,
-                'linked_at' => $link->linked_at?->toISOString(),
-                'notes' => $link->notes,
-            ]),
-            'availableAssets' => Asset::query()
-                ->orderBy('name')
-                ->limit(500)
-                ->get(['id', 'name', 'asset_tag'])
-                ->map(fn (Asset $a) => [
-                    'id' => $a->id,
-                    'name' => $a->name,
-                    'asset_tag' => $a->asset_tag,
-                ]),
+            'assetLinks' => $device->activeAssetLinks->map(function ($link) use ($user, $accessibleAssetIds): array {
+                $destination = $link->asset && in_array((int) $link->asset_id, $accessibleAssetIds, true)
+                    ? $this->assetTechnologyDestination($user, $link->asset)
+                    : [
+                        'href' => null,
+                        'access' => [
+                            'state' => 'restricted',
+                            'label' => 'Fleet & Assets technology access required',
+                        ],
+                    ];
+
+                return [
+                    'id' => $link->id,
+                    'asset_id' => $link->asset_id,
+                    'asset_name' => $link->asset?->name,
+                    'asset_tag' => $link->asset?->asset_tag,
+                    ...$destination,
+                    'link_type' => $link->link_type?->value,
+                    'linked_at' => $link->linked_at?->toISOString(),
+                    'notes' => $link->notes,
+                ];
+            }),
+            'availableAssets' => $availableAssets,
             'linkTypes' => collect(LinkType::cases())->map(fn ($t) => [
                 'value' => $t->value,
                 'label' => $t->label(),
@@ -177,21 +360,10 @@ class DeviceController extends Controller
                 'value' => $t->value,
                 'label' => $t->label(),
             ]),
-            // Other devices in this tenant, excluding this one. Capped at 500
+            // Other visible devices, excluding this one. Capped at 500
             // to keep the page payload small; picker becomes search-driven
             // past that volume (future PR).
-            'otherDevices' => Device::query()
-                ->where('id', '!=', $device->id)
-                ->when($device->tenant_id, fn ($q) => $q->where('tenant_id', $device->tenant_id))
-                ->orderBy('name')
-                ->limit(500)
-                ->get(['id', 'name', 'device_uid', 'category'])
-                ->map(fn (Device $d) => [
-                    'id' => $d->id,
-                    'name' => $d->name,
-                    'device_uid' => $d->device_uid,
-                    'category' => $d->category,
-                ]),
+            'otherDevices' => $otherDevices,
             'documents' => $device->documents->map(fn ($doc) => [
                 'id' => $doc->id,
                 'title' => $doc->title,
@@ -206,6 +378,26 @@ class DeviceController extends Controller
                 'uploaded_at' => $doc->created_at?->toISOString(),
                 'download_url' => "/security-devices/devices/{$device->id}/documents/{$doc->id}",
             ]),
+            'documentHistory' => $device->documentHistory->map(fn (DeviceDocument $doc) => [
+                'id' => $doc->id,
+                'title' => $doc->title,
+                'category' => $doc->category,
+                'version' => $doc->version,
+                'original_name' => $doc->original_name,
+                'size_bytes' => $doc->size_bytes,
+                'uploaded_at' => $doc->created_at?->toISOString(),
+                'uploaded_by' => $doc->uploadedBy?->name,
+                'state' => $doc->lifecycle_state,
+                'status_label' => $this->documentLifecycleLabel($doc),
+                'needs_attention' => $doc->lifecycle_error_code !== null,
+                'storage_verified_at' => $doc->storage_verified_at?->toISOString(),
+                'integrity_sha256' => $doc->content_sha256,
+                'removal_requested_at' => $doc->removal_requested_at?->toISOString(),
+                'removed_at' => $doc->removed_at?->toISOString(),
+                'removed_by' => $doc->removedBy?->name ?? $doc->removalRequestedBy?->name,
+                'removal_reason' => $doc->removal_reason ?? $doc->removal_request_reason,
+                'storage_deleted_at' => $doc->storage_deleted_at?->toISOString(),
+            ])->values(),
             'documentCategories' => [
                 ['value' => 'manual', 'label' => 'Manual'],
                 ['value' => 'install_photo', 'label' => 'Install photo'],
@@ -215,14 +407,14 @@ class DeviceController extends Controller
                 ['value' => 'network_diagram', 'label' => 'Network diagram'],
                 ['value' => 'other', 'label' => 'Other'],
             ],
-            'recentEvents' => $device->events->map(fn ($e) => [
+            'recentEvents' => ! $canViewEvents ? [] : $device->events->map(fn ($e) => [
                 'id' => $e->id,
                 'event_type' => $e->event_type,
                 'severity' => $e->severity,
                 'occurred_at' => $e->occurred_at?->toISOString(),
                 'source' => $e->source,
             ]),
-            'maintenanceRecords' => $device->maintenanceRecords->map(fn ($m) => [
+            'maintenanceRecords' => ! $canViewMaintenance ? [] : $device->maintenanceRecords->map(fn ($m) => [
                 'id' => $m->id,
                 'type' => $m->type,
                 'status' => $m->status,
@@ -246,13 +438,138 @@ class DeviceController extends Controller
                     'port' => $r->port,
                 ]),
             ],
-            'groups' => $device->groups->map(fn ($g) => ['id' => $g->id, 'name' => $g->name]),
+            'relationshipHistory' => [
+                'parents' => $device->relationshipHistoryAsChild->map(fn (DeviceRelationship $relationship) => [
+                    'id' => $relationship->id,
+                    'device_id' => $relationship->parent_device_id,
+                    'device_name' => $relationship->parent?->name,
+                    'type' => $relationship->relationship_type?->value,
+                    'port' => $relationship->port,
+                    'created_at' => $relationship->created_at?->toISOString(),
+                    'created_by' => $relationship->createdBy?->name,
+                    'unlinked_at' => $relationship->unlinked_at?->toISOString(),
+                    'unlinked_by' => $relationship->unlinkedBy?->name,
+                    'unlink_reason' => $relationship->unlink_reason,
+                ]),
+                'children' => $device->relationshipHistoryAsParent->map(fn (DeviceRelationship $relationship) => [
+                    'id' => $relationship->id,
+                    'device_id' => $relationship->child_device_id,
+                    'device_name' => $relationship->child?->name,
+                    'type' => $relationship->relationship_type?->value,
+                    'port' => $relationship->port,
+                    'created_at' => $relationship->created_at?->toISOString(),
+                    'created_by' => $relationship->createdBy?->name,
+                    'unlinked_at' => $relationship->unlinked_at?->toISOString(),
+                    'unlinked_by' => $relationship->unlinkedBy?->name,
+                    'unlink_reason' => $relationship->unlink_reason,
+                ]),
+            ],
             'can' => [
-                'update' => $user->canDo('securityDevices.devices.update'),
+                'update' => $profile['capabilities']['registry']['available'],
                 'delete' => $user->canDo('securityDevices.devices.delete'),
-                'assign' => $user->canDo('securityDevices.devices.assign'),
+                'assign' => $profile['capabilities']['assignment']['available'],
+                'viewEvents' => $canViewEvents,
+                'manageMaintenance' => $profile['capabilities']['maintenance']['available'],
             ],
         ]);
+    }
+
+    /** @return array{href: string|null, access: array{state: string, label: string}} */
+    private function assetTechnologyDestination(User $viewer, Asset $asset): array
+    {
+        $isVehicle = strcasecmp((string) $asset->category, 'vehicle') === 0
+            || $asset->categoryRef?->slug === 'vehicle';
+
+        if ($isVehicle) {
+            $href = $viewer->canDo('fleet.viewAny')
+                ? "/fleet-assets/vehicles/{$asset->id}?tab=technology"
+                : null;
+
+            return [
+                'href' => $href,
+                'access' => [
+                    'state' => $href ? 'available' : 'restricted',
+                    'label' => $href
+                        ? 'Open Fleet vehicle technology'
+                        : 'Fleet vehicle technology access required',
+                ],
+            ];
+        }
+
+        return [
+            'href' => "/fleet-assets/assets/{$asset->id}?tab=technology",
+            'access' => [
+                'state' => 'available',
+                'label' => 'Open Asset technology',
+            ],
+        ];
+    }
+
+    private function documentLifecycleLabel(DeviceDocument $document): string
+    {
+        if ($document->lifecycle_error_code !== null) {
+            return match ($document->lifecycle_state) {
+                DeviceDocument::STATE_UPLOAD_STAGED => 'Upload needs storage recovery',
+                DeviceDocument::STATE_REMOVAL_PENDING => 'Removal needs storage recovery',
+                DeviceDocument::STATE_REMOVED => 'Private cleanup needs recovery',
+                default => 'Storage verification needs recovery',
+            };
+        }
+
+        return match ($document->lifecycle_state) {
+            DeviceDocument::STATE_UPLOAD_STAGED => 'Upload recovery pending',
+            DeviceDocument::STATE_REMOVAL_PENDING => 'Removal pending',
+            DeviceDocument::STATE_REMOVED => $document->storage_deleted_at === null
+                ? 'Removed · private cleanup pending'
+                : 'Removed',
+            default => 'Storage verification pending',
+        };
+    }
+
+    /** @return array<int, array{key: string, label: string, count: int}> */
+    private function savedViews(Builder $baseQuery): array
+    {
+        return [
+            ['key' => 'all', 'label' => 'All devices', 'count' => (clone $baseQuery)->count()],
+            ['key' => 'needs_attention', 'label' => 'Needs attention', 'count' => (clone $baseQuery)->needingAttention()->count()],
+            ['key' => 'offline', 'label' => 'Offline', 'count' => (clone $baseQuery)->where('status', DeviceStatus::Offline->value)->count()],
+            [
+                'key' => 'unmonitored',
+                'label' => 'Without monitoring',
+                'count' => (clone $baseQuery)->whereDoesntHave('monitors', fn ($monitor) => $monitor->where('is_enabled', true))->count(),
+            ],
+            [
+                'key' => 'unassigned',
+                'label' => 'Unassigned',
+                'count' => (clone $baseQuery)->whereDoesntHave('assignments', fn ($assignment) => $assignment->active())->count(),
+            ],
+            [
+                'key' => 'stale',
+                'label' => 'Stale or never seen',
+                'count' => (clone $baseQuery)
+                    ->whereNotIn('status', [DeviceStatus::Decommissioned->value, DeviceStatus::InStock->value, DeviceStatus::Lost->value])
+                    ->where(fn (Builder $stale) => $stale
+                        ->whereNull('last_seen_at')
+                        ->orWhere('last_seen_at', '<', now()->subMinutes(15)))
+                    ->count(),
+            ],
+        ];
+    }
+
+    private function applyInventoryView(Builder $query, string $view): void
+    {
+        match ($view) {
+            'needs_attention' => $query->needingAttention(),
+            'offline' => $query->where('status', DeviceStatus::Offline->value),
+            'unmonitored' => $query->whereDoesntHave('monitors', fn ($monitor) => $monitor->where('is_enabled', true)),
+            'unassigned' => $query->whereDoesntHave('assignments', fn ($assignment) => $assignment->active()),
+            'stale' => $query
+                ->whereNotIn('status', [DeviceStatus::Decommissioned->value, DeviceStatus::InStock->value, DeviceStatus::Lost->value])
+                ->where(fn (Builder $stale) => $stale
+                    ->whereNull('last_seen_at')
+                    ->orWhere('last_seen_at', '<', now()->subMinutes(15))),
+            default => null,
+        };
     }
 
     /**
@@ -262,6 +579,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
@@ -270,6 +588,7 @@ class DeviceController extends Controller
         ]);
 
         $asset = Asset::findOrFail($validated['asset_id']);
+        $this->access->assertCanUseAsset($user, $device, $asset->id);
 
         try {
             $this->linkService->link(
@@ -297,9 +616,10 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
-            'other_device_id' => ['required', 'integer', 'different:device', 'exists:devices,id'],
+            'other_device_id' => ['required', 'integer', Rule::notIn([(int) $device->id]), 'exists:devices,id'],
             'relationship_type' => ['required', 'string', 'in:records_to,powered_by,connected_to,mounted_in,controls,uplinks_to,backs_up_to'],
             'direction' => ['required', 'string', 'in:upstream,downstream'],
             'port' => ['nullable', 'string', 'max:64'],
@@ -307,32 +627,9 @@ class DeviceController extends Controller
         ]);
 
         $other = Device::findOrFail($validated['other_device_id']);
+        $this->access->assertCanViewDevice($user, $other);
 
-        // Tenant guard — prevent cross-tenant relationships.
-        if ($device->tenant_id && $other->tenant_id && $device->tenant_id !== $other->tenant_id) {
-            return redirect()->back()->with('error', 'Cannot link devices from different tenants.');
-        }
-
-        $parentId = $validated['direction'] === 'downstream' ? $device->id : $other->id;
-        $childId = $validated['direction'] === 'downstream' ? $other->id : $device->id;
-
-        $exists = DeviceRelationship::query()
-            ->where('parent_device_id', $parentId)
-            ->where('child_device_id', $childId)
-            ->where('relationship_type', $validated['relationship_type'])
-            ->exists();
-
-        if ($exists) {
-            return redirect()->back()->with('error', 'That relationship already exists.');
-        }
-
-        DeviceRelationship::create([
-            'parent_device_id' => $parentId,
-            'child_device_id' => $childId,
-            'relationship_type' => $validated['relationship_type'],
-            'port' => $validated['port'] ?? null,
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        $this->relationshipLifecycle->create($user, $device, $other, $validated);
 
         return redirect()->back()->with('success', 'Relationship added.');
     }
@@ -345,16 +642,22 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
-        // Relationship must involve this device on at least one side.
-        abort_unless(
-            $relationship->parent_device_id === $device->id
-                || $relationship->child_device_id === $device->id,
-            404,
-            'This relationship does not involve this device.',
-        );
+        abort_unless(in_array((int) $device->id, [
+            (int) $relationship->parent_device_id,
+            (int) $relationship->child_device_id,
+        ], true), 404, 'This relationship does not involve this Device.');
+        $otherDeviceId = (int) $relationship->parent_device_id === (int) $device->id
+            ? (int) $relationship->child_device_id
+            : (int) $relationship->parent_device_id;
+        $otherDevice = Device::query()->findOrFail($otherDeviceId);
+        $this->access->assertCanViewDevice($user, $otherDevice);
 
-        $relationship->delete();
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:1000', 'regex:/\S/'],
+        ]);
+        $this->relationshipLifecycle->unlink($user, $device, $relationship, trim($validated['reason']));
 
         return redirect()->back()->with('success', 'Relationship removed.');
     }
@@ -368,12 +671,14 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         abort_unless(
             $link->device_id === $device->id,
             404,
             'This asset link does not belong to this device.',
         );
+        $this->access->assertCanUseAsset($user, $device, (int) $link->asset_id);
 
         try {
             $this->linkService->unlink($link);
@@ -409,7 +714,7 @@ class DeviceController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'domain' => ['required', 'string', 'in:' . implode(',', DeviceTaxonomy::domains())],
+            'domain' => ['required', 'string', 'in:'.implode(',', DeviceTaxonomy::domains())],
             'category' => ['required', 'string', 'max:100'],
             'subcategory' => ['nullable', 'string', 'max:100'],
             'manufacturer' => ['nullable', 'string', 'max:255'],
@@ -426,7 +731,6 @@ class DeviceController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $validated['tenant_id'] = $this->resolveDeviceTenantId($user);
         $validated['created_by_user_id'] = $user->id;
 
         $device = Device::create($validated);
@@ -439,6 +743,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         return Inertia::render('security-devices/devices/edit', [
             'device' => $this->mapDeviceForDetail($device),
@@ -459,6 +764,7 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:5000'],
@@ -476,10 +782,11 @@ class DeviceController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.update'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'domain' => ['required', 'string', 'in:' . implode(',', DeviceTaxonomy::domains())],
+            'domain' => ['required', 'string', 'in:'.implode(',', DeviceTaxonomy::domains())],
             'category' => ['required', 'string', 'max:100'],
             'subcategory' => ['nullable', 'string', 'max:100'],
             'manufacturer' => ['nullable', 'string', 'max:255'],
@@ -506,10 +813,10 @@ class DeviceController extends Controller
     public function destroy(Request $request, Device $device)
     {
         $user = $request->user();
-        abort_unless($user->canDo('securityDevices.devices.delete'), 403);
+        abort_unless($user?->canDo('securityDevices.devices.delete'), 403);
+        $this->access->assertCanViewDevice($user, $device);
 
-        $device->update(['status' => DeviceStatus::Decommissioned->value]);
-        $device->delete(); // soft delete
+        $this->registry->decommission($device, $user);
 
         return redirect()->route('security-devices.devices.index')
             ->with('success', "Device '{$device->name}' decommissioned.");
@@ -547,16 +854,8 @@ class DeviceController extends Controller
             'expected_lifespan_months' => $d->expected_lifespan_months,
             'purchase_price' => $d->purchase_price,
             'provider' => $d->provider,
-            'external_ref' => $d->external_ref,
-            'config' => $d->config,
-            'meta' => $d->meta,
-            'latitude' => $d->latitude,
-            'longitude' => $d->longitude,
-            'location_description' => $d->location_description,
-            'notes' => $d->notes,
             'created_at' => $d->created_at?->toISOString(),
             'created_by' => $d->createdBy ? ['id' => $d->createdBy->id, 'name' => $d->createdBy->name] : null,
         ];
     }
-
 }

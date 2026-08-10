@@ -13,8 +13,8 @@ class ShiftOrphanDetectionService
 {
     public function __construct(
         protected TimesheetReconciliationService $reconciliationService,
-    ) {
-    }
+        protected UserSiteAccessService $siteAccess,
+    ) {}
 
     /**
      * @return Collection<int, Timesheet>
@@ -73,7 +73,7 @@ class ShiftOrphanDetectionService
                     return true;
                 }
 
-                return false;
+                return ! $this->siteAccess->handoverHasIntrinsicIntegrity($handover);
             })
             ->values();
     }

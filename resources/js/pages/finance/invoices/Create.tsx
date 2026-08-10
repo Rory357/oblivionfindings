@@ -1,16 +1,29 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import { type BreadcrumbItem, PageProps } from '@/types';
-import AppLayout from '@/layouts/app-layout';
+import { formatMoney } from '@/components/finance/money';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem, PageProps } from '@/types';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { Plus, Trash2 } from 'lucide-react';
-import { PageHero, PageLayout } from '@/components/page';
-import { formatMoney } from '@/components/finance/money';
 
 interface Account {
     id: number;
@@ -87,7 +100,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'New Invoice', href: '/finance/invoices/create' },
 ];
 
-const clientName = (client: Client) => `${client.first_name} ${client.last_name}`.trim();
+const clientName = (client: Client) =>
+    `${client.first_name} ${client.last_name}`.trim();
 
 const billingEntryLabel = (entry: BillingEntry) => {
     const client = entry.client ? clientName(entry.client) : 'No client';
@@ -96,7 +110,14 @@ const billingEntryLabel = (entry: BillingEntry) => {
     return `${date} - ${client} - ${formatMoney(Number(entry.amount) || 0)}`;
 };
 
-export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients = [], billingEntries = [] }: Props) {
+export default function InvoiceCreate({
+    auth,
+    accounts,
+    taxRates,
+    bills,
+    clients = [],
+    billingEntries = [],
+}: Props) {
     const { data, setData, post, processing, errors } = useForm<{
         invoice_number: string;
         client_id: string;
@@ -137,10 +158,17 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
 
     const removeLine = (index: number) => {
         if (data.lines.length <= 1) return;
-        setData('lines', data.lines.filter((_, i) => i !== index));
+        setData(
+            'lines',
+            data.lines.filter((_, i) => i !== index),
+        );
     };
 
-    const updateLine = (index: number, field: keyof LineItem, value: string) => {
+    const updateLine = (
+        index: number,
+        field: keyof LineItem,
+        value: string,
+    ) => {
         const updated = [...data.lines];
         updated[index] = { ...updated[index], [field]: value };
         setData('lines', updated);
@@ -150,7 +178,9 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
         const selectedValue = value === 'none' ? '' : value;
         setData('client_id', selectedValue);
 
-        const selected = clients.find((client) => client.id === Number(selectedValue));
+        const selected = clients.find(
+            (client) => client.id === Number(selectedValue),
+        );
         if (selected && !data.client_name) {
             setData('client_name', clientName(selected));
         }
@@ -162,7 +192,9 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
             return;
         }
 
-        const entry = billingEntries.find((billingEntry) => billingEntry.id === Number(value));
+        const entry = billingEntries.find(
+            (billingEntry) => billingEntry.id === Number(value),
+        );
         if (!entry) return;
 
         const updated = [...data.lines];
@@ -174,7 +206,8 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
         updated[index] = {
             ...line,
             billing_entry_id: String(entry.id),
-            description: line.description || entry.notes || `Billing entry ${entry.id}`,
+            description:
+                line.description || entry.notes || `Billing entry ${entry.id}`,
             quantity: hours > 0 ? String(hours) : line.quantity,
             unit_price: rate > 0 ? String(rate) : String(amount),
             service_date: entry.service_date ?? line.service_date,
@@ -192,16 +225,25 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
     const calcLineTax = (line: LineItem) => {
         const subtotal = calcLineSubtotal(line);
         if (line.tax_rate_id) {
-            const rate = taxRates.find((r) => r.id === Number(line.tax_rate_id));
+            const rate = taxRates.find(
+                (r) => r.id === Number(line.tax_rate_id),
+            );
             if (rate) return subtotal * (parseFloat(rate.rate) / 100);
         }
         return subtotal * 0.15; // Default 15% GST
     };
 
-    const calcLineTotal = (line: LineItem) => calcLineSubtotal(line) + calcLineTax(line);
+    const calcLineTotal = (line: LineItem) =>
+        calcLineSubtotal(line) + calcLineTax(line);
 
-    const subtotal = data.lines.reduce((sum, line) => sum + calcLineSubtotal(line), 0);
-    const taxTotal = data.lines.reduce((sum, line) => sum + calcLineTax(line), 0);
+    const subtotal = data.lines.reduce(
+        (sum, line) => sum + calcLineSubtotal(line),
+        0,
+    );
+    const taxTotal = data.lines.reduce(
+        (sum, line) => sum + calcLineTax(line),
+        0,
+    );
     const total = subtotal + taxTotal;
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -215,7 +257,8 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         variant="compact"
                         backHref="/finance/invoices"
                         title="New Invoice"
@@ -230,26 +273,48 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                             <CardTitle>Invoice Details</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 <div>
-                                    <Label htmlFor="invoice_number">Invoice Number (auto if blank)</Label>
+                                    <Label htmlFor="invoice_number">
+                                        Invoice Number (auto if blank)
+                                    </Label>
                                     <Input
                                         id="invoice_number"
                                         value={data.invoice_number}
-                                        onChange={(e) => setData('invoice_number', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'invoice_number',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Auto-generated"
                                     />
-                                    {errors.invoice_number && <p className="text-sm text-destructive mt-1">{errors.invoice_number}</p>}
+                                    {errors.invoice_number && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {errors.invoice_number}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="invoice_date">Invoice Date *</Label>
+                                    <Label htmlFor="invoice_date">
+                                        Invoice Date *
+                                    </Label>
                                     <Input
                                         id="invoice_date"
                                         type="date"
                                         value={data.invoice_date}
-                                        onChange={(e) => setData('invoice_date', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'invoice_date',
+                                                e.target.value,
+                                            )
+                                        }
                                     />
-                                    {errors.invoice_date && <p className="text-sm text-destructive mt-1">{errors.invoice_date}</p>}
+                                    {errors.invoice_date && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {errors.invoice_date}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label htmlFor="due_date">Due Date *</Label>
@@ -257,9 +322,15 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                                         id="due_date"
                                         type="date"
                                         value={data.due_date}
-                                        onChange={(e) => setData('due_date', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('due_date', e.target.value)
+                                        }
                                     />
-                                    {errors.due_date && <p className="text-sm text-destructive mt-1">{errors.due_date}</p>}
+                                    {errors.due_date && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {errors.due_date}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
@@ -271,61 +342,113 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                             <CardTitle>Client Details</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div>
                                     <Label htmlFor="client_id">Client</Label>
-                                    <Select value={data.client_id || 'none'} onValueChange={updateClient}>
+                                    <Select
+                                        value={data.client_id || 'none'}
+                                        onValueChange={updateClient}
+                                    >
                                         <SelectTrigger id="client_id">
                                             <SelectValue placeholder="Select client" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="none">No linked client</SelectItem>
+                                            <SelectItem value="none">
+                                                No linked client
+                                            </SelectItem>
                                             {clients.map((client) => (
-                                                <SelectItem key={client.id} value={String(client.id)}>
+                                                <SelectItem
+                                                    key={client.id}
+                                                    value={String(client.id)}
+                                                >
                                                     {clientName(client)}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.client_id && <p className="text-sm text-destructive mt-1">{errors.client_id}</p>}
+                                    {errors.client_id && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {errors.client_id}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="funding_body">Funding Body</Label>
+                                    <Label htmlFor="funding_body">
+                                        Funding Body
+                                    </Label>
                                     <Input
                                         id="funding_body"
                                         value={data.funding_body}
-                                        onChange={(e) => setData('funding_body', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'funding_body',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="ACC, MSD, private, or other funder"
                                     />
-                                    {errors.funding_body && <p className="text-sm text-destructive mt-1">{errors.funding_body}</p>}
+                                    {errors.funding_body && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {errors.funding_body}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="client_name">Client Name *</Label>
+                                    <Label htmlFor="client_name">
+                                        Client Name *
+                                    </Label>
                                     <Input
                                         id="client_name"
                                         value={data.client_name}
-                                        onChange={(e) => setData('client_name', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'client_name',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Client or company name"
                                     />
-                                    {errors.client_name && <p className="text-sm text-destructive mt-1">{errors.client_name}</p>}
+                                    {errors.client_name && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {errors.client_name}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
-                                    <Label htmlFor="client_email">Client Email</Label>
+                                    <Label htmlFor="client_email">
+                                        Client Email
+                                    </Label>
                                     <Input
                                         id="client_email"
                                         type="email"
                                         value={data.client_email}
-                                        onChange={(e) => setData('client_email', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'client_email',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="client@example.com"
                                     />
-                                    {errors.client_email && <p className="text-sm text-destructive mt-1">{errors.client_email}</p>}
+                                    {errors.client_email && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {errors.client_email}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="md:col-span-2">
-                                    <Label htmlFor="client_address">Client Address</Label>
+                                    <Label htmlFor="client_address">
+                                        Client Address
+                                    </Label>
                                     <Textarea
                                         id="client_address"
                                         value={data.client_address}
-                                        onChange={(e) => setData('client_address', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'client_address',
+                                                e.target.value,
+                                            )
+                                        }
                                         rows={2}
                                         placeholder="Postal address..."
                                     />
@@ -338,25 +461,50 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                     <Card className="mb-6">
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Line Items</CardTitle>
-                            <Button type="button" variant="outline" size="sm" onClick={addLine}>
-                                <Plus className="w-4 h-4 mr-1" />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={addLine}
+                            >
+                                <Plus className="mr-1 h-4 w-4" />
                                 Add Line
                             </Button>
                         </CardHeader>
                         <CardContent>
-                            {errors.lines && <p className="text-sm text-destructive mb-2">{errors.lines}</p>}
+                            {errors.lines && (
+                                <p className="mb-2 text-sm text-destructive">
+                                    {errors.lines}
+                                </p>
+                            )}
                             <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead className="min-w-[220px]">Billing Entry</TableHead>
-                                            <TableHead className="min-w-[200px]">Description</TableHead>
-                                            <TableHead className="w-24">Qty</TableHead>
-                                            <TableHead className="w-32">Unit Price</TableHead>
-                                            <TableHead className="min-w-[150px]">Tax Rate</TableHead>
-                                            <TableHead className="min-w-[180px]">Account</TableHead>
-                                            <TableHead className="w-24 text-right">Tax</TableHead>
-                                            <TableHead className="w-28 text-right">Total</TableHead>
+                                            <TableHead className="min-w-[220px]">
+                                                Billing Entry
+                                            </TableHead>
+                                            <TableHead className="min-w-[200px]">
+                                                Description
+                                            </TableHead>
+                                            <TableHead className="w-24">
+                                                Qty
+                                            </TableHead>
+                                            <TableHead className="w-32">
+                                                Unit Price
+                                            </TableHead>
+                                            <TableHead className="min-w-[150px]">
+                                                Tax Rate
+                                            </TableHead>
+                                            <TableHead className="min-w-[180px]">
+                                                Account
+                                            </TableHead>
+                                            <TableHead className="w-24 text-right">
+                                                Tax
+                                            </TableHead>
+                                            <TableHead className="w-28 text-right">
+                                                Total
+                                            </TableHead>
                                             <TableHead className="w-12"></TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -365,34 +513,77 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                                             <TableRow key={index}>
                                                 <TableCell>
                                                     <Select
-                                                        value={line.billing_entry_id || 'none'}
-                                                        onValueChange={(v) => applyBillingEntryToLine(index, v)}
+                                                        value={
+                                                            line.billing_entry_id ||
+                                                            'none'
+                                                        }
+                                                        onValueChange={(v) =>
+                                                            applyBillingEntryToLine(
+                                                                index,
+                                                                v,
+                                                            )
+                                                        }
                                                     >
                                                         <SelectTrigger className="min-w-[200px]">
                                                             <SelectValue placeholder="Optional" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="none">None</SelectItem>
-                                                            {billingEntries.map((entry) => (
-                                                                <SelectItem key={entry.id} value={String(entry.id)}>
-                                                                    {billingEntryLabel(entry)}
-                                                                </SelectItem>
-                                                            ))}
+                                                            <SelectItem value="none">
+                                                                None
+                                                            </SelectItem>
+                                                            {billingEntries.map(
+                                                                (entry) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            entry.id
+                                                                        }
+                                                                        value={String(
+                                                                            entry.id,
+                                                                        )}
+                                                                    >
+                                                                        {billingEntryLabel(
+                                                                            entry,
+                                                                        )}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
-                                                    {errors[`lines.${index}.billing_entry_id` as keyof typeof errors] && (
-                                                        <p className="text-xs text-destructive">{errors[`lines.${index}.billing_entry_id` as keyof typeof errors]}</p>
+                                                    {errors[
+                                                        `lines.${index}.billing_entry_id` as keyof typeof errors
+                                                    ] && (
+                                                        <p className="text-xs text-destructive">
+                                                            {
+                                                                errors[
+                                                                    `lines.${index}.billing_entry_id` as keyof typeof errors
+                                                                ]
+                                                            }
+                                                        </p>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input
                                                         value={line.description}
-                                                        onChange={(e) => updateLine(index, 'description', e.target.value)}
+                                                        onChange={(e) =>
+                                                            updateLine(
+                                                                index,
+                                                                'description',
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         placeholder="Description"
                                                         className="min-w-[180px]"
                                                     />
-                                                    {errors[`lines.${index}.description` as keyof typeof errors] && (
-                                                        <p className="text-xs text-destructive">{errors[`lines.${index}.description` as keyof typeof errors]}</p>
+                                                    {errors[
+                                                        `lines.${index}.description` as keyof typeof errors
+                                                    ] && (
+                                                        <p className="text-xs text-destructive">
+                                                            {
+                                                                errors[
+                                                                    `lines.${index}.description` as keyof typeof errors
+                                                                ]
+                                                            }
+                                                        </p>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
@@ -401,7 +592,13 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                                                         step="0.01"
                                                         min="0.01"
                                                         value={line.quantity}
-                                                        onChange={(e) => updateLine(index, 'quantity', e.target.value)}
+                                                        onChange={(e) =>
+                                                            updateLine(
+                                                                index,
+                                                                'quantity',
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         className="w-20"
                                                     />
                                                 </TableCell>
@@ -411,61 +608,119 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                                                         step="0.01"
                                                         min="0"
                                                         value={line.unit_price}
-                                                        onChange={(e) => updateLine(index, 'unit_price', e.target.value)}
+                                                        onChange={(e) =>
+                                                            updateLine(
+                                                                index,
+                                                                'unit_price',
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         className="w-28"
                                                     />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select
                                                         value={line.tax_rate_id}
-                                                        onValueChange={(v) => updateLine(index, 'tax_rate_id', v)}
+                                                        onValueChange={(v) =>
+                                                            updateLine(
+                                                                index,
+                                                                'tax_rate_id',
+                                                                v,
+                                                            )
+                                                        }
                                                     >
                                                         <SelectTrigger className="min-w-[130px]">
                                                             <SelectValue placeholder="Default 15%" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="default">Default 15% GST</SelectItem>
-                                                            {taxRates.map((tr) => (
-                                                                <SelectItem key={tr.id} value={String(tr.id)}>
-                                                                    {tr.name} ({tr.rate}%)
-                                                                </SelectItem>
-                                                            ))}
+                                                            <SelectItem value="default">
+                                                                Default 15% GST
+                                                            </SelectItem>
+                                                            {taxRates.map(
+                                                                (tr) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            tr.id
+                                                                        }
+                                                                        value={String(
+                                                                            tr.id,
+                                                                        )}
+                                                                    >
+                                                                        {
+                                                                            tr.name
+                                                                        }{' '}
+                                                                        (
+                                                                        {
+                                                                            tr.rate
+                                                                        }
+                                                                        %)
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Select
                                                         value={line.account_id}
-                                                        onValueChange={(v) => updateLine(index, 'account_id', v)}
+                                                        onValueChange={(v) =>
+                                                            updateLine(
+                                                                index,
+                                                                'account_id',
+                                                                v,
+                                                            )
+                                                        }
                                                     >
                                                         <SelectTrigger className="min-w-[160px]">
                                                             <SelectValue placeholder="Select" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="none">None</SelectItem>
-                                                            {accounts.map((a) => (
-                                                                <SelectItem key={a.id} value={String(a.id)}>
-                                                                    {a.code} - {a.name}
-                                                                </SelectItem>
-                                                            ))}
+                                                            <SelectItem value="none">
+                                                                None
+                                                            </SelectItem>
+                                                            {accounts.map(
+                                                                (a) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            a.id
+                                                                        }
+                                                                        value={String(
+                                                                            a.id,
+                                                                        )}
+                                                                    >
+                                                                        {a.code}{' '}
+                                                                        -{' '}
+                                                                        {a.name}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
                                                         </SelectContent>
                                                     </Select>
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm">
-                                                    {formatMoney(calcLineTax(line))}
+                                                    {formatMoney(
+                                                        calcLineTax(line),
+                                                    )}
                                                 </TableCell>
-                                                <TableCell className="text-right font-medium text-sm">
-                                                    {formatMoney(calcLineTotal(line))}
+                                                <TableCell className="text-right text-sm font-medium">
+                                                    {formatMoney(
+                                                        calcLineTotal(line),
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => removeLine(index)}
-                                                        disabled={data.lines.length <= 1}
+                                                        onClick={() =>
+                                                            removeLine(index)
+                                                        }
+                                                        disabled={
+                                                            data.lines.length <=
+                                                            1
+                                                        }
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-destructive" />
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
@@ -475,17 +730,21 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                             </div>
 
                             {/* Totals */}
-                            <div className="flex justify-end mt-4">
+                            <div className="mt-4 flex justify-end">
                                 <div className="w-64 space-y-2">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Subtotal</span>
+                                        <span className="text-muted-foreground">
+                                            Subtotal
+                                        </span>
                                         <span>{formatMoney(subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">GST</span>
+                                        <span className="text-muted-foreground">
+                                            GST
+                                        </span>
                                         <span>{formatMoney(taxTotal)}</span>
                                     </div>
-                                    <div className="flex justify-between text-base font-bold border-t pt-2">
+                                    <div className="flex justify-between border-t pt-2 text-base font-bold">
                                         <span>Total</span>
                                         <span>{formatMoney(total)}</span>
                                     </div>
@@ -502,20 +761,34 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                         <CardContent>
                             <div className="grid grid-cols-1 gap-4">
                                 <div>
-                                    <Label htmlFor="email_subject">Email Subject</Label>
+                                    <Label htmlFor="email_subject">
+                                        Email Subject
+                                    </Label>
                                     <Input
                                         id="email_subject"
                                         value={data.email_subject}
-                                        onChange={(e) => setData('email_subject', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'email_subject',
+                                                e.target.value,
+                                            )
+                                        }
                                         placeholder="Custom email subject (auto-generated if blank)"
                                     />
                                 </div>
                                 <div>
-                                    <Label htmlFor="email_body">Email Body</Label>
+                                    <Label htmlFor="email_body">
+                                        Email Body
+                                    </Label>
                                     <Textarea
                                         id="email_body"
                                         value={data.email_body}
-                                        onChange={(e) => setData('email_body', e.target.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'email_body',
+                                                e.target.value,
+                                            )
+                                        }
                                         rows={3}
                                         placeholder="Custom email body (auto-generated if blank)"
                                     />
@@ -530,13 +803,15 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                             <CardTitle>Notes & Terms</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div>
                                     <Label htmlFor="notes">Notes</Label>
                                     <Textarea
                                         id="notes"
                                         value={data.notes}
-                                        onChange={(e) => setData('notes', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('notes', e.target.value)
+                                        }
                                         rows={3}
                                         placeholder="Notes visible on the invoice..."
                                     />
@@ -546,7 +821,9 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
                                     <Textarea
                                         id="terms"
                                         value={data.terms}
-                                        onChange={(e) => setData('terms', e.target.value)}
+                                        onChange={(e) =>
+                                            setData('terms', e.target.value)
+                                        }
                                         rows={3}
                                         placeholder="Payment terms..."
                                     />

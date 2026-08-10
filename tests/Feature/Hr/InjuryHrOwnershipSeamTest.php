@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
 use Database\Seeders\RbacSeeder;
@@ -15,18 +16,18 @@ use Database\Seeders\SeedHrPermissionsSeeder;
  * employee profile and still has no create/update/delete path. These tests lock
  * the per-employee and one-owner-per-fact boundaries.
  */
-function makeInjuryEmployeeProfile(User $employee, int $tenantId = 1): HrEmployeeProfile
+function makeInjuryEmployeeProfile(User $employee, Site $site): HrEmployeeProfile
 {
     return HrEmployeeProfile::query()->create([
-        'tenant_id' => $tenantId,
         'user_id' => $employee->id,
-        'employee_number' => 'INJURY-'.$tenantId.'-'.$employee->id,
+        'employee_number' => 'INJURY-'.$site->id.'-'.$employee->id,
         'work_email' => $employee->email,
         'position_title' => 'Support Worker',
         'position_role' => 'support_worker',
         'employment_type' => 'full_time',
         'start_date' => now()->subYear()->toDateString(),
         'is_active' => true,
+        'primary_site_id' => $site->id,
     ]);
 }
 
@@ -37,12 +38,14 @@ beforeEach(function () {
     $this->viewer = User::factory()->create([
         'name' => 'HR Injury Viewer',
         'role' => 'hr',
-        'organization_id' => 1,
         'approved_at' => now(),
     ]);
     $this->viewer->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
     ]);
+    $this->allowedSite = Site::factory()->create(['name' => 'Injury HR Allowed Site']);
+    $this->hiddenSite = Site::factory()->create(['name' => 'Injury HR Hidden Site']);
+    makeInjuryEmployeeProfile($this->viewer, $this->allowedSite);
 });
 
 test('S4 seam: a workplace injury is H&S-owned per-employee data that HR would federate read-only', function () {
@@ -64,10 +67,11 @@ test('employee profile surfaces H&S-owned injuries read-only with hazards view p
         $permission->id => ['allowed' => true],
     ]);
 
-    $employee = User::factory()->create(['organization_id' => 1]);
-    $profile = makeInjuryEmployeeProfile($employee);
+    $employee = User::factory()->create();
+    $profile = makeInjuryEmployeeProfile($employee, $this->allowedSite);
     $injury = WorkplaceInjury::factory()->create([
         'user_id' => $employee->id,
+        'site_id' => $this->allowedSite->id,
         'injury_type' => 'manual_handling',
         'body_part_affected' => 'Lower back',
         'severity' => 'moderate',
@@ -76,9 +80,15 @@ test('employee profile surfaces H&S-owned injuries read-only with hazards view p
     ]);
     $injury->refresh();
     $original = $injury->getRawOriginal();
+    $hiddenInjury = WorkplaceInjury::factory()->create([
+        'user_id' => $employee->id,
+        'site_id' => $this->hiddenSite->id,
+        'injury_type' => 'hidden_site_injury',
+    ]);
 
-    $this->actingAs($this->viewer)
-        ->get("/hr/people/{$profile->id}")
+    $response = $this->actingAs($this->viewer)
+        ->get("/hr/people/{$profile->id}");
+    $response
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('hr/employees/show')
@@ -87,13 +97,19 @@ test('employee profile surfaces H&S-owned injuries read-only with hazards view p
             ->where('workplaceInjuries.0.injury_type', 'manual_handling')
             ->where('workplaceInjuries.0.status', 'return_to_work'));
 
-    expect($injury->fresh()->getRawOriginal())->toBe($original);
+    expect(collect($response->inertiaProps('workplaceInjuries'))->pluck('id')->all())
+        ->toBe([$injury->id])
+        ->and($injury->fresh()->getRawOriginal())->toBe($original)
+        ->and($hiddenInjury->fresh())->not->toBeNull();
 });
 
 test('employee profile omits workplace injuries without hazards view permission', function () {
-    $employee = User::factory()->create(['organization_id' => 1]);
-    $profile = makeInjuryEmployeeProfile($employee);
-    WorkplaceInjury::factory()->create(['user_id' => $employee->id]);
+    $employee = User::factory()->create();
+    $profile = makeInjuryEmployeeProfile($employee, $this->allowedSite);
+    WorkplaceInjury::factory()->create([
+        'user_id' => $employee->id,
+        'site_id' => $this->allowedSite->id,
+    ]);
 
     $this->actingAs($this->viewer)
         ->get("/hr/people/{$profile->id}")
@@ -103,15 +119,18 @@ test('employee profile omits workplace injuries without hazards view permission'
             ->missing('workplaceInjuries'));
 });
 
-test('employee profile blocks a foreign tenant before injury data is resolved', function () {
+test('employee profile blocks a hidden Site before injury data is resolved', function () {
     $permission = Permission::query()->where('key', 'hazards.view')->firstOrFail();
     $this->viewer->permissionOverrides()->syncWithoutDetaching([
         $permission->id => ['allowed' => true],
     ]);
 
-    $employee = User::factory()->create(['organization_id' => 2]);
-    $profile = makeInjuryEmployeeProfile($employee, 2);
-    WorkplaceInjury::factory()->create(['user_id' => $employee->id]);
+    $employee = User::factory()->create();
+    $profile = makeInjuryEmployeeProfile($employee, $this->hiddenSite);
+    WorkplaceInjury::factory()->create([
+        'user_id' => $employee->id,
+        'site_id' => $this->hiddenSite->id,
+    ]);
 
     $this->actingAs($this->viewer)
         ->get("/hr/people/{$profile->id}")

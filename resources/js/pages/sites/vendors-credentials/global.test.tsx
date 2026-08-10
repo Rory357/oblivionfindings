@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 // Mock the app shell so the page renders without the full sidebar/layout tree.
 vi.mock('@/layouts/app-layout', () => ({
-    default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    default: ({ children }: { children: React.ReactNode }) => (
+        <div>{children}</div>
+    ),
 }));
 
 // Minimal @inertiajs/react surface used by the page + dialogs.
@@ -11,9 +13,19 @@ vi.mock('@inertiajs/react', async () => {
     const ReactActual = await vi.importActual<typeof import('react')>('react');
     return {
         Head: () => null,
-        Link: ({ children, ...rest }: { children: React.ReactNode }) => <a {...rest}>{children}</a>,
-        usePage: () => ({ props: { auth: { user: { name: 'Rangi Morgan' } } } }),
-        router: { patch: vi.fn(), post: vi.fn(), delete: vi.fn(), visit: vi.fn(), reload: vi.fn() },
+        Link: ({ children, ...rest }: { children: React.ReactNode }) => (
+            <a {...rest}>{children}</a>
+        ),
+        usePage: () => ({
+            props: { auth: { user: { name: 'Rangi Morgan' } } },
+        }),
+        router: {
+            patch: vi.fn(),
+            post: vi.fn(),
+            delete: vi.fn(),
+            visit: vi.fn(),
+            reload: vi.fn(),
+        },
         useForm: (initial: Record<string, unknown>) => {
             const [data, setData] = ReactActual.useState(initial);
             const form = {
@@ -23,8 +35,10 @@ vi.mock('@inertiajs/react', async () => {
                 setData: (key: string, value: unknown) =>
                     setData((current) => ({ ...current, [key]: value })),
                 transform: () => form,
-                post: (_url: string, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.(),
-                put: (_url: string, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.(),
+                post: (_url: string, opts?: { onSuccess?: () => void }) =>
+                    opts?.onSuccess?.(),
+                put: (_url: string, opts?: { onSuccess?: () => void }) =>
+                    opts?.onSuccess?.(),
             };
             return form;
         },
@@ -86,8 +100,18 @@ const baseProps = {
     serviceTypes: ['Plumbing'],
     credentialTypes: ['pin', 'password'],
     credentialTypeOptions: [
-        { key: 'password', label: 'Password', description: 'Username + secret', icon: 'lock' },
-        { key: 'pin', label: 'PIN / Code', description: 'Door, alarm, panel', icon: 'fingerprint' },
+        {
+            key: 'password',
+            label: 'Password',
+            description: 'Username + secret',
+            icon: 'lock',
+        },
+        {
+            key: 'pin',
+            label: 'PIN / Code',
+            description: 'Door, alarm, panel',
+            icon: 'fingerprint',
+        },
     ],
     filters: {},
     can: {
@@ -122,16 +146,22 @@ describe('GlobalVendorsCredentials', () => {
         expect(screen.getByText('Access vault')).toBeInTheDocument();
         expect(screen.getByText('Front Door Smart Lock')).toBeInTheDocument();
         // PIN credential rotated 2026-01-02 is well past the 180d threshold today.
-        expect(screen.getAllByText(/Rotation overdue|Rotation due/).length).toBeGreaterThan(0);
+        expect(
+            screen.getAllByText(/Rotation overdue|Rotation due/).length,
+        ).toBeGreaterThan(0);
     });
 
     it('opens the Add credential dialog with the tile picker and site picker', async () => {
         render(<GlobalVendorsCredentials {...baseProps} />);
 
-        fireEvent.click(screen.getByRole('button', { name: /Add credential/i }));
+        fireEvent.click(
+            screen.getByRole('button', { name: /Add credential/i }),
+        );
 
         // Dialog header + a couple of tile-picker options + the required site picker.
-        expect(await screen.findByText('Create credential')).toBeInTheDocument();
+        expect(
+            await screen.findByText('Create credential'),
+        ).toBeInTheDocument();
         expect(screen.getByText('Password')).toBeInTheDocument();
         expect(screen.getByText('PIN / Code')).toBeInTheDocument();
         expect(screen.getByText('Select a site…')).toBeInTheDocument();

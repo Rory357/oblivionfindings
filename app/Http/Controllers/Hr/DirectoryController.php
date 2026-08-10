@@ -6,19 +6,24 @@ use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Domain\Hr\Services\HrProfilePhotoStorageService;
+use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
-use App\Models\Site;
+use App\Models\User;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class DirectoryController extends Controller
 {
-    use ResolvesHrTenant;
-
     /**
-     * The standalone employee directory has been folded into the People hub as a
-     * "Directory" tab (one list, one source). Preserve the route by redirecting,
-     * carrying the search/department filters across (site → site_id).
+     * Retired management alias only. The operational staff directory remains
+     * /hr/my/directory and belongs to the separate My HR boundary.
      */
     public function index(Request $request)
     {
@@ -39,22 +44,30 @@ class DirectoryController extends Controller
         return redirect()->route('hr.people.index', $params);
     }
 
-    public function show(Request $request, HrEmployeeProfile $profile)
-    {
+    public function show(
+        Request $request,
+        string $profile,
+        HrCurrentStaffService $currentStaff,
+        UserSiteAccessService $siteAccess,
+        HrProfilePhotoStorageService $profilePhotos,
+    ) {
         $user = $request->user();
-        abort_unless($user, 403);
+        $profile = $this->currentVisibleProfile(
+            $profile,
+            $user,
+            $currentStaff,
+            $siteAccess,
+        );
+        $visibleStaff = $this->visibleCurrentStaffQuery($user, $siteAccess);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $profile->load('user:id,name', 'primarySite:id,name', 'departmentRelation:id,name');
+        abort_unless($profile->user, 404);
 
-        // The route is open to all authenticated users; restrict to staff (the
-        // viewer must have an HR employee profile) so portal/family users can't
-        // pull a colleague's directory card.
-        $viewerIsStaff = HrEmployeeProfile::where('tenant_id', $tenantId)
-            ->where('user_id', $user->id)
-            ->exists();
-        abort_unless($viewerIsStaff, 403);
-
-        $profile->load('user:id,name,email,cellphone,work_phone', 'primarySite:id,name', 'position:id,title,code', 'departmentRelation:id,name');
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $visiblePrimarySite = $profile->primarySite
+            && in_array((int) $profile->primary_site_id, $accessibleSiteIds, true)
+                ? $profile->primarySite
+                : null;
 
         // Tenure calculation
         $tenure = null;
@@ -66,12 +79,14 @@ class DirectoryController extends Controller
             ];
         }
 
+        $canViewOrgChart = $user->canDo('hr.orgchart.view')
+            || $user->canDo('hr.employees.viewAny');
+
         // Manager
         $manager = null;
-        if ($profile->manager_user_id) {
+        if ($canViewOrgChart && $profile->manager_user_id) {
             $managerProfile = HrEmployeeProfile::where('user_id', $profile->manager_user_id)
-                ->where('tenant_id', $tenantId)
-                ->active()
+                ->whereIn('user_id', (clone $visibleStaff)->select('users.id'))
                 ->with('user:id,name')
                 ->first();
             if ($managerProfile) {
@@ -79,56 +94,68 @@ class DirectoryController extends Controller
                     'id' => $managerProfile->id,
                     'name' => $managerProfile->user?->name ?? 'Unknown',
                     'position_title' => $managerProfile->position_title,
-                    'profile_photo_path' => $managerProfile->profile_photo_path,
                 ];
             }
         }
 
         // Direct reports
-        $directReports = HrEmployeeProfile::where('manager_user_id', $profile->user_id)
-            ->where('tenant_id', $tenantId)
-            ->active()
-            ->with('user:id,name')
-            ->limit(10)
-            ->get()
-            ->map(fn ($r) => [
-                'id' => $r->id,
-                'name' => $r->user?->name ?? 'Unknown',
-                'position_title' => $r->position_title,
-                'profile_photo_path' => $r->profile_photo_path,
-            ]);
+        $directReports = $canViewOrgChart
+            ? HrEmployeeProfile::where('manager_user_id', $profile->user_id)
+                ->whereIn('user_id', (clone $visibleStaff)->select('users.id'))
+                ->with('user:id,name')
+                ->orderBy('id')
+                ->limit(10)
+                ->get()
+                ->map(fn ($r) => [
+                    'id' => $r->id,
+                    'name' => $r->user?->name ?? 'Unknown',
+                    'position_title' => $r->position_title,
+                ])
+            : collect();
 
         // Kudos received (public)
-        $kudosReceived = HrKudos::where('tenant_id', $tenantId)
-            ->where('to_user_id', $profile->user_id)
-            ->where('is_public', true)
-            ->with('fromUser:id,name')
-            ->orderByDesc('created_at')
-            ->limit(10)
-            ->get()
-            ->map(fn ($k) => [
-                'id' => $k->id,
-                'from_name' => $k->fromUser?->name ?? 'Someone',
-                'category' => $k->category,
-                'message' => $k->message,
-                'created_at' => $k->created_at?->toDateString(),
-            ]);
+        $canViewRecognition = $user->canDo('hr.recognition.view');
+        $kudosReceived = collect();
+        $kudosCount = 0;
+        if ($canViewRecognition) {
+            $visibleKudos = HrKudos::query()
+                ->where('to_user_id', $profile->user_id)
+                ->where('is_public', true)
+                ->whereIn('from_user_id', (clone $visibleStaff)->select('users.id'));
+            $kudosReceived = (clone $visibleKudos)
+                ->with('fromUser:id,name')
+                ->orderByDesc('created_at')
+                ->limit(10)
+                ->get()
+                ->map(fn ($k) => [
+                    'id' => $k->id,
+                    'from_name' => $k->fromUser?->name ?? 'Someone',
+                    'category' => $k->category,
+                    'message' => $k->message,
+                    'created_at' => $k->created_at?->toDateString(),
+                ]);
 
-        $kudosCount = HrKudos::where('tenant_id', $tenantId)
-            ->where('to_user_id', $profile->user_id)
-            ->where('created_at', '>=', now()->subDays(30))
-            ->count();
+            $kudosCount = (clone $visibleKudos)
+                ->where('created_at', '>=', now()->subDays(30))
+                ->count();
+        }
 
-        // Compliance (manager-only)
-        $canManage = $user->canDo('hr.employees.manage') || $user->canDo('hr.compliance.view');
+        // Each non-directory domain keeps its own narrow permission boundary.
+        // In particular, compliance access must never imply personal-contact or
+        // performance access.
+        $canViewSensitive = $user->canDo('hr.employees.viewRestricted');
+        $canViewCompliance = $user->canDo('hr.compliance.view');
+        $canViewPerformance = $user->canDo('hr.goals.view')
+            || $user->canDo('hr.goals.manage')
+            || $user->canDo('hr.performance.view')
+            || $user->canDo('hr.performance.manage');
         $complianceSummary = null;
         $goals = null;
 
-        if ($canManage) {
-            $statuses = HrStaffComplianceStatus::where('tenant_id', $tenantId)
+        if ($canViewCompliance) {
+            $statuses = HrStaffComplianceStatus::query()
                 ->where('user_id', $profile->user_id)
-                ->with('requirement:id,name,category')
-                ->get();
+                ->get(['status']);
 
             $complianceSummary = [
                 'compliant' => $statuses->where('status', 'compliant')->count(),
@@ -137,12 +164,15 @@ class DirectoryController extends Controller
                 'not_started' => $statuses->whereNotIn('status', ['compliant', 'expiring_soon', 'expired', 'non_compliant'])->count(),
                 'total' => $statuses->count(),
             ];
+        }
 
-            $goals = HrDevelopmentGoal::where('tenant_id', $tenantId)
+        if ($canViewPerformance) {
+            $goals = HrDevelopmentGoal::query()
                 ->where('employee_user_id', $profile->user_id)
                 ->whereIn('status', ['not_started', 'in_progress', 'blocked'])
+                ->orderBy('id')
                 ->limit(5)
-                ->get()
+                ->get(['id', 'title', 'status', 'progress_percent'])
                 ->map(fn ($g) => [
                     'id' => $g->id,
                     'title' => $g->title,
@@ -153,22 +183,23 @@ class DirectoryController extends Controller
 
         // JSON for the People-hub Directory staff-details modal (the standalone
         // full-page directory profile was dropped in favour of the modal).
-        // Personal contact is manager-only; everyone else sees work contact.
+        // Personal contact requires the dedicated restricted-profile permission;
+        // work contact remains the ordinary directory contract.
         return response()->json([
             'employee' => [
                 'id' => $profile->id,
                 'user_id' => $profile->user_id,
                 'name' => $profile->preferred_name ?? $profile->user?->name ?? 'Unknown',
                 'full_name' => $profile->user?->name ?? 'Unknown',
-                'email' => $profile->work_email ?? $profile->user?->email,
+                'email' => $profile->work_email,
                 'work_phone' => $profile->work_phone,
-                'personal_email' => $canManage ? $profile->personal_email : null,
-                'personal_phone' => $canManage ? ($profile->user?->cellphone ?? $profile->personal_phone) : null,
+                'personal_email' => $canViewSensitive ? $profile->personal_email : null,
+                'personal_phone' => $canViewSensitive ? $profile->personal_phone : null,
                 'position_title' => $profile->position_title,
                 'department' => $profile->departmentRelation?->name ?? $profile->department,
                 'team' => $profile->team,
-                'site' => $profile->primarySite?->name,
-                'profile_photo_path' => $profile->profile_photo_path,
+                'site' => $visiblePrimarySite?->name,
+                'profile_photo_url' => $this->profilePhotoUrl($profile, $profilePhotos),
                 'bio' => $profile->bio,
                 'start_date' => $profile->start_date?->toDateString(),
                 'employment_type' => $profile->employment_type,
@@ -182,22 +213,277 @@ class DirectoryController extends Controller
             'kudosCount' => $kudosCount,
             'complianceSummary' => $complianceSummary,
             'goals' => $goals,
-            'canManage' => $canManage,
+            // Retained for the existing modal contract; it gates only the
+            // bounded compliance roll-up in that component.
+            'canManage' => $canViewCompliance,
         ]);
     }
 
-    public function uploadPhoto(Request $request, HrEmployeeProfile $profile)
-    {
+    public function uploadPhoto(
+        Request $request,
+        string $profile,
+        HrCurrentStaffService $currentStaff,
+        UserSiteAccessService $siteAccess,
+        PeopleMutationLockService $mutationLocks,
+        HrProfilePhotoStorageService $profilePhotos,
+    ) {
         $user = $request->user();
-        abort_unless($user && ($user->id === $profile->user_id || $user->canDo('hr.employees.manage')), 403);
+        $profile = $this->currentVisibleProfile(
+            $profile,
+            $user,
+            $currentStaff,
+            $siteAccess,
+        );
+        abort_unless(
+            $user->id === $profile->user_id || $user->canDo('hr.employees.manage'),
+            403,
+        );
 
         $request->validate([
             'photo' => ['required', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
         ]);
 
-        $path = $request->file('photo')->store("hr/photos/{$profile->id}", 'public');
-        $profile->update(['profile_photo_path' => $path]);
+        $photo = $request->file('photo');
+        abort_unless($photo instanceof UploadedFile, 422);
+        $newPath = null;
+        $committed = false;
+
+        try {
+            $newPath = DB::transaction(function () use (
+                $user,
+                $profile,
+                $photo,
+                $currentStaff,
+                $mutationLocks,
+                $profilePhotos,
+                &$committed,
+                &$newPath,
+            ): string {
+                $locked = $mutationLocks->lock(
+                    [$user->id, $profile->user_id],
+                    [$profile->id],
+                );
+                $lockedActor = $locked['users']->get($user->id);
+                $lockedProfile = $locked['profiles']->get($profile->id);
+                abort_unless(
+                    $lockedActor instanceof User
+                        && $lockedProfile instanceof HrEmployeeProfile
+                        && ! $lockedProfile->trashed()
+                        && $currentStaff->isCurrent($lockedActor),
+                    404,
+                );
+
+                // A fresh access service is intentional: the pre-validation
+                // visibility decision must not be reused after the lock wait.
+                $lockedSiteAccess = new UserSiteAccessService;
+                abort_unless(
+                    $this->isCurrentVisibleProfile(
+                        (int) $lockedProfile->id,
+                        $lockedActor,
+                        $lockedSiteAccess,
+                    ),
+                    404,
+                );
+                abort_unless(
+                    $lockedActor->id === $lockedProfile->user_id
+                        || $lockedActor->canDo('hr.employees.manage'),
+                    403,
+                );
+
+                $oldPath = $lockedProfile->profile_photo_path;
+                $storedPath = $this->storeProfilePhoto(
+                    $photo,
+                    (int) $lockedProfile->id,
+                    $profilePhotos,
+                );
+                $newPath = is_string($storedPath) ? $storedPath : null;
+                if (! $profilePhotos->isOwnedPath($newPath, (int) $lockedProfile->id)
+                    || ! $profilePhotos->privateExists($newPath, (int) $lockedProfile->id)) {
+                    throw ValidationException::withMessages([
+                        'photo' => 'The photo could not be stored. Please try again.',
+                    ]);
+                }
+
+                $this->persistProfilePhoto($lockedProfile, $newPath);
+                DB::afterCommit(function () use (
+                    $lockedProfile,
+                    $oldPath,
+                    $newPath,
+                    $profilePhotos,
+                    &$committed,
+                ): void {
+                    // Mark the database write committed before any fallible
+                    // cleanup. The outer catch must never remove the new object
+                    // after the row has begun referencing it.
+                    $committed = true;
+
+                    try {
+                        $persistedPath = $this->persistedProfilePhotoPath((int) $lockedProfile->id);
+                        if ($oldPath !== $newPath && $persistedPath !== $oldPath) {
+                            $profilePhotos->deleteEverywhere($oldPath, (int) $lockedProfile->id);
+                        }
+                    } catch (Throwable $exception) {
+                        $this->reportWithoutThrowing($exception);
+                    }
+                });
+
+                return $newPath;
+            }, 1);
+            $committed = true;
+        } catch (Throwable $exception) {
+            if (! $committed) {
+                $this->deletePrivateWithoutThrowing(
+                    $profilePhotos,
+                    $newPath,
+                    (int) $profile->id,
+                );
+            }
+
+            throw $exception;
+        }
 
         return redirect()->back()->with('success', 'Photo updated.');
+    }
+
+    public function photo(
+        Request $request,
+        string $profile,
+        HrCurrentStaffService $currentStaff,
+        UserSiteAccessService $siteAccess,
+        HrProfilePhotoStorageService $profilePhotos,
+    ) {
+        $profile = $this->currentVisibleProfile(
+            $profile,
+            $request->user(),
+            $currentStaff,
+            $siteAccess,
+        );
+        $path = $profile->profile_photo_path;
+        $response = $profilePhotos->response($path, (int) $profile->id, [
+            'Cache-Control' => 'private, max-age=300',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+        abort_unless($response, 404);
+
+        return $response;
+    }
+
+    public function concealInvalidProfile(): never
+    {
+        abort(404);
+    }
+
+    protected function storeProfilePhoto(
+        UploadedFile $photo,
+        int $profileId,
+        HrProfilePhotoStorageService $profilePhotos,
+    ): string|false {
+        return $profilePhotos->store($photo, $profileId);
+    }
+
+    protected function persistProfilePhoto(HrEmployeeProfile $profile, string $path): void
+    {
+        $profile->update(['profile_photo_path' => $path]);
+    }
+
+    protected function persistedProfilePhotoPath(int $profileId): ?string
+    {
+        return HrEmployeeProfile::query()
+            ->whereKey($profileId)
+            ->value('profile_photo_path');
+    }
+
+    private function currentVisibleProfile(
+        string $routeProfileId,
+        ?User $viewer,
+        HrCurrentStaffService $currentStaff,
+        UserSiteAccessService $siteAccess,
+    ): HrEmployeeProfile {
+        abort_unless($viewer && $currentStaff->isCurrent($viewer), 404);
+        $profileId = $this->boundedRouteId($routeProfileId);
+        $profile = HrEmployeeProfile::query()
+            ->whereKey($profileId)
+            ->whereIn(
+                'user_id',
+                $this->visibleCurrentStaffQuery($viewer, $siteAccess)->select('users.id'),
+            )
+            ->first();
+        abort_unless($profile, 404);
+
+        return $profile;
+    }
+
+    private function isCurrentVisibleProfile(
+        int $profileId,
+        User $viewer,
+        UserSiteAccessService $siteAccess,
+    ): bool {
+        return HrEmployeeProfile::query()
+            ->whereKey($profileId)
+            ->whereIn(
+                'user_id',
+                $this->visibleCurrentStaffQuery($viewer, $siteAccess)->select('users.id'),
+            )
+            ->exists();
+    }
+
+    private function boundedRouteId(string $value): int
+    {
+        $normalized = ltrim($value, '0');
+        $maximum = (string) PHP_INT_MAX;
+        abort_unless(
+            ctype_digit($value)
+                && $normalized !== ''
+                && (strlen($normalized) < strlen($maximum)
+                    || (strlen($normalized) === strlen($maximum) && strcmp($normalized, $maximum) <= 0)),
+            404,
+        );
+
+        return (int) $normalized;
+    }
+
+    private function profilePhotoUrl(
+        HrEmployeeProfile $profile,
+        HrProfilePhotoStorageService $profilePhotos,
+    ): ?string {
+        $path = $profile->profile_photo_path;
+        if ($profilePhotos->readableDisk($path, (int) $profile->id) === null) {
+            return null;
+        }
+
+        return route('hr.directory.photo', ['profile' => $profile->id]);
+    }
+
+    private function deletePrivateWithoutThrowing(
+        HrProfilePhotoStorageService $profilePhotos,
+        mixed $path,
+        int $profileId,
+    ): void {
+        try {
+            $profilePhotos->deletePrivate($path, $profileId);
+        } catch (Throwable $exception) {
+            $this->reportWithoutThrowing($exception);
+        }
+    }
+
+    private function reportWithoutThrowing(Throwable $exception): void
+    {
+        try {
+            report($exception);
+        } catch (Throwable) {
+            // Cleanup/reporting failures must never corrupt the committed
+            // database-to-object reference or mask the primary exception.
+        }
+    }
+
+    /** @return Builder<User> */
+    private function visibleCurrentStaffQuery(
+        User $viewer,
+        UserSiteAccessService $siteAccess,
+    ): Builder {
+        $query = User::query();
+        $siteAccess->applyStaffScope($query, $viewer);
+
+        return $query;
     }
 }

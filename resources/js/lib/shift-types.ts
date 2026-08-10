@@ -1,5 +1,5 @@
-import { Briefcase, Moon, Phone, Plane, Split } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { Briefcase, Moon, Phone, Plane, Split } from 'lucide-react';
 
 export type ShiftTypeKey =
     | 'standard'
@@ -66,7 +66,10 @@ export const SHIFT_TYPE_BY_KEY: Record<ShiftTypeKey, ShiftTypeMeta> =
     );
 
 export function shiftTypeMeta(key: string | null | undefined): ShiftTypeMeta {
-    return SHIFT_TYPE_BY_KEY[(key ?? 'standard') as ShiftTypeKey] ?? SHIFT_TYPE_BY_KEY.standard;
+    return (
+        SHIFT_TYPE_BY_KEY[(key ?? 'standard') as ShiftTypeKey] ??
+        SHIFT_TYPE_BY_KEY.standard
+    );
 }
 
 export const SHIFT_TYPE_ACCENT_CLASSES: Record<

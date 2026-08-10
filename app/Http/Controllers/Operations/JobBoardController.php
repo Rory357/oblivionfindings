@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
+use App\Models\CoverageReservation;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\User;
@@ -10,6 +11,7 @@ use App\Services\CoverageReservationService;
 use App\Services\Eligibility\EligibilityResult;
 use App\Services\ShiftReplacementService;
 use App\Services\ShiftStaffEligibilityService;
+use App\Services\UserSiteAccessService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -21,6 +23,10 @@ use Illuminate\Validation\ValidationException;
 class JobBoardController extends Controller
 {
     protected const RECENT_WEEKS_LOOKBACK = 26;
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     public function index(Request $request)
     {
@@ -52,7 +58,7 @@ class JobBoardController extends Controller
         $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
 
         $positions = ShiftOpenPosition::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
             ->with([
                 'shift:id,client_id,starts_at,ends_at,location,status,user_id,coverage_roles',
                 'shift.client:id,first_name,last_name,site_id,suburb,city',
@@ -124,7 +130,7 @@ class JobBoardController extends Controller
             ->withQueryString();
 
         $statsQuery = ShiftOpenPosition::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']));
         $availableSkills = $this->availableSkills($auth);
 
         $positionItems = $positions->getCollection();
@@ -164,7 +170,7 @@ class JobBoardController extends Controller
             ->count();
 
         $myClaimsCount = ShiftOpenPosition::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
             ->where('claimed_by', $auth->id)
             ->where(function ($nested) {
                 $nested->where('status', 'claimed')
@@ -192,7 +198,7 @@ class JobBoardController extends Controller
             : 0;
 
         $sitesCount = ShiftOpenPosition::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('shift_open_positions.organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
             ->where('shift_open_positions.status', 'open')
             ->where(function ($query) {
                 $query->whereNull('shift_open_positions.expires_at')
@@ -205,6 +211,7 @@ class JobBoardController extends Controller
             ->count('clients.site_id');
 
         $sitesWorkedThisWeek = Shift::query()
+            ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth))
             ->where('shifts.user_id', $auth->id)
             ->where('shifts.starts_at', '>=', $weekStart)
             ->where('shifts.starts_at', '<=', $weekEnd)
@@ -217,7 +224,7 @@ class JobBoardController extends Controller
             'jobs' => $formattedJobs,
             'filters' => array_merge($filters, [
                 'scope' => $scope,
-                'week' => $weekStart->toDateString(),
+                'week' => $weekFilterRequested ? $weekStart->toDateString() : null,
             ]),
             'available_skills' => $availableSkills,
             'week' => [
@@ -273,10 +280,11 @@ class JobBoardController extends Controller
         ]);
 
         $shift = Shift::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
             ->findOrFail($data['shift_id']);
 
         $existingActivePosition = ShiftOpenPosition::query()
+            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
             ->where('shift_id', $shift->id)
             ->whereIn('status', ['open', 'claimed'])
             ->exists();
@@ -289,8 +297,12 @@ class JobBoardController extends Controller
 
         try {
             DB::transaction(function () use ($auth, $data, $shift) {
-                $lockedShift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
+                $lockedShift = Shift::query()
+                    ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
+                    ->lockForUpdate()
+                    ->findOrFail($shift->id);
                 $existingActivePosition = ShiftOpenPosition::query()
+                    ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
                     ->where('shift_id', $lockedShift->id)
                     ->whereIn('status', ['open', 'claimed'])
                     ->exists();
@@ -302,7 +314,6 @@ class JobBoardController extends Controller
                 }
 
                 ShiftOpenPosition::create([
-                    'organization_id' => $auth->organization_id,
                     'shift_id' => $lockedShift->id,
                     'replacement_request_id' => app(ShiftReplacementService::class)->activeForShift($lockedShift)?->id,
                     'status' => 'open',
@@ -322,7 +333,7 @@ class JobBoardController extends Controller
 
         // Surface the new position's skills in the filter chips immediately
         // rather than waiting out the short cache TTL.
-        Cache::forget($this->availableSkillsCacheKey($auth->organization_id));
+        Cache::forget($this->availableSkillsCacheKey($auth));
 
         return redirect()->back()->with('success', 'Open position published.');
     }
@@ -352,7 +363,7 @@ class JobBoardController extends Controller
         abort_unless($this->canClaimPositions($auth), 403);
 
         $position = ShiftOpenPosition::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
             ->with(['shift', 'replacementRequest', 'claimer'])
             ->findOrFail($position);
 
@@ -397,9 +408,12 @@ class JobBoardController extends Controller
 
         try {
             DB::transaction(function () use ($position, $auth, $reservation) {
-                $position = ShiftOpenPosition::query()->lockForUpdate()->findOrFail($position->id);
+                $position = ShiftOpenPosition::query()
+                    ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
+                    ->lockForUpdate()
+                    ->findOrFail($position->id);
                 if ($position->status !== 'open') {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'claim' => 'This position was just claimed by another worker.',
                     ]);
                 }
@@ -432,7 +446,7 @@ class JobBoardController extends Controller
         abort_unless($this->canApprovePositions($auth), 403);
 
         $position = ShiftOpenPosition::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
             ->with(['shift', 'replacementRequest'])
             ->where('status', 'claimed')
             ->findOrFail($position);
@@ -447,6 +461,16 @@ class JobBoardController extends Controller
         if (! $assignee) {
             return redirect()->back()->withErrors([
                 'position' => 'The claimed worker is no longer available for assignment.',
+            ]);
+        }
+
+        $shiftSiteId = $this->siteAccess->shiftSiteId($position->shift);
+        $eligibleAssignee = User::query()->whereKey($assignee->id);
+        if (! $shiftSiteId || ! $this->siteAccess
+            ->applyFleetRecipientEligibility($eligibleAssignee, $shiftSiteId)
+            ->exists()) {
+            return redirect()->back()->withErrors([
+                'position' => 'The claimed worker is no longer eligible to work at this Shift Site.',
             ]);
         }
 
@@ -471,7 +495,7 @@ class JobBoardController extends Controller
             ]);
         }
 
-        $reservation = \App\Models\CoverageReservation::query()
+        $reservation = CoverageReservation::query()
             ->where('shift_open_position_id', $position->id)
             ->where('status', CoverageReservationService::STATUS_ACTIVE)
             ->latest('id')
@@ -484,11 +508,12 @@ class JobBoardController extends Controller
         try {
             DB::transaction(function () use ($position, $auth, $reservation) {
                 $position = ShiftOpenPosition::query()
+                    ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
                     ->with('shift')
                     ->lockForUpdate()
                     ->findOrFail($position->id);
                 if ($position->status !== 'claimed') {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'position' => 'This claim is no longer active.',
                     ]);
                 }
@@ -505,6 +530,7 @@ class JobBoardController extends Controller
                 ]);
 
                 ShiftOpenPosition::query()
+                    ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
                     ->where('shift_id', $position->shift_id)
                     ->where('id', '!=', $position->id)
                     ->whereIn('status', ['open', 'claimed'])
@@ -567,8 +593,7 @@ class JobBoardController extends Controller
         ?EligibilityResult $positionEligibilityResult = null,
         ?bool $viewerCanSeeSensitive = null,
         ?int $pastShiftsHere = null,
-    ): array
-    {
+    ): array {
         $canViewSensitiveDetails = $this->canViewSensitivePositionDetails($position, $viewer, $viewerCanSeeSensitive);
         $viewerEligibilityResult ??= $this->evaluateViewerEligibility($position, $viewer);
         $viewerEligibility = $viewerEligibilityResult
@@ -952,12 +977,12 @@ class JobBoardController extends Controller
     protected function availableSkills(User $viewer): array
     {
         // The chip list plucks + JSON-decodes required_skills for every open
-        // position on each load. Cache the derived list per organization for a
+        // position on each load. Cache the derived list per accessible Site set for a
         // short TTL so the decode does not run on every request; the brief
         // staleness window avoids needing explicit cross-writer invalidation.
-        return Cache::remember($this->availableSkillsCacheKey($viewer->organization_id), 60, function () use ($viewer) {
+        return Cache::remember($this->availableSkillsCacheKey($viewer), 60, function () use ($viewer) {
             return ShiftOpenPosition::query()
-                ->when($viewer->organization_id, fn ($q) => $q->where('organization_id', $viewer->organization_id))
+                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $viewer, ['reports.viewAny']))
                 ->where('status', 'open')
                 ->where(function ($query) {
                     $query->whereNull('expires_at')
@@ -974,9 +999,11 @@ class JobBoardController extends Controller
         });
     }
 
-    protected function availableSkillsCacheKey(?int $organizationId): string
+    protected function availableSkillsCacheKey(User $viewer): string
     {
-        return sprintf('job_board:available_skills:org:%s', $organizationId ?? 'none');
+        $siteIds = $this->siteAccess->accessibleSiteIds($viewer, ['reports.viewAny']);
+
+        return 'job_board:available_skills:sites:'.sha1(json_encode($siteIds, JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -1005,6 +1032,7 @@ class JobBoardController extends Controller
                     checked_rules: [],
                     overrideable_warnings: [],
                 );
+
                 continue;
             }
 
@@ -1016,6 +1044,7 @@ class JobBoardController extends Controller
                     checked_rules: [],
                     overrideable_warnings: [],
                 );
+
                 continue;
             }
 

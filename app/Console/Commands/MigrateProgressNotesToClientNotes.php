@@ -108,7 +108,6 @@ class MigrateProgressNotesToClientNotes extends Command
             'shift_id' => $note->shift_id,
             'care_plan_goal_id' => $note->care_plan_goal_id,
             'user_id' => $note->author_id,
-            'organization_id' => $note->organization_id,
             'type' => 'progress_note',
             'category' => $note->note_type,
             'subject' => ucfirst(str_replace('_', ' ', (string) $note->note_type))

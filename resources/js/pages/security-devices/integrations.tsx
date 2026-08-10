@@ -1,171 +1,440 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { PageHero } from '@/components/page';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Check,
     CheckCircle2,
-    Clock,
     Database,
+    MapPin,
     Plug,
-    Radio,
-    Shield,
+    RefreshCw,
 } from 'lucide-react';
+import type { HTMLAttributes } from 'react';
 
 import { StatCard, formatTimeSince } from './devices/shared';
 
-// ── Types ─────────────────────────────────────────────────────────
-
-type ConnectionStatus =
-    | 'connected'
-    | 'disconnected'
-    | 'error'
-    | 'not_configured';
-
-type ImplementationStatus = 'live' | 'planned';
-
-type Provider = {
+export type ProviderException = {
+    type: string;
+    summary: string;
+    action: string;
+    href: string | null;
+    count: number;
+};
+export type Provider = {
     slug: string;
     name: string;
     vendor: string;
     summary: string;
-    implementation_status: ImplementationStatus;
     capabilities: string[];
     device_scope: string[];
     docs_href: string | null;
-
-    connection_status: ConnectionStatus;
+    connection_status:
+        | 'connected'
+        | 'disconnected'
+        | 'error'
+        | 'untested'
+        | 'disabled'
+        | 'unavailable'
+        | 'not_configured';
     connected: boolean;
     last_tested_at: string | null;
     last_synced_at: string | null;
-    secret_last4: string | null;
     device_count: number;
     events_24h: number;
+    credential?: {
+        configured: boolean;
+        reference: string | null;
+        reference_label: string | null;
+        display_state:
+            | 'provider_connection_configured'
+            | 'site_credentials_configured'
+            | 'not_configured';
+        rotation_state: string;
+        rotation_cadence_days: number;
+        rotated_at: string | null;
+        created_at: string | null;
+        last_tested_at: string | null;
+        site_credentials: {
+            total: number;
+            enabled: number;
+            needs_attention: number;
+            capabilities: string[];
+        };
+    };
+    site_mapping: {
+        total: number;
+        mapped: number;
+        unmapped: number;
+        sites: Array<{ id: number; name: string | null; state: string }>;
+    };
+    sync: {
+        status: string;
+        freshness: string;
+        last_synced_at: string | null;
+        items_processed: number;
+        items_errored: number;
+        stale_site_count: number;
+        affected_site_count: number;
+        summary: string | null;
+    };
+    reconciliation: {
+        imported_devices: number;
+        unassigned_devices: number;
+        duplicate_candidates: number;
+        unsupported_checks: number;
+    };
+    monitoring_support: {
+        state: 'supported' | 'capability_absent';
+        scope: 'provider';
+        note: string;
+    };
+    runtime: {
+        version: string;
+        contract_state:
+            | 'native_runtime_only'
+            | 'connection_health_only'
+            | 'inventory_sync'
+            | 'topology_collection';
+        contract_label: string;
+        contract_note: string;
+        capabilities: string[];
+        page_limit: number;
+        minimum_interval_seconds: number;
+        backfill_limit: number;
+        cursor_scopes: number;
+        partial_scopes: number;
+        exception_count: number;
+        latest_completed_at: string | null;
+        latest_exception_at: string | null;
+        exception_codes: string[];
+        disconnect_ready: boolean;
+        revoke_ready: boolean;
+    };
+    exceptions: ProviderException[];
+    exception_count: number;
 };
+
+function ConnectionBadge({ provider }: { provider: Provider }) {
+    if (provider.connection_status === 'connected')
+        return (
+            <Badge className="gap-1 bg-status-success text-white">
+                <CheckCircle2 className="h-3 w-3" />
+                Connected
+            </Badge>
+        );
+    if (provider.connection_status === 'error')
+        return (
+            <Badge variant="destructive" className="gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Error
+            </Badge>
+        );
+    if (provider.connection_status === 'untested')
+        return (
+            <Badge variant="secondary" className="gap-1">
+                <Plug className="h-3 w-3" />
+                Not tested
+            </Badge>
+        );
+    if (provider.connection_status === 'disabled')
+        return (
+            <Badge variant="secondary" className="gap-1">
+                <Plug className="h-3 w-3" />
+                Disabled
+            </Badge>
+        );
+    if (provider.connection_status === 'unavailable')
+        return (
+            <Badge variant="outline" className="gap-1">
+                <Plug className="h-3 w-3" />
+                Cloud API unavailable
+            </Badge>
+        );
+    return (
+        <Badge variant="secondary" className="gap-1">
+            <Plug className="h-3 w-3" />
+            {provider.connection_status === 'not_configured'
+                ? 'Not configured'
+                : 'Disconnected'}
+        </Badge>
+    );
+}
+
+export function CredentialRotationStatus({
+    state,
+    cadenceDays,
+    ...props
+}: {
+    state: string;
+    cadenceDays: number;
+} & HTMLAttributes<HTMLParagraphElement>) {
+    const presentation =
+        state === 'rotation_due'
+            ? {
+                  label: `Rotation due (${cadenceDays}-day cadence)`,
+                  variant: 'warning',
+                  className: 'text-status-warning',
+              }
+            : state === 'current'
+              ? {
+                    label: 'Rotation current',
+                    variant: 'default',
+                    className: 'text-muted-foreground',
+                }
+              : state === 'not_configured'
+                ? {
+                      label: 'Credential not configured',
+                      variant: 'secondary',
+                      className: 'text-muted-foreground',
+                  }
+                : {
+                      label: 'Rotation status unknown',
+                      variant: 'secondary',
+                      className: 'text-muted-foreground',
+                  };
+
+    return (
+        <p
+            {...props}
+            className={`${presentation.className} ${props.className ?? ''}`.trim()}
+            data-variant={presentation.variant}
+        >
+            {presentation.label}
+        </p>
+    );
+}
+
+export function ProviderCard({
+    provider,
+    canManage,
+}: {
+    provider: Provider;
+    canManage: boolean;
+}) {
+    return (
+        <Card className="min-w-0">
+            <CardHeader className="space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <CardTitle>{provider.name}</CardTitle>
+                        <p className="text-xs text-muted-foreground">
+                            {provider.vendor}
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                        <Badge variant="outline">
+                            {provider.runtime.contract_label}
+                        </Badge>
+                        <ConnectionBadge provider={provider} />
+                    </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                    {provider.summary}
+                </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-lg border p-3">
+                        <p className="text-muted-foreground">Imported</p>
+                        <p className="text-xl font-semibold">
+                            {provider.reconciliation.imported_devices}
+                        </p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                        <p className="text-muted-foreground">Site mapping</p>
+                        <p className="font-semibold">
+                            {provider.site_mapping.mapped} of{' '}
+                            {provider.site_mapping.total}
+                        </p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                        <p className="text-muted-foreground">Last sync</p>
+                        <p className="font-medium capitalize">
+                            {provider.sync.freshness === 'never'
+                                ? 'Not run'
+                                : formatTimeSince(provider.sync.last_synced_at)}
+                        </p>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                        <p className="text-muted-foreground">Exceptions</p>
+                        <p className="text-xl font-semibold">
+                            {provider.exception_count}
+                        </p>
+                    </div>
+                </div>
+
+                {provider.credential ? (
+                    <div className="rounded-lg bg-muted/40 p-3 text-sm">
+                        <p className="font-medium">
+                            {provider.credential.reference_label ??
+                                (provider.credential.display_state ===
+                                'site_credentials_configured'
+                                    ? 'Site credentials configured'
+                                    : 'Credential not configured')}
+                        </p>
+                        <CredentialRotationStatus
+                            state={provider.credential.rotation_state}
+                            cadenceDays={
+                                provider.credential.rotation_cadence_days
+                            }
+                        />
+                    </div>
+                ) : null}
+
+                <section
+                    aria-label={`${provider.name} runtime capabilities`}
+                    className="rounded-lg border p-3 text-sm"
+                >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="font-semibold">
+                            Runtime contract v{provider.runtime.version}
+                        </h3>
+                        <Badge
+                            variant={
+                                provider.monitoring_support.state ===
+                                'supported'
+                                    ? 'outline'
+                                    : 'secondary'
+                            }
+                        >
+                            {provider.monitoring_support.state === 'supported'
+                                ? 'Monitoring capable'
+                                : 'Monitoring capability absent'}
+                        </Badge>
+                    </div>
+                    <p className="mt-2 text-muted-foreground">
+                        {provider.runtime.capabilities.length
+                            ? provider.runtime.capabilities
+                                  .map((value) => value.replaceAll('_', ' '))
+                                  .join(', ')
+                            : 'No runtime capabilities declared'}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        Page limit {provider.runtime.page_limit} · minimum
+                        interval {provider.runtime.minimum_interval_seconds}s ·
+                        backfill limit {provider.runtime.backfill_limit} ·{' '}
+                        {provider.runtime.cursor_scopes} cursor scopes ·{' '}
+                        {provider.runtime.exception_count} runtime exceptions
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        {provider.runtime.contract_note}
+                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        {provider.monitoring_support.note}
+                    </p>
+                </section>
+
+                <section
+                    aria-label={`${provider.name} exceptions`}
+                    className="space-y-2"
+                >
+                    <h3 className="text-sm font-semibold">Required action</h3>
+                    {provider.exceptions.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            No current reconciliation exceptions.
+                        </p>
+                    ) : (
+                        provider.exceptions.map((exception) => (
+                            <div
+                                key={exception.type}
+                                className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm"
+                            >
+                                <p>{exception.summary}</p>
+                                {exception.href ? (
+                                    <Link
+                                        className="frontline-focus mt-2 inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline"
+                                        href={exception.href}
+                                    >
+                                        {exception.action}
+                                    </Link>
+                                ) : (
+                                    <p className="mt-2 text-muted-foreground">
+                                        Ask an integration manager to{' '}
+                                        {exception.action.toLowerCase()}.
+                                    </p>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </section>
+
+                {provider.docs_href && canManage ? (
+                    <Button asChild className="min-h-11 w-full sm:w-auto">
+                        <Link href={provider.docs_href}>
+                            Open {provider.name} diagnostics
+                        </Link>
+                    </Button>
+                ) : null}
+            </CardContent>
+        </Card>
+    );
+}
 
 type Props = {
     providers: Provider[];
     stats: {
         providers_total: number;
-        providers_live: number;
         providers_connected: number;
         providers_errored: number;
         imported_devices: number;
         events_24h: number;
+        exceptions: number;
     };
-    can: {
-        manage: boolean;
+    can: { manage: boolean };
+    boundaries: {
+        sync_stale_after_hours: number;
+        credential_rotation_cadence_days: number;
+        alert_owner: string;
     };
 };
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-function connectionBadge(provider: Provider) {
-    if (provider.implementation_status === 'planned') {
-        return (
-            <Badge variant="outline" className="gap-1">
-                <Clock className="h-3 w-3" /> Planned
-            </Badge>
-        );
-    }
-
-    switch (provider.connection_status) {
-        case 'connected':
-            return (
-                <Badge className="gap-1 bg-status-success text-white hover:bg-status-success">
-                    <CheckCircle2 className="h-3 w-3" /> Connected
-                </Badge>
-            );
-        case 'error':
-            return (
-                <Badge variant="destructive" className="gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Error
-                </Badge>
-            );
-        case 'disconnected':
-            return (
-                <Badge variant="outline" className="gap-1">
-                    <Plug className="h-3 w-3" /> Disconnected
-                </Badge>
-            );
-        default:
-            return (
-                <Badge variant="secondary" className="gap-1">
-                    <Plug className="h-3 w-3" /> Not configured
-                </Badge>
-            );
-    }
-}
-
-function humanCapability(slug: string): string {
-    const map: Record<string, string> = {
-        network: 'Network',
-        cctv: 'CCTV',
-        access_control: 'Access Control',
-        device_health: 'Device health',
-        event_stream: 'Events',
-        tracking: 'Tracking',
-        telemetry: 'Telemetry',
-        iot: 'IoT',
-        environmental: 'Environmental',
-        healthcare_sensors: 'Healthcare sensors',
-        gateway_management: 'Gateway management',
-    };
-    return map[slug] ?? slug;
-}
-
-// ── Page ──────────────────────────────────────────────────────────
-
-export default function IntegrationsHub({ providers, stats, can }: Props) {
-    const breadcrumbs = [
-        { title: 'Security & Devices', href: '/security-devices' },
-        { title: 'APIs & Integrations', href: '/security-devices/integrations' },
-    ];
-
+export default function IntegrationsHub({
+    providers,
+    stats,
+    can,
+    boundaries,
+}: Props) {
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="APIs & Integrations - Security & Devices" />
-
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Security & Devices', href: '/security-devices' },
+                {
+                    title: 'Integrations',
+                    href: '/security-devices/integrations',
+                },
+            ]}
+        >
+            <Head title="Integrations - Security & Devices" />
             <PageShell>
                 <PageHero
                     icon={Plug}
-                    title="APIs & Integrations"
-                    description="Provider credentials, site mapping, sync controls, and exceptions. Devices pages show the result of sync; this hub controls it."
+                    title="Integrations"
+                    description="Connection health, site mapping, sync, and imported-device reconciliation. Provider setup and diagnostics stay in each provider workspace."
                     stats={[
-                        { label: 'Connected', value: stats.providers_connected },
-                        { label: 'Imported', value: stats.imported_devices },
-                        { label: 'Events 24h', value: stats.events_24h },
-                        { label: 'Errored', value: stats.providers_errored },
+                        {
+                            label: 'Connected',
+                            value: stats.providers_connected,
+                        },
+                        {
+                            label: 'Imported devices',
+                            value: stats.imported_devices,
+                        },
+                        { label: 'Exceptions', value: stats.exceptions },
+                        {
+                            label: 'Connection errors',
+                            value: stats.providers_errored,
+                        },
                     ]}
-                    actions={
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">Source of truth</Badge>
-                            {stats.providers_errored > 0 ? (
-                                <Badge variant="destructive" className="gap-1">
-                                    <AlertTriangle className="h-3 w-3" />
-                                    {stats.providers_errored} errored
-                                </Badge>
-                            ) : null}
-                        </div>
-                    }
                 />
-
-                {/* ── Summary strip ─────────────────────────────── */}
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <StatCard
-                        label={`Providers connected (${stats.providers_live} live in platform)`}
+                        label="Connected providers"
                         value={stats.providers_connected}
-                        icon={Check}
+                        icon={Plug}
                     />
                     <StatCard
                         label="Imported devices"
@@ -173,199 +442,41 @@ export default function IntegrationsHub({ providers, stats, can }: Props) {
                         icon={Database}
                     />
                     <StatCard
-                        label="Provider events (24h)"
-                        value={stats.events_24h}
-                        icon={Radio}
-                    />
-                    <StatCard
-                        label="Providers with errors"
-                        value={stats.providers_errored}
+                        label="Reconciliation exceptions"
+                        value={stats.exceptions}
                         icon={AlertTriangle}
                         variant="warning"
                     />
+                    <StatCard
+                        label="Mapped provider sites"
+                        value={providers.reduce(
+                            (sum, provider) =>
+                                sum + provider.site_mapping.mapped,
+                            0,
+                        )}
+                        icon={MapPin}
+                    />
                 </div>
-
-                {/* ── Provider cards ────────────────────────────── */}
-                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                <div className="grid min-w-0 gap-4 xl:grid-cols-3">
                     {providers.map((provider) => (
-                        <Card
+                        <ProviderCard
                             key={provider.slug}
-                            className={
-                                provider.implementation_status === 'planned'
-                                    ? 'border-dashed bg-muted/20'
-                                    : undefined
-                            }
-                        >
-                            <CardHeader className="space-y-3">
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <CardTitle className="text-lg">
-                                            {provider.name}
-                                        </CardTitle>
-                                        <CardDescription className="text-xs">
-                                            {provider.vendor}
-                                        </CardDescription>
-                                    </div>
-                                    {connectionBadge(provider)}
-                                </div>
-                                <p className="text-sm leading-6 text-muted-foreground">
-                                    {provider.summary}
-                                </p>
-                            </CardHeader>
-
-                            <CardContent className="space-y-4">
-                                {/* Capabilities */}
-                                <div className="space-y-2">
-                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        Capabilities
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {provider.capabilities.map((cap) => (
-                                            <Badge
-                                                key={cap}
-                                                variant="secondary"
-                                                className="text-xs font-normal"
-                                            >
-                                                {humanCapability(cap)}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Device scope */}
-                                <div className="space-y-2">
-                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        Device scope
-                                    </p>
-                                    <p className="text-sm leading-6 text-muted-foreground">
-                                        {provider.device_scope.join(' · ')}
-                                    </p>
-                                </div>
-
-                                {/* Live stats — only meaningful for live providers */}
-                                {provider.implementation_status === 'live' ? (
-                                    <div className="grid grid-cols-2 gap-3 rounded-lg border bg-muted/30 p-3">
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">
-                                                Imported devices
-                                            </p>
-                                            <p className="text-xl font-semibold">
-                                                {provider.device_count}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">
-                                                Events (24h)
-                                            </p>
-                                            <p className="text-xl font-semibold">
-                                                {provider.events_24h}
-                                            </p>
-                                        </div>
-                                        <div className="col-span-2 space-y-1 pt-1 text-xs text-muted-foreground">
-                                            <p>
-                                                Last sync:{' '}
-                                                <span className="text-foreground">
-                                                    {formatTimeSince(
-                                                        provider.last_synced_at,
-                                                    )}
-                                                </span>
-                                            </p>
-                                            <p>
-                                                Last tested:{' '}
-                                                <span className="text-foreground">
-                                                    {formatTimeSince(
-                                                        provider.last_tested_at,
-                                                    )}
-                                                </span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="rounded-lg border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
-                                        Adapter not yet implemented. Hub entry
-                                        reserved so site and device pages can
-                                        reference the provider early.
-                                    </div>
-                                )}
-
-                                {/* Actions */}
-                                <div className="flex flex-wrap items-center gap-2 pt-1">
-                                    {provider.implementation_status === 'live' &&
-                                    provider.docs_href ? (
-                                        <Button asChild size="sm">
-                                            <Link href={provider.docs_href}>
-                                                {provider.connected
-                                                    ? 'Manage'
-                                                    : 'Configure'}
-                                            </Link>
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            disabled
-                                        >
-                                            Adapter planned
-                                        </Button>
-                                    )}
-                                    {provider.connected && can.manage ? (
-                                        <Badge
-                                            variant="outline"
-                                            className="gap-1 text-xs"
-                                        >
-                                            Credentials: {'•••• '}
-                                            {provider.secret_last4 ?? '----'}
-                                        </Badge>
-                                    ) : null}
-                                </div>
-                            </CardContent>
-                        </Card>
+                            provider={provider}
+                            canManage={can.manage}
+                        />
                     ))}
                 </div>
-
-                {/* ── Ownership guidance ───────────────────────── */}
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Where integration work lives</CardTitle>
-                        <CardDescription>
-                            Ownership rules to keep Security & Devices, Sites,
-                            and Control Room cleanly separated.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-3 md:grid-cols-3">
-                        <div className="flex items-start gap-3 rounded-xl border p-4">
-                            <Shield className="mt-0.5 h-4 w-4 text-primary" />
-                            <div className="space-y-1 text-sm">
-                                <p className="font-medium">Here</p>
-                                <p className="leading-6 text-muted-foreground">
-                                    Provider credentials, site mapping, sync
-                                    schedules, and exceptions. Nothing else
-                                    manages these.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-start gap-3 rounded-xl border p-4">
-                            <Plug className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                            <div className="space-y-1 text-sm">
-                                <p className="font-medium">Sites / Houses</p>
-                                <p className="leading-6 text-muted-foreground">
-                                    Read-only view of assigned hardware and
-                                    provider health at the site level. No
-                                    credentials or sync here.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-start gap-3 rounded-xl border p-4">
-                            <Radio className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                            <div className="space-y-1 text-sm">
-                                <p className="font-medium">Control Room</p>
-                                <p className="leading-6 text-muted-foreground">
-                                    Signals from providers route into Control
-                                    Room for triage. Alert state lives there,
-                                    not here.
-                                </p>
-                            </div>
-                        </div>
+                    <CardContent className="flex flex-wrap items-start gap-3 p-5 text-sm text-muted-foreground">
+                        <RefreshCw className="mt-0.5 h-4 w-4" />
+                        <p>
+                            Sync is marked stale after{' '}
+                            {boundaries.sync_stale_after_hours} hours.
+                            Credential rotation uses a declared{' '}
+                            {boundaries.credential_rotation_cadence_days}-day
+                            review cadence. Correlated operational alerts remain
+                            owned by {boundaries.alert_owner}.
+                        </p>
                     </CardContent>
                 </Card>
             </PageShell>

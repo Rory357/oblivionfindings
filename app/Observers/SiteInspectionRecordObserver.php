@@ -29,7 +29,6 @@ class SiteInspectionRecordObserver implements ShouldHandleEventsAfterCommit
                 'reported_at' => $record->created_at,
                 'site_id' => $record->site_id,
                 'staff_id' => $record->completed_by_user_id,
-                'organization_id' => $record->tenant_id,
                 'created_by' => $record->completed_by_user_id,
             ]);
         } catch (\Throwable $e) {

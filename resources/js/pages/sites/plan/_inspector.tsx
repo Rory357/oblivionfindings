@@ -30,7 +30,12 @@ import {
     SendToBack,
     Trash2,
 } from 'lucide-react';
-import { createElement, useState, type CSSProperties, type Dispatch } from 'react';
+import {
+    createElement,
+    useState,
+    type CSSProperties,
+    type Dispatch,
+} from 'react';
 import EmergencyChecklist from './_emergency-checklist';
 import {
     DOOR_SUBKIND_LABELS,
@@ -158,7 +163,7 @@ export default function PlanInspector({
                     Use the <strong>Set scale</strong> tool on the canvas for a
                     click-and-measure calibration. Walls show their length live.
                 </p>
-            <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/50 px-2 py-2">
+                <div className="mt-3 flex items-center justify-between rounded-md border bg-muted/50 px-2 py-2">
                     <div>
                         <Label className="text-xs">Snap to grid</Label>
                         <p className="text-[11px] text-muted-foreground">
@@ -194,7 +199,7 @@ export default function PlanInspector({
                                     key={group.id}
                                     className="flex items-center justify-between"
                                 >
-                                        <span className="text-xs text-muted-foreground">
+                                    <span className="text-xs text-muted-foreground">
                                         {group.label}
                                     </span>
                                     <Switch
@@ -254,9 +259,10 @@ export default function PlanInspector({
                                 return (
                                     <div
                                         key={room.id}
-                                                className={`rounded-md border p-2 ${selected ? 'border-primary bg-primary/10' : ''}`}
+                                        className={`rounded-md border p-2 ${selected ? 'border-primary bg-primary/10' : ''}`}
                                     >
-                                        <Button unstyled
+                                        <Button
+                                            unstyled
                                             type="button"
                                             className="block w-full text-left"
                                             onClick={() =>
@@ -366,10 +372,11 @@ export default function PlanInspector({
                                 return (
                                     <div
                                         key={id}
-                                                className={`rounded-md border p-2 ${selected ? 'border-primary bg-primary/10' : ''}`}
+                                        className={`rounded-md border p-2 ${selected ? 'border-primary bg-primary/10' : ''}`}
                                     >
                                         <div className="flex items-start justify-between gap-2">
-                                            <Button unstyled
+                                            <Button
+                                                unstyled
                                                 type="button"
                                                 className="block flex-1 text-left"
                                                 onClick={() =>
@@ -539,7 +546,7 @@ function SelectionDetails({
                 <h3 className="mb-2 text-sm font-medium">
                     Room — {room.label ?? 'Unnamed'}
                 </h3>
-                    <dl className="space-y-1 text-xs text-muted-foreground">
+                <dl className="space-y-1 text-xs text-muted-foreground">
                     <div className="flex justify-between">
                         <dt>Width</dt>
                         <dd>{formatMeters(room.width * canvasWidth, mpu)}</dd>
@@ -594,7 +601,7 @@ function SelectionDetails({
         return (
             <div className="rounded-md border p-3">
                 <h3 className="mb-2 text-sm font-medium">Wall</h3>
-                    <dl className="space-y-1 text-xs text-muted-foreground">
+                <dl className="space-y-1 text-xs text-muted-foreground">
                     <div className="flex justify-between">
                         <dt>Length</dt>
                         <dd>{formatMeters(length, mpu)}</dd>
@@ -645,7 +652,7 @@ function SelectionDetails({
                     {kindMeta?.label ?? pin.kind.replaceAll('_', ' ')}
                 </h3>
                 {validationError && (
-            <div className="rounded-md border border-status-critical/30 bg-status-critical-bg px-2 py-1 text-xs text-status-critical">
+                    <div className="rounded-md border border-status-critical/30 bg-status-critical-bg px-2 py-1 text-xs text-status-critical">
                         {validationError}
                     </div>
                 )}
@@ -820,7 +827,7 @@ function SelectionDetails({
                     </Badge>
                 </div>
                 {!normalised.wall_id && (
-            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
+                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
                         Drag this door close to a wall to create a clean
                         opening.
                     </div>
@@ -1003,7 +1010,7 @@ function SelectionDetails({
                     </Badge>
                 </div>
                 {!item.wall_id && (
-            <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
+                    <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
                         Drag this window close to a wall to align it with the
                         plan.
                     </div>
@@ -1234,7 +1241,7 @@ function PinKindPicker({
                 <div className="max-h-[360px] space-y-2 overflow-y-auto">
                     {groups.map((group) => (
                         <div key={group.id}>
-                    <div className="mb-1 px-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                            <div className="mb-1 px-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                                 {group.label}
                             </div>
                             <div className="grid grid-cols-3 gap-1">
@@ -1244,7 +1251,8 @@ function PinKindPicker({
                                     const Icon = resolveIcon(kind.icon);
                                     const active = pin.kind === kindKey;
                                     return (
-                                        <Button unstyled
+                                        <Button
+                                            unstyled
                                             key={kindKey}
                                             type="button"
                                             onClick={() => changeKind(kindKey)}

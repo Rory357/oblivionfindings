@@ -49,11 +49,17 @@ export function CircularGauge({
         return { remaining, fillColor, dashOffset };
     }, [value, max, circumference, color]);
 
-    const displayValue = remaining % 1 === 0 ? remaining.toFixed(0) : remaining.toFixed(1);
+    const displayValue =
+        remaining % 1 === 0 ? remaining.toFixed(0) : remaining.toFixed(1);
 
     return (
         <div className="flex flex-col items-center gap-1.5">
-            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+            <svg
+                width={size}
+                height={size}
+                viewBox={`0 0 ${size} ${size}`}
+                className="shrink-0"
+            >
                 {/* Background ring */}
                 <circle
                     cx={cx}

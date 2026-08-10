@@ -21,6 +21,7 @@ class ClientControlledDrugDiscrepancy extends Model
         'difference',
         'reason',
         'notes',
+        'immediate_action_taken',
         'reported_at',
         'reported_by',
         'witnessed_by',

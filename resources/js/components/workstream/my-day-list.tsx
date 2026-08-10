@@ -36,13 +36,15 @@ function formatWhen(startIso: string, endIso?: string | null) {
         minute: '2-digit',
     });
 
-    return sameDay ? `${startStr} – ${endStr}` : `${startStr} – ${end.toLocaleString([], {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    })}`;
+    return sameDay
+        ? `${startStr} – ${endStr}`
+        : `${startStr} – ${end.toLocaleString([], {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+          })}`;
 }
 
 function badgeLabel(item: MyDayItem) {
@@ -78,9 +80,12 @@ export function MyDayList({
                                 className="flex items-start justify-between gap-4 py-3"
                             >
                                 <div className="min-w-0">
-                                    <div className="text-sm font-medium truncate">
+                                    <div className="truncate text-sm font-medium">
                                         {item.url ? (
-                                            <Link href={item.url} className="underline">
+                                            <Link
+                                                href={item.url}
+                                                className="underline"
+                                            >
                                                 {item.title}
                                             </Link>
                                         ) : (
@@ -88,8 +93,13 @@ export function MyDayList({
                                         )}
                                     </div>
                                     <div className="mt-1 text-xs text-muted-foreground">
-                                        {formatWhen(item.at, item.end_at ?? null)}
-                                        {item.subtitle ? ` • ${item.subtitle}` : ''}
+                                        {formatWhen(
+                                            item.at,
+                                            item.end_at ?? null,
+                                        )}
+                                        {item.subtitle
+                                            ? ` • ${item.subtitle}`
+                                            : ''}
                                     </div>
                                 </div>
                                 <Badge variant="outline" className="shrink-0">
@@ -99,7 +109,9 @@ export function MyDayList({
                         ))}
                     </div>
                 ) : (
-                    <div className="text-sm text-muted-foreground">{emptyLabel}</div>
+                    <div className="text-sm text-muted-foreground">
+                        {emptyLabel}
+                    </div>
                 )}
             </CardContent>
         </Card>

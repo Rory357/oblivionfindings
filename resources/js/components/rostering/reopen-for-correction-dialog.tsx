@@ -60,10 +60,9 @@ export function ReopenForCorrectionDialog({
                         Reopen completed shift for correction
                     </DialogTitle>
                     <DialogDescription>
-                        Reverts {dateLabel} from completed back to scheduled
-                        so the actual start/end and any timesheet can be
-                        corrected. The reason is recorded on the shift
-                        timeline for audit.
+                        Reverts {dateLabel} from completed back to scheduled so
+                        the actual start/end and any timesheet can be corrected.
+                        The reason is recorded on the shift timeline for audit.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2 py-2">
@@ -95,10 +94,7 @@ export function ReopenForCorrectionDialog({
                     ) : null}
                 </div>
                 <DialogFooter>
-                    <Button
-                        variant="ghost"
-                        onClick={() => onOpenChange(false)}
-                    >
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>
                         Cancel
                     </Button>
                     <Button

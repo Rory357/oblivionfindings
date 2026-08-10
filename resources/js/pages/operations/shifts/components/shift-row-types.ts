@@ -94,6 +94,8 @@ export function shiftHours(starts_at: string, ends_at: string): number {
     return (b - a) / 3_600_000;
 }
 
-export function clientFullName(c: Pick<ShiftRowClient, 'first_name' | 'last_name'>): string {
+export function clientFullName(
+    c: Pick<ShiftRowClient, 'first_name' | 'last_name'>,
+): string {
     return `${c.first_name} ${c.last_name}`.trim();
 }

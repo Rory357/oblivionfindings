@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrSkill;
 use App\Domain\Hr\Services\SkillsMatrixService;
+use App\Http\Controllers\Controller;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class SkillsController extends Controller
@@ -16,7 +18,7 @@ class SkillsController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Index — skills list                                                */
+    /*  Index — skills list */
     /* ------------------------------------------------------------------ */
 
     public function index(Request $request)
@@ -24,26 +26,33 @@ class SkillsController extends Controller
         $user = $request->user();
         abort_unless($this->canView($user), 403);
 
-        $tenantId = null;
         $category = $request->query('category');
         $search = trim((string) $request->query('q', ''));
 
-        $skills = HrSkill::forTenant($tenantId)
+        $skills = $this->skillsService
+            ->withVisibleAssessmentCount(HrSkill::query(), $user)
             ->when($category, fn ($q) => $q->where('category', $category))
             ->when($search !== '', fn ($q) => $q->where('name', 'like', "%{$search}%"))
-            ->withCount('employeeSkills')
             ->orderBy('category')
             ->orderBy('name')
             ->paginate(30)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (HrSkill $skill): array => [
+                'id' => $skill->id,
+                'name' => $skill->name,
+                'category' => $skill->category,
+                'description' => $skill->description,
+                'is_active' => (bool) $skill->is_active,
+                'employee_skills_count' => (int) $skill->employee_skills_count,
+            ]);
 
-        $categories = HrSkill::forTenant($tenantId)
+        $categories = HrSkill::query()
             ->distinct()
             ->pluck('category')
             ->sort()
             ->values();
 
-        $skillGaps = $this->skillsService->getSkillGaps($tenantId);
+        $skillGaps = $this->skillsService->getSkillGaps($user);
 
         return Inertia::render('hr/performance/skills/index', [
             'skills' => $skills,
@@ -61,7 +70,7 @@ class SkillsController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Matrix — employees vs skills grid                                  */
+    /*  Matrix — employees vs skills grid */
     /* ------------------------------------------------------------------ */
 
     public function matrix(Request $request)
@@ -69,9 +78,7 @@ class SkillsController extends Controller
         $user = $request->user();
         abort_unless($this->canView($user), 403);
 
-        $tenantId = null;
-
-        $matrixData = $this->skillsService->getSkillsMatrix($tenantId);
+        $matrixData = $this->skillsService->getSkillsMatrix($user);
 
         return Inertia::render('hr/performance/skills/matrix', [
             'employees' => $matrixData['employees'],
@@ -84,7 +91,7 @@ class SkillsController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Store Skill — create a new skill                                   */
+    /*  Store Skill — create a new skill */
     /* ------------------------------------------------------------------ */
 
     public function storeSkill(Request $request)
@@ -92,25 +99,47 @@ class SkillsController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
+        $request->merge([
+            'name' => trim((string) $request->input('name')),
+            'category' => trim((string) $request->input('category')),
+        ]);
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('hr_skills', 'name')->where(
+                    fn ($query) => $query->where('category', $request->input('category')),
+                ),
+            ],
             'category' => ['required', 'string', 'max:100'],
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        HrSkill::create([
-            'tenant_id' => $user->tenant_id,
-            'name' => $validated['name'],
-            'category' => $validated['category'],
-            'description' => $validated['description'] ?? null,
-            'is_active' => true,
-        ]);
+        try {
+            HrSkill::query()->create([
+                'name' => $validated['name'],
+                'category' => $validated['category'],
+                'description' => $validated['description'] ?? null,
+                'is_active' => true,
+            ]);
+        } catch (QueryException $exception) {
+            if ($exception->getCode() !== '23000'
+                && ! str_contains($exception->getMessage(), 'hr_skills_category_name_uq')
+            ) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages([
+                'name' => 'A skill with this name already exists in the selected category.',
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Skill created.');
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Assess Employee — record a skill assessment                        */
+    /*  Assess Employee — record a skill assessment */
     /* ------------------------------------------------------------------ */
 
     public function assessEmployee(Request $request)
@@ -126,13 +155,11 @@ class SkillsController extends Controller
         ]);
 
         $this->skillsService->assessSkill(
-            $user->tenant_id,
+            $user,
             $validated['employee_profile_id'],
             $validated['skill_id'],
             [
                 'proficiency_level' => $validated['proficiency_level'],
-                'self_assessed' => false,
-                'assessed_by' => $user->id,
                 'notes' => $validated['notes'] ?? null,
             ]
         );

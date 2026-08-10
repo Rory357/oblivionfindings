@@ -7,7 +7,6 @@ use App\Domain\Roadmap\Models\ChangeLogEntry;
 class RoadmapChangeLogService
 {
     public function log(
-        ?int $tenantId,
         string $entityType,
         int $entityId,
         string $changeType,
@@ -17,7 +16,6 @@ class RoadmapChangeLogService
         ?string $correlationId = null
     ): ChangeLogEntry {
         return ChangeLogEntry::create([
-            'tenant_id' => $tenantId,
             'entity_type' => $entityType,
             'entity_id' => $entityId,
             'change_type' => $changeType,

@@ -15,9 +15,13 @@ class LinkSiteClientRequest extends FormRequest
     public function authorize(): bool
     {
         $site = $this->route('site');
+        $user = $this->user();
 
         return $site instanceof Site
-            && ($this->user()?->can('update', $site) ?? false);
+            && $user !== null
+            && $user->can('update', $site)
+            && $user->canDo('clients.assignments.update')
+            && $user->canDo('clients.viewAny');
     }
 
     /** @return array<string, array<int, string>> */
@@ -39,23 +43,18 @@ class LinkSiteClientRequest extends FormRequest
                 return;
             }
 
-            $organizationId = $site->tenant_id ?? $this->user()?->organization_id;
             $clientId = $this->integer('client_id');
             $client = $clientId > 0
                 ? Client::query()
                     ->whereKey($clientId)
                     ->whereNull('site_id')
-                    ->when(
-                        $organizationId !== null,
-                        fn ($query) => $query->where('organization_id', $organizationId),
-                    )
                     ->first()
                 : null;
 
             if (! $client) {
                 $validator->errors()->add(
                     'client_id',
-                    'Choose an unassigned client from this organisation.',
+                    'Choose an unassigned client.',
                 );
             }
 
@@ -64,10 +63,6 @@ class LinkSiteClientRequest extends FormRequest
                 $roomIsAvailable = SiteHouseRoom::query()
                     ->whereKey($roomId)
                     ->where('site_id', $site->id)
-                    ->when(
-                        $organizationId !== null,
-                        fn ($query) => $query->where('tenant_id', $organizationId),
-                    )
                     ->where('is_active', true)
                     ->where('is_assignable', true)
                     ->where(function ($query) use ($clientId) {
@@ -87,35 +82,29 @@ class LinkSiteClientRequest extends FormRequest
             }
 
             $serviceContextId = $this->integer('service_context_id');
-            if ($serviceContextId > 0) {
-                $contextIsAvailable = ServiceContext::query()
-                    ->forOrganization($organizationId)
+            if (
+                $serviceContextId > 0
+                && ! ServiceContext::query()
+                    ->availableToSite($site->id)
                     ->whereKey($serviceContextId)
                     ->where('is_active', true)
-                    ->where(fn ($query) => $query
-                        ->whereNull('site_id')
-                        ->orWhere('site_id', $site->id))
-                    ->exists();
-
-                if (! $contextIsAvailable) {
-                    $validator->errors()->add(
-                        'service_context_id',
-                        'Choose a service context available at this Site.',
-                    );
-                }
+                    ->exists()
+            ) {
+                $validator->errors()->add(
+                    'service_context_id',
+                    'Choose a service context available at this Site.',
+                );
             }
 
             $keyWorkerId = $this->integer('key_worker_id');
             if (
                 $keyWorkerId > 0
                 && ! app(ClientWorkerEligibility::class)
-                    ->queryForOrganization($organizationId)
-                    ->whereKey($keyWorkerId)
-                    ->exists()
+                    ->containsForSite($site->id, $keyWorkerId)
             ) {
                 $validator->errors()->add(
                     'key_worker_id',
-                    'Choose an eligible key worker from this organisation.',
+                    'Choose a current key worker assigned to this Site.',
                 );
             }
         });

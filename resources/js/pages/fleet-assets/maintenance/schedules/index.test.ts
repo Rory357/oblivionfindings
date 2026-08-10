@@ -10,9 +10,11 @@ const source = readFileSync(
 describe('Service schedule workflow', () => {
     it('uses an accessible asset-and-interval wizard with review', () => {
         expect(source).toContain('title="Create service schedule"');
-        expect(source).toContain('description="Set a Fleet asset service interval and review it before creating the schedule."');
-        expect(source).toContain('label: \'Asset & interval\'');
-        expect(source).toContain('label: \'Review\'');
+        expect(source).toContain(
+            'description="Set a Fleet asset service interval and review it before creating the schedule."',
+        );
+        expect(source).toContain("label: 'Asset & interval'");
+        expect(source).toContain("label: 'Review'");
         expect(source).toContain('htmlFor="service-schedule-name"');
         expect(source).toContain('htmlFor="service-schedule-asset"');
         expect(source).not.toMatch(/<DialogContent(?:\s|>)/);
