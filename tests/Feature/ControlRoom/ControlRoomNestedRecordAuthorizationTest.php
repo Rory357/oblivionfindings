@@ -55,7 +55,7 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
     }
 
     #[DataProvider('deniedNestedOperations')]
-    public function test_site_bound_operator_cannot_access_another_sites_nested_alert_route(string $operation): void
+    public function test_site_bound_operator_cannot_discover_another_sites_nested_alert_route(string $operation): void
     {
         [$method, $uri, $payload, $expectsNoFileResponse] = $this->prepareDeniedOperation($operation);
         $before = $this->snapshotAlertData($this->hiddenAlert);
@@ -66,7 +66,7 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
         if ($expectsNoFileResponse) {
             $this->assertFalse($response->headers->has('content-disposition'));
         }
-        $response->assertForbidden();
+        $response->assertNotFound();
     }
 
     public static function deniedNestedOperations(): array

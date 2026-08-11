@@ -4,7 +4,7 @@
  * design token. */
 import { HrTabs, useHrTab, type HrTabItem } from '@/components/hr/hr-tabs';
 import { useLeaveContextMenu } from '@/components/hr/leave-context-menu';
-import { CsatRater, CsatStars } from '@/components/it/csat';
+import { CsatRater } from '@/components/it/csat';
 import { ItHero } from '@/components/it/it-hero';
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import { ItOverview, type OverviewPayload } from '@/components/it/it-overview';
@@ -32,6 +32,10 @@ import {
     type TicketRow,
 } from '@/components/it/it-wizards';
 import { KnowledgeDraftDeleteDialog } from '@/components/it/knowledge-draft-delete-dialog';
+import {
+    MyTicketsList,
+    type MyTicketRow,
+} from '@/components/it/my-tickets-list';
 import { ProvisioningCancelDialog } from '@/components/it/provisioning-cancel-dialog';
 import { SlaChip } from '@/components/it/sla-chip';
 import { TicketAdvancedFilters } from '@/components/it/ticket-advanced-filters';
@@ -192,23 +196,6 @@ interface Filters {
     to: string | null;
     sort: string | null;
     dir: string | null;
-}
-
-interface MyTicketRow {
-    id: number;
-    reference: string | null;
-    title: string;
-    description: string | null;
-    category: string;
-    priority: string;
-    status: string;
-    waiting_party: 'requester' | 'other' | null;
-    assignee: string | null;
-    age: string | null;
-    resolved: string | null;
-    /** §K CSAT: a resolved ticket invites a rating; the given score shows back. */
-    can_rate: boolean;
-    csat_score: number | null;
 }
 
 /** A published KB article as browsed by a requester (§I). */
@@ -2688,100 +2675,17 @@ export default function ItIndex({
                                 </div>
                             ) : null}
 
-                            <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                                <div className="grid grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] gap-3 border-b border-border bg-muted px-4.5 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
-                                    <span>Ticket</span>
-                                    <span>Assignee</span>
-                                    <span>Priority</span>
-                                    <span>Status</span>
-                                    <span>Raised</span>
-                                </div>
-                                {myTickets.map((t) => (
-                                    <div
-                                        key={t.id}
-                                        onClick={(e) => openTicket(t.id, e)}
-                                        onDoubleClick={() =>
-                                            router.visit(`/it/tickets/${t.id}`)
-                                        }
-                                        onContextMenu={myTicketMenu(t)}
-                                        className="grid cursor-pointer grid-cols-[3fr_1.3fr_0.9fr_1fr_0.8fr] items-center gap-3 border-b border-border/55 px-4.5 py-3 transition-colors last:border-0 hover:bg-muted/40"
-                                    >
-                                        <div className="flex min-w-0 items-center gap-2">
-                                            <span className="grid h-7 w-7 flex-none place-items-center rounded-lg bg-accent text-primary">
-                                                <Ticket className="h-3.5 w-3.5" />
-                                            </span>
-                                            <span className="min-w-0">
-                                                <span className="block truncate text-[13px] font-semibold">
-                                                    {t.title}
-                                                </span>
-                                                <span className="block truncate text-[11px] text-muted-foreground">
-                                                    {t.reference
-                                                        ? `${t.reference} · `
-                                                        : ''}
-                                                    {label(t.category)}
-                                                    {t.description
-                                                        ? ` · ${t.description}`
-                                                        : ''}
-                                                </span>
-                                            </span>
-                                        </div>
-                                        <span className="truncate text-[12.5px] text-muted-foreground">
-                                            {t.assignee ?? 'With IT for triage'}
-                                        </span>
-                                        <span>
-                                            <StatusBadge
-                                                variant={
-                                                    priorityVariant[
-                                                        t.priority
-                                                    ] ?? 'neutral'
-                                                }
-                                                size="sm"
-                                            >
-                                                {label(t.priority)}
-                                            </StatusBadge>
-                                        </span>
-                                        <span className="flex flex-col items-start gap-1">
-                                            <StatusBadge
-                                                variant={
-                                                    t.status === 'waiting'
-                                                        ? 'warning'
-                                                        : (ticketStatusVariant[
-                                                              t.status
-                                                          ] ?? 'neutral')
-                                                }
-                                                size="sm"
-                                            >
-                                                {t.status === 'waiting'
-                                                    ? waitingStatusLabel(
-                                                          t.waiting_party,
-                                                          true,
-                                                      )
-                                                    : label(t.status)}
-                                            </StatusBadge>
-                                            <StatusDots status={t.status} />
-                                            {t.csat_score != null ? (
-                                                <span className="inline-flex items-center gap-1 text-[10.5px] text-muted-foreground">
-                                                    You rated{' '}
-                                                    <CsatStars
-                                                        score={t.csat_score}
-                                                        size="h-3 w-3"
-                                                    />
-                                                </span>
-                                            ) : null}
-                                        </span>
-                                        <span className="text-[12px] text-muted-foreground">
-                                            {t.age ?? '—'}
-                                        </span>
-                                    </div>
-                                ))}
-                                {myTickets.length === 0 ? (
+                            <MyTicketsList
+                                tickets={myTickets}
+                                onTicketContextMenu={myTicketMenu}
+                                emptyState={
                                     <EmptyState
                                         icon={Inbox}
                                         title="No tickets yet"
                                         blurb="Broken phone? Locked out? Raise it here — IT sees it instantly and you can track progress on this tab."
                                     />
-                                ) : null}
-                            </div>
+                                }
+                            />
                         </>
                     )}
 
@@ -3212,29 +3116,6 @@ function SortHeader({
                 <ChevronsUpDown className="h-3 w-3 opacity-40" />
             )}
         </button>
-    );
-}
-
-/** Progress dots for a requester's ticket: raised → working → resolved →
- *  closed. Decorative (aria-hidden) — the StatusBadge text beside it carries
- *  the meaning; `waiting` sits at the working stage with its own flag. */
-const DOT_STAGES = ['open', 'in_progress', 'resolved', 'closed'];
-
-function StatusDots({ status }: { status: string }) {
-    const reached = status === 'waiting' ? 1 : DOT_STAGES.indexOf(status);
-    return (
-        <span aria-hidden className="flex items-center gap-1 pl-0.5">
-            {DOT_STAGES.map((stage, i) => (
-                <span
-                    key={stage}
-                    className={
-                        i <= reached
-                            ? 'h-1.5 w-1.5 rounded-full bg-primary'
-                            : 'h-1.5 w-1.5 rounded-full bg-border'
-                    }
-                />
-            ))}
-        </span>
     );
 }
 

@@ -38,6 +38,7 @@ SKIP_NOMINATIM=0
 SKIP_GIT_UPDATE=0
 SKIP_INERTIA_SSR=0
 SKIP_MONITORING_SUPERVISOR=0
+DEPLOY_ORIGINAL_ARGS=("$@")
 for arg in "$@"; do
     case "$arg" in
         --skip-git-update) SKIP_GIT_UPDATE=1 ;;
@@ -51,6 +52,7 @@ for arg in "$@"; do
     esac
 done
 
+DEPLOY_SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"
 cd "$(dirname "$0")/.."
 
 APP_RUN_USER="${APP_RUN_USER:-${SUDO_USER:-}}"
@@ -331,6 +333,7 @@ elif [ ! -e .git ]; then
     exit 1
 else
     assert_clean_release_checkout
+    deploy_revision_before_update="$(run_app git rev-parse --verify HEAD)"
 
     echo "▶ git fetch --prune origin"
     run_app git fetch --prune origin
@@ -340,6 +343,12 @@ else
 
     assert_origin_main_release
     assert_clean_release_checkout
+
+    deploy_revision_after_update="$(run_app git rev-parse --verify HEAD)"
+    if [ "$deploy_revision_after_update" != "$deploy_revision_before_update" ]; then
+        echo "▶ restarting deployment from the updated release script"
+        exec bash "$DEPLOY_SCRIPT_PATH" --skip-git-update "${DEPLOY_ORIGINAL_ARGS[@]}"
+    fi
 fi
 
 echo "▶ composer install"

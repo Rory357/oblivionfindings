@@ -8,6 +8,28 @@ it('updates the checkout from origin main before building', function () {
         ->toContain('git pull --ff-only origin main');
 });
 
+it('restarts from the updated deploy script before provisioning when git advances', function () {
+    $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
+
+    expect($script)->toContain(
+        'DEPLOY_ORIGINAL_ARGS=("$@")',
+        'DEPLOY_SCRIPT_PATH="$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")"',
+        'deploy_revision_before_update="$(run_app git rev-parse --verify HEAD)"',
+        'deploy_revision_after_update="$(run_app git rev-parse --verify HEAD)"',
+        'exec bash "$DEPLOY_SCRIPT_PATH" --skip-git-update "${DEPLOY_ORIGINAL_ARGS[@]}"',
+    );
+
+    $pull = strpos($script, 'run_app git pull --ff-only origin main');
+    $updatedRevision = strpos($script, 'deploy_revision_after_update=', $pull);
+    $restart = strpos($script, 'exec bash "$DEPLOY_SCRIPT_PATH" --skip-git-update', $updatedRevision);
+    $composer = strpos($script, 'run_app composer install', $restart);
+
+    expect($pull)->not->toBeFalse()
+        ->and($updatedRevision)->toBeGreaterThan($pull)
+        ->and($restart)->toBeGreaterThan($updatedRevision)
+        ->and($composer)->toBeGreaterThan($restart);
+});
+
 it('refuses a dirty, unbound, or non-exact release before dependencies and assets are built', function () {
     $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
 
