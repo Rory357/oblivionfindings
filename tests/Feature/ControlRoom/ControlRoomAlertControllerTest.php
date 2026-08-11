@@ -13,6 +13,7 @@ use App\Models\ControlRoom\PlaybookStep;
 use App\Models\ControlRoom\Shift;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -112,14 +113,44 @@ class ControlRoomAlertControllerTest extends TestCase
             );
     }
 
-    public function test_show_blocked_for_user_without_permission(): void
+    public function test_show_returns_403_when_user_lacks_parent_alert_permission(): void
     {
         $alert = $this->alertFactory()->create();
-        $noPermUser = User::factory()->create(['approved_at' => now()]);
+        $noPermUser = User::factory()->create([
+            'approved_at' => now(),
+            'role' => 'support_worker',
+        ]);
+        $this->scopeUserToSite($noPermUser, $this->site);
 
         $this->actingAs($noPermUser)
             ->get("/control-room/alerts/{$alert->id}")
             ->assertForbidden();
+    }
+
+    public function test_show_conceals_alert_outside_the_readers_site(): void
+    {
+        $alphaAlert = $this->alertFactory()->create();
+        $hiddenSite = Site::factory()->create([
+            'is_active' => true,
+            'archived' => false,
+            'archived_at' => null,
+        ]);
+        $hiddenSiteViewer = User::factory()->create([
+            'approved_at' => now(),
+            'role' => 'support_worker',
+        ]);
+        $this->scopeUserToSite($hiddenSiteViewer, $hiddenSite);
+        $hiddenSiteViewer->permissionOverrides()->sync(
+            Permission::query()
+                ->whereIn('key', ['controlRoom.viewAny', 'controlRoom.alerts.view'])
+                ->pluck('id')
+                ->mapWithKeys(fn (int $id): array => [$id => ['allowed' => true]])
+                ->all(),
+        );
+
+        $this->actingAs($hiddenSiteViewer)
+            ->get("/control-room/alerts/{$alphaAlert->id}")
+            ->assertNotFound();
     }
 
     // ──────────────────────────────────────

@@ -250,9 +250,14 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             );
     }
 
-    public function test_resident_history_rejects_foreign_client_unless_fleet_manage_is_explicit(): void
+    public function test_resident_history_conceals_foreign_client_after_parent_permission_and_preserves_parent_denial(): void
     {
-        $user = $this->makeSiteUser($this->localSite, ['fleet.viewAny', 'assets.telemetry.view']);
+        $hiddenSiteUser = $this->makeSiteUser($this->localSite, [
+            'fleet.viewAny',
+            'assets.telemetry.view',
+            'assets.telemetry.export',
+        ]);
+        $sourceDeniedUser = $this->makeSiteUser($this->foreignSite, []);
         $manager = $this->makeSiteUser($this->localSite, [
             'fleet.viewAny',
             'fleet.manage',
@@ -270,7 +275,11 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
         ]);
         $this->assignDeviceToClient($foreignDevice, $foreignClient, $foreignConsent);
 
-        $this->actingAs($user)
+        $this->actingAs($hiddenSiteUser)
+            ->get("/fleet-assets/resident-tracking/history/{$foreignClient->id}")
+            ->assertNotFound();
+
+        $this->actingAs($sourceDeniedUser)
             ->get("/fleet-assets/resident-tracking/history/{$foreignClient->id}")
             ->assertForbidden();
 

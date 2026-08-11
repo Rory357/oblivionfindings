@@ -578,7 +578,10 @@ class ResidentTrackingController extends Controller
     public function history(Request $request, Client $client)
     {
         $user = $request->user();
-        $this->assertCanAccessClient($user, $client);
+        // The parent telemetry permissions are enforced by route middleware.
+        // Once they pass, conceal a Client outside the user's Site/object
+        // scope so this direct location-history route cannot confirm it exists.
+        $this->assertCanDiscoverClientHistory($user, $client);
         $assignment = $this->assertHasActiveTrackingConsent($client);
         $device = $assignment->device;
 
@@ -844,6 +847,14 @@ class ResidentTrackingController extends Controller
         abort_unless(
             in_array((int) $client->id, $this->getAuthorizedClientIds($user), true),
             403,
+        );
+    }
+
+    private function assertCanDiscoverClientHistory(User $user, Client $client): void
+    {
+        abort_unless(
+            in_array((int) $client->id, $this->getAuthorizedClientIds($user), true),
+            404,
         );
     }
 

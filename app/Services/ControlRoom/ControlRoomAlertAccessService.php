@@ -169,6 +169,13 @@ final class ControlRoomAlertAccessService
         User $user,
         mixed $returnTo = null,
     ): void {
+        // A caller without the alert-read capability is denied at the parent
+        // permission boundary. Keep that distinct from Site-scoped object
+        // concealment below.
+        if (! $this->canRead($user)) {
+            throw new HttpException(403, 'You are not authorized to access this Control Room alert.');
+        }
+
         if ($this->canView($alert, $user)) {
             return;
         }
@@ -181,7 +188,9 @@ final class ControlRoomAlertAccessService
             );
         }
 
-        throw new HttpException(403, 'You are not authorized to access this Control Room alert.');
+        // The caller may read alerts generally, but this particular object is
+        // outside their canonical Site scope. Conceal it like a missing alert.
+        throw new HttpException(404, 'Control Room alert not found.');
     }
 
     /**

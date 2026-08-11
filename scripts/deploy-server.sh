@@ -190,6 +190,33 @@ monitoring_supervisor_status() {
     return 1
 }
 
+monitoring_root_supervisor_pid() {
+    local supervisord_config="$1"
+    local -a supervisor_pids
+
+    mapfile -t supervisor_pids < <(
+        ps -eo pid=,user=,args= | awk -v config="$supervisord_config" \
+            '$2 == "root" && index($0, "/usr/bin/supervisord") > 0 && index($0, " -c " config) > 0 { print $1 }'
+    )
+
+    [ "${#supervisor_pids[@]}" -eq 1 ] || return 1
+    printf '%s\n' "${supervisor_pids[0]}"
+}
+
+monitoring_supervised_process_pids() {
+    local supervisord_config="$1"
+    local release_artisan="$2"
+    local command_marker="$3"
+    local supervisor_pid
+
+    supervisor_pid="$(monitoring_root_supervisor_pid "$supervisord_config")" || return 1
+    ps -eo pid=,ppid=,args= | awk \
+        -v parent="$supervisor_pid" \
+        -v artisan="$release_artisan" \
+        -v marker="$command_marker" \
+        '$2 == parent && index($0, artisan) > 0 && index($0, marker) > 0 { print $1 }'
+}
+
 monitoring_runtime_is_release_bound() {
     local supervisord_config="${MONITORING_SUPERVISORD_CONFIG:-}"
     local release_artisan
@@ -219,12 +246,22 @@ monitoring_runtime_is_release_bound() {
         program="${MONITORING_PROGRAMS[$index]}"
         expected_processes="${MONITORING_EXPECTED_PROCESSES[$index]}"
         command_marker="${MONITORING_COMMAND_MARKERS[$index]}"
-        status_output="$(monitoring_supervisor_status "$supervisord_config" "$program")" || return 1
-        process_count="$(awk 'NF { count++ } END { print count + 0 }' <<< "$status_output")"
-        [ "$process_count" -eq "$expected_processes" ] || return 1
-        awk 'NF < 4 || $2 != "RUNNING" || $3 != "pid" || $4 !~ /^[0-9]+,$/ { exit 1 }' <<< "$status_output" \
-            || return 1
-        mapfile -t process_pids < <(awk '{ gsub(/,/, "", $4); print $4 }' <<< "$status_output")
+        if status_output="$(monitoring_supervisor_status "$supervisord_config" "$program")"; then
+            process_count="$(awk 'NF { count++ } END { print count + 0 }' <<< "$status_output")"
+            [ "$process_count" -eq "$expected_processes" ] || return 1
+            awk 'NF < 4 || $2 != "RUNNING" || $3 != "pid" || $4 !~ /^[0-9]+,$/ { exit 1 }' <<< "$status_output" \
+                || return 1
+            mapfile -t process_pids < <(awk '{ gsub(/,/, "", $4); print $4 }' <<< "$status_output")
+        else
+            # Some hardened hosts keep the Supervisor control socket root-only.
+            # In that case, fail closed unless every expected process is an
+            # immediate child of the one root-owned supervisord instance using
+            # this exact configuration, release path, and command marker.
+            mapfile -t process_pids < <(
+                monitoring_supervised_process_pids "$supervisord_config" "$release_artisan" "$command_marker"
+            )
+            [ "${#process_pids[@]}" -eq "$expected_processes" ] || return 1
+        fi
         [ "${#process_pids[@]}" -eq "$expected_processes" ] || return 1
 
         for pid in "${process_pids[@]}"; do
