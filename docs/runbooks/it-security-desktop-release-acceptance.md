@@ -134,7 +134,12 @@ grant `release-control-room` broad consent management in the browser: the
 approved fixture transition is the separately guarded staging command action,
 run by the release operator while the Control Room browser session remains open,
 then the page is refocused and reloaded. Run guarded `reset` after D10 before a
-repeat matrix run. Fixture
+repeat matrix run. The same exact-manifest reset also refreshes only the two
+simulated no-network door registry observations so D16 starts from a current
+fixture baseline. Readiness must fail with
+`release_fixture_command_observation_stale` after that bounded registry window
+expires; the fixture timestamp is lifecycle/UI test state and is never
+equipment, provider, or monitoring evidence. Fixture
 preparation remains `v10_release_evidence=false`; run the read-only readiness
 command again afterward, then complete D01-D18. Never improvise partial rows in
 Tinker, SQL, a browser, or a generic seeder.

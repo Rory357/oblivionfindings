@@ -7,6 +7,7 @@ use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Management\Services\CommandObservationFreshnessService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
@@ -324,7 +325,10 @@ final class ItSecurityDesktopReleaseFixtureReadiness
         ],
     ];
 
-    public function __construct(private readonly CanonicalDeviceSiteResolver $deviceSites) {}
+    public function __construct(
+        private readonly CanonicalDeviceSiteResolver $deviceSites,
+        private readonly CommandObservationFreshnessService $commandFreshness,
+    ) {}
 
     /** @return array<string, mixed> */
     public function assess(): array
@@ -638,6 +642,8 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                             'release_fixture' => ['no_network' => true],
                         ],
                     ]);
+            $fixtureCommandObservationReady = ! ($contract['release_fixture_command'] ?? false)
+                || $this->commandFreshness->inspect($device)->isFresh();
 
             if (! $taxonomyReady) {
                 $gaps[] = 'release_device_taxonomy_mismatch';
@@ -654,6 +660,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             if (! $fixtureCommandReady) {
                 $gaps[] = 'release_fixture_command_device_contract_mismatch';
             }
+            if (! $fixtureCommandObservationReady) {
+                $gaps[] = 'release_fixture_command_observation_stale';
+            }
 
             if (in_array($status, $operational, true)
                 && $siteReady
@@ -661,7 +670,8 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 && $bindingReady
                 && $trackingBaselineReady
                 && $trackingHistoryReady
-                && $fixtureCommandReady) {
+                && $fixtureCommandReady
+                && $fixtureCommandObservationReady) {
                 $ready++;
             } elseif (! $siteReady || ! in_array($status, $operational, true)) {
                 $gaps[] = 'release_device_canonical_scope_mismatch';

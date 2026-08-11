@@ -238,11 +238,13 @@ it('requires both Alpha command doors to use the exact simulated no-network fixt
     $primary = Device::factory()->create([
         ...$contract,
         'name' => 'RELEASE Alpha Door',
+        'last_seen_at' => now(),
     ]);
     $secondary = Device::factory()->create([
         ...$contract,
         'name' => 'RELEASE Alpha Door Secondary',
         'provider' => 'manual',
+        'last_seen_at' => now(),
     ]);
     foreach ([$primary, $secondary] as $device) {
         DeviceAssignment::query()->create([
@@ -266,6 +268,12 @@ it('requires both Alpha command doors to use the exact simulated no-network fixt
             'release_fixture_command_device_contract_mismatch',
             'release_fixture_command_device_set_mismatch',
         );
+
+    $primary->update(['last_seen_at' => now()->subHour()]);
+    $stale = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+    expect($stale['sections']['devices']['ready'])->toBe(1)
+        ->and($stale['gap_codes'])->toContain('release_fixture_command_observation_stale');
+    $primary->update(['last_seen_at' => now()]);
 
     Device::factory()->create([
         ...$contract,

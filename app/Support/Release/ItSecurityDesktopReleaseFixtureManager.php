@@ -46,6 +46,7 @@ use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -198,7 +199,10 @@ final class ItSecurityDesktopReleaseFixtureManager
 
         $gaps = $this->packGaps($pack, requireReadiness: false);
         if ($gaps === []) {
-            $gaps = $this->trackingFixtureMutationGaps($pack);
+            $gaps = [
+                ...$this->trackingFixtureMutationGaps($pack),
+                ...$this->commandFixtureMutationGaps($pack),
+            ];
         }
 
         return $this->report(
@@ -207,7 +211,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             $revision,
             'dry_run',
             $gaps,
-            operation: 'restore_owned_tracking_baseline',
+            operation: 'restore_owned_mutable_baseline',
         );
     }
 
@@ -400,18 +404,23 @@ final class ItSecurityDesktopReleaseFixtureManager
             if ($gaps !== []) {
                 return $gaps;
             }
+            $gaps = $this->commandFixtureMutationGaps($pack, lock: true);
+            if ($gaps !== []) {
+                return $gaps;
+            }
             $this->restoreTrackingBaseline($pack);
+            $this->refreshCommandFixtureObservationBaseline($pack);
             if (($this->readiness->assess()['state'] ?? null) !== 'ready') {
-                throw new DomainException('The owned tracking fixture baseline did not recover.');
+                throw new DomainException('The owned mutable fixture baseline did not recover.');
             }
 
             return [];
         }, 1);
         if ($gaps !== []) {
-            return $this->report('failed', 'reset', $revision, 'execute', $gaps, operation: 'restore_owned_tracking_baseline');
+            return $this->report('failed', 'reset', $revision, 'execute', $gaps, operation: 'restore_owned_mutable_baseline');
         }
 
-        return $this->report('ready', 'reset', $revision, 'execute', [], operation: 'restored_owned_tracking_baseline', mutationApplied: true);
+        return $this->report('ready', 'reset', $revision, 'execute', [], operation: 'restored_owned_mutable_baseline', mutationApplied: true);
     }
 
     /** @return array<string, mixed> */
@@ -1270,6 +1279,65 @@ final class ItSecurityDesktopReleaseFixtureManager
             'longitude' => ItSecurityDesktopReleaseFixtureReadiness::TRACKING_LONGITUDE,
             'last_seen_at' => $event->occurred_at,
         ])->save();
+    }
+
+    /** @return list<string> */
+    private function commandFixtureMutationGaps(
+        ItSecurityDesktopReleaseFixturePack $pack,
+        bool $lock = false,
+    ): array {
+        try {
+            $this->commandFixtureDevices($pack, $lock);
+        } catch (DomainException) {
+            return ['release_fixture_command_device_contract_mismatch'];
+        }
+
+        return [];
+    }
+
+    /** @return Collection<int, Device> */
+    private function commandFixtureDevices(
+        ItSecurityDesktopReleaseFixturePack $pack,
+        bool $lock = false,
+    ): Collection {
+        $manifestDeviceIds = collect((array) data_get($pack->manifest, 'records', []))
+            ->filter(fn (mixed $record): bool => is_array($record)
+                && ($record['type'] ?? null) === 'device'
+                && is_int($record['id'] ?? null))
+            ->pluck('id')
+            ->all();
+        $query = Device::query()
+            ->whereIn('id', $manifestDeviceIds)
+            ->whereIn('name', ['RELEASE Alpha Door', 'RELEASE Alpha Door Secondary']);
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+        $devices = $query->get()->sortBy('name')->values();
+        $contract = [
+            'management' => [
+                'capabilities' => ['access.door.unlock_timed'],
+                'release_fixture' => ['no_network' => true],
+            ],
+        ];
+
+        if ($devices->pluck('name')->all() !== ['RELEASE Alpha Door', 'RELEASE Alpha Door Secondary']
+            || $devices->contains(fn (Device $device): bool => $device->provider !== 'release_fixture'
+                || $device->domain !== 'security'
+                || $device->category !== 'access_control'
+                || ($device->config ?? []) !== $contract)) {
+            throw new DomainException('The release fixture command Device contract is incomplete.');
+        }
+
+        return $devices;
+    }
+
+    private function refreshCommandFixtureObservationBaseline(
+        ItSecurityDesktopReleaseFixturePack $pack,
+    ): void {
+        $observedAt = now();
+        foreach ($this->commandFixtureDevices($pack, lock: true) as $device) {
+            $device->forceFill(['last_seen_at' => $observedAt])->save();
+        }
     }
 
     /** @return list<string> */

@@ -255,6 +255,12 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
     $assignment->refresh();
     $device->refresh();
     $event->refresh();
+    $commandDoors = Device::query()
+        ->whereIn('name', ['RELEASE Alpha Door', 'RELEASE Alpha Door Secondary'])
+        ->get();
+    $commandDoors->each(fn (Device $door) => $door->update([
+        'last_seen_at' => now()->subHour(),
+    ]));
 
     expect($withdrawn)->toMatchArray([
         'state' => 'ready',
@@ -268,6 +274,8 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
         ->and(json_encode($event->only($eventSnapshotFields), JSON_THROW_ON_ERROR))->toBe($eventSnapshot)
         ->and(AuditLog::query()->where('action', 'tracking.collection.stopped')->exists())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'tracking.consent.withdrawal_enforced')->exists())->toBeTrue()
+        ->and(app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess()['gap_codes'])
+        ->toContain('release_fixture_command_observation_stale')
         ->and($manager->plan('reset', $revision)['state'])->toBe('ready');
     $this->actingAs($viewer)
         ->getJson("/operations/clients/{$consent->client_id}/location/history")
@@ -278,10 +286,11 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
     $assignment->refresh();
     $device->refresh();
     $event->refresh();
+    $commandDoors->each->refresh();
 
     expect($reset)->toMatchArray([
         'state' => 'ready',
-        'operation' => 'restored_owned_tracking_baseline',
+        'operation' => 'restored_owned_mutable_baseline',
         'fixture_mutation_applied' => true,
     ])->and($consent->status)->toBe('given')
         ->and($consent->withdrawn_at)->toBeNull()
@@ -295,6 +304,7 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
         ->and(AuditLog::query()->where('action', 'tracking.consent.withdrawal_enforced')->exists())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'tracking.collection.resumed')->exists())->toBeTrue()
         ->and(ConsentType::query()->where('name', 'RELEASE Client Location Tracking')->count())->toBe(1)
+        ->and($commandDoors->every(fn (Device $door): bool => $door->last_seen_at?->gt(now()->subMinute()) === true))->toBeTrue()
         ->and(app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess()['state'])->toBe('ready');
     $this->actingAs($viewer)
         ->getJson("/operations/clients/{$consent->client_id}/location/history")
