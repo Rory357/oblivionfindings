@@ -76,7 +76,7 @@ it('refuses a dirty, unbound, or non-exact release before dependencies and asset
         ->and($composer)->toBeLessThan($npm);
 });
 
-it('builds and proves the Inertia SSR runtime even when Supervisor installation is explicitly skipped', function () {
+it('reloads and proves an externally managed exact-release Inertia SSR runtime when Supervisor installation is explicitly skipped', function () {
     $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
     $package = json_decode((string) file_get_contents(__DIR__.'/../../package.json'), true, flags: JSON_THROW_ON_ERROR);
 
@@ -93,12 +93,25 @@ it('builds and proves the Inertia SSR runtime even when Supervisor installation 
             'Inertia SSR Supervisor install requires root or sudo',
             'Re-run with privilege or explicitly pass --skip-inertia-ssr',
             'skipping Inertia SSR Supervisor install (--skip-inertia-ssr)',
+            'inertia_ssr_runtime_pids()',
+            'inertia_ssr_is_healthy()',
+            'wait_for_external_inertia_ssr_reload()',
+            'DEPLOY_INERTIA_SSR_EXTERNAL_RELOAD_ATTEMPTS',
+            'inertia:start-ssr --runtime=node',
+            '[ "${replacement_pids[0]}" != "$pre_stop_pid" ]',
+            '[ "$consecutive_healthy_replacements" -ge 2 ]',
+            'expected exactly one externally managed Inertia SSR process from this release before reload',
+            'run_app php artisan inertia:stop-ssr',
+            'the externally managed Inertia SSR runtime did not replace the stopped exact-release process and remain healthy',
             'run_app php artisan inertia:check-ssr',
         )->not->toContain('sudo -E bash scripts/inertia/install-supervisor.sh');
 
     $build = strpos($script, 'run_app env NODE_OPTIONS="$NODE_OPTIONS" npm run build:ssr');
     $optimise = strpos($script, 'run_app php artisan optimize:clear', $build);
     $skipBranch = strpos($script, 'if [ "$SKIP_INERTIA_SSR" -eq 1 ]; then', $optimise);
+    $preStopPids = strpos($script, 'mapfile -t pre_stop_inertia_ssr_pids < <(inertia_ssr_runtime_pids)', $skipBranch);
+    $stop = strpos($script, 'run_app php artisan inertia:stop-ssr', $preStopPids);
+    $replacementHealth = strpos($script, 'wait_for_external_inertia_ssr_reload "${pre_stop_inertia_ssr_pids[0]}"', $stop);
     $installer = strpos($script, 'bash scripts/inertia/install-supervisor.sh', $optimise);
     $supervisorBranchEnd = strpos($script, "\nfi\n\n", $installer);
     $health = strpos($script, 'run_app php artisan inertia:check-ssr', $supervisorBranchEnd);
@@ -110,10 +123,13 @@ it('builds and proves the Inertia SSR runtime even when Supervisor installation 
         ->not->toBeFalse()
         ->and($optimise)->toBeGreaterThan($build)
         ->and($skipBranch)->toBeGreaterThan($optimise)
+        ->and($preStopPids)->toBeGreaterThan($skipBranch)
+        ->and($stop)->toBeGreaterThan($preStopPids)
+        ->and($replacementHealth)->toBeGreaterThan($stop)
         ->and($installer)->toBeGreaterThan($skipBranch)
         ->and($supervisorBranchEnd)->toBeGreaterThan($installer)
         ->and($health)->toBeGreaterThan($supervisorBranchEnd)
-        ->and(substr_count($script, 'run_app php artisan inertia:check-ssr'))->toBe(1)
+        ->and(substr_count($script, 'run_app php artisan inertia:check-ssr'))->toBe(2)
         ->and($monitoringInstaller)->toBeGreaterThan($health)
         ->and($queueRestart)->toBeGreaterThan($monitoringInstaller)
         ->and($success)->toBeGreaterThan($queueRestart);

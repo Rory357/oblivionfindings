@@ -19,6 +19,11 @@ it('cannot report a normal production release before the configured Inertia SSR 
             'npm run build:ssr',
             'scripts/inertia/install-supervisor.sh',
             '--skip-inertia-ssr',
+            'run_app php artisan inertia:stop-ssr',
+            'wait_for_external_inertia_ssr_reload',
+            'consecutive_healthy_replacements',
+            '[ "${replacement_pids[0]}" != "$pre_stop_pid" ]',
+            '[ "$consecutive_healthy_replacements" -ge 2 ]',
             'run_app php artisan inertia:check-ssr',
         )
         ->and($installer)->toContain(
@@ -28,6 +33,9 @@ it('cannot report a normal production release before the configured Inertia SSR 
         );
 
     $build = strpos($deploy, 'run_app env NODE_OPTIONS="$NODE_OPTIONS" npm run build:ssr');
+    $skipBranch = strpos($deploy, 'if [ "$SKIP_INERTIA_SSR" -eq 1 ]; then', $build);
+    $stop = strpos($deploy, 'run_app php artisan inertia:stop-ssr', $skipBranch);
+    $replacementHealth = strpos($deploy, 'wait_for_external_inertia_ssr_reload "${pre_stop_inertia_ssr_pids[0]}"', $stop);
     $installerGate = strpos($deploy, 'bash scripts/inertia/install-supervisor.sh', $build);
     $supervisorBranchEnd = strpos($deploy, "\nfi\n\n", $installerGate);
     $healthGate = strpos($deploy, 'run_app php artisan inertia:check-ssr', $supervisorBranchEnd);
@@ -37,10 +45,13 @@ it('cannot report a normal production release before the configured Inertia SSR 
 
     expect($build)
         ->not->toBeFalse()
+        ->and($skipBranch)->toBeGreaterThan($build)
+        ->and($stop)->toBeGreaterThan($skipBranch)
+        ->and($replacementHealth)->toBeGreaterThan($stop)
         ->and($installerGate)->toBeGreaterThan($build)
         ->and($supervisorBranchEnd)->toBeGreaterThan($installerGate)
         ->and($healthGate)->toBeGreaterThan($supervisorBranchEnd)
-        ->and(substr_count($deploy, 'run_app php artisan inertia:check-ssr'))->toBe(1)
+        ->and(substr_count($deploy, 'run_app php artisan inertia:check-ssr'))->toBe(2)
         ->and($monitoringGate)->toBeGreaterThan($healthGate)
         ->and($queclinkGate)->toBeGreaterThan($monitoringGate)
         ->and($success)->toBeGreaterThan($queclinkGate);

@@ -71,6 +71,7 @@ run_app() {
 MAINTENANCE_ACTIVE=0
 DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS="${DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS:-390}"
 DEPLOY_WEB_DRAIN_SECONDS="${DEPLOY_WEB_DRAIN_SECONDS:-5}"
+DEPLOY_INERTIA_SSR_EXTERNAL_RELOAD_ATTEMPTS="${DEPLOY_INERTIA_SSR_EXTERNAL_RELOAD_ATTEMPTS:-20}"
 
 assert_bounded_seconds() {
     local name="$1"
@@ -122,6 +123,50 @@ wait_for_queue_writer_exit() {
     done
 }
 
+inertia_ssr_runtime_pids() {
+    local release_artisan
+    release_artisan="$(pwd -P)/artisan"
+
+    ps -eo pid=,args= | awk \
+        -v artisan="$release_artisan" \
+        '$1 ~ /^[0-9]+$/ && index($0, artisan " inertia:start-ssr --runtime=node") > 0 { print $1 }'
+}
+
+inertia_ssr_is_healthy() {
+    run_app php artisan inertia:check-ssr >/dev/null 2>&1
+}
+
+wait_for_external_inertia_ssr_reload() {
+    local pre_stop_pid="$1"
+    local attempt=0
+    local consecutive_healthy_replacements=0
+    local -a replacement_pids
+
+    while [ "$attempt" -lt "$DEPLOY_INERTIA_SSR_EXTERNAL_RELOAD_ATTEMPTS" ]; do
+        attempt=$((attempt + 1))
+        mapfile -t replacement_pids < <(inertia_ssr_runtime_pids)
+
+        if [ "${#replacement_pids[@]}" -eq 1 ] \
+            && [ "${replacement_pids[0]}" != "$pre_stop_pid" ] \
+            && inertia_ssr_is_healthy; then
+            consecutive_healthy_replacements=$((consecutive_healthy_replacements + 1))
+        else
+            consecutive_healthy_replacements=0
+        fi
+
+        if [ "$consecutive_healthy_replacements" -ge 2 ]; then
+            return 0
+        fi
+
+        if [ "$attempt" -lt "$DEPLOY_INERTIA_SSR_EXTERNAL_RELOAD_ATTEMPTS" ]; then
+            sleep 1
+        fi
+    done
+
+    echo "✗ deployment refused: the externally managed Inertia SSR runtime did not replace the stopped exact-release process and remain healthy."
+    return 1
+}
+
 report_maintenance_on_failure() {
     local exit_code=$?
 
@@ -142,6 +187,7 @@ trap report_maintenance_on_failure EXIT
 
 assert_bounded_seconds "DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS" "$DEPLOY_WRITER_DRAIN_TIMEOUT_SECONDS" 900
 assert_bounded_seconds "DEPLOY_WEB_DRAIN_SECONDS" "$DEPLOY_WEB_DRAIN_SECONDS" 60
+assert_bounded_seconds "DEPLOY_INERTIA_SSR_EXTERNAL_RELOAD_ATTEMPTS" "$DEPLOY_INERTIA_SSR_EXTERNAL_RELOAD_ATTEMPTS" 60
 command -v ps >/dev/null || { echo "✗ deployment refused: ps is required for writer drain verification."; exit 1; }
 command -v awk >/dev/null || { echo "✗ deployment refused: awk is required for writer drain verification."; exit 1; }
 
@@ -422,6 +468,17 @@ fi
 
 if [ "$SKIP_INERTIA_SSR" -eq 1 ]; then
     echo "▶ skipping Inertia SSR Supervisor install (--skip-inertia-ssr)"
+    mapfile -t pre_stop_inertia_ssr_pids < <(inertia_ssr_runtime_pids)
+    if [ "${#pre_stop_inertia_ssr_pids[@]}" -ne 1 ]; then
+        echo "✗ deployment refused: expected exactly one externally managed Inertia SSR process from this release before reload."
+        exit 1
+    fi
+
+    echo "▶ reloading externally managed Inertia SSR runtime"
+    run_app php artisan inertia:stop-ssr
+
+    echo "▶ waiting for externally managed Inertia SSR replacement health"
+    wait_for_external_inertia_ssr_reload "${pre_stop_inertia_ssr_pids[0]}"
 else
     echo "▶ scripts/inertia/install-supervisor.sh"
     inertia_ssr_supervisor_args=(
