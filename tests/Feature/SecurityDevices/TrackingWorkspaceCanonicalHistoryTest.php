@@ -88,8 +88,7 @@ class TrackingWorkspaceCanonicalHistoryTest extends TestCase
             'retention_days' => 90,
             'collection_started_at' => now()->subHour(),
         ]);
-        $personalEvent = IntegrationEvent::query()->create([
-            'tenant_id' => 1,
+        $personalEvent = IntegrationEvent::factory()->create([
             'site_id' => $site->id,
             'canonical_device_id' => $personal->id,
             'provider' => 'release_fixture',
@@ -188,8 +187,7 @@ class TrackingWorkspaceCanonicalHistoryTest extends TestCase
         $excluded = Device::factory()->tracking()->create(['name' => 'Excluded tracker']);
         $asset = Asset::factory()->forSite($site)->create(['category' => 'Vehicle']);
         $base = now()->startOfSecond();
-        $rows = collect(range(1, 105))->map(fn (int $index): array => [
-            'tenant_id' => 1,
+        $rows = collect(range(1, 105))->map(fn (int $index): array => IntegrationEvent::factory()->raw([
             'site_id' => $site->id,
             'room_id' => null,
             'hardware_id' => null,
@@ -209,7 +207,7 @@ class TrackingWorkspaceCanonicalHistoryTest extends TestCase
             'raw_payload' => null,
             'created_at' => $base,
             'updated_at' => $base,
-        ])->all();
+        ]))->all();
         DB::table('integration_events')->insert($rows);
         IntegrationEvent::query()->create([
             'site_id' => $site->id,
