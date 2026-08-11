@@ -8,9 +8,13 @@ use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\ControlRoomAlert;
+use App\Models\Integration\IntegrationEvent;
 use App\Models\ItCatalogItem;
 use App\Models\ItChange;
 use App\Models\ItKbArticle;
@@ -20,6 +24,7 @@ use App\Models\ItProvisioningWorkflow;
 use App\Models\ItTicket;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Throwable;
 use UnexpectedValueException;
@@ -29,6 +34,32 @@ final class ItSecurityDesktopReleaseFixtureReadiness
     public const int SCHEMA_VERSION = 1;
 
     public const string EVIDENCE_CLASS = 'it_security_desktop_release_fixture_readiness_v1';
+
+    public const float TRACKING_LATITUDE = 0.0001;
+
+    public const float TRACKING_LONGITUDE = 0.0001;
+
+    public const string TRACKING_EVENT_PROVIDER = 'release_fixture';
+
+    public const string TRACKING_EVENT_SOURCE_APP = 'desktop_release_acceptance';
+
+    public const string TRACKING_EVENT_SOURCE_ID = 'release-alpha-personal-tracker-synthetic-position-v1';
+
+    public const string TRACKING_EVENT_TYPE = 'location_report';
+
+    public const array TRACKING_EVENT_TAGS = [
+        'fixture' => true,
+        'privacy_class' => 'non_private',
+        'synthetic' => true,
+    ];
+
+    public const array TRACKING_EVENT_PAYLOAD = [
+        'battery_pct' => 82,
+        'lat' => self::TRACKING_LATITUDE,
+        'lng' => self::TRACKING_LONGITUDE,
+        'privacy_class' => 'non_private',
+        'synthetic' => true,
+    ];
 
     /**
      * @var array<string, array{
@@ -196,7 +227,8 @@ final class ItSecurityDesktopReleaseFixtureReadiness
      *     category: string,
      *     subcategory: string,
      *     binding_type: 'site'|'client'|'asset',
-     *     binding_name: string
+     *     binding_name: string,
+     *     release_fixture_command?: bool
      * }>
      */
     public const array DEVICES = [
@@ -223,6 +255,16 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             'subcategory' => 'card_reader',
             'binding_type' => 'site',
             'binding_name' => 'RELEASE Site Alpha',
+            'release_fixture_command' => true,
+        ],
+        'RELEASE Alpha Door Secondary' => [
+            'site' => 'RELEASE Site Alpha',
+            'domain' => 'security',
+            'category' => 'access_control',
+            'subcategory' => 'card_reader',
+            'binding_type' => 'site',
+            'binding_name' => 'RELEASE Site Alpha',
+            'release_fixture_command' => true,
         ],
         'RELEASE Alpha Camera' => [
             'site' => 'RELEASE Site Alpha',
@@ -516,7 +558,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
     {
         $deviceRows = Device::query()
             ->whereIn('name', array_keys(self::DEVICES))
-            ->with(['assignments', 'assetLinks'])
+            ->with(['assignments.consent.consentType', 'assetLinks'])
             ->get();
         $devices = $deviceRows->keyBy('name');
         $clients = Client::query()
@@ -538,6 +580,21 @@ final class ItSecurityDesktopReleaseFixtureReadiness
 
         if ($deviceRows->count() !== $devices->count()) {
             $gaps[] = 'release_device_name_not_unique';
+        }
+        $expectedFixtureCommandNames = collect(self::DEVICES)
+            ->filter(fn (array $contract): bool => ($contract['release_fixture_command'] ?? false) === true)
+            ->keys()
+            ->sort()
+            ->values()
+            ->all();
+        $actualFixtureCommandNames = Device::query()
+            ->where('provider', 'release_fixture')
+            ->pluck('name')
+            ->sort()
+            ->values()
+            ->all();
+        if ($actualFixtureCommandNames !== $expectedFixtureCommandNames) {
+            $gaps[] = 'release_fixture_command_device_set_mismatch';
         }
 
         foreach (self::DEVICES as $name => $contract) {
@@ -561,6 +618,18 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 && $device->category === $contract['category']
                 && $device->subcategory === $contract['subcategory'];
             $bindingReady = $this->deviceBindingReady($device, $contract, $sites, $clients, $assets);
+            $trackingBaselineReady = $name !== 'RELEASE Alpha Personal Tracker'
+                || $this->personalTrackingBaselineReady($device, $clients->get('RELEASE Client Alpha'));
+            $trackingHistoryReady = $name !== 'RELEASE Alpha Personal Tracker'
+                || $this->personalTrackingHistoryBaselineReady($device, $clients->get('RELEASE Client Alpha'));
+            $fixtureCommandReady = ! ($contract['release_fixture_command'] ?? false)
+                || ($device->provider === 'release_fixture'
+                    && ($device->config ?? []) === [
+                        'management' => [
+                            'capabilities' => ['access.door.unlock_timed'],
+                            'release_fixture' => ['no_network' => true],
+                        ],
+                    ]);
 
             if (! $taxonomyReady) {
                 $gaps[] = 'release_device_taxonomy_mismatch';
@@ -568,8 +637,23 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             if (! $bindingReady) {
                 $gaps[] = 'release_device_owner_binding_mismatch';
             }
+            if (! $trackingBaselineReady) {
+                $gaps[] = 'release_personal_tracking_consent_baseline_missing';
+            }
+            if (! $trackingHistoryReady) {
+                $gaps[] = 'release_personal_tracking_history_baseline_missing';
+            }
+            if (! $fixtureCommandReady) {
+                $gaps[] = 'release_fixture_command_device_contract_mismatch';
+            }
 
-            if (in_array($status, $operational, true) && $siteReady && $taxonomyReady && $bindingReady) {
+            if (in_array($status, $operational, true)
+                && $siteReady
+                && $taxonomyReady
+                && $bindingReady
+                && $trackingBaselineReady
+                && $trackingHistoryReady
+                && $fixtureCommandReady) {
                 $ready++;
             } elseif (! $siteReady || ! in_array($status, $operational, true)) {
                 $gaps[] = 'release_device_canonical_scope_mismatch';
@@ -577,6 +661,78 @@ final class ItSecurityDesktopReleaseFixtureReadiness
         }
 
         return $this->section(count(self::DEVICES), $devices->count(), $ready, $gaps);
+    }
+
+    private function personalTrackingBaselineReady(Device $device, ?Client $client): bool
+    {
+        $assignments = $device->assignments->whereNull('released_at');
+        if ($assignments->count() !== 1) {
+            return false;
+        }
+        $assignment = $assignments->first();
+        $consent = $assignment?->consent;
+        $type = $consent?->consentType;
+        $consentAssignments = $consent instanceof ClientConsent
+            ? DeviceAssignment::query()
+                ->where('consent_id', $consent->id)
+                ->whereNull('released_at')
+                ->get()
+            : collect();
+
+        return $client instanceof Client
+            && $assignment !== null
+            && (int) $assignment->assignable_id === (int) $client->id
+            && $assignment->assignable_type === 'client'
+            && $consent instanceof ClientConsent
+            && $type instanceof ConsentType
+            && $consent->status === 'given'
+            && $consent->withdrawn_at === null
+            && ($consent->expires_at === null || $consent->expires_at->isFuture())
+            && $type->name === 'RELEASE Client Location Tracking'
+            && $type->purpose === 'Client personal safety tracking'
+            && $assignment->tracking_purpose === 'Client personal safety tracking'
+            && $assignment->authority_basis === 'assignment_linked_client_consent'
+            && $consentAssignments->count() === 1
+            && (int) $consentAssignments->sole()->id === (int) $assignment->id
+            && $assignment->isCollectionActive();
+    }
+
+    private function personalTrackingHistoryBaselineReady(Device $device, ?Client $client): bool
+    {
+        if (! $client instanceof Client) {
+            return false;
+        }
+
+        $eventRows = IntegrationEvent::query()
+            ->where('source_event_id', self::TRACKING_EVENT_SOURCE_ID)
+            ->get();
+        if ($eventRows->count() !== 1) {
+            return false;
+        }
+
+        $event = $eventRows->sole();
+        $assignment = $device->assignments->whereNull('released_at')->first();
+        $retentionDays = max(1, (int) ($assignment?->retention_days ?? 90));
+
+        return (float) $device->latitude === self::TRACKING_LATITUDE
+            && (float) $device->longitude === self::TRACKING_LONGITUDE
+            && $device->last_seen_at !== null
+            && $event->occurred_at !== null
+            && $device->last_seen_at->equalTo($event->occurred_at)
+            && $event->occurred_at->gte(now()->subDays($retentionDays))
+            && $event->occurred_at->lte(now())
+            && $event->received_at?->equalTo($event->occurred_at) === true
+            && (int) $event->site_id === (int) $client->site_id
+            && (int) $event->canonical_device_id === (int) $device->id
+            && $event->room_id === null
+            && $event->hardware_id === null
+            && $event->provider === self::TRACKING_EVENT_PROVIDER
+            && $event->source_app === self::TRACKING_EVENT_SOURCE_APP
+            && $event->event_type === self::TRACKING_EVENT_TYPE
+            && $event->severity === IntegrationEvent::SEVERITY_INFO
+            && Arr::sortRecursive((array) $event->tags) === Arr::sortRecursive(self::TRACKING_EVENT_TAGS)
+            && Arr::sortRecursive((array) $event->normalized_payload) === Arr::sortRecursive(self::TRACKING_EVENT_PAYLOAD)
+            && $event->raw_payload === null;
     }
 
     /**

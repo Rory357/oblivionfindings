@@ -181,7 +181,7 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'ItTicketLinkService::MONITORING_OPERATION',
         "'release_device_taxonomy_mismatch'",
         "'release_device_owner_binding_mismatch'",
-        "'assignments', 'assetLinks'",
+        "'assignments.consent.consentType', 'assetLinks'",
         "'fixture_readiness_query_failed'",
         "'v10_release_evidence' => false",
     )->and($fixtureReadiness)->not->toContain(
@@ -197,7 +197,7 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
 
     expect($fixtureMutationGuard)->toContain(
         "EVIDENCE_CLASS = 'it_security_desktop_release_fixture_mutation_guard_v1'",
-        "ACTIONS = ['prepare', 'cleanup']",
+        "ACTIONS = ['prepare', 'cleanup', 'reset', 'withdraw-tracking-consent']",
         "\$environment === 'testing'",
         "\$environment === 'staging' && \$platform === 'Linux'",
         "=== 'approved_non_production'",
@@ -216,8 +216,12 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     )->and($runbook)->toContain(
         '`ItSecurityDesktopReleaseFixtureMutationGuard`',
         'The preparer is dry-run-only unless `--execute` is supplied.',
-        'deletes only the records and private attachment named in that manifest',
+        'form one bounded disposable D01',
+        'Every submission made under both exact parent IDs',
+        'deletes only the records and private attachment',
         'Never improvise partial rows',
+        '`withdraw-tracking-consent`',
+        'Run guarded `reset` after D10',
     );
 
     expect($fixtureManagementCommand)->toContain(

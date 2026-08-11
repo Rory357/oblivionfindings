@@ -10,6 +10,8 @@ final class ItSecurityDesktopReleaseFixturePack extends Model
 
     public const string STATE_READY = 'ready';
 
+    public const string STATE_CLEANUP_FILES_PENDING = 'cleanup_files_pending';
+
     protected $fillable = [
         'pack_key',
         'release_revision',

@@ -99,7 +99,7 @@ it('fails closed for every environment database checkout and confirmation bounda
     'wrong confirmation' => ['wrong confirmation', 'release_fixture_confirmation_mismatch'],
 ]);
 
-it('uses a different exact confirmation for cleanup and never treats a guard pass as V10 evidence', function (): void {
+it('uses a different exact confirmation for every mutable fixture action and never treats a guard pass as V10 evidence', function (): void {
     $revision = str_repeat('c', 40);
     $guard = new ItSecurityDesktopReleaseFixtureMutationGuard(static fn (): bool => true);
 
@@ -115,10 +115,24 @@ it('uses a different exact confirmation for cleanup and never treats a guard pas
         ItSecurityDesktopReleaseFixtureMutationGuard::confirmationToken('cleanup', $revision),
         validDesktopFixtureMutationContext(),
     );
+    $reset = $guard->assess(
+        'reset',
+        $revision,
+        ItSecurityDesktopReleaseFixtureMutationGuard::confirmationToken('reset', $revision),
+        validDesktopFixtureMutationContext(),
+    );
+    $withdraw = $guard->assess(
+        'withdraw-tracking-consent',
+        $revision,
+        ItSecurityDesktopReleaseFixtureMutationGuard::confirmationToken('withdraw-tracking-consent', $revision),
+        validDesktopFixtureMutationContext(),
+    );
 
     expect($wrongAction['state'])->toBe('refused')
         ->and($wrongAction['gap_codes'])->toContain('release_fixture_confirmation_mismatch')
         ->and($cleanup['state'])->toBe('authorised')
         ->and($cleanup['fixture_write_authorized'])->toBeTrue()
+        ->and($reset['state'])->toBe('authorised')
+        ->and($withdraw['state'])->toBe('authorised')
         ->and($cleanup['v10_release_evidence'])->toBeFalse();
 });

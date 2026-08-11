@@ -220,6 +220,61 @@ it('requires unique Devices with exact taxonomy and canonical owner bindings', f
     expect($duplicated['gap_codes'])->toContain('release_device_name_not_unique');
 });
 
+it('requires both Alpha command doors to use the exact simulated no-network fixture contract', function (): void {
+    $site = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $actor = User::factory()->create();
+    $contract = [
+        'domain' => 'security',
+        'category' => 'access_control',
+        'subcategory' => 'card_reader',
+        'provider' => 'release_fixture',
+        'config' => [
+            'management' => [
+                'capabilities' => ['access.door.unlock_timed'],
+                'release_fixture' => ['no_network' => true],
+            ],
+        ],
+    ];
+    $primary = Device::factory()->create([
+        ...$contract,
+        'name' => 'RELEASE Alpha Door',
+    ]);
+    $secondary = Device::factory()->create([
+        ...$contract,
+        'name' => 'RELEASE Alpha Door Secondary',
+        'provider' => 'manual',
+    ]);
+    foreach ([$primary, $secondary] as $device) {
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assignment_type' => 'permanent',
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $actor->id,
+        ]);
+    }
+
+    $invalid = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+    expect($invalid['sections']['devices']['ready'])->toBe(1)
+        ->and($invalid['gap_codes'])->toContain('release_fixture_command_device_contract_mismatch');
+
+    $secondary->update(['provider' => 'release_fixture']);
+    $valid = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+    expect($valid['sections']['devices']['ready'])->toBe(2)
+        ->and($valid['gap_codes'])->not->toContain(
+            'release_fixture_command_device_contract_mismatch',
+            'release_fixture_command_device_set_mismatch',
+        );
+
+    Device::factory()->create([
+        ...$contract,
+        'name' => 'Unowned release fixture lookalike',
+    ]);
+    $unexpected = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
+    expect($unexpected['gap_codes'])->toContain('release_fixture_command_device_set_mismatch');
+});
+
 it('requires unique canonical Asset and Finance owners with exact Alpha scope', function (): void {
     $alpha = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
     $other = Site::factory()->create(['name' => 'Other Site']);

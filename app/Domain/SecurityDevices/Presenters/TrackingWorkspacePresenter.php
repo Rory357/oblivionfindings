@@ -11,10 +11,10 @@ use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ClientConsent;
-use App\Models\FleetTelemetryEvent;
 use App\Models\LoneWorkerSession;
 use App\Models\User;
 use App\Services\ConsentValidationService;
+use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -31,6 +31,7 @@ class TrackingWorkspacePresenter
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly UserSiteAccessService $siteAccess,
+        private readonly IntegrationEventHistoryService $eventHistory,
     ) {}
 
     public function present(User $viewer, Builder $trackingScope, array $activeTab, array $filters = []): array
@@ -888,48 +889,49 @@ class TrackingWorkspacePresenter
 
     private function history(Collection $devices): Collection
     {
-        $byId = $devices->keyBy('id');
-        $eligibleIds = $devices
+        $eligible = $devices
             ->filter(fn (array $device): bool => $device['privacy']['locationAllowed'])
-            ->pluck('id');
-        if ($eligibleIds->isEmpty()) {
+            ->keyBy('id');
+        if ($eligible->isEmpty()) {
             return collect();
         }
 
-        return FleetTelemetryEvent::query()
-            ->whereIn('device_id', $eligibleIds)
-            ->where('consent_blocked', false)
-            ->where('occurred_at', '>=', now()->subDays($this->retentionDays()))
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->latest('occurred_at')
-            ->latest('id')
-            ->limit(self::HISTORY_LIMIT)
+        $canonicalDevices = Device::query()
+            ->whereKey($eligible->keys()->all())
             ->get()
-            ->map(function (FleetTelemetryEvent $event) use ($byId): ?array {
-                $device = $byId->get($event->device_id);
-                if (! $device || ! $device['privacy']['locationAllowed']) {
+            ->keyBy('id');
+
+        return $this->eventHistory
+            ->forDevices(
+                $canonicalDevices->values(),
+                includeEventType: true,
+                retentionDays: $this->retentionDays(),
+                limit: self::HISTORY_LIMIT,
+            )
+            ->map(function (array $event) use ($eligible): ?array {
+                $device = $eligible->get((int) $event['device_id']);
+                if (! is_array($device) || ! $device['privacy']['locationAllowed']) {
                     return null;
                 }
 
                 return [
-                    'id' => $event->id,
-                    'eventType' => $event->event_type ?: 'location_report',
-                    'occurredAt' => $event->occurred_at?->toISOString(),
+                    'eventType' => $event['event_type'] ?? 'location_report',
+                    'occurredAt' => $event['timestamp'] ?? null,
                     'deviceName' => $device['name'],
                     'subjectLabel' => $device['person']['displayName']
                         ?? $device['asset']['name']
                         ?? $device['name'],
                     'group' => $device['group'],
-                    'latitude' => (float) $event->latitude,
-                    'longitude' => (float) $event->longitude,
-                    'battery' => $event->battery_pct,
-                    'speed' => $event->speed_kph === null ? null : (float) $event->speed_kph,
+                    'latitude' => (float) $event['lat'],
+                    'longitude' => (float) $event['lng'],
+                    'battery' => $event['battery'] ?? null,
+                    'speed' => isset($event['speed']) ? (float) $event['speed'] : null,
                     'canonicalHref' => $device['canonicalHref'],
                 ];
             })
             ->filter()
-            ->values();
+            ->values()
+            ->map(fn (array $event, int $index): array => ['id' => $index + 1, ...$event]);
     }
 
     private function retentionDays(): int

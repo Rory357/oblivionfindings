@@ -69,7 +69,10 @@ use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultSecretStore;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerSecretStore;
+use App\Domain\SecurityDevices\Management\Adapters\DatabaseReleaseFixtureCommandRuntime;
 use App\Domain\SecurityDevices\Management\Adapters\QueclinkTrackingCommandAdapter;
+use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandAdapter;
+use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandRuntime;
 use App\Domain\SecurityDevices\Management\Adapters\UnifiAccessCommandAdapter;
 use App\Domain\SecurityDevices\Management\Contracts\CommandHttpTransport;
 use App\Domain\SecurityDevices\Management\Services\CommandExecutionAdapterRegistry;
@@ -221,7 +224,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->tag([
             UnifiAccessCommandAdapter::class,
             QueclinkTrackingCommandAdapter::class,
+            ReleaseFixtureCommandAdapter::class,
         ], 'device-command-adapters');
+        $this->app->bind(ReleaseFixtureCommandRuntime::class, DatabaseReleaseFixtureCommandRuntime::class);
         $this->app->bind(CredentialLeaseProvider::class, GovernedCredentialLeaseBroker::class);
         $this->app->singleton(SecretManagerLeaseIssuer::class, function ($app): SecretManagerLeaseIssuer {
             return match ((string) config('monitoring.credentials.driver', 'unavailable')) {

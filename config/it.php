@@ -53,6 +53,7 @@ return [
     'desktop_release_fixtures' => [
         'enabled' => env('IT_SECURITY_DESKTOP_FIXTURES_ENABLED', false),
         'environment_class' => env('IT_SECURITY_DESKTOP_FIXTURES_ENVIRONMENT_CLASS'),
+        'release_revision' => env('IT_SECURITY_DESKTOP_FIXTURES_RELEASE_REVISION'),
         'database_name_sha256' => env('IT_SECURITY_DESKTOP_FIXTURES_DATABASE_NAME_SHA256'),
         'actor_password' => env('IT_SECURITY_DESKTOP_FIXTURES_PASSWORD'),
         'reviewer_totp_secret' => env('IT_SECURITY_DESKTOP_FIXTURES_REVIEWER_TOTP_SECRET'),

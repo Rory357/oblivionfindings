@@ -10,7 +10,7 @@ use Throwable;
 final class ManageItSecurityDesktopReleaseFixtures extends Command
 {
     protected $signature = 'it-security:desktop-release-fixtures
-        {action : prepare or cleanup}
+        {action : prepare, cleanup, reset, or withdraw-tracking-consent}
         {--revision= : Exact 40-character origin/main release revision}
         {--confirm= : Exact action-and-revision confirmation token}
         {--execute : Apply the planned database mutation}

@@ -11,6 +11,10 @@ use Illuminate\Support\Facades\Schema;
 
 class IntegrationEventHistoryService
 {
+    private const int MAX_DEVICE_LIMIT = 100;
+
+    private const int MAX_HISTORY_LIMIT = 500;
+
     public function forDevice(
         ?Device $device,
         array $filters = [],
@@ -21,68 +25,106 @@ class IntegrationEventHistoryService
             return collect();
         }
 
+        return $this->forDevices(
+            collect([$device]),
+            $filters,
+            $includeEventType,
+            $retentionDays,
+        )->map(fn (array $location): array => collect($location)->except('device_id')->all());
+    }
+
+    /**
+     * Read a bounded authorised Device set without issuing one history query
+     * per Device. The returned device_id is canonical and always belongs to
+     * the supplied allowlist; callers remain responsible for authorising that
+     * allowlist before invoking this method.
+     *
+     * @param  Collection<int, Device>  $devices
+     */
+    public function forDevices(
+        Collection $devices,
+        array $filters = [],
+        bool $includeEventType = false,
+        ?int $retentionDays = null,
+        int $limit = self::MAX_HISTORY_LIMIT,
+    ): Collection {
+        $devices = $devices
+            ->filter(fn (mixed $device): bool => $device instanceof Device)
+            ->unique(fn (Device $device): int => (int) $device->id)
+            ->take(self::MAX_DEVICE_LIMIT)
+            ->keyBy(fn (Device $device): int => (int) $device->id);
+        if ($devices->isEmpty()) {
+            return collect();
+        }
+
+        $limit = max(1, min(self::MAX_HISTORY_LIMIT, $limit));
         $retentionDays = max(
             1,
             $retentionDays ?? (int) config('fleet.retention.telemetry_days', 365),
         );
         $retentionCutoff = now()->subDays($retentionDays);
-        $locations = $this->integrationEventLocations(
-            $device,
+        $candidateLimit = self::MAX_HISTORY_LIMIT;
+        $locations = $this->integrationEventLocationsForDevices(
+            $devices,
             $filters,
             $includeEventType,
             $retentionCutoff,
-        )->merge($this->fleetTelemetryLocations(
-            $device,
+            $candidateLimit,
+        )->merge($this->fleetTelemetryLocationsForDevices(
+            $devices,
             $filters,
             $includeEventType,
             $retentionCutoff,
+            $candidateLimit,
         ));
 
         return $locations
             ->sortByDesc(fn (array $location) => $location['timestamp'] ?? '')
-            ->take(500)
+            ->take($limit)
             ->values();
     }
 
-    private function integrationEventLocations(
-        Device $device,
+    /** @param Collection<int, Device> $devices */
+    private function integrationEventLocationsForDevices(
+        Collection $devices,
         array $filters,
         bool $includeEventType,
         \DateTimeInterface $retentionCutoff,
+        int $candidateLimit,
     ): Collection {
         if (! Schema::hasTable('integration_events')) {
             return collect();
         }
 
         $hasCanonicalColumn = $this->hasCanonicalDeviceColumn();
-        $legacyHardwareId = $device->legacy_location_hardware_id;
+        $legacyHardwareMap = $this->uniqueLegacyDeviceMap($devices, 'legacy_location_hardware_id');
 
-        if (! $hasCanonicalColumn && ! $legacyHardwareId) {
+        if (! $hasCanonicalColumn && $legacyHardwareMap->isEmpty()) {
             return collect();
         }
 
         $query = IntegrationEvent::query()
             ->select($this->selectColumns())
             ->where('occurred_at', '>=', $retentionCutoff)
-            ->where(function (Builder $query) use ($device, $legacyHardwareId, $hasCanonicalColumn): void {
+            ->where(function (Builder $query) use ($devices, $legacyHardwareMap, $hasCanonicalColumn): void {
                 if ($hasCanonicalColumn) {
-                    $query->where('canonical_device_id', $device->id);
+                    $query->whereIn('canonical_device_id', $devices->keys()->all());
                 }
 
-                if (! $legacyHardwareId) {
+                if ($legacyHardwareMap->isEmpty()) {
                     return;
                 }
 
                 if ($hasCanonicalColumn) {
-                    $query->orWhere(function (Builder $fallback) use ($legacyHardwareId): void {
+                    $query->orWhere(function (Builder $fallback) use ($legacyHardwareMap): void {
                         $fallback->whereNull('canonical_device_id')
-                            ->where('hardware_id', $legacyHardwareId);
+                            ->whereIn('hardware_id', $legacyHardwareMap->keys()->all());
                     });
 
                     return;
                 }
 
-                $query->where('hardware_id', $legacyHardwareId);
+                $query->whereIn('hardware_id', $legacyHardwareMap->keys()->all());
             });
 
         if (! empty($filters['date_from'])) {
@@ -103,38 +145,52 @@ class IntegrationEventHistoryService
         }
 
         return $query->orderByDesc('occurred_at')
-            ->limit(500)
+            ->orderByDesc('id')
+            ->limit($candidateLimit)
             ->get()
             ->toBase()
-            ->map(fn (IntegrationEvent $event) => $this->mapLocationEvent($event, $includeEventType))
+            ->map(function (IntegrationEvent $event) use ($devices, $legacyHardwareMap, $hasCanonicalColumn, $includeEventType): ?array {
+                $deviceId = $hasCanonicalColumn && $event->canonical_device_id !== null
+                    ? (int) $event->canonical_device_id
+                    : $legacyHardwareMap->get($event->hardware_id);
+                if (! is_int($deviceId) || ! $devices->has($deviceId)) {
+                    return null;
+                }
+
+                $location = $this->mapLocationEvent($event, $includeEventType);
+
+                return $location === null ? null : ['device_id' => $deviceId, ...$location];
+            })
             ->filter()
             ->values();
     }
 
-    private function fleetTelemetryLocations(
-        Device $device,
+    /** @param Collection<int, Device> $devices */
+    private function fleetTelemetryLocationsForDevices(
+        Collection $devices,
         array $filters,
         bool $includeEventType,
         \DateTimeInterface $retentionCutoff,
+        int $candidateLimit,
     ): Collection {
         if (! Schema::hasTable('fleet_telemetry_events')) {
             return collect();
         }
 
-        $legacyTrackerId = $device->legacy_asset_tracker_id;
+        $legacyTrackerMap = $this->uniqueLegacyDeviceMap($devices, 'legacy_asset_tracker_id');
 
         $query = FleetTelemetryEvent::query()
             ->where('consent_blocked', false)
             ->where('occurred_at', '>=', $retentionCutoff)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->where(function (Builder $query) use ($device, $legacyTrackerId): void {
-                $query->where('device_id', $device->id);
+            ->where(function (Builder $query) use ($devices, $legacyTrackerMap): void {
+                $query->whereIn('device_id', $devices->keys()->all());
 
-                if ($legacyTrackerId) {
-                    $query->orWhere(function (Builder $fallback) use ($legacyTrackerId): void {
+                if ($legacyTrackerMap->isNotEmpty()) {
+                    $query->orWhere(function (Builder $fallback) use ($legacyTrackerMap): void {
                         $fallback->whereNull('device_id')
-                            ->where('asset_tracker_id', $legacyTrackerId);
+                            ->whereIn('asset_tracker_id', $legacyTrackerMap->keys()->all());
                     });
                 }
             });
@@ -158,11 +214,32 @@ class IntegrationEventHistoryService
 
         return $query->orderByDesc('occurred_at')
             ->orderByDesc('id')
-            ->limit(500)
+            ->limit($candidateLimit)
             ->get()
             ->toBase()
-            ->map(fn (FleetTelemetryEvent $event) => $this->mapFleetTelemetryEvent($event, $includeEventType))
+            ->map(function (FleetTelemetryEvent $event) use ($devices, $legacyTrackerMap, $includeEventType): ?array {
+                $deviceId = $event->device_id !== null
+                    ? (int) $event->device_id
+                    : $legacyTrackerMap->get($event->asset_tracker_id);
+                if (! is_int($deviceId) || ! $devices->has($deviceId)) {
+                    return null;
+                }
+
+                return ['device_id' => $deviceId, ...$this->mapFleetTelemetryEvent($event, $includeEventType)];
+            })
+            ->filter()
             ->values();
+    }
+
+    /** @param Collection<int, Device> $devices */
+    private function uniqueLegacyDeviceMap(Collection $devices, string $attribute): Collection
+    {
+        return $devices
+            ->filter(fn (Device $device): bool => is_numeric($device->getAttribute($attribute))
+                && (int) $device->getAttribute($attribute) > 0)
+            ->groupBy(fn (Device $device): int => (int) $device->getAttribute($attribute))
+            ->filter(fn (Collection $matches): bool => $matches->count() === 1)
+            ->map(fn (Collection $matches): int => (int) $matches->first()->id);
     }
 
     private function mapLocationEvent(IntegrationEvent $event, bool $includeEventType): ?array

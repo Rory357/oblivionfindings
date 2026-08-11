@@ -77,10 +77,14 @@ configuration-history or restore evidence.
 
 The approved fixture preparer must pass
 `ItSecurityDesktopReleaseFixtureMutationGuard` before its first write. The gate
-allows only `prepare` or `cleanup`, refuses production, permits staging only on
+allows only `prepare`, `cleanup`, `reset`, or `withdraw-tracking-consent`, refuses production, permits staging only on
 Linux, requires `IT_SECURITY_DESKTOP_FIXTURES_ENABLED=true`, exact environment
 class `approved_non_production`, MySQL and the SHA-256 of the exact configured
 database name in `IT_SECURITY_DESKTOP_FIXTURES_DATABASE_NAME_SHA256`. It also
+binds each action to the supplied clean revision. The D16 no-network runtime
+additionally requires `IT_SECURITY_DESKTOP_FIXTURES_RELEASE_REVISION` to equal the same
+40-hex release revision recorded by the ready pack. The no-network D16 adapter
+refuses the pack when that revision is absent, stale, or mismatched. The guard
 requires the supplied 40-hex revision to be the clean checkout's exact
 `HEAD == refs/remotes/origin/main` and requires the action-specific confirmation
 `IT-SECURITY-DESKTOP-FIXTURES:<ACTION>:<revision>`. The gate emits no database
@@ -91,16 +95,46 @@ The owned fixture manager is available through
 `it-security:desktop-release-fixtures`. The preparer is dry-run-only unless `--execute` is supplied. It refuses reserved fixture identities, creates one
 registry manifest containing every owned database record plus the exact private
 attachment hash, verifies the complete readiness contract before commit, and
-reuses an intact pack idempotently. Cleanup first revalidates that manifest and
-deletes only the records and private attachment named in that manifest; it does
-not delete by a broad label or touch unrelated application data.
+reuses an intact pack idempotently. The pack includes one fixture-specific active
+location-tracking ConsentType, ClientConsent, and tracker assignment. The guarded
+`withdraw-tracking-consent` action changes only that manifest-owned consent and
+uses the canonical privacy stop path; `reset` restores only those exact
+manifest-owned mutable records through the canonical privacy resume path. Neither
+action creates, resets, or deletes command, batch, attempt, reconciliation, or
+audit history. After D16 creates retained command or batch evidence against an
+owned fixture Device, cleanup fails early with
+`release_fixture_retained_d16_evidence_requires_pack_archive`. Preserve and
+archive that fixture pack with its immutable D16 evidence; do not delete or
+repoint the retained history to force cleanup. Any later D01 submissions remain
+part of that archived pack and must not be separately deleted after D16 evidence
+exists.
+
+Before D16 evidence exists, the exact manifest-owned
+`release-requester@acceptance.invalid` User ID plus the exact manifest-owned
+`RELEASE Access Request` catalogue-item ID form one bounded disposable D01
+journey scope. Every submission made under both exact parent IDs, including
+multiple viewport attempts or retests with distinct idempotency keys, and each
+submission's exact result ticket belong to that disposable scope. A matching
+name, title, category, requester alone, catalogue item alone, or time window is
+not ownership; unrelated submissions and tickets must remain. Each D01 evidence
+capture must record the run-specific idempotency reference and the exact newly
+created ticket reference/identifier so evidence never silently points at the
+pre-existing requester fixture ticket or a prior attempt. Cleanup first
+revalidates that manifest and deletes only the records and private attachment
+named in that manifest; it does not delete by a broad label or touch unrelated
+application data.
 
 Configure the actor password and reviewer TOTP secret through
 `IT_SECURITY_DESKTOP_FIXTURES_PASSWORD` and
 `IT_SECURITY_DESKTOP_FIXTURES_REVIEWER_TOTP_SECRET` in the approved staging
 runtime. Keep both outside the checkout. Use the mutation guard's exact
-revision-bound confirmation for `prepare` or `cleanup`, review the dry-run JSON,
-and obtain separate execution approval before adding `--execute`. Fixture
+revision-bound confirmation for the selected action, review the dry-run JSON,
+and obtain separate execution approval before adding `--execute`. D10 does not
+grant `release-control-room` broad consent management in the browser: the
+approved fixture transition is the separately guarded staging command action,
+run by the release operator while the Control Room browser session remains open,
+then the page is refocused and reloaded. Run guarded `reset` after D10 before a
+repeat matrix run. Fixture
 preparation remains `v10_release_evidence=false`; run the read-only readiness
 command again afterward, then complete D01-D18. Never improvise partial rows in
 Tinker, SQL, a browser, or a generic seeder.
@@ -118,7 +152,8 @@ Tinker, SQL, a browser, or a generic seeder.
 
 - `RELEASE Alpha Gateway`: Alpha Network & IT gateway with current direct-path monitoring, topology, configuration, firmware, and capacity history.
 - `RELEASE Alpha Switch`: Alpha switch related to the gateway and linked to one monitoring-created Control Room alert and IT incident.
-- `RELEASE Alpha Door`: Alpha UniFi Access Device with a fresh observation and one safe governed command fixture.
+- `RELEASE Alpha Door`: primary Alpha access-control Device owned by the ready fixture pack. Its `release_fixture` provider executes only the explicitly approved simulated no-network D16 lifecycle.
+- `RELEASE Alpha Door Secondary`: secondary Alpha access-control Device owned by the same ready pack for independently visible partial bulk outcomes. It has the same exact simulated no-network contract and is not a live target.
 - `RELEASE Alpha Camera`: Alpha CCTV Device with media available only to an actor holding `securityDevices.cctv.media.view`.
 - `RELEASE Alpha Healthcare`: Alpha healthcare Device assigned to `RELEASE Client Alpha`; technical evidence exists but no clinical reading is copied into Security & Devices.
 - `RELEASE Alpha Personal Tracker`: canonical Alpha tracker with active purpose, authority, audience, consent, collection, and retention evidence.
@@ -150,7 +185,7 @@ Run each row at `1440 x 900` and `1280 x 800`. Start a fresh authenticated brows
 
 | ID | Actor | Exact routes and workspace | Required action or evidence | Pass criteria |
 | --- | --- | --- | --- | --- |
-| D01 | `release-requester` | `/it?tab=knowledge`, `/it?tab=catalog`, `/it?tab=my-tickets`, `/it/tickets/{requester-ticket}` | Use knowledge deflection, submit `RELEASE Access Request`, find the new request, add a public comment, then inspect reopen/CSAT only when lifecycle-eligible. | Only own requests and public activity appear. Internal tasks, routing, watchers, affected-Device operations, internal reasons, and private attachments are absent from HTML, page props, and network responses. |
+| D01 | `release-requester` | `/it?tab=knowledge`, `/it?tab=catalog`, `/it?tab=my-tickets`, `/it/tickets/{requester-ticket}` | Use knowledge deflection, submit `RELEASE Access Request` with a fresh run-specific idempotency key, record the exact newly created ticket reference/identifier, find that same request, add a public comment, then inspect reopen/CSAT only when lifecycle-eligible. | The evidence row binds this run to its exact new ticket. Only own requests and public activity appear. Internal tasks, routing, watchers, affected-Device operations, internal reasons, and private attachments are absent from HTML, page props, and network responses. |
 | D02 | `release-it-manager` | `/it`, `/it?tab=tickets`, `/it/tickets/{alpha-ticket}` | Use queue/Site/advanced filters, open the Alpha incident, inspect Site, SLA, thread, attachment, watcher, approval, task, affected Device, live state, and sealed incident snapshot. | Service Desk navigation is clear; the ticket remains one work record; Device and Control Room links open only when source and destination permission both pass; sealed and live evidence are visibly distinct. |
 | D03 | `release-it-manager` | `/it?tab=provisioning` | Open the Alpha joiner/mover/leaver workflow and inspect assignment, approval, per-item outcome, reversal, HR handoff, equipment, network, and access-control work. | Every item has owner, state, next action, and failure/recovery evidence. No duplicate HR, Asset, access credential, or Device record is created. |
 | D04 | `release-it-manager` | `/it/problems`, `/it/problems/{problem}`, `/it/changes`, `/it/changes/{change}`, `/it/major-incidents`, `/it/major-incidents/{major-incident}` | Follow Problem to workaround/knowledge, Change to validation/backout and linked work, and Major Incident to published updates. | Lifecycle controls match current state, require governed dialogs/reasons, and write into their canonical record. Inert controls, browser-native dialogs, mock panels, and duplicate queues are release failures. |
@@ -165,7 +200,7 @@ Run each row at `1440 x 900` and `1280 x 800`. Start a fresh authenticated brows
 | D13 | `release-it-manager` | `/security-devices/discovery?tab=scopes`, `?tab=runs`, `?tab=candidates`, `?tab=collectors`, `?tab=paths`, `?tab=limitations` | Inspect direct discovery, candidate review, limitation copy, and the separately approved remote collector rehearsal when present. | Direct-first operation is clear; remote collection is optional; scope/run/candidate/collector counts reconcile; private targets, certificate material, queue bytes, and Hidden Site evidence are absent. |
 | D14 | `release-it-manager` | `/security-devices/maintenance?tab=due`, `?tab=planned`, `?tab=in-progress`, `?tab=completed`, `?tab=calibration`, `?tab=firmware-configuration` | Follow due work to the canonical Device, Site, IT, configuration, firmware, and healthcare technical context. | One maintenance record owns the work; finance costs remain informational; state-changing controls use named confirmation dialogs and reflect the resulting state. |
 | D15 | `release-it-manager` | `/security-devices/integrations`, `/security-devices/integrations/unifi`, `/security-devices/integrations/milesight`, `/security-devices/integrations/queclink`, `/security-devices/settings` | Inspect manifests, mappings, supervised execution status, credential-reference safe state, rotation/test audit, listener status, monitoring policy, Device groups, reports, and audit. | UniFi/Milesight capabilities match approved contracts. Queclink is native-listener-only. No secret, external reference, lease identifier, raw cursor/frame/payload, hostname, or command is exposed. Browser acceptance observes already approved provider evidence; it does not invent or trigger an undocumented provider action. |
-| D16 | `release-it-manager`, `release-it-reviewer` | `/security-devices/devices/{alpha-door}?section=management`, `/security-devices/command-batches/{batch}` | Request a safe fixture command with reason and step-up, independently approve/reject as the reviewer, inspect signed dispatch/reconciliation/audit, and inspect one partial bulk result. | Requester and reviewer differ; current Site, Device, assignment, observation, policy, expiry, and signature are revalidated; every child has an independent outcome; uncertain execution is never blindly retried. No live safety-impacting target is used. |
+| D16 | `release-it-manager`, `release-it-reviewer` | `/security-devices/devices/{alpha-door}?section=management`, `/security-devices/command-batches/{batch}` | Request a safe simulated no-network fixture command with reason and step-up, independently approve/reject as the reviewer, inspect signed dispatch/reconciliation/audit, and inspect one partial bulk result across the two owned Alpha fixture doors. | Requester and reviewer differ; current Site, Device, assignment, observation, policy, expiry, signature, ready-pack ownership, canonical manifest hash, and exact release revision are revalidated; every child has an independent outcome; uncertain execution is never blindly retried. This row proves lifecycle/UI/audit behavior only and never counts as equipment or provider evidence. No live safety-impacting target is used; real UniFi execution and return-to-locked proof remain external. |
 | D17 | `release-it-manager` | `/security-devices/devices/{alpha-device}`, `/sites/{alpha-site}?tab=technology`, `/operations/clients/{alpha-client}?tab=healthcare_devices`, `/operations/clients/{alpha-client}?tab=location`, `/hr/people/{alpha-employee-profile}?tab=assets`, `/fleet-assets/vehicles/{alpha-vehicle}?tab=technology`, `/fleet-assets/assets/{alpha-asset}?tab=technology`, `/control-room/alerts/{alpha-alert}`, `/it/tickets/{alpha-ticket}` | Traverse each visible canonical handoff in both directions. | Each projection states its owning module, carries only minimum necessary fields, links to the same canonical Device/ticket/alert, and becomes an explicit access-required state when destination permission is absent. |
 | D18 | `release-denied`, then `release-source-denied` | `/security-devices/devices/{alpha-device}`, `/it/tickets/{alpha-ticket}`, `/control-room/alerts/{alpha-alert}`, `/fleet-assets/resident-tracking/history/{alpha-client}` | Enter direct URLs, search Alpha labels, and inspect counts, pickers, and exports first as the Hidden-Site actor and then as the Alpha actor that lacks the parent source permission. | A Hidden-Site direct object is concealed as `404`. A missing parent-module permission returns `403` or removes the destination as designed. Alpha names, identifiers, counts, picker choices, export rows, coordinates, media, and source fields never leak. Do not change permissions during the browser run. |
 

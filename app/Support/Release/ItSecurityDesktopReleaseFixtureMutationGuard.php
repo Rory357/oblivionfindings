@@ -13,7 +13,7 @@ final class ItSecurityDesktopReleaseFixtureMutationGuard
     public const string EVIDENCE_CLASS = 'it_security_desktop_release_fixture_mutation_guard_v1';
 
     /** @var list<string> */
-    public const array ACTIONS = ['prepare', 'cleanup'];
+    public const array ACTIONS = ['prepare', 'cleanup', 'reset', 'withdraw-tracking-consent'];
 
     /** @var Closure(string, string): bool */
     private readonly Closure $verifyCheckout;
