@@ -46,17 +46,17 @@ intentionally unavailable must use only an explicitly approved non-release path.
 
 ## Acceptance actors
 
-Create these dedicated acceptance users through the approved release-fixture process. Assign only `RELEASE Site Alpha` unless the row says otherwise. Do not use `admin@test.com`, the `admin` role, impersonation, an application-wide permission override, or a permission change during the run.
+Create these dedicated acceptance users through the approved release-fixture process. Assign only `RELEASE V10 Site Alpha` unless the row says otherwise. Do not use `admin@test.com`, the `admin` role, impersonation, an application-wide permission override, or a permission change during the run.
 
 | Actor | Exact role | Required scope and purpose |
 | --- | --- | --- |
-| `release-requester@acceptance.invalid` | `support_worker` | Current staff member at `RELEASE Site Alpha`; uses inherited `it.request` for Help Centre, catalogue, own requests, comments, reopen, and CSAT. |
-| `release-it-manager@acceptance.invalid` | `it_manager` | Current staff member at `RELEASE Site Alpha`; works IT queues, provisioning, specialist work, canonical Devices, Monitoring, integrations, settings, and governed Device actions. The prepared fixture has explicit denials for `it.organisationWide` and `securityDevices.devices.viewAllSites` so this actor remains Site-scoped. |
-| `release-it-reviewer@acceptance.invalid` | `it_manager` | A different current staff member at `RELEASE Site Alpha`, with configured MFA and step-up capability; independently approves or rejects governed Device work. The same two application-wide permissions are explicitly denied in the prepared fixture. |
-| `release-control-room@acceptance.invalid` | `coordinator` | Current staff member at `RELEASE Site Alpha`; owns Control Room triage and sees only source data allowed by its independent Security & Devices permissions. |
-| `release-auditor@acceptance.invalid` | `auditor` | Current staff member at `RELEASE Site Alpha`; read-only Device, event, report, access-control, and command-evidence acceptance. No mutation control may appear. |
-| `release-denied@acceptance.invalid` | `support_worker` | Current staff member at `RELEASE Site Hidden`; proves Site and direct-object concealment against Alpha records. |
-| `release-source-denied@acceptance.invalid` | `finance` | Current staff member at `RELEASE Site Alpha`; proves missing Security & Devices and Control Room parent permissions without changing another actor during the run. |
+| `release-v10-requester@acceptance.invalid` | `support_worker` | Current staff member at `RELEASE V10 Site Alpha`; uses inherited `it.request` for Help Centre, catalogue, own requests, comments, reopen, and CSAT. |
+| `release-v10-it-manager@acceptance.invalid` | `it_manager` | Current staff member at `RELEASE V10 Site Alpha`; works IT queues, provisioning, specialist work, canonical Devices, Monitoring, integrations, settings, and governed Device actions. The prepared fixture has explicit denials for `it.organisationWide` and `securityDevices.devices.viewAllSites` so this actor remains Site-scoped. |
+| `release-v10-it-reviewer@acceptance.invalid` | `it_manager` | A different current staff member at `RELEASE V10 Site Alpha`, with configured MFA and step-up capability; independently approves or rejects governed Device work. The same two application-wide permissions are explicitly denied in the prepared fixture. |
+| `release-v10-control-room@acceptance.invalid` | `coordinator` | Current staff member at `RELEASE V10 Site Alpha`; owns Control Room triage and sees only source data allowed by its independent Security & Devices permissions. |
+| `release-v10-auditor@acceptance.invalid` | `auditor` | Current staff member at `RELEASE V10 Site Alpha`; read-only Device, event, report, access-control, and command-evidence acceptance. No mutation control may appear. |
+| `release-v10-denied@acceptance.invalid` | `support_worker` | Current staff member at `RELEASE V10 Site Hidden`; proves Site and direct-object concealment against Alpha records. |
+| `release-v10-source-denied@acceptance.invalid` | `finance` | Current staff member at `RELEASE V10 Site Alpha`; proves missing Security & Devices and Control Room parent permissions without changing another actor during the run. |
 
 If a required actor, seeded role grant, MFA prerequisite, or Site assignment is absent or incorrect, the release is blocked. Do not repair acceptance by granting `admin`, logging in as an Administrator, or changing permission overrides mid-journey.
 
@@ -124,17 +124,24 @@ owned fixture Device, cleanup fails early with
 archive that fixture pack with its immutable D16 evidence; do not delete or
 repoint the retained history to force cleanup. Any later D01 submissions remain
 part of that archived pack and must not be separately deleted after D16 evidence
-exists. There is deliberately no in-application archive/retire or fresh-pack
-transition for a retained D16 pack: its fixed owned identities and attachment
-cannot be shared safely with a new revision. `prepare` fails closed rather than
-repointing a retained pack to another release revision. Do not change the
-fixture revision or reuse D16 after deployment; a new D16 requires an approved
-versioned-fixture design that keeps records, files, and command/audit history
-disjoint.
+exists. The current pack uses the `it-security-desktop-release-v10` key and a
+fully namespaced V10 identity, natural-key, and attachment set. A historical V1
+pack with retained D16 evidence remains immutable under its original key and is
+not queried, reset, cleaned, or treated as current readiness. The first V10
+`prepare` may therefore create a disjoint current pack without sharing or
+rewriting any V1-owned row, file, command, batch, reconciliation, or audit
+record. V10 cleanup deletes only IDs and files in the V10 manifest.
+
+There is deliberately no generic archive/retire action that silently advances
+an arbitrary retained pack. After V10 itself contains retained D16 evidence,
+`prepare` still fails closed rather than repointing it to another release
+revision. Do not change the V10 fixture revision or reuse D16 after deployment;
+a later D16 generation must introduce another explicitly namespaced pack with
+wholly disjoint records and files.
 
 Before D16 evidence exists, the exact manifest-owned
-`release-requester@acceptance.invalid` User ID plus the exact manifest-owned
-`RELEASE Access Request` catalogue-item ID form one bounded disposable D01
+`release-v10-requester@acceptance.invalid` User ID plus the exact manifest-owned
+`RELEASE V10 Access Request` catalogue-item ID form one bounded disposable D01
 journey scope. Every submission made under both exact parent IDs, including
 multiple viewport attempts or retests with distinct idempotency keys, and each
 submission's exact result ticket belong to that disposable scope. A matching
@@ -169,34 +176,34 @@ Tinker, SQL, a browser, or a generic seeder.
 
 ### Sites and people
 
-- `RELEASE Site Alpha`: active operational Site reachable over the main SD-WAN.
-- `RELEASE Site Hidden`: active operational Site not visible to any Alpha actor.
-- `RELEASE Client Alpha`: active Client at Alpha with a consent-governed personal tracker and one technical healthcare Device.
-- `RELEASE Client Hidden`: active Client at Hidden with equivalent private records.
-- `RELEASE Staff Alpha`: current staff member at Alpha with one canonical staff laptop.
-- `RELEASE Staff Hidden`: current staff member at Hidden with one private staff Device.
+- `RELEASE V10 Site Alpha`: active operational Site reachable over the main SD-WAN.
+- `RELEASE V10 Site Hidden`: active operational Site not visible to any Alpha actor.
+- `RELEASE V10 Client Alpha`: active Client at Alpha with a consent-governed personal tracker and one technical healthcare Device.
+- `RELEASE V10 Client Hidden`: active Client at Hidden with equivalent private records.
+- `RELEASE V10 Staff Alpha`: current staff member at Alpha with one canonical staff laptop.
+- `RELEASE V10 Staff Hidden`: current staff member at Hidden with one private staff Device.
 
 ### Canonical Devices and linked records
 
-- `RELEASE Alpha Gateway`: Alpha Network & IT gateway with current direct-path monitoring, topology, configuration, firmware, and capacity history.
-- `RELEASE Alpha Switch`: Alpha switch related to the gateway and linked to one monitoring-created Control Room alert and IT incident.
-- `RELEASE Alpha Door`: primary Alpha access-control Device owned by the ready fixture pack. Its `release_fixture` provider executes only the explicitly approved simulated no-network D16 lifecycle.
-- `RELEASE Alpha Door Secondary`: secondary Alpha access-control Device owned by the same ready pack for independently visible partial bulk outcomes. It has the same exact simulated no-network contract and is not a live target.
-- `RELEASE Alpha Camera`: Alpha CCTV Device with media available only to an actor holding `securityDevices.cctv.media.view`.
-- `RELEASE Alpha Healthcare`: Alpha healthcare Device assigned to `RELEASE Client Alpha`; technical evidence exists but no clinical reading is copied into Security & Devices.
-- `RELEASE Alpha Personal Tracker`: canonical Alpha tracker with active purpose, authority, audience, consent, collection, and retention evidence.
-- `RELEASE Alpha Fleet Tracker`: canonical tracker installed in `RELEASE Alpha Vehicle` through the active Device-to-Asset link.
-- `RELEASE Alpha Environment Sensor`: Alpha Facilities & IoT Device with current observation and maintenance evidence.
-- `RELEASE Hidden Device`: any canonical Device at Hidden used for list, count, search, picker, export, and direct-object denial.
-- `RELEASE Alpha Vehicle`, `RELEASE Alpha Asset`, and `RELEASE Alpha Financial Record`: three uniquely named canonical owners. The active Vehicle has both current and home Site set to Alpha, category `Vehicle`, and no Client owner. The active operational Asset has category `IT Equipment`, Site Alpha, and no Client owner. The active Finance record has category `it_equipment` and links to that exact operational Asset. Their authorised technology projections must reuse these records.
+- `RELEASE V10 Alpha Gateway`: Alpha Network & IT gateway with current direct-path monitoring, topology, configuration, firmware, and capacity history.
+- `RELEASE V10 Alpha Switch`: Alpha switch related to the gateway and linked to one monitoring-created Control Room alert and IT incident.
+- `RELEASE V10 Alpha Door`: primary Alpha access-control Device owned by the ready fixture pack. Its `release_fixture` provider executes only the explicitly approved simulated no-network D16 lifecycle.
+- `RELEASE V10 Alpha Door Secondary`: secondary Alpha access-control Device owned by the same ready pack for independently visible partial bulk outcomes. It has the same exact simulated no-network contract and is not a live target.
+- `RELEASE V10 Alpha Camera`: Alpha CCTV Device with media available only to an actor holding `securityDevices.cctv.media.view`.
+- `RELEASE V10 Alpha Healthcare`: Alpha healthcare Device assigned to `RELEASE V10 Client Alpha`; technical evidence exists but no clinical reading is copied into Security & Devices.
+- `RELEASE V10 Alpha Personal Tracker`: canonical Alpha tracker with active purpose, authority, audience, consent, collection, and retention evidence.
+- `RELEASE V10 Alpha Fleet Tracker`: canonical tracker installed in `RELEASE V10 Alpha Vehicle` through the active Device-to-Asset link.
+- `RELEASE V10 Alpha Environment Sensor`: Alpha Facilities & IoT Device with current observation and maintenance evidence.
+- `RELEASE V10 Hidden Device`: any canonical Device at Hidden used for list, count, search, picker, export, and direct-object denial.
+- `RELEASE V10 Alpha Vehicle`, `RELEASE V10 Alpha Asset`, and `RELEASE V10 Alpha Financial Record`: three uniquely named canonical owners. The active Vehicle has both current and home Site set to Alpha, category `Vehicle`, and no Client owner. The active operational Asset has category `IT Equipment`, Site Alpha, and no Client owner. The active Finance record has category `it_equipment` and links to that exact operational Asset. Their authorised technology projections must reuse these records.
 
 ### IT, Control Room, monitoring, and provider state
 
-- A published `RELEASE Access Request` catalogue item and published `RELEASE Network Recovery` knowledge article.
+- A published `RELEASE V10 Access Request` catalogue item and published `RELEASE V10 Network Recovery` knowledge article.
 - One requester-owned service request and one agent-owned incident at Alpha, with SLA, public and internal activity, attachment, watcher, task, approval, and canonical affected-Device context.
 - One Alpha joiner/mover/leaver provisioning workflow with account, licence, equipment, network, and access-control tasks plus an HR completion handoff.
 - One Problem, Known Error/workaround, Change with validation/backout, and Major Incident with a published update.
-- One monitoring-created Control Room alert and one canonical IT incident sharing the same valid sealed incident-time snapshot for the exact `RELEASE Alpha Switch`, while live Device state is visibly newer. Both ticket links must carry the native monitoring principal and operation context; an unrelated Device, alert, event, Site, human-authored link, duplicate snapshot, or checksum-only lookalike does not satisfy readiness.
+- One monitoring-created Control Room alert and one canonical IT incident sharing the same valid sealed incident-time snapshot for the exact `RELEASE V10 Alpha Switch`, while live Device state is visibly newer. Both ticket links must carry the native monitoring principal and operation context; an unrelated Device, alert, event, Site, human-authored link, duplicate snapshot, or checksum-only lookalike does not satisfy readiness.
 - All eight specialised monitoring workers and the SNMP-trap, syslog, and flow listeners current in the deployed runtime; the external heartbeat current; Alpha direct Site readiness current; no collector required for Alpha.
 - A separate remote-Site evidence fixture only when the approved collector rehearsal is being inspected. It must not change Alpha into a collector-dependent Site.
 - UniFi and Milesight connections with approved Site mappings, safe capability manifests, fresh supervised execution evidence, and no credential or raw payload in browser data.
@@ -213,7 +220,7 @@ Run each row at `1440 x 900` and `1280 x 800`. Start a fresh authenticated brows
 
 | ID | Actor | Exact routes and workspace | Required action or evidence | Pass criteria |
 | --- | --- | --- | --- | --- |
-| D01 | `release-requester` | `/it?tab=knowledge`, `/it?tab=catalog`, `/it?tab=my-tickets`, `/it/tickets/{requester-ticket}` | Use knowledge deflection, submit `RELEASE Access Request` with a fresh run-specific idempotency key, record the exact newly created ticket reference/identifier, find that same request, add a public comment, then inspect reopen/CSAT only when lifecycle-eligible. | The evidence row binds this run to its exact new ticket. Only own requests and public activity appear. Internal tasks, routing, watchers, affected-Device operations, internal reasons, and private attachments are absent from HTML, page props, and network responses. |
+| D01 | `release-requester` | `/it?tab=knowledge`, `/it?tab=catalog`, `/it?tab=my-tickets`, `/it/tickets/{requester-ticket}` | Use knowledge deflection, submit `RELEASE V10 Access Request` with a fresh run-specific idempotency key, record the exact newly created ticket reference/identifier, find that same request, add a public comment, then inspect reopen/CSAT only when lifecycle-eligible. | The evidence row binds this run to its exact new ticket. Only own requests and public activity appear. Internal tasks, routing, watchers, affected-Device operations, internal reasons, and private attachments are absent from HTML, page props, and network responses. |
 | D02 | `release-it-manager` | `/it`, `/it?tab=tickets`, `/it/tickets/{alpha-ticket}` | Use queue/Site/advanced filters, open the Alpha incident, inspect Site, SLA, thread, attachment, watcher, approval, task, affected Device, live state, and sealed incident snapshot. | Service Desk navigation is clear; the ticket remains one work record; Device and Control Room links open only when source and destination permission both pass; sealed and live evidence are visibly distinct. |
 | D03 | `release-it-manager` | `/it?tab=provisioning` | Open the Alpha joiner/mover/leaver workflow and inspect assignment, approval, per-item outcome, reversal, HR handoff, equipment, network, and access-control work. | Every item has owner, state, next action, and failure/recovery evidence. No duplicate HR, Asset, access credential, or Device record is created. |
 | D04 | `release-it-manager` | `/it/problems`, `/it/problems/{problem}`, `/it/changes`, `/it/changes/{change}`, `/it/major-incidents`, `/it/major-incidents/{major-incident}` | Follow Problem to workaround/knowledge, Change to validation/backout and linked work, and Major Incident to published updates. | Lifecycle controls match current state, require governed dialogs/reasons, and write into their canonical record. Inert controls, browser-native dialogs, mock panels, and duplicate queues are release failures. |
@@ -221,7 +228,7 @@ Run each row at `1440 x 900` and `1280 x 800`. Start a fresh authenticated brows
 | D06 | `release-it-manager` | `/security-devices`, `/security-devices/sites`, `/security-devices/devices` | Navigate the grouped Overview, Workspaces, Operations, and Setup side navigation; filter Alpha; search both Alpha and Hidden fixture names. | Estate health, findings, coverage, Site impact, change, and required action reconcile. Hidden names and counts never appear. The sidebar remains legible and the active item is unambiguous. |
 | D07 | `release-it-manager` | `/security-devices/network-it?tab=map`, `?tab=devices`, `?tab=interfaces`, `?tab=services`, `?tab=traffic-capacity`, `?tab=configuration-firmware` | Follow gateway/switch topology, monitor/service, capacity, configuration diff, firmware, Site, Device, IT, and Control Room handoffs. | Native and provider sources are labelled, history is retained, missing evidence is not fabricated, and every handoff preserves canonical Alpha context. |
 | D08 | `release-it-manager`, then `release-auditor` | `/security-devices/security?tab=cctv`, `?tab=alarms`, `?tab=access-control`, `?tab=events` | Inspect CCTV, alarms, Access Control, and event evidence; verify auditor read-only treatment. | CCTV media is absent without the sensitive-media grant; credentials/schedules are provider-evidenced; the auditor sees no mutation control; Control Room remains the operational alert destination. |
-| D09 | `release-it-manager` | `/security-devices/healthcare?tab=client-devices`, `?tab=shared-site-devices`, `?tab=data-flow`, `?tab=calibration-maintenance` | Open `RELEASE Alpha Healthcare`, Client Profile, maintenance, and authorised IT handoffs. | Only technical health, connectivity, delivery, calibration, maintenance, and minimum Client identity are present. Clinical readings, diagnoses, medication, thresholds, and notes are absent from DOM, source, page props, and network responses. |
+| D09 | `release-it-manager` | `/security-devices/healthcare?tab=client-devices`, `?tab=shared-site-devices`, `?tab=data-flow`, `?tab=calibration-maintenance` | Open `RELEASE V10 Alpha Healthcare`, Client Profile, maintenance, and authorised IT handoffs. | Only technical health, connectivity, delivery, calibration, maintenance, and minimum Client identity are present. Clinical readings, diagnoses, medication, thresholds, and notes are absent from DOM, source, page props, and network responses. |
 | D10 | `release-control-room` | `/security-devices/tracking?tab=personal-safety`, `?tab=fleet`, `?tab=assets`, `?tab=geofences`, `?tab=history`, `/control-room/map` | Inspect purpose-separated tracking, then withdraw the Alpha personal-tracking consent through the approved fixture transition and refocus/reload the page. | Personal, Fleet, and Asset tracking are not combined. Withdrawal removes current location, history, export, map marker, cached state, and direct access. Fleet/Asset operational positions remain independently governed. |
 | D11 | `release-it-manager` | `/security-devices/facilities-iot?tab=environment`, `?tab=building-systems`, `?tab=utilities`, `?tab=automations`, `?tab=history` | Open the Alpha environmental Device, observation history, maintenance, Site, and finding handoffs. | Facilities data stays technical and Site-scoped; supported automation status is truthful; unavailable actions are labelled unavailable rather than rendered inert. |
 | D12 | `release-it-manager` | `/security-devices/monitoring`, `?tab=findings`, `?tab=coverage`, `?tab=dependencies`, `?tab=trends`, `?tab=collection`, `/security-devices/runtime-health` | Inspect Alpha direct monitoring, all worker/listener states, current advancing observations, dependency/maintenance/confirmation/stale states, retention and storage health, external heartbeat, and one accurate path/runtime correlation. | Alpha says direct path and no collector required. Runtime timestamps advance, no per-Device storm replaces a path finding, no endpoint/credential/raw metric dimension leaks, and the authenticated runtime response is current rather than cached evidence. |

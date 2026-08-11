@@ -6,7 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 final class ItSecurityDesktopReleaseFixturePack extends Model
 {
-    public const string PACK_KEY = 'it-security-desktop-release-v1';
+    /** Historical pack retained because its immutable D16 evidence is still referenced. */
+    public const string LEGACY_PACK_KEY = 'it-security-desktop-release-v1';
+
+    /** Current disjoint fixture generation. */
+    public const string PACK_KEY = 'it-security-desktop-release-v10';
 
     public const string STATE_READY = 'ready';
 

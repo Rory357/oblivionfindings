@@ -33,7 +33,7 @@ function releaseFixtureCommandDevice(array $overrides = []): Device
 {
     return new Device(array_replace_recursive([
         'id' => 7001,
-        'name' => 'RELEASE Alpha Door',
+        'name' => 'RELEASE V10 Alpha Door',
         'provider' => 'release_fixture',
         'domain' => 'security',
         'category' => 'access_control',
@@ -78,7 +78,7 @@ it('refuses every non-approved runtime before it checks fixture ownership', func
         $runtime = new ReleaseFixtureRuntimeStub(approved: false, owned: true);
         $adapter = new ReleaseFixtureCommandAdapter($runtime);
 
-        expect($adapter->supports(releaseFixtureCommandDevice(['name' => "RELEASE {$runtimeName} Door"]), 'access.door.unlock_timed'))->toBeFalse()
+        expect($adapter->supports(releaseFixtureCommandDevice(['name' => "RELEASE V10 {$runtimeName} Door"]), 'access.door.unlock_timed'))->toBeFalse()
             ->and($runtime->ownershipChecks)->toBe(0);
     }
 });

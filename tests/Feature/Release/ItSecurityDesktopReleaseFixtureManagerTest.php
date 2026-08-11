@@ -96,10 +96,10 @@ it('prepares one complete pack reuses it idempotently and removes only owned rec
         ->and(MonitoringIncidentEvidenceSnapshot::query()->count())->toBe(1);
 
     $hiddenSiteActor = User::query()
-        ->where('email', 'release-denied@acceptance.invalid')
+        ->where('email', 'release-v10-denied@acceptance.invalid')
         ->sole();
     $sourceDeniedActor = User::query()
-        ->where('email', 'release-source-denied@acceptance.invalid')
+        ->where('email', 'release-v10-source-denied@acceptance.invalid')
         ->sole();
 
     expect($hiddenSiteActor->canDo('controlRoom.viewAny'))->toBeTrue()
@@ -111,7 +111,7 @@ it('prepares one complete pack reuses it idempotently and removes only owned rec
         ->and($sourceDeniedActor->canDo('fleet.viewAny'))->toBeFalse()
         ->and($sourceDeniedActor->canDo('assets.telemetry.view'))->toBeFalse();
 
-    Storage::disk('private')->assertExists('it-security-release-fixtures/release-network-evidence.txt');
+    Storage::disk('private')->assertExists('it-security-release-fixtures/v10/release-network-evidence.txt');
 
     $reused = $manager->execute('prepare', $secondRevision);
 
@@ -140,13 +140,74 @@ it('prepares one complete pack reuses it idempotently and removes only owned rec
         ->and(Device::query()->whereKey($unrelatedDevice->id)->exists())->toBeTrue()
         ->and(Site::query()->whereKey($unrelatedSite->id)->exists())->toBeTrue()
         ->and(User::query()->whereKey($unrelatedUser->id)->exists())->toBeTrue();
-    Storage::disk('private')->assertMissing('it-security-release-fixtures/release-network-evidence.txt');
+    Storage::disk('private')->assertMissing('it-security-release-fixtures/v10/release-network-evidence.txt');
+});
+
+it('creates and cleans the disjoint V10 generation without mutating retained V1 evidence', function (): void {
+    $legacyRevision = str_repeat('1', 40);
+    $currentRevision = str_repeat('a', 40);
+    $legacyManifest = [
+        'schema_version' => 1,
+        'records' => [],
+        'files' => [],
+    ];
+    $legacyPack = ItSecurityDesktopReleaseFixturePack::query()->create([
+        'pack_key' => ItSecurityDesktopReleaseFixturePack::LEGACY_PACK_KEY,
+        'release_revision' => $legacyRevision,
+        'state' => ItSecurityDesktopReleaseFixturePack::STATE_READY,
+        'manifest' => $legacyManifest,
+        'manifest_sha256' => hash('sha256', json_encode($legacyManifest, JSON_THROW_ON_ERROR)),
+        'prepared_at' => now()->subDay(),
+        'last_verified_at' => now()->subDay(),
+    ]);
+    $legacySite = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $legacyUser = User::factory()->create(['email' => 'release-requester@acceptance.invalid']);
+    $legacyDoor = Device::factory()->create([
+        'name' => 'RELEASE Alpha Door',
+        'provider' => 'release_fixture',
+    ]);
+    Storage::disk('private')->put(
+        'it-security-release-fixtures/release-network-evidence.txt',
+        "Retained V1 fixture evidence.\n",
+    );
+
+    $manager = app(ItSecurityDesktopReleaseFixtureManager::class);
+    $created = $manager->execute('prepare', $currentRevision);
+
+    expect($created)->toMatchArray([
+        'state' => 'ready',
+        'operation' => 'created',
+        'release_revision' => $currentRevision,
+        'fixture_mutation_applied' => true,
+    ])->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(2)
+        ->and(ItSecurityDesktopReleaseFixturePack::query()
+            ->where('pack_key', ItSecurityDesktopReleaseFixturePack::PACK_KEY)
+            ->value('release_revision'))->toBe($currentRevision)
+        ->and($legacyPack->fresh()->release_revision)->toBe($legacyRevision)
+        ->and($legacyPack->fresh()->state)->toBe(ItSecurityDesktopReleaseFixturePack::STATE_READY)
+        ->and(Site::query()->whereKey($legacySite->id)->exists())->toBeTrue()
+        ->and(User::query()->whereKey($legacyUser->id)->exists())->toBeTrue()
+        ->and(Device::query()->whereKey($legacyDoor->id)->exists())->toBeTrue();
+    Storage::disk('private')->assertExists('it-security-release-fixtures/release-network-evidence.txt');
+    Storage::disk('private')->assertExists('it-security-release-fixtures/v10/release-network-evidence.txt');
+
+    $cleaned = $manager->execute('cleanup', $currentRevision);
+
+    expect($cleaned['state'])->toBe('ready')
+        ->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(1)
+        ->and(ItSecurityDesktopReleaseFixturePack::query()->sole()->is($legacyPack))->toBeTrue()
+        ->and(Site::query()->whereKey($legacySite->id)->exists())->toBeTrue()
+        ->and(User::query()->whereKey($legacyUser->id)->exists())->toBeTrue()
+        ->and(Device::query()->whereKey($legacyDoor->id)->exists())->toBeTrue()
+        ->and(User::query()->whereIn('email', array_keys(ItSecurityDesktopReleaseFixtureReadiness::ACTORS))->count())->toBe(0);
+    Storage::disk('private')->assertExists('it-security-release-fixtures/release-network-evidence.txt');
+    Storage::disk('private')->assertMissing('it-security-release-fixtures/v10/release-network-evidence.txt');
 });
 
 it('refuses a reserved identity before writing any owned pack record', function (): void {
     $manager = app(ItSecurityDesktopReleaseFixtureManager::class);
     $revision = str_repeat('c', 40);
-    $reserved = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $reserved = Site::factory()->create(['name' => 'RELEASE V10 Site Alpha']);
 
     $plan = $manager->plan('prepare', $revision);
     $executed = $manager->execute('prepare', $revision);
@@ -197,14 +258,14 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
     $manager->execute('prepare', $revision);
 
     $consent = ClientConsent::query()
-        ->whereHas('consentType', fn ($query) => $query->where('name', 'RELEASE Client Location Tracking'))
+        ->whereHas('consentType', fn ($query) => $query->where('name', 'RELEASE V10 Client Location Tracking'))
         ->sole();
     $assignment = DeviceAssignment::query()->where('consent_id', $consent->id)->sole();
-    $device = Device::query()->where('name', 'RELEASE Alpha Personal Tracker')->sole();
+    $device = Device::query()->where('name', 'RELEASE V10 Alpha Personal Tracker')->sole();
     $event = IntegrationEvent::query()
         ->where('source_event_id', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_EVENT_SOURCE_ID)
         ->sole();
-    $viewer = User::query()->where('email', 'release-control-room@acceptance.invalid')->sole();
+    $viewer = User::query()->where('email', 'release-v10-control-room@acceptance.invalid')->sole();
     $eventSnapshotFields = [
         'id',
         'site_id',
@@ -242,7 +303,7 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
         ->and(Arr::sortRecursive((array) $event->tags))->toBe(Arr::sortRecursive(ItSecurityDesktopReleaseFixtureReadiness::TRACKING_EVENT_TAGS))
         ->and(Arr::sortRecursive((array) $event->normalized_payload))->toBe(Arr::sortRecursive(ItSecurityDesktopReleaseFixtureReadiness::TRACKING_EVENT_PAYLOAD))
         ->and($event->raw_payload)->toBeNull()
-        ->and($history()->pluck('deviceName')->all())->toBe(['RELEASE Alpha Personal Tracker'])
+        ->and($history()->pluck('deviceName')->all())->toBe(['RELEASE V10 Alpha Personal Tracker'])
         ->and(app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess()['state'])->toBe('ready')
         ->and($manager->plan('withdraw-tracking-consent', $revision)['state'])->toBe('ready');
     $this->actingAs($viewer)
@@ -256,7 +317,7 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
     $device->refresh();
     $event->refresh();
     $commandDoors = Device::query()
-        ->whereIn('name', ['RELEASE Alpha Door', 'RELEASE Alpha Door Secondary'])
+        ->whereIn('name', ['RELEASE V10 Alpha Door', 'RELEASE V10 Alpha Door Secondary'])
         ->get();
     $commandDoors->each(fn (Device $door) => $door->update([
         'last_seen_at' => now()->subHour(),
@@ -298,12 +359,12 @@ it('withdraws and resets only the owned personal tracking consent baseline', fun
         ->and((float) $device->latitude)->toBe(ItSecurityDesktopReleaseFixtureReadiness::TRACKING_LATITUDE)
         ->and((float) $device->longitude)->toBe(ItSecurityDesktopReleaseFixtureReadiness::TRACKING_LONGITUDE)
         ->and($device->last_seen_at?->equalTo($event->occurred_at))->toBeTrue()
-        ->and($history()->pluck('deviceName')->all())->toBe(['RELEASE Alpha Personal Tracker'])
+        ->and($history()->pluck('deviceName')->all())->toBe(['RELEASE V10 Alpha Personal Tracker'])
         ->and(json_encode($event->only($eventSnapshotFields), JSON_THROW_ON_ERROR))->toBe($eventSnapshot)
         ->and(AuditLog::query()->where('action', 'tracking.collection.stopped')->exists())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'tracking.consent.withdrawal_enforced')->exists())->toBeTrue()
         ->and(AuditLog::query()->where('action', 'tracking.collection.resumed')->exists())->toBeTrue()
-        ->and(ConsentType::query()->where('name', 'RELEASE Client Location Tracking')->count())->toBe(1)
+        ->and(ConsentType::query()->where('name', 'RELEASE V10 Client Location Tracking')->count())->toBe(1)
         ->and($commandDoors->every(fn (Device $door): bool => $door->last_seen_at?->gt(now()->subMinute()) === true))->toBeTrue()
         ->and(app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess()['state'])->toBe('ready');
     $this->actingAs($viewer)
@@ -318,11 +379,11 @@ it('refuses withdrawal and reset when the owned consent is shared with a non man
     $manager->execute('prepare', $revision);
 
     $consent = ClientConsent::query()
-        ->whereHas('consentType', fn ($query) => $query->where('name', 'RELEASE Client Location Tracking'))
+        ->whereHas('consentType', fn ($query) => $query->where('name', 'RELEASE V10 Client Location Tracking'))
         ->sole();
     $fixtureAssignment = DeviceAssignment::query()->where('consent_id', $consent->id)->sole();
-    $fixtureDevice = Device::query()->where('name', 'RELEASE Alpha Personal Tracker')->sole();
-    $actor = User::query()->where('email', 'release-control-room@acceptance.invalid')->sole();
+    $fixtureDevice = Device::query()->where('name', 'RELEASE V10 Alpha Personal Tracker')->sole();
+    $actor = User::query()->where('email', 'release-v10-control-room@acceptance.invalid')->sole();
     $extraDevice = Device::factory()->tracking()->create(['name' => 'Non manifest consent-sharing tracker']);
     $extraAssignment = DeviceAssignment::query()->create([
         'device_id' => $extraDevice->id,
@@ -394,8 +455,8 @@ it('cleans every D01 attempt for the exact owned requester and catalogue pair wh
     $revision = str_repeat('e', 40);
     $manager->execute('prepare', $revision);
 
-    $requester = User::query()->where('email', 'release-requester@acceptance.invalid')->sole();
-    $catalog = ItCatalogItem::query()->where('slug', 'release-access-request')->sole();
+    $requester = User::query()->where('email', 'release-v10-requester@acceptance.invalid')->sole();
+    $catalog = ItCatalogItem::query()->where('slug', 'release-v10-access-request')->sole();
     $outcomes = collect(['d01-browser-run-1', 'd01-browser-run-2'])
         ->map(fn (string $idempotencyKey): array => app(ItCatalogSubmissionService::class)->submit(
             $catalog,
@@ -437,8 +498,8 @@ it('cleans every D01 attempt for the exact owned requester and catalogue pair wh
     ]);
     $unrelatedRequester = User::factory()->create();
     $unrelatedCatalog = ItCatalogItem::query()->create([
-        'name' => 'RELEASE Access Request lookalike',
-        'slug' => 'release-access-request-lookalike',
+        'name' => 'RELEASE V10 Access Request lookalike',
+        'slug' => 'release-v10-access-request-lookalike',
         'description' => 'Unrelated retained catalogue item.',
         'outcome_type' => 'service_request',
         'category' => 'account',
@@ -452,7 +513,7 @@ it('cleans every D01 attempt for the exact owned requester and catalogue pair wh
     ]);
     $unrelatedTicket = ItTicket::factory()->create([
         'requester_user_id' => $unrelatedRequester->id,
-        'title' => 'RELEASE Access Request lookalike',
+        'title' => 'RELEASE V10 Access Request lookalike',
     ]);
     $unrelatedSubmission = ItCatalogSubmission::query()->create([
         'catalog_item_id' => $unrelatedCatalog->id,
@@ -486,8 +547,8 @@ it('fails closed when D01 has an unexpected private attachment', function (): vo
     $revision = str_repeat('g', 40);
     $manager->execute('prepare', $revision);
 
-    $requester = User::query()->where('email', 'release-requester@acceptance.invalid')->sole();
-    $catalog = ItCatalogItem::query()->where('slug', 'release-access-request')->sole();
+    $requester = User::query()->where('email', 'release-v10-requester@acceptance.invalid')->sole();
+    $catalog = ItCatalogItem::query()->where('slug', 'release-v10-access-request')->sole();
     $outcome = app(ItCatalogSubmissionService::class)->submit($catalog, $requester, [
         'schema_version' => $catalog->form_schema_version,
         'values' => [],
@@ -523,7 +584,7 @@ it('resumes a durable pending file-cleanup journal idempotently', function (): v
 
     expect($cleaned['operation'])->toBe('deleted_owned')
         ->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(0);
-    Storage::disk('private')->assertMissing('it-security-release-fixtures/release-network-evidence.txt');
+    Storage::disk('private')->assertMissing('it-security-release-fixtures/v10/release-network-evidence.txt');
 });
 
 it('refuses cleanup when an owned file is missing or the manifest is corrupt and preserves every record', function (): void {
@@ -535,7 +596,7 @@ it('refuses cleanup when an owned file is missing or the manifest is corrupt and
         'name',
         array_keys(ItSecurityDesktopReleaseFixtureReadiness::DEVICES),
     )->count();
-    Storage::disk('private')->delete('it-security-release-fixtures/release-network-evidence.txt');
+    Storage::disk('private')->delete('it-security-release-fixtures/v10/release-network-evidence.txt');
 
     $missingFileReport = $manager->execute('cleanup', $revision);
 
@@ -546,7 +607,7 @@ it('refuses cleanup when an owned file is missing or the manifest is corrupt and
         ->and(Device::query()->whereIn('name', array_keys(ItSecurityDesktopReleaseFixtureReadiness::DEVICES))->count())->toBe($deviceCount);
 
     Storage::disk('private')->put(
-        'it-security-release-fixtures/release-network-evidence.txt',
+        'it-security-release-fixtures/v10/release-network-evidence.txt',
         "Non-sensitive desktop release acceptance evidence.\n",
     );
     $pack->update(['manifest_sha256' => str_repeat('0', 64)]);
@@ -558,7 +619,7 @@ it('refuses cleanup when an owned file is missing or the manifest is corrupt and
         ->and($report['fixture_mutation_applied'])->toBeFalse()
         ->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(1)
         ->and(Device::query()->whereIn('name', array_keys(ItSecurityDesktopReleaseFixtureReadiness::DEVICES))->count())->toBe($deviceCount);
-    Storage::disk('private')->assertExists('it-security-release-fixtures/release-network-evidence.txt');
+    Storage::disk('private')->assertExists('it-security-release-fixtures/v10/release-network-evidence.txt');
 });
 
 it('retains the fixture pack when immutable D16 batch evidence references an owned door', function (): void {
@@ -567,13 +628,13 @@ it('retains the fixture pack when immutable D16 batch evidence references an own
     expect($manager->execute('prepare', $revision)['state'])->toBe('ready');
 
     $managerUserId = (int) User::query()
-        ->where('email', 'release-it-manager@acceptance.invalid')
+        ->where('email', 'release-v10-it-manager@acceptance.invalid')
         ->value('id');
     $doorId = (int) Device::query()
-        ->where('name', 'RELEASE Alpha Door')
+        ->where('name', 'RELEASE V10 Alpha Door')
         ->value('id');
     $siteId = (int) Site::query()
-        ->where('name', 'RELEASE Site Alpha')
+        ->where('name', 'RELEASE V10 Site Alpha')
         ->value('id');
     $batchId = DB::table('device_command_batches')->insertGetId([
         'batch_uuid' => (string) Str::uuid(),
@@ -636,11 +697,11 @@ it('rechecks retained D16 evidence under the cleanup lock before deleting any ow
     expect($manager->execute('prepare', $revision)['state'])->toBe('ready');
 
     $managerUserId = (int) User::query()
-        ->where('email', 'release-it-manager@acceptance.invalid')
+        ->where('email', 'release-v10-it-manager@acceptance.invalid')
         ->value('id');
-    $doorId = (int) Device::query()->where('name', 'RELEASE Alpha Door')->value('id');
-    $siteId = (int) Site::query()->where('name', 'RELEASE Site Alpha')->value('id');
-    $catalogueId = (int) ItCatalogItem::query()->where('name', 'RELEASE Access Request')->value('id');
+    $doorId = (int) Device::query()->where('name', 'RELEASE V10 Alpha Door')->value('id');
+    $siteId = (int) Site::query()->where('name', 'RELEASE V10 Site Alpha')->value('id');
+    $catalogueId = (int) ItCatalogItem::query()->where('name', 'RELEASE V10 Access Request')->value('id');
     $packSelects = 0;
     $evidenceInserted = false;
 

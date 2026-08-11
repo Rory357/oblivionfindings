@@ -47,7 +47,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
 
     public const string TRACKING_EVENT_SOURCE_APP = 'desktop_release_acceptance';
 
-    public const string TRACKING_EVENT_SOURCE_ID = 'release-alpha-personal-tracker-synthetic-position-v1';
+    public const string TRACKING_EVENT_SOURCE_ID = 'release-v10-alpha-personal-tracker-synthetic-position-v1';
 
     public const string TRACKING_EVENT_TYPE = 'location_report';
 
@@ -76,9 +76,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
      * }>
      */
     public const array ACTORS = [
-        'release-requester@acceptance.invalid' => [
+        'release-v10-requester@acceptance.invalid' => [
             'role' => 'support_worker',
-            'site' => 'RELEASE Site Alpha',
+            'site' => 'RELEASE V10 Site Alpha',
             'required_permissions' => ['it.request'],
             'forbidden_permissions' => [
                 'it.view',
@@ -87,9 +87,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 'it.viewSensitive',
             ],
         ],
-        'release-it-manager@acceptance.invalid' => [
+        'release-v10-it-manager@acceptance.invalid' => [
             'role' => 'it_manager',
-            'site' => 'RELEASE Site Alpha',
+            'site' => 'RELEASE V10 Site Alpha',
             'required_permissions' => [
                 'it.request',
                 'it.view',
@@ -109,9 +109,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             ],
             'explicit_denials' => ['it.organisationWide', 'securityDevices.devices.viewAllSites'],
         ],
-        'release-it-reviewer@acceptance.invalid' => [
+        'release-v10-it-reviewer@acceptance.invalid' => [
             'role' => 'it_manager',
-            'site' => 'RELEASE Site Alpha',
+            'site' => 'RELEASE V10 Site Alpha',
             'required_permissions' => [
                 'it.view',
                 'securityDevices.viewAny',
@@ -126,9 +126,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             'mfa' => true,
             'explicit_denials' => ['it.organisationWide', 'securityDevices.devices.viewAllSites'],
         ],
-        'release-control-room@acceptance.invalid' => [
+        'release-v10-control-room@acceptance.invalid' => [
             'role' => 'coordinator',
-            'site' => 'RELEASE Site Alpha',
+            'site' => 'RELEASE V10 Site Alpha',
             'required_permissions' => [
                 'controlRoom.viewAny',
                 'controlRoom.alerts.view',
@@ -139,9 +139,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             ],
             'forbidden_permissions' => ['securityDevices.devices.viewAllSites'],
         ],
-        'release-auditor@acceptance.invalid' => [
+        'release-v10-auditor@acceptance.invalid' => [
             'role' => 'auditor',
-            'site' => 'RELEASE Site Alpha',
+            'site' => 'RELEASE V10 Site Alpha',
             'required_permissions' => [
                 'securityDevices.viewAny',
                 'securityDevices.devices.view',
@@ -166,9 +166,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 'securityDevices.commands.admin',
             ],
         ],
-        'release-denied@acceptance.invalid' => [
+        'release-v10-denied@acceptance.invalid' => [
             'role' => 'support_worker',
-            'site' => 'RELEASE Site Hidden',
+            'site' => 'RELEASE V10 Site Hidden',
             'required_permissions' => [
                 'securityDevices.viewAny',
                 'securityDevices.devices.view',
@@ -178,7 +178,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 'securityDevices.commands.observe',
                 // These parent grants deliberately let the direct-route checks
                 // reach Site/object authorization. The actor is assigned only
-                // to RELEASE Site Hidden, so Alpha records must still be
+                // to RELEASE V10 Site Hidden, so Alpha records must still be
                 // concealed by their canonical access services.
                 'controlRoom.viewAny',
                 'controlRoom.alerts.view',
@@ -204,9 +204,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 'securityDevices.devices.viewAllSites',
             ],
         ],
-        'release-source-denied@acceptance.invalid' => [
+        'release-v10-source-denied@acceptance.invalid' => [
             'role' => 'finance',
-            'site' => 'RELEASE Site Alpha',
+            'site' => 'RELEASE V10 Site Alpha',
             'required_permissions' => ['finance.dashboard'],
             'forbidden_permissions' => [
                 'securityDevices.viewAny',
@@ -218,18 +218,18 @@ final class ItSecurityDesktopReleaseFixtureReadiness
     ];
 
     /** @var list<string> */
-    public const array SITES = ['RELEASE Site Alpha', 'RELEASE Site Hidden'];
+    public const array SITES = ['RELEASE V10 Site Alpha', 'RELEASE V10 Site Hidden'];
 
     /** @var array<string, string> */
     public const array CLIENTS = [
-        'RELEASE Client Alpha' => 'RELEASE Site Alpha',
-        'RELEASE Client Hidden' => 'RELEASE Site Hidden',
+        'RELEASE V10 Client Alpha' => 'RELEASE V10 Site Alpha',
+        'RELEASE V10 Client Hidden' => 'RELEASE V10 Site Hidden',
     ];
 
     /** @var array<string, string> */
     public const array STAFF = [
-        'RELEASE Staff Alpha' => 'RELEASE Site Alpha',
-        'RELEASE Staff Hidden' => 'RELEASE Site Hidden',
+        'RELEASE V10 Staff Alpha' => 'RELEASE V10 Site Alpha',
+        'RELEASE V10 Staff Hidden' => 'RELEASE V10 Site Hidden',
     ];
 
     /**
@@ -244,87 +244,87 @@ final class ItSecurityDesktopReleaseFixtureReadiness
      * }>
      */
     public const array DEVICES = [
-        'RELEASE Alpha Gateway' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Gateway' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'it_infrastructure',
             'category' => 'network',
             'subcategory' => 'router',
             'binding_type' => 'site',
-            'binding_name' => 'RELEASE Site Alpha',
+            'binding_name' => 'RELEASE V10 Site Alpha',
         ],
-        'RELEASE Alpha Switch' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Switch' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'it_infrastructure',
             'category' => 'network',
             'subcategory' => 'switch',
             'binding_type' => 'site',
-            'binding_name' => 'RELEASE Site Alpha',
+            'binding_name' => 'RELEASE V10 Site Alpha',
         ],
-        'RELEASE Alpha Door' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Door' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'security',
             'category' => 'access_control',
             'subcategory' => 'card_reader',
             'binding_type' => 'site',
-            'binding_name' => 'RELEASE Site Alpha',
+            'binding_name' => 'RELEASE V10 Site Alpha',
             'release_fixture_command' => true,
         ],
-        'RELEASE Alpha Door Secondary' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Door Secondary' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'security',
             'category' => 'access_control',
             'subcategory' => 'card_reader',
             'binding_type' => 'site',
-            'binding_name' => 'RELEASE Site Alpha',
+            'binding_name' => 'RELEASE V10 Site Alpha',
             'release_fixture_command' => true,
         ],
-        'RELEASE Alpha Camera' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Camera' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'security',
             'category' => 'cctv',
             'subcategory' => 'dome_camera',
             'binding_type' => 'site',
-            'binding_name' => 'RELEASE Site Alpha',
+            'binding_name' => 'RELEASE V10 Site Alpha',
         ],
-        'RELEASE Alpha Healthcare' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Healthcare' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'iot_healthcare',
             'category' => 'fall_detection',
             'subcategory' => 'wearable_fall',
             'binding_type' => 'client',
-            'binding_name' => 'RELEASE Client Alpha',
+            'binding_name' => 'RELEASE V10 Client Alpha',
         ],
-        'RELEASE Alpha Personal Tracker' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Personal Tracker' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'tracking',
             'category' => 'personal_tracker',
             'subcategory' => 'wearable_gps',
             'binding_type' => 'client',
-            'binding_name' => 'RELEASE Client Alpha',
+            'binding_name' => 'RELEASE V10 Client Alpha',
         ],
-        'RELEASE Alpha Fleet Tracker' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Fleet Tracker' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'tracking',
             'category' => 'vehicle_tracker',
             'subcategory' => 'hardwired_gps',
             'binding_type' => 'asset',
-            'binding_name' => 'RELEASE Alpha Vehicle',
+            'binding_name' => 'RELEASE V10 Alpha Vehicle',
         ],
-        'RELEASE Alpha Environment Sensor' => [
-            'site' => 'RELEASE Site Alpha',
+        'RELEASE V10 Alpha Environment Sensor' => [
+            'site' => 'RELEASE V10 Site Alpha',
             'domain' => 'facilities',
             'category' => 'cold_chain',
             'subcategory' => 'fridge_sensor',
             'binding_type' => 'site',
-            'binding_name' => 'RELEASE Site Alpha',
+            'binding_name' => 'RELEASE V10 Site Alpha',
         ],
-        'RELEASE Hidden Device' => [
-            'site' => 'RELEASE Site Hidden',
+        'RELEASE V10 Hidden Device' => [
+            'site' => 'RELEASE V10 Site Hidden',
             'domain' => 'it_infrastructure',
             'category' => 'endpoint',
             'subcategory' => 'shared_device',
             'binding_type' => 'site',
-            'binding_name' => 'RELEASE Site Hidden',
+            'binding_name' => 'RELEASE V10 Site Hidden',
         ],
     ];
 
@@ -567,7 +567,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
     private function peopleSection(Collection $sites): array
     {
         $clientRows = Client::query()
-            ->where('first_name', 'RELEASE Client')
+            ->where('first_name', 'RELEASE V10 Client')
             ->whereIn('last_name', ['Alpha', 'Hidden'])
             ->get();
         $clients = $clientRows->keyBy(fn (Client $client): string => $client->full_name);
@@ -639,12 +639,12 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             ->get();
         $devices = $deviceRows->keyBy('name');
         $clients = Client::query()
-            ->where('first_name', 'RELEASE Client')
+            ->where('first_name', 'RELEASE V10 Client')
             ->whereIn('last_name', ['Alpha', 'Hidden'])
             ->get()
             ->keyBy(fn (Client $client): string => $client->full_name);
         $assets = Asset::query()
-            ->whereIn('name', ['RELEASE Alpha Vehicle', 'RELEASE Alpha Asset'])
+            ->whereIn('name', ['RELEASE V10 Alpha Vehicle', 'RELEASE V10 Alpha Asset'])
             ->get()
             ->keyBy('name');
         $ready = 0;
@@ -666,6 +666,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             ->all();
         $actualFixtureCommandNames = Device::query()
             ->where('provider', 'release_fixture')
+            ->where('name', 'like', 'RELEASE V10 %')
             ->pluck('name')
             ->sort()
             ->values()
@@ -695,10 +696,10 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 && $device->category === $contract['category']
                 && $device->subcategory === $contract['subcategory'];
             $bindingReady = $this->deviceBindingReady($device, $contract, $sites, $clients, $assets);
-            $trackingBaselineReady = $name !== 'RELEASE Alpha Personal Tracker'
-                || $this->personalTrackingBaselineReady($device, $clients->get('RELEASE Client Alpha'));
-            $trackingHistoryReady = $name !== 'RELEASE Alpha Personal Tracker'
-                || $this->personalTrackingHistoryBaselineReady($device, $clients->get('RELEASE Client Alpha'));
+            $trackingBaselineReady = $name !== 'RELEASE V10 Alpha Personal Tracker'
+                || $this->personalTrackingBaselineReady($device, $clients->get('RELEASE V10 Client Alpha'));
+            $trackingHistoryReady = $name !== 'RELEASE V10 Alpha Personal Tracker'
+                || $this->personalTrackingHistoryBaselineReady($device, $clients->get('RELEASE V10 Client Alpha'));
             $fixtureCommandReady = ! ($contract['release_fixture_command'] ?? false)
                 || ($device->provider === 'release_fixture'
                     && ($device->config ?? []) === [
@@ -771,7 +772,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             && $consent->status === 'given'
             && $consent->withdrawn_at === null
             && ($consent->expires_at === null || $consent->expires_at->isFuture())
-            && $type->name === 'RELEASE Client Location Tracking'
+            && $type->name === 'RELEASE V10 Client Location Tracking'
             && $type->purpose === 'Client personal safety tracking'
             && $assignment->tracking_purpose === 'Client personal safety tracking'
             && $assignment->authority_basis === 'assignment_linked_client_consent'
@@ -861,17 +862,17 @@ final class ItSecurityDesktopReleaseFixtureReadiness
     private function assetSection(Collection $sites): array
     {
         $assetRows = Asset::query()
-            ->whereIn('name', ['RELEASE Alpha Vehicle', 'RELEASE Alpha Asset'])
+            ->whereIn('name', ['RELEASE V10 Alpha Vehicle', 'RELEASE V10 Alpha Asset'])
             ->get();
         $assets = $assetRows->groupBy('name');
         $financialRows = FinFixedAsset::query()
-            ->where('asset_name', 'RELEASE Alpha Financial Record')
+            ->where('asset_name', 'RELEASE V10 Alpha Financial Record')
             ->get();
-        $alpha = $sites->get('RELEASE Site Alpha');
+        $alpha = $sites->get('RELEASE V10 Site Alpha');
         $ready = 0;
         $gaps = [];
-        $vehicleRows = $assets->get('RELEASE Alpha Vehicle', collect());
-        $assetRows = $assets->get('RELEASE Alpha Asset', collect());
+        $vehicleRows = $assets->get('RELEASE V10 Alpha Vehicle', collect());
+        $assetRows = $assets->get('RELEASE V10 Alpha Asset', collect());
         $vehicle = $vehicleRows->count() === 1 ? $vehicleRows->first() : null;
         $asset = $assetRows->count() === 1 ? $assetRows->first() : null;
         $financial = $financialRows->count() === 1 ? $financialRows->first() : null;
@@ -931,19 +932,19 @@ final class ItSecurityDesktopReleaseFixtureReadiness
      */
     private function itSection(Collection $sites): array
     {
-        $alpha = $sites->get('RELEASE Site Alpha');
-        $requester = User::query()->where('email', 'release-requester@acceptance.invalid')->first();
-        $manager = User::query()->where('email', 'release-it-manager@acceptance.invalid')->first();
-        $switchRows = Device::query()->where('name', 'RELEASE Alpha Switch')->get();
+        $alpha = $sites->get('RELEASE V10 Site Alpha');
+        $requester = User::query()->where('email', 'release-v10-requester@acceptance.invalid')->first();
+        $manager = User::query()->where('email', 'release-v10-it-manager@acceptance.invalid')->first();
+        $switchRows = Device::query()->where('name', 'RELEASE V10 Alpha Switch')->get();
         $switch = $switchRows->count() === 1 ? $switchRows->first() : null;
         $checks = [];
         $checks['catalog'] = ItCatalogItem::query()
-            ->where('name', 'RELEASE Access Request')
+            ->where('name', 'RELEASE V10 Access Request')
             ->where('is_published', true)
             ->where('internal_only', false)
             ->exists();
         $checks['knowledge'] = ItKbArticle::query()
-            ->where('title', 'RELEASE Network Recovery')
+            ->where('title', 'RELEASE V10 Network Recovery')
             ->where('status', 'published')
             ->exists();
 

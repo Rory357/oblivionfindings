@@ -10,7 +10,7 @@ use Illuminate\Contracts\Foundation\Application;
 
 final class DatabaseReleaseFixtureCommandRuntime implements ReleaseFixtureCommandRuntime
 {
-    private const string ATTACHMENT_PATH = 'it-security-release-fixtures/release-network-evidence.txt';
+    private const string ATTACHMENT_PATH = 'it-security-release-fixtures/v10/release-network-evidence.txt';
 
     private const string ATTACHMENT_CONTENT = "Non-sensitive desktop release acceptance evidence.\n";
 

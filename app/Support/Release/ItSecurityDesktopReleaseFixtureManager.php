@@ -58,7 +58,7 @@ final class ItSecurityDesktopReleaseFixtureManager
 
     public const string EVIDENCE_CLASS = 'it_security_desktop_release_fixture_management_v1';
 
-    private const string ATTACHMENT_PATH = 'it-security-release-fixtures/release-network-evidence.txt';
+    private const string ATTACHMENT_PATH = 'it-security-release-fixtures/v10/release-network-evidence.txt';
 
     private const string ATTACHMENT_CONTENT = "Non-sensitive desktop release acceptance evidence.\n";
 
@@ -520,7 +520,7 @@ final class ItSecurityDesktopReleaseFixtureManager
         foreach (ItSecurityDesktopReleaseFixtureReadiness::ACTORS as $email => $contract) {
             $name = Str::headline(str_replace(['release-', '@acceptance.invalid'], ['', ''], $email));
             $actor = $this->own('user', User::query()->create([
-                'name' => 'RELEASE '.$name,
+                'name' => 'RELEASE V10 '.$name,
                 'email' => $email,
                 'password' => $password,
                 'role' => $contract['role'],
@@ -567,14 +567,14 @@ final class ItSecurityDesktopReleaseFixtureManager
             $actors[$email] = $actor;
         }
 
-        $manager = $actors['release-it-manager@acceptance.invalid'];
+        $manager = $actors['release-v10-it-manager@acceptance.invalid'];
         $staff = [];
         $profiles = [];
         foreach (ItSecurityDesktopReleaseFixtureReadiness::STAFF as $name => $siteName) {
             $suffix = str_ends_with($name, 'Alpha') ? 'alpha' : 'hidden';
             $user = $this->own('user', User::query()->create([
                 'name' => $name,
-                'email' => "release-staff-{$suffix}@acceptance.invalid",
+                'email' => "release-v10-staff-{$suffix}@acceptance.invalid",
                 'password' => $password,
                 'role' => 'support_worker',
                 'approved_at' => now(),
@@ -601,10 +601,10 @@ final class ItSecurityDesktopReleaseFixtureManager
 
         $clients = [];
         foreach (ItSecurityDesktopReleaseFixtureReadiness::CLIENTS as $name => $siteName) {
-            [, , $lastName] = explode(' ', $name, 3);
+            $lastName = Str::after($name, 'RELEASE V10 Client ');
             $clients[$name] = $this->own('client', Client::query()->create([
                 'site_id' => $sites[$siteName]->id,
-                'first_name' => 'RELEASE Client',
+                'first_name' => 'RELEASE V10 Client',
                 'last_name' => $lastName,
                 'status' => 'active',
                 'service_start_date' => today()->subYear(),
@@ -612,7 +612,7 @@ final class ItSecurityDesktopReleaseFixtureManager
         }
 
         $trackingConsentType = $this->own('consent_type', ConsentType::query()->create([
-            'name' => 'RELEASE Client Location Tracking',
+            'name' => 'RELEASE V10 Client Location Tracking',
             'category' => 'optional',
             'description' => 'Non-production desktop release fixture consent only.',
             'purpose' => 'Client personal safety tracking',
@@ -625,8 +625,8 @@ final class ItSecurityDesktopReleaseFixtureManager
             'active' => true,
         ]));
         $consents = [
-            'RELEASE Client Alpha' => $this->own('client_consent', ClientConsent::query()->create([
-                'client_id' => $clients['RELEASE Client Alpha']->id,
+            'RELEASE V10 Client Alpha' => $this->own('client_consent', ClientConsent::query()->create([
+                'client_id' => $clients['RELEASE V10 Client Alpha']->id,
                 'consent_type_id' => $trackingConsentType->id,
                 'status' => 'given',
                 'given_at' => now(),
@@ -641,27 +641,27 @@ final class ItSecurityDesktopReleaseFixtureManager
         ];
 
         $assets = [
-            'RELEASE Alpha Vehicle' => $this->own('asset', Asset::query()->create([
-                'site_id' => $sites['RELEASE Site Alpha']->id,
-                'home_site_id' => $sites['RELEASE Site Alpha']->id,
+            'RELEASE V10 Alpha Vehicle' => $this->own('asset', Asset::query()->create([
+                'site_id' => $sites['RELEASE V10 Site Alpha']->id,
+                'home_site_id' => $sites['RELEASE V10 Site Alpha']->id,
                 'client_id' => null,
                 'created_by_user_id' => $manager->id,
                 'updated_by_user_id' => $manager->id,
                 'asset_tag' => 'REL-VEHICLE-001',
-                'qr_token' => hash('sha256', 'it-security-release-vehicle'),
-                'name' => 'RELEASE Alpha Vehicle',
+                'qr_token' => hash('sha256', 'it-security-release-v10-vehicle'),
+                'name' => 'RELEASE V10 Alpha Vehicle',
                 'category' => 'Vehicle',
                 'status' => 'active',
                 'risk_level' => 'low',
             ])),
-            'RELEASE Alpha Asset' => $this->own('asset', Asset::query()->create([
-                'site_id' => $sites['RELEASE Site Alpha']->id,
+            'RELEASE V10 Alpha Asset' => $this->own('asset', Asset::query()->create([
+                'site_id' => $sites['RELEASE V10 Site Alpha']->id,
                 'client_id' => null,
                 'created_by_user_id' => $manager->id,
                 'updated_by_user_id' => $manager->id,
                 'asset_tag' => 'REL-ASSET-001',
-                'qr_token' => hash('sha256', 'it-security-release-asset'),
-                'name' => 'RELEASE Alpha Asset',
+                'qr_token' => hash('sha256', 'it-security-release-v10-asset'),
+                'name' => 'RELEASE V10 Alpha Asset',
                 'category' => 'IT Equipment',
                 'status' => 'active',
                 'risk_level' => 'low',
@@ -670,7 +670,7 @@ final class ItSecurityDesktopReleaseFixtureManager
 
         $this->own('fin_fixed_asset', FinFixedAsset::query()->create([
             'organization_id' => 1,
-            'asset_name' => 'RELEASE Alpha Financial Record',
+            'asset_name' => 'RELEASE V10 Alpha Financial Record',
             'asset_tag' => 'REL-FIN-001',
             'category' => 'it_equipment',
             'purchase_date' => today()->subYear(),
@@ -680,7 +680,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             'depreciation_method' => 'straight_line',
             'accumulated_depreciation' => 0,
             'status' => 'active',
-            'linked_asset_id' => $assets['RELEASE Alpha Asset']->id,
+            'linked_asset_id' => $assets['RELEASE V10 Alpha Asset']->id,
             'created_by' => $manager->id,
         ]));
 
@@ -697,13 +697,13 @@ final class ItSecurityDesktopReleaseFixtureManager
                 'serial_number' => 'REL-'.strtoupper(substr(hash('sha256', $name), 0, 12)),
                 'status' => DeviceStatus::Active,
                 'health_status' => HealthStatus::Healthy,
-                'last_seen_at' => $name === 'RELEASE Alpha Personal Tracker'
+                'last_seen_at' => $name === 'RELEASE V10 Alpha Personal Tracker'
                     ? $trackingObservedAt
                     : now(),
-                'latitude' => $name === 'RELEASE Alpha Personal Tracker'
+                'latitude' => $name === 'RELEASE V10 Alpha Personal Tracker'
                     ? ItSecurityDesktopReleaseFixtureReadiness::TRACKING_LATITUDE
                     : null,
-                'longitude' => $name === 'RELEASE Alpha Personal Tracker'
+                'longitude' => $name === 'RELEASE V10 Alpha Personal Tracker'
                     ? ItSecurityDesktopReleaseFixtureReadiness::TRACKING_LONGITUDE
                     : null,
                 'provider' => ($contract['release_fixture_command'] ?? false) ? 'release_fixture' : 'manual',
@@ -736,20 +736,20 @@ final class ItSecurityDesktopReleaseFixtureManager
                     'assignment_type' => 'permanent',
                     'assigned_at' => now(),
                     'assigned_by_user_id' => $manager->id,
-                    'consent_id' => $name === 'RELEASE Alpha Personal Tracker'
-                        ? $consents['RELEASE Client Alpha']->id
+                    'consent_id' => $name === 'RELEASE V10 Alpha Personal Tracker'
+                        ? $consents['RELEASE V10 Client Alpha']->id
                         : null,
-                    'tracking_purpose' => $name === 'RELEASE Alpha Personal Tracker'
+                    'tracking_purpose' => $name === 'RELEASE V10 Alpha Personal Tracker'
                         ? 'Client personal safety tracking'
                         : null,
-                    'authority_basis' => $name === 'RELEASE Alpha Personal Tracker'
+                    'authority_basis' => $name === 'RELEASE V10 Alpha Personal Tracker'
                         ? 'assignment_linked_client_consent'
                         : null,
-                    'access_audience' => $name === 'RELEASE Alpha Personal Tracker'
+                    'access_audience' => $name === 'RELEASE V10 Alpha Personal Tracker'
                         ? ['authorised_client_care', 'control_room', 'health_and_safety']
                         : null,
-                    'retention_days' => $name === 'RELEASE Alpha Personal Tracker' ? 90 : null,
-                    'collection_started_at' => $name === 'RELEASE Alpha Personal Tracker' ? now() : null,
+                    'retention_days' => $name === 'RELEASE V10 Alpha Personal Tracker' ? 90 : null,
+                    'collection_started_at' => $name === 'RELEASE V10 Alpha Personal Tracker' ? now() : null,
                     'notes' => 'Owned desktop release acceptance assignment.',
                 ]));
             }
@@ -757,10 +757,10 @@ final class ItSecurityDesktopReleaseFixtureManager
         }
 
         $this->own('integration_event', IntegrationEvent::query()->create([
-            'site_id' => $sites['RELEASE Site Alpha']->id,
+            'site_id' => $sites['RELEASE V10 Site Alpha']->id,
             'room_id' => null,
             'hardware_id' => null,
-            'canonical_device_id' => $devices['RELEASE Alpha Personal Tracker']->id,
+            'canonical_device_id' => $devices['RELEASE V10 Alpha Personal Tracker']->id,
             'provider' => ItSecurityDesktopReleaseFixtureReadiness::TRACKING_EVENT_PROVIDER,
             'source_app' => ItSecurityDesktopReleaseFixtureReadiness::TRACKING_EVENT_SOURCE_APP,
             'source_event_id' => ItSecurityDesktopReleaseFixtureReadiness::TRACKING_EVENT_SOURCE_ID,
@@ -787,15 +787,15 @@ final class ItSecurityDesktopReleaseFixtureManager
         $profiles = $context['profiles'];
         /** @var array<string, Device> $devices */
         $devices = $context['devices'];
-        $alpha = $sites['RELEASE Site Alpha'];
-        $requester = $actors['release-requester@acceptance.invalid'];
-        $manager = $actors['release-it-manager@acceptance.invalid'];
-        $reviewer = $actors['release-it-reviewer@acceptance.invalid'];
-        $switch = $devices['RELEASE Alpha Switch'];
+        $alpha = $sites['RELEASE V10 Site Alpha'];
+        $requester = $actors['release-v10-requester@acceptance.invalid'];
+        $manager = $actors['release-v10-it-manager@acceptance.invalid'];
+        $reviewer = $actors['release-v10-it-reviewer@acceptance.invalid'];
+        $switch = $devices['RELEASE V10 Alpha Switch'];
 
         $this->own('it_catalog_item', ItCatalogItem::query()->create([
-            'name' => 'RELEASE Access Request',
-            'slug' => 'release-access-request',
+            'name' => 'RELEASE V10 Access Request',
+            'slug' => 'release-v10-access-request',
             'description' => 'Request governed access for desktop release acceptance.',
             'outcome_type' => 'service_request',
             'category' => 'account',
@@ -811,8 +811,8 @@ final class ItSecurityDesktopReleaseFixtureManager
             'updated_by' => $manager->id,
         ]));
         $this->own('it_kb_article', ItKbArticle::query()->create([
-            'title' => 'RELEASE Network Recovery',
-            'slug' => 'release-network-recovery',
+            'title' => 'RELEASE V10 Network Recovery',
+            'slug' => 'release-v10-network-recovery',
             'category' => 'network',
             'body' => 'Use the governed monitoring and incident workflow to confirm recovery.',
             'status' => 'published',
@@ -827,7 +827,7 @@ final class ItSecurityDesktopReleaseFixtureManager
         ]));
 
         $this->own('it_ticket', ItTicket::createWithReference([
-            'title' => 'RELEASE Requester Access Request',
+            'title' => 'RELEASE V10 Requester Access Request',
             'description' => 'Requester-visible desktop release acceptance request.',
             'requester_user_id' => $requester->id,
             'site_id' => $alpha->id,
@@ -845,7 +845,7 @@ final class ItSecurityDesktopReleaseFixtureManager
         ]));
 
         $incident = $this->own('it_ticket', ItTicket::createWithReference([
-            'title' => 'RELEASE Alpha Switch Connectivity Incident',
+            'title' => 'RELEASE V10 Alpha Switch Connectivity Incident',
             'description' => 'Canonical monitoring incident for desktop release acceptance.',
             'requester_user_id' => null,
             'assigned_to_user_id' => $manager->id,
@@ -931,7 +931,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             'status' => ControlRoomAlert::STATUS_OPEN,
             'site_id' => $alpha->id,
             'triggered_at' => $event->occurred_at,
-            'assigned_to_user_id' => $actors['release-control-room@acceptance.invalid']->id,
+            'assigned_to_user_id' => $actors['release-v10-control-room@acceptance.invalid']->id,
             'assigned_at' => now(),
             'assigned_by_user_id' => $manager->id,
             'created_by_user_id' => $manager->id,
@@ -953,11 +953,11 @@ final class ItSecurityDesktopReleaseFixtureManager
             $switch,
             $alert,
             $event,
-            hash('sha256', 'release-alpha-switch-monitor'),
+            hash('sha256', 'release-v10-alpha-switch-monitor'),
         );
         $this->records[] = ['type' => 'monitoring_incident_evidence_snapshot', 'id' => (int) $snapshot->id];
 
-        $problemTicket = $this->workTicket('RELEASE Recurring Network Problem', 'problem', $alpha, $requester, $manager);
+        $problemTicket = $this->workTicket('RELEASE V10 Recurring Network Problem', 'problem', $alpha, $requester, $manager);
         $this->own('it_problem', ItProblem::query()->create([
             'ticket_id' => $problemTicket->id,
             'impact_summary' => 'Intermittent release acceptance connectivity.',
@@ -965,7 +965,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             'created_by_user_id' => $manager->id,
             'updated_by_user_id' => $manager->id,
         ]));
-        $changeTicket = $this->workTicket('RELEASE Network Change', 'change', $alpha, $requester, $manager);
+        $changeTicket = $this->workTicket('RELEASE V10 Network Change', 'change', $alpha, $requester, $manager);
         $this->own('it_change', ItChange::query()->create([
             'ticket_id' => $changeTicket->id,
             'change_type' => 'normal',
@@ -980,7 +980,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             'created_by_user_id' => $manager->id,
             'updated_by_user_id' => $manager->id,
         ]));
-        $majorTicket = $this->workTicket('RELEASE Major Connectivity Incident', 'major_incident', $alpha, $requester, $manager);
+        $majorTicket = $this->workTicket('RELEASE V10 Major Connectivity Incident', 'major_incident', $alpha, $requester, $manager);
         $major = $this->own('it_major_incident', ItMajorIncident::query()->create([
             'ticket_id' => $majorTicket->id,
             'severity' => 'sev2',
@@ -1005,11 +1005,11 @@ final class ItSecurityDesktopReleaseFixtureManager
 
         foreach (['joiner', 'mover', 'leaver'] as $offset => $lifecycle) {
             $workflow = $this->own('it_provisioning_workflow', ItProvisioningWorkflow::query()->create([
-                'employee_profile_id' => $profiles['RELEASE Staff Alpha']->id,
+                'employee_profile_id' => $profiles['RELEASE V10 Staff Alpha']->id,
                 'lifecycle_type' => $lifecycle,
                 'source_type' => 'release_fixture',
                 'source_id' => $offset + 1,
-                'source_event_key' => "release-desktop-{$lifecycle}",
+                'source_event_key' => "release-v10-desktop-{$lifecycle}",
                 'status' => 'pending',
                 'effective_at' => now()->addDays($offset),
                 'role_snapshot' => 'support_worker',
@@ -1019,7 +1019,7 @@ final class ItSecurityDesktopReleaseFixtureManager
                 'created_by_user_id' => $manager->id,
             ]));
             $this->own('it_provisioning_request', ItProvisioningRequest::query()->create([
-                'employee_profile_id' => $profiles['RELEASE Staff Alpha']->id,
+                'employee_profile_id' => $profiles['RELEASE V10 Staff Alpha']->id,
                 'provisioning_workflow_id' => $workflow->id,
                 'type' => 'access',
                 'task_key' => "release-{$lifecycle}-access",
@@ -1093,23 +1093,23 @@ final class ItSecurityDesktopReleaseFixtureManager
     {
         $collisions = User::query()->whereIn('email', [
             ...array_keys(ItSecurityDesktopReleaseFixtureReadiness::ACTORS),
-            'release-staff-alpha@acceptance.invalid',
-            'release-staff-hidden@acceptance.invalid',
+            'release-v10-staff-alpha@acceptance.invalid',
+            'release-v10-staff-hidden@acceptance.invalid',
         ])->exists()
             || User::query()->whereIn('name', array_keys(ItSecurityDesktopReleaseFixtureReadiness::STAFF))->exists()
             || Site::withTrashed()->whereIn('name', ItSecurityDesktopReleaseFixtureReadiness::SITES)->exists()
-            || Client::withTrashed()->where('first_name', 'RELEASE Client')->whereIn('last_name', ['Alpha', 'Hidden'])->exists()
-            || ConsentType::withTrashed()->where('name', 'RELEASE Client Location Tracking')->exists()
-            || ClientConsent::withTrashed()->whereHas('consentType', fn ($query) => $query->withTrashed()->where('name', 'RELEASE Client Location Tracking'))->exists()
-            || Asset::query()->whereIn('name', ['RELEASE Alpha Vehicle', 'RELEASE Alpha Asset'])->exists()
-            || FinFixedAsset::withTrashed()->where('asset_name', 'RELEASE Alpha Financial Record')->exists()
+            || Client::withTrashed()->where('first_name', 'RELEASE V10 Client')->whereIn('last_name', ['Alpha', 'Hidden'])->exists()
+            || ConsentType::withTrashed()->where('name', 'RELEASE V10 Client Location Tracking')->exists()
+            || ClientConsent::withTrashed()->whereHas('consentType', fn ($query) => $query->withTrashed()->where('name', 'RELEASE V10 Client Location Tracking'))->exists()
+            || Asset::query()->whereIn('name', ['RELEASE V10 Alpha Vehicle', 'RELEASE V10 Alpha Asset'])->exists()
+            || FinFixedAsset::withTrashed()->where('asset_name', 'RELEASE V10 Alpha Financial Record')->exists()
             || Device::withTrashed()->whereIn('name', array_keys(ItSecurityDesktopReleaseFixtureReadiness::DEVICES))->exists()
-            || ItCatalogItem::withTrashed()->where('slug', 'release-access-request')->exists()
-            || ItKbArticle::query()->where('slug', 'release-network-recovery')->exists()
+            || ItCatalogItem::withTrashed()->where('slug', 'release-v10-access-request')->exists()
+            || ItKbArticle::query()->where('slug', 'release-v10-network-recovery')->exists()
             || ItProvisioningWorkflow::query()->whereIn('source_event_key', [
-                'release-desktop-joiner',
-                'release-desktop-mover',
-                'release-desktop-leaver',
+                'release-v10-desktop-joiner',
+                'release-v10-desktop-mover',
+                'release-v10-desktop-leaver',
             ])->exists()
             || IntegrationEvent::query()
                 ->where('provider', ItSecurityDesktopReleaseFixtureReadiness::TRACKING_EVENT_PROVIDER)
@@ -1171,17 +1171,17 @@ final class ItSecurityDesktopReleaseFixtureManager
 
         $actor = $one(User::query()
             ->whereIn('id', $recordIds('user'))
-            ->where('email', 'release-control-room@acceptance.invalid'));
+            ->where('email', 'release-v10-control-room@acceptance.invalid'));
         $consentType = $one(ConsentType::query()
             ->whereIn('id', $recordIds('consent_type'))
-            ->where('name', 'RELEASE Client Location Tracking'));
+            ->where('name', 'RELEASE V10 Client Location Tracking'));
         $client = $one(Client::query()
             ->whereIn('id', $recordIds('client'))
-            ->where('first_name', 'RELEASE Client')
+            ->where('first_name', 'RELEASE V10 Client')
             ->where('last_name', 'Alpha'));
         $device = $one(Device::query()
             ->whereIn('id', $recordIds('device'))
-            ->where('name', 'RELEASE Alpha Personal Tracker'));
+            ->where('name', 'RELEASE V10 Alpha Personal Tracker'));
         $consent = $client instanceof Client && $consentType instanceof ConsentType
             ? $one(ClientConsent::query()
                 ->whereIn('id', $recordIds('client_consent'))
@@ -1321,7 +1321,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             ->all();
         $query = Device::query()
             ->whereIn('id', $manifestDeviceIds)
-            ->whereIn('name', ['RELEASE Alpha Door', 'RELEASE Alpha Door Secondary']);
+            ->whereIn('name', ['RELEASE V10 Alpha Door', 'RELEASE V10 Alpha Door Secondary']);
         if ($lock) {
             $query->lockForUpdate();
         }
@@ -1333,7 +1333,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             ],
         ];
 
-        if ($devices->pluck('name')->all() !== ['RELEASE Alpha Door', 'RELEASE Alpha Door Secondary']
+        if ($devices->pluck('name')->all() !== ['RELEASE V10 Alpha Door', 'RELEASE V10 Alpha Door Secondary']
             || $devices->contains(fn (Device $device): bool => $device->provider !== 'release_fixture'
                 || $device->domain !== 'security'
                 || $device->category !== 'access_control'
@@ -1578,11 +1578,11 @@ final class ItSecurityDesktopReleaseFixtureManager
             ->pluck('id');
         $catalog = ItCatalogItem::query()
             ->whereIn('id', $catalogIds)
-            ->where('slug', 'release-access-request')
+            ->where('slug', 'release-v10-access-request')
             ->first();
         $requester = User::query()
             ->whereIn('id', $requesterIds)
-            ->where('email', 'release-requester@acceptance.invalid')
+            ->where('email', 'release-v10-requester@acceptance.invalid')
             ->first();
         if (! $catalog || ! $requester) {
             throw new DomainException('The owned release fixture manifest is missing the D01 parent identities.');

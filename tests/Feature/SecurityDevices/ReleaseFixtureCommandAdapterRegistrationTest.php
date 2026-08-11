@@ -73,7 +73,7 @@ function releaseFixtureIntegrityManifest(int $deviceId): array
         'schema_version' => 1,
         'records' => [['type' => 'device', 'id' => $deviceId]],
         'files' => [[
-            'path' => 'it-security-release-fixtures/release-network-evidence.txt',
+            'path' => 'it-security-release-fixtures/v10/release-network-evidence.txt',
             'sha256' => hash('sha256', "Non-sensitive desktop release acceptance evidence.\n"),
         ]],
     ];
@@ -106,7 +106,7 @@ function releaseFixtureIntegrityHash(array $manifest): string
 function releaseFixtureIntegrityDevice(): Device
 {
     return Device::factory()->security()->create([
-        'name' => 'RELEASE Alpha Door',
+        'name' => 'RELEASE V10 Alpha Door',
         'provider' => 'release_fixture',
         'category' => 'access_control',
         'config' => [
@@ -153,7 +153,7 @@ it('does not make release fixture commands available in the testing runtime even
     config()->set('it.desktop_release_fixtures.enabled', true);
     config()->set('it.desktop_release_fixtures.environment_class', 'approved_non_production');
     $device = Device::factory()->security()->create([
-        'name' => 'RELEASE Alpha Door',
+        'name' => 'RELEASE V10 Alpha Door',
         'provider' => 'release_fixture',
         'category' => 'access_control',
         'config' => [
@@ -244,9 +244,9 @@ it('routes both manager-prepared D16 doors through the owned no-network central 
     $registry = app(CommandExecutionAdapterRegistry::class);
     $routes = app(CommandExecutionRouteResolver::class);
     $declared = app(DeclaredDeviceCommandCapabilities::class);
-    $siteId = (int) Site::query()->where('name', 'RELEASE Site Alpha')->value('id');
+    $siteId = (int) Site::query()->where('name', 'RELEASE V10 Site Alpha')->value('id');
     $doors = Device::query()
-        ->whereIn('name', ['RELEASE Alpha Door', 'RELEASE Alpha Door Secondary'])
+        ->whereIn('name', ['RELEASE V10 Alpha Door', 'RELEASE V10 Alpha Door Secondary'])
         ->orderBy('name')
         ->get();
 
@@ -276,8 +276,8 @@ it('routes both manager-prepared D16 doors through the owned no-network central 
             ->and($route->adapter->observe($context)->state)->toBe(['locked' => true]);
     }
 
-    $requester = User::query()->where('email', 'release-it-manager@acceptance.invalid')->firstOrFail();
-    $reviewer = User::query()->where('email', 'release-it-reviewer@acceptance.invalid')->firstOrFail();
+    $requester = User::query()->where('email', 'release-v10-it-manager@acceptance.invalid')->firstOrFail();
+    $reviewer = User::query()->where('email', 'release-v10-it-reviewer@acceptance.invalid')->firstOrFail();
     $command = app(DeviceCommandRequestService::class)->request(
         $doors->first(),
         $requester,

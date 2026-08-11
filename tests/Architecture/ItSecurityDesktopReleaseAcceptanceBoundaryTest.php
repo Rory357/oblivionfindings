@@ -30,6 +30,9 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     $fixtureRuntime = (string) file_get_contents(
         $root.'/app/Domain/SecurityDevices/Management/Adapters/DatabaseReleaseFixtureCommandRuntime.php',
     );
+    $fixturePack = (string) file_get_contents(
+        $root.'/app/Models/ItSecurityDesktopReleaseFixturePack.php',
+    );
     $fixturePackMigration = (string) file_get_contents(
         $root.'/database/migrations/2026_08_10_000049_create_it_security_desktop_release_fixture_packs.php',
     );
@@ -66,16 +69,16 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'IT owns technical work',
         'Do not use `admin@test.com`, the `admin` role, impersonation',
         'Do not repair acceptance by granting `admin`',
-        '`release-requester@acceptance.invalid`',
-        '`release-it-manager@acceptance.invalid`',
-        '`release-it-reviewer@acceptance.invalid`',
-        '`release-control-room@acceptance.invalid`',
-        '`release-auditor@acceptance.invalid`',
-        '`release-denied@acceptance.invalid`',
-        '`release-source-denied@acceptance.invalid`',
-        '`RELEASE Site Alpha`',
-        '`RELEASE Site Hidden`',
-        '`RELEASE Hidden Device`',
+        '`release-v10-requester@acceptance.invalid`',
+        '`release-v10-it-manager@acceptance.invalid`',
+        '`release-v10-it-reviewer@acceptance.invalid`',
+        '`release-v10-control-room@acceptance.invalid`',
+        '`release-v10-auditor@acceptance.invalid`',
+        '`release-v10-denied@acceptance.invalid`',
+        '`release-v10-source-denied@acceptance.invalid`',
+        '`RELEASE V10 Site Alpha`',
+        '`RELEASE V10 Site Hidden`',
+        '`RELEASE V10 Hidden Device`',
         '`it.organisationWide`',
         '`securityDevices.devices.viewAllSites`',
         'php artisan it-security:verify-desktop-release-fixtures --json',
@@ -159,16 +162,16 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
 
     expect($fixtureReadiness)->toContain(
         "EVIDENCE_CLASS = 'it_security_desktop_release_fixture_readiness_v1'",
-        "'release-requester@acceptance.invalid'",
-        "'release-it-manager@acceptance.invalid'",
-        "'release-it-reviewer@acceptance.invalid'",
-        "'release-control-room@acceptance.invalid'",
-        "'release-auditor@acceptance.invalid'",
-        "'release-denied@acceptance.invalid'",
-        "'release-source-denied@acceptance.invalid'",
-        "'RELEASE Site Alpha'",
-        "'RELEASE Site Hidden'",
-        "'RELEASE Hidden Device'",
+        "'release-v10-requester@acceptance.invalid'",
+        "'release-v10-it-manager@acceptance.invalid'",
+        "'release-v10-it-reviewer@acceptance.invalid'",
+        "'release-v10-control-room@acceptance.invalid'",
+        "'release-v10-auditor@acceptance.invalid'",
+        "'release-v10-denied@acceptance.invalid'",
+        "'release-v10-source-denied@acceptance.invalid'",
+        "'RELEASE V10 Site Alpha'",
+        "'RELEASE V10 Site Hidden'",
+        "'RELEASE V10 Hidden Device'",
         "'required_permissions'",
         "'forbidden_permissions'",
         "'release_actor_required_permission_missing'",
@@ -225,8 +228,11 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'Never improvise partial rows',
         '`withdraw-tracking-consent`',
         'Run guarded `reset` after D10',
-        'There is deliberately no in-application archive/retire or fresh-pack',
-        'cannot be shared safely with a new revision',
+        '`it-security-desktop-release-v10` key',
+        'historical V1',
+        'pack with retained D16 evidence remains immutable',
+        'V10 cleanup deletes only IDs and files in the V10 manifest',
+        'There is deliberately no generic archive/retire action',
     );
 
     expect($fixtureManagementCommand)->toContain(
@@ -266,10 +272,15 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'LoadSoakReleaseCheckoutVerifier',
         '$this->checkoutMatchesReleaseRevision($revision)',
         "->where('pack_key', ItSecurityDesktopReleaseFixturePack::PACK_KEY)",
+        'it-security-release-fixtures/v10/release-network-evidence.txt',
+    )->and($fixturePack)->toContain(
+        "LEGACY_PACK_KEY = 'it-security-desktop-release-v1'",
+        "PACK_KEY = 'it-security-desktop-release-v10'",
     )->and($fixtureReadiness)->toContain(
         'assess(bool $requireRuntimePack = false)',
         "'release_fixture_runtime_checkout_revision_mismatch'",
         'LoadSoakReleaseCheckoutVerifier',
+        "->where('name', 'like', 'RELEASE V10 %')",
     );
 
     expect($runbook)->toContain(

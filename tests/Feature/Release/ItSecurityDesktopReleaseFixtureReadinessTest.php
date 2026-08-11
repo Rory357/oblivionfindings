@@ -124,9 +124,9 @@ it('requires the active ready pack configured revision and deployed checkout tog
 });
 
 it('checks effective actor permissions in addition to the role label', function (): void {
-    $site = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $site = Site::factory()->create(['name' => 'RELEASE V10 Site Alpha']);
     $actor = User::factory()->create([
-        'email' => 'release-requester@acceptance.invalid',
+        'email' => 'release-v10-requester@acceptance.invalid',
         'role' => 'support_worker',
     ]);
     $role = Role::query()->create([
@@ -179,10 +179,10 @@ it('checks effective actor permissions in addition to the role label', function 
 });
 
 it('requires unique Devices with exact taxonomy and canonical owner bindings', function (): void {
-    $site = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $site = Site::factory()->create(['name' => 'RELEASE V10 Site Alpha']);
     $actor = User::factory()->create();
     $gateway = Device::factory()->create([
-        'name' => 'RELEASE Alpha Gateway',
+        'name' => 'RELEASE V10 Alpha Gateway',
         'domain' => 'security',
         'category' => 'cctv',
         'subcategory' => 'dome_camera',
@@ -241,7 +241,7 @@ it('requires unique Devices with exact taxonomy and canonical owner bindings', f
     $unexpectedLink->update(['unlinked_at' => now()]);
 
     $duplicate = Device::factory()->create([
-        'name' => 'RELEASE Alpha Gateway',
+        'name' => 'RELEASE V10 Alpha Gateway',
         'domain' => 'it_infrastructure',
         'category' => 'network',
         'subcategory' => 'router',
@@ -261,7 +261,7 @@ it('requires unique Devices with exact taxonomy and canonical owner bindings', f
 });
 
 it('requires both Alpha command doors to use the exact simulated no-network fixture contract', function (): void {
-    $site = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $site = Site::factory()->create(['name' => 'RELEASE V10 Site Alpha']);
     $actor = User::factory()->create();
     $contract = [
         'domain' => 'security',
@@ -277,12 +277,12 @@ it('requires both Alpha command doors to use the exact simulated no-network fixt
     ];
     $primary = Device::factory()->create([
         ...$contract,
-        'name' => 'RELEASE Alpha Door',
+        'name' => 'RELEASE V10 Alpha Door',
         'last_seen_at' => now(),
     ]);
     $secondary = Device::factory()->create([
         ...$contract,
-        'name' => 'RELEASE Alpha Door Secondary',
+        'name' => 'RELEASE V10 Alpha Door Secondary',
         'provider' => 'manual',
         'last_seen_at' => now(),
     ]);
@@ -317,18 +317,18 @@ it('requires both Alpha command doors to use the exact simulated no-network fixt
 
     Device::factory()->create([
         ...$contract,
-        'name' => 'Unowned release fixture lookalike',
+        'name' => 'RELEASE V10 Unowned release fixture lookalike',
     ]);
     $unexpected = app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess();
     expect($unexpected['gap_codes'])->toContain('release_fixture_command_device_set_mismatch');
 });
 
 it('requires unique canonical Asset and Finance owners with exact Alpha scope', function (): void {
-    $alpha = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $alpha = Site::factory()->create(['name' => 'RELEASE V10 Site Alpha']);
     $other = Site::factory()->create(['name' => 'Other Site']);
     $actor = User::factory()->create();
     $vehicle = Asset::factory()->create([
-        'name' => 'RELEASE Alpha Vehicle',
+        'name' => 'RELEASE V10 Alpha Vehicle',
         'category' => 'Vehicle',
         'site_id' => $alpha->id,
         'home_site_id' => $other->id,
@@ -338,7 +338,7 @@ it('requires unique canonical Asset and Finance owners with exact Alpha scope', 
         'updated_by_user_id' => $actor->id,
     ]);
     $asset = Asset::factory()->create([
-        'name' => 'RELEASE Alpha Asset',
+        'name' => 'RELEASE V10 Alpha Asset',
         'category' => 'Safety Equipment',
         'site_id' => $alpha->id,
         'client_id' => null,
@@ -347,7 +347,7 @@ it('requires unique canonical Asset and Finance owners with exact Alpha scope', 
         'updated_by_user_id' => $actor->id,
     ]);
     $financial = FinFixedAsset::factory()->create([
-        'asset_name' => 'RELEASE Alpha Financial Record',
+        'asset_name' => 'RELEASE V10 Alpha Financial Record',
         'category' => 'vehicle',
         'status' => 'active',
         'linked_asset_id' => $vehicle->id,
@@ -384,7 +384,7 @@ it('requires unique canonical Asset and Finance owners with exact Alpha scope', 
         );
 
     Asset::factory()->create([
-        'name' => 'RELEASE Alpha Asset',
+        'name' => 'RELEASE V10 Alpha Asset',
         'category' => 'IT Equipment',
         'site_id' => $alpha->id,
         'client_id' => null,
@@ -393,7 +393,7 @@ it('requires unique canonical Asset and Finance owners with exact Alpha scope', 
         'updated_by_user_id' => $actor->id,
     ]);
     FinFixedAsset::factory()->create([
-        'asset_name' => 'RELEASE Alpha Financial Record',
+        'asset_name' => 'RELEASE V10 Alpha Financial Record',
         'category' => 'it_equipment',
         'status' => 'active',
         'linked_asset_id' => $asset->id,
@@ -409,10 +409,10 @@ it('requires unique canonical Asset and Finance owners with exact Alpha scope', 
 });
 
 it('binds the IT incident Control Room alert and immutable evidence to the exact Alpha Switch', function (): void {
-    $alpha = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
-    $manager = User::factory()->create(['email' => 'release-it-manager@acceptance.invalid']);
+    $alpha = Site::factory()->create(['name' => 'RELEASE V10 Site Alpha']);
+    $manager = User::factory()->create(['email' => 'release-v10-it-manager@acceptance.invalid']);
     $switch = Device::factory()->create([
-        'name' => 'RELEASE Alpha Switch',
+        'name' => 'RELEASE V10 Alpha Switch',
         'domain' => 'it_infrastructure',
         'category' => 'network',
         'subcategory' => 'switch',
@@ -530,22 +530,22 @@ it('binds the IT incident Control Room alert and immutable evidence to the exact
 });
 
 it('rejects duplicate canonical Site Client and staff identities', function (): void {
-    $alpha = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
-    $hidden = Site::factory()->create(['name' => 'RELEASE Site Hidden']);
-    Site::factory()->create(['name' => 'RELEASE Site Alpha']);
+    $alpha = Site::factory()->create(['name' => 'RELEASE V10 Site Alpha']);
+    $hidden = Site::factory()->create(['name' => 'RELEASE V10 Site Hidden']);
+    Site::factory()->create(['name' => 'RELEASE V10 Site Alpha']);
 
     foreach ([
-        ['first_name' => 'RELEASE Client', 'last_name' => 'Alpha', 'site_id' => $alpha->id],
-        ['first_name' => 'RELEASE Client', 'last_name' => 'Hidden', 'site_id' => $hidden->id],
-        ['first_name' => 'RELEASE Client', 'last_name' => 'Alpha', 'site_id' => $alpha->id],
+        ['first_name' => 'RELEASE V10 Client', 'last_name' => 'Alpha', 'site_id' => $alpha->id],
+        ['first_name' => 'RELEASE V10 Client', 'last_name' => 'Hidden', 'site_id' => $hidden->id],
+        ['first_name' => 'RELEASE V10 Client', 'last_name' => 'Alpha', 'site_id' => $alpha->id],
     ] as $client) {
         Client::factory()->create([...$client, 'status' => 'active']);
     }
 
     foreach ([
-        ['name' => 'RELEASE Staff Alpha', 'site' => $alpha],
-        ['name' => 'RELEASE Staff Hidden', 'site' => $hidden],
-        ['name' => 'RELEASE Staff Alpha', 'site' => $alpha],
+        ['name' => 'RELEASE V10 Staff Alpha', 'site' => $alpha],
+        ['name' => 'RELEASE V10 Staff Hidden', 'site' => $hidden],
+        ['name' => 'RELEASE V10 Staff Alpha', 'site' => $alpha],
     ] as $staff) {
         $user = User::factory()->create(['name' => $staff['name']]);
         HrEmployeeProfile::factory()->create([
