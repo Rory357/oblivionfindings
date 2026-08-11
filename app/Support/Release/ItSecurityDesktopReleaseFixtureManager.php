@@ -138,6 +138,10 @@ final class ItSecurityDesktopReleaseFixtureManager
         $pack = $this->pack();
         if ($pack) {
             $gaps = $this->packGaps($pack, requireReadiness: true);
+            $retained = $this->retainedD16EvidenceGaps($pack) !== [];
+            if ($retained && ! hash_equals($revision, (string) $pack->release_revision)) {
+                $gaps[] = 'release_fixture_retained_d16_evidence_requires_pack_archive';
+            }
 
             return $this->report(
                 $gaps === [] ? 'ready' : 'failed',
@@ -145,7 +149,7 @@ final class ItSecurityDesktopReleaseFixtureManager
                 $revision,
                 'dry_run',
                 $gaps,
-                operation: 'reuse',
+                operation: $retained ? 'retain' : 'reuse',
                 recordCount: count((array) data_get($pack->manifest, 'records', [])),
             );
         }
@@ -251,7 +255,8 @@ final class ItSecurityDesktopReleaseFixtureManager
 
         $existing = $this->pack();
         if ($existing) {
-            DB::transaction(function () use ($existing, $revision): void {
+            $retained = false;
+            DB::transaction(function () use ($existing, $revision, &$retained): void {
                 $locked = ItSecurityDesktopReleaseFixturePack::query()
                     ->whereKey($existing->id)
                     ->lockForUpdate()
@@ -259,6 +264,14 @@ final class ItSecurityDesktopReleaseFixtureManager
                 $gaps = $this->packGaps($locked, requireReadiness: true);
                 if ($gaps !== []) {
                     throw new DomainException('The owned release fixture pack is no longer complete.');
+                }
+                if ($this->retainedD16EvidenceGaps($locked) !== []) {
+                    $retained = true;
+                    if (! hash_equals($revision, (string) $locked->release_revision)) {
+                        throw new DomainException('release_fixture_retained_d16_evidence_requires_pack_archive');
+                    }
+
+                    return;
                 }
                 $locked->update([
                     'release_revision' => $revision,
@@ -272,8 +285,8 @@ final class ItSecurityDesktopReleaseFixtureManager
                 $revision,
                 'execute',
                 [],
-                operation: 'reused',
-                mutationApplied: true,
+                operation: $retained ? 'retained' : 'reused',
+                mutationApplied: ! $retained,
                 recordCount: count((array) data_get($existing->manifest, 'records', [])),
             );
         }

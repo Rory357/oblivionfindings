@@ -142,7 +142,11 @@ function approvedReleaseFixtureDatabaseRuntime(): DatabaseReleaseFixtureCommandR
         'release-fixture-integration' => base64_encode(str_repeat('R', SODIUM_CRYPTO_AUTH_KEYBYTES)),
     ]);
 
-    return new DatabaseReleaseFixtureCommandRuntime(app(), fn (): string => 'staging');
+    return new DatabaseReleaseFixtureCommandRuntime(
+        app(),
+        fn (): string => 'staging',
+        fn (string $checkout, string $revision): bool => $revision === RELEASE_FIXTURE_REVISION,
+    );
 }
 
 it('does not make release fixture commands available in the testing runtime even when the fixture flag is set', function () {
@@ -196,6 +200,23 @@ it('rejects a stale pack revision even when its manifest and hash are canonical'
     ]);
 
     expect(approvedReleaseFixtureDatabaseRuntime()->owns($device->fresh()))->toBeFalse();
+});
+
+it('rejects a pack when the configured revision is not the clean deployed checkout revision', function () {
+    $device = releaseFixtureIntegrityDevice();
+    releaseFixtureIntegrityPack(releaseFixtureIntegrityManifest((int) $device->id));
+    config()->set('it.desktop_release_fixtures.enabled', true);
+    config()->set('it.desktop_release_fixtures.environment_class', 'approved_non_production');
+    config()->set('it.desktop_release_fixtures.release_revision', RELEASE_FIXTURE_REVISION);
+
+    $runtime = new DatabaseReleaseFixtureCommandRuntime(
+        app(),
+        fn (): string => 'staging',
+        fn (string $checkout, string $revision): bool => false,
+    );
+
+    expect($runtime->isApprovedStagingFixtureRuntime())->toBeFalse()
+        ->and($runtime->owns($device->fresh()))->toBeFalse();
 });
 
 it('routes both manager-prepared D16 doors through the owned no-network central adapter only', function () {

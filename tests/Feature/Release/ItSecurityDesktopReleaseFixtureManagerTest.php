@@ -609,6 +609,7 @@ it('retains the fixture pack when immutable D16 batch evidence references an own
 
     $plan = $manager->plan('cleanup', $revision);
     $execution = $manager->execute('cleanup', $revision);
+    $repoint = $manager->execute('prepare', str_repeat('f', 40));
 
     expect($plan)->toMatchArray([
         'state' => 'failed',
@@ -619,6 +620,12 @@ it('retains the fixture pack when immutable D16 batch evidence references an own
         'fixture_mutation_applied' => false,
         'gap_codes' => ['release_fixture_retained_d16_evidence_requires_pack_archive'],
     ])->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(1)
+        ->and($repoint)->toMatchArray([
+            'state' => 'failed',
+            'gap_codes' => ['release_fixture_retained_d16_evidence_requires_pack_archive'],
+            'fixture_mutation_applied' => false,
+        ])
+        ->and(ItSecurityDesktopReleaseFixturePack::query()->value('release_revision'))->toBe($revision)
         ->and(Device::query()->whereKey($doorId)->exists())->toBeTrue()
         ->and(DB::table('device_command_batches')->where('id', $batchId)->exists())->toBeTrue();
 });

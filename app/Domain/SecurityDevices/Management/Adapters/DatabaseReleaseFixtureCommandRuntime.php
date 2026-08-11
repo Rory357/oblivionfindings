@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Management\Adapters;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\ItSecurityDesktopReleaseFixturePack;
+use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
 use Closure;
 use Illuminate\Contracts\Foundation\Application;
 
@@ -13,10 +14,13 @@ final class DatabaseReleaseFixtureCommandRuntime implements ReleaseFixtureComman
 
     private const string ATTACHMENT_CONTENT = "Non-sensitive desktop release acceptance evidence.\n";
 
-    /** @param null|Closure(): string $environment */
+    /** @param null|Closure(): string $environment
+     * @param  null|Closure(string, string): bool  $verifyCheckout
+     */
     public function __construct(
         private readonly Application $app,
         private readonly ?Closure $environment = null,
+        private readonly ?Closure $verifyCheckout = null,
     ) {}
 
     public function isApprovedStagingFixtureRuntime(): bool
@@ -27,7 +31,8 @@ final class DatabaseReleaseFixtureCommandRuntime implements ReleaseFixtureComman
             && config('it.desktop_release_fixtures.enabled') === true
             && config('it.desktop_release_fixtures.environment_class') === 'approved_non_production'
             && is_string($revision)
-            && preg_match('/\A[0-9a-f]{40}\z/', $revision) === 1;
+            && preg_match('/\A[0-9a-f]{40}\z/', $revision) === 1
+            && $this->checkoutMatchesReleaseRevision($revision);
     }
 
     public function owns(Device $device): bool
@@ -75,6 +80,17 @@ final class DatabaseReleaseFixtureCommandRuntime implements ReleaseFixtureComman
         return $this->environment instanceof Closure
             ? (string) ($this->environment)()
             : (string) $this->app->environment();
+    }
+
+    private function checkoutMatchesReleaseRevision(string $revision): bool
+    {
+        try {
+            return $this->verifyCheckout instanceof Closure
+                ? ($this->verifyCheckout)(base_path(), $revision)
+                : (new LoadSoakReleaseCheckoutVerifier)->verify(base_path(), $revision);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** @param array<string, mixed> $manifest */

@@ -4,6 +4,8 @@ use App\Domain\Finance\Models\FinFixedAsset;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItTicketLinkService;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
+use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\SecurityDevices\Management\Services\CommandObservationFreshnessService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -12,6 +14,7 @@ use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\ItAttachment;
+use App\Models\ItSecurityDesktopReleaseFixturePack;
 use App\Models\ItTicket;
 use App\Models\ItTicketApproval;
 use App\Models\ItTicketComment;
@@ -52,6 +55,7 @@ it('fails closed with a value-free report when the deployed fixture pack is abse
             'devices',
             'assets',
             'it_and_control_room',
+            'runtime',
         ])
         ->and($report['gap_codes'])->toContain(
             'release_sites_missing',
@@ -62,6 +66,9 @@ it('fails closed with a value-free report when the deployed fixture pack is abse
             'release_vehicle_missing',
             'release_catalog_fixture_missing',
             'release_control_room_fixture_missing',
+            'release_fixture_runtime_not_approved',
+            'release_fixture_runtime_revision_invalid',
+            'release_fixture_runtime_pack_missing',
         )
         ->and($report['gap_codes'])->not->toContain('fixture_readiness_query_failed');
 
@@ -81,6 +88,39 @@ it('fails closed with a value-free report when the deployed fixture pack is abse
             $statement,
         ) === 1,
     )->all())->toBe([]);
+});
+
+it('requires the active ready pack configured revision and deployed checkout together for runtime readiness', function (): void {
+    $revision = str_repeat('a', 40);
+    config()->set('it.desktop_release_fixtures.enabled', true);
+    config()->set('it.desktop_release_fixtures.environment_class', 'approved_non_production');
+    config()->set('it.desktop_release_fixtures.release_revision', $revision);
+    ItSecurityDesktopReleaseFixturePack::query()->create([
+        'pack_key' => ItSecurityDesktopReleaseFixturePack::PACK_KEY,
+        'release_revision' => $revision,
+        'state' => ItSecurityDesktopReleaseFixturePack::STATE_READY,
+        'manifest' => ['records' => [], 'files' => [], 'schema_version' => 1],
+        'manifest_sha256' => str_repeat('a', 64),
+        'prepared_at' => now(),
+        'last_verified_at' => now(),
+    ]);
+
+    $readiness = new ItSecurityDesktopReleaseFixtureReadiness(
+        app(CanonicalDeviceSiteResolver::class),
+        app(CommandObservationFreshnessService::class),
+        fn (): string => 'staging',
+        fn (string $checkout, string $candidate): bool => $candidate === $revision,
+    );
+
+    $readyRuntime = $readiness->assess(requireRuntimePack: true);
+    config()->set('it.desktop_release_fixtures.release_revision', str_repeat('b', 40));
+    $mismatchedRuntime = $readiness->assess(requireRuntimePack: true);
+
+    expect($readyRuntime['sections']['runtime'])->toMatchArray([
+        'required' => 5,
+        'ready' => 5,
+        'gap_codes' => [],
+    ])->and($mismatchedRuntime['gap_codes'])->toContain('release_fixture_runtime_pack_revision_mismatch');
 });
 
 it('checks effective actor permissions in addition to the role label', function (): void {

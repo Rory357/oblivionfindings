@@ -22,9 +22,12 @@ use App\Models\ItKbArticle;
 use App\Models\ItMajorIncident;
 use App\Models\ItProblem;
 use App\Models\ItProvisioningWorkflow;
+use App\Models\ItSecurityDesktopReleaseFixturePack;
 use App\Models\ItTicket;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
+use Closure;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Throwable;
@@ -328,10 +331,12 @@ final class ItSecurityDesktopReleaseFixtureReadiness
     public function __construct(
         private readonly CanonicalDeviceSiteResolver $deviceSites,
         private readonly CommandObservationFreshnessService $commandFreshness,
+        private readonly ?Closure $environment = null,
+        private readonly ?Closure $verifyCheckout = null,
     ) {}
 
     /** @return array<string, mixed> */
-    public function assess(): array
+    public function assess(bool $requireRuntimePack = false): array
     {
         try {
             $sites = $this->sites();
@@ -343,6 +348,9 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 'assets' => $this->assetSection($sites),
                 'it_and_control_room' => $this->itSection($sites),
             ];
+            if ($requireRuntimePack) {
+                $sections['runtime'] = $this->runtimeSection();
+            }
 
             $gapCodes = collect($sections)
                 ->flatMap(fn (array $section): array => $section['gap_codes'])
@@ -370,6 +378,63 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 'gap_codes' => ['fixture_readiness_query_failed'],
                 'v10_release_evidence' => false,
             ];
+        }
+    }
+
+    /** @return array{required: int, present: int, ready: int, gap_codes: list<string>} */
+    private function runtimeSection(): array
+    {
+        $revision = config('it.desktop_release_fixtures.release_revision');
+        $revisionValid = is_string($revision) && preg_match('/\A[0-9a-f]{40}\z/', $revision) === 1;
+        $runtimeApproved = $this->environment() === 'staging'
+            && config('it.desktop_release_fixtures.enabled') === true
+            && config('it.desktop_release_fixtures.environment_class') === 'approved_non_production';
+        $checkoutVerified = $revisionValid && $this->checkoutMatchesReleaseRevision($revision);
+        $packs = ItSecurityDesktopReleaseFixturePack::query()
+            ->where('pack_key', ItSecurityDesktopReleaseFixturePack::PACK_KEY)
+            ->get(['release_revision', 'state']);
+        $pack = $packs->count() === 1 ? $packs->sole() : null;
+        $packReady = $pack instanceof ItSecurityDesktopReleaseFixturePack
+            && $pack->state === ItSecurityDesktopReleaseFixturePack::STATE_READY;
+        $revisionMatches = $packReady && $revisionValid
+            && hash_equals($revision, (string) $pack->release_revision);
+
+        $gaps = [];
+        if (! $runtimeApproved) {
+            $gaps[] = 'release_fixture_runtime_not_approved';
+        }
+        if (! $revisionValid) {
+            $gaps[] = 'release_fixture_runtime_revision_invalid';
+        }
+        if ($revisionValid && ! $checkoutVerified) {
+            $gaps[] = 'release_fixture_runtime_checkout_revision_mismatch';
+        }
+        if ($packs->count() !== 1) {
+            $gaps[] = 'release_fixture_runtime_pack_missing';
+        } elseif (! $packReady) {
+            $gaps[] = 'release_fixture_runtime_pack_not_ready';
+        } elseif (! $revisionMatches) {
+            $gaps[] = 'release_fixture_runtime_pack_revision_mismatch';
+        }
+
+        return $this->section(5, 5 - count($gaps), $gaps === [] ? 5 : 0, $gaps);
+    }
+
+    private function environment(): string
+    {
+        return $this->environment instanceof Closure
+            ? (string) ($this->environment)()
+            : (string) app()->environment();
+    }
+
+    private function checkoutMatchesReleaseRevision(string $revision): bool
+    {
+        try {
+            return $this->verifyCheckout instanceof Closure
+                ? ($this->verifyCheckout)(base_path(), $revision)
+                : (new LoadSoakReleaseCheckoutVerifier)->verify(base_path(), $revision);
+        } catch (Throwable) {
+            return false;
         }
     }
 

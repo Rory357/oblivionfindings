@@ -27,6 +27,9 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
     $fixtureManagementCommand = (string) file_get_contents(
         $root.'/app/Console/Commands/ManageItSecurityDesktopReleaseFixtures.php',
     );
+    $fixtureRuntime = (string) file_get_contents(
+        $root.'/app/Domain/SecurityDevices/Management/Adapters/DatabaseReleaseFixtureCommandRuntime.php',
+    );
     $fixturePackMigration = (string) file_get_contents(
         $root.'/database/migrations/2026_08_10_000049_create_it_security_desktop_release_fixture_packs.php',
     );
@@ -222,6 +225,8 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'Never improvise partial rows',
         '`withdraw-tracking-consent`',
         'Run guarded `reset` after D10',
+        'There is deliberately no in-application archive/retire or fresh-pack',
+        'cannot be shared safely with a new revision',
     );
 
     expect($fixtureManagementCommand)->toContain(
@@ -241,6 +246,7 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         'linkMonitoringEvidence',
         'MonitoringIncidentEvidenceService',
         'DeviceEvent::withoutEvents',
+        "'release_fixture_retained_d16_evidence_requires_pack_archive'",
         "'fixture_mutation_applied' => \$mutationApplied",
         "'v10_release_evidence' => false",
     )->and($fixtureManager)->not->toContain(
@@ -256,6 +262,14 @@ it('keeps the final IT and Security release matrix deployed desktop role Site pr
         "\$table->string('pack_key', 100)->unique()",
         "\$table->json('manifest')",
         "\$table->char('manifest_sha256', 64)",
+    )->and($fixtureRuntime)->toContain(
+        'LoadSoakReleaseCheckoutVerifier',
+        '$this->checkoutMatchesReleaseRevision($revision)',
+        "->where('pack_key', ItSecurityDesktopReleaseFixturePack::PACK_KEY)",
+    )->and($fixtureReadiness)->toContain(
+        'assess(bool $requireRuntimePack = false)',
+        "'release_fixture_runtime_checkout_revision_mismatch'",
+        'LoadSoakReleaseCheckoutVerifier',
     );
 
     expect($runbook)->toContain(

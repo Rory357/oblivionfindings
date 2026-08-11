@@ -98,7 +98,10 @@ database name in `IT_SECURITY_DESKTOP_FIXTURES_DATABASE_NAME_SHA256`. It also
 binds each action to the supplied clean revision. The D16 no-network runtime
 additionally requires `IT_SECURITY_DESKTOP_FIXTURES_RELEASE_REVISION` to equal the same
 40-hex release revision recorded by the ready pack. The no-network D16 adapter
-refuses the pack when that revision is absent, stale, or mismatched. The guard
+and the read-only fixture preflight also require that revision to be the clean
+deployed checkout's exact `HEAD == refs/remotes/origin/main`; either command
+refuses the pack when the configured, stored, or deployed revision is absent,
+stale, or mismatched. The guard
 requires the supplied 40-hex revision to be the clean checkout's exact
 `HEAD == refs/remotes/origin/main` and requires the action-specific confirmation
 `IT-SECURITY-DESKTOP-FIXTURES:<ACTION>:<revision>`. The gate emits no database
@@ -121,7 +124,13 @@ owned fixture Device, cleanup fails early with
 archive that fixture pack with its immutable D16 evidence; do not delete or
 repoint the retained history to force cleanup. Any later D01 submissions remain
 part of that archived pack and must not be separately deleted after D16 evidence
-exists.
+exists. There is deliberately no in-application archive/retire or fresh-pack
+transition for a retained D16 pack: its fixed owned identities and attachment
+cannot be shared safely with a new revision. `prepare` fails closed rather than
+repointing a retained pack to another release revision. Do not change the
+fixture revision or reuse D16 after deployment; a new D16 requires an approved
+versioned-fixture design that keeps records, files, and command/audit history
+disjoint.
 
 Before D16 evidence exists, the exact manifest-owned
 `release-requester@acceptance.invalid` User ID plus the exact manifest-owned

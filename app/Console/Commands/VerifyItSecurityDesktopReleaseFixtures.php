@@ -14,7 +14,7 @@ final class VerifyItSecurityDesktopReleaseFixtures extends Command
 
     public function handle(ItSecurityDesktopReleaseFixtureReadiness $readiness): int
     {
-        $report = $readiness->assess();
+        $report = $readiness->assess(requireRuntimePack: true);
 
         if ((bool) $this->option('json')) {
             $this->line(json_encode($report, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
