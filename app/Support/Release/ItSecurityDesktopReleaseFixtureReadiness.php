@@ -172,7 +172,15 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 'securityDevices.integrations.view',
                 'securityDevices.reports.view',
                 'securityDevices.commands.observe',
+                // These parent grants deliberately let the direct-route checks
+                // reach Site/object authorization. The actor is assigned only
+                // to RELEASE Site Hidden, so Alpha records must still be
+                // concealed by their canonical access services.
+                'controlRoom.viewAny',
                 'controlRoom.alerts.view',
+                'fleet.viewAny',
+                'assets.telemetry.view',
+                'assets.telemetry.export',
                 'it.view',
             ],
             'forbidden_permissions' => [

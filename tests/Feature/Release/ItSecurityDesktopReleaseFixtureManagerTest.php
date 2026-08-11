@@ -94,6 +94,23 @@ it('prepares one complete pack reuses it idempotently and removes only owned rec
         ->and($ownedRecordCount)->toBeGreaterThan(40)
         ->and(app(ItSecurityDesktopReleaseFixtureReadiness::class)->assess()['state'])->toBe('ready')
         ->and(MonitoringIncidentEvidenceSnapshot::query()->count())->toBe(1);
+
+    $hiddenSiteActor = User::query()
+        ->where('email', 'release-denied@acceptance.invalid')
+        ->sole();
+    $sourceDeniedActor = User::query()
+        ->where('email', 'release-source-denied@acceptance.invalid')
+        ->sole();
+
+    expect($hiddenSiteActor->canDo('controlRoom.viewAny'))->toBeTrue()
+        ->and($hiddenSiteActor->canDo('controlRoom.alerts.view'))->toBeTrue()
+        ->and($hiddenSiteActor->canDo('fleet.viewAny'))->toBeTrue()
+        ->and($hiddenSiteActor->canDo('assets.telemetry.view'))->toBeTrue()
+        ->and($hiddenSiteActor->canDo('assets.telemetry.export'))->toBeTrue()
+        ->and($sourceDeniedActor->canDo('controlRoom.viewAny'))->toBeFalse()
+        ->and($sourceDeniedActor->canDo('fleet.viewAny'))->toBeFalse()
+        ->and($sourceDeniedActor->canDo('assets.telemetry.view'))->toBeFalse();
+
     Storage::disk('private')->assertExists('it-security-release-fixtures/release-network-evidence.txt');
 
     $reused = $manager->execute('prepare', $secondRevision);
