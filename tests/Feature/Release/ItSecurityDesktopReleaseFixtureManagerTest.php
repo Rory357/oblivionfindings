@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItCatalogSubmissionService;
 use App\Domain\It\Services\ItTicketInteractionService;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
@@ -162,6 +163,13 @@ it('creates and cleans the disjoint V10 generation without mutating retained V1 
     ]);
     $legacySite = Site::factory()->create(['name' => 'RELEASE Site Alpha']);
     $legacyUser = User::factory()->create(['email' => 'release-requester@acceptance.invalid']);
+    $legacyProfile = HrEmployeeProfile::factory()->create([
+        'user_id' => $legacyUser->id,
+        'employee_number' => 'REL-ACTOR-01',
+        'primary_site_id' => $legacySite->id,
+        'created_by' => $legacyUser->id,
+        'updated_by' => $legacyUser->id,
+    ]);
     $legacyDoor = Device::factory()->create([
         'name' => 'RELEASE Alpha Door',
         'provider' => 'release_fixture',
@@ -187,6 +195,7 @@ it('creates and cleans the disjoint V10 generation without mutating retained V1 
         ->and($legacyPack->fresh()->state)->toBe(ItSecurityDesktopReleaseFixturePack::STATE_READY)
         ->and(Site::query()->whereKey($legacySite->id)->exists())->toBeTrue()
         ->and(User::query()->whereKey($legacyUser->id)->exists())->toBeTrue()
+        ->and(HrEmployeeProfile::query()->whereKey($legacyProfile->id)->exists())->toBeTrue()
         ->and(Device::query()->whereKey($legacyDoor->id)->exists())->toBeTrue();
     Storage::disk('private')->assertExists('it-security-release-fixtures/release-network-evidence.txt');
     Storage::disk('private')->assertExists('it-security-release-fixtures/v10/release-network-evidence.txt');
@@ -198,6 +207,7 @@ it('creates and cleans the disjoint V10 generation without mutating retained V1 
         ->and(ItSecurityDesktopReleaseFixturePack::query()->sole()->is($legacyPack))->toBeTrue()
         ->and(Site::query()->whereKey($legacySite->id)->exists())->toBeTrue()
         ->and(User::query()->whereKey($legacyUser->id)->exists())->toBeTrue()
+        ->and(HrEmployeeProfile::query()->whereKey($legacyProfile->id)->exists())->toBeTrue()
         ->and(Device::query()->whereKey($legacyDoor->id)->exists())->toBeTrue()
         ->and(User::query()->whereIn('email', array_keys(ItSecurityDesktopReleaseFixtureReadiness::ACTORS))->count())->toBe(0);
     Storage::disk('private')->assertExists('it-security-release-fixtures/release-network-evidence.txt');
@@ -219,6 +229,28 @@ it('refuses a reserved identity before writing any owned pack record', function 
         ->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(0)
         ->and(Site::query()->whereKey($reserved->id)->exists())->toBeTrue()
         ->and(User::query()->whereIn('email', array_keys(ItSecurityDesktopReleaseFixtureReadiness::ACTORS))->count())->toBe(0);
+});
+
+it('refuses a reserved V10 employee identity before writing any owned pack record', function (): void {
+    $manager = app(ItSecurityDesktopReleaseFixtureManager::class);
+    $revision = str_repeat('d', 40);
+    $user = User::factory()->create();
+    $reserved = HrEmployeeProfile::factory()->create([
+        'user_id' => $user->id,
+        'employee_number' => ItSecurityDesktopReleaseFixtureReadiness::ACTOR_EMPLOYEE_NUMBERS['release-v10-requester@acceptance.invalid'],
+        'created_by' => $user->id,
+        'updated_by' => $user->id,
+    ]);
+
+    $plan = $manager->plan('prepare', $revision);
+    $executed = $manager->execute('prepare', $revision);
+
+    expect($plan['state'])->toBe('failed')
+        ->and($plan['gap_codes'])->toBe(['release_fixture_reserved_identity_present'])
+        ->and($executed['state'])->toBe('failed')
+        ->and($executed['fixture_mutation_applied'])->toBeFalse()
+        ->and(ItSecurityDesktopReleaseFixturePack::query()->count())->toBe(0)
+        ->and(HrEmployeeProfile::query()->whereKey($reserved->id)->exists())->toBeTrue();
 });
 
 it('refuses the exact reserved tracking event identity before fixture creation', function (): void {

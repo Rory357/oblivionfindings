@@ -152,6 +152,7 @@ it('checks effective actor permissions in addition to the role label', function 
     $actor->roles()->attach($role);
     HrEmployeeProfile::factory()->create([
         'user_id' => $actor->id,
+        'employee_number' => ItSecurityDesktopReleaseFixtureReadiness::ACTOR_EMPLOYEE_NUMBERS['release-v10-requester@acceptance.invalid'],
         'primary_site_id' => $site->id,
         'secondary_site_ids' => [],
         'start_date' => today()->subDay(),

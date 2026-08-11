@@ -217,6 +217,17 @@ final class ItSecurityDesktopReleaseFixtureReadiness
         ],
     ];
 
+    /** @var array<string, string> */
+    public const array ACTOR_EMPLOYEE_NUMBERS = [
+        'release-v10-requester@acceptance.invalid' => 'REL-V10-ACTOR-01',
+        'release-v10-it-manager@acceptance.invalid' => 'REL-V10-ACTOR-02',
+        'release-v10-it-reviewer@acceptance.invalid' => 'REL-V10-ACTOR-03',
+        'release-v10-control-room@acceptance.invalid' => 'REL-V10-ACTOR-04',
+        'release-v10-auditor@acceptance.invalid' => 'REL-V10-ACTOR-05',
+        'release-v10-denied@acceptance.invalid' => 'REL-V10-ACTOR-06',
+        'release-v10-source-denied@acceptance.invalid' => 'REL-V10-ACTOR-07',
+    ];
+
     /** @var list<string> */
     public const array SITES = ['RELEASE V10 Site Alpha', 'RELEASE V10 Site Hidden'];
 
@@ -230,6 +241,12 @@ final class ItSecurityDesktopReleaseFixtureReadiness
     public const array STAFF = [
         'RELEASE V10 Staff Alpha' => 'RELEASE V10 Site Alpha',
         'RELEASE V10 Staff Hidden' => 'RELEASE V10 Site Hidden',
+    ];
+
+    /** @var array<string, string> */
+    public const array STAFF_EMPLOYEE_NUMBERS = [
+        'RELEASE V10 Staff Alpha' => 'REL-V10-STAFF-ALPHA',
+        'RELEASE V10 Staff Hidden' => 'REL-V10-STAFF-HIDDEN',
     ];
 
     /**
@@ -505,6 +522,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
                 && (string) $actor->role !== 'admin';
             $profileReady = $site instanceof Site
                 && $profile !== null
+                && $profile->employee_number === self::ACTOR_EMPLOYEE_NUMBERS[$email]
                 && (bool) $profile->is_active
                 && ($profile->start_date === null || $profile->start_date->lte(today()))
                 && ($profile->end_date === null || $profile->end_date->gte(today()))
@@ -612,6 +630,7 @@ final class ItSecurityDesktopReleaseFixtureReadiness
             $profile = $user->hrEmployeeProfile;
             if ($site instanceof Site
                 && $profile !== null
+                && $profile->employee_number === self::STAFF_EMPLOYEE_NUMBERS[$name]
                 && (bool) $profile->is_active
                 && (int) $profile->primary_site_id === (int) $site->id) {
                 $ready++;

@@ -552,7 +552,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             $site = $sites[$contract['site']];
             $this->own('hr_employee_profile', HrEmployeeProfile::query()->create([
                 'user_id' => $actor->id,
-                'employee_number' => 'REL-ACTOR-'.str_pad((string) (count($actors) + 1), 2, '0', STR_PAD_LEFT),
+                'employee_number' => ItSecurityDesktopReleaseFixtureReadiness::ACTOR_EMPLOYEE_NUMBERS[$email],
                 'work_email' => $email,
                 'position_title' => Str::headline($contract['role']),
                 'position_role' => $contract['role'],
@@ -584,7 +584,7 @@ final class ItSecurityDesktopReleaseFixtureManager
             $user->roles()->attach($roles->get('support_worker')->id);
             $profiles[$name] = $this->own('hr_employee_profile', HrEmployeeProfile::query()->create([
                 'user_id' => $user->id,
-                'employee_number' => 'REL-STAFF-'.strtoupper($suffix),
+                'employee_number' => ItSecurityDesktopReleaseFixtureReadiness::STAFF_EMPLOYEE_NUMBERS[$name],
                 'work_email' => $user->email,
                 'position_title' => 'Support Worker',
                 'position_role' => 'support_worker',
@@ -1096,6 +1096,10 @@ final class ItSecurityDesktopReleaseFixtureManager
             'release-v10-staff-alpha@acceptance.invalid',
             'release-v10-staff-hidden@acceptance.invalid',
         ])->exists()
+            || HrEmployeeProfile::query()->whereIn('employee_number', [
+                ...array_values(ItSecurityDesktopReleaseFixtureReadiness::ACTOR_EMPLOYEE_NUMBERS),
+                ...array_values(ItSecurityDesktopReleaseFixtureReadiness::STAFF_EMPLOYEE_NUMBERS),
+            ])->exists()
             || User::query()->whereIn('name', array_keys(ItSecurityDesktopReleaseFixtureReadiness::STAFF))->exists()
             || Site::withTrashed()->whereIn('name', ItSecurityDesktopReleaseFixtureReadiness::SITES)->exists()
             || Client::withTrashed()->where('first_name', 'RELEASE V10 Client')->whereIn('last_name', ['Alpha', 'Hidden'])->exists()
