@@ -137,11 +137,7 @@ it('maps Control Room task destinations to the same manage view and no-access de
         ->get('/control-room/alerts/'.$alert->id.'?'.http_build_query([
             'return_to' => $returnTo,
         ]))
-        ->assertRedirect($returnTo)
-        ->assertSessionHas(
-            'error',
-            'Your access changed. The item is still listed, but you can no longer open that Control Room response.',
-        );
+        ->assertForbidden();
 });
 
 it('returns permission-scoped task detail actions and preserves the filtered return path', function () {
@@ -193,10 +189,9 @@ it('returns permission-scoped task detail actions and preserves the filtered ret
     ]);
 });
 
-it('recovers permission drift to the exact safe task filters instead of a bare 403', function () {
+it('recovers site-scope drift to the exact safe task filters instead of a bare 404', function () {
     $site = Site::factory()->create();
     $user = makeTaskRecoveryUser($site, [
-        'controlRoom.viewAny',
         'controlRoom.alerts.view',
     ], 'Drifted Worker');
     $alert = ControlRoomAlert::factory()->triaging()->create([
@@ -205,11 +200,11 @@ it('recovers permission drift to the exact safe task filters instead of a bare 4
     $returnTo = '/tasks?q='.$alert->reference_number
         .'&sources=alert&bucket=in_progress&assigned=me&overdue=1'
         .'&due=week&following=1&done=1&page=2&severity=high';
-    denyTaskRecoveryPermissions($user, [
-        'controlRoom.viewAny',
-        'controlRoom.alerts.view',
-        'controlRoom.alerts.manage',
+    $user->hrEmployeeProfile->update([
+        'primary_site_id' => Site::factory()->create()->id,
+        'secondary_site_ids' => [],
     ]);
+    $user->refresh();
 
     $this->actingAs($user)
         ->get('/control-room/alerts/'.$alert->id.'?'.http_build_query([
@@ -222,7 +217,7 @@ it('recovers permission drift to the exact safe task filters instead of a bare 4
         );
 });
 
-it('keeps invalid recovery targets and unrelated authorization failures as normal 403 responses', function () {
+it('keeps invalid recovery targets and parent permission failures as normal 403 responses', function () {
     $site = Site::factory()->create();
     $user = makeTaskRecoveryUser($site, [], 'Unauthorized Worker');
     $alert = ControlRoomAlert::factory()->triaging()->create([
@@ -239,11 +234,7 @@ it('keeps invalid recovery targets and unrelated authorization failures as norma
         ->get('/control-room/alerts/'.$alert->id.'?'.http_build_query([
             'return_to' => '/tasks?q=allowed&evil=drop-me',
         ]))
-        ->assertRedirect('/tasks?q=allowed')
-        ->assertSessionHas(
-            'error',
-            'Your access changed. The item is still listed, but you can no longer open that Control Room response.',
-        );
+        ->assertForbidden();
 
     $this->actingAs($user)
         ->getJson('/control-room/alerts/'.$alert->id.'?'.http_build_query([
@@ -252,7 +243,7 @@ it('keeps invalid recovery targets and unrelated authorization failures as norma
         ->assertForbidden()
         ->assertJsonPath(
             'message',
-            'Your access changed. The item is still listed, but you can no longer open that Control Room response.',
+            'You are not authorized to access this Control Room alert.',
         );
 });
 

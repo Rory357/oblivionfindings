@@ -11,13 +11,11 @@ import { Input } from '@/components/ui/input';
 import { NEWS2_BAND_LABEL, type News2Band } from '@/lib/news2';
 import { cn } from '@/lib/utils';
 import {
-    AlertTriangle,
     HeartPulse,
     Loader2,
     Search,
     ShieldAlert,
     Stethoscope,
-    User,
     Workflow,
     X,
 } from 'lucide-react';
@@ -41,7 +39,6 @@ export function clientInitials(name: string): string {
             .toUpperCase() || '–'
     );
 }
-
 /* ------------------------------------------------------------------ */
 /*  Client picker (debounced server search)                            */
 /* ------------------------------------------------------------------ */
@@ -339,6 +336,3 @@ export function ClinicalCardRail({ clientId }: { clientId: number | null }) {
         </div>
     );
 }
-
-/* Re-exported icons used by the wizards (keeps a single import surface). */
-export { AlertTriangle, User };

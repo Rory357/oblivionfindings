@@ -2,20 +2,37 @@ import { useSyncExternalStore } from 'react';
 
 const MOBILE_BREAKPOINT = 768;
 
-const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+let mobileMediaQuery: MediaQueryList | null = null;
 
-function mediaQueryListener(callback: (event: MediaQueryListEvent) => void) {
-    mql.addEventListener('change', callback);
+function mediaQuery(): MediaQueryList | null {
+    if (typeof window === 'undefined') return null;
+
+    mobileMediaQuery ??= window.matchMedia(
+        `(max-width: ${MOBILE_BREAKPOINT - 1}px)`,
+    );
+
+    return mobileMediaQuery;
+}
+
+function mediaQueryListener(callback: () => void) {
+    const query = mediaQuery();
+    if (!query) return () => undefined;
+
+    query.addEventListener('change', callback);
 
     return () => {
-        mql.removeEventListener('change', callback);
+        query.removeEventListener('change', callback);
     };
 }
 
 function isSmallerThanBreakpoint() {
-    return mql.matches;
+    return mediaQuery()?.matches ?? false;
 }
 
 export function useIsMobile() {
-    return useSyncExternalStore(mediaQueryListener, isSmallerThanBreakpoint);
+    return useSyncExternalStore(
+        mediaQueryListener,
+        isSmallerThanBreakpoint,
+        () => false,
+    );
 }

@@ -182,6 +182,10 @@ function humanise(value: string): string {
 const ADD_DEVICE_HISTORY_STATE = 'oblivion:add-device-dialog';
 
 function addDeviceDialogIsOpen(): boolean {
+    // The dialog can be included in an SSR page render. Browser history is
+    // only meaningful after hydration, so start closed on the server.
+    if (typeof window === 'undefined') return false;
+
     const url = new URL(window.location.href);
 
     return (

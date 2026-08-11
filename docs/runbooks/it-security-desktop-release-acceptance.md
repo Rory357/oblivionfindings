@@ -30,6 +30,20 @@ both installed and externally managed Supervisor configurations; an absent,
 stale, wrong-release, partially restarted, or inaccessible runtime blocks the
 release.
 
+Before lifecycle work, maintenance mode, or any governed Device command can be
+accepted, deployment runs the value-free signing preflight:
+
+```bash
+php artisan monitoring:verify-envelope-signing --json
+```
+
+It requires a configured active monitoring signing-key ID and its matching
+valid 32-byte key. A missing, unknown, malformed, or wrong-length key exits
+non-zero and blocks the deployment; no key ID, key material, signature, or
+probe payload is emitted. No signing key material is emitted. There is no
+implicit non-release bypass: a deployment where governed commands are
+intentionally unavailable must use only an explicitly approved non-release path.
+
 ## Acceptance actors
 
 Create these dedicated acceptance users through the approved release-fixture process. Assign only `RELEASE Site Alpha` unless the row says otherwise. Do not use `admin@test.com`, the `admin` role, impersonation, an application-wide permission override, or a permission change during the run.

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     AddDeviceDialog,
@@ -30,6 +31,12 @@ function AddDeviceDialogLauncher() {
             <AddDeviceDialog open={dialog.open} onClose={dialog.closeDialog} />
         </>
     );
+}
+
+function AddDeviceDialogStateProbe() {
+    const { open } = useAddDeviceDialogState();
+
+    return <span>{open ? 'open' : 'closed'}</span>;
 }
 
 describe('AddDeviceDialog', () => {
@@ -71,6 +78,17 @@ describe('AddDeviceDialog', () => {
         expect(window.location.search).toBe('?status=offline');
     });
 
+    it('renders the local dialog state closed during SSR without accessing window', () => {
+        vi.stubGlobal('window', undefined);
+
+        expect(() =>
+            renderToString(<AddDeviceDialogStateProbe />),
+        ).not.toThrow();
+        expect(renderToString(<AddDeviceDialogStateProbe />)).toContain(
+            'closed',
+        );
+    });
+
     it('keeps legacy create links opening the same modal and cleans the query when closed', async () => {
         window.history.replaceState(
             null,
@@ -83,6 +101,9 @@ describe('AddDeviceDialog', () => {
         expect(
             screen.getByRole('dialog', { name: 'Register device' }),
         ).toBeVisible();
+        expect(
+            await screen.findByText('What are we registering?'),
+        ).toBeVisible();
 
         fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
 
@@ -93,7 +114,7 @@ describe('AddDeviceDialog', () => {
         expect(window.location.search).toBe('?domain=security');
     });
 
-    it('closes an in-place registration when browser history moves back', () => {
+    it('closes an in-place registration when browser history moves back', async () => {
         window.history.replaceState(
             null,
             '',
@@ -104,6 +125,9 @@ describe('AddDeviceDialog', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Register device' }),
         );
+        expect(
+            await screen.findByText('What are we registering?'),
+        ).toBeVisible();
 
         window.history.replaceState(
             null,

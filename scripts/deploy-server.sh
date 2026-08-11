@@ -354,6 +354,9 @@ fi
 echo "▶ composer install"
 run_app composer install --no-dev --optimize-autoloader --no-interaction
 
+echo "▶ monitoring envelope signing preflight"
+run_app php artisan monitoring:verify-envelope-signing --json
+
 echo "▶ lifecycle trigger database preflight"
 run_app php artisan database:verify-lifecycle-triggers preflight --json
 
