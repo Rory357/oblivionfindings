@@ -134,7 +134,8 @@ test.describe('meds readiness workflows', () => {
         await expect(
             page.getByText('PW Meds Morning Tablets').first(),
         ).toBeVisible();
-        // The fixtures seed overdue doses, so the sidebar "Meds today" item
+        // The fixture keeps its first local-day slot overdue during the
+        // early-midnight seed window, so the sidebar "Meds today" item
         // carries its critical overdue badge (sidebar is desktop chrome).
         if (!testInfo.project.name.includes('mobile')) {
             await expect(

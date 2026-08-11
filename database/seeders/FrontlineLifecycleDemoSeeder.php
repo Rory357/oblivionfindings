@@ -553,7 +553,10 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             ]);
 
         if ($anchor->hour === 0 && $anchor->minute < 30) {
-            $anchor->setTime(0, 30);
+            // The first slot is anchor minus 15 minutes. Keep it on the
+            // current local day and already due during the early-midnight
+            // test window, rather than making every fixture slot future.
+            $anchor->setTime(0, 15);
         } elseif ($anchor->hour === 23 && $anchor->minute > 30) {
             $anchor->setTime(23, 30);
         }
