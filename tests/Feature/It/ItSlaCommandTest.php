@@ -241,6 +241,9 @@ test('a business-hours SLA neither risks nor breaches over a weekend, then fires
 
     // Raise it Friday 16:00 NZ (travel as the UTC instant — production now() is UTC).
     $friday = CarbonImmutable::parse('2026-07-06 00:00', 'Pacific/Auckland')->startOfWeek()->addDays(4)->setTime(16, 0);
+    HrEmployeeProfile::query()
+        ->whereIn('user_id', [$this->hr->id, $this->worker->id])
+        ->update(['start_date' => $friday->subMonth()->toDateString()]);
     $this->travelTo($friday->utc());
     $this->actingAs($this->worker)->post('/it/tickets', [
         'title' => 'Weekend clock',
