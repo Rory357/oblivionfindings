@@ -224,16 +224,17 @@ export function ItServiceCatalogue({ items, fieldOptions }: Props) {
                 onOpenChange={(openState) => !openState && close()}
             >
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {selected?.name ?? 'Service request'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Complete the published request form. Required fields
+                            are marked.
+                        </DialogDescription>
+                    </DialogHeader>
                     {selected ? (
                         <form onSubmit={submit}>
-                            <DialogHeader>
-                                <DialogTitle>{selected.name}</DialogTitle>
-                                <DialogDescription>
-                                    Complete the published request form.
-                                    Required fields are marked.
-                                </DialogDescription>
-                            </DialogHeader>
-
                             {Object.keys(form.errors).length ? (
                                 <div
                                     role="alert"

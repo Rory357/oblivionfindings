@@ -482,6 +482,9 @@ describe('IT & Support grouped navigation', () => {
         expect(
             screen.getByRole('heading', { name: 'Request VPN access' }),
         ).toBeVisible();
+        expect(screen.getByRole('dialog')).toHaveAccessibleDescription(
+            'Complete the published request form. Required fields are marked.',
+        );
         expect(screen.getByLabelText(/What do you need/)).toBeVisible();
         expect(screen.getByLabelText(/Who needs this/)).toHaveValue('');
         expect(
