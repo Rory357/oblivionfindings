@@ -597,6 +597,12 @@ it('treats repeated assignment to the same shift as an idempotent success', func
         'status' => 'scheduled',
     ]);
 
+    $accessStart = Carbon::parse('2026-06-10 10:00:00');
+    $manager->forceFill(['approved_at' => $accessStart])->save();
+    $manager->hrEmployeeProfile()->update([
+        'start_date' => $accessStart->toDateString(),
+    ]);
+
     $this->travelTo(Carbon::parse('2026-07-10 10:00:00'));
     $this->actingAs($manager)
         ->post("/clients/{$client->id}/family-notes/{$note->id}/assign-shift", [
