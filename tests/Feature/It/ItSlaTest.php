@@ -204,6 +204,11 @@ test('a business-hours policy rolls SLA targets onto working time', function () 
     // Freeze "now" at Friday 16:30 NZ so the ticket anchors after-hours. Travel
     // to the UTC instant (production now() is UTC); assertions stay in NZ.
     $friday = CarbonImmutable::parse('2026-07-06 00:00', 'Pacific/Auckland')->startOfWeek()->addDays(4)->setTime(16, 30);
+    $accessStart = $friday->subMonth();
+    $this->worker->forceFill(['approved_at' => $accessStart])->save();
+    $this->worker->hrEmployeeProfile()->update([
+        'start_date' => $accessStart->toDateString(),
+    ]);
     $this->travelTo($friday->utc());
     $this->actingAs($this->worker)->post('/it/tickets', [
         'title' => 'After-hours breakage',
