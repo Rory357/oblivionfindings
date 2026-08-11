@@ -510,14 +510,15 @@ echo json_encode([
         await expect(
             page.getByText(/Golden relay awaits final H&S/i),
         ).toBeVisible();
+        // Leave the live handover page before the API transition retires its
+        // route. Otherwise a concurrent shared-inbox partial reload can race
+        // the acceptance request and truthfully receive the resulting 404.
+        await page.goto('/control-room/shifts');
         await postLaravel(
             page,
             `/control-room/shifts/${manifest.shift.id}/accept-handover`,
             { expected_version: preparedVersion },
         );
-        // Acceptance retires the handover page. Leave it before its live inbox
-        // poll refreshes a route that is now intentionally unavailable.
-        await page.goto('/control-room/shifts');
         await postLaravel(page, `/control-room/alerts/${alertId}/resolve`, {
             resolution_notes:
                 'Immediate response and transferred operational task are complete.',
