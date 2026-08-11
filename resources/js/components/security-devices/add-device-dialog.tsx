@@ -179,7 +179,65 @@ function humanise(value: string): string {
         .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function useDeviceDialogState(dialog: 'add-device' | 'edit-device') {
+const ADD_DEVICE_HISTORY_STATE = 'oblivion:add-device-dialog';
+
+function addDeviceDialogIsOpen(): boolean {
+    const url = new URL(window.location.href);
+
+    return (
+        url.searchParams.get('dialog') === 'add-device' ||
+        window.history.state?.dialog === ADD_DEVICE_HISTORY_STATE
+    );
+}
+
+function useAddDeviceLocalDialogState() {
+    const [open, setOpen] = useState(addDeviceDialogIsOpen);
+
+    useEffect(() => {
+        const syncDialogState = () => setOpen(addDeviceDialogIsOpen());
+
+        syncDialogState();
+        window.addEventListener('popstate', syncDialogState);
+        return () => window.removeEventListener('popstate', syncDialogState);
+    }, []);
+
+    const openDialog = () => {
+        if (addDeviceDialogIsOpen()) {
+            setOpen(true);
+            return;
+        }
+
+        window.history.pushState(
+            {
+                ...window.history.state,
+                dialog: ADD_DEVICE_HISTORY_STATE,
+            },
+            '',
+            `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        );
+        setOpen(true);
+    };
+
+    const closeDialog = () => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('dialog') === 'add-device') {
+            url.searchParams.delete('dialog');
+            window.history.replaceState(
+                window.history.state,
+                '',
+                `${url.pathname}${url.search}${url.hash}`,
+            );
+        } else if (window.history.state?.dialog === ADD_DEVICE_HISTORY_STATE) {
+            window.history.back();
+        }
+
+        setOpen(false);
+    };
+
+    return { open, openDialog, closeDialog };
+}
+
+function useUrlBackedDeviceDialogState(dialog: 'edit-device') {
     const [open, setOpen] = useState(false);
 
     useEffect(() => {
@@ -221,11 +279,14 @@ function useDeviceDialogState(dialog: 'add-device' | 'edit-device') {
 }
 
 export function useAddDeviceDialogState() {
-    return useDeviceDialogState('add-device');
+    // Registration follows the canonical Add Client pattern: opening the
+    // governed wizard does not navigate away or rewrite the workspace URL.
+    // Existing create-route and bookmark deep links remain supported.
+    return useAddDeviceLocalDialogState();
 }
 
 export function useEditDeviceDialogState() {
-    return useDeviceDialogState('edit-device');
+    return useUrlBackedDeviceDialogState('edit-device');
 }
 
 export function AddDeviceDialog({

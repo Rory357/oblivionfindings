@@ -1,6 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { Button } from '@/components/ui/button';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AddDeviceDialog, EditDeviceDialog } from './add-device-dialog';
+import {
+    AddDeviceDialog,
+    EditDeviceDialog,
+    useAddDeviceDialogState,
+} from './add-device-dialog';
 
 const options = {
     taxonomy: {
@@ -13,6 +18,19 @@ const options = {
     domains: [{ value: 'security', label: 'Security' }],
     statuses: [{ value: 'active', label: 'Active' }],
 };
+
+function AddDeviceDialogLauncher() {
+    const dialog = useAddDeviceDialogState();
+
+    return (
+        <>
+            <Button type="button" onClick={dialog.openDialog}>
+                Register device
+            </Button>
+            <AddDeviceDialog open={dialog.open} onClose={dialog.closeDialog} />
+        </>
+    );
+}
 
 describe('AddDeviceDialog', () => {
     beforeEach(() => {
@@ -27,6 +45,76 @@ describe('AddDeviceDialog', () => {
 
     afterEach(() => {
         vi.unstubAllGlobals();
+        window.history.replaceState(null, '', '/');
+    });
+
+    it('opens the canonical in-place wizard without changing the workspace URL', async () => {
+        window.history.replaceState(
+            window.history.state,
+            '',
+            '/security-devices/devices?status=offline',
+        );
+
+        render(<AddDeviceDialogLauncher />);
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Register device' }),
+        );
+
+        expect(
+            screen.getByRole('dialog', { name: 'Register device' }),
+        ).toBeVisible();
+        expect(
+            await screen.findByText('What are we registering?'),
+        ).toBeVisible();
+        expect(window.location.pathname).toBe('/security-devices/devices');
+        expect(window.location.search).toBe('?status=offline');
+    });
+
+    it('keeps legacy create links opening the same modal and cleans the query when closed', async () => {
+        window.history.replaceState(
+            null,
+            '',
+            '/security-devices/devices?dialog=add-device&domain=security',
+        );
+
+        render(<AddDeviceDialogLauncher />);
+
+        expect(
+            screen.getByRole('dialog', { name: 'Register device' }),
+        ).toBeVisible();
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+
+        expect(
+            screen.queryByRole('dialog', { name: 'Register device' }),
+        ).not.toBeInTheDocument();
+        expect(window.location.pathname).toBe('/security-devices/devices');
+        expect(window.location.search).toBe('?domain=security');
+    });
+
+    it('closes an in-place registration when browser history moves back', () => {
+        window.history.replaceState(
+            null,
+            '',
+            '/security-devices/devices?status=offline',
+        );
+
+        render(<AddDeviceDialogLauncher />);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Register device' }),
+        );
+
+        window.history.replaceState(
+            null,
+            '',
+            '/security-devices/devices?status=offline',
+        );
+        fireEvent.popState(window);
+
+        expect(
+            screen.queryByRole('dialog', { name: 'Register device' }),
+        ).not.toBeInTheDocument();
     });
 
     it('uses the shared wizard shell without navigating to a standalone form page', async () => {

@@ -374,10 +374,8 @@ export default function DevicesIndex({
                     <EmptyList
                         icon={Shield}
                         itemName="device"
-                        createHref={
-                            can.create
-                                ? '/security-devices/devices?dialog=add-device'
-                                : undefined
+                        onCreate={
+                            can.create ? addDeviceDialog.openDialog : undefined
                         }
                         createLabel={can.create ? 'Register device' : undefined}
                     />
