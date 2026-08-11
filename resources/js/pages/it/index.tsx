@@ -63,6 +63,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
@@ -1327,6 +1328,10 @@ export default function ItIndex({
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>{readerArticle?.title}</DialogTitle>
+                        <DialogDescription>
+                            Read this published support article, then record
+                            whether it helped resolve the request.
+                        </DialogDescription>
                     </DialogHeader>
                     {readerArticle ? (
                         <div className="space-y-4">
