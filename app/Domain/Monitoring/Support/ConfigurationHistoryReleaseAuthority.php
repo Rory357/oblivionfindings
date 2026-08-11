@@ -17,6 +17,8 @@ final class ConfigurationHistoryReleaseAuthority
 
     private const array AUTHORITY_KEYS = [
         'authority_reference',
+        'backup_generation_reference',
+        'backup_manifest_sha256',
         'browser_attestation_public_key_base64',
         'evidence_acl_reference',
         'evidence_class',
@@ -24,6 +26,9 @@ final class ConfigurationHistoryReleaseAuthority
         'production_attestation_public_key_base64',
         'release_revision',
         'restored_environment_reference_sha256',
+        'restore_artifact_sha256',
+        'restore_authority_reference',
+        'restore_authority_sha256',
         'schema_version',
         'valid_from_utc',
         'valid_until_utc',
@@ -119,9 +124,14 @@ final class ConfigurationHistoryReleaseAuthority
         if (($authority['schema_version'] ?? null) !== 1
             || ($authority['evidence_class'] ?? null) !== 'monitoring_configuration_history_release_authority_v1'
             || ! $this->matches($authority['authority_reference'] ?? null, '/\AAUTHORITY-[a-f0-9]{32}\z/')
+            || ! $this->matches($authority['backup_generation_reference'] ?? null, '/\ABKP-[a-f0-9]{32}\z/')
             || ! $this->matches($authority['evidence_acl_reference'] ?? null, '/\AACL-[a-f0-9]{32}\z/')
+            || ! $this->sha($authority['backup_manifest_sha256'] ?? null)
             || ! $this->sha($authority['release_revision'] ?? null, 40)
             || ! $this->sha($authority['restored_environment_reference_sha256'] ?? null)
+            || ! $this->sha($authority['restore_artifact_sha256'] ?? null)
+            || ! $this->matches($authority['restore_authority_reference'] ?? null, '/\AAUTHORITY-[a-f0-9]{32}\z/')
+            || ! $this->sha($authority['restore_authority_sha256'] ?? null)
             || ! $this->sha($authority['hmac_key_sha256'] ?? null)
             || ! is_string($productionKey)
             || strlen($productionKey) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES
@@ -140,12 +150,17 @@ final class ConfigurationHistoryReleaseAuthority
         return [
             'authority_reference' => $authority['authority_reference'],
             'authority_sha256' => hash('sha256', $rawAuthority),
+            'backup_generation_reference' => $authority['backup_generation_reference'],
+            'backup_manifest_sha256' => $authority['backup_manifest_sha256'],
             'browser_public_key' => $browserKey,
             'evidence_acl_reference' => $authority['evidence_acl_reference'],
             'hmac_key_sha256' => $authority['hmac_key_sha256'],
             'production_public_key' => $productionKey,
             'release_revision' => $authority['release_revision'],
             'restored_environment_reference_sha256' => $authority['restored_environment_reference_sha256'],
+            'restore_artifact_sha256' => $authority['restore_artifact_sha256'],
+            'restore_authority_reference' => $authority['restore_authority_reference'],
+            'restore_authority_sha256' => $authority['restore_authority_sha256'],
         ];
     }
 

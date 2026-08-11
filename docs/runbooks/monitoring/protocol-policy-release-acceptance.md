@@ -111,12 +111,17 @@ nine policy attestations and six transition drills required by this runbook:
 - every policy row has one bounded opaque reviewed-evidence reference; and
 - confirmation, dependency, maintenance, hysteresis, stale/unknown and baseline
   transitions have ordered before/during/after references with zero ticket and
-  notification storm counts.
+  notification storm counts. All 18 transition references must be globally
+  unique and the timestamps must strictly advance from start to changed state
+  to recovery; one snapshot cannot be relabelled as multiple phases or drills.
 
 The same signed document binds opaque supervised-process, provider-audit,
 target-side-log and operator-signoff references and confirms that no target,
 credential or payload was retained. All evidence times must remain within the
 same preceding-hour/sustained-run interval and the protected authority window.
+The four top-level evidence-class references are pairwise distinct, and each
+protocol row's runtime reference must differ from its target-side reference;
+one process observation cannot be relabelled as target-side execution proof.
 Missing, duplicate, stale, reordered, cross-environment or weak evidence fails
 closed even when another protocol or policy row is healthy.
 
@@ -129,24 +134,47 @@ deployed release run:
   --s10-release-evidence=/private/evidence/security-devices-s10-release-evidence.json \
   --evidence=/private/evidence/protocol-policy-review.json \
   --signature=/private/evidence/protocol-policy-review.sig \
-  --public-key=/private/evidence/protocol-policy-review.pub
+  --public-key=/private/evidence/protocol-policy-review.pub \
+  --output-directory=/private/evidence/protocol-policy-verification
 ```
 
 The verifier accepts only stable regular external files that are not
 group/other writable, a clean exact `HEAD == origin/main`, the unchanged
-protected authority before and after verification, an exact S10 combined
+protected authority before verification, after verification and after
+publication, an exact S10 combined
 artifact with at least 15 one-minute protocol samples over the preceding-hour
 window, the independently pinned signature and the complete exact matrices. It
-emits only bounded counts, opaque hashes and timestamps. This makes the release
-evidence coherent; local fixtures, a standalone child result or the verifier
-contract does not itself close A07 or A08 without the real targets, listener
-traffic, provider executions, policy drills, protected deployed S10 artifact
-and retained independent review.
+also binds the S10 artifact's authority reference/hash, environment, release
+revision and runtime-environment hash to the separately installed protected S10
+release authority; a stable S10-shaped JSON file is not sufficient. It
+rechecks the S10 artifact, signed review, detached signature and public key
+after verification and again after publication, so replacing any retained
+input during the verification window fails closed. The output directory must
+already exist outside the checkout, be owned by the service account and have
+exact mode `0700`. The verifier exclusively creates one mode-`0600` value-free
+JSON result and matching `.sha256` sidecar, flushes and syncs both, then after
+all final source/authority checks reopens both outputs and requires their exact
+bytes, private owner/mode and stable identities before reporting success. A collision never
+overwrites or removes the pre-existing file; failure after creating only one
+member removes only that newly created member. The checksum detects later
+change but is not a WORM or retention receipt, so
+`worm_receipt_verified=false` remains explicit and immutable retention must be
+proved separately. The result includes exact raw signed-review and
+detached-signature SHA-256 values, so its immutable receipt binds the exact
+independently signed review package rather than only its format-checked
+`PROTOCOL-` reference. Retain that digest-addressed review/signature package
+with the external target-side, supervision, provider-audit and operator
+records. It emits only bounded counts, opaque hashes, filenames and
+timestamps. This makes the release evidence coherent; local fixtures, a
+standalone child result or contract is insufficient. The verifier does not
+itself close A07 or A08 without the real targets, listener traffic, provider executions, policy
+drills, protected deployed S10 artifact and retained independent review.
 
 ## External evidence still required
 
 Retain supervised process timestamps, provider request/audit references,
-approved target-side logs, the value-free verifier result and operator sign-off.
+approved target-side logs, the value-free verifier JSON/checksum pair, an
+independent immutable-storage receipt and operator sign-off.
 For maintenance, dependency, hysteresis, stale and unknown exercises, retain the
 expected before/during/after state and proof that ticket or notification storms
 were not created. Do not retain secrets, IP addresses, URLs, Site names, Device

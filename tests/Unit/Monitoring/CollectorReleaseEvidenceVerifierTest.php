@@ -103,8 +103,8 @@ function collectorReleaseDataset(array $authority): array
         'revoked' => $revoked,
         'replacement' => $replacement,
         'evidence' => [
-            'schema_version' => 1,
-            'evidence_class' => 'monitoring_collector_release_evidence_v1',
+            'schema_version' => 2,
+            'evidence_class' => 'monitoring_collector_release_evidence_v2',
             'authority_reference' => $authority['authority_reference'],
             'authority_sha256' => $authority['authority_sha256'],
             'environment_reference_sha256' => $authority['environment_reference_sha256'],
@@ -177,6 +177,8 @@ function collectorReleaseDataset(array $authority): array
                 'service_restored_at' => '2026-08-10T00:39:00Z',
                 'old_identity_forwarded_and_denied' => true,
                 'replacement_heartbeat_current' => true,
+                'replacement_heartbeat_observed_at' => '2026-08-10T00:38:00Z',
+                'replacement_heartbeat_reference_sha256' => hash('sha256', 'replacement-heartbeat'),
                 'replacement_zero_backlog' => true,
             ],
         ],
@@ -217,7 +219,9 @@ it('validates a protected collector authority and pins it across the release exe
         'remote_site_reference_sha256' => str_repeat('d', 64),
         'load_balancer_reference_sha256' => str_repeat('e', 64),
         'attestation_public_key_sha256' => hash('sha256', $publicKey),
-    ])->and((new CollectorReleaseAuthorityVerifier)->identitiesRemainPinned([$authority, $authority]))->toBeTrue();
+    ])->and((new CollectorReleaseAuthorityVerifier)->identitiesRemainPinned([$authority, $authority]))->toBeTrue()
+        ->and((new CollectorReleaseAuthorityVerifier)->identitiesRemainPinned([$authority, $authority, $authority]))->toBeTrue()
+        ->and((new CollectorReleaseAuthorityVerifier)->identitiesRemainPinned([$authority]))->toBeFalse();
 });
 
 it('rejects unprotected expired duplicate or changed collector authorities', function (Closure $mutate): void {
@@ -276,6 +280,42 @@ it('verifies one signed coherent collector deployment outage revocation and repl
     ]);
 });
 
+it('binds publication to the exact signed collector review and detached signature bytes', function (): void {
+    $keyPair = sodium_crypto_sign_keypair();
+    $publicKey = sodium_crypto_sign_publickey($keyPair);
+    $secretKey = sodium_crypto_sign_secretkey($keyPair);
+    $authority = collectorReleaseAuthority($publicKey);
+    $firstDataset = collectorReleaseDataset($authority);
+    $secondDataset = $firstDataset;
+    $secondDataset['evidence']['outage']['correlation_reference_sha256'] = hash('sha256', 'changed-correlation-review');
+    $firstRaw = json_encode($firstDataset['evidence'], JSON_THROW_ON_ERROR);
+    $secondRaw = json_encode($secondDataset['evidence'], JSON_THROW_ON_ERROR);
+    $firstSignature = sodium_crypto_sign_detached($firstRaw, $secretKey);
+    $secondSignature = sodium_crypto_sign_detached($secondRaw, $secretKey);
+    $verifier = new CollectorReleaseEvidenceVerifier;
+    $verify = static function (array $dataset, string $raw, string $signature) use ($verifier, $publicKey, $authority): array {
+        return $verifier->verify(
+            json_encode($dataset['active'], JSON_THROW_ON_ERROR),
+            json_encode($dataset['revoked'], JSON_THROW_ON_ERROR),
+            json_encode($dataset['replacement'], JSON_THROW_ON_ERROR),
+            $raw,
+            base64_encode($signature),
+            base64_encode($publicKey),
+            $authority,
+            new DateTimeImmutable('2026-08-10T01:00:00Z'),
+        );
+    };
+
+    $firstReport = $verify($firstDataset, $firstRaw, $firstSignature);
+    $secondReport = $verify($secondDataset, $secondRaw, $secondSignature);
+
+    expect($secondDataset['evidence']['evidence_reference'])->toBe($firstDataset['evidence']['evidence_reference'])
+        ->and($firstReport['signed_collector_evidence_sha256'])->toBe(hash('sha256', $firstRaw))
+        ->and($firstReport['detached_signature_sha256'])->toBe(hash('sha256', $firstSignature))
+        ->and($secondReport['signed_collector_evidence_sha256'])->not->toBe($firstReport['signed_collector_evidence_sha256'])
+        ->and($secondReport['detached_signature_sha256'])->not->toBe($firstReport['detached_signature_sha256']);
+});
+
 it('rejects a locally substituted collector release signer', function (): void {
     $approvedPair = sodium_crypto_sign_keypair();
     $authority = collectorReleaseAuthority(sodium_crypto_sign_publickey($approvedPair));
@@ -319,6 +359,14 @@ it('rejects mixed weak or incomplete collector release evidence even when correc
         $dataset['evidence']['deployment']['application_instances'] = 1;
         $dataset['evidence']['deployment']['reviewed_instances'] = 1;
     },
+    'dedicated CA proof is relabelled as proxy proof' => function (array &$dataset): void {
+        $dataset['evidence']['deployment']['proxy_configuration_sha256'] =
+            $dataset['evidence']['deployment']['dedicated_ca_configuration_sha256'];
+    },
+    'shared Redis proof is relabelled as routing proof' => function (array &$dataset): void {
+        $dataset['evidence']['deployment']['shared_redis_configuration_sha256'] =
+            $dataset['evidence']['deployment']['load_balancer_routing_reference_sha256'];
+    },
     'partial affected roster return' => function (array &$dataset): void {
         $dataset['evidence']['outage']['post_boundary_observations'] = 2;
     },
@@ -339,6 +387,25 @@ it('rejects mixed weak or incomplete collector release evidence even when correc
     },
     'outage chronology overlaps active transport' => function (array &$dataset): void {
         $dataset['evidence']['outage']['outage_started_at'] = '2026-08-10T00:05:30Z';
+    },
+    'replacement heartbeat predates replacement transport completion' => function (array &$dataset): void {
+        $dataset['evidence']['revocation']['replacement_heartbeat_observed_at'] = '2026-08-10T00:35:59Z';
+    },
+    'replacement token reuse denial predates replacement transport completion' => function (array &$dataset): void {
+        $dataset['evidence']['revocation']['replacement_token_reuse_denied_at'] = '2026-08-10T00:35:59Z';
+    },
+    'general token denial follows replacement heartbeat' => function (array &$dataset): void {
+        $dataset['evidence']['revocation']['general_site_token_denied_at'] = '2026-08-10T00:38:01Z';
+    },
+    'replacement heartbeat is stale when the exercise completes' => function (array &$dataset): void {
+        $dataset['evidence']['revocation']['replacement_heartbeat_observed_at'] = '2026-08-10T00:36:00Z';
+    },
+    'replacement heartbeat has no immutable evidence reference' => function (array &$dataset): void {
+        $dataset['evidence']['revocation']['replacement_heartbeat_reference_sha256'] = 'missing';
+    },
+    'one retained proof is reused for different exercise events' => function (array &$dataset): void {
+        $dataset['evidence']['revocation']['central_revocation_audit_reference_sha256'] =
+            $dataset['evidence']['credentialed_protocol']['observation_reference_sha256'];
     },
 ]);
 

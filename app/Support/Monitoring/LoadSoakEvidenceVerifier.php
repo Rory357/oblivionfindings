@@ -150,6 +150,7 @@ final class LoadSoakEvidenceVerifier
             $measurementContract,
             $roster,
         );
+        $measurementReferencesUnique = $this->measurementReferencesAreDistinct($samples, $recovery);
 
         $checks = [
             'exact_schema' => $topLevelSchema,
@@ -161,7 +162,8 @@ final class LoadSoakEvidenceVerifier
             'generator_scoped_zero_baseline_totals_and_exit' => $generatorResult['valid'],
             'continuous_runtime_sampling' => $sampleResult['continuous'],
             'all_samples_within_objectives' => $sampleResult['within_objectives'],
-            'measurement_provenance_and_sample_counts' => $sampleResult['measurements_valid'],
+            'measurement_provenance_and_sample_counts' => $sampleResult['measurements_valid']
+                && $measurementReferencesUnique,
             'complete_worker_listener_dependency_roster' => $sampleResult['runtime_available'],
             'bounded_zero_backlog_recovery' => $recoveryValid,
         ];
@@ -580,6 +582,27 @@ final class LoadSoakEvidenceVerifier
             && ($measurement['source_sha256'] ?? null) === ($contract['source_sha256'] ?? null)
             && ($measurement['metric_set_sha256'] ?? null) === ($contract['metric_set_sha256'] ?? null)
             && $this->sha256($measurement['observation_sha256'] ?? null) !== null;
+    }
+
+    private function measurementReferencesAreDistinct(array $samples, array $recovery): bool
+    {
+        if (! array_is_list($samples) || ! is_array($recovery['measurement'] ?? null)) {
+            return false;
+        }
+
+        $references = [];
+        foreach ([...$samples, $recovery] as $observation) {
+            $reference = is_array($observation)
+                && is_array($observation['measurement'] ?? null)
+                    ? $this->sha256($observation['measurement']['observation_sha256'] ?? null)
+                    : null;
+            if ($reference === null) {
+                return false;
+            }
+            $references[] = $reference;
+        }
+
+        return count($references) === count(array_unique($references, SORT_STRING));
     }
 
     private function runtimeObservationIsAvailable(array $observation, array $roster): bool

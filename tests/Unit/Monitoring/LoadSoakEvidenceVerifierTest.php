@@ -141,8 +141,12 @@ function validLoadSoakEvidence(): array
 }
 
 /** @return array{attestation: array<string, mixed>, public: string, pin: string} */
-function signedLoadSoakAttestation(array $evidence, string $rawEvidence): array
-{
+function signedLoadSoakAttestation(
+    array $evidence,
+    string $rawEvidence,
+    string $issuedAt = '2026-08-08T19:01:00Z',
+    string $expiresAt = '2026-08-09T19:00:00Z',
+): array {
     $keypair = sodium_crypto_sign_keypair();
     $public = sodium_crypto_sign_publickey($keypair);
     $secret = sodium_crypto_sign_secretkey($keypair);
@@ -157,8 +161,8 @@ function signedLoadSoakAttestation(array $evidence, string $rawEvidence): array
         'load_profile_sha256' => $evidence['load_profile']['profile_sha256'],
         'measurement_contract_sha256' => $evidence['measurement_contract']['contract_sha256'],
         'supervisor_observation_generation' => $evidence['runtime_roster']['supervisor_observation_generation'],
-        'issued_at' => '2026-08-08T19:01:00Z',
-        'expires_at' => '2027-08-08T19:01:00Z',
+        'issued_at' => $issuedAt,
+        'expires_at' => $expiresAt,
     ];
     $signature = sodium_crypto_sign_detached(
         LoadSoakPlatformAttestationVerifier::message($claims),
@@ -322,6 +326,20 @@ it('rejects substituted roster identities counter history profiles and measureme
         fn (array &$value) => $value['samples'][0]['measurement']['sample_count'] = 0,
         'measurement_provenance_and_sample_counts',
     ],
+    'reused interval measurement record' => [
+        function (array &$value): void {
+            $value['samples'][1]['measurement']['observation_sha256'] =
+                $value['samples'][0]['measurement']['observation_sha256'];
+        },
+        'measurement_provenance_and_sample_counts',
+    ],
+    'recovery reuses the final load measurement record' => [
+        function (array &$value): void {
+            $value['recovery']['measurement']['observation_sha256'] =
+                $value['samples'][59]['measurement']['observation_sha256'];
+        },
+        'measurement_provenance_and_sample_counts',
+    ],
 ]);
 
 it('rejects duplicate JSON object keys including escaped equivalents', function (string $json): void {
@@ -409,6 +427,36 @@ it('accepts only an exact protected release-authority record bound to the source
     ]);
 });
 
+it('rejects a freshly installed authority that attempts to relabel a pre-window platform attestation', function (): void {
+    $evidence = validLoadSoakEvidence();
+    $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $signed = signedLoadSoakAttestation(
+        $evidence,
+        $rawEvidence,
+        '2026-08-08T19:01:00Z',
+        '2026-08-10T19:00:00Z',
+    );
+    $rawAttestation = json_encode($signed['attestation'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    $authority = validLoadSoakReleaseAuthority($evidence, $rawEvidence, $signed);
+    $authority['not_before'] = '2026-08-09T19:00:00Z';
+    $authority['not_after'] = '2026-08-10T19:00:00Z';
+
+    $result = (new LoadSoakReleaseAuthorityVerifier)->verifyRecord(
+        json_encode($authority, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
+        protectedLoadSoakAuthorityMetadata(),
+        hash('sha256', $rawEvidence),
+        hash('sha256', $rawAttestation),
+        $evidence,
+        $signed['attestation'],
+        $signed['public'],
+        new DateTimeImmutable('2026-08-09T19:02:00Z'),
+    );
+
+    expect($result['valid'])->toBeFalse()
+        ->and($result['authority_reference'])->toBeNull()
+        ->and($result['public_key_sha256'])->toBeNull();
+});
+
 it('rejects tampered expired and duplicate-key release-authority records', function (string $failure): void {
     $evidence = validLoadSoakEvidence();
     $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
@@ -420,6 +468,8 @@ it('rejects tampered expired and duplicate-key release-authority records', funct
         $authority['source_sha256'] = str_repeat('0', 64);
     } elseif ($failure === 'expired') {
         $authority['not_after'] = '2026-08-08T19:01:59Z';
+    } elseif ($failure === 'long-lived') {
+        $authority['not_after'] = '2026-08-09T19:00:01Z';
     }
 
     $rawAuthority = json_encode($authority, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
@@ -447,7 +497,7 @@ it('rejects tampered expired and duplicate-key release-authority records', funct
         'authority_reference' => null,
         'public_key_sha256' => null,
     ]);
-})->with(['tampered source', 'expired', 'duplicate key']);
+})->with(['tampered source', 'expired', 'long-lived', 'duplicate key']);
 
 it('rejects an authority record without protected ownership mode and file identity', function (string $failure): void {
     $evidence = validLoadSoakEvidence();
@@ -495,7 +545,12 @@ it('writes a collision-safe test-authority artifact that cannot claim V09 releas
     mkdir($temporary, 0700, true);
     $evidence = validLoadSoakEvidence();
     $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-    $signed = signedLoadSoakAttestation($evidence, $rawEvidence);
+    $signed = signedLoadSoakAttestation(
+        $evidence,
+        $rawEvidence,
+        '2026-08-08T19:01:00Z',
+        '2027-08-08T19:01:00Z',
+    );
     $evidencePath = $temporary.DIRECTORY_SEPARATOR.'evidence.json';
     $attestationPath = $temporary.DIRECTORY_SEPARATOR.'attestation.json';
     $publicKeyPath = $temporary.DIRECTORY_SEPARATOR.'public-key.txt';
@@ -524,9 +579,12 @@ it('writes a collision-safe test-authority artifact that cannot claim V09 releas
             ->and($output['status'])->toBe('contract_valid_test_authority')
             ->and($output['authority_scope'])->toBe('test_only')
             ->and($output['release_provenance_verified'])->toBeFalse()
+            ->and($output['artifact_sha256'])->toMatch('/\A[a-f0-9]{64}\z/')
+            ->and($output['checksum_file'])->toBe(basename($artifacts[0]).'.sha256')
             ->and($artifacts)->toHaveCount(1);
 
         $artifact = json_decode((string) file_get_contents($artifacts[0]), true, 32, JSON_THROW_ON_ERROR);
+        $checksum = (string) file_get_contents($temporary.DIRECTORY_SEPARATOR.$output['checksum_file']);
         expect($artifact['source_sha256'])->toBe(hash_file('sha256', $evidencePath))
             ->and($artifact['source_contract_status'])->toBe('contract_valid')
             ->and($artifact['platform_attestation_verified'])->toBeTrue()
@@ -535,6 +593,8 @@ it('writes a collision-safe test-authority artifact that cannot claim V09 releas
             ->and($artifact['test_authority_can_close_v09'])->toBeFalse()
             ->and($artifact['output_storage_semantics'])->toBe('collision_safe_exclusive_create')
             ->and($artifact['worm_receipt_verified'])->toBeFalse()
+            ->and($output['artifact_sha256'])->toBe(hash_file('sha256', $artifacts[0]))
+            ->and($checksum)->toBe($output['artifact_sha256'].'  '.basename($artifacts[0]).PHP_EOL)
             ->and($artifact)->not->toHaveKeys(['target', 'hostname', 'credential', 'payload']);
     } finally {
         foreach (glob($temporary.DIRECTORY_SEPARATOR.'*') ?: [] as $path) {
@@ -575,7 +635,12 @@ it('does not execute ignored Composer autoload code in the verification path', f
 
     $evidence = validLoadSoakEvidence();
     $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-    $signed = signedLoadSoakAttestation($evidence, $rawEvidence);
+    $signed = signedLoadSoakAttestation(
+        $evidence,
+        $rawEvidence,
+        '2026-08-08T19:01:00Z',
+        '2027-08-08T19:01:00Z',
+    );
     $evidencePath = $temporary.DIRECTORY_SEPARATOR.'evidence.json';
     $attestationPath = $temporary.DIRECTORY_SEPARATOR.'attestation.json';
     $publicKeyPath = $temporary.DIRECTORY_SEPARATOR.'public-key.txt';

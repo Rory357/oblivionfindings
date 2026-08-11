@@ -73,33 +73,92 @@ if ($testAuthority) {
     }
 }
 
-$resolveInput = static function (string $path, int $maximumBytes) use ($fail): string {
+$readStableInput = static function (string $path, int $maximumBytes) use ($fail): array {
     if (is_link($path)) {
         $fail('paths');
     }
     $resolved = realpath($path);
-    $size = is_string($resolved) && is_file($resolved) ? filesize($resolved) : false;
-    if (! is_string($resolved) || ! is_int($size) || $size < 1 || $size > $maximumBytes) {
+    $before = is_string($resolved) ? @lstat($resolved) : false;
+    $handle = is_string($resolved) ? @fopen($resolved, 'rb') : false;
+    if (! is_string($resolved) || ! is_array($before) || $handle === false) {
         $fail('paths');
     }
 
-    return $resolved;
+    try {
+        $opened = @fstat($handle);
+        $size = is_array($opened) ? ($opened['size'] ?? null) : null;
+        $mode = is_array($opened) ? ($opened['mode'] ?? null) : null;
+        if (! is_array($opened)
+            || ! is_int($size)
+            || $size < 1
+            || $size > $maximumBytes
+            || ! is_int($mode)
+            || ($mode & 0170000) !== 0100000) {
+            $fail('paths');
+        }
+        $raw = stream_get_contents($handle, $maximumBytes + 1);
+        $read = @fstat($handle);
+        $after = @lstat($resolved);
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (! is_array($read)
+                || ! is_array($after)
+                || ! array_key_exists($key, $before)
+                || ! array_key_exists($key, $opened)
+                || ! array_key_exists($key, $read)
+                || ! array_key_exists($key, $after)
+                || $before[$key] !== $opened[$key]
+                || $opened[$key] !== $read[$key]
+                || $read[$key] !== $after[$key]) {
+                $fail('read');
+            }
+        }
+        if (! is_string($raw) || strlen($raw) !== $size) {
+            $fail('read');
+        }
+
+        return [
+            'path' => $resolved,
+            'raw' => $raw,
+            'identity' => array_intersect_key($after, array_flip(['dev', 'ino', 'mode', 'uid', 'size', 'mtime'])),
+        ];
+    } finally {
+        fclose($handle);
+    }
 };
 
-$evidencePath = $resolveInput($arguments['evidence'], 2_097_152);
-$attestationPath = $resolveInput($arguments['attestation'], 65_536);
-$publicKeyPath = $resolveInput($arguments['public-key'], 4_096);
+$inputs = [
+    'evidence' => $readStableInput($arguments['evidence'], 2_097_152),
+    'attestation' => $readStableInput($arguments['attestation'], 65_536),
+    'public_key' => $readStableInput($arguments['public-key'], 4_096),
+];
 $outputDirectory = realpath($arguments['output-directory']);
 if (! is_string($outputDirectory) || ! is_dir($outputDirectory) || ! is_writable($outputDirectory)) {
     $fail('paths');
 }
 
-$rawEvidence = file_get_contents($evidencePath);
-$rawAttestation = file_get_contents($attestationPath);
-$rawPublicKey = file_get_contents($publicKeyPath);
-if (! is_string($rawEvidence) || ! is_string($rawAttestation) || ! is_string($rawPublicKey)) {
-    $fail('read');
-}
+$rawEvidence = $inputs['evidence']['raw'];
+$rawAttestation = $inputs['attestation']['raw'];
+$rawPublicKey = $inputs['public_key']['raw'];
+$inputsRemainPinned = static function (array $records): bool {
+    foreach ($records as $record) {
+        $path = $record['path'] ?? null;
+        $identity = $record['identity'] ?? null;
+        if (! is_string($path) || ! is_array($identity) || is_link($path)) {
+            return false;
+        }
+        $after = @lstat($path);
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (! is_array($after)
+                || ! array_key_exists($key, $identity)
+                || ! array_key_exists($key, $after)
+                || $identity[$key] !== $after[$key]) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+};
 
 $decoder = new StrictJsonObjectDecoder;
 $evidence = null;
@@ -131,8 +190,9 @@ $verification = $evidence === null
     ]
     : (new LoadSoakEvidenceVerifier)->verify($evidence, $verifiedAt);
 
+$releaseAuthorityVerifier = new LoadSoakReleaseAuthorityVerifier;
 $releaseAuthority = ! $testAuthority && $evidence !== null && $attestation !== null
-    ? (new LoadSoakReleaseAuthorityVerifier)->verifyInstalled(
+    ? $releaseAuthorityVerifier->verifyInstalled(
         hash('sha256', $rawEvidence),
         hash('sha256', $rawAttestation),
         $evidence,
@@ -161,10 +221,11 @@ $attestationResult = $evidence !== null && $attestation !== null
 $contractValid = $verification['status'] === 'contract_valid';
 $attestationValid = $attestationResult['valid'] === true;
 $releaseAuthorityValid = $releaseAuthority['valid'] === true;
+$releaseCheckoutVerifier = new LoadSoakReleaseCheckoutVerifier;
 $releaseCheckoutValid = ! $testAuthority
     && $releaseAuthorityValid
     && is_string($verification['release_revision'] ?? null)
-    && (new LoadSoakReleaseCheckoutVerifier)->verify(
+    && $releaseCheckoutVerifier->verify(
         dirname(__DIR__, 2),
         $verification['release_revision'],
     );
@@ -179,6 +240,35 @@ $status = match (true) {
     $testContractValid => 'contract_valid_test_authority',
     default => 'failed',
 };
+
+$outputDirectoryBefore = @lstat($outputDirectory);
+$effectiveUid = function_exists('posix_geteuid') ? posix_geteuid() : false;
+if ($releaseProvenance) {
+    $applicationPath = realpath($root);
+    $relativeOutput = is_string($applicationPath)
+        ? str_starts_with($outputDirectory.DIRECTORY_SEPARATOR, rtrim($applicationPath, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR)
+        : true;
+    if (PHP_OS_FAMILY !== 'Linux'
+        || ! is_string($applicationPath)
+        || is_link($arguments['output-directory'])
+        || $relativeOutput
+        || ! is_array($outputDirectoryBefore)
+        || ! is_int($effectiveUid)
+        || (($outputDirectoryBefore['mode'] ?? 0) & 0170000) !== 0040000
+        || (($outputDirectoryBefore['mode'] ?? 0) & 0777) !== 0700
+        || ($outputDirectoryBefore['uid'] ?? null) !== $effectiveUid) {
+        $fail('output_directory_protection');
+    }
+    foreach ($inputs as $input) {
+        $path = $input['path'];
+        $identity = $input['identity'];
+        if (str_starts_with($path.DIRECTORY_SEPARATOR, rtrim($applicationPath, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR)
+            || (($identity['mode'] ?? 0) & 0022) !== 0
+            || ($identity['uid'] ?? null) !== $effectiveUid) {
+            $fail('input_protection');
+        }
+    }
+}
 
 $artifactId = bin2hex(random_bytes(16));
 $timestamp = $verifiedAt->format('Ymd\THis.u\Z');
@@ -227,42 +317,174 @@ $artifact = [
     'test_authority_can_close_v09' => false,
 ];
 $encoded = json_encode($artifact, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
-
-$handle = @fopen($artifactPath, 'x+b');
-if ($handle === false) {
-    $fail('artifact_create');
-}
-
-$committed = false;
-try {
-    $offset = 0;
-    $length = strlen($encoded);
-    while ($offset < $length) {
-        $written = fwrite($handle, substr($encoded, $offset));
-        if ($written === false || $written === 0) {
-            throw new RuntimeException('artifact_write');
+$artifactSha256 = hash('sha256', $encoded);
+$checksumFile = $artifactFile.'.sha256';
+$checksumPath = $outputDirectory.DIRECTORY_SEPARATOR.$checksumFile;
+$checksumEncoded = $artifactSha256.'  '.$artifactFile.PHP_EOL;
+$writeExclusive = static function (
+    string $path,
+    string $contents,
+    bool $privateReleaseOutput,
+) use ($effectiveUid): void {
+    $handle = @fopen($path, 'x+b');
+    if ($handle === false) {
+        throw new RuntimeException('artifact_create');
+    }
+    $created = true;
+    try {
+        if ($privateReleaseOutput && ! @chmod($path, 0600)) {
+            throw new RuntimeException('artifact_permissions');
         }
-        $offset += $written;
-    }
+        $opened = @fstat($handle);
+        if (! is_array($opened)
+            || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+            || ($privateReleaseOutput && (
+                (($opened['mode'] ?? 0) & 0777) !== 0600
+                || ($opened['uid'] ?? null) !== $effectiveUid
+            ))) {
+            throw new RuntimeException('artifact_permissions');
+        }
 
-    if (! fflush($handle)) {
-        throw new RuntimeException('artifact_flush');
+        $offset = 0;
+        $length = strlen($contents);
+        while ($offset < $length) {
+            $written = fwrite($handle, substr($contents, $offset));
+            if ($written === false || $written === 0) {
+                throw new RuntimeException('artifact_write');
+            }
+            $offset += $written;
+        }
+        if (! fflush($handle) || (function_exists('fsync') && ! fsync($handle))) {
+            throw new RuntimeException('artifact_flush');
+        }
+        $written = @fstat($handle);
+        $published = @lstat($path);
+        foreach (['dev', 'ino', 'mode', 'uid'] as $key) {
+            if (! is_array($written)
+                || ! is_array($published)
+                || ! array_key_exists($key, $opened)
+                || ! array_key_exists($key, $written)
+                || ! array_key_exists($key, $published)
+                || $opened[$key] !== $written[$key]
+                || $written[$key] !== $published[$key]) {
+                throw new RuntimeException('artifact_identity');
+            }
+        }
+        foreach (['size', 'mtime'] as $key) {
+            if (! is_array($written)
+                || ! is_array($published)
+                || ! array_key_exists($key, $written)
+                || ! array_key_exists($key, $published)
+                || $written[$key] !== $published[$key]) {
+                throw new RuntimeException('artifact_identity');
+            }
+        }
+        if (($written['size'] ?? null) !== $length) {
+            throw new RuntimeException('artifact_size');
+        }
+        $created = false;
+    } finally {
+        fclose($handle);
+        if ($created && is_file($path)) {
+            @unlink($path);
+        }
     }
-    if (function_exists('fsync') && ! fsync($handle)) {
-        throw new RuntimeException('artifact_sync');
+};
+
+$publishedRemainsExact = static function (
+    string $path,
+    string $expected,
+    bool $privateReleaseOutput,
+) use ($effectiveUid): bool {
+    if (is_link($path)) {
+        return false;
     }
-    $committed = true;
-} catch (Throwable) {
-    fclose($handle);
-    @unlink($artifactPath);
-    $fail('artifact_write');
-} finally {
-    if (is_resource($handle)) {
+    $before = @lstat($path);
+    $handle = @fopen($path, 'rb');
+    if (! is_array($before) || $handle === false) {
+        return false;
+    }
+    try {
+        $opened = @fstat($handle);
+        $contents = stream_get_contents($handle, strlen($expected) + 1);
+        $read = @fstat($handle);
+        $final = @lstat($path);
+        if (! is_array($opened)
+            || ! is_array($read)
+            || ! is_array($final)
+            || ! is_string($contents)
+            || ! hash_equals($expected, $contents)
+            || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+            || ($privateReleaseOutput && (
+                (($opened['mode'] ?? 0) & 0777) !== 0600
+                || ($opened['uid'] ?? null) !== $effectiveUid
+            ))) {
+            return false;
+        }
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (($before[$key] ?? null) !== ($opened[$key] ?? null)
+                || ($opened[$key] ?? null) !== ($read[$key] ?? null)
+                || ($read[$key] ?? null) !== ($final[$key] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
+    } finally {
         fclose($handle);
     }
-    if (! $committed && is_file($artifactPath)) {
+};
+
+$artifactPublished = false;
+$checksumPublished = false;
+try {
+    $writeExclusive($artifactPath, $encoded, $releaseProvenance);
+    $artifactPublished = true;
+    $writeExclusive($checksumPath, $checksumEncoded, $releaseProvenance);
+    $checksumPublished = true;
+
+    if (! $inputsRemainPinned($inputs)) {
+        throw new RuntimeException('input_changed');
+    }
+    if ($releaseProvenance) {
+        $publishedAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+        $releaseAuthorityFinal = $releaseAuthorityVerifier->verifyInstalled(
+            hash('sha256', $rawEvidence),
+            hash('sha256', $rawAttestation),
+            $evidence,
+            $attestation,
+            $rawPublicKey,
+            $publishedAt,
+        );
+        if (($releaseAuthorityFinal['valid'] ?? null) !== true
+            || ! hash_equals((string) $releaseAuthority['authority_reference'], (string) $releaseAuthorityFinal['authority_reference'])
+            || ! hash_equals((string) $releaseAuthority['public_key_sha256'], (string) $releaseAuthorityFinal['public_key_sha256'])
+            || ! $releaseCheckoutVerifier->verify($root, (string) $verification['release_revision'])) {
+            throw new RuntimeException('release_identity_changed');
+        }
+    }
+    $outputDirectoryAfter = @lstat($outputDirectory);
+    foreach (['dev', 'ino', 'mode', 'uid'] as $key) {
+        if (! is_array($outputDirectoryBefore)
+            || ! is_array($outputDirectoryAfter)
+            || ! array_key_exists($key, $outputDirectoryBefore)
+            || ! array_key_exists($key, $outputDirectoryAfter)
+            || $outputDirectoryBefore[$key] !== $outputDirectoryAfter[$key]) {
+            throw new RuntimeException('output_directory_changed');
+        }
+    }
+    if (! $publishedRemainsExact($artifactPath, $encoded, $releaseProvenance)
+        || ! $publishedRemainsExact($checksumPath, $checksumEncoded, $releaseProvenance)) {
+        throw new RuntimeException('published_artifact_changed');
+    }
+} catch (Throwable) {
+    if ($artifactPublished) {
         @unlink($artifactPath);
     }
+    if ($checksumPublished) {
+        @unlink($checksumPath);
+    }
+    $fail('artifact_write');
 }
 
 fwrite(STDOUT, json_encode([
@@ -270,6 +492,8 @@ fwrite(STDOUT, json_encode([
     'authority_scope' => $artifact['authority_scope'],
     'artifact_id' => $artifactId,
     'artifact_file' => $artifactFile,
+    'artifact_sha256' => $artifactSha256,
+    'checksum_file' => $checksumFile,
     'release_provenance_verified' => $releaseProvenance,
     'release_authority_verified' => $releaseAuthorityValid,
     'release_checkout_verified' => $releaseCheckoutValid,

@@ -144,7 +144,8 @@ it('requires the fixed protected release authority and cannot trust a caller sup
 
     expect($verified['release_revision'])->toBe(str_repeat('d', 40))
         ->and($verified['key_reference'])->toBe($record['key_reference'])
-        ->and($verified['public_key'])->toBe(productionRetentionPublicKey());
+        ->and($verified['public_key'])->toBe(productionRetentionPublicKey())
+        ->and($verified['authority_sha256'])->toBe(hash('sha256', json_encode($record, JSON_THROW_ON_ERROR)));
 
     expect(fn () => $verifier->verifyRecord(
         json_encode($record, JSON_THROW_ON_ERROR),
@@ -172,6 +173,30 @@ it('requires the fixed protected release authority and cannot trust a caller sup
         str_repeat('d', 40),
         CarbonImmutable::now('UTC'),
     ))->toThrow(RuntimeException::class, 'public key is unavailable');
+});
+
+it('pins the complete protected authority rather than only its release and attestation key', function (): void {
+    $now = CarbonImmutable::parse('2026-08-09T12:00:00Z');
+    $record = productionRetentionReleaseAuthority($now);
+    $replacement = $record;
+    $replacement['valid_until_utc'] = $now->addHours(2)->format('Y-m-d\TH:i:s\Z');
+    $verifier = new ProductionRetentionReleaseAuthority;
+
+    $initial = $verifier->verifyRecord(
+        json_encode($record, JSON_THROW_ON_ERROR),
+        productionRetentionProtectedAuthorityMetadata(),
+        $now,
+    );
+    $changedWindow = $verifier->verifyRecord(
+        json_encode($replacement, JSON_THROW_ON_ERROR),
+        productionRetentionProtectedAuthorityMetadata(),
+        $now,
+    );
+
+    expect($changedWindow['release_revision'])->toBe($initial['release_revision'])
+        ->and($changedWindow['key_reference'])->toBe($initial['key_reference'])
+        ->and($changedWindow['public_key'])->toBe($initial['public_key'])
+        ->and($changedWindow['authority_sha256'])->not->toBe($initial['authority_sha256']);
 });
 
 it('rejects every local fixture and incomplete endpoint combination as A05 production evidence', function (): void {
@@ -303,6 +328,72 @@ it('cleans the completed artifact when checksum publication collides', function 
             ->and(file_get_contents($checksum))->toBe('existing');
     } finally {
         unlink($checksum);
+        rmdir($directory);
+    }
+});
+
+it('removes the newly published pair when the final release identity check fails', function (): void {
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'retention-evidence-'.bin2hex(random_bytes(8));
+    mkdir($directory, 0700);
+    if (DIRECTORY_SEPARATOR !== '\\') {
+        chmod($directory, 0700);
+    }
+    $report = productionRetentionReport('018f47a8-674f-7d2c-9f1c-9d5f82f7d128');
+
+    try {
+        expect(fn () => productionRetentionWriter()->write(
+            $directory,
+            $report,
+            beforeCommit: fn () => throw new RuntimeException('release identity changed'),
+        ))->toThrow(RuntimeException::class, 'could not be created');
+        expect(glob($directory.DIRECTORY_SEPARATOR.'*') ?: [])->toBe([]);
+    } finally {
+        rmdir($directory);
+    }
+});
+
+it('removes the pair when an artifact is replaced during the final release identity check', function (): void {
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'retention-evidence-'.bin2hex(random_bytes(8));
+    mkdir($directory, 0700);
+    if (DIRECTORY_SEPARATOR !== '\\') {
+        chmod($directory, 0700);
+    }
+    $report = productionRetentionReport('018f47a8-674f-7d2c-9f1c-9d5f82f7d128');
+
+    try {
+        expect(fn () => productionRetentionWriter()->write(
+            $directory,
+            $report,
+            beforeCommit: function () use ($directory): void {
+                $artifact = collect(glob($directory.DIRECTORY_SEPARATOR.'*.json') ?: [])->first();
+                if (! is_string($artifact)) {
+                    throw new RuntimeException('artifact missing');
+                }
+                file_put_contents($artifact, str_repeat('x', (int) filesize($artifact)));
+            },
+        ))->toThrow(RuntimeException::class, 'could not be created');
+        expect(glob($directory.DIRECTORY_SEPARATOR.'*') ?: [])->toBe([]);
+    } finally {
+        rmdir($directory);
+    }
+});
+
+it('requires exact service-private directory mode for release evidence', function (): void {
+    if (DIRECTORY_SEPARATOR === '\\') {
+        expect(true)->toBeTrue();
+
+        return;
+    }
+
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'retention-evidence-'.bin2hex(random_bytes(8));
+    mkdir($directory, 0750);
+    chmod($directory, 0750);
+
+    try {
+        expect(fn () => productionRetentionWriter()->validateDirectory($directory))
+            ->toThrow(RuntimeException::class, 'private to the service account');
+    } finally {
+        chmod($directory, 0700);
         rmdir($directory);
     }
 });

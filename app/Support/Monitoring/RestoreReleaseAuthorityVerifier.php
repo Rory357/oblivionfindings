@@ -26,6 +26,7 @@ final class RestoreReleaseAuthorityVerifier
         'recovery_started_at_utc',
         'release_revision',
         'restored_environment_reference_sha256',
+        'restored_runtime_commitment_sha256',
         'schema_version',
         'valid_from_utc',
         'valid_until_utc',
@@ -124,6 +125,7 @@ final class RestoreReleaseAuthorityVerifier
             || ! $this->sha($authority['backup_manifest_sha256'] ?? null)
             || ! $this->sha($authority['release_revision'] ?? null, 40)
             || ! $this->sha($authority['restored_environment_reference_sha256'] ?? null)
+            || ! $this->sha($authority['restored_runtime_commitment_sha256'] ?? null)
             || ! is_int($maximumRpo)
             || $maximumRpo < 1
             || $maximumRpo > 10_080
@@ -156,6 +158,7 @@ final class RestoreReleaseAuthorityVerifier
             'recovery_started_at_utc' => $authority['recovery_started_at_utc'],
             'release_revision' => $authority['release_revision'],
             'restored_environment_reference_sha256' => $authority['restored_environment_reference_sha256'],
+            'restored_runtime_commitment_sha256' => $authority['restored_runtime_commitment_sha256'],
         ];
     }
 

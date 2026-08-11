@@ -19,7 +19,9 @@ The protected deployment control plane must install exactly
 `/etc/oblivion/security-devices-s10-release-authority.json`. There is no CLI or
 environment override for this path. The file must be a root-owned regular file,
 not a symlink, with no group or other write permission. Its path identity must
-remain stable while read.
+remain stable while read. The verifier requires device, inode, mode, owner,
+size and modification time to remain exact before opening, through the
+completed read and at the fixed path afterward.
 
 The duplicate-free exact JSON schema is:
 
@@ -65,7 +67,7 @@ authority, dirty checkout, missing Git metadata, changed revision or changed
 identity fails closed. An artifact-only deployment without verifiable checkout
 metadata cannot use a caller-supplied revision as a substitute.
 
-The orchestrator bootstraps only its five exact tracked support sources and
+The orchestrator bootstraps only its six exact tracked support sources and
 never executes the ignored Composer autoloader before the checkout decision.
 Git and child-process supervision use a bounded shell-free native process runner.
 Git inspection uses the fixed root-owned `/usr/bin/git`, disables ambient
@@ -87,10 +89,18 @@ pretend that ignored/generated dependencies, built assets or runtime
 configuration are Git source. Those remain separately governed by
 deployment/runtime attestation and V10 release packaging.
 
+Each sustained child is read through a stable non-symlink file handle, matched
+byte-for-byte to its exact `HEAD` Git blob, and those captured bytes—not the
+checkout path—are supplied to the protected Bash process through standard
+input. A child script temporarily replaced between the clean pre/post Git
+snapshots therefore cannot execute and then hide by restoring the tracked file.
+
 ## Execute
 
 Create an approved private output directory outside the application checkout.
-Run from the deployed release root:
+It must be owned by the application service account and have exact POSIX mode
+`0700`; a merely writable shared or temporary directory is ineligible. Run from
+the deployed release root:
 
 ```bash
 php scripts/monitoring/verify-s10-release-evidence.php \
@@ -122,22 +132,36 @@ either child payload into the combined artifact.
 ## Result and retention
 
 Success creates one collision-safe
-`security-devices-s10-release-evidence-<timestamp>-<random>.json` file using
-exclusive creation, flush and filesystem sync. The value-free artifact contains
+`security-devices-s10-release-evidence-<timestamp>-<random>.json` file and its
+matching `.sha256` sidecar. Both use exclusive creation, exact mode `0600`, the
+service-account owner, complete-write checks, flush and filesystem sync; a
+collision never removes or overwrites an existing file, and a sidecar failure
+removes only the newly created artifact. The value-free artifact contains
 the exact release revision, environment, protected-runtime hash and authority references, both child
 SHA-256 values, bounded time/count summaries, the two provider labels, native
 Queclink transport label and explicit release-provenance result. It contains no
 Site, Device, tracker, target, endpoint, credential, provider response, frame,
 payload or observation value.
 
-Exclusive creation prevents accidental overwrite; it does not prove immutable
-retention, and the artifact records `worm_receipt_verified: false`. Move the
-completed file through the approved release-evidence process and retain the
-storage receipt separately. Attach the combined artifact to the
+Exclusive creation and the checksum pair prevent accidental overwrite and make
+later change detectable; they do not prove immutable retention, and the
+artifact records `worm_receipt_verified: false`. After the final authority and
+checkout checks, the gate reopens both output files and requires their exact
+bytes, private owner/mode and stable identities before emitting success. Independently validate the
+sidecar, move both files through the approved release-evidence process and
+retain the storage receipt separately. Attach the combined artifact to the
 same release record as supervised process timestamps, approved target/provider
 audit references and final desktop evidence. This artifact closes only the S10
 deployed common-contract gate; it does not independently close A07, V10 or the
 overall goal.
+
+Immediately before reopening the outputs, the gate revalidates the protected
+authority and clean checkout. The final authority must still be current and
+byte-identical, and `HEAD` must still equal `origin/main` with no tracked or
+untracked source change. It revalidates the protected authority and clean
+checkout before reopening the outputs, making the exact-byte/private-identity
+check the terminal gate before stdout success. A replacement, expiry, checkout
+change or output replacement removes the newly published pair and fails closed.
 
 On failure, do not edit timestamps, provider cursors, connection-test state,
 tracker frames, the authority file or the checkout to make the gate pass. Repair

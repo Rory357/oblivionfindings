@@ -190,6 +190,9 @@ final class RecordProductionMonitoringRetentionEvidence extends Command
             ) && hash_equals(
                 $authority['public_key'],
                 $currentAuthority['public_key'],
+            ) && hash_equals(
+                $authority['authority_sha256'],
+                $currentAuthority['authority_sha256'],
             );
         } catch (Throwable) {
             $authorityIsCurrent = false;
@@ -204,7 +207,39 @@ final class RecordProductionMonitoringRetentionEvidence extends Command
         }
 
         try {
-            $artifact = $writer->write($outputDirectory, $report, $authority['public_key']);
+            $artifact = $writer->write(
+                $outputDirectory,
+                $report,
+                $authority['public_key'],
+                function () use (
+                    $approvedEndpoints,
+                    $authority,
+                    $endpointAttestation,
+                    $endpointProbe,
+                    $releaseAuthority,
+                    $releaseCheckout,
+                    $settings,
+                ): void {
+                    $finalFingerprints = $endpointProbe->fingerprints($settings);
+                    $endpointAttestation->verify(
+                        $approvedEndpoints,
+                        $finalFingerprints,
+                        $authority['release_revision'],
+                        null,
+                        $authority['public_key'],
+                    );
+                    if (! $releaseCheckout->verify(base_path(), $authority['release_revision'])) {
+                        throw new \RuntimeException('Release checkout changed during evidence publication.');
+                    }
+                    $finalAuthority = $releaseAuthority->loadInstalled();
+                    if (! hash_equals($authority['release_revision'], $finalAuthority['release_revision'])
+                        || ! hash_equals($authority['key_reference'], $finalAuthority['key_reference'])
+                        || ! hash_equals($authority['public_key'], $finalAuthority['public_key'])
+                        || ! hash_equals($authority['authority_sha256'], $finalAuthority['authority_sha256'])) {
+                        throw new \RuntimeException('Release authority changed during evidence publication.');
+                    }
+                },
+            );
         } catch (Throwable) {
             return $this->finish(['evidence_artifact_write_failed']);
         }

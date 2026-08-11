@@ -26,7 +26,7 @@ final class ProductionRetentionReleaseAuthority
     /**
      * The production gate deliberately has no caller-selectable authority path.
      *
-     * @return array{release_revision: string, key_reference: string, public_key: string}
+     * @return array{release_revision: string, key_reference: string, public_key: string, authority_sha256: string}
      */
     public function loadInstalled(?CarbonImmutable $now = null): array
     {
@@ -61,6 +61,12 @@ final class ProductionRetentionReleaseAuthority
                 throw new RuntimeException('Production retention release authority is invalid.');
             }
 
+            $read = @fstat($handle);
+            $final = @lstat(self::AUTHORITY_PATH);
+            if (! is_array($read) || ! is_array($final)) {
+                throw new RuntimeException('Production retention release authority is invalid.');
+            }
+
             $mode = $opened['mode'] ?? null;
 
             return $this->verifyRecord(
@@ -72,7 +78,9 @@ final class ProductionRetentionReleaseAuthority
                     'mode' => $mode,
                     'owner_uid' => $opened['uid'] ?? null,
                     'stable_identity' => $this->sameFile($before, $opened)
-                        && $this->sameFile($opened, $after),
+                        && $this->sameFile($opened, $after)
+                        && $this->sameFile($after, $read)
+                        && $this->sameFile($read, $final),
                 ],
                 $now,
             );
@@ -88,7 +96,7 @@ final class ProductionRetentionReleaseAuthority
      * Release callers must use loadInstalled().
      *
      * @param  array<string, mixed>  $metadata
-     * @return array{release_revision: string, key_reference: string, public_key: string}
+     * @return array{release_revision: string, key_reference: string, public_key: string, authority_sha256: string}
      */
     public function verifyRecord(
         string $rawAuthority,
@@ -154,6 +162,7 @@ final class ProductionRetentionReleaseAuthority
             'release_revision' => $releaseRevision,
             'key_reference' => $keyReference,
             'public_key' => $publicKey,
+            'authority_sha256' => hash('sha256', $rawAuthority),
         ];
     }
 
@@ -178,12 +187,14 @@ final class ProductionRetentionReleaseAuthority
     /** @param array<string|int, mixed> $left @param array<string|int, mixed> $right */
     private function sameFile(array $left, array $right): bool
     {
-        return isset($left['dev'], $left['ino'], $right['dev'], $right['ino'])
-            && is_int($left['dev'])
-            && is_int($left['ino'])
-            && is_int($right['dev'])
-            && is_int($right['ino'])
-            && $left['dev'] === $right['dev']
-            && $left['ino'] === $right['ino'];
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (! array_key_exists($key, $left)
+                || ! array_key_exists($key, $right)
+                || $left[$key] !== $right[$key]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

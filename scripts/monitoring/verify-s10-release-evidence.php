@@ -2,6 +2,7 @@
 <?php
 
 use App\Support\Monitoring\S10NativeProcessRunner;
+use App\Support\Monitoring\S10PinnedChildSource;
 use App\Support\Monitoring\S10ProcessEnvironment;
 use App\Support\Monitoring\S10ProtectedRuntimeEnvironment;
 use App\Support\Monitoring\S10ReleaseAuthorityVerifier;
@@ -14,6 +15,7 @@ $bootstrapFiles = [
     '/app/Support/Monitoring/S10ProtectedRuntimeEnvironment.php',
     '/app/Support/Monitoring/S10ReleaseAuthorityVerifier.php',
     '/app/Support/Monitoring/S10NativeProcessRunner.php',
+    '/app/Support/Monitoring/S10PinnedChildSource.php',
 ];
 
 foreach ($bootstrapFiles as $relativePath) {
@@ -31,13 +33,11 @@ const S10_BASH_BINARY = '/usr/bin/bash';
 const S10_PHP_BINARY = '/usr/bin/php8.4';
 const S10_CHILD_BOOTSTRAP = <<<'BASH'
 readonly S10_CHILD_PHP_BINARY="$OBLIVION_S10_PHP_BINARY"
-readonly S10_CHILD_SCRIPT="$1"
-shift
 php() {
     command "$S10_CHILD_PHP_BINARY" "$@"
 }
 readonly -f php
-source "$S10_CHILD_SCRIPT" "$@"
+source /dev/stdin "$@"
 BASH;
 
 $fail = static function (string $reason): never {
@@ -105,6 +105,15 @@ if (PHP_OS_FAMILY !== 'Linux'
     || ! is_writable($outputDirectory)) {
     $fail('paths');
 }
+$outputDirectoryBefore = @lstat($outputDirectory);
+$effectiveUid = function_exists('posix_geteuid') ? posix_geteuid() : false;
+if (! is_array($outputDirectoryBefore)
+    || ! is_int($effectiveUid)
+    || (($outputDirectoryBefore['mode'] ?? 0) & 0170000) !== 0040000
+    || (($outputDirectoryBefore['mode'] ?? 0) & 0777) !== 0700
+    || ($outputDirectoryBefore['uid'] ?? null) !== $effectiveUid) {
+    $fail('output_directory_protection');
+}
 $protectedExecutable = static function (string $path): bool {
     if (is_link($path) || ! is_file($path) || ! is_executable($path)) {
         return false;
@@ -139,7 +148,7 @@ if ($normalizedOutputDirectory === $normalizedApplicationPath
 }
 
 $authorityVerifier = new S10ReleaseAuthorityVerifier;
-$git = static function (array $arguments) use ($applicationPath, $gitEnvironment, $processRunner): ?string {
+$git = static function (array $arguments, bool $preserveOutput = false) use ($applicationPath, $gitEnvironment, $processRunner): ?string {
     try {
         $result = $processRunner->run(
             [
@@ -161,7 +170,7 @@ $git = static function (array $arguments) use ($applicationPath, $gitEnvironment
             return null;
         }
 
-        return trim($result['stdout']);
+        return $preserveOutput ? $result['stdout'] : trim($result['stdout']);
     } catch (Throwable) {
         return null;
     }
@@ -196,7 +205,7 @@ $identitySnapshot = static function () use ($authorityVerifier, $fail, $git, $no
     return [...$authority, 'verified_at' => $verifiedAt];
 };
 
-$runChild = static function (array $command, array $environment, int $timeoutSeconds, string $failure) use (
+$runChild = static function (array $command, array $environment, int $timeoutSeconds, string $failure, string $source) use (
     $applicationPath,
     $fail,
     $processRunner,
@@ -206,6 +215,8 @@ $runChild = static function (array $command, array $environment, int $timeoutSec
         $applicationPath,
         $environment,
         $timeoutSeconds,
+        65_536,
+        $source,
     );
     $output = $result['stdout'];
     if (! $result['successful']
@@ -216,6 +227,23 @@ $runChild = static function (array $command, array $environment, int $timeoutSec
     }
 
     return $output;
+};
+$childSourceReader = new S10PinnedChildSource;
+$pinnedChildSource = static function (string $relativePath) use (
+    $applicationPath,
+    $childSourceReader,
+    $fail,
+    $git,
+): string {
+    $committed = $git(['cat-file', 'blob', 'HEAD:'.$relativePath], true);
+    $source = is_string($committed)
+        ? $childSourceReader->read($applicationPath.'/'.$relativePath, $committed)
+        : null;
+    if (! is_string($source)) {
+        $fail('child_source');
+    }
+
+    return $source;
 };
 
 $hasExactKeys = static function (array $value, array $expected): bool {
@@ -271,6 +299,7 @@ $validateWindow = static function (
 };
 
 $protocolBefore = $identitySnapshot();
+$protocolSource = $pinnedChildSource('scripts/monitoring/verify-protocol-policy-evidence.sh');
 $protocolEnvironment = (new S10ProtectedRuntimeEnvironment)->loadInstalled(
     (string) $protocolBefore['runtime_environment_sha256'],
     $resolvedPhpBinary,
@@ -283,12 +312,11 @@ $protocolRaw = $runChild([
     '-c',
     S10_CHILD_BOOTSTRAP,
     'oblivion-s10-child',
-    $applicationPath.'/scripts/monitoring/verify-protocol-policy-evidence.sh',
     '--application-path='.$applicationPath,
     '--samples='.$protocolSamples,
     '--interval-seconds='.$intervalSeconds,
     '--window-minutes='.$windowMinutes,
-], $protocolEnvironment, (($protocolSamples - 1) * $intervalSeconds) + 300, 'protocol_policy_evidence');
+], $protocolEnvironment, (($protocolSamples - 1) * $intervalSeconds) + 300, 'protocol_policy_evidence', $protocolSource);
 $protocolAfter = $identitySnapshot();
 
 try {
@@ -321,6 +349,7 @@ if (! $hasExactKeys($protocol, [
 }
 
 $queclinkBefore = $identitySnapshot();
+$queclinkSource = $pinnedChildSource('scripts/monitoring/verify-queclink-native-listener-evidence.sh');
 $queclinkEnvironment = (new S10ProtectedRuntimeEnvironment)->loadInstalled(
     (string) $queclinkBefore['runtime_environment_sha256'],
     $resolvedPhpBinary,
@@ -333,12 +362,11 @@ $queclinkRaw = $runChild([
     '-c',
     S10_CHILD_BOOTSTRAP,
     'oblivion-s10-child',
-    $applicationPath.'/scripts/monitoring/verify-queclink-native-listener-evidence.sh',
     '--application-path='.$applicationPath,
     '--samples='.$queclinkSamples,
     '--interval-seconds='.$intervalSeconds,
     '--max-frame-age='.$maxFrameAge,
-], $queclinkEnvironment, (($queclinkSamples - 1) * $intervalSeconds) + 300, 'queclink_native_listener_evidence');
+], $queclinkEnvironment, (($queclinkSamples - 1) * $intervalSeconds) + 300, 'queclink_native_listener_evidence', $queclinkSource);
 $queclinkAfter = $identitySnapshot();
 
 try {
@@ -377,6 +405,11 @@ if (! $hasExactKeys($queclink, [
 }
 
 $snapshots = [$protocolBefore, $protocolAfter, $queclinkBefore, $queclinkAfter];
+if (! $authorityVerifier->identitiesRemainPinned($snapshots)) {
+    $fail('release_identity_changed');
+}
+$publicationBefore = $identitySnapshot();
+$snapshots[] = $publicationBefore;
 if (! $authorityVerifier->identitiesRemainPinned($snapshots)) {
     $fail('release_identity_changed');
 }
@@ -421,43 +454,168 @@ $artifact = [
     'worm_receipt_verified' => false,
 ];
 $encoded = json_encode($artifact, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
-
-$handle = @fopen($artifactPath, 'x+b');
-if ($handle === false) {
-    $fail('artifact_create');
-}
-$committed = false;
-try {
-    $offset = 0;
-    $length = strlen($encoded);
-    while ($offset < $length) {
-        $written = fwrite($handle, substr($encoded, $offset));
-        if ($written === false || $written === 0) {
-            throw new RuntimeException('artifact_write');
+$artifactSha256 = hash('sha256', $encoded);
+$checksumFile = $artifactFile.'.sha256';
+$checksumPath = $outputDirectory.DIRECTORY_SEPARATOR.$checksumFile;
+$checksumEncoded = $artifactSha256.'  '.$artifactFile.PHP_EOL;
+$writeExclusivePrivate = static function (string $path, string $contents) use ($effectiveUid): void {
+    $handle = @fopen($path, 'x+b');
+    if ($handle === false) {
+        throw new RuntimeException('artifact_create');
+    }
+    $created = true;
+    try {
+        if (! @chmod($path, 0600)) {
+            throw new RuntimeException('artifact_permissions');
         }
-        $offset += $written;
+        $opened = @fstat($handle);
+        if (! is_array($opened)
+            || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+            || (($opened['mode'] ?? 0) & 0777) !== 0600
+            || ($opened['uid'] ?? null) !== $effectiveUid) {
+            throw new RuntimeException('artifact_permissions');
+        }
+
+        $offset = 0;
+        $length = strlen($contents);
+        while ($offset < $length) {
+            $written = fwrite($handle, substr($contents, $offset));
+            if ($written === false || $written === 0) {
+                throw new RuntimeException('artifact_write');
+            }
+            $offset += $written;
+        }
+        if (! fflush($handle) || (function_exists('fsync') && ! fsync($handle))) {
+            throw new RuntimeException('artifact_flush');
+        }
+        $written = @fstat($handle);
+        $published = @lstat($path);
+        foreach (['dev', 'ino', 'mode', 'uid'] as $key) {
+            if (! is_array($written)
+                || ! is_array($published)
+                || ! array_key_exists($key, $opened)
+                || ! array_key_exists($key, $written)
+                || ! array_key_exists($key, $published)
+                || $opened[$key] !== $written[$key]
+                || $written[$key] !== $published[$key]) {
+                throw new RuntimeException('artifact_identity');
+            }
+        }
+        foreach (['size', 'mtime'] as $key) {
+            if (! is_array($written)
+                || ! is_array($published)
+                || ! array_key_exists($key, $written)
+                || ! array_key_exists($key, $published)
+                || $written[$key] !== $published[$key]) {
+                throw new RuntimeException('artifact_identity');
+            }
+        }
+        if (($written['size'] ?? null) !== $length) {
+            throw new RuntimeException('artifact_size');
+        }
+        $created = false;
+    } finally {
+        fclose($handle);
+        if ($created && is_file($path)) {
+            @unlink($path);
+        }
     }
-    if (! fflush($handle) || (function_exists('fsync') && ! fsync($handle))) {
-        throw new RuntimeException('artifact_flush');
+};
+
+$publishedRemainsExact = static function (string $path, string $expected) use ($effectiveUid): bool {
+    if (is_link($path)) {
+        return false;
     }
-    $committed = true;
-} catch (Throwable) {
-    fclose($handle);
-    @unlink($artifactPath);
-    $fail('artifact_write');
-} finally {
-    if (is_resource($handle)) {
+    $before = @lstat($path);
+    $handle = @fopen($path, 'rb');
+    if (! is_array($before) || $handle === false) {
+        return false;
+    }
+    try {
+        $opened = @fstat($handle);
+        $contents = stream_get_contents($handle, strlen($expected) + 1);
+        $read = @fstat($handle);
+        $final = @lstat($path);
+        if (! is_array($opened)
+            || ! is_array($read)
+            || ! is_array($final)
+            || ! is_string($contents)
+            || ! hash_equals($expected, $contents)
+            || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+            || (($opened['mode'] ?? 0) & 0777) !== 0600
+            || ($opened['uid'] ?? null) !== $effectiveUid) {
+            return false;
+        }
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (($before[$key] ?? null) !== ($opened[$key] ?? null)
+                || ($opened[$key] ?? null) !== ($read[$key] ?? null)
+                || ($read[$key] ?? null) !== ($final[$key] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
+    } finally {
         fclose($handle);
     }
-    if (! $committed && is_file($artifactPath)) {
+};
+
+$artifactPublished = false;
+$checksumPublished = false;
+try {
+    $writeExclusivePrivate($artifactPath, $encoded);
+    $artifactPublished = true;
+    $writeExclusivePrivate($checksumPath, $checksumEncoded);
+    $checksumPublished = true;
+    $outputDirectoryAfter = @lstat($outputDirectory);
+    foreach (['dev', 'ino', 'mode', 'uid'] as $key) {
+        if (! is_array($outputDirectoryAfter)
+            || ! array_key_exists($key, $outputDirectoryBefore)
+            || ! array_key_exists($key, $outputDirectoryAfter)
+            || $outputDirectoryBefore[$key] !== $outputDirectoryAfter[$key]) {
+            throw new RuntimeException('output_directory_changed');
+        }
+    }
+} catch (Throwable) {
+    if ($artifactPublished) {
         @unlink($artifactPath);
     }
+    if ($checksumPublished) {
+        @unlink($checksumPath);
+    }
+    $fail('artifact_write');
+}
+
+$publicationAfter = $authorityVerifier->verifyInstalled(
+    new DateTimeImmutable('now', new DateTimeZone('UTC')),
+);
+$snapshots[] = $publicationAfter;
+$finalHead = $git(['rev-parse', '--verify', 'HEAD']);
+$finalOriginMain = $git(['rev-parse', '--verify', 'refs/remotes/origin/main']);
+$finalStatus = $git(['status', '--porcelain=v1', '--untracked-files=all']);
+if (! $authorityVerifier->identitiesRemainPinned($snapshots)
+    || ! is_string($finalHead)
+    || ! hash_equals((string) $artifact['release_revision'], $finalHead)
+    || ! is_string($finalOriginMain)
+    || ! hash_equals($finalHead, $finalOriginMain)
+    || $finalStatus !== '') {
+    @unlink($artifactPath);
+    @unlink($checksumPath);
+    $fail('release_identity_changed');
+}
+if (! $publishedRemainsExact($artifactPath, $encoded)
+    || ! $publishedRemainsExact($checksumPath, $checksumEncoded)) {
+    @unlink($artifactPath);
+    @unlink($checksumPath);
+    $fail('published_artifact_changed');
 }
 
 fwrite(STDOUT, json_encode([
     'status' => 'passed',
     'artifact_id' => $artifactId,
     'artifact_file' => $artifactFile,
+    'artifact_sha256' => $artifactSha256,
+    'checksum_file' => $checksumFile,
     'release_revision' => $artifact['release_revision'],
     'environment_reference_sha256' => $artifact['environment_reference_sha256'],
     'release_provenance_verified' => true,

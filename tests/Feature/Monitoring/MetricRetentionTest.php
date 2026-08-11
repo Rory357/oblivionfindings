@@ -835,6 +835,43 @@ it('detects both count loss and payload mutation anywhere inside a due legal-hol
         ->and($countMismatch['errors'])->toContain('legal_hold_preservation_gap');
 });
 
+it('captures a legal-hold cohort only when it is eligible under the same aligned retention cutoff', function (): void {
+    [, , $monitor] = metricRetentionMonitor();
+    $ingest = app(MetricIngestService::class);
+    $now = CarbonImmutable::parse('2026-07-23T12:15:00Z');
+    MonitoringRetentionPolicy::query()->create([
+        'name' => 'Aligned legal-hold cohort proof',
+        'scope_kind' => 'device',
+        'device_id' => $monitor->device_id,
+        'raw_days' => 1,
+        'hourly_days' => 1,
+        'daily_days' => 1,
+        'legal_hold' => true,
+        'is_active' => true,
+    ]);
+
+    $ingest->write($monitor, new MetricSample(
+        metric: 'device.temperature',
+        value: 18.4,
+        unit: 'celsius',
+        observedAt: CarbonImmutable::parse('2026-07-22T12:05:00Z'),
+    ));
+    $verifier = app(ProductionRetentionEvidenceVerifier::class);
+
+    expect(RetentionEnforcer::retentionCutoff('raw', $now, 1))
+        ->toEqual(CarbonImmutable::parse('2026-07-22T12:00:00Z'))
+        ->and($verifier->captureBefore($now)['held'])->toBe([]);
+
+    $ingest->write($monitor, new MetricSample(
+        metric: 'device.temperature',
+        value: 18.5,
+        unit: 'celsius',
+        observedAt: CarbonImmutable::parse('2026-07-22T11:00:00Z'),
+    ));
+
+    expect($verifier->captureBefore($now)['held'])->toHaveCount(1);
+});
+
 it('preserves payloads under legal hold and identifies missing restored pointers', function (): void {
     [, , $monitor] = metricRetentionMonitor();
     app(MetricIngestService::class)->write($monitor, new MetricSample(

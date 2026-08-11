@@ -8,6 +8,7 @@ it('keeps A10 production configuration history proof attested isolated value fre
         $root.'/app/Domain/Monitoring/Support/ConfigurationHistoryReleaseAuthority.php',
     );
     $service = (string) file_get_contents($root.'/app/Domain/Monitoring/Services/ConfigurationHistoryEvidenceService.php');
+    $writer = (string) file_get_contents($root.'/app/Domain/Monitoring/Services/ConfigurationHistoryEvidenceArtifactWriter.php');
     $runbook = (string) file_get_contents($root.'/docs/runbooks/monitoring/configuration-history-release-acceptance.md');
 
     expect($command)->toContain(
@@ -15,12 +16,25 @@ it('keeps A10 production configuration history proof attested isolated value fre
         '{--manifest=',
         '{--restore-evidence=',
         '{--browser-evidence=',
+        '{--output-directory=',
         '$contract->restoredRuntimeIsIsolated(',
-        'All three external evidence paths are required. No monitoring store was read.',
+        'All three external evidence paths and the output directory are required. No monitoring store was read.',
         'No target or configuration value was emitted.',
         'loadRestoreEvidence',
+        '$contract->assertProtectedEvidenceOutputDirectory(',
+        '$writer->validateDirectory(',
+        '$writer->write(',
+        "'restore_artifact_sha256' => \$restore['sha256']",
+        "'restored_environment_reference_sha256' => data_get(\$manifest, 'restore.restored_environment_reference_sha256')",
+        '$contract->loadProductionManifest($manifestPath, base_path()) !== $manifest',
+        '$contract->loadRestoreEvidence($restorePath, base_path()) !== $restore',
+        '$contract->loadBrowserEvidence($browserPath, base_path()) !== $browser',
+        "'publication' => 'collision_safe_exclusive_create'",
+        "'worm_receipt_verified' => false",
+        "'restore_artifact_sha256'",
+        "'restored_environment_reference_sha256'",
         'return $report[\'all_verified\'] ? self::SUCCESS : self::FAILURE;',
-    )->and(substr_count($command, '$contract->restoredRuntimeIsIsolated('))->toBe(2)
+    )->and(substr_count($command, '$contract->restoredRuntimeIsIsolated('))->toBe(3)
         ->and(strpos($command, '$contract->restoredRuntimeIsIsolated('))
         ->toBeLessThan(strpos($command, 'loadProductionManifest'))
         ->and(strrpos($command, '$contract->restoredRuntimeIsIsolated('))
@@ -52,6 +66,22 @@ it('keeps A10 production configuration history proof attested isolated value fre
         "'oblivion-a10-production-manifest-v2'",
         "'oblivion-a10-browser-evidence-v2'",
         "'changed_firmware_hmac_sha256'",
+        "'capture_sha256' => []",
+        "'network_trace_sha256' => []",
+        "'evidence_reference' => []",
+        '$retainedArtifactHashes = []',
+        "foreach (['capture_sha256', 'network_trace_sha256'] as \$hashField)",
+        'isset($retainedArtifactHashes[$viewport[$hashField]])',
+        'isset($viewportEvidence[$field][$viewport[$field]])',
+        'MAXIMUM_BROWSER_ARTIFACT_BYTES = 536_870_912',
+        'browserArtifactsAreRetained',
+        "'capture' => 'capture_sha256'",
+        "'network' => 'network_trace_sha256'",
+        "\$reference.'-'.\$viewportName.'.'.\$suffix",
+        'hash_update_stream($hash, $handle)',
+        '$this->sameFile($before, $opened)',
+        '$this->sameFile($opened, $read)',
+        '$this->sameFile($read, $final)',
         "'evidence_sha256'",
         "'recovery_objectives_met'",
         "'restore_release_evidence'",
@@ -69,6 +99,7 @@ it('keeps A10 production configuration history proof attested isolated value fre
         'Microsoft.PowerShell.Security.psd1',
         'Get-Acl -LiteralPath $path',
         '$acl.AreAccessRulesProtected',
+        'assertProtectedEvidenceOutputDirectory',
     )->not->toContain(
         "'target_reference_sha256'",
         "'baseline_firmware_sha256'",
@@ -87,7 +118,12 @@ it('keeps A10 production configuration history proof attested isolated value fre
         "'production_attestation_public_key_base64'",
         "'browser_attestation_public_key_base64'",
         "'hmac_key_sha256'",
+        "'backup_generation_reference'",
+        "'backup_manifest_sha256'",
         "'restored_environment_reference_sha256'",
+        "'restore_artifact_sha256'",
+        "'restore_authority_reference'",
+        "'restore_authority_sha256'",
         "'evidence_acl_reference'",
         'hash_equals($productionKey, $browserKey)',
         'MAXIMUM_AUTHORITY_SECONDS = 86_400',
@@ -121,6 +157,24 @@ it('keeps A10 production configuration history proof attested isolated value fre
         'hash(\'sha256\', (string) $series->external_key)',
     );
 
+    expect($writer)->toContain(
+        "'monitoring-configuration-history-release-evidence-v1'",
+        "'a10_release_evidence' => true",
+        "'publication' => 'collision_safe_exclusive_create'",
+        "'worm_receipt_verified' => false",
+        "fopen(\$path, 'xb')",
+        'chmod($path, 0600)',
+        'fflush($stream)',
+        'fsync($stream)',
+        '$beforeCommit();',
+        '$this->assertIdentity($directory, $directoryIdentity)',
+        '$this->assertPublished($path, $payload)',
+        '$this->assertPublished($checksumPath, $sha256.\'  \'.$filename.PHP_EOL)',
+        'hash_equals($expectedPayload, $contents)',
+        '$this->removeCreated($checksumPath, $exception)',
+        '$this->removeCreated($path, $exception)',
+    );
+
     expect($runbook)->toContain(
         'bounded A10 acceptance gate',
         'must never be labelled as production proof',
@@ -129,13 +183,20 @@ it('keeps A10 production configuration history proof attested isolated value fre
         '`/etc/oblivion/monitoring-configuration-history-release-authority.json`',
         'keyed HMAC',
         'verified restore reconciliation artifact',
+        'the exact V09 restore artifact, restore',
+        'immutable backup-manifest SHA-256 and backup-generation commitments',
         'Duplicate JSON object keys are rejected recursively',
         'private evidence directory',
         'recomputes the structural diff',
         'exact changed firmware commitment',
+        'all four retained artifact hashes are globally distinct',
         '`1440 x 900`',
         '`1280 x 800`',
+        'must each be distinct between the two required viewports',
+        'The gate streams and hashes all four files',
         '--restore-evidence=',
+        '--output-directory=',
+        'collision-safe JSON and adjacent `.sha256`',
         'This gate does not by itself close A05, V09, V10, deployment, or the overall release.',
     );
 });

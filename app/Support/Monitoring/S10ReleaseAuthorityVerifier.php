@@ -70,6 +70,12 @@ final class S10ReleaseAuthorityVerifier
                 return $this->invalid();
             }
 
+            $read = @fstat($handle);
+            $final = @lstat(self::AUTHORITY_PATH);
+            if (! is_array($read) || ! is_array($final)) {
+                return $this->invalid();
+            }
+
             $mode = $opened['mode'] ?? null;
             $metadata = [
                 'is_regular_file' => is_int($mode) && ($mode & 0170000) === 0100000,
@@ -78,7 +84,9 @@ final class S10ReleaseAuthorityVerifier
                 'mode' => $mode,
                 'owner_uid' => $opened['uid'] ?? null,
                 'stable_identity' => $this->sameFile($before, $opened)
-                    && $this->sameFile($opened, $after),
+                    && $this->sameFile($opened, $after)
+                    && $this->sameFile($after, $read)
+                    && $this->sameFile($read, $final),
             ];
 
             return $this->verifyRecord($rawAuthority, $metadata, $verifiedAt);
@@ -161,7 +169,7 @@ final class S10ReleaseAuthorityVerifier
     /** @param array<int, array<string, mixed>> $snapshots */
     public function identitiesRemainPinned(array $snapshots): bool
     {
-        if (count($snapshots) !== 4) {
+        if (count($snapshots) < 4) {
             return false;
         }
 
@@ -209,13 +217,15 @@ final class S10ReleaseAuthorityVerifier
     /** @param array<string|int, mixed> $left @param array<string|int, mixed> $right */
     private function sameFile(array $left, array $right): bool
     {
-        return isset($left['dev'], $left['ino'], $right['dev'], $right['ino'])
-            && is_int($left['dev'])
-            && is_int($left['ino'])
-            && is_int($right['dev'])
-            && is_int($right['ino'])
-            && $left['dev'] === $right['dev']
-            && $left['ino'] === $right['ino'];
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (! array_key_exists($key, $left)
+                || ! array_key_exists($key, $right)
+                || $left[$key] !== $right[$key]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @param array<string, mixed> $value */

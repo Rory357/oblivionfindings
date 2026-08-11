@@ -2,6 +2,7 @@
 
 use App\Support\Monitoring\ProtocolPolicyReleaseAuthorityVerifier;
 use App\Support\Monitoring\ProtocolPolicyReleaseEvidenceVerifier;
+use App\Support\Monitoring\S10ReleaseAuthorityVerifier;
 
 /** @return array<string, mixed> */
 function protocolPolicyReleaseAuthorityRecord(string $publicKey): array
@@ -58,19 +59,48 @@ function protocolPolicyReleaseDrills(): array
     return ['baselines', 'confirmation', 'dependencies', 'hysteresis', 'maintenance', 'stale_unknown'];
 }
 
+/** @return array<string, bool|string|null> */
+function protocolPolicyS10Authority(): array
+{
+    $record = [
+        'schema_version' => 1,
+        'evidence_class' => 'security_devices_s10_release_authority_v1',
+        'authority_reference' => 'AUTHORITY-'.str_repeat('e', 32),
+        'release_revision' => str_repeat('b', 40),
+        'environment_reference_sha256' => str_repeat('c', 64),
+        'runtime_environment_sha256' => str_repeat('a', 64),
+        'not_before' => '2026-08-10T00:00:00Z',
+        'not_after' => '2026-08-10T02:00:00Z',
+    ];
+
+    return (new S10ReleaseAuthorityVerifier)->verifyRecord(
+        json_encode($record, JSON_THROW_ON_ERROR),
+        [
+            'is_regular_file' => true,
+            'is_symlink' => false,
+            'mode' => 0100644,
+            'owner_uid' => 0,
+            'stable_identity' => true,
+        ],
+        new DateTimeImmutable('2026-08-10T01:00:00Z'),
+    );
+}
+
 /** @return array<string, mixed> */
 function protocolPolicyS10Artifact(): array
 {
+    $authority = protocolPolicyS10Authority();
+
     return [
         'schema_version' => 1,
         'artifact_id' => str_repeat('d', 32),
         'evidence_class' => 'security_devices_s10_release_evidence_v1',
         'created_at' => '2026-08-10T00:20:01.123456Z',
-        'authority_reference' => 'AUTHORITY-'.str_repeat('e', 32),
-        'authority_sha256' => str_repeat('f', 64),
-        'release_revision' => str_repeat('b', 40),
-        'environment_reference_sha256' => str_repeat('c', 64),
-        'runtime_environment_sha256' => str_repeat('a', 64),
+        'authority_reference' => $authority['authority_reference'],
+        'authority_sha256' => $authority['authority_sha256'],
+        'release_revision' => $authority['release_revision'],
+        'environment_reference_sha256' => $authority['environment_reference_sha256'],
+        'runtime_environment_sha256' => $authority['runtime_environment_sha256'],
         'provider_api_contracts' => ['unifi', 'milesight'],
         'queclink_transport' => 'native_tcp',
         'protocol_policy_evidence' => [
@@ -175,6 +205,7 @@ function verifyProtocolPolicyRelease(
         base64_encode(sodium_crypto_sign_detached($rawEvidence, $secretKey)),
         base64_encode($publicKey),
         $authority,
+        protocolPolicyS10Authority(),
         new DateTimeImmutable('2026-08-10T01:00:00Z'),
     );
 }
@@ -188,7 +219,9 @@ it('validates one protected independently signed protocol-policy authority', fun
         'release_revision' => str_repeat('b', 40),
         'environment_reference_sha256' => str_repeat('c', 64),
         'attestation_public_key_sha256' => hash('sha256', $publicKey),
-    ])->and((new ProtocolPolicyReleaseAuthorityVerifier)->identitiesRemainPinned([$authority, $authority]))->toBeTrue();
+    ])->and((new ProtocolPolicyReleaseAuthorityVerifier)->identitiesRemainPinned([$authority, $authority]))->toBeTrue()
+        ->and((new ProtocolPolicyReleaseAuthorityVerifier)->identitiesRemainPinned([$authority, $authority, $authority]))->toBeTrue()
+        ->and((new ProtocolPolicyReleaseAuthorityVerifier)->identitiesRemainPinned([$authority]))->toBeFalse();
 });
 
 it('rejects malformed expired duplicate or unprotected protocol-policy authorities', function (Closure $mutate): void {
@@ -240,6 +273,11 @@ it('verifies the complete independently signed A07 and A08 release companion', f
 
     expect($report)->toMatchArray([
         'status' => 'verified',
+        'signed_review_sha256' => hash('sha256', json_encode($evidence, JSON_THROW_ON_ERROR)),
+        'detached_signature_sha256' => hash('sha256', base64_encode(sodium_crypto_sign_detached(
+            json_encode($evidence, JSON_THROW_ON_ERROR),
+            sodium_crypto_sign_secretkey($keyPair),
+        ))),
         'protocols_verified' => 14,
         'policies_verified' => 9,
         'transition_drills_verified' => 6,
@@ -247,6 +285,40 @@ it('verifies the complete independently signed A07 and A08 release companion', f
         'a07_release_evidence' => true,
         'a08_release_evidence' => true,
     ]);
+});
+
+it('binds the retained companion to the exact re-signed review and detached signature', function (): void {
+    $keyPair = sodium_crypto_sign_keypair();
+    $publicKey = sodium_crypto_sign_publickey($keyPair);
+    $secretKey = sodium_crypto_sign_secretkey($keyPair);
+    $authority = protocolPolicyReleaseAuthority($publicKey);
+    $s10 = protocolPolicyS10Artifact();
+    $rawS10 = json_encode($s10, JSON_THROW_ON_ERROR);
+    $review = protocolPolicyReleaseEvidence($authority, $rawS10);
+    $substitutedReview = $review;
+    $substitutedReview['operator_signoff_reference_sha256'] = hash('sha256', 'substituted-operator-signoff');
+    $verifier = new ProtocolPolicyReleaseEvidenceVerifier;
+    $verify = static function (array $evidence) use ($verifier, $rawS10, $publicKey, $secretKey, $authority): array {
+        $rawEvidence = json_encode($evidence, JSON_THROW_ON_ERROR);
+        $signature = base64_encode(sodium_crypto_sign_detached($rawEvidence, $secretKey));
+
+        return $verifier->verify(
+            $rawS10,
+            $rawEvidence,
+            $signature,
+            base64_encode($publicKey),
+            $authority,
+            protocolPolicyS10Authority(),
+            new DateTimeImmutable('2026-08-10T01:00:00Z'),
+        );
+    };
+
+    $original = $verify($review);
+    $substituted = $verify($substitutedReview);
+
+    expect($original['evidence_reference'])->toBe($substituted['evidence_reference'])
+        ->and($original['signed_review_sha256'])->not->toBe($substituted['signed_review_sha256'])
+        ->and($original['detached_signature_sha256'])->not->toBe($substituted['detached_signature_sha256']);
 });
 
 it('rejects a locally substituted protocol-policy signer', function (): void {
@@ -304,6 +376,9 @@ it('rejects incomplete mixed or weak protocol-policy release companions', functi
     'different environment' => function (array &$s10): void {
         $s10['environment_reference_sha256'] = str_repeat('8', 64);
     },
+    'S10 artifact authority is substituted' => function (array &$s10): void {
+        $s10['authority_reference'] = 'AUTHORITY-'.str_repeat('0', 32);
+    },
     'target evidence outside the accepted window' => function (array &$s10, array &$evidence): void {
         $evidence['protocol_attestations'][0]['observed_at'] = '2026-08-09T23:04:59Z';
     },
@@ -312,6 +387,25 @@ it('rejects incomplete mixed or weak protocol-policy release companions', functi
     },
     'incomplete S10 Queclink roster' => function (array &$s10): void {
         $s10['queclink_native_listener_evidence']['fresh_trackers_observed'] = 1;
+    },
+    'transition reuses its before reference during the changed state' => function (array &$s10, array &$evidence): void {
+        $evidence['transition_drills'][0]['during_reference_sha256'] = $evidence['transition_drills'][0]['before_reference_sha256'];
+    },
+    'two transitions reuse one evidence reference' => function (array &$s10, array &$evidence): void {
+        $evidence['transition_drills'][1]['after_reference_sha256'] = $evidence['transition_drills'][0]['after_reference_sha256'];
+    },
+    'top level evidence classes reuse one reference' => function (array &$s10, array &$evidence): void {
+        $evidence['operator_signoff_reference_sha256'] = $evidence['supervision_reference_sha256'];
+    },
+    'protocol runtime evidence is relabelled as target side proof' => function (array &$s10, array &$evidence): void {
+        $evidence['protocol_attestations'][0]['target_side_reference_sha256'] =
+            $evidence['protocol_attestations'][0]['runtime_reference_sha256'];
+    },
+    'transition begins and enters its changed state at the same instant' => function (array &$s10, array &$evidence): void {
+        $evidence['transition_drills'][0]['during_at'] = $evidence['transition_drills'][0]['started_at'];
+    },
+    'transition changed state and recovery collapse to one instant' => function (array &$s10, array &$evidence): void {
+        $evidence['transition_drills'][0]['recovered_at'] = $evidence['transition_drills'][0]['during_at'];
     },
 ]);
 
@@ -332,6 +426,7 @@ it('rejects duplicate protocol-policy manifest keys before signature-backed vali
         base64_encode($signature),
         base64_encode($publicKey),
         $authority,
+        protocolPolicyS10Authority(),
         new DateTimeImmutable('2026-08-10T01:00:00Z'),
     ))->toThrow(RuntimeException::class, 'Protocol-policy release evidence is invalid.');
 });

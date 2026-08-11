@@ -13,6 +13,18 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
 
     private const int MAXIMUM_AUTHORITY_BYTES = 32_768;
 
+    private const int MAXIMUM_CAPTURE_OR_NETWORK_BYTES = 536_870_912;
+
+    private const int MAXIMUM_CONSOLE_ACCESSIBILITY_OR_COMPANION_BYTES = 67_108_864;
+
+    private const int MAXIMUM_ROUTE_OR_FIXTURE_BYTES = 16_777_216;
+
+    private const int MAXIMUM_SESSION_BINDING_BYTES = 65_536;
+
+    private const int MAXIMUM_BROWSER_DESCRIPTOR_BYTES = 65_536;
+
+    private const int RETAINED_ARTIFACT_COUNT = 274;
+
     private const int MAXIMUM_AUTHORITY_SECONDS = 604_800;
 
     private const array AUTHORITY_KEYS = [
@@ -29,7 +41,9 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
     ];
 
     private const array PAYLOAD_KEYS = [
-        'browser_version_reference_sha256',
+        'browser_version_descriptor',
+        'browser_version_descriptor_sha256',
+        'browser_version_reference',
         'companions',
         'deployed_at_utc',
         'environment_reference_sha256',
@@ -213,25 +227,33 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
             $deployedAt = $this->utc($payload['deployed_at_utc'] ?? null);
             $reviewedAt = $this->utc($payload['reviewed_at_utc'] ?? null);
             $verifiedAt = $verifiedAt->setTimezone(new DateTimeZone('UTC'));
-            if (($payload['schema_version'] ?? null) !== 2
-                || ($payload['evidence_class'] ?? null) !== 'it_security_desktop_release_evidence_v2'
+            if (($payload['schema_version'] ?? null) !== 3
+                || ($payload['evidence_class'] ?? null) !== 'it_security_desktop_release_evidence_v3'
                 || ! hash_equals((string) $authority['release_revision'], (string) ($payload['release_revision'] ?? ''))
                 || ! hash_equals((string) $authority['environment_reference_sha256'], (string) ($payload['environment_reference_sha256'] ?? ''))
                 || ! hash_equals((string) $authority['restored_environment_reference_sha256'], (string) ($payload['restored_environment_reference_sha256'] ?? ''))
                 || ! $this->matches($payload['release_identifier_reference'] ?? null, '/\ARELEASE-[a-f0-9]{32}\z/')
                 || ! $this->matches($payload['reviewer_reference'] ?? null, '/\AREVIEWER-[a-f0-9]{32}\z/')
-                || ! $this->sha($payload['browser_version_reference_sha256'] ?? null)
+                || ! $this->matches($payload['browser_version_reference'] ?? null, '/\ABROWSER-[a-f0-9]{32}\z/')
+                || ! $this->sha($payload['browser_version_descriptor_sha256'] ?? null)
+                || ! $this->validBrowserDescriptor($payload['browser_version_descriptor'] ?? null)
                 || $deployedAt === null
                 || $reviewedAt === null
                 || $deployedAt > $reviewedAt
                 || $reviewedAt > $verifiedAt->modify('+60 seconds')
                 || $reviewedAt->getTimestamp() - $deployedAt->getTimestamp() > self::MAXIMUM_AUTHORITY_SECONDS
-                || ! $this->validCompanions($payload['companions'] ?? null, $authority)
+                || ! $this->validCompanions(
+                    $payload['companions'] ?? null,
+                    $authority,
+                    $deployedAt,
+                    $reviewedAt,
+                )
                 || ! $this->uniqueCompanionEvidence($payload['companions'] ?? null)
                 || ! $this->validRows(
                     $payload['rows'] ?? null,
                     self::ROW_ACTORS,
                     (string) $authority['environment_reference_sha256'],
+                    (string) $payload['browser_version_descriptor_sha256'],
                     $deployedAt,
                     $reviewedAt,
                 )
@@ -239,12 +261,23 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                     $payload['restored_rows'] ?? null,
                     array_intersect_key(self::ROW_ACTORS, array_flip(self::RESTORED_ROWS)),
                     (string) $authority['restored_environment_reference_sha256'],
+                    (string) $payload['browser_version_descriptor_sha256'],
                     $deployedAt,
                     $reviewedAt,
+                )
+                || ! $this->restoredRowsFollowCompanions(
+                    $payload['restored_rows'] ?? null,
+                    $payload['companions'] ?? null,
                 )
                 || ! $this->uniqueEvidenceReferences(
                     $payload['rows'] ?? null,
                     $payload['restored_rows'] ?? null,
+                )
+                || ! $this->artifactClassesAreDistinct(
+                    $payload['rows'] ?? null,
+                    $payload['restored_rows'] ?? null,
+                    $payload['companions'] ?? null,
+                    $payload['browser_version_descriptor_sha256'] ?? null,
                 )
                 || ! $this->actorSessionReferencesAreRoleBound(
                     $payload['rows'] ?? null,
@@ -256,6 +289,7 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
             return [
                 'valid' => true,
                 'authority_reference' => $authority['authority_reference'],
+                'retained_artifacts' => $this->retainedArtifacts($payload),
                 'environment_reference_sha256' => $authority['environment_reference_sha256'],
                 'manifest_sha256' => hash('sha256', $rawManifest),
                 'primary_rows' => count(self::ROW_ACTORS),
@@ -268,6 +302,110 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
         } catch (Throwable) {
             return $this->invalidManifest();
         }
+    }
+
+    public function retainedPackageArtifactsAreValid(
+        mixed $artifacts,
+        string $directory,
+        string $repositoryRoot,
+    ): bool {
+        try {
+            if (! is_array($artifacts)
+                || ! array_is_list($artifacts)
+                || count($artifacts) !== self::RETAINED_ARTIFACT_COUNT
+                || is_link($directory)) {
+                return false;
+            }
+
+            $resolvedDirectory = realpath($directory);
+            $resolvedRepository = realpath($repositoryRoot);
+            if (! is_string($resolvedDirectory) || ! is_string($resolvedRepository)) {
+                return false;
+            }
+
+            $normalise = static fn (string $path): string => rtrim(str_replace('\\', '/', $path), '/');
+            $evidenceDirectory = $normalise($resolvedDirectory);
+            $repository = $normalise($resolvedRepository);
+            if ($evidenceDirectory === $repository
+                || str_starts_with($evidenceDirectory.'/', $repository.'/')) {
+                return false;
+            }
+
+            $directoryBefore = @lstat($resolvedDirectory);
+            $effectiveUid = PHP_OS_FAMILY === 'Windows' || ! function_exists('posix_geteuid')
+                ? null
+                : posix_geteuid();
+            if (! is_array($directoryBefore)
+                || (($directoryBefore['mode'] ?? 0) & 0170000) !== 0040000
+                || (PHP_OS_FAMILY !== 'Windows' && (
+                    ! is_int($effectiveUid)
+                    || (($directoryBefore['mode'] ?? 0) & 0777) !== 0700
+                    || ($directoryBefore['uid'] ?? null) !== $effectiveUid
+                ))) {
+                return false;
+            }
+
+            $paths = [];
+            foreach ($artifacts as $artifact) {
+                $suffix = is_array($artifact) && is_string($artifact['suffix'] ?? null)
+                    ? $artifact['suffix']
+                    : '';
+                $maximumBytes = $this->maximumArtifactBytes($suffix);
+                $expectedKeys = in_array($suffix, ['browser', 'sessions'], true)
+                    ? ['document', 'reference', 'sha256', 'suffix']
+                    : ['reference', 'sha256', 'suffix'];
+                if (! is_array($artifact)
+                    || array_is_list($artifact)
+                    || ! $this->exactKeys($artifact, $expectedKeys)
+                    || ! $this->validArtifactReference($artifact['reference'] ?? null, $suffix)
+                    || ! $this->sha($artifact['sha256'] ?? null)
+                    || $maximumBytes === null
+                    || ! (in_array($suffix, ['browser', 'sessions'], true)
+                        ? $this->jsonArtifactMatches(
+                            $resolvedDirectory.DIRECTORY_SEPARATOR.$artifact['reference'].'.'.$suffix,
+                            $resolvedDirectory,
+                            (string) $artifact['sha256'],
+                            $artifact['document'] ?? null,
+                            $maximumBytes,
+                            $effectiveUid,
+                        )
+                        : $this->artifactHashMatches(
+                            $resolvedDirectory.DIRECTORY_SEPARATOR.$artifact['reference'].'.'.$suffix,
+                            $resolvedDirectory,
+                            (string) $artifact['sha256'],
+                            $maximumBytes,
+                            $effectiveUid,
+                        ))) {
+                    return false;
+                }
+
+                $paths[] = $artifact['reference'].'.'.$suffix;
+            }
+
+            $directoryAfter = @lstat($resolvedDirectory);
+
+            return count($paths) === count(array_unique($paths, SORT_STRING))
+                && is_array($directoryAfter)
+                && $this->sameFile($directoryBefore, $directoryAfter);
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /** @param array<string, mixed> $before @param array<string, mixed> $after */
+    public function protectedManifestRemainsPinned(array $before, array $after): bool
+    {
+        foreach ([$before, $after] as $snapshot) {
+            if (! $this->exactKeys($snapshot, ['identity', 'raw'])
+                || ! is_string($snapshot['raw'] ?? null)
+                || ! is_array($snapshot['identity'] ?? null)
+                || ! $this->exactKeys($snapshot['identity'], ['dev', 'ino', 'mode', 'mtime', 'size', 'uid'])) {
+                return false;
+            }
+        }
+
+        return hash_equals(hash('sha256', $before['raw']), hash('sha256', $after['raw']))
+            && $this->sameFile($before['identity'], $after['identity']);
     }
 
     /** @param array<string, mixed> $payload */
@@ -295,14 +433,21 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
     }
 
     /** @param mixed $companions @param array<string, mixed> $authority */
-    private function validCompanions(mixed $companions, array $authority): bool
-    {
+    private function validCompanions(
+        mixed $companions,
+        array $authority,
+        DateTimeImmutable $deployedAt,
+        DateTimeImmutable $reviewedAt,
+    ): bool {
         if (! is_array($companions) || array_is_list($companions)
             || ! $this->exactKeys($companions, array_keys(self::COMPANIONS))) {
             return false;
         }
         foreach (self::COMPANIONS as $name => $environment) {
             $companion = $companions[$name] ?? null;
+            $companionVerifiedAt = is_array($companion)
+                ? $this->utc($companion['verified_at_utc'] ?? null)
+                : null;
             $expectedEnvironment = $environment === 'restored'
                 ? $authority['restored_environment_reference_sha256']
                 : $authority['environment_reference_sha256'];
@@ -314,13 +459,58 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                     'evidence_sha256',
                     'release_revision',
                     'status',
+                    'verified_at_utc',
                 ])
                 || ($companion['status'] ?? null) !== 'verified'
                 || ! $this->matches($companion['evidence_reference'] ?? null, '/\AEVIDENCE-[a-f0-9]{32}\z/')
                 || ! $this->sha($companion['evidence_sha256'] ?? null)
                 || ! hash_equals((string) $authority['release_revision'], (string) ($companion['release_revision'] ?? ''))
-                || ! hash_equals((string) $expectedEnvironment, (string) ($companion['environment_reference_sha256'] ?? ''))) {
+                || ! hash_equals((string) $expectedEnvironment, (string) ($companion['environment_reference_sha256'] ?? ''))
+                || $companionVerifiedAt === null
+                || $companionVerifiedAt > $reviewedAt
+                || ($name !== 'local_automated' && $companionVerifiedAt < $deployedAt)) {
                 return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function restoredRowsFollowCompanions(mixed $rows, mixed $companions): bool
+    {
+        if (! is_array($rows) || ! array_is_list($rows)
+            || ! is_array($companions) || array_is_list($companions)) {
+            return false;
+        }
+
+        $configurationHistoryAt = $this->utc(
+            is_array($companions['configuration_history'] ?? null)
+                ? ($companions['configuration_history']['verified_at_utc'] ?? null)
+                : null,
+        );
+        $storageRestoreAt = $this->utc(
+            is_array($companions['storage_restore'] ?? null)
+                ? ($companions['storage_restore']['verified_at_utc'] ?? null)
+                : null,
+        );
+        if ($configurationHistoryAt === null || $storageRestoreAt === null) {
+            return false;
+        }
+
+        $restoredEvidenceReadyAt = $configurationHistoryAt > $storageRestoreAt
+            ? $configurationHistoryAt
+            : $storageRestoreAt;
+        foreach ($rows as $row) {
+            if (! is_array($row) || ! is_array($row['viewports'] ?? null)) {
+                return false;
+            }
+            foreach ($row['viewports'] as $viewport) {
+                $verifiedAt = is_array($viewport)
+                    ? $this->utc($viewport['verified_at_utc'] ?? null)
+                    : null;
+                if ($verifiedAt === null || $verifiedAt < $restoredEvidenceReadyAt) {
+                    return false;
+                }
             }
         }
 
@@ -355,6 +545,7 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
         mixed $rows,
         array $expectedRows,
         string $expectedEnvironmentReference,
+        string $browserDescriptorHash,
         DateTimeImmutable $deployedAt,
         DateTimeImmutable $reviewedAt,
     ): bool {
@@ -393,6 +584,7 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 || ! $this->validViewports(
                     $row['viewports'] ?? null,
                     $actors,
+                    $browserDescriptorHash,
                     $deployedAt,
                     $reviewedAt,
                 )) {
@@ -434,9 +626,271 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
             && count($captureHashes) === count(array_unique($captureHashes, SORT_STRING));
     }
 
+    private function artifactClassesAreDistinct(
+        mixed $rows,
+        mixed $restoredRows,
+        mixed $companions,
+        mixed $browserDescriptorHash,
+    ): bool {
+        $artifactClasses = [];
+        $record = static function (mixed $hash, string $class) use (&$artifactClasses): bool {
+            if (! is_string($hash)) {
+                return false;
+            }
+            if (isset($artifactClasses[$hash]) && $artifactClasses[$hash] !== $class) {
+                return false;
+            }
+
+            $artifactClasses[$hash] = $class;
+
+            return true;
+        };
+        if (! $record($browserDescriptorHash, 'browser')) {
+            return false;
+        }
+
+        foreach ([$rows, $restoredRows] as $rowSet) {
+            if (! is_array($rowSet) || ! array_is_list($rowSet)) {
+                return false;
+            }
+            foreach ($rowSet as $row) {
+                if (! is_array($row)
+                    || ! $record($row['route_manifest_sha256'] ?? null, 'routes')
+                    || ! $record($row['fixture_manifest_sha256'] ?? null, 'fixtures')) {
+                    return false;
+                }
+                foreach (($row['viewports'] ?? []) as $viewport) {
+                    if (! is_array($viewport)) {
+                        return false;
+                    }
+                    foreach ([
+                        'capture_archive_sha256' => 'capture',
+                        'network_trace_sha256' => 'network',
+                        'console_log_sha256' => 'console',
+                        'accessibility_report_sha256' => 'accessibility',
+                        'actor_session_binding_sha256' => 'sessions',
+                    ] as $field => $class) {
+                        if (! $record($viewport[$field] ?? null, $class)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (! is_array($companions) || array_is_list($companions)) {
+            return false;
+        }
+        foreach ($companions as $companion) {
+            if (! is_array($companion)
+                || ! $record($companion['evidence_sha256'] ?? null, 'companion')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @param array<string, mixed> $payload @return list<array{reference: string, sha256: string, suffix: string}> */
+    private function retainedArtifacts(array $payload): array
+    {
+        $archives = [[
+            'document' => $payload['browser_version_descriptor'],
+            'reference' => $payload['browser_version_reference'],
+            'sha256' => $payload['browser_version_descriptor_sha256'],
+            'suffix' => 'browser',
+        ]];
+        foreach ([$payload['rows'], $payload['restored_rows']] as $rows) {
+            foreach ($rows as $row) {
+                foreach ($row['viewports'] as $viewport) {
+                    foreach ([
+                        'capture' => 'capture_archive_sha256',
+                        'network' => 'network_trace_sha256',
+                        'console' => 'console_log_sha256',
+                        'accessibility' => 'accessibility_report_sha256',
+                    ] as $suffix => $hashField) {
+                        $archives[] = [
+                            'reference' => $viewport['capture_archive_reference'],
+                            'sha256' => $viewport[$hashField],
+                            'suffix' => $suffix,
+                        ];
+                    }
+                    $archives[] = [
+                        'document' => $viewport['actor_session_references'],
+                        'reference' => $viewport['actor_session_binding_reference'],
+                        'sha256' => $viewport['actor_session_binding_sha256'],
+                        'suffix' => 'sessions',
+                    ];
+                }
+                foreach ([
+                    'routes' => 'route_manifest_sha256',
+                    'fixtures' => 'fixture_manifest_sha256',
+                ] as $suffix => $hashField) {
+                    $archives[] = [
+                        'reference' => $row['result_reference'],
+                        'sha256' => $row[$hashField],
+                        'suffix' => $suffix,
+                    ];
+                }
+            }
+        }
+        foreach ($payload['companions'] as $companion) {
+            $archives[] = [
+                'reference' => $companion['evidence_reference'],
+                'sha256' => $companion['evidence_sha256'],
+                'suffix' => 'companion',
+            ];
+        }
+
+        return $archives;
+    }
+
+    private function validArtifactReference(mixed $reference, string $suffix): bool
+    {
+        return match ($suffix) {
+            'accessibility', 'capture', 'console', 'network' => $this->matches(
+                $reference,
+                '/\ACAPTURE-[a-f0-9]{32}\z/',
+            ),
+            'sessions' => $this->matches($reference, '/\ASESSION-[a-f0-9]{32}\z/'),
+            'browser' => $this->matches($reference, '/\ABROWSER-[a-f0-9]{32}\z/'),
+            'fixtures', 'routes' => $this->matches($reference, '/\ARESULT-[a-f0-9]{32}\z/'),
+            'companion' => $this->matches($reference, '/\AEVIDENCE-[a-f0-9]{32}\z/'),
+            default => false,
+        };
+    }
+
+    private function maximumArtifactBytes(string $suffix): ?int
+    {
+        return match ($suffix) {
+            'capture', 'network' => self::MAXIMUM_CAPTURE_OR_NETWORK_BYTES,
+            'accessibility', 'console', 'companion' => self::MAXIMUM_CONSOLE_ACCESSIBILITY_OR_COMPANION_BYTES,
+            'fixtures', 'routes' => self::MAXIMUM_ROUTE_OR_FIXTURE_BYTES,
+            'sessions' => self::MAXIMUM_SESSION_BINDING_BYTES,
+            'browser' => self::MAXIMUM_BROWSER_DESCRIPTOR_BYTES,
+            default => null,
+        };
+    }
+
+    private function artifactHashMatches(
+        string $path,
+        string $directory,
+        string $expectedHash,
+        int $maximumBytes,
+        ?int $effectiveUid,
+    ): bool {
+        if (is_link($path)) {
+            return false;
+        }
+
+        $resolved = realpath($path);
+        if (! is_string($resolved)
+            || dirname($resolved) !== $directory
+            || basename($resolved) !== basename($path)) {
+            return false;
+        }
+
+        $before = @lstat($path);
+        $handle = @fopen($path, 'rb');
+        if (! is_array($before) || $handle === false) {
+            return false;
+        }
+
+        try {
+            $opened = @fstat($handle);
+            if (! is_array($opened)
+                || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+                || ! is_int($opened['size'] ?? null)
+                || $opened['size'] < 1
+                || $opened['size'] > $maximumBytes
+                || (PHP_OS_FAMILY !== 'Windows' && (
+                    ! is_int($effectiveUid)
+                    || (($opened['mode'] ?? 0) & 0077) !== 0
+                    || ($opened['uid'] ?? null) !== $effectiveUid
+                ))) {
+                return false;
+            }
+
+            $hash = hash_init('sha256');
+            $bytes = hash_update_stream($hash, $handle, $maximumBytes + 1);
+            $read = @fstat($handle);
+            $final = @lstat($path);
+
+            return is_int($bytes)
+                && $bytes === $opened['size']
+                && is_array($read)
+                && is_array($final)
+                && $this->sameFile($before, $opened)
+                && $this->sameFile($opened, $read)
+                && $this->sameFile($read, $final)
+                && hash_equals($expectedHash, hash_final($hash));
+        } finally {
+            fclose($handle);
+        }
+    }
+
+    private function jsonArtifactMatches(
+        string $path,
+        string $directory,
+        string $expectedHash,
+        mixed $expectedDocument,
+        int $maximumBytes,
+        ?int $effectiveUid,
+    ): bool {
+        if (! is_array($expectedDocument) || array_is_list($expectedDocument) || is_link($path)) {
+            return false;
+        }
+        $resolved = realpath($path);
+        if (! is_string($resolved) || dirname($resolved) !== $directory || basename($resolved) !== basename($path)) {
+            return false;
+        }
+        $before = @lstat($path);
+        $handle = @fopen($path, 'rb');
+        if (! is_array($before) || $handle === false) {
+            return false;
+        }
+        try {
+            $opened = @fstat($handle);
+            if (! is_array($opened)
+                || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+                || ! is_int($opened['size'] ?? null)
+                || $opened['size'] < 1
+                || $opened['size'] > $maximumBytes
+                || (PHP_OS_FAMILY !== 'Windows' && (
+                    ! is_int($effectiveUid)
+                    || (($opened['mode'] ?? 0) & 0077) !== 0
+                    || ($opened['uid'] ?? null) !== $effectiveUid
+                ))) {
+                return false;
+            }
+            $raw = stream_get_contents($handle, $maximumBytes + 1);
+            $read = @fstat($handle);
+            $final = @lstat($path);
+            if (! is_string($raw)
+                || strlen($raw) !== $opened['size']
+                || ! hash_equals($expectedHash, hash('sha256', $raw))
+                || ! is_array($read)
+                || ! is_array($final)
+                || ! $this->sameFile($before, $opened)
+                || ! $this->sameFile($opened, $read)
+                || ! $this->sameFile($read, $final)) {
+                return false;
+            }
+
+            $document = (new StrictJsonObjectDecoder)->decode($raw, 16);
+
+            return ! array_is_list($document) && $document === $expectedDocument;
+        } catch (Throwable) {
+            return false;
+        } finally {
+            fclose($handle);
+        }
+    }
+
     private function validViewports(
         mixed $viewports,
         array $expectedActors,
+        string $browserDescriptorHash,
         DateTimeImmutable $deployedAt,
         DateTimeImmutable $reviewedAt,
     ): bool {
@@ -450,7 +904,10 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 || array_is_list($viewport)
                 || ! $this->exactKeys($viewport, [
                     'accessibility_report_sha256',
-                    'actor_session_references_sha256',
+                    'actor_session_binding_reference',
+                    'actor_session_binding_sha256',
+                    'actor_session_references',
+                    'browser_version_descriptor_sha256',
                     'capture_archive_reference',
                     'capture_archive_sha256',
                     'console_clean',
@@ -478,10 +935,13 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 || $viewport['route_evidence_count'] < 1
                 || $viewport['route_evidence_count'] > 64
                 || ! $this->matches($viewport['capture_archive_reference'] ?? null, '/\ACAPTURE-[a-f0-9]{32}\z/')
+                || ! $this->matches($viewport['actor_session_binding_reference'] ?? null, '/\ASESSION-[a-f0-9]{32}\z/')
                 || ! $this->validActorSessionReferences(
-                    $viewport['actor_session_references_sha256'] ?? null,
+                    $viewport['actor_session_references'] ?? null,
                     $expectedActors,
                 )
+                || ! hash_equals($browserDescriptorHash, (string) ($viewport['browser_version_descriptor_sha256'] ?? ''))
+                || ! $this->sha($viewport['actor_session_binding_sha256'] ?? null)
                 || ! $this->sha($viewport['capture_archive_sha256'] ?? null)
                 || ! $this->sha($viewport['network_trace_sha256'] ?? null)
                 || ! $this->sha($viewport['console_log_sha256'] ?? null)
@@ -506,12 +966,22 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
         }
 
         foreach ($expectedActors as $actor) {
-            if (! $this->sha($references[$actor] ?? null)) {
+            if (! $this->matches($references[$actor] ?? null, '/\ASESSION-[a-f0-9]{32}\z/')) {
                 return false;
             }
         }
 
         return count($references) === count(array_unique(array_values($references), SORT_STRING));
+    }
+
+    private function validBrowserDescriptor(mixed $descriptor): bool
+    {
+        return is_array($descriptor)
+            && ! array_is_list($descriptor)
+            && $this->exactKeys($descriptor, ['browser', 'version'])
+            && ($descriptor['browser'] ?? null) === 'chromium'
+            && is_string($descriptor['version'] ?? null)
+            && preg_match('/\A\d+(?:\.\d+){1,3}\z/', $descriptor['version']) === 1;
     }
 
     private function actorSessionReferencesAreRoleBound(mixed ...$rowSets): bool
@@ -527,7 +997,7 @@ final class ItSecurityDesktopReleaseEvidenceVerifier
                 }
                 foreach ($row['viewports'] as $viewport) {
                     $references = is_array($viewport)
-                        ? ($viewport['actor_session_references_sha256'] ?? null)
+                        ? ($viewport['actor_session_references'] ?? null)
                         : null;
                     if (! is_array($references) || array_is_list($references)) {
                         return false;

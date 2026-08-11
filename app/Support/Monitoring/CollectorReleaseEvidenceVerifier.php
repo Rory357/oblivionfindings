@@ -101,6 +101,8 @@ final class CollectorReleaseEvidenceVerifier
         'replacement_consumed_at',
         'replacement_consume_audit_reference_sha256',
         'replacement_heartbeat_current',
+        'replacement_heartbeat_observed_at',
+        'replacement_heartbeat_reference_sha256',
         'replacement_issued_at',
         'replacement_issue_audit_reference_sha256',
         'replacement_token_reuse_denied_at',
@@ -164,8 +166,8 @@ final class CollectorReleaseEvidenceVerifier
                 ->setTimezone(new DateTimeZone('UTC'));
             $started = $this->utc($evidence['exercise_started_at'] ?? null);
             $completed = $this->utc($evidence['exercise_completed_at'] ?? null);
-            if (($evidence['schema_version'] ?? null) !== 1
-                || ($evidence['evidence_class'] ?? null) !== 'monitoring_collector_release_evidence_v1'
+            if (($evidence['schema_version'] ?? null) !== 2
+                || ($evidence['evidence_class'] ?? null) !== 'monitoring_collector_release_evidence_v2'
                 || ! $this->matches($evidence['evidence_reference'] ?? null, '/\ACOLLECTOR-[a-f0-9]{32}\z/')
                 || ! $this->linked($evidence, $authority, 'authority_reference')
                 || ! $this->linked($evidence, $authority, 'authority_sha256')
@@ -206,17 +208,24 @@ final class CollectorReleaseEvidenceVerifier
             if ($credentialObserved === null) {
                 $this->refuse();
             }
+            $revocation = $evidence['revocation'];
             $this->revocation(
-                $evidence['revocation'],
+                $revocation,
                 $credentialObserved,
                 $revokedWindow,
                 $replacementWindow,
                 $completed,
             );
+            $this->exerciseEvidenceReferencesAreDistinct(
+                $deployment,
+                $outage,
+                $credential,
+                $revocation,
+            );
 
             return [
                 'status' => 'verified',
-                'evidence_class' => 'monitoring_collector_release_verification_v1',
+                'evidence_class' => 'monitoring_collector_release_verification_v2',
                 'authority_reference' => $authority['authority_reference'],
                 'authority_sha256' => $authority['authority_sha256'],
                 'environment_reference_sha256' => $authority['environment_reference_sha256'],
@@ -224,6 +233,8 @@ final class CollectorReleaseEvidenceVerifier
                 'remote_site_reference_sha256' => $authority['remote_site_reference_sha256'],
                 'load_balancer_reference_sha256' => $authority['load_balancer_reference_sha256'],
                 'evidence_reference' => $evidence['evidence_reference'],
+                'signed_collector_evidence_sha256' => hash('sha256', $rawEvidence),
+                'detached_signature_sha256' => hash('sha256', $signature),
                 'active_transport_sha256' => $evidence['active_transport_sha256'],
                 'revoked_transport_sha256' => $evidence['revoked_transport_sha256'],
                 'replacement_transport_sha256' => $evidence['replacement_transport_sha256'],
@@ -304,17 +315,22 @@ final class CollectorReleaseEvidenceVerifier
             || $reviewedAt > $activeTransportFrom) {
             $this->refuse();
         }
-        foreach ([
+        $evidenceHashes = [
             'cross_instance_replay_reference_sha256',
             'dedicated_ca_configuration_sha256',
             'load_balancer_routing_reference_sha256',
             'nginx_validation_reference_sha256',
             'proxy_configuration_sha256',
             'shared_redis_configuration_sha256',
-        ] as $key) {
+        ];
+        foreach ($evidenceHashes as $key) {
             if (! $this->sha($deployment[$key] ?? null)) {
                 $this->refuse();
             }
+        }
+        $values = array_map(fn (string $key): string => (string) $deployment[$key], $evidenceHashes);
+        if (count($values) !== count(array_unique($values, SORT_STRING))) {
+            $this->refuse();
         }
 
         return $deployment;
@@ -409,6 +425,7 @@ final class CollectorReleaseEvidenceVerifier
         $consumedAt = $this->utc($revocation['replacement_consumed_at'] ?? null);
         $replacementReuseDeniedAt = $this->utc($revocation['replacement_token_reuse_denied_at'] ?? null);
         $generalTokenDeniedAt = $this->utc($revocation['general_site_token_denied_at'] ?? null);
+        $replacementHeartbeatObservedAt = $this->utc($revocation['replacement_heartbeat_observed_at'] ?? null);
         $serviceRestoredAt = $this->utc($revocation['service_restored_at'] ?? null);
         if (! $this->exactKeys($revocation, self::REVOCATION_KEYS)
             || ($revocation['old_identity_forwarded_and_denied'] ?? null) !== true
@@ -419,6 +436,7 @@ final class CollectorReleaseEvidenceVerifier
             || $consumedAt === null
             || $replacementReuseDeniedAt === null
             || $generalTokenDeniedAt === null
+            || $replacementHeartbeatObservedAt === null
             || $serviceRestoredAt === null
             || $revokedAt < $credentialObserved
             || $revokedAt > $revokedWindow['from']
@@ -426,9 +444,16 @@ final class CollectorReleaseEvidenceVerifier
             || $issuedAt > $consumedAt
             || $consumedAt > $replacementWindow['from']
             || $replacementReuseDeniedAt < $consumedAt
+            || $replacementReuseDeniedAt < $replacementWindow['until']
+            || $replacementReuseDeniedAt > $replacementHeartbeatObservedAt
             || $replacementReuseDeniedAt > $exerciseCompleted
             || $generalTokenDeniedAt < $consumedAt
+            || $generalTokenDeniedAt < $replacementWindow['until']
+            || $generalTokenDeniedAt > $replacementHeartbeatObservedAt
             || $generalTokenDeniedAt > $exerciseCompleted
+            || $replacementHeartbeatObservedAt < $replacementWindow['until']
+            || $replacementHeartbeatObservedAt > $serviceRestoredAt
+            || $exerciseCompleted->getTimestamp() - $replacementHeartbeatObservedAt->getTimestamp() > 180
             || $serviceRestoredAt < $replacementWindow['until']
             || $serviceRestoredAt > $exerciseCompleted) {
             $this->refuse();
@@ -438,12 +463,50 @@ final class CollectorReleaseEvidenceVerifier
             'general_site_token_denial_reference_sha256',
             'replacement_consume_audit_reference_sha256',
             'replacement_issue_audit_reference_sha256',
+            'replacement_heartbeat_reference_sha256',
             'replacement_token_reuse_denial_reference_sha256',
             'restored_service_reference_sha256',
         ] as $key) {
             if (! $this->sha($revocation[$key] ?? null)) {
                 $this->refuse();
             }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $deployment
+     * @param  array<string, mixed>  $outage
+     * @param  array<string, mixed>  $credential
+     * @param  array<string, mixed>  $revocation
+     */
+    private function exerciseEvidenceReferencesAreDistinct(
+        array $deployment,
+        array $outage,
+        array $credential,
+        array $revocation,
+    ): void {
+        $references = [
+            $deployment['cross_instance_replay_reference_sha256'],
+            $deployment['load_balancer_routing_reference_sha256'],
+            $deployment['nginx_validation_reference_sha256'],
+            $outage['correlation_reference_sha256'],
+            $outage['pinned_monitor_roster_sha256'],
+            $outage['roster_drift_negative_reference_sha256'],
+            $outage['unrelated_site_observation_sha256'],
+            $credential['lease_reference_sha256'],
+            $credential['observation_reference_sha256'],
+            $credential['plaintext_scan_reference_sha256'],
+            $revocation['central_revocation_audit_reference_sha256'],
+            $revocation['general_site_token_denial_reference_sha256'],
+            $revocation['replacement_consume_audit_reference_sha256'],
+            $revocation['replacement_issue_audit_reference_sha256'],
+            $revocation['replacement_heartbeat_reference_sha256'],
+            $revocation['replacement_token_reuse_denial_reference_sha256'],
+            $revocation['restored_service_reference_sha256'],
+        ];
+
+        if (count($references) !== count(array_unique($references, SORT_STRING))) {
+            $this->refuse();
         }
     }
 

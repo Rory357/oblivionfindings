@@ -127,6 +127,30 @@ it('verifies process-scoped restore configuration before reading any restored st
             $previousConfiguredValues[$key] = config($key);
             config()->set($key, $value);
         }
+        $disk = config('filesystems.disks.monitoring-restore');
+        $disk = is_array($disk) ? $disk : [];
+        $configuredSha256 = static fn (mixed $value): ?string => is_string($value) && $value !== ''
+            ? hash('sha256', $value)
+            : null;
+        $runtimeCommitment = hash('sha256', json_encode([
+            'database_url_sha256' => $configuredSha256(config('database.connections.mysql.url')),
+            'redis_url_sha256' => $configuredSha256(config('database.redis.default.url')),
+            'timeseries_url_sha256' => $configuredSha256(config('monitoring.storage.timeseries.url')),
+            'vault_url_sha256' => $configuredSha256(config('monitoring.credentials.vault.url')),
+            'credential_driver' => config('monitoring.credentials.driver'),
+            'snapshot_driver' => $disk['driver'] ?? null,
+            'snapshot_root_sha256' => $configuredSha256($disk['root'] ?? null),
+            'snapshot_key_sha256' => $configuredSha256($disk['key'] ?? null),
+            'snapshot_secret_sha256' => $configuredSha256($disk['secret'] ?? null),
+            'snapshot_region_sha256' => $configuredSha256($disk['region'] ?? null),
+            'snapshot_bucket_sha256' => $configuredSha256($disk['bucket'] ?? null),
+            'snapshot_endpoint_sha256' => $configuredSha256($disk['endpoint'] ?? null),
+            'snapshot_path_style' => $disk['use_path_style_endpoint'] ?? null,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+        $previousProcessValues['MONITORING_RESTORE_RUNTIME_COMMITMENT_SHA256'] = getenv('MONITORING_RESTORE_RUNTIME_COMMITMENT_SHA256');
+        putenv("MONITORING_RESTORE_RUNTIME_COMMITMENT_SHA256={$runtimeCommitment}");
+        $_ENV['MONITORING_RESTORE_RUNTIME_COMMITMENT_SHA256'] = $runtimeCommitment;
+        $_SERVER['MONITORING_RESTORE_RUNTIME_COMMITMENT_SHA256'] = $runtimeCommitment;
 
         expect(Artisan::call('monitoring:reconcile-restore', [
             '--assert-process-config' => true,
@@ -137,6 +161,23 @@ it('verifies process-scoped restore configuration before reading any restored st
         foreach ($processValues as $value) {
             expect(Artisan::output())->not->toContain($value);
         }
+
+        $substitutedDatabaseUrl = 'mysql://restore-user:RESTORE-PASSWORD-SENTINEL@127.0.0.1/substituted-copy';
+        putenv("DB_URL={$substitutedDatabaseUrl}");
+        $_ENV['DB_URL'] = $substitutedDatabaseUrl;
+        $_SERVER['DB_URL'] = $substitutedDatabaseUrl;
+        config()->set('database.connections.mysql.url', $substitutedDatabaseUrl);
+        expect(Artisan::call('monitoring:reconcile-restore', [
+            '--assert-process-config' => true,
+            '--config-only' => true,
+        ]))->toBe(1)
+            ->and(Artisan::output())->toContain('process configuration was not applied')
+            ->and(Artisan::output())->not->toContain($substitutedDatabaseUrl)
+            ->and($probe->healthChecks)->toBe(0);
+        putenv("DB_URL={$processValues['DB_URL']}");
+        $_ENV['DB_URL'] = $processValues['DB_URL'];
+        $_SERVER['DB_URL'] = $processValues['DB_URL'];
+        config()->set('database.connections.mysql.url', $processValues['DB_URL']);
 
         config()->set('filesystems.disks.monitoring-restore.root', storage_path('app/monitoring-restore'));
         expect(Artisan::call('monitoring:reconcile-restore', [

@@ -46,7 +46,12 @@ final class ProductionRetentionEvidenceVerifier
                     $policy = $matches->sortBy(
                         fn (MonitoringRetentionPolicy $candidate): int => (int) $candidate->{$daysField},
                     )->first();
-                    if ($series->first_point_at->greaterThanOrEqualTo($now->subDays((int) $policy->{$daysField}))) {
+                    $cutoff = RetentionEnforcer::retentionCutoff(
+                        (string) $series->retention_tier,
+                        $now,
+                        (int) $policy->{$daysField},
+                    );
+                    if ($series->first_point_at->greaterThanOrEqualTo($cutoff)) {
                         continue;
                     }
                     if (! $matches->contains('legal_hold', true)

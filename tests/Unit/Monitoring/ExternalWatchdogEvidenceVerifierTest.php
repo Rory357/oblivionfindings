@@ -96,6 +96,11 @@ function watchdogEvents(): array
     ];
 }
 
+function watchdogProviderReceipt(): string
+{
+    return '{"receipt_reference":"PROVIDER-00000000000000000000000000000000"}';
+}
+
 function watchdogEvidence(array $authority, string $centralRaw, array $overrides = []): array
 {
     return [
@@ -107,7 +112,7 @@ function watchdogEvidence(array $authority, string $centralRaw, array $overrides
         'release_revision' => $authority['release_revision'],
         'central_runtime_evidence_sha256' => hash('sha256', $centralRaw),
         'watchdog_evidence_reference' => 'WATCHDOG-'.str_repeat('5', 32),
-        'provider_receipt_sha256' => str_repeat('6', 64),
+        'provider_receipt_sha256' => hash('sha256', watchdogProviderReceipt()),
         'exercise_started_at' => '2026-08-10T00:15:00Z',
         'exercise_completed_at' => '2026-08-10T00:56:00Z',
         'events' => watchdogEvents(),
@@ -128,6 +133,7 @@ it('verifies one independently signed complete watchdog exercise against central
         base64_encode($signature),
         base64_encode($publicKey),
         $centralRaw,
+        watchdogProviderReceipt(),
         $authority,
         new DateTimeImmutable('2026-08-10T01:00:00Z'),
     );
@@ -137,8 +143,54 @@ it('verifies one independently signed complete watchdog exercise against central
         'events_verified' => 4,
         'release_revision' => str_repeat('b', 40),
         'central_runtime_evidence_sha256' => hash('sha256', $centralRaw),
+        'signed_watchdog_evidence_sha256' => hash('sha256', $evidenceRaw),
+        'detached_signature_sha256' => hash('sha256', $signature),
         'external_watchdog_release_evidence' => true,
-    ]);
+    ])->and((new CentralRuntimeReleaseAuthorityVerifier)->identitiesRemainPinned([
+        $authority,
+        $authority,
+        $authority,
+    ]))->toBeTrue()
+        ->and((new CentralRuntimeReleaseAuthorityVerifier)->identitiesRemainPinned([$authority]))->toBeFalse();
+});
+
+it('binds publication to the exact signed watchdog review and detached signature bytes', function (): void {
+    $keyPair = sodium_crypto_sign_keypair();
+    $publicKey = sodium_crypto_sign_publickey($keyPair);
+    $secretKey = sodium_crypto_sign_secretkey($keyPair);
+    $authority = watchdogAuthority($publicKey);
+    $centralRaw = json_encode(watchdogCentralEvidence($authority), JSON_THROW_ON_ERROR);
+    $firstEvidence = watchdogEvidence($authority, $centralRaw);
+    $secondEvidence = $firstEvidence;
+    $secondEvidence['events'][0]['observation_reference_sha256'] = str_repeat('6', 64);
+    $firstRaw = json_encode($firstEvidence, JSON_THROW_ON_ERROR);
+    $secondRaw = json_encode($secondEvidence, JSON_THROW_ON_ERROR);
+    $firstSignature = sodium_crypto_sign_detached($firstRaw, $secretKey);
+    $secondSignature = sodium_crypto_sign_detached($secondRaw, $secretKey);
+    $verifier = new ExternalWatchdogEvidenceVerifier;
+
+    $firstReport = $verifier->verify(
+        $firstRaw,
+        base64_encode($firstSignature),
+        base64_encode($publicKey),
+        $centralRaw,
+        watchdogProviderReceipt(),
+        $authority,
+        new DateTimeImmutable('2026-08-10T01:00:00Z'),
+    );
+    $secondReport = $verifier->verify(
+        $secondRaw,
+        base64_encode($secondSignature),
+        base64_encode($publicKey),
+        $centralRaw,
+        watchdogProviderReceipt(),
+        $authority,
+        new DateTimeImmutable('2026-08-10T01:00:00Z'),
+    );
+
+    expect($secondEvidence['watchdog_evidence_reference'])->toBe($firstEvidence['watchdog_evidence_reference'])
+        ->and($secondReport['signed_watchdog_evidence_sha256'])->not->toBe($firstReport['signed_watchdog_evidence_sha256'])
+        ->and($secondReport['detached_signature_sha256'])->not->toBe($firstReport['detached_signature_sha256']);
 });
 
 it('rejects a locally substituted watchdog signer even when its signature is valid', function (): void {
@@ -156,6 +208,7 @@ it('rejects a locally substituted watchdog signer even when its signature is val
         base64_encode($signature),
         base64_encode($localPublicKey),
         $centralRaw,
+        watchdogProviderReceipt(),
         $authority,
         new DateTimeImmutable('2026-08-10T01:00:00Z'),
     ))->toThrow(RuntimeException::class, 'External watchdog release evidence is invalid.');
@@ -167,7 +220,8 @@ it('rejects incomplete misordered or weak watchdog evidence even when correctly 
     $authority = watchdogAuthority($publicKey);
     $central = watchdogCentralEvidence($authority);
     $evidence = [];
-    $mutate($central, $evidence, $authority);
+    $providerReceipt = watchdogProviderReceipt();
+    $mutate($central, $evidence, $authority, $providerReceipt);
     $centralRaw = json_encode($central, JSON_THROW_ON_ERROR);
     $evidence = $evidence === [] ? watchdogEvidence($authority, $centralRaw) : $evidence;
     if (! isset($evidence['central_runtime_evidence_sha256'])) {
@@ -181,6 +235,7 @@ it('rejects incomplete misordered or weak watchdog evidence even when correctly 
         base64_encode($signature),
         base64_encode($publicKey),
         $centralRaw,
+        $providerReceipt,
         $authority,
         new DateTimeImmutable('2026-08-10T01:00:00Z'),
     ))->toThrow(RuntimeException::class, 'External watchdog release evidence is invalid.');
@@ -217,6 +272,46 @@ it('rejects incomplete misordered or weak watchdog evidence even when correctly 
             'authority_reference' => 'AUTHORITY-'.str_repeat('0', 32),
         ]);
     },
+    'two outage kinds reuse one observation commitment' => function (array &$central, array &$evidence, array $authority): void {
+        $centralRaw = json_encode($central, JSON_THROW_ON_ERROR);
+        $events = watchdogEvents();
+        $events[1]['observation_reference_sha256'] = $events[0]['observation_reference_sha256'];
+        $evidence = watchdogEvidence($authority, $centralRaw, ['events' => $events]);
+    },
+    'provider receipt reuses the captured central runtime evidence commitment' => function (array &$central, array &$evidence, array $authority, string &$providerReceipt): void {
+        $centralRaw = json_encode($central, JSON_THROW_ON_ERROR);
+        $providerReceipt = $centralRaw;
+        $evidence = watchdogEvidence($authority, $centralRaw, [
+            'provider_receipt_sha256' => hash('sha256', $centralRaw),
+        ]);
+    },
+    'provider receipt reuses an outage observation commitment' => function (array &$central, array &$evidence, array $authority, string &$providerReceipt): void {
+        $centralRaw = json_encode($central, JSON_THROW_ON_ERROR);
+        $events = watchdogEvents();
+        $providerReceipt = 'shared-provider-and-outage-proof';
+        $events[0]['observation_reference_sha256'] = hash('sha256', $providerReceipt);
+        $evidence = watchdogEvidence($authority, $centralRaw, [
+            'events' => $events,
+            'provider_receipt_sha256' => hash('sha256', $providerReceipt),
+        ]);
+    },
+    'provider receipt bytes do not match the signed commitment' => function (array &$central, array &$evidence, array $authority, string &$providerReceipt): void {
+        $centralRaw = json_encode($central, JSON_THROW_ON_ERROR);
+        $evidence = watchdogEvidence($authority, $centralRaw);
+        $providerReceipt = '{"receipt_reference":"PROVIDER-substituted"}';
+    },
+    'outage and alarm collapse to the same instant' => function (array &$central, array &$evidence, array $authority): void {
+        $centralRaw = json_encode($central, JSON_THROW_ON_ERROR);
+        $events = watchdogEvents();
+        $events[0]['alarm_raised_at'] = $events[0]['outage_started_at'];
+        $evidence = watchdogEvidence($authority, $centralRaw, ['events' => $events]);
+    },
+    'recovery and restored delivery collapse to the same instant' => function (array &$central, array &$evidence, array $authority): void {
+        $centralRaw = json_encode($central, JSON_THROW_ON_ERROR);
+        $events = watchdogEvents();
+        $events[0]['delivery_restored_at'] = $events[0]['recovery_started_at'];
+        $evidence = watchdogEvidence($authority, $centralRaw, ['events' => $events]);
+    },
 ]);
 
 it('rejects duplicate evidence keys before signature-backed semantic validation', function (): void {
@@ -233,6 +328,7 @@ it('rejects duplicate evidence keys before signature-backed semantic validation'
         base64_encode($signature),
         base64_encode($publicKey),
         $centralRaw,
+        watchdogProviderReceipt(),
         $authority,
         new DateTimeImmutable('2026-08-10T01:00:00Z'),
     ))->toThrow(RuntimeException::class, 'External watchdog release evidence is invalid.');

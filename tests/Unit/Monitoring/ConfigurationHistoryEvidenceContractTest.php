@@ -17,18 +17,87 @@ function configurationHistoryKeyPair(string $name): array
     })();
 }
 
+/** @return list<string> */
+function protectConfigurationHistoryArtifactDirectoryForContractTest(string $path): array
+{
+    if (DIRECTORY_SEPARATOR !== '\\') {
+        return [];
+    }
+
+    $script = <<<'POWERSHELL'
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+Import-Module (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1') -Force -ErrorAction Stop
+$path = [Environment]::GetEnvironmentVariable('OBLIVION_A10_UNIT_ACL_PATH', 'Process')
+$acl = Get-Acl -LiteralPath $path
+$acl.SetAccessRuleProtection($true, $true)
+Set-Acl -LiteralPath $path -AclObject $acl
+$verifiedAcl = Get-Acl -LiteralPath $path
+$identities = @($verifiedAcl.Access | Where-Object {
+    $_.AccessControlType.ToString() -eq 'Allow'
+} | ForEach-Object { $_.IdentityReference.Value } | Select-Object -Unique)
+if (-not $verifiedAcl.AreAccessRulesProtected -or $identities.Count -eq 0) {
+    throw 'The exact test ACL was not applied.'
+}
+[ordered]@{
+    protected = $verifiedAcl.AreAccessRulesProtected
+    identities = $identities
+} | ConvertTo-Json -Compress -Depth 3
+POWERSHELL;
+    $encodedScript = base64_encode(mb_convert_encoding($script, 'UTF-16LE', 'UTF-8'));
+    $previousAclPath = getenv('OBLIVION_A10_UNIT_ACL_PATH');
+    putenv('OBLIVION_A10_UNIT_ACL_PATH='.$path);
+    $process = proc_open(
+        ['powershell.exe', '-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', $encodedScript],
+        [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes,
+        null,
+        null,
+        ['bypass_shell' => true],
+    );
+    if (! is_resource($process)) {
+        throw new RuntimeException('Unable to prepare the exact test ACL.');
+    }
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $exit = proc_close($process);
+    $previousAclPath === false
+        ? putenv('OBLIVION_A10_UNIT_ACL_PATH')
+        : putenv('OBLIVION_A10_UNIT_ACL_PATH='.$previousAclPath);
+    if ($exit !== 0 || ! is_string($stdout) || trim($stdout) === '' || trim((string) $stderr) !== '') {
+        throw new RuntimeException('Unable to prepare the exact test ACL: '.trim((string) $stderr));
+    }
+    $result = json_decode($stdout, true, 8, JSON_THROW_ON_ERROR);
+    if (! is_array($result)
+        || ($result['protected'] ?? null) !== true
+        || ! is_array($result['identities'] ?? null)
+        || $result['identities'] === []) {
+        throw new RuntimeException('Unable to verify the exact test ACL.');
+    }
+
+    return array_values(array_unique($result['identities']));
+}
+
 /** @return array<string, mixed> */
 function verifiedConfigurationHistoryAuthorityForContractTest(): array
 {
     return [
         'authority_reference' => 'AUTHORITY-'.str_repeat('a', 32),
         'authority_sha256' => str_repeat('b', 64),
+        'backup_generation_reference' => 'BKP-'.str_repeat('e', 32),
+        'backup_manifest_sha256' => str_repeat('c', 64),
         'browser_public_key' => configurationHistoryKeyPair('browser')['public'],
         'evidence_acl_reference' => 'ACL-'.str_repeat('4', 32),
         'hmac_key_sha256' => hash('sha256', str_repeat('h', 32)),
         'production_public_key' => configurationHistoryKeyPair('production')['public'],
         'release_revision' => str_repeat('1', 40),
-        'restored_environment_reference_sha256' => str_repeat('a', 64),
+        'restored_environment_reference_sha256' => str_repeat('3', 64),
+        'restore_artifact_sha256' => str_repeat('f', 64),
+        'restore_authority_reference' => 'AUTHORITY-'.str_repeat('a', 32),
+        'restore_authority_sha256' => str_repeat('b', 64),
     ];
 }
 
@@ -276,6 +345,106 @@ it('rejects a browser companion signed by the production signer or lacking firmw
     expect(fn () => validateConfigurationBrowser($browser))->toThrow(InvalidArgumentException::class);
 });
 
+it('rejects browser evidence reused across the required desktop viewports', function (string $field): void {
+    $browser = validConfigurationHistoryBrowserEvidence();
+    $browser['viewports']['1440x900'][$field] = $browser['viewports']['1280x800'][$field];
+    $browser = signConfigurationHistoryDocument($browser, 'oblivion-a10-browser-evidence-v2', 'browser');
+
+    expect(fn () => validateConfigurationBrowser($browser))->toThrow(
+        InvalidArgumentException::class,
+        'Configuration history evidence contract is incomplete or unsafe.',
+    );
+})->with([
+    'capture file hash' => 'capture_sha256',
+    'network trace hash' => 'network_trace_sha256',
+    'capture evidence reference' => 'evidence_reference',
+]);
+
+it('rejects a retained capture relabelled as a network trace', function (): void {
+    $browser = validConfigurationHistoryBrowserEvidence();
+    $browser['viewports']['1280x800']['network_trace_sha256'] =
+        $browser['viewports']['1280x800']['capture_sha256'];
+    $browser = signConfigurationHistoryDocument($browser, 'oblivion-a10-browser-evidence-v2', 'browser');
+
+    expect(fn () => validateConfigurationBrowser($browser))->toThrow(
+        InvalidArgumentException::class,
+        'Configuration history evidence contract is incomplete or unsafe.',
+    );
+});
+
+it('requires every signed browser hash to match a retained private viewport artifact', function (): void {
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'a10-browser-artifacts-'.bin2hex(random_bytes(6));
+    mkdir($directory, 0700);
+    if (DIRECTORY_SEPARATOR !== '\\') {
+        chmod($directory, 0700);
+    }
+    $allowedIdentities = protectConfigurationHistoryArtifactDirectoryForContractTest($directory);
+    $previousDirectory = getenv('MONITORING_A10_EVIDENCE_DIRECTORY');
+    $previousAllowed = getenv('MONITORING_A10_WINDOWS_ACL_ALLOWED_IDENTITIES');
+    putenv('MONITORING_A10_EVIDENCE_DIRECTORY='.$directory);
+    putenv('MONITORING_A10_WINDOWS_ACL_ALLOWED_IDENTITIES='.implode('|', $allowedIdentities));
+    $paths = [];
+    $contents = [];
+
+    try {
+        $browser = validConfigurationHistoryBrowserEvidence();
+        foreach ($browser['viewports'] as $viewportName => &$viewport) {
+            foreach ([
+                'capture' => 'capture_sha256',
+                'network' => 'network_trace_sha256',
+            ] as $suffix => $hashField) {
+                $path = $directory.DIRECTORY_SEPARATOR.$viewport['evidence_reference'].'-'.$viewportName.'.'.$suffix;
+                $content = $viewportName.'-'.$suffix.'-retained-evidence';
+                file_put_contents($path, $content);
+                if (DIRECTORY_SEPARATOR !== '\\') {
+                    chmod($path, 0600);
+                }
+                $viewport[$hashField] = hash('sha256', $content);
+                $paths[] = $path;
+                $contents[$path] = $content;
+            }
+        }
+        unset($viewport);
+        $browser = signConfigurationHistoryDocument($browser, 'oblivion-a10-browser-evidence-v2', 'browser');
+        $browserPath = $directory.DIRECTORY_SEPARATOR.'browser-companion-v2.json';
+        file_put_contents($browserPath, json_encode($browser, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+        if (DIRECTORY_SEPARATOR !== '\\') {
+            chmod($browserPath, 0600);
+        }
+        $paths[] = $browserPath;
+
+        $contract = new ConfigurationHistoryEvidenceContract(
+            verifiedConfigurationHistoryAuthorityForContractTest(),
+            true,
+        );
+        $repositoryRoot = dirname(__DIR__, 3);
+        expect($contract->loadBrowserEvidence($browserPath, $repositoryRoot))
+            ->toMatchArray(['evidence_class' => 'restored-production-browser-companion']);
+
+        file_put_contents($paths[0], 'tampered-retained-evidence');
+        expect(fn () => $contract->loadBrowserEvidence($browserPath, $repositoryRoot))
+            ->toThrow(InvalidArgumentException::class);
+
+        file_put_contents($paths[0], $contents[$paths[0]]);
+        unlink($paths[1]);
+        expect(fn () => $contract->loadBrowserEvidence($browserPath, $repositoryRoot))
+            ->toThrow(InvalidArgumentException::class);
+    } finally {
+        foreach ($paths as $path) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+        rmdir($directory);
+        $previousDirectory === false
+            ? putenv('MONITORING_A10_EVIDENCE_DIRECTORY')
+            : putenv('MONITORING_A10_EVIDENCE_DIRECTORY='.$previousDirectory);
+        $previousAllowed === false
+            ? putenv('MONITORING_A10_WINDOWS_ACL_ALLOWED_IDENTITIES')
+            : putenv('MONITORING_A10_WINDOWS_ACL_ALLOWED_IDENTITIES='.$previousAllowed);
+    }
+});
+
 it('fails closed when exact restore browser firmware or immutable row linkage changes', function (Closure $mutate): void {
     $contract = new ConfigurationHistoryEvidenceContract;
     $manifest = validateConfigurationManifest(validConfigurationHistoryManifest());
@@ -347,6 +516,46 @@ it('refuses external evidence stored inside the repository', function (): void {
     expect(fn () => $contract->loadProductionManifest(__FILE__, dirname(__DIR__, 3)))
         ->toThrow(InvalidArgumentException::class);
 });
+
+it('rejects a re-signed production manifest and otherwise valid restore artifact with substituted V09 provenance', function (string $field): void {
+    $authority = verifiedConfigurationHistoryAuthorityForContractTest();
+    $provenance = [
+        'backup_generation_reference' => $authority['backup_generation_reference'],
+        'backup_manifest_sha256' => $authority['backup_manifest_sha256'],
+        'restore_artifact_sha256' => $authority['restore_artifact_sha256'],
+        'restore_authority_reference' => $authority['restore_authority_reference'],
+        'restore_authority_sha256' => $authority['restore_authority_sha256'],
+    ];
+    $manifest = validConfigurationHistoryManifest();
+    $manifest['restore']['evidence_sha256'] = str_repeat('0', 64);
+    $manifest = signConfigurationHistoryDocument($manifest, 'oblivion-a10-production-manifest-v2', 'production');
+    $restore = validConfigurationHistoryRestoreEvidence();
+    $restore[$field] = $field === 'restore_authority_reference'
+        ? 'AUTHORITY-'.str_repeat('0', 32)
+        : str_repeat('0', 64);
+
+    $contract = new ConfigurationHistoryEvidenceContract;
+    expect(fn () => $contract->validateProductionManifest(
+        $manifest,
+        CarbonImmutable::parse('2026-08-03T00:00:00Z'),
+        configurationHistoryKeyPair('production')['public'],
+        str_repeat('1', 40),
+        'ACL-'.str_repeat('4', 32),
+        str_repeat('3', 64),
+        $provenance,
+    ))->toThrow(InvalidArgumentException::class);
+    expect(fn () => $contract->validateRestoreEvidence(
+        $restore,
+        CarbonImmutable::parse('2026-08-03T00:00:00Z'),
+        str_repeat('1', 40),
+        str_repeat('3', 64),
+        $provenance,
+    ))->toThrow(InvalidArgumentException::class);
+})->with([
+    'restore_authority_reference',
+    'restore_authority_sha256',
+    'backup_manifest_sha256',
+]);
 
 it('rejects duplicate object keys at every depth before validating A10 evidence', function (string $encoded): void {
     $decode = new ReflectionMethod(ConfigurationHistoryEvidenceContract::class, 'decode');

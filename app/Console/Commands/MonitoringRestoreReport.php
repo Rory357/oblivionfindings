@@ -68,7 +68,8 @@ final class MonitoringRestoreReport extends Command
             && $this->snapshotConfigurationMatches()
             && $this->configuredValueMatches('MONITORING_CREDENTIAL_DRIVER', config('monitoring.credentials.driver'))
             && config('monitoring.credentials.driver') === 'vault'
-            && $this->configuredValueMatches('MONITORING_VAULT_URL', config('monitoring.credentials.vault.url'));
+            && $this->configuredValueMatches('MONITORING_VAULT_URL', config('monitoring.credentials.vault.url'))
+            && $this->runtimeCommitmentMatches();
     }
 
     private function snapshotConfigurationMatches(): bool
@@ -133,5 +134,42 @@ final class MonitoringRestoreReport extends Command
         return is_bool($expectedBoolean)
             && is_bool($configured)
             && $expectedBoolean === $configured;
+    }
+
+    private function runtimeCommitmentMatches(): bool
+    {
+        $expected = getenv('MONITORING_RESTORE_RUNTIME_COMMITMENT_SHA256');
+
+        return is_string($expected)
+            && preg_match('/\A[a-f0-9]{64}\z/', $expected) === 1
+            && hash_equals($expected, $this->runtimeCommitment());
+    }
+
+    private function runtimeCommitment(): string
+    {
+        $disk = config('filesystems.disks.monitoring-restore');
+        $disk = is_array($disk) ? $disk : [];
+        $identity = [
+            'database_url_sha256' => $this->configuredSha256(config('database.connections.mysql.url')),
+            'redis_url_sha256' => $this->configuredSha256(config('database.redis.default.url')),
+            'timeseries_url_sha256' => $this->configuredSha256(config('monitoring.storage.timeseries.url')),
+            'vault_url_sha256' => $this->configuredSha256(config('monitoring.credentials.vault.url')),
+            'credential_driver' => config('monitoring.credentials.driver'),
+            'snapshot_driver' => $disk['driver'] ?? null,
+            'snapshot_root_sha256' => $this->configuredSha256($disk['root'] ?? null),
+            'snapshot_key_sha256' => $this->configuredSha256($disk['key'] ?? null),
+            'snapshot_secret_sha256' => $this->configuredSha256($disk['secret'] ?? null),
+            'snapshot_region_sha256' => $this->configuredSha256($disk['region'] ?? null),
+            'snapshot_bucket_sha256' => $this->configuredSha256($disk['bucket'] ?? null),
+            'snapshot_endpoint_sha256' => $this->configuredSha256($disk['endpoint'] ?? null),
+            'snapshot_path_style' => $disk['use_path_style_endpoint'] ?? null,
+        ];
+
+        return hash('sha256', json_encode($identity, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function configuredSha256(mixed $value): ?string
+    {
+        return is_string($value) && $value !== '' ? hash('sha256', $value) : null;
     }
 }

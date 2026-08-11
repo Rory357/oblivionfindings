@@ -10,6 +10,7 @@ function restoreReleaseAuthorityRecord(array $overrides = []): array
         'authority_reference' => 'AUTHORITY-'.str_repeat('a', 32),
         'release_revision' => str_repeat('b', 40),
         'restored_environment_reference_sha256' => str_repeat('c', 64),
+        'restored_runtime_commitment_sha256' => str_repeat('f', 64),
         'backup_generation' => 'BKP-'.str_repeat('e', 32),
         'backup_manifest_sha256' => str_repeat('d', 64),
         'recovery_point_utc' => '2026-08-10T01:00:00Z',
@@ -49,6 +50,7 @@ it('accepts one exact protected restore release authority', function (): void {
         'backup_manifest_sha256' => str_repeat('d', 64),
         'release_revision' => str_repeat('b', 40),
         'restored_environment_reference_sha256' => str_repeat('c', 64),
+        'restored_runtime_commitment_sha256' => str_repeat('f', 64),
     ]);
 });
 
@@ -80,6 +82,9 @@ it('rejects unprotected stale ambiguous or unapproved restore authority data', f
     },
     'non UTC recovery start' => function (array &$record): void {
         $record['recovery_started_at_utc'] = '2026-08-10T01:10:00+00:00';
+    },
+    'malformed restored runtime commitment' => function (array &$record): void {
+        $record['restored_runtime_commitment_sha256'] = 'not-a-commitment';
     },
     'extra field' => function (array &$record): void {
         $record['endpoint'] = 'prohibited';

@@ -12,6 +12,8 @@ final class LoadSoakReleaseAuthorityVerifier
 
     private const int MAXIMUM_AUTHORITY_BYTES = 65_536;
 
+    private const int MAXIMUM_AUTHORITY_SECONDS = 86_400;
+
     private const array AUTHORITY_KEYS = [
         'attestation_public_key_sha256',
         'attestation_sha256',
@@ -71,8 +73,16 @@ final class LoadSoakReleaseAuthorityVerifier
                 return $this->invalid();
             }
 
+            $read = @fstat($handle);
+            $final = @lstat(self::AUTHORITY_PATH);
+            if (! is_array($read) || ! is_array($final)) {
+                return $this->invalid();
+            }
+
             $sameFile = $this->sameFile($before, $opened)
-                && $this->sameFile($opened, $after);
+                && $this->sameFile($opened, $after)
+                && $this->sameFile($after, $read)
+                && $this->sameFile($read, $final);
             $mode = $opened['mode'] ?? null;
             $metadata = [
                 'is_regular_file' => is_int($mode) && ($mode & 0170000) === 0100000,
@@ -142,6 +152,8 @@ final class LoadSoakReleaseAuthorityVerifier
             $environmentReferenceSha256 = $authority['environment_reference_sha256'] ?? null;
             $notBefore = $this->utc($authority['not_before'] ?? null);
             $notAfter = $this->utc($authority['not_after'] ?? null);
+            $attestationIssuedAt = $this->utc($attestation['issued_at'] ?? null);
+            $attestationExpiresAt = $this->utc($attestation['expires_at'] ?? null);
             $verifiedAt = $verifiedAt->setTimezone(new DateTimeZone('UTC'));
 
             $valid = ($authority['schema_version'] ?? null) === 1
@@ -163,8 +175,14 @@ final class LoadSoakReleaseAuthorityVerifier
                 && $notBefore !== null
                 && $notAfter !== null
                 && $notBefore < $notAfter
+                && $notAfter->getTimestamp() - $notBefore->getTimestamp() <= self::MAXIMUM_AUTHORITY_SECONDS
                 && $verifiedAt >= $notBefore
-                && $verifiedAt <= $notAfter;
+                && $verifiedAt <= $notAfter
+                && $attestationIssuedAt !== null
+                && $attestationExpiresAt !== null
+                && $notBefore <= $attestationIssuedAt
+                && $attestationIssuedAt <= $attestationExpiresAt
+                && $attestationExpiresAt <= $notAfter;
 
             return $valid
                 ? [
@@ -204,13 +222,15 @@ final class LoadSoakReleaseAuthorityVerifier
     /** @param array<string|int, mixed> $left @param array<string|int, mixed> $right */
     private function sameFile(array $left, array $right): bool
     {
-        return isset($left['dev'], $left['ino'], $right['dev'], $right['ino'])
-            && is_int($left['dev'])
-            && is_int($left['ino'])
-            && is_int($right['dev'])
-            && is_int($right['ino'])
-            && $left['dev'] === $right['dev']
-            && $left['ino'] === $right['ino'];
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (! array_key_exists($key, $left)
+                || ! array_key_exists($key, $right)
+                || $left[$key] !== $right[$key]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @param array<string, mixed> $value */

@@ -203,34 +203,55 @@ The independent watcher/reviewer signs one exact duplicate-free JSON record with
 the Ed25519 key whose raw public-key SHA-256 is pinned in the same protected
 central-runtime authority. The record binds the exact captured central-runtime
 JSON SHA-256, authority, environment and release; an opaque immutable provider
-receipt; and four sequential events in this exact order: `scheduler_outage`,
+receipt whose SHA-256 differs from the captured central-runtime JSON and every
+outage observation reference; and four sequential events in this exact order: `scheduler_outage`,
 `worker_outage`, `listener_outage`, `regional_outage`. Each event contains only
 `kind`, whole-second UTC `outage_started_at`, `alarm_raised_at`,
-`recovery_started_at`, `delivery_restored_at`, `alarm_recovered_at`, and an
-opaque 64-hex `observation_reference_sha256`. The alarm must appear within six
-minutes and recovery must reconcile within 30 minutes of the recorded recovery
-start. Do not include the watchdog URL, Site, Device, region name, PID, queue,
+`recovery_started_at`, `delivery_restored_at`, `alarm_recovered_at`, and a
+unique opaque observation reference in 64-hex `observation_reference_sha256`.
+An observation reference cannot be reused for a different outage kind. The
+outage must precede its alarm, the recovery action must precede restored
+delivery, the alarm must appear within six minutes, and recovery must reconcile
+within 30 minutes of the recorded recovery start. Do not include the watchdog
+URL, Site, Device, region name, PID, queue,
 credential, provider response or private incident narrative.
 
 Store the captured central-runtime JSON, signed watchdog JSON, detached Base64
-signature and Base64 public key as stable regular external files outside the
-checkout with no group/other write bit. Verify them from the same clean release:
+signature, Base64 public key and exact retained provider receipt bytes as stable
+regular external files outside the checkout with no group/other write bit. The
+verifier hashes the retained receipt itself and requires it to equal the signed
+`provider_receipt_sha256`; a signed random hash or missing receipt cannot prove
+provider delivery. The published result also retains the exact raw signed-watchdog and detached-signature SHA-256 values, so the immutable receipt must cover that digest-addressed review/signature package rather than an interchangeable record carrying the same opaque evidence reference. Verify them from the same clean release:
 
 ```bash
 /usr/bin/php8.4 scripts/monitoring/verify-external-watchdog-evidence.php \
   --central-runtime-evidence=/approved-evidence/central-runtime.json \
   --evidence=/approved-evidence/external-watchdog.json \
+  --provider-receipt=/approved-evidence/provider-receipt \
   --public-key=/approved-evidence/external-watchdog-public-key.base64 \
-  --signature=/approved-evidence/external-watchdog.sig.base64
+  --signature=/approved-evidence/external-watchdog.sig.base64 \
+  --output-directory=/approved-evidence/watchdog-verification
 ```
 
 The verifier revalidates the installed authority and exact clean checkout,
 rejects local/substituted signers, recursively duplicated keys, fewer than 15
 central samples, fewer than 11 supervised groups, missing/overlapping outage
 classes, late alarm/recovery, cross-authority/runtime evidence and future or
-out-of-window chronology. Its value-free result is only the external-watchdog
-companion; A02/L05 also require the genuine central runtime, Site-path and
-collector correlation evidence described in this runbook.
+out-of-window chronology. It pins the central-runtime artifact, signed watchdog
+record, detached signature and public key through verification and publication,
+then rechecks the protected authority and clean checkout after publication. The
+output directory must already exist outside the checkout, be owned by the
+service account and have exact mode `0700`. The verifier exclusively creates
+one mode-`0600` value-free JSON result and matching `.sha256` sidecar, flushes
+and syncs both, then after all final source/authority checks reopens both
+outputs and requires their exact bytes, private owner/mode and stable identities
+before reporting success. Collisions preserve pre-existing files and partial publication removes
+only current-run files. The checksum detects later change but does not prove
+immutable storage, so `worm_receipt_verified=false` remains explicit and an
+independent WORM/retention receipt is still required. This value-free result is
+only the external-watchdog companion; A02/L05 also require the genuine central
+runtime, Site-path and collector correlation evidence described in this
+runbook.
 
 ## Containment that preserves evidence
 

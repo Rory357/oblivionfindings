@@ -42,7 +42,9 @@ decoded 32-byte public key equals the key hash in the protected authority record
 at exactly `/etc/oblivion/monitoring-load-soak-authority.json`. There is no CLI
 or environment override for this path. A missing authority record, non-Linux
 runtime, symlink, non-regular file, non-root owner, group/other writable mode, or
-file identity change while it is read fails closed.
+file identity or metadata change while it is read fails closed. The verifier
+compares device, inode, mode, owner, size and modification time before opening,
+through the completed read and again at the fixed path afterward.
 
 The authority record is a duplicate-free exact JSON object:
 
@@ -66,7 +68,7 @@ file with no group or other write permission. The opaque authority reference
 identifies the approval without carrying an operator, Site, Device, endpoint,
 credential or payload. The record binds the exact source bytes, exact
 attestation bytes, exact release, environment reference and signer key and must
-be valid at verification time. Extra fields, duplicate keys, fractional times,
+be valid at verification time. Its validity window is positive and no longer than 24 hours. Extra fields, duplicate keys, fractional times,
 an invalid interval, changed hash or changed key fail. The evidence,
 attestation, public-key input and protected authority record remain independent;
 no key identity declared inside the source or caller environment is trusted.
@@ -81,8 +83,11 @@ The detached signature covers a canonical object containing:
 
 The attestation must be issued no earlier than the completed source record, no
 later than verifier time plus the 60-second clock allowance, and must remain
-unexpired. A changed source byte, wrong pinned key, changed release/profile,
-different Supervisor generation, expired statement or invalid signature fails.
+unexpired. Its signed issue and expiry UTC values must both fall within the
+same protected authority window (with issue no later than expiry); a newly
+installed authority cannot relabel an older still-unexpired attestation. A
+changed source byte, wrong pinned key, changed release/profile, different
+Supervisor generation, expired statement or invalid signature fails.
 
 ## Version 2 source contract
 
@@ -126,7 +131,9 @@ observation supplies the same source/metric hashes, a positive raw measurement
 sample count, an opaque observation SHA-256, and exact measurement-window start
 and end times. This binds the aggregate p95, p99, error and queue values to a
 reviewed telemetry definition without retaining metric values or endpoints in
-the verification artifact.
+the verification artifact. Each interval and the recovery observation must use
+a distinct `observation_sha256`; one retained measurement record cannot be
+relabelled across several windows.
 
 ### Exact supervised runtime roster
 
@@ -195,7 +202,10 @@ php scripts/monitoring/verify-load-soak-evidence.php \
 
 Release mode exits zero with `status: passed` only when the source contract and
 independently pinned Ed25519 attestation both pass and the fixed protected
-authority record is verified. It also fails unless the verifier itself is
+authority record is verified. The governed source, platform attestation and
+public key must be stable private regular files outside the checkout; their
+device, inode, mode, owner, size and modification time remain pinned through
+publication. It also fails unless the verifier itself is
 running from the exact clean deployed source checkout whose `HEAD` and
 `refs/remotes/origin/main` both equal the authority-bound release revision;
 missing Git state, a nested checkout path, tracked or non-ignored untracked
@@ -227,8 +237,15 @@ run, release, environment, profile, measurement contract and Supervisor
 generation without emitting targets, credentials, payloads, Sites, Devices,
 process references or measurement values.
 
-The verifier uses exclusive file creation, flush and filesystem sync. This is
-collision-safe publication, not proof of immutability. It records
+Release output requires a pre-existing service-account-owned directory outside
+the checkout with exact mode `0700`. The verifier exclusively creates one
+mode-`0600` JSON artifact and matching `.sha256` sidecar, verifies complete
+writes and stable file identity, flushes and filesystem-syncs both, then
+revalidates the protected authority, clean exact checkout, retained inputs and
+output-directory identity, then reopens both outputs and requires their exact
+bytes, private owner/mode and stable identities before reporting success. A collision preserves the
+pre-existing file and a partial publication removes only files created by the
+current run. This is collision-safe publication, not proof of immutability. It records
 `output_storage_semantics: collision_safe_exclusive_create` and
 `worm_receipt_verified: false`. If release policy requires immutable retention,
 move the closed artifact through the approved evidence workflow into WORM or

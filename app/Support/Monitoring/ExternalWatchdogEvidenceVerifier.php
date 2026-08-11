@@ -72,6 +72,7 @@ final class ExternalWatchdogEvidenceVerifier
         string $encodedSignature,
         string $encodedPublicKey,
         string $rawCentralRuntimeEvidence,
+        string $rawProviderReceipt,
         array $authority,
         ?DateTimeImmutable $now = null,
     ): array {
@@ -141,6 +142,12 @@ final class ExternalWatchdogEvidenceVerifier
                 || ($evidence['evidence_class'] ?? null) !== 'monitoring_external_watchdog_release_evidence_v1'
                 || ! $this->matches($evidence['watchdog_evidence_reference'] ?? null, '/\AWATCHDOG-[a-f0-9]{32}\z/')
                 || ! $this->sha($evidence['provider_receipt_sha256'] ?? null)
+                || $rawProviderReceipt === ''
+                || strlen($rawProviderReceipt) > 65_536
+                || ! hash_equals(
+                    (string) $evidence['provider_receipt_sha256'],
+                    hash('sha256', $rawProviderReceipt),
+                )
                 || ! $this->sha($evidence['central_runtime_evidence_sha256'] ?? null)
                 || ! hash_equals(
                     (string) $evidence['central_runtime_evidence_sha256'],
@@ -174,6 +181,7 @@ final class ExternalWatchdogEvidenceVerifier
                 $this->refuse();
             }
             $previousRecovered = $exerciseStarted;
+            $observationReferences = [];
             foreach (self::EVENT_KINDS as $index => $kind) {
                 $event = $events[$index] ?? null;
                 if (! is_array($event)
@@ -182,6 +190,11 @@ final class ExternalWatchdogEvidenceVerifier
                     || ! $this->sha($event['observation_reference_sha256'] ?? null)) {
                     $this->refuse();
                 }
+                $observationReference = (string) $event['observation_reference_sha256'];
+                if (isset($observationReferences[$observationReference])) {
+                    $this->refuse();
+                }
+                $observationReferences[$observationReference] = true;
                 $outageStarted = $this->utc($event['outage_started_at'] ?? null);
                 $alarmRaised = $this->utc($event['alarm_raised_at'] ?? null);
                 $recoveryStarted = $this->utc($event['recovery_started_at'] ?? null);
@@ -193,16 +206,23 @@ final class ExternalWatchdogEvidenceVerifier
                     || $deliveryRestored === null
                     || $alarmRecovered === null
                     || $outageStarted < $previousRecovered
-                    || $outageStarted > $alarmRaised
+                    || $outageStarted >= $alarmRaised
                     || ($alarmRaised->getTimestamp() - $outageStarted->getTimestamp()) > self::MAXIMUM_ALARM_SECONDS
                     || $alarmRaised > $recoveryStarted
-                    || $recoveryStarted > $deliveryRestored
+                    || $recoveryStarted >= $deliveryRestored
                     || $deliveryRestored > $alarmRecovered
                     || ($alarmRecovered->getTimestamp() - $recoveryStarted->getTimestamp()) > self::MAXIMUM_RECOVERY_SECONDS
                     || $alarmRecovered > $exerciseCompleted) {
                     $this->refuse();
                 }
                 $previousRecovered = $alarmRecovered;
+            }
+            if (isset($observationReferences[(string) $evidence['provider_receipt_sha256']])
+                || hash_equals(
+                    (string) $evidence['provider_receipt_sha256'],
+                    (string) $evidence['central_runtime_evidence_sha256'],
+                )) {
+                $this->refuse();
             }
 
             return [
@@ -213,6 +233,8 @@ final class ExternalWatchdogEvidenceVerifier
                 'environment_reference_sha256' => $authority['environment_reference_sha256'],
                 'release_revision' => $authority['release_revision'],
                 'central_runtime_evidence_sha256' => hash('sha256', $rawCentralRuntimeEvidence),
+                'signed_watchdog_evidence_sha256' => hash('sha256', $rawEvidence),
+                'detached_signature_sha256' => hash('sha256', $signature),
                 'watchdog_evidence_reference' => $evidence['watchdog_evidence_reference'],
                 'provider_receipt_sha256' => $evidence['provider_receipt_sha256'],
                 'events_verified' => count(self::EVENT_KINDS),

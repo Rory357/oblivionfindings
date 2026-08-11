@@ -6,6 +6,7 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
     $processEnvironment = (string) file_get_contents($root.'/app/Support/Monitoring/S10ProcessEnvironment.php');
     $protectedRuntimeEnvironment = (string) file_get_contents($root.'/app/Support/Monitoring/S10ProtectedRuntimeEnvironment.php');
     $nativeProcess = (string) file_get_contents($root.'/app/Support/Monitoring/S10NativeProcessRunner.php');
+    $pinnedChild = (string) file_get_contents($root.'/app/Support/Monitoring/S10PinnedChildSource.php');
     $script = (string) file_get_contents($root.'/scripts/monitoring/verify-s10-release-evidence.php');
     $runbook = (string) file_get_contents($root.'/docs/runbooks/monitoring/s10-release-evidence.md');
 
@@ -15,6 +16,11 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         'is_link(self::AUTHORITY_PATH)',
         '@lstat(self::AUTHORITY_PATH)',
         "@fopen(self::AUTHORITY_PATH, 'rb')",
+        '$read = @fstat($handle)',
+        '$final = @lstat(self::AUTHORITY_PATH)',
+        '$this->sameFile($after, $read)',
+        '$this->sameFile($read, $final)',
+        "['dev', 'ino', 'mode', 'uid', 'size', 'mtime']",
         '($mode & 0170000) === 0100000',
         '($mode & 0022) === 0',
         "(\$metadata['owner_uid'] ?? null) === 0",
@@ -26,7 +32,7 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         "'authority_reference'",
         'MAXIMUM_AUTHORITY_SECONDS = 86_400',
         'public function identitiesRemainPinned(array $snapshots): bool',
-        'count($snapshots) !== 4',
+        'count($snapshots) < 4',
     )->not->toContain(
         'getenv(',
         '$_ENV',
@@ -86,10 +92,20 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         'microtime(true) + $timeoutSeconds',
         '@proc_terminate($process)',
         'strlen($stdout) > $maximumOutputBytes',
+        'strlen($standardInput) > 65_536',
+        'fwrite($pipes[0], substr($standardInput, $inputOffset))',
         "'successful' => \$exitCode === 0",
     )->not->toContain(
         'Symfony',
         'vendor/autoload.php',
+    );
+
+    expect($pinnedChild)->toContain(
+        'MAXIMUM_SOURCE_BYTES = 32_768',
+        'is_link($path)',
+        "@fopen(\$path, 'rb')",
+        'hash_equals($committedSource, $source)',
+        "['dev', 'ino', 'mode', 'uid', 'size', 'mtime']",
     );
 
     expect($script)->toContain(
@@ -99,6 +115,11 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         '$queclinkBefore = $identitySnapshot();',
         '$queclinkAfter = $identitySnapshot();',
         '$authorityVerifier->identitiesRemainPinned($snapshots)',
+        '$publicationBefore = $identitySnapshot();',
+        '$publicationAfter = $authorityVerifier->verifyInstalled(',
+        "\$finalHead = \$git(['rev-parse', '--verify', 'HEAD'])",
+        "\$finalOriginMain = \$git(['rev-parse', '--verify', 'refs/remotes/origin/main'])",
+        "\$finalStatus = \$git(['status', '--porcelain=v1', '--untracked-files=all'])",
         "'rev-parse', '--verify', 'HEAD'",
         "'rev-parse', '--verify', 'refs/remotes/origin/main'",
         "'rev-parse', '--show-toplevel'",
@@ -108,6 +129,7 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         "S10_PHP_BINARY = '/usr/bin/php8.4'",
         'S10_CHILD_BOOTSTRAP',
         "'/app/Support/Monitoring/S10NativeProcessRunner.php'",
+        "'/app/Support/Monitoring/S10PinnedChildSource.php'",
         "'/app/Support/Monitoring/S10ProtectedRuntimeEnvironment.php'",
         'is_link($path) || ! is_file($path)',
         'require_once $path',
@@ -122,11 +144,18 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         "'-p'",
         'readonly S10_CHILD_PHP_BINARY="$OBLIVION_S10_PHP_BINARY"',
         'readonly -f php',
+        'source /dev/stdin "$@"',
+        "['cat-file', 'blob', 'HEAD:'.\$relativePath]",
+        'new S10PinnedChildSource',
+        "\$fail('child_source')",
+        '65_536,',
+        '$protocolSource',
+        '$queclinkSource',
         "'core.fsmonitor=false'",
         "'core.untrackedCache=false'",
         "trim(\$result['stderr'])",
-        "'/scripts/monitoring/verify-protocol-policy-evidence.sh'",
-        "'/scripts/monitoring/verify-queclink-native-listener-evidence.sh'",
+        "'scripts/monitoring/verify-protocol-policy-evidence.sh'",
+        "'scripts/monitoring/verify-queclink-native-listener-evidence.sh'",
         "\$integerArgument('protocol-samples', 15, 15, 120)",
         "\$integerArgument('interval-seconds', 60, 60, 60)",
         "\$integerArgument('window-minutes', 60, 60, 60)",
@@ -140,7 +169,23 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         "'runtime_environment_sha256' => \$protocolBefore['runtime_environment_sha256']",
         "'sha256' => hash('sha256', \$protocolRaw)",
         "'sha256' => hash('sha256', \$queclinkRaw)",
-        "fopen(\$artifactPath, 'x+b')",
+        "fopen(\$path, 'x+b')",
+        '($outputDirectoryBefore[\'mode\'] ?? 0) & 0777) !== 0700',
+        "function_exists('posix_geteuid') ? posix_geteuid() : false",
+        'chmod($path, 0600)',
+        "(\$opened['mode'] ?? 0) & 0777) !== 0600",
+        "\$checksumFile = \$artifactFile.'.sha256'",
+        "\$checksumEncoded = \$artifactSha256.'  '.\$artifactFile.PHP_EOL",
+        '$writeExclusivePrivate($artifactPath, $encoded)',
+        '$writeExclusivePrivate($checksumPath, $checksumEncoded)',
+        '$publishedRemainsExact = static function',
+        'hash_equals($expected, $contents)',
+        '$publishedRemainsExact($artifactPath, $encoded)',
+        '$publishedRemainsExact($checksumPath, $checksumEncoded)',
+        "'artifact_sha256' => \$artifactSha256",
+        "'checksum_file' => \$checksumFile",
+        'if ($artifactPublished)',
+        'if ($checksumPublished)',
         "'output_storage_semantics' => 'collision_safe_exclusive_create'",
         "'worm_receipt_verified' => false",
         "'s10_release_evidence' => true",
@@ -155,6 +200,11 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         'Symfony',
     );
 
+    expect(strrpos($script, '$publishedRemainsExact($artifactPath, $encoded)'))
+        ->toBeGreaterThan(strrpos($script, '$publicationAfter = $authorityVerifier->verifyInstalled('))
+        ->and(strrpos($script, '$publishedRemainsExact($checksumPath, $checksumEncoded)'))
+        ->toBeGreaterThan(strrpos($script, '$finalStatus = $git(['));
+
     expect($runbook)->toContain(
         '`/etc/oblivion/security-devices-s10-release-authority.json`',
         'verify-s10-release-evidence.php',
@@ -162,5 +212,11 @@ it('binds UniFi Milesight and native Queclink evidence to one protected deployed
         '`queclink_transport: native_tcp`',
         'does not create or claim a Queclink',
         'exact deployed revision and value-free environment reference',
+        'exact POSIX mode',
+        'matching `.sha256` sidecar',
+        'reopens both output files',
+        'After the final authority and',
+        'checkout checks, the gate reopens',
+        'checkout before reopening the outputs',
     );
 });

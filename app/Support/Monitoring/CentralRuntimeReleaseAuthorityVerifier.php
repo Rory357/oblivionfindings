@@ -143,6 +143,37 @@ final class CentralRuntimeReleaseAuthorityVerifier
         ];
     }
 
+    /** @param list<array<string, int|string>> $snapshots */
+    public function identitiesRemainPinned(array $snapshots): bool
+    {
+        if (count($snapshots) < 2) {
+            return false;
+        }
+        foreach ([
+            'application_path_sha256',
+            'authority_reference',
+            'authority_sha256',
+            'environment_reference_sha256',
+            'health_url_sha256',
+            'release_revision',
+            'supervisor_configuration_sha256',
+            'watchdog_attestation_public_key_sha256',
+        ] as $key) {
+            $expected = $snapshots[0][$key] ?? null;
+            if (! is_string($expected)) {
+                return false;
+            }
+            foreach ($snapshots as $snapshot) {
+                $actual = $snapshot[$key] ?? null;
+                if (! is_string($actual) || ! hash_equals($expected, $actual)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     /** @param array<string, mixed> $metadata */
     private function protectedMetadata(array $metadata): bool
     {

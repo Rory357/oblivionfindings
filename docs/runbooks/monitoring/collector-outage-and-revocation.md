@@ -203,34 +203,40 @@ more than 24 hours, and contain only:
   combined exercise, plus exact UTC `not_before` and `not_after` bounds.
 
 There is no command-line or environment override for that trust root. The
-signed `monitoring_collector_release_evidence_v1` document must link the exact
+signed `monitoring_collector_release_evidence_v2` document must link the exact
 authority hash/reference, environment, revision, remote Site, load balancer and
 the byte hashes of the initial-active, revoked and replacement-active v2
 transport documents. It records only opaque commitments and bounded counts. It
 must prove all application instances were reviewed during this exercise; the dedicated CA, proxy,
 verified-certificate-header replacement, disabled legacy header, shared Redis,
-`nginx -t`, load-balancer routing and cross-instance replay evidence; and the
+`nginx -t`, load-balancer routing and cross-instance replay evidence. The
+dedicated-CA, proxy and shared-Redis configuration hashes must be pairwise
+distinct and must each differ from replay, routing and nginx-validation
+evidence; and the
 single pinned-roster outage/recovery, unrelated-Site and roster-drift negative
 check. It also binds one post-recovery accepted credentialed protocol lease with a clean
 plaintext scan, the ordered central revocation/replacement audits, replacement
 and general-token reuse denials, current replacement heartbeat and zero
-backlog.
+backlog. The replacement heartbeat requires its own timestamp and immutable evidence reference: it must follow the replacement transport proof, precede the restored-service evidence, and remain within the fixed 180-second collector freshness boundary when the combined exercise completes. A boolean `current` assertion without that chronology cannot close A03. Every event-specific evidence reference in that exercise must be distinct across deployment replay/routing validation, outage/correlation/roster proof, credential use and scan, revocation, replacement issue/consumption, denial, heartbeat and restored service; one retained record cannot be relabelled as several completed checks.
 
 The verifier requires the same collector reference across all three transport
 documents, the old signing key and identity generation across initial-active
 and revoked evidence, and fresh signing and identity-generation references in
 the replacement-active evidence. Every transport phase is exactly five
 samples. Deployment review, credential observation, revocation, revoked
-transport, replacement issue/consumption, replacement transport, reuse denials
-and restored-service evidence must form one ordered interval inside the
-authority window. The outage must contain buffered evidence, exactly one root
+transport, replacement issue/consumption, replacement transport, reuse denials,
+the replacement heartbeat timestamp and immutable evidence reference, and
+restored-service evidence must form one ordered interval inside the
+authority window. Both token-denial timestamps must be at or after replacement
+transport completion and at or before the replacement heartbeat; the two
+denial attempts may occur in either order. The outage must contain buffered evidence, exactly one root
 correlation, the complete pinned monitor roster returning after its boundary,
 matching non-zero acknowledged/highest sequences, zero final gap/corruption,
 and downstream recovery before revocation.
 
 Retain the three transport JSON documents, signed combined document, detached
 signature and public key in a private external directory outside the checkout,
-then run from the exact deployed release:
+and retain the verifier's exact raw signed-collector and detached-signature SHA-256 values with that digest-addressed package. This prevents a different independently re-signed exercise carrying the same opaque `evidence_reference` from being substituted behind an otherwise identical verification result. Then run from the exact deployed release:
 
 ```bash
 /usr/bin/php8.4 scripts/monitoring/verify-collector-release-evidence.php \
@@ -239,19 +245,31 @@ then run from the exact deployed release:
   --replacement-transport=/private/evidence/collector-replacement.json \
   --evidence=/private/evidence/collector-exercise.json \
   --signature=/private/evidence/collector-exercise.sig \
-  --public-key=/private/evidence/collector-exercise.pub
+  --public-key=/private/evidence/collector-exercise.pub \
+  --output-directory=/private/evidence/collector-verification
 ```
 
 The verifier accepts only stable regular external files that are not
 group/other writable, a clean exact `HEAD == origin/main` checkout, and one
 protected authority, environment, revision, remote Site and load balancer
-before and after verification. It emits a single value-free result and fails
-closed on mixed runs, substituted signers, incomplete rosters, weak deployment
-review, chronology drift or authority/revision replacement. This executable
-gate makes the deployed evidence coherent; running it with local fixtures or
-without the real remote collector, load balancer, shared Redis, controlled
-outage, credential lease and revocation/re-enrolment exercise does not itself
-close A03.
+before verification, after verification and after publication. It rechecks all
+three transport documents, the signed combined document, detached signature
+and public key after verification and again after publication. The output
+directory must already exist outside the checkout, be owned by the service
+account and have exact mode `0700`. The verifier exclusively creates one
+mode-`0600` value-free JSON result and matching `.sha256` sidecar, flushes and
+syncs both, then after all final source/authority checks reopens both outputs
+and requires their exact bytes, private owner/mode and stable identities before
+reporting success. A collision never overwrites or removes a pre-existing file; partial
+publication removes only files created by the current run. The checksum detects
+later change but is not immutable retention, so `worm_receipt_verified=false`
+remains explicit and a separate WORM/retention receipt is required. The gate
+fails closed on mixed runs, substituted signers, incomplete rosters, weak
+deployment review, chronology drift or authority/revision/input replacement.
+This executable gate makes the deployed evidence coherent; running it with
+local fixtures or without the real remote collector, load balancer, shared
+Redis, controlled outage, credential lease and revocation/re-enrolment exercise
+does not itself close A03.
 
 ## Escalation, repair rule, and closure evidence
 

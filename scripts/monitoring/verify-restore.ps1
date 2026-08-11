@@ -200,7 +200,8 @@ function Get-RestoreReleaseAuthority {
         'recovery_point_utc',
         'recovery_started_at_utc',
         'release_revision',
-        'restored_environment_reference_sha256'
+        'restored_environment_reference_sha256',
+        'restored_runtime_commitment_sha256'
     ) | Sort-Object
     $actual = @($authority.PSObject.Properties.Name) | Sort-Object
     if ((Compare-Object -ReferenceObject $expected -DifferenceObject $actual).Count -ne 0) {
@@ -351,7 +352,8 @@ $variables = @(
     'MONITORING_TIMESERIES_URL',
     'MONITORING_SNAPSHOT_DISK',
     'MONITORING_CREDENTIAL_DRIVER',
-    'MONITORING_VAULT_URL',
+        'MONITORING_VAULT_URL',
+        'MONITORING_RESTORE_RUNTIME_COMMITMENT_SHA256',
     'PATH',
     'PHPRC',
     'PHP_INI_SCAN_DIR',
@@ -375,6 +377,7 @@ try {
     [Environment]::SetEnvironmentVariable('MONITORING_SNAPSHOT_DISK', $ObjectDisk, 'Process')
     [Environment]::SetEnvironmentVariable('MONITORING_CREDENTIAL_DRIVER', 'vault', 'Process')
     [Environment]::SetEnvironmentVariable('MONITORING_VAULT_URL', $VaultUrl, 'Process')
+    [Environment]::SetEnvironmentVariable('MONITORING_RESTORE_RUNTIME_COMMITMENT_SHA256', $releaseAuthority.restored_runtime_commitment_sha256, 'Process')
     [Environment]::SetEnvironmentVariable('PATH', '/usr/bin:/bin', 'Process')
     [Environment]::SetEnvironmentVariable('PHPRC', $null, 'Process')
     [Environment]::SetEnvironmentVariable('PHP_INI_SCAN_DIR', $null, 'Process')
@@ -441,6 +444,10 @@ try {
         [StringComparison]::Ordinal
     )) {
         throw 'The protected restore release authority changed during verification.'
+    }
+    & $phpPath artisan monitoring:reconcile-restore --assert-process-config --config-only
+    if ($LASTEXITCODE -ne 0) {
+        throw "Restore process configuration changed before evidence publication."
     }
     $evidence = [ordered]@{}
     $evidence['schema_version'] = 3
@@ -509,6 +516,18 @@ try {
             -or -not [string]::Equals($utf8.GetString($checksumBytes), $readbackChecksum, [StringComparison]::Ordinal)) {
             throw 'Restore evidence publication could not be read back exactly.'
         }
+
+        $postPublicationReleaseRevision = Get-ReleaseRevision -GitPath $gitPath -Checkout $resolvedApplication
+        $postPublicationReleaseAuthority = Get-RestoreReleaseAuthority -PhpPath $phpPath -Checkout $resolvedApplication
+        if (-not [string]::Equals($releaseRevision, $postPublicationReleaseRevision, [StringComparison]::Ordinal) `
+            -or -not [string]::Equals(
+                $releaseAuthority.authority_sha256,
+                $postPublicationReleaseAuthority.authority_sha256,
+                [StringComparison]::Ordinal
+            )) {
+            throw 'The protected release identity changed during restore evidence publication.'
+        }
+        Assert-PrivateEvidenceDirectory -Path $resolvedOutputDirectory
         $evidenceCommitted = $true
     } finally {
         if ($null -ne $evidenceStream) {

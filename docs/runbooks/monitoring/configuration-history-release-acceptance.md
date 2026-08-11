@@ -27,8 +27,10 @@ non-symlink file, not group- or other-writable, and valid for no more than 24
 hours. Its duplicate-key-free exact schema contains `schema_version=1`,
 `evidence_class=monitoring_configuration_history_release_authority_v1`, opaque
 `AUTHORITY-` and `ACL-` references, the exact 40-hex release revision, the
-restored-environment SHA-256 reference, distinct production and browser Ed25519
-public keys, SHA-256 of the secret HMAC key, and exact UTC validity bounds. The
+restored-environment SHA-256 reference, the exact V09 restore artifact, restore
+authority, immutable backup-manifest SHA-256 and backup-generation commitments,
+distinct production and browser Ed25519 public keys, SHA-256 of the secret HMAC
+key, and exact UTC validity bounds. The
 private signing keys remain on their independent review systems.
 
 Use the same isolated restore process that passed `monitoring:reconcile-restore --assert-process-config`. Before invoking A10, export only these runtime values without printing them:
@@ -64,9 +66,9 @@ The production manifest must contain exactly:
 - Signed opaque `CHG-`, `OP-` and `RV-` references and an approved decision.
 - The production attestation envelope.
 
-The browser companion must contain exactly the restored environment classification, current release, protected restored-environment reference, same backup/ACL references, changed snapshot ID/UUID, capacity-series ID, changed content/diff/firmware/capacity HMAC commitments, the configuration/firmware route contract, and both viewport objects. Each viewport object contains `status=passed`, an opaque `CAPTURE-` reference, SHA-256 of the retained capture, and SHA-256 of the retained network trace. The browser attestation binds all of it.
+The browser companion must contain exactly the restored environment classification, current release, protected restored-environment reference, same backup/ACL references, changed snapshot ID/UUID, capacity-series ID, changed content/diff/firmware/capacity HMAC commitments, the configuration/firmware route contract, and both viewport objects. Each viewport object contains `status=passed`, an opaque `CAPTURE-` reference, SHA-256 of the retained capture, and SHA-256 of the retained network trace. The capture hash, network-trace hash and opaque evidence reference must each be distinct between the two required viewports, and all four retained artifact hashes are globally distinct; one browser run cannot be relabelled as both viewports and a capture cannot be copied into the network-trace evidence class. The browser attestation binds all of it. Beside the signed companion, store each retained file using the exact opaque names `<CAPTURE-reference>-<viewport>.capture` and `<CAPTURE-reference>-<viewport>.network`, where viewport is `1280x800` or `1440x900`. The gate streams and hashes all four files, limits each to 512 MiB, and requires a stable regular non-symlink private file inside the protected evidence directory. A signed hash without its exact retained artifact fails.
 
-Keep the production manifest, the exact verified restore reconciliation JSON and its adjacent exact-name `.sha256` sidecar, and the browser companion inside the private evidence directory. They must be regular non-symlink files no larger than 64 KiB; never commit them. The gate recomputes the restore JSON hash, verifies the sidecar names that exact JSON file, and accepts only a verified V3 restore artifact carrying the protected restore-authority reference/hash and immutable backup-manifest hash, whose clean `HEAD == origin/main` revision and restored-environment reference match both independently signed documents. Preserve the protected authority, signed source documents and capture/trace artifacts in immutable evidence storage.
+Keep the production manifest, the exact verified restore reconciliation JSON and its adjacent exact-name `.sha256` sidecar, and the browser companion inside the private evidence directory. They must be regular non-symlink files no larger than 64 KiB; never commit them. The gate recomputes the restore JSON hash, verifies the sidecar names that exact JSON file, and accepts only a verified V3 restore artifact whose exact SHA-256, protected V09 restore-authority reference/hash, immutable backup-manifest SHA-256 and backup generation each equal the fixed A10 authority before any restored-store read. Its clean `HEAD == origin/main` revision and restored-environment reference must also match both independently signed documents. Preserve the protected authority, signed source documents and capture/trace artifacts in immutable evidence storage.
 
 ## Production observation and restored browser prerequisites
 
@@ -84,11 +86,14 @@ php artisan monitoring:configuration-history-evidence `
   --manifest=C:\private\a10\production-manifest-v2.json `
   --restore-evidence=C:\private\a10\reconciliation-exact.json `
   --browser-evidence=C:\private\a10\browser-companion-v2.json `
+  --output-directory=C:\private\a10 `
   --json
 ```
 
-The command exits `0` only when every value-free check is `verified`. It repeats the protected authority, exact checkout, endpoint, store and private-root preflight after all restored reads and before emitting success, so expiry or replacement during verification fails closed. It prints only the check states, counts, a timestamp and an evidence fingerprint. Dependency and payload failures become `not_verified`; exception values are never emitted.
+The output directory is mandatory and must resolve to the exact protected `MONITORING_A10_EVIDENCE_DIRECTORY`; an arbitrary outside directory is not eligible. The command exits `0` only when every value-free check is `verified`. It writes one collision-safe JSON and adjacent `.sha256` checksum with exclusive creation, complete-write checks, private permissions, flush/fsync and stable file/directory identity. The retained result honestly records `worm_receipt_verified=false`; transfer the pair to the approved immutable evidence store before making any immutability claim.
 
-Retain the three exact inputs, stdout, signatures, capture/trace artifacts and approval record together. A failed or unsigned document cannot be repaired in place; preserve it, correct the source workflow and issue a new independently signed evidence set.
+After writing both uncommitted files, the command re-loads and verifies the production manifest, restore JSON and checksum, browser companion, and all four retained browser capture/network artifacts, and requires them to be byte-for-byte equivalent to the inputs used for the restored-store reads. It also repeats the protected authority, exact checkout, endpoint, store and private-root preflight, then reopens both output files and requires their exact bytes, private mode, owner and stable identity to remain unchanged through those final checks. Replacement, expiry or scope drift cleans the newly created pair and fails closed. Stdout contains only the check states, counts, timestamp, evidence fingerprint and value-free artifact filenames/hash; dependency and payload failures become `not_verified`, and exception values are never emitted.
+
+Retain the three exact inputs, published JSON/checksum pair, stdout, signatures, capture/trace artifacts and approval record together. A failed or unsigned document cannot be repaired in place; preserve it, correct the source workflow and issue a new independently signed evidence set.
 
 This gate does not by itself close A05, V09, V10, deployment, or the overall release.

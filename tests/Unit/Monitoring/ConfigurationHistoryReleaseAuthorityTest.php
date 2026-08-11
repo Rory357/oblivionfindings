@@ -8,6 +8,8 @@ function configurationHistoryAuthorityRecord(CarbonImmutable $now): array
 {
     return [
         'authority_reference' => 'AUTHORITY-'.str_repeat('a', 32),
+        'backup_generation_reference' => 'BKP-'.str_repeat('e', 32),
+        'backup_manifest_sha256' => str_repeat('c', 64),
         'browser_attestation_public_key_base64' => base64_encode(str_repeat('b', 32)),
         'evidence_acl_reference' => 'ACL-'.str_repeat('1', 32),
         'evidence_class' => 'monitoring_configuration_history_release_authority_v1',
@@ -15,6 +17,9 @@ function configurationHistoryAuthorityRecord(CarbonImmutable $now): array
         'production_attestation_public_key_base64' => base64_encode(str_repeat('p', 32)),
         'release_revision' => str_repeat('c', 40),
         'restored_environment_reference_sha256' => str_repeat('d', 64),
+        'restore_artifact_sha256' => str_repeat('f', 64),
+        'restore_authority_reference' => 'AUTHORITY-'.str_repeat('a', 32),
+        'restore_authority_sha256' => str_repeat('b', 64),
         'schema_version' => 1,
         'valid_from_utc' => $now->subMinutes(5)->format('Y-m-d\TH:i:s\Z'),
         'valid_until_utc' => $now->addHour()->format('Y-m-d\TH:i:s\Z'),
@@ -44,10 +49,15 @@ it('accepts one exact protected A10 release authority with independent signers',
 
     expect($authority)->toMatchArray([
         'authority_reference' => $record['authority_reference'],
+        'backup_generation_reference' => $record['backup_generation_reference'],
+        'backup_manifest_sha256' => $record['backup_manifest_sha256'],
         'evidence_acl_reference' => $record['evidence_acl_reference'],
         'hmac_key_sha256' => $record['hmac_key_sha256'],
         'release_revision' => $record['release_revision'],
         'restored_environment_reference_sha256' => $record['restored_environment_reference_sha256'],
+        'restore_artifact_sha256' => $record['restore_artifact_sha256'],
+        'restore_authority_reference' => $record['restore_authority_reference'],
+        'restore_authority_sha256' => $record['restore_authority_sha256'],
     ])->and($authority['production_public_key'])->toBe(str_repeat('p', 32))
         ->and($authority['browser_public_key'])->toBe(str_repeat('b', 32));
 });

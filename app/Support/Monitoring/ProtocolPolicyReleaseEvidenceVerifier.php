@@ -109,13 +109,14 @@ final class ProtocolPolicyReleaseEvidenceVerifier
         'transition_drills',
     ];
 
-    /** @param array<string, int|string> $authority @return array<string, bool|int|string> */
+    /** @param array<string, int|string> $authority @param array<string, bool|string|null> $s10Authority @return array<string, bool|int|string> */
     public function verify(
         string $rawS10Evidence,
         string $rawEvidence,
         string $encodedSignature,
         string $encodedPublicKey,
         array $authority,
+        array $s10Authority,
         ?DateTimeImmutable $now = null,
     ): array {
         try {
@@ -155,11 +156,12 @@ final class ProtocolPolicyReleaseEvidenceVerifier
             if (($s10['schema_version'] ?? null) !== 1
                 || ($s10['evidence_class'] ?? null) !== 'security_devices_s10_release_evidence_v1'
                 || ! $this->matches($s10['artifact_id'] ?? null, '/\A[a-f0-9]{32}\z/')
-                || ! $this->matches($s10['authority_reference'] ?? null, '/\AAUTHORITY-[a-f0-9]{32}\z/')
-                || ! $this->sha($s10['authority_sha256'] ?? null)
-                || ! $this->linked($s10, $authority, 'environment_reference_sha256')
-                || ! $this->linked($s10, $authority, 'release_revision')
-                || ! $this->sha($s10['runtime_environment_sha256'] ?? null)
+                || ! $this->linked($s10, $s10Authority, 'authority_reference')
+                || ! $this->linked($s10, $s10Authority, 'authority_sha256')
+                || ! $this->linked($s10, $s10Authority, 'environment_reference_sha256')
+                || ! $this->linked($s10, $s10Authority, 'release_revision')
+                || ! $this->linked($s10, $s10Authority, 'runtime_environment_sha256')
+                || ($s10Authority['valid'] ?? null) !== true
                 || ($s10['provider_api_contracts'] ?? null) !== ['unifi', 'milesight']
                 || ($s10['queclink_transport'] ?? null) !== 'native_tcp'
                 || ($s10['release_provenance_verified'] ?? null) !== true
@@ -218,6 +220,12 @@ final class ProtocolPolicyReleaseEvidenceVerifier
                 || ! $this->sha($evidence['provider_audit_reference_sha256'] ?? null)
                 || ! $this->sha($evidence['target_side_logs_reference_sha256'] ?? null)
                 || ! $this->sha($evidence['operator_signoff_reference_sha256'] ?? null)
+                || count(array_unique([
+                    $evidence['supervision_reference_sha256'],
+                    $evidence['provider_audit_reference_sha256'],
+                    $evidence['target_side_logs_reference_sha256'],
+                    $evidence['operator_signoff_reference_sha256'],
+                ], SORT_STRING)) !== 4
                 || ($evidence['no_targets_credentials_payloads_retained'] ?? null) !== true
                 || $exerciseStarted === null
                 || $exerciseCompleted === null
@@ -243,6 +251,8 @@ final class ProtocolPolicyReleaseEvidenceVerifier
                 'environment_reference_sha256' => $authority['environment_reference_sha256'],
                 'release_revision' => $authority['release_revision'],
                 's10_release_evidence_sha256' => $evidence['s10_release_evidence_sha256'],
+                'signed_review_sha256' => hash('sha256', $rawEvidence),
+                'detached_signature_sha256' => hash('sha256', $encodedSignature),
                 'evidence_reference' => $evidence['evidence_reference'],
                 'protocols_verified' => count(self::PROTOCOLS),
                 'policies_verified' => count(self::POLICIES),
@@ -276,6 +286,10 @@ final class ProtocolPolicyReleaseEvidenceVerifier
                 || ($row['state'] ?? null) !== 'verified'
                 || ! $this->sha($row['runtime_reference_sha256'] ?? null)
                 || ! $this->sha($row['target_side_reference_sha256'] ?? null)
+                || hash_equals(
+                    (string) $row['runtime_reference_sha256'],
+                    (string) $row['target_side_reference_sha256'],
+                )
                 || $observedAt === null
                 || $observedAt < $earliest
                 || $observedAt > $latest) {
@@ -324,6 +338,7 @@ final class ProtocolPolicyReleaseEvidenceVerifier
     private function transitionDrills(array $rows, DateTimeImmutable $earliest, DateTimeImmutable $latest): void
     {
         $seen = [];
+        $seenReferences = [];
         foreach ($rows as $row) {
             if (! is_array($row)
                 || array_is_list($row)
@@ -344,6 +359,11 @@ final class ProtocolPolicyReleaseEvidenceVerifier
             $started = $this->utc($row['started_at'] ?? null);
             $during = $this->utc($row['during_at'] ?? null);
             $recovered = $this->utc($row['recovered_at'] ?? null);
+            $references = [
+                (string) ($row['before_reference_sha256'] ?? ''),
+                (string) ($row['during_reference_sha256'] ?? ''),
+                (string) ($row['after_reference_sha256'] ?? ''),
+            ];
             if (! is_string($name)
                 || ! in_array($name, self::TRANSITION_DRILLS, true)
                 || isset($seen[$name])
@@ -356,10 +376,16 @@ final class ProtocolPolicyReleaseEvidenceVerifier
                 || $during === null
                 || $recovered === null
                 || $started < $earliest
-                || $started > $during
-                || $during > $recovered
+                || $started >= $during
+                || $during >= $recovered
                 || $recovered > $latest) {
                 $this->refuse();
+            }
+            foreach ($references as $reference) {
+                if (isset($seenReferences[$reference])) {
+                    $this->refuse();
+                }
+                $seenReferences[$reference] = true;
             }
             $seen[$name] = true;
         }
@@ -398,7 +424,7 @@ final class ProtocolPolicyReleaseEvidenceVerifier
         }
     }
 
-    /** @param array<string, mixed> $record @param array<string, int|string> $authority */
+    /** @param array<string, mixed> $record @param array<string, mixed> $authority */
     private function linked(array $record, array $authority, string $key): bool
     {
         return is_string($record[$key] ?? null)

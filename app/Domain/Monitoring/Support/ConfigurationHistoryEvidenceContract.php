@@ -16,6 +16,8 @@ final class ConfigurationHistoryEvidenceContract
 {
     private const int MAXIMUM_FILE_BYTES = 65_536;
 
+    private const int MAXIMUM_BROWSER_ARTIFACT_BYTES = 536_870_912;
+
     private const array RESTORE_ZERO_CHECKS = [
         'outbox_gap',
         'inbox_checkpoint_gap',
@@ -61,6 +63,15 @@ final class ConfigurationHistoryEvidenceContract
             $timeSeriesStoreClass,
             $repositoryRoot ?? base_path(),
         ) === [];
+    }
+
+    public function assertProtectedEvidenceOutputDirectory(string $path, string $repositoryRoot): void
+    {
+        $expected = $this->evidenceDirectory($repositoryRoot);
+        $resolved = realpath($path);
+        if (! is_string($expected) || ! is_string($resolved) || ! hash_equals($expected, $resolved)) {
+            $this->refuse();
+        }
     }
 
     /** @return list<string> */
@@ -143,6 +154,7 @@ final class ConfigurationHistoryEvidenceContract
             expectedRevision: $authority['release_revision'],
             expectedAclReference: $authority['evidence_acl_reference'],
             expectedRestoredEnvironmentReference: $authority['restored_environment_reference_sha256'],
+            expectedRestoreProvenance: $this->restoreProvenance($authority),
         );
     }
 
@@ -150,14 +162,22 @@ final class ConfigurationHistoryEvidenceContract
     public function loadBrowserEvidence(string $path, string $repositoryRoot): array
     {
         $authority = $this->releaseAuthority();
+        $resolved = $this->externalFile($path, $repositoryRoot);
+        $encoded = file_get_contents($resolved);
+        if (! is_string($encoded)) {
+            $this->refuse();
+        }
 
-        return $this->validateBrowserEvidence(
-            $this->loadExternalJson($path, $repositoryRoot),
+        $evidence = $this->validateBrowserEvidence(
+            $this->decode($encoded),
             publicKey: $authority['browser_public_key'],
             expectedRevision: $authority['release_revision'],
             expectedAclReference: $authority['evidence_acl_reference'],
             expectedRestoredEnvironmentReference: $authority['restored_environment_reference_sha256'],
         );
+        $this->browserArtifactsAreRetained($evidence, dirname($resolved), $repositoryRoot);
+
+        return $evidence;
     }
 
     /** @return array{document: array<string, mixed>, sha256: string} */
@@ -176,12 +196,17 @@ final class ConfigurationHistoryEvidenceContract
         if (! is_string($checksum) || ! hash_equals($expectedChecksum, $checksum)) {
             $this->refuse();
         }
+        $provenance = $this->restoreProvenance($authority);
+        if (! hash_equals($provenance['restore_artifact_sha256'], $sha256)) {
+            $this->refuse();
+        }
 
         return [
             'document' => $this->validateRestoreEvidence(
                 $this->decode($encoded),
                 expectedRevision: $authority['release_revision'],
                 expectedRestoredEnvironmentReference: $authority['restored_environment_reference_sha256'],
+                expectedRestoreProvenance: $provenance,
             ),
             'sha256' => $sha256,
         ];
@@ -198,6 +223,7 @@ final class ConfigurationHistoryEvidenceContract
         ?string $expectedRevision = null,
         ?string $expectedAclReference = null,
         ?string $expectedRestoredEnvironmentReference = null,
+        ?array $expectedRestoreProvenance = null,
     ): array {
         $this->exactKeys($manifest, [
             'schema_version',
@@ -321,6 +347,18 @@ final class ConfigurationHistoryEvidenceContract
         )) {
             $this->refuse();
         }
+        if ($expectedRestoreProvenance !== null && (
+            ! hash_equals(
+                $expectedRestoreProvenance['backup_generation_reference'],
+                (string) $restore['backup_generation_reference'],
+            )
+            || ! hash_equals(
+                $expectedRestoreProvenance['restore_artifact_sha256'],
+                (string) $restore['evidence_sha256'],
+            )
+        )) {
+            $this->refuse();
+        }
         $recoveryPoint = $this->utc($restore['recovery_point_at_utc'] ?? null);
         if ($recoveryPoint->lt($completed) || $recoveryPoint->gt($now)) {
             $this->refuse();
@@ -440,6 +478,12 @@ final class ConfigurationHistoryEvidenceContract
 
         $viewports = $this->map($evidence['viewports'] ?? null);
         $this->exactKeys($viewports, ['1280x800', '1440x900']);
+        $viewportEvidence = [
+            'capture_sha256' => [],
+            'network_trace_sha256' => [],
+            'evidence_reference' => [],
+        ];
+        $retainedArtifactHashes = [];
         foreach ($viewports as $viewport) {
             $viewport = $this->map($viewport);
             $this->exactKeys($viewport, [
@@ -454,6 +498,22 @@ final class ConfigurationHistoryEvidenceContract
             $this->sha256($viewport['capture_sha256'] ?? null);
             $this->sha256($viewport['network_trace_sha256'] ?? null);
             $this->reference($viewport['evidence_reference'] ?? null, 'CAPTURE');
+
+            foreach (['capture_sha256', 'network_trace_sha256'] as $hashField) {
+                if (isset($retainedArtifactHashes[$viewport[$hashField]])) {
+                    $this->refuse();
+                }
+
+                $retainedArtifactHashes[$viewport[$hashField]] = true;
+            }
+
+            foreach (array_keys($viewportEvidence) as $field) {
+                if (isset($viewportEvidence[$field][$viewport[$field]])) {
+                    $this->refuse();
+                }
+
+                $viewportEvidence[$field][$viewport[$field]] = true;
+            }
         }
 
         return $evidence;
@@ -465,6 +525,7 @@ final class ConfigurationHistoryEvidenceContract
         ?CarbonImmutable $now = null,
         ?string $expectedRevision = null,
         ?string $expectedRestoredEnvironmentReference = null,
+        ?array $expectedRestoreProvenance = null,
     ): array {
         $this->exactKeys($evidence, [
             'schema_version',
@@ -524,6 +585,26 @@ final class ConfigurationHistoryEvidenceContract
         $this->reference($evidence['restore_authority_reference'] ?? null, 'AUTHORITY');
         $this->sha256($evidence['restore_authority_sha256'] ?? null);
         $this->sha256($evidence['backup_manifest_sha256'] ?? null);
+        if ($expectedRestoreProvenance !== null && (
+            ! hash_equals(
+                $expectedRestoreProvenance['backup_generation_reference'],
+                (string) $evidence['backup_generation'],
+            )
+            || ! hash_equals(
+                $expectedRestoreProvenance['restore_authority_reference'],
+                (string) $evidence['restore_authority_reference'],
+            )
+            || ! hash_equals(
+                $expectedRestoreProvenance['restore_authority_sha256'],
+                (string) $evidence['restore_authority_sha256'],
+            )
+            || ! hash_equals(
+                $expectedRestoreProvenance['backup_manifest_sha256'],
+                (string) $evidence['backup_manifest_sha256'],
+            )
+        )) {
+            $this->refuse();
+        }
         foreach (self::RESTORE_ZERO_CHECKS as $check) {
             if (($evidence[$check] ?? null) !== 0) {
                 $this->refuse();
@@ -666,6 +747,90 @@ final class ConfigurationHistoryEvidenceContract
         }
 
         return $resolved;
+    }
+
+    /** @param array<string, mixed> $evidence */
+    private function browserArtifactsAreRetained(
+        array $evidence,
+        string $directory,
+        string $repositoryRoot,
+    ): void {
+        foreach ($evidence['viewports'] as $viewportName => $viewport) {
+            $reference = $viewport['evidence_reference'];
+            foreach ([
+                'capture' => 'capture_sha256',
+                'network' => 'network_trace_sha256',
+            ] as $suffix => $hashField) {
+                $path = $directory.DIRECTORY_SEPARATOR.$reference.'-'.$viewportName.'.'.$suffix;
+                if (! $this->browserArtifactHashMatches($path, $repositoryRoot, $viewport[$hashField])) {
+                    $this->refuse();
+                }
+            }
+        }
+    }
+
+    private function browserArtifactHashMatches(
+        string $path,
+        string $repositoryRoot,
+        string $expectedHash,
+    ): bool {
+        if (! $this->isAbsolutePath($path) || ! file_exists($path) || is_link($path)) {
+            return false;
+        }
+        $before = @lstat($path);
+        $resolved = realpath($path);
+        $root = realpath($repositoryRoot);
+        $evidenceRoot = $this->evidenceDirectory($repositoryRoot);
+        if (! is_array($before)
+            || ! is_string($resolved)
+            || ! is_string($root)
+            || ! is_string($evidenceRoot)
+            || ! is_file($resolved)
+            || ! is_readable($resolved)
+            || $this->within($resolved, $root)
+            || ! $this->within($resolved, $evidenceRoot)
+            || ($before['mode'] & 0170000) !== 0100000
+            || ! is_int($before['size'])
+            || $before['size'] < 1
+            || $before['size'] > self::MAXIMUM_BROWSER_ARTIFACT_BYTES) {
+            return false;
+        }
+
+        $handle = @fopen($resolved, 'rb');
+        if (! is_resource($handle)) {
+            return false;
+        }
+        $opened = @fstat($handle);
+        $hash = hash_init('sha256');
+        $bytes = hash_update_stream($hash, $handle);
+        $read = @fstat($handle);
+        fclose($handle);
+        $final = @lstat($path);
+
+        return is_array($opened)
+            && is_array($read)
+            && is_array($final)
+            && is_int($bytes)
+            && $bytes === $before['size']
+            && $this->sameFile($before, $opened)
+            && $this->sameFile($opened, $read)
+            && $this->sameFile($read, $final)
+            && $this->privatePermissions($resolved, false)
+            && hash_equals($expectedHash, hash_final($hash));
+    }
+
+    /** @param array<string, mixed> $left @param array<string, mixed> $right */
+    private function sameFile(array $left, array $right): bool
+    {
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (! array_key_exists($key, $left)
+                || ! array_key_exists($key, $right)
+                || $left[$key] !== $right[$key]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function evidenceDirectory(string $repositoryRoot): ?string
@@ -916,12 +1081,17 @@ POWERSHELL;
         if (! $this->exactKeysMatch($authority, [
             'authority_reference',
             'authority_sha256',
+            'backup_generation_reference',
+            'backup_manifest_sha256',
             'browser_public_key',
             'evidence_acl_reference',
             'hmac_key_sha256',
             'production_public_key',
             'release_revision',
             'restored_environment_reference_sha256',
+            'restore_artifact_sha256',
+            'restore_authority_reference',
+            'restore_authority_sha256',
         ])) {
             return false;
         }
@@ -932,11 +1102,28 @@ POWERSHELL;
             && strlen($authority['browser_public_key']) === SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES
             && ! hash_equals($authority['production_public_key'], $authority['browser_public_key'])
             && $this->matches($authority['authority_reference'], '/\AAUTHORITY-[a-f0-9]{32}\z/')
+            && $this->matches($authority['backup_generation_reference'], '/\ABKP-[a-f0-9]{32}\z/')
             && $this->matches($authority['evidence_acl_reference'], '/\AACL-[a-f0-9]{32}\z/')
             && $this->shaValue($authority['authority_sha256'])
+            && $this->shaValue($authority['backup_manifest_sha256'])
             && $this->shaValue($authority['hmac_key_sha256'])
             && $this->shaValue($authority['release_revision'], 40)
-            && $this->shaValue($authority['restored_environment_reference_sha256']);
+            && $this->shaValue($authority['restored_environment_reference_sha256'])
+            && $this->shaValue($authority['restore_artifact_sha256'])
+            && $this->matches($authority['restore_authority_reference'], '/\AAUTHORITY-[a-f0-9]{32}\z/')
+            && $this->shaValue($authority['restore_authority_sha256']);
+    }
+
+    /** @param array<string, mixed> $authority @return array{backup_generation_reference: string, backup_manifest_sha256: string, restore_artifact_sha256: string, restore_authority_reference: string, restore_authority_sha256: string} */
+    private function restoreProvenance(array $authority): array
+    {
+        return [
+            'backup_generation_reference' => $authority['backup_generation_reference'],
+            'backup_manifest_sha256' => $authority['backup_manifest_sha256'],
+            'restore_artifact_sha256' => $authority['restore_artifact_sha256'],
+            'restore_authority_reference' => $authority['restore_authority_reference'],
+            'restore_authority_sha256' => $authority['restore_authority_sha256'],
+        ];
     }
 
     private function checkoutVerified(string $repositoryRoot, string $revision): bool

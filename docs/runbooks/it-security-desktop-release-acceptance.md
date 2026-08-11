@@ -239,12 +239,27 @@ all of the following to one exact release revision:
   no primary row relabelled as restored evidence;
 - passed overflow, console, network, privacy, keyboard and accessibility
   outcomes plus positive route-evidence counts for every viewport;
+- one opaque `BROWSER-` reference plus SHA-256 of a private, duplicate-key-free
+  Chromium browser/version descriptor. Store it as `<BROWSER-reference>.browser`
+  beside the manifest; every viewport must bind that exact descriptor hash. The
+  verifier streams, hashes and parses this retained descriptor, so a free-form
+  browser-version hash or a viewport captured with another browser descriptor is
+  ineligible;
 - immutable SHA-256 commitments for each capture archive, network trace,
   console record, accessibility report, route manifest and fixture manifest;
-- an exact actor-to-session reference map for every viewport, keyed by all and
-  only the row's required actor aliases. Multi-actor rows require a distinct
-  session reference for each actor. Across the primary and restored matrix, a
-  session reference cannot be reused by another actor alias;
+- class-aware hash separation across every retained artifact: copied bytes may
+  recur only within the same evidence class and can never be relabelled from a
+  capture to a network/console/accessibility record, from routes to fixtures, or
+  from any browser/row artifact to a companion;
+- an exact actor-to-opaque-session reference map for every viewport, keyed by
+  all and only the row's required actor aliases. Store that exact map as a
+  duplicate-key-free private `<SESSION-reference>.sessions` JSON artifact beside
+  the manifest, and bind both its opaque `SESSION-` reference and SHA-256 in the
+  signed viewport record. The verifier streams, hashes and parses it before
+  requiring exact map equality; a random signed map without its retained binding
+  artifact is ineligible. Multi-actor rows require a distinct session reference
+  for each actor. Across the primary and restored matrix, a session reference
+  cannot be reused by another actor alias;
 - one distinct opaque result reference per row and one distinct capture archive
   reference and SHA-256 per viewport across all 22 rows / 44 viewport records; and
 - verified local-automated, deployment/runtime, central-runtime, collector,
@@ -253,7 +268,13 @@ all of the following to one exact release revision:
   and either the protected primary or restored environment reference as defined
   by its runbook. Every companion also uses a distinct evidence reference and
   SHA-256; one artifact cannot be relabelled to satisfy several companion
-  requirements.
+  requirements. Every companion records its exact UTC verification time. The
+  local automated companion may precede deployment because it is the exact
+  revision's CI gate. Every live, runtime, provider, retention, load, collector
+  and restored companion must be verified at or after deployment and no later
+  than the signed review; pre-deployment operational evidence is ineligible. The
+  restored D07, D12, D15 and D18 browser records must be captured only after
+  both the configuration-history and storage-restore companions have completed.
 
 The signing authority exists only at
 `/etc/oblivion/it-security-desktop-release-authority.json`; there is no CLI or
@@ -268,8 +289,8 @@ environment references, an opaque `KEY-` reference, the independent reviewer's
 host and is never copied into the manifest or release checkout.
 
 The manifest has exactly `payload` and `signature_base64`. The payload uses
-`schema_version=2`,
-`evidence_class=it_security_desktop_release_evidence_v2`, and the exact
+`schema_version=3`,
+`evidence_class=it_security_desktop_release_evidence_v3`, and the exact
 value-free schema enforced by
 `ItSecurityDesktopReleaseEvidenceVerifier`; sign its recursively key-sorted,
 compact UTF-8 JSON representation. Use only the fixed actor aliases, opaque
@@ -280,11 +301,25 @@ provider payload or console body. Keep the manifest outside the checkout as a
 stable regular non-symlink file no larger than 2 MiB and not group- or
 other-writable.
 
+Retain all 274 hashed package artifacts in that same protected external
+directory. On Linux the directory must be exact mode `0700` and owned by the
+bounded verifier account; every retained file must have no group/other access
+and the same owner. Each viewport uses `<CAPTURE-reference>.capture`, `.network`,
+`.console` and `.accessibility`; each row uses `<RESULT-reference>.routes` and
+`.fixtures`; and every companion uses `<EVIDENCE-reference>.companion`. Capture
+and network files may be at most 512 MiB, console/accessibility/companion files
+64 MiB, and route/fixture manifests 16 MiB. Every file must be non-empty,
+regular, non-symlink and private to its owner, and its streamed SHA-256 must
+equal the corresponding signed hash. The directory itself must be private and
+must remain outside the release checkout. A signed hash without its retained
+file is not desktop release evidence.
+
 From the clean deployed checkout, verify the final package with:
 
 ```bash
 php scripts/release/verify-it-security-desktop-evidence.php \
-  --manifest=/private/oblivion-evidence/it-security-desktop-release.json
+  --manifest=/private/oblivion-evidence/it-security-desktop-release.json \
+  --output-directory=/private/oblivion-evidence/verified
 ```
 
 The verifier reads no browser session or live endpoint. It bootstraps only its
@@ -293,18 +328,34 @@ autoloader before the checkout decision. It requires Linux, the fixed protected
 authority, a clean exact `HEAD == origin/main` checkout, a valid
 Ed25519 signature, all 18/36 primary and 4/8 restored records, exact actor and
 viewport contracts, distinct non-replayed result/capture evidence, and all nine revision/environment-bound companions.
-It also requires a distinct evidence reference and SHA-256 for every companion. It
-rechecks the authority and checkout after verification and emits only a
-value-free aggregate result plus the signed manifest SHA-256. Any missing row,
+It streams and hashes all 274 exact retained package files while requiring stable
+device, inode, mode, owner, size and modification-time identity before it
+reopens the signed manifest and requires its bytes and the same complete file
+identity to remain pinned across that entire package read. It then rechecks the
+authority and checkout. It also requires a distinct evidence reference and SHA-256 for every companion. It
+rechecks the authority and checkout after verification. The mandatory output
+directory must be outside the checkout, mode `0700`, owned by the exact service
+account and stable for the complete run. The verifier exclusively creates one
+mode-`0600` value-free aggregate JSON plus adjacent `.sha256`, flushes and
+fsyncs both, and records `publication=collision_safe_exclusive_create` and
+`worm_receipt_verified=false`. After both files are written but before success,
+it reopens the signed manifest, streams and hashes all 274 retained package
+artifacts again, and rechecks the authority, checkout and output-directory
+identity. A changed input or identity removes the newly created pair and fails
+closed. It then reopens both published files, requires their exact bytes,
+private mode, owner and stable identity to remain unchanged through those final
+checks, and only then emits success. Stdout contains only the artifact filenames/hash and the same bounded
+aggregate identity. Any missing row,
 single viewport, wrong actor, failed criterion, primary evidence relabelled as
 restored, replayed result/capture artifact, mixed revision/environment, invalid
-companion, duplicate key, changed authority, dirty checkout or invalid
+companion chronology, restored browser evidence captured before restore
+completion, missing/tampered/replaced package artifact, changed/deleted signed manifest, duplicate key, changed authority, dirty checkout or invalid
 signature exits non-zero with `v10_release_evidence=false`.
 
 This gate proves completeness, identity and independent attestation of the
 retained package. It does not make a fabricated capture true: the reviewer must
 inspect the immutable source artifacts and release-system approvals before
-signing, and the signed manifest plus its verifier output must be retained in
+signing, and the signed manifest plus the published JSON/checksum pair must be retained in
 the approved immutable evidence store.
 
 ## Completion record

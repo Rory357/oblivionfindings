@@ -60,9 +60,14 @@ final class ProductionRetentionEvidenceArtifactWriter
     ];
 
     /** @return array{filename: string, sha256_filename: string, sha256: string} */
-    public function write(string $directory, array $report, ?string $attestationPublicKey = null): array
-    {
+    public function write(
+        string $directory,
+        array $report,
+        ?string $attestationPublicKey = null,
+        ?callable $beforeCommit = null,
+    ): array {
         $directory = $this->eligibleDirectory($directory);
+        $directoryIdentity = $this->directoryIdentity($directory);
         $this->assertValueFreeContract($report, $attestationPublicKey);
 
         $artifactId = (string) ($report['artifact_id'] ?? '');
@@ -99,6 +104,12 @@ final class ProductionRetentionEvidenceArtifactWriter
             $checksum = hash('sha256', $payload);
             $this->writeExclusive($checksumPath, $checksum.'  '.$filename.PHP_EOL);
             $checksumCreated = true;
+            if ($beforeCommit !== null) {
+                $beforeCommit();
+            }
+            $this->assertDirectoryIdentity($directory, $directoryIdentity);
+            $this->assertPublished($path, $payload);
+            $this->assertPublished($checksumPath, $checksum.'  '.$filename.PHP_EOL);
         } catch (Throwable $exception) {
             if ($checksumCreated) {
                 $this->removeCreated($checksumPath, $exception);
@@ -140,8 +151,11 @@ final class ProductionRetentionEvidenceArtifactWriter
         }
 
         if (DIRECTORY_SEPARATOR !== '\\') {
-            $permissions = fileperms($resolved);
-            if ($permissions === false || ($permissions & 0077) !== 0) {
+            $identity = $this->directoryIdentity($resolved);
+            $effectiveUid = function_exists('posix_geteuid') ? posix_geteuid() : false;
+            if (($identity['mode'] & 0777) !== 0700
+                || ! is_int($effectiveUid)
+                || $identity['uid'] !== $effectiveUid) {
                 throw new RuntimeException('Evidence output directory must be private to the service account.');
             }
         }
@@ -280,6 +294,15 @@ final class ProductionRetentionEvidenceArtifactWriter
             if (DIRECTORY_SEPARATOR !== '\\' && ! chmod($path, 0600)) {
                 throw new RuntimeException('Evidence artifact permissions could not be restricted.');
             }
+            $opened = @fstat($stream);
+            if (! is_array($opened)
+                || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+                || (DIRECTORY_SEPARATOR !== '\\' && (
+                    (($opened['mode'] ?? 0) & 0777) !== 0600
+                    || ($opened['uid'] ?? null) !== posix_geteuid()
+                ))) {
+                throw new RuntimeException('Evidence artifact permissions could not be restricted.');
+            }
             $offset = 0;
             $length = strlen($payload);
             while ($offset < $length) {
@@ -294,6 +317,31 @@ final class ProductionRetentionEvidenceArtifactWriter
             }
             if (function_exists('fsync') && ! fsync($stream)) {
                 throw new RuntimeException('Evidence artifact sync failed.');
+            }
+            $written = @fstat($stream);
+            $published = @lstat($path);
+            foreach (['dev', 'ino', 'mode', 'uid'] as $key) {
+                if (! is_array($written)
+                    || ! is_array($published)
+                    || ! array_key_exists($key, $opened)
+                    || ! array_key_exists($key, $written)
+                    || ! array_key_exists($key, $published)
+                    || $opened[$key] !== $written[$key]
+                    || $written[$key] !== $published[$key]) {
+                    throw new RuntimeException('Evidence artifact identity changed during publication.');
+                }
+            }
+            foreach (['size', 'mtime'] as $key) {
+                if (! is_array($written)
+                    || ! is_array($published)
+                    || ! array_key_exists($key, $written)
+                    || ! array_key_exists($key, $published)
+                    || $written[$key] !== $published[$key]) {
+                    throw new RuntimeException('Evidence artifact identity changed during publication.');
+                }
+            }
+            if (($written['size'] ?? null) !== $length) {
+                throw new RuntimeException('Evidence artifact write was incomplete.');
             }
         } catch (Throwable $exception) {
             fclose($stream);
@@ -311,6 +359,72 @@ final class ProductionRetentionEvidenceArtifactWriter
             }
         }
 
+    }
+
+    /** @return array{dev: int, ino: int, mode: int, uid: int} */
+    private function directoryIdentity(string $directory): array
+    {
+        $metadata = @lstat($directory);
+        if (! is_array($metadata)
+            || (($metadata['mode'] ?? 0) & 0170000) !== 0040000
+            || ! is_int($metadata['dev'] ?? null)
+            || ! is_int($metadata['ino'] ?? null)
+            || ! is_int($metadata['mode'] ?? null)
+            || ! is_int($metadata['uid'] ?? null)) {
+            throw new RuntimeException('Evidence output directory identity is invalid.');
+        }
+
+        return [
+            'dev' => $metadata['dev'],
+            'ino' => $metadata['ino'],
+            'mode' => $metadata['mode'],
+            'uid' => $metadata['uid'],
+        ];
+    }
+
+    /** @param array{dev: int, ino: int, mode: int, uid: int} $expected */
+    private function assertDirectoryIdentity(string $directory, array $expected): void
+    {
+        if ($this->directoryIdentity($directory) !== $expected) {
+            throw new RuntimeException('Evidence output directory changed during publication.');
+        }
+    }
+
+    private function assertPublished(string $path, string $expectedPayload): void
+    {
+        if (is_link($path)) {
+            throw new RuntimeException('Evidence artifact identity changed after final verification.');
+        }
+        $before = @lstat($path);
+        $stream = @fopen($path, 'rb');
+        if (! is_array($before) || ! is_resource($stream)) {
+            throw new RuntimeException('Evidence artifact identity changed after final verification.');
+        }
+        try {
+            $opened = @fstat($stream);
+            $contents = stream_get_contents($stream, strlen($expectedPayload) + 1);
+            $read = @fstat($stream);
+            $final = @lstat($path);
+            if (! is_array($opened) || ! is_array($read) || ! is_array($final)
+                || ! is_string($contents)
+                || ! hash_equals($expectedPayload, $contents)
+                || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+                || (DIRECTORY_SEPARATOR !== '\\' && (
+                    (($opened['mode'] ?? 0) & 0777) !== 0600
+                    || ($opened['uid'] ?? null) !== posix_geteuid()
+                ))) {
+                throw new RuntimeException('Evidence artifact identity changed after final verification.');
+            }
+            foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+                if (($before[$key] ?? null) !== ($opened[$key] ?? null)
+                    || ($opened[$key] ?? null) !== ($read[$key] ?? null)
+                    || ($read[$key] ?? null) !== ($final[$key] ?? null)) {
+                    throw new RuntimeException('Evidence artifact identity changed after final verification.');
+                }
+            }
+        } finally {
+            fclose($stream);
+        }
     }
 
     private function removeCreated(string $path, Throwable $cause): void

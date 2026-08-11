@@ -94,9 +94,10 @@ final class RetentionEnforcer
                     /** @var MonitoringRetentionPolicy $policy */
                     $policy = $matches->sortBy(fn (MonitoringRetentionPolicy $candidate): int => (int) $candidate->{$daysField})->first();
                     $retentionDays = (int) $policy->{$daysField};
-                    $cutoff = $this->alignedCutoff(
+                    $cutoff = self::retentionCutoff(
                         (string) $series->retention_tier,
-                        $now->subDays($retentionDays),
+                        $now,
+                        $retentionDays,
                     );
                     if ($series->first_point_at->greaterThanOrEqualTo($cutoff)) {
                         continue;
@@ -405,8 +406,10 @@ final class RetentionEnforcer
         }, 3);
     }
 
-    private function alignedCutoff(string $tier, CarbonImmutable $cutoff): CarbonImmutable
+    public static function retentionCutoff(string $tier, CarbonImmutable $now, int $retentionDays): CarbonImmutable
     {
+        $cutoff = $now->subDays($retentionDays);
+
         return match ($tier) {
             'raw' => $cutoff->startOfHour(),
             'hourly' => $cutoff->startOfDay(),

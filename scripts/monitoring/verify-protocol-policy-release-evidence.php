@@ -6,6 +6,7 @@ declare(strict_types=1);
 use App\Support\Monitoring\LoadSoakReleaseCheckoutVerifier;
 use App\Support\Monitoring\ProtocolPolicyReleaseAuthorityVerifier;
 use App\Support\Monitoring\ProtocolPolicyReleaseEvidenceVerifier;
+use App\Support\Monitoring\S10ReleaseAuthorityVerifier;
 
 $root = dirname(__DIR__, 2);
 $sources = [
@@ -13,6 +14,7 @@ $sources = [
     $root.'/app/Support/Monitoring/LoadSoakReleaseCheckoutVerifier.php',
     $root.'/app/Support/Monitoring/ProtocolPolicyReleaseAuthorityVerifier.php',
     $root.'/app/Support/Monitoring/ProtocolPolicyReleaseEvidenceVerifier.php',
+    $root.'/app/Support/Monitoring/S10ReleaseAuthorityVerifier.php',
 ];
 
 $fail = static function (string $reason): never {
@@ -35,13 +37,13 @@ foreach ($sources as $source) {
 $arguments = [];
 foreach (array_slice($argv, 1) as $argument) {
     if (! is_string($argument)
-        || preg_match('/\A--(evidence|public-key|s10-release-evidence|signature)=(.+)\z/', $argument, $matches) !== 1
+        || preg_match('/\A--(evidence|output-directory|public-key|s10-release-evidence|signature)=(.+)\z/', $argument, $matches) !== 1
         || array_key_exists($matches[1], $arguments)) {
         $fail('arguments');
     }
     $arguments[$matches[1]] = $matches[2];
 }
-$expectedArguments = ['evidence', 'public-key', 's10-release-evidence', 'signature'];
+$expectedArguments = ['evidence', 'output-directory', 'public-key', 's10-release-evidence', 'signature'];
 $actualArguments = array_keys($arguments);
 sort($expectedArguments, SORT_STRING);
 sort($actualArguments, SORT_STRING);
@@ -50,11 +52,29 @@ if ($actualArguments !== $expectedArguments) {
 }
 
 $applicationPath = realpath($root);
-if (PHP_OS_FAMILY !== 'Linux' || ! is_string($applicationPath)) {
+$outputArgument = $arguments['output-directory'];
+$outputDirectory = is_string($outputArgument) && ! is_link($outputArgument)
+    ? realpath($outputArgument)
+    : false;
+if (PHP_OS_FAMILY !== 'Linux'
+    || ! is_string($applicationPath)
+    || ! is_string($outputDirectory)
+    || ! str_starts_with($outputDirectory, DIRECTORY_SEPARATOR)
+    || ! is_dir($outputDirectory)
+    || ! is_writable($outputDirectory)) {
     $fail('runtime');
 }
+$outputDirectoryBefore = @lstat($outputDirectory);
+$effectiveUid = function_exists('posix_geteuid') ? posix_geteuid() : false;
+if (! is_array($outputDirectoryBefore)
+    || ! is_int($effectiveUid)
+    || (($outputDirectoryBefore['mode'] ?? 0) & 0170000) !== 0040000
+    || (($outputDirectoryBefore['mode'] ?? 0) & 0777) !== 0700
+    || ($outputDirectoryBefore['uid'] ?? null) !== $effectiveUid) {
+    $fail('output_directory_protection');
+}
 
-$readStable = static function (string $path, int $maximumBytes) use ($applicationPath, $fail): string {
+$readStable = static function (string $path, int $maximumBytes) use ($applicationPath, $fail): array {
     if (! str_starts_with($path, DIRECTORY_SEPARATOR) || is_link($path)) {
         $fail('evidence_paths');
     }
@@ -103,35 +123,265 @@ $readStable = static function (string $path, int $maximumBytes) use ($applicatio
             $fail('evidence_files');
         }
 
-        return $raw;
+        return [
+            'path' => $resolved,
+            'raw' => $raw,
+            'identity' => array_intersect_key($after, array_flip(['dev', 'ino', 'mode', 'uid', 'size', 'mtime'])),
+        ];
     } finally {
         fclose($handle);
     }
 };
 
+$inputsRemainPinned = static function (array $inputs): bool {
+    foreach ($inputs as $input) {
+        $path = $input['path'] ?? null;
+        $identity = $input['identity'] ?? null;
+        if (! is_string($path) || ! is_array($identity) || is_link($path)) {
+            return false;
+        }
+        $after = @lstat($path);
+        foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+            if (! is_array($after)
+                || ! array_key_exists($key, $identity)
+                || ! array_key_exists($key, $after)
+                || $identity[$key] !== $after[$key]) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+};
+
 try {
     $authorityVerifier = new ProtocolPolicyReleaseAuthorityVerifier;
     $authorityBefore = $authorityVerifier->loadInstalled();
+    $s10AuthorityVerifier = new S10ReleaseAuthorityVerifier;
+    $s10AuthorityBefore = $s10AuthorityVerifier->verifyInstalled(new DateTimeImmutable('now', new DateTimeZone('UTC')));
+    if (($s10AuthorityBefore['valid'] ?? null) !== true) {
+        $fail('s10_release_authority');
+    }
     $checkoutVerifier = new LoadSoakReleaseCheckoutVerifier('/usr/bin/git');
     if (! $checkoutVerifier->verify($applicationPath, (string) $authorityBefore['release_revision'])) {
         $fail('release_checkout');
     }
 
+    $inputs = [
+        's10' => $readStable($arguments['s10-release-evidence'], 131_072),
+        'evidence' => $readStable($arguments['evidence'], 131_072),
+        'signature' => $readStable($arguments['signature'], 512),
+        'public_key' => $readStable($arguments['public-key'], 512),
+    ];
     $report = (new ProtocolPolicyReleaseEvidenceVerifier)->verify(
-        rawS10Evidence: $readStable($arguments['s10-release-evidence'], 131_072),
-        rawEvidence: $readStable($arguments['evidence'], 131_072),
-        encodedSignature: $readStable($arguments['signature'], 512),
-        encodedPublicKey: $readStable($arguments['public-key'], 512),
+        rawS10Evidence: $inputs['s10']['raw'],
+        rawEvidence: $inputs['evidence']['raw'],
+        encodedSignature: $inputs['signature']['raw'],
+        encodedPublicKey: $inputs['public_key']['raw'],
         authority: $authorityBefore,
+        s10Authority: $s10AuthorityBefore,
     );
 
     $authorityAfter = $authorityVerifier->loadInstalled();
+    $s10AuthorityAfter = $s10AuthorityVerifier->verifyInstalled(new DateTimeImmutable('now', new DateTimeZone('UTC')));
     if (! $authorityVerifier->identitiesRemainPinned([$authorityBefore, $authorityAfter])
+        || ! $s10AuthorityVerifier->identitiesRemainPinned([
+            $s10AuthorityBefore,
+            $s10AuthorityAfter,
+            $s10AuthorityAfter,
+            $s10AuthorityAfter,
+        ])
         || ! $checkoutVerifier->verify($applicationPath, (string) $authorityAfter['release_revision'])) {
         $fail('release_identity_changed');
     }
+    if (! $inputsRemainPinned($inputs)) {
+        $fail('evidence_changed');
+    }
 
-    fwrite(STDOUT, json_encode($report, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES).PHP_EOL);
+    $createdAt = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    $artifactId = bin2hex(random_bytes(16));
+    $artifactFile = 'monitoring-protocol-policy-release-verification-'
+        .$createdAt->format('Ymd\THis.u\Z').'-'.$artifactId.'.json';
+    $artifactPath = $outputDirectory.DIRECTORY_SEPARATOR.$artifactFile;
+    $artifact = [
+        ...$report,
+        'artifact_id' => $artifactId,
+        'created_at' => $createdAt->format('Y-m-d\TH:i:s.u\Z'),
+        'output_storage_semantics' => 'collision_safe_exclusive_create',
+        'worm_receipt_verified' => false,
+    ];
+    $encoded = json_encode($artifact, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR).PHP_EOL;
+    $artifactSha256 = hash('sha256', $encoded);
+    $checksumFile = $artifactFile.'.sha256';
+    $checksumPath = $outputDirectory.DIRECTORY_SEPARATOR.$checksumFile;
+    $checksumEncoded = $artifactSha256.'  '.$artifactFile.PHP_EOL;
+    $writeExclusivePrivate = static function (string $path, string $contents) use ($effectiveUid): void {
+        $handle = @fopen($path, 'x+b');
+        if ($handle === false) {
+            throw new RuntimeException('artifact_create');
+        }
+        $created = true;
+        try {
+            if (! @chmod($path, 0600)) {
+                throw new RuntimeException('artifact_permissions');
+            }
+            $opened = @fstat($handle);
+            if (! is_array($opened)
+                || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+                || (($opened['mode'] ?? 0) & 0777) !== 0600
+                || ($opened['uid'] ?? null) !== $effectiveUid) {
+                throw new RuntimeException('artifact_permissions');
+            }
+
+            $offset = 0;
+            $length = strlen($contents);
+            while ($offset < $length) {
+                $written = fwrite($handle, substr($contents, $offset));
+                if ($written === false || $written === 0) {
+                    throw new RuntimeException('artifact_write');
+                }
+                $offset += $written;
+            }
+            if (! fflush($handle) || (function_exists('fsync') && ! fsync($handle))) {
+                throw new RuntimeException('artifact_flush');
+            }
+            $written = @fstat($handle);
+            $published = @lstat($path);
+            foreach (['dev', 'ino', 'mode', 'uid'] as $key) {
+                if (! is_array($written)
+                    || ! is_array($published)
+                    || ! array_key_exists($key, $opened)
+                    || ! array_key_exists($key, $written)
+                    || ! array_key_exists($key, $published)
+                    || $opened[$key] !== $written[$key]
+                    || $written[$key] !== $published[$key]) {
+                    throw new RuntimeException('artifact_identity');
+                }
+            }
+            foreach (['size', 'mtime'] as $key) {
+                if (! is_array($written)
+                    || ! is_array($published)
+                    || ! array_key_exists($key, $written)
+                    || ! array_key_exists($key, $published)
+                    || $written[$key] !== $published[$key]) {
+                    throw new RuntimeException('artifact_identity');
+                }
+            }
+            if (($written['size'] ?? null) !== $length) {
+                throw new RuntimeException('artifact_size');
+            }
+            $created = false;
+        } finally {
+            fclose($handle);
+            if ($created && is_file($path)) {
+                @unlink($path);
+            }
+        }
+    };
+
+    $publishedRemainsExact = static function (string $path, string $expected) use ($effectiveUid): bool {
+        if (is_link($path)) {
+            return false;
+        }
+        $before = @lstat($path);
+        $handle = @fopen($path, 'rb');
+        if (! is_array($before) || $handle === false) {
+            return false;
+        }
+        try {
+            $opened = @fstat($handle);
+            $contents = stream_get_contents($handle, strlen($expected) + 1);
+            $read = @fstat($handle);
+            $final = @lstat($path);
+            if (! is_array($opened)
+                || ! is_array($read)
+                || ! is_array($final)
+                || ! is_string($contents)
+                || ! hash_equals($expected, $contents)
+                || (($opened['mode'] ?? 0) & 0170000) !== 0100000
+                || (($opened['mode'] ?? 0) & 0777) !== 0600
+                || ($opened['uid'] ?? null) !== $effectiveUid) {
+                return false;
+            }
+            foreach (['dev', 'ino', 'mode', 'uid', 'size', 'mtime'] as $key) {
+                if (($before[$key] ?? null) !== ($opened[$key] ?? null)
+                    || ($opened[$key] ?? null) !== ($read[$key] ?? null)
+                    || ($read[$key] ?? null) !== ($final[$key] ?? null)) {
+                    return false;
+                }
+            }
+
+            return true;
+        } finally {
+            fclose($handle);
+        }
+    };
+
+    $artifactPublished = false;
+    $checksumPublished = false;
+    try {
+        $writeExclusivePrivate($artifactPath, $encoded);
+        $artifactPublished = true;
+        $writeExclusivePrivate($checksumPath, $checksumEncoded);
+        $checksumPublished = true;
+        $authorityFinal = $authorityVerifier->loadInstalled();
+        $s10AuthorityFinal = $s10AuthorityVerifier->verifyInstalled(new DateTimeImmutable('now', new DateTimeZone('UTC')));
+        if (! $authorityVerifier->identitiesRemainPinned([$authorityBefore, $authorityAfter, $authorityFinal])
+            || ! $s10AuthorityVerifier->identitiesRemainPinned([
+                $s10AuthorityBefore,
+                $s10AuthorityAfter,
+                $s10AuthorityFinal,
+                $s10AuthorityFinal,
+            ])
+            || ! $checkoutVerifier->verify($applicationPath, (string) $authorityFinal['release_revision'])) {
+            throw new RuntimeException('release_identity_changed');
+        }
+        if (! $inputsRemainPinned($inputs)) {
+            throw new RuntimeException('evidence_changed');
+        }
+        $outputDirectoryAfter = @lstat($outputDirectory);
+        foreach (['dev', 'ino', 'mode', 'uid'] as $key) {
+            if (! is_array($outputDirectoryAfter)
+                || ! array_key_exists($key, $outputDirectoryBefore)
+                || ! array_key_exists($key, $outputDirectoryAfter)
+                || $outputDirectoryBefore[$key] !== $outputDirectoryAfter[$key]) {
+                throw new RuntimeException('output_directory_changed');
+            }
+        }
+        if (! $publishedRemainsExact($artifactPath, $encoded)
+            || ! $publishedRemainsExact($checksumPath, $checksumEncoded)) {
+            throw new RuntimeException('published_artifact_changed');
+        }
+        $s10AuthorityPublished = $s10AuthorityVerifier->verifyInstalled(new DateTimeImmutable('now', new DateTimeZone('UTC')));
+        if (! $s10AuthorityVerifier->identitiesRemainPinned([
+            $s10AuthorityBefore,
+            $s10AuthorityAfter,
+            $s10AuthorityFinal,
+            $s10AuthorityPublished,
+        ])) {
+            throw new RuntimeException('s10_release_authority_changed');
+        }
+    } catch (Throwable) {
+        if ($artifactPublished) {
+            @unlink($artifactPath);
+        }
+        if ($checksumPublished) {
+            @unlink($checksumPath);
+        }
+        $fail('artifact_write');
+    }
+
+    fwrite(STDOUT, json_encode([
+        'status' => 'passed',
+        'artifact_id' => $artifactId,
+        'artifact_file' => $artifactFile,
+        'artifact_sha256' => $artifactSha256,
+        'checksum_file' => $checksumFile,
+        'release_revision' => $report['release_revision'],
+        'environment_reference_sha256' => $report['environment_reference_sha256'],
+        'a07_release_evidence' => true,
+        'a08_release_evidence' => true,
+    ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES).PHP_EOL);
 } catch (Throwable) {
     $fail('verification');
 }

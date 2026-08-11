@@ -1,6 +1,7 @@
 <?php
 
 use App\Support\Monitoring\S10NativeProcessRunner;
+use App\Support\Monitoring\S10PinnedChildSource;
 use App\Support\Monitoring\S10ProcessEnvironment;
 use App\Support\Monitoring\S10ProtectedRuntimeEnvironment;
 use App\Support\Monitoring\S10ReleaseAuthorityVerifier;
@@ -160,7 +161,9 @@ it('rejects a release or environment identity change between either sustained ch
     );
     $snapshots = [$identity, $identity, $identity, $identity];
 
-    expect($verifier->identitiesRemainPinned($snapshots))->toBeTrue();
+    expect($verifier->identitiesRemainPinned($snapshots))->toBeTrue()
+        ->and($verifier->identitiesRemainPinned([...$snapshots, $identity]))->toBeTrue()
+        ->and($verifier->identitiesRemainPinned(array_slice($snapshots, 0, 3)))->toBeFalse();
 
     $snapshots[2][$changed] = match ($changed) {
         'release_revision' => str_repeat('d', 40),
@@ -312,6 +315,7 @@ it('does not execute ignored Composer bootstrap code before S10 release identity
         'S10ProtectedRuntimeEnvironment.php',
         'S10ReleaseAuthorityVerifier.php',
         'S10NativeProcessRunner.php',
+        'S10PinnedChildSource.php',
     ] as $supportFile) {
         copy(
             $root.'/app/Support/Monitoring/'.$supportFile,
@@ -387,6 +391,41 @@ it('runs one bounded shell-free S10 child and rejects oversized output', functio
     ])->and($oversized)->toBe([
         'successful' => false,
         'stdout' => '',
+        'stderr' => '',
+    ]);
+});
+
+it('reads only stable child bytes that exactly match the committed source', function (): void {
+    $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'s10-child-'.bin2hex(random_bytes(8));
+    mkdir($directory, 0700, true);
+    $path = $directory.DIRECTORY_SEPARATOR.'child.sh';
+    file_put_contents($path, "#!/usr/bin/env bash\nprintf 'pinned'\n");
+
+    try {
+        $source = (string) file_get_contents($path);
+        $reader = new S10PinnedChildSource;
+
+        expect($reader->read($path, $source))->toBe($source)
+            ->and($reader->read($path, $source."# substituted\n"))->toBeNull();
+    } finally {
+        @unlink($path);
+        @rmdir($directory);
+    }
+});
+
+it('supplies the pinned child source through standard input', function (): void {
+    $result = (new S10NativeProcessRunner)->run(
+        [PHP_BINARY, '-r', 'fwrite(STDOUT, stream_get_contents(STDIN));'],
+        null,
+        [],
+        10,
+        128,
+        'pinned-child-source',
+    );
+
+    expect($result)->toBe([
+        'successful' => true,
+        'stdout' => 'pinned-child-source',
         'stderr' => '',
     ]);
 });

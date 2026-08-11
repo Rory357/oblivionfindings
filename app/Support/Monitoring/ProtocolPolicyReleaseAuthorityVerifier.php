@@ -125,7 +125,7 @@ final class ProtocolPolicyReleaseAuthorityVerifier
     /** @param list<array<string, int|string>> $snapshots */
     public function identitiesRemainPinned(array $snapshots): bool
     {
-        if (count($snapshots) !== 2) {
+        if (count($snapshots) < 2) {
             return false;
         }
         foreach ([
@@ -136,9 +136,14 @@ final class ProtocolPolicyReleaseAuthorityVerifier
             'release_revision',
         ] as $key) {
             $expected = $snapshots[0][$key] ?? null;
-            $actual = $snapshots[1][$key] ?? null;
-            if (! is_string($expected) || ! is_string($actual) || ! hash_equals($expected, $actual)) {
+            if (! is_string($expected)) {
                 return false;
+            }
+            foreach ($snapshots as $snapshot) {
+                $actual = $snapshot[$key] ?? null;
+                if (! is_string($actual) || ! hash_equals($expected, $actual)) {
+                    return false;
+                }
             }
         }
 
