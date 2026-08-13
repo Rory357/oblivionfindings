@@ -34,8 +34,10 @@ it('keeps operational cost allocations out of the personal running balance', fun
     ]);
     ClientFundTransaction::create([
         'client_fund_id' => $fund->id, 'transaction_type' => 'credit',
+        'client_id' => $client->id, 'site_id' => $site->id, 'status' => 'posted',
         'amount' => '100.00', 'running_balance' => '100.00', 'description' => 'Personal deposit',
         'transaction_date' => Carbon::parse('2026-02-01'), 'recorded_by' => $user->id,
+        'approved_at' => Carbon::parse('2026-02-01'), 'balance_effect_applied_at' => Carbon::parse('2026-02-01'),
     ]);
 
     // Operational service cost attributed to the client (NOT their personal money).

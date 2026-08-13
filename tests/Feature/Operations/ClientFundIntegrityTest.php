@@ -4,6 +4,7 @@ use App\Domain\Finance\Jobs\PostClientFundJournalJob;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientFund;
+use App\Models\ClientFundTransaction;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -128,6 +129,62 @@ PHP;
             base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)),
             $readyPath,
             $attemptPath,
+            $releasePath,
+        ],
+        base_path(),
+        [
+            'APP_ENV' => 'testing',
+            'DB_CONNECTION' => 'mysql',
+            'DB_DATABASE' => $database,
+            'QUEUE_CONNECTION' => 'sync',
+        ],
+    );
+    $process->setTimeout(30);
+    $process->start();
+
+    return $process;
+}
+
+function startClientFundApprovalWorker(
+    int $transactionId,
+    int $checkerId,
+    string $readyPath,
+    string $releasePath,
+    string $database,
+): Process {
+    $worker = <<<'PHP'
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$transaction = App\Models\ClientFundTransaction::query()->findOrFail((int) $argv[2]);
+$checker = App\Models\User::query()->findOrFail((int) $argv[3]);
+file_put_contents($argv[4], 'ready');
+$deadline = microtime(true) + 15;
+while (! is_file($argv[5])) {
+    if (microtime(true) >= $deadline) {
+        throw new RuntimeException('Timed out waiting for the approval release barrier.');
+    }
+    usleep(10_000);
+}
+App\Models\ClientFundTransaction::unsetEventDispatcher();
+try {
+    $approved = $app->make(App\Domain\Finance\Services\ClientFundTransactionService::class)
+        ->approve($transaction, $checker, 'Concurrent independent balance check.');
+    echo json_encode(['result' => 'approved', 'id' => $approved->id], JSON_THROW_ON_ERROR);
+} catch (Illuminate\Validation\ValidationException $exception) {
+    echo json_encode(['result' => 'denied', 'errors' => $exception->errors()], JSON_THROW_ON_ERROR);
+}
+PHP;
+
+    $process = new Process(
+        [
+            PHP_BINARY,
+            '-r',
+            $worker,
+            base_path(),
+            (string) $transactionId,
+            (string) $checkerId,
+            $readyPath,
             $releasePath,
         ],
         base_path(),
@@ -295,6 +352,7 @@ it('rejects reuse of an idempotency key with a different payload', function () {
 it('preserves exact running balances across sequential writes', function () {
     $site = Site::factory()->create();
     $manager = makeClientFundIntegrityUser($site, ['client_funds.manage']);
+    $checker = makeClientFundIntegrityUser($site, ['client_funds.approve']);
     $fund = makeClientFundIntegrityFund($site);
 
     $this->actingAs($manager)
@@ -308,6 +366,12 @@ it('preserves exact running balances across sequential writes', function () {
             "/operations/client-funds/{$fund->id}/transactions",
             clientFundIntegrityTransactionPayload('debit', '5.67'),
         )
+        ->assertRedirect();
+    $debit = $fund->transactions()->where('transaction_type', 'debit')->firstOrFail();
+    $this->actingAs($checker)
+        ->post("/operations/client-funds/{$fund->id}/transactions/{$debit->id}/approve", [
+            'reason' => 'Checked against the client receipt.',
+        ])
         ->assertRedirect();
 
     $runningBalances = $fund->transactions()
@@ -386,7 +450,7 @@ it('serializes simultaneous fund movements without losing either balance update'
     expect($connection->getDriverName())->toBe('mysql');
 
     $site = Site::factory()->create();
-    $actor = makeClientFundIntegrityUser($site);
+    $actor = makeClientFundIntegrityUser($site, ['client_funds.manage']);
     $fund = makeClientFundIntegrityFund($site, balance: '100.00');
     $clientId = $fund->client_id;
     $siteId = $site->id;
@@ -495,6 +559,91 @@ it('serializes simultaneous fund movements without losing either balance update'
             DB::table('clients')->where('id', $clientId)->delete();
             DB::table('hr_employee_profiles')->where('user_id', $actor->id)->delete();
             DB::table('users')->where('id', $actor->id)->delete();
+            DB::table('sites')->where('id', $siteId)->delete();
+        } finally {
+            $connection->beginTransaction();
+        }
+    }
+});
+
+it('serializes simultaneous debit approvals so available balance cannot be overdrawn', function () {
+    $connection = DB::connection();
+    expect($connection->getDriverName())->toBe('mysql');
+
+    $site = Site::factory()->create();
+    $maker = makeClientFundIntegrityUser($site, ['client_funds.manage']);
+    $checker = makeClientFundIntegrityUser($site, ['client_funds.approve']);
+    $fund = makeClientFundIntegrityFund($site, balance: '100.00');
+    $service = app(App\Domain\Finance\Services\ClientFundTransactionService::class);
+    $debits = collect([
+        $service->record($fund, $maker, clientFundIntegrityTransactionPayload('debit', '80.00')),
+        $service->record($fund, $maker, clientFundIntegrityTransactionPayload('debit', '80.00')),
+    ]);
+    $database = $connection->getDatabaseName();
+    $token = Str::uuid()->toString();
+    $releasePath = sys_get_temp_dir().DIRECTORY_SEPARATOR."client-fund-approval-release-{$token}";
+    $readyPaths = [
+        sys_get_temp_dir().DIRECTORY_SEPARATOR."client-fund-approval-ready-a-{$token}",
+        sys_get_temp_dir().DIRECTORY_SEPARATOR."client-fund-approval-ready-b-{$token}",
+    ];
+    $processes = [];
+    $clientId = $fund->client_id;
+    $siteId = $site->id;
+
+    $connection->commit();
+
+    try {
+        foreach ($debits->values() as $index => $debit) {
+            $processes[] = startClientFundApprovalWorker(
+                $debit->id,
+                $checker->id,
+                $readyPaths[$index],
+                $releasePath,
+                $database,
+            );
+        }
+
+        waitForClientFundIntegrityWorkers($readyPaths);
+        touch($releasePath);
+
+        $results = collect($processes)->map(function (Process $process): array {
+            $process->wait();
+            expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+
+            return json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        });
+
+        expect($results->where('result', 'approved'))->toHaveCount(1)
+            ->and($results->where('result', 'denied'))->toHaveCount(1)
+            ->and((string) ClientFund::query()->findOrFail($fund->id)->balance)->toBe('20.00')
+            ->and((string) ClientFund::query()->findOrFail($fund->id)->available_balance)->toBe('20.00')
+            ->and(ClientFundTransaction::query()
+                ->whereIn('id', $debits->pluck('id'))
+                ->whereNotNull('balance_effect_applied_at')
+                ->count())->toBe(1);
+    } finally {
+        while ($connection->transactionLevel() > 0) {
+            $connection->rollBack();
+        }
+
+        foreach ($processes as $process) {
+            if ($process->isRunning()) {
+                $process->stop(1);
+            }
+        }
+
+        foreach ([...$readyPaths, $releasePath] as $path) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+
+        try {
+            DB::table('client_fund_transactions')->where('client_fund_id', $fund->id)->delete();
+            DB::table('client_funds')->where('id', $fund->id)->delete();
+            DB::table('clients')->where('id', $clientId)->delete();
+            DB::table('hr_employee_profiles')->whereIn('user_id', [$maker->id, $checker->id])->delete();
+            DB::table('users')->whereIn('id', [$maker->id, $checker->id])->delete();
             DB::table('sites')->where('id', $siteId)->delete();
         } finally {
             $connection->beginTransaction();

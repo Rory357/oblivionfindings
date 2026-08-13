@@ -1072,6 +1072,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'client_funds' => [
                 'manage' => $user->canDo('client_funds.manage'),
+                'approve' => $user->canDo('client_funds.approve'),
             ],
             'price_books' => [
                 'viewAny' => $user->canDo('price_books.viewAny'),

@@ -6,6 +6,7 @@ use App\Domain\Finance\Services\ClientFundTransactionService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientFund;
+use App\Models\ClientFundTransaction;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,8 +44,10 @@ class ClientFundController extends Controller
             ->through(fn (ClientFund $fund) => [
                 'id' => $fund->id,
                 'name' => $fund->fund_name,
-                'fund_type' => $fund->fund_type ?? 'trust',
-                'balance' => (float) ($fund->balance ?? 0),
+            'fund_type' => $fund->fund_type ?? 'trust',
+            'balance' => (float) ($fund->balance ?? 0),
+            'available_balance' => (float) ($fund->available_balance ?? 0),
+            'reconciliation_status' => $fund->reconciliation_status,
                 'low_balance_threshold' => $fund->low_balance_threshold,
                 'transaction_count' => (int) ($fund->transactions_count ?? 0),
                 'client' => $fund->client ? [
@@ -69,6 +72,9 @@ class ClientFundController extends Controller
                     ->whereNotNull('low_balance_threshold')
                     ->whereColumn('balance', '<=', 'low_balance_threshold')
                     ->count(),
+                'review_required' => (clone $baseQuery)
+                    ->whereIn('reconciliation_status', ['review', 'mismatch'])
+                    ->count(),
             ],
         ]);
     }
@@ -79,11 +85,50 @@ class ClientFundController extends Controller
         abort_unless($auth && $this->canViewFunds($auth), 403);
 
         $fund = $this->accessibleFunds($auth)
-            ->with(['client:id,first_name,last_name', 'transactions' => fn ($q) => $q->orderByDesc('created_at')])
+            ->with([
+                'client:id,first_name,last_name',
+                'transactions' => fn ($q) => $q->with([
+                    'recorder:id,name',
+                    'approver:id,name',
+                    'rejecter:id,name',
+                ])->orderByDesc('created_at'),
+            ])
             ->findOrFail($fund);
 
         return inertia('operations/client-funds/Show', [
-            'fund' => $fund,
+            'fund' => [
+                'id' => $fund->id,
+                'fund_name' => $fund->fund_name,
+                'fund_type' => $fund->fund_type,
+                'balance' => $fund->balance,
+                'available_balance' => $fund->available_balance,
+                'low_balance_threshold' => $fund->low_balance_threshold,
+                'notes' => $fund->notes,
+                'reconciliation_status' => $fund->reconciliation_status,
+                'client' => $fund->client ? [
+                    'id' => $fund->client->id,
+                    'first_name' => $fund->client->first_name,
+                    'last_name' => $fund->client->last_name,
+                ] : null,
+                'transactions' => $fund->transactions->map(fn (ClientFundTransaction $transaction): array => [
+                    'id' => $transaction->id,
+                    'status' => $transaction->status,
+                    'transaction_type' => $transaction->transaction_type,
+                    'amount' => $transaction->amount,
+                    'currency_code' => $transaction->currency_code,
+                    'running_balance' => $transaction->running_balance,
+                    'description' => $transaction->description,
+                    'reference' => $transaction->reference,
+                    'transaction_date' => $transaction->transaction_date?->toDateString(),
+                    'approval_required' => (bool) $transaction->approval_required,
+                    'recorded_by_name' => $transaction->recorder?->name,
+                    'approved_by_name' => $transaction->approver?->name,
+                    'rejected_by_name' => $transaction->rejecter?->name,
+                    'requested_at' => $transaction->requested_at?->toISOString(),
+                    'approved_at' => $transaction->approved_at?->toISOString(),
+                    'rejected_at' => $transaction->rejected_at?->toISOString(),
+                ])->values(),
+            ],
         ]);
     }
 
@@ -95,7 +140,7 @@ class ClientFundController extends Controller
         $clients = $this->siteAccess->applyClientScope(
             Client::query(),
             $auth,
-            ['reports.viewAny'],
+            $this->siteBypassPermissions(),
         )
             ->select('id', 'first_name', 'last_name')
             ->orderBy('last_name')
@@ -125,7 +170,7 @@ class ClientFundController extends Controller
         $this->siteAccess->assertCanAccessClientId(
             $auth,
             (int) $data['client_id'],
-            ['reports.viewAny'],
+            $this->siteBypassPermissions(),
         );
 
         DB::transaction(function () use ($auth, $data): void {
@@ -149,6 +194,7 @@ class ClientFundController extends Controller
                     'amount' => $openingBalance,
                     'description' => 'Opening balance',
                     'reference' => null,
+                    'source_type' => 'opening_balance',
                     'idempotency_key' => Str::uuid()->toString(),
                 ]);
             }
@@ -190,21 +236,70 @@ class ClientFundController extends Controller
         $fund = $this->accessibleFunds($auth)->findOrFail($fund);
 
         $data = $request->validate([
-            'type' => ['required', 'string', 'in:credit,debit'],
+            'type' => ['required', 'string', 'in:credit,debit,transfer'],
             'amount' => ['required', 'numeric', 'decimal:0,2', 'min:0.01'],
             'description' => ['required', 'string', 'max:255'],
             'reference' => ['nullable', 'string', 'max:255'],
             'idempotency_key' => ['required', 'uuid'],
+            'destination_fund_id' => ['nullable', 'integer'],
+            'currency_code' => ['nullable', 'string', 'size:3'],
         ]);
 
-        $this->fundTransactions->record($fund, $auth, $data);
+        $transaction = $this->fundTransactions->record($fund, $auth, $data);
 
-        return redirect()->back()->with('success', 'Transaction recorded.');
+        $message = $transaction->status === 'pending'
+            ? 'Transaction submitted for independent approval.'
+            : 'Transaction recorded.';
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    public function approveTransaction(Request $request, $fund, $transaction)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('client_funds.approve'), 403);
+
+        $transaction = $this->accessibleTransaction($auth, $fund, $transaction);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
+
+        $this->fundTransactions->approve($transaction, $auth, $data['reason']);
+
+        return redirect()->back()->with('success', 'Transaction approved.');
+    }
+
+    public function rejectTransaction(Request $request, $fund, $transaction)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('client_funds.approve'), 403);
+
+        $transaction = $this->accessibleTransaction($auth, $fund, $transaction);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
+
+        $this->fundTransactions->reject($transaction, $auth, $data['reason']);
+
+        return redirect()->back()->with('success', 'Transaction rejected.');
+    }
+
+    public function reverseTransaction(Request $request, $fund, $transaction)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $this->canManageFunds($auth), 403);
+
+        $transaction = $this->accessibleTransaction($auth, $fund, $transaction);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+            'reference' => ['nullable', 'string', 'max:255'],
+            'idempotency_key' => ['required', 'uuid'],
+        ]);
+
+        $this->fundTransactions->reverse($transaction, $auth, $data);
+
+        return redirect()->back()->with('success', 'Reversal submitted for independent approval.');
     }
 
     private function canViewFunds($auth): bool
     {
-        return $auth->canDo('client_funds.manage');
+        return $auth->canDo('client_funds.manage') || $auth->canDo('client_funds.approve');
     }
 
     private function canManageFunds($auth): bool
@@ -218,7 +313,22 @@ class ClientFundController extends Controller
             ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
                 $clientQuery,
                 $user,
-                ['reports.viewAny'],
+                $this->siteBypassPermissions(),
             ));
+    }
+
+    private function accessibleTransaction(User $user, int|string $fundId, int|string $transactionId): ClientFundTransaction
+    {
+        $fund = $this->accessibleFunds($user)->findOrFail($fundId);
+
+        return ClientFundTransaction::query()
+            ->where('client_fund_id', $fund->id)
+            ->findOrFail($transactionId);
+    }
+
+    /** @return list<string> */
+    private function siteBypassPermissions(): array
+    {
+        return [(string) config('finance.client_funds.site_bypass_permission', 'client_funds.viewAllSites')];
     }
 }

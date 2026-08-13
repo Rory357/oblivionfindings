@@ -449,6 +449,7 @@ function buildIconNavItems({
         !!can?.care_plans?.viewAny ||
         !!can?.service_agreements?.viewAny ||
         !!can?.client_funds?.manage ||
+        !!can?.client_funds?.approve ||
         !!can?.funding?.viewAny ||
         !!can?.mileage?.viewAny ||
         !!can?.mileage?.viewOwn ||
@@ -882,7 +883,7 @@ function buildOperationsSubPanelGroups({
             href: '/operations/funding',
             icon: PieChart,
         });
-    if (can?.client_funds?.manage)
+    if (can?.client_funds?.manage || can?.client_funds?.approve)
         clientMgmt.push({
             title: `${clientLabel} Funds`,
             href: '/operations/client-funds',

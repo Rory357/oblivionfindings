@@ -164,6 +164,7 @@ class ClientLedgerService
     private function clientFundTransactions(int $clientId)
     {
         return ClientFundTransaction::query()
+            ->whereNotNull('balance_effect_applied_at')
             ->whereHas('fund', fn ($q) => $q->where('client_id', $clientId));
     }
 

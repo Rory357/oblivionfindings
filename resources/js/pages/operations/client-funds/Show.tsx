@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react';
 
 const nzd = new Intl.NumberFormat('en-NZ', {
@@ -34,11 +34,21 @@ function newIdempotencyKey(): string {
 type FundTransaction = {
     id: number;
     transaction_type: 'credit' | 'debit' | string;
+    status:
+        | 'pending'
+        | 'approved'
+        | 'posted'
+        | 'rejected'
+        | 'reversed'
+        | 'review';
     amount: number | string;
     running_balance: number | string;
     description: string;
     reference: string | null;
     transaction_date: string | null;
+    recorded_by_name: string | null;
+    approved_by_name: string | null;
+    rejected_by_name: string | null;
 };
 
 type ClientFund = {
@@ -47,6 +57,8 @@ type ClientFund = {
     name?: string;
     fund_type: string;
     balance: number | string;
+    available_balance: number | string;
+    reconciliation_status: 'clear' | 'review' | 'mismatch' | string;
     low_balance_threshold: number | string | null;
     notes: string | null;
     client: { id: number; first_name: string; last_name: string } | null;
@@ -71,6 +83,8 @@ function formatDate(value: string | null): string {
 }
 
 export default function ClientFundShow({ fund }: Props) {
+    const { auth } = usePage().props as any;
+    const canManage = Boolean(auth?.can?.client_funds?.manage);
     const { data, setData, post, processing, errors, reset } = useForm({
         type: 'debit',
         amount: '',
@@ -119,6 +133,18 @@ export default function ClientFundShow({ fund }: Props) {
                                         >
                                             {fund.fund_type ?? 'general'}
                                         </Badge>
+                                        {fund.reconciliation_status !==
+                                            'clear' && (
+                                            <Badge
+                                                variant="secondary"
+                                                className="capitalize"
+                                            >
+                                                {fund.reconciliation_status ===
+                                                'mismatch'
+                                                    ? 'Reconciliation mismatch'
+                                                    : 'Finance review'}
+                                            </Badge>
+                                        )}
                                     </div>
                                     <p className="text-sm text-muted-foreground">
                                         {fund.client
@@ -128,10 +154,10 @@ export default function ClientFundShow({ fund }: Props) {
                                 </div>
                                 <div className="text-right">
                                     <p className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Current balance
+                                        Available balance
                                     </p>
                                     <p className="text-2xl font-semibold tabular-nums">
-                                        {money(fund.balance)}
+                                        {money(fund.available_balance)}
                                     </p>
                                 </div>
                             </CardContent>
@@ -152,9 +178,13 @@ export default function ClientFundShow({ fund }: Props) {
                                 )}
                                 {(fund.transactions ?? []).map(
                                     (transaction) => {
-                                        const isCredit =
-                                            transaction.transaction_type ===
-                                            'credit';
+                                        const isCredit = [
+                                            'credit',
+                                            'transfer_credit',
+                                            'transfer_reversal',
+                                        ].includes(
+                                            transaction.transaction_type,
+                                        );
                                         const Icon = isCredit
                                             ? ArrowUpCircle
                                             : ArrowDownCircle;
@@ -184,6 +214,23 @@ export default function ClientFundShow({ fund }: Props) {
                                                             ? ` - ${transaction.reference}`
                                                             : ''}
                                                     </p>
+                                                    {transaction.recorded_by_name && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Requested by{' '}
+                                                            {
+                                                                transaction.recorded_by_name
+                                                            }
+                                                        </p>
+                                                    )}
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="mt-1 h-5 capitalize"
+                                                    >
+                                                        {transaction.status ===
+                                                        'pending'
+                                                            ? 'Pending approval'
+                                                            : transaction.status}
+                                                    </Badge>
                                                 </div>
                                                 <div className="text-right text-sm tabular-nums">
                                                     <p
@@ -212,98 +259,110 @@ export default function ClientFundShow({ fund }: Props) {
                         </Card>
                     </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">
-                                Record Transaction
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="type">Type</Label>
-                                    <select
-                                        id="type"
-                                        value={data.type}
-                                        onChange={(event) =>
-                                            setData('type', event.target.value)
-                                        }
-                                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-                                    >
-                                        <option value="credit">Credit</option>
-                                        <option value="debit">Debit</option>
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="amount">Amount *</Label>
-                                    <Input
-                                        id="amount"
-                                        type="number"
-                                        min="0.01"
-                                        step="0.01"
-                                        value={data.amount}
-                                        onChange={(event) =>
-                                            setData(
-                                                'amount',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                    {errors.amount && (
-                                        <p className="text-xs text-destructive">
-                                            {errors.amount}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="description">
-                                        Description *
-                                    </Label>
-                                    <Textarea
-                                        id="description"
-                                        rows={3}
-                                        value={data.description}
-                                        onChange={(event) =>
-                                            setData(
-                                                'description',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                    {errors.description && (
-                                        <p className="text-xs text-destructive">
-                                            {errors.description}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="reference">Reference</Label>
-                                    <Input
-                                        id="reference"
-                                        value={data.reference}
-                                        onChange={(event) =>
-                                            setData(
-                                                'reference',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                {errors.idempotency_key && (
-                                    <p className="text-xs text-destructive">
-                                        {errors.idempotency_key}
-                                    </p>
-                                )}
-                                <Button
-                                    type="submit"
-                                    disabled={processing}
-                                    className="w-full"
-                                >
+                    {canManage && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">
                                     Record Transaction
-                                </Button>
-                            </form>
-                        </CardContent>
-                    </Card>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <form
+                                    onSubmit={handleSubmit}
+                                    className="space-y-4"
+                                >
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="type">Type</Label>
+                                        <select
+                                            id="type"
+                                            value={data.type}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'type',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                                        >
+                                            <option value="credit">
+                                                Credit
+                                            </option>
+                                            <option value="debit">Debit</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="amount">Amount *</Label>
+                                        <Input
+                                            id="amount"
+                                            type="number"
+                                            min="0.01"
+                                            step="0.01"
+                                            value={data.amount}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'amount',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        {errors.amount && (
+                                            <p className="text-xs text-destructive">
+                                                {errors.amount}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="description">
+                                            Description *
+                                        </Label>
+                                        <Textarea
+                                            id="description"
+                                            rows={3}
+                                            value={data.description}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'description',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        {errors.description && (
+                                            <p className="text-xs text-destructive">
+                                                {errors.description}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="reference">
+                                            Reference
+                                        </Label>
+                                        <Input
+                                            id="reference"
+                                            value={data.reference}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'reference',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    {errors.idempotency_key && (
+                                        <p className="text-xs text-destructive">
+                                            {errors.idempotency_key}
+                                        </p>
+                                    )}
+                                    <Button
+                                        type="submit"
+                                        disabled={processing}
+                                        className="w-full"
+                                    >
+                                        Record Transaction
+                                    </Button>
+                                </form>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             </PageShell>
         </AppLayout>

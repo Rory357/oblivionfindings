@@ -924,6 +924,8 @@ class ClientController extends Controller
                         'name' => $fund->fund_name,
                         'type' => $fund->fund_type,
                         'balance' => (float) $fund->balance,
+                        'available_balance' => (float) $fund->available_balance,
+                        'reconciliation_status' => $fund->reconciliation_status,
                         'low_balance_threshold' => $fund->low_balance_threshold
                             ? (float) $fund->low_balance_threshold
                             : null,
@@ -932,6 +934,7 @@ class ClientController extends Controller
                     ])
                     ->values(),
                 'recent_transactions' => ClientFundTransaction::query()
+                    ->whereNotNull('balance_effect_applied_at')
                     ->whereIn(
                         'client_fund_id',
                         ClientFund::query()

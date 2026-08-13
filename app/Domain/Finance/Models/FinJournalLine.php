@@ -17,6 +17,9 @@ class FinJournalLine extends Model
         'account_id',
         'cost_centre_id',
         'funding_stream_id',
+        'client_id',
+        'client_fund_id',
+        'site_id',
         'description',
         'debit',
         'credit',
@@ -48,6 +51,21 @@ class FinJournalLine extends Model
     public function fundingStream(): BelongsTo
     {
         return $this->belongsTo(FinFundingStream::class, 'funding_stream_id');
+    }
+
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Client::class, 'client_id');
+    }
+
+    public function clientFund(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ClientFund::class, 'client_fund_id');
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Site::class, 'site_id');
     }
 
     public function taxRate(): BelongsTo

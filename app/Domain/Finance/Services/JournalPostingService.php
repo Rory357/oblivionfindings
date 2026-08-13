@@ -20,6 +20,15 @@ class JournalPostingService
     public function createDraftJournal(?int $orgId, array $data): FinJournal
     {
         return DB::transaction(function () use ($orgId, $data) {
+            // Journal numbers are organisation-wide. Serialize number
+            // allocation on a stable chart row so concurrent source services
+            // cannot derive and insert the same next number.
+            FinAccount::query()
+                ->where('organization_id', $orgId)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+
             $journal = FinJournal::create([
                 'organization_id' => $orgId,
                 'journal_number' => $this->generateJournalNumber($orgId),
@@ -31,7 +40,7 @@ class JournalPostingService
                 'source_id' => $data['source_id'] ?? null,
                 'status' => 'draft',
                 'total_amount' => 0,
-                'created_by' => Auth::id(),
+                'created_by' => $data['actor_id'] ?? Auth::id(),
             ]);
 
             $totalDebits = '0';
@@ -44,6 +53,9 @@ class JournalPostingService
                     'credit' => $line['credit'] ?? 0,
                     'cost_centre_id' => $line['cost_centre_id'] ?? null,
                     'funding_stream_id' => $line['funding_stream_id'] ?? null,
+                    'client_id' => $line['client_id'] ?? null,
+                    'client_fund_id' => $line['client_fund_id'] ?? null,
+                    'site_id' => $line['site_id'] ?? null,
                     'tax_rate_id' => $line['tax_rate_id'] ?? null,
                     'tax_amount' => $line['tax_amount'] ?? 0,
                 ]);
@@ -159,7 +171,7 @@ class JournalPostingService
             $journal->update([
                 'status' => 'posted',
                 'posted_at' => now(),
-                'posted_by' => Auth::id(),
+                'posted_by' => $journal->created_by ?? Auth::id(),
                 'fiscal_period_id' => $period->id,
                 'total_amount' => $totalDebits,
             ]);
@@ -202,6 +214,9 @@ class JournalPostingService
                 'credit' => $line->debit,
                 'cost_centre_id' => $line->cost_centre_id,
                 'funding_stream_id' => $line->funding_stream_id,
+                'client_id' => $line->client_id,
+                'client_fund_id' => $line->client_fund_id,
+                'site_id' => $line->site_id,
                 'tax_rate_id' => $line->tax_rate_id,
                 'tax_amount' => $line->tax_amount,
             ])->toArray(),

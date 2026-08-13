@@ -24,12 +24,18 @@ function makeRecoverableClientFundTransaction(array $attributes = []): ClientFun
     $actor = User::factory()->create();
 
     $transaction = $fund->transactions()->create(array_merge([
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'status' => 'approved',
         'transaction_type' => 'credit',
         'amount' => '10.00',
         'running_balance' => '10.00',
         'description' => 'Pending GL recovery',
         'transaction_date' => now()->toDateString(),
         'recorded_by' => $actor->id,
+        'approved_by' => $actor->id,
+        'approved_at' => now()->subMinutes(10),
+        'balance_effect_applied_at' => now()->subMinutes(10),
         'created_at' => now()->subMinutes(10),
         'updated_at' => now()->subMinutes(10),
     ], $attributes));
@@ -48,6 +54,7 @@ function makeRecoverableClientFundTransaction(array $attributes = []): ClientFun
 it('redispatches every durable unposted client-fund transaction and skips ineligible rows', function () {
     $pending = makeRecoverableClientFundTransaction();
     $alreadyQueuedRecently = makeRecoverableClientFundTransaction([
+        'approved_at' => now(),
         'created_at' => now(),
         'updated_at' => now(),
     ]);

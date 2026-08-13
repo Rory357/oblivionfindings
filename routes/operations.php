@@ -1167,8 +1167,13 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::post('/client-funds', [ClientFundController::class, 'store'])->name('operations.client_funds.store');
         Route::put('/client-funds/{fund}', [ClientFundController::class, 'update'])->name('operations.client_funds.update');
         Route::post('/client-funds/{fund}/transactions', [ClientFundController::class, 'addTransaction'])->name('operations.client_funds.transactions.store');
+        Route::post('/client-funds/{fund}/transactions/{transaction}/reverse', [ClientFundController::class, 'reverseTransaction'])->name('operations.client_funds.transactions.reverse');
     });
-    Route::middleware('permission:client_funds.manage')->group(function () {
+    Route::middleware('permission:client_funds.approve')->group(function () {
+        Route::post('/client-funds/{fund}/transactions/{transaction}/approve', [ClientFundController::class, 'approveTransaction'])->name('operations.client_funds.transactions.approve');
+        Route::post('/client-funds/{fund}/transactions/{transaction}/reject', [ClientFundController::class, 'rejectTransaction'])->name('operations.client_funds.transactions.reject');
+    });
+    Route::middleware('permission:client_funds.manage|client_funds.approve')->group(function () {
         Route::get('/client-funds', [ClientFundController::class, 'index'])->name('operations.client_funds.index');
         Route::get('/client-funds/{fund}', [ClientFundController::class, 'show'])->name('operations.client_funds.show');
     });
