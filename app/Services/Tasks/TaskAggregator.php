@@ -2,12 +2,14 @@
 
 namespace App\Services\Tasks;
 
+use App\Exceptions\TaskProviderNavigationException;
 use App\Models\TaskWatcher;
 use App\Models\User;
 use App\Services\Tasks\Contracts\ProvidesTaskSourceAliases;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use Illuminate\Support\Carbon;
+use Throwable;
 
 /**
  * The company-wide work-item feed: unions open incidents, corrective
@@ -340,6 +342,53 @@ class TaskAggregator
     }
 
     /**
+     * Build the shared-navigation projection without allowing one provider to
+     * take down every authenticated Inertia response. Failures are reported
+     * with provider context and surfaced as `degraded`; the strict /tasks feed
+     * continues to use itemsFor(), where provider failures are not suppressed.
+     *
+     * @return array{view: bool, badge: int, degraded: bool}
+     */
+    public function navigationBadgeFor(User $user): array
+    {
+        $view = false;
+        $degraded = false;
+        $items = [];
+
+        foreach ($this->providers as $provider) {
+            $sourceKey = $provider::class;
+
+            try {
+                $sourceKey = $provider->sourceKey();
+                if (! $provider->canView($user)) {
+                    continue;
+                }
+
+                $view = true;
+                foreach ($provider->tasks($user) as $item) {
+                    // Match itemsFor(): retries or legacy aliases cannot
+                    // inflate the shared count for one canonical record.
+                    $items[$item->id] ??= $item;
+                }
+            } catch (Throwable $exception) {
+                $degraded = true;
+                report(new TaskProviderNavigationException(
+                    providerClass: $provider::class,
+                    sourceKey: $sourceKey,
+                    userId: (int) $user->id,
+                    previous: $exception,
+                ));
+            }
+        }
+
+        return [
+            'view' => $view,
+            'badge' => $this->countBadgeItems(array_values($items), $user),
+            'degraded' => $degraded,
+        ];
+    }
+
+    /**
      * Permission-filtered, normalised, sorted work items.
      *
      * @param  array{
@@ -484,8 +533,14 @@ class TaskAggregator
      */
     public function badgeCountFor(User $user): int
     {
-        $items = $this->itemsFor($user, []);
+        return $this->countBadgeItems($this->itemsFor($user, []), $user);
+    }
 
+    /**
+     * @param  TaskItem[]  $items
+     */
+    private function countBadgeItems(array $items, User $user): int
+    {
         return count(array_filter(
             $items,
             fn (TaskItem $i) => $i->isOverdue() || ($i->assignee['id'] ?? null) === $user->id,

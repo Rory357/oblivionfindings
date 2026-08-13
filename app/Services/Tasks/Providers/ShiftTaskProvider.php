@@ -71,6 +71,7 @@ class ShiftTaskProvider implements HasModelClass, TaskProvider
 
         return $query->get()->map(function (ShiftTask $task) {
             $shift = $task->shift;
+            $staff = $shift?->staff;
             $client = $shift?->client;
 
             return new TaskItem(
@@ -83,8 +84,8 @@ class ShiftTaskProvider implements HasModelClass, TaskProvider
                 bucket: $task->is_completed ? TaskItem::BUCKET_DONE : TaskItem::BUCKET_OPEN,
                 severity: 'low',
                 // The shift's rostered worker owns its tasks.
-                assignee: $shift?->staff
-                    ? ['id' => $shift->staff->id, 'name' => (string) $shift->staff->name]
+                assignee: $staff
+                    ? ['id' => $staff->id, 'name' => (string) $staff->name]
                     : null,
                 client: $client
                     ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]

@@ -3,11 +3,13 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\Shift;
 use App\Models\ShiftTask;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Tasks\Providers\ShiftTaskProvider;
+use App\Services\Tasks\TaskAggregator;
 use Database\Seeders\RbacSeeder;
 
 test('shift tasks expose the rostered staff assignee while enforcing canonical Site access', function () {
@@ -124,5 +126,48 @@ it('renders the rostered worker without loading an undefined shift relationship'
         ->and($items[0]->assignee)->toBe([
             'id' => $worker->id,
             'name' => $worker->name,
+        ]);
+});
+
+it('counts zero and populated rostered shift tasks for the navigation badge', function () {
+    $this->seed(RbacSeeder::class);
+    $worker = User::factory()->create([
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    $worker->roles()->attach(
+        Role::query()->where('name', 'support_worker')->firstOrFail(),
+    );
+    $site = Site::factory()->create();
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $worker->id,
+        'primary_site_id' => $site->id,
+        'secondary_site_ids' => [],
+    ]);
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $aggregator = new TaskAggregator([new ShiftTaskProvider]);
+
+    expect($aggregator->badgeCountFor($worker))->toBe(0);
+
+    $shift = Shift::factory()->create([
+        'site_id' => $site->id,
+        'client_id' => $client->id,
+        'user_id' => $worker->id,
+        'starts_at' => now()->addHour(),
+        'status' => 'scheduled',
+    ]);
+    ShiftTask::query()->create([
+        'shift_id' => $shift->id,
+        'label' => 'Check the rostered client plan',
+        'is_completed' => false,
+    ]);
+
+    $projection = $aggregator->navigationBadgeFor($worker);
+
+    expect($aggregator->badgeCountFor($worker))->toBe(1)
+        ->and($projection)->toBe([
+            'view' => true,
+            'badge' => 1,
+            'degraded' => false,
         ]);
 });

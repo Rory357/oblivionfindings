@@ -37,10 +37,9 @@ class ControlRoomDeskTest extends TestCase
         $viewer = $this->siteBoundUser($site, ['controlRoom.viewAny', 'controlRoom.alerts.manage']);
 
         $this->mock(TaskAggregator::class, function ($mock): void {
-            $mock->shouldReceive('sourcesFor')
+            $mock->shouldReceive('navigationBadgeFor')
                 ->once()
-                ->andReturn([['key' => 'control_room_alerts', 'label' => 'Control Room alerts']]);
-            $mock->shouldReceive('badgeCountFor')->once()->andReturn(7);
+                ->andReturn(['view' => true, 'badge' => 7, 'degraded' => false]);
         });
 
         DB::flushQueryLog();
@@ -63,6 +62,7 @@ class ControlRoomDeskTest extends TestCase
                 ->has('can')
                 ->where('auth.can.tasks.view', true)
                 ->where('auth.can.tasks.badge', 7)
+                ->where('auth.can.tasks.badgeDegraded', false)
                 ->missing('analytics')
             );
 
