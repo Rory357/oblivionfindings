@@ -14,7 +14,8 @@ class FinBankTransactionPolicy
 
     public function view(User $user, FinBankTransaction $bankTransaction): bool
     {
-        return $user->canDo('finance.bank.view');
+        return $user->canDo('finance.bank.view')
+            && (int) $user->organization_id === (int) $bankTransaction->organization_id;
     }
 
     public function create(User $user): bool
@@ -24,6 +25,7 @@ class FinBankTransactionPolicy
 
     public function update(User $user, FinBankTransaction $bankTransaction): bool
     {
-        return $user->canDo('finance.bank.manage');
+        return $user->canDo('finance.bank.manage')
+            && (int) $user->organization_id === (int) $bankTransaction->organization_id;
     }
 }

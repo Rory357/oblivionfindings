@@ -498,6 +498,9 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/bank-reconciliation/{reconciliation}/complete', [BankReconciliationController::class, 'complete'])
         ->name('bank-reconciliation.complete')
         ->middleware('permission:finance.bank.manage');
+    Route::post('/bank-reconciliation/{reconciliation}/amend', [BankReconciliationController::class, 'amend'])
+        ->name('bank-reconciliation.amend')
+        ->middleware('permission:finance.bank.manage');
 
     // ── Tax & Compliance hub ────────────────────────────────────────────
     // /finance/tax is the hub entry point; it redirects to the first tax tab the

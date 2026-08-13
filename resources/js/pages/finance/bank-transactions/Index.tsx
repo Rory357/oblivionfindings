@@ -80,6 +80,14 @@ type Props = {
     transactions: PaginatedTransactions;
     bankAccounts: BankAccount[];
     filters: Filters;
+    latestStatementImport: {
+        status: string;
+        imported_count: number;
+        skipped_count: number;
+        completed_at: string | null;
+        failed_at: string | null;
+        recovery_message: string | null;
+    } | null;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -110,6 +118,7 @@ export default function BankTransactionsIndex({
     transactions,
     bankAccounts,
     filters,
+    latestStatementImport,
 }: Props) {
     const [showManualDialog, setShowManualDialog] = useState(false);
     const [showImportDialog, setShowImportDialog] = useState(false);
@@ -600,6 +609,16 @@ export default function BankTransactionsIndex({
                     />
                 }
             >
+                {latestStatementImport?.status === 'failed' && (
+                    <Card className="border-status-warning/30 bg-status-warning-bg">
+                        <CardContent className="py-4 text-sm text-status-warning">
+                            {latestStatementImport.recovery_message ??
+                                'The latest statement import failed and no rows were applied.'}{' '}
+                            Review the account and file, then retry the import.
+                        </CardContent>
+                    </Card>
+                )}
+
                 <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="pt-6">

@@ -7,6 +7,7 @@ use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournalLine;
 use App\Domain\Finance\Services\BankReconciliationService;
+use App\Models\User;
 
 /**
  * Matching a statement line that has no existing journal (a bank fee / interest)
@@ -15,6 +16,8 @@ use App\Domain\Finance\Services\BankReconciliationService;
  * matches the new bank-side journal line.
  */
 beforeEach(function () {
+    $this->actor = User::factory()->create(['organization_id' => 1]);
+    $this->actingAs($this->actor);
     $this->bankGl = FinAccount::factory()->create([
         'organization_id' => 1, 'code' => '1000', 'name' => 'Bank', 'type' => 'asset', 'is_active' => true,
     ]);
@@ -30,9 +33,10 @@ beforeEach(function () {
     $this->bankAccount = FinBankAccount::factory()->create([
         'organization_id' => 1, 'is_active' => true, 'gl_account_id' => $this->bankGl->id,
     ]);
-    $this->recon = FinBankReconciliation::create([
-        'organization_id' => 1, 'bank_account_id' => $this->bankAccount->id,
-        'statement_date' => now()->toDateString(), 'statement_balance' => '0.00', 'status' => 'in_progress',
+    $this->recon = app(BankReconciliationService::class)->startReconciliation(1, $this->bankAccount->id, [
+        'statement_date' => now()->toDateString(),
+        'statement_balance' => '0.00',
+        'created_by' => $this->actor->id,
     ]);
     // A $5 bank fee on the statement (outflow), with no journal yet.
     $this->fee = FinBankTransaction::create([
@@ -44,7 +48,7 @@ beforeEach(function () {
 
 it('posts a balanced DR expense / CR bank journal when matching a fee as an adjustment', function () {
     $line = app(BankReconciliationService::class)->matchTransaction(
-        $this->recon->id, $this->fee->id, null, $this->feeAccount->id,
+        $this->recon->id, $this->fee->id, null, $this->feeAccount->id, $this->actor->id, 1,
     );
 
     // The reconciliation line links a (newly created) bank-side journal line.
@@ -65,11 +69,11 @@ it('posts a balanced DR expense / CR bank journal when matching a fee as an adju
         ->and($bankLine->account->code)->toBe('1000');   // recon matched the bank-side line
 });
 
-it('still marks reconciled without a journal when no adjustment account is given', function () {
-    $line = app(BankReconciliationService::class)->matchTransaction(
-        $this->recon->id, $this->fee->id, null, null,
-    );
+it('refuses to match a statement effect without a posted GL line', function () {
+    expect(fn () => app(BankReconciliationService::class)->matchTransaction(
+        $this->recon->id, $this->fee->id, null, null, $this->actor->id, 1,
+    ))->toThrow(\DomainException::class);
 
-    expect($line->journal_line_id)->toBeNull()
-        ->and($this->fee->fresh()->status)->toBe('matched');
+    expect($this->fee->fresh()->status)->toBe('unreconciled')
+        ->and($this->recon->fresh()->version)->toBe(1);
 });

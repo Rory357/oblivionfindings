@@ -2,6 +2,8 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Domain\Finance\Exceptions\BankReconciliationConflict;
+use App\Domain\Finance\Support\BankReconciliationMutationGuard;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +19,9 @@ class FinBankTransaction extends Model
     protected $fillable = [
         'organization_id',
         'bank_account_id',
+        'statement_import_id',
+        'import_row_fingerprint',
+        'import_row_number',
         'transaction_date',
         'amount',
         'description',
@@ -35,7 +40,34 @@ class FinBankTransaction extends Model
         'transaction_date' => 'date',
         'amount' => 'decimal:2',
         'is_from_feed' => 'boolean',
+        'import_row_number' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $transaction): void {
+            if ($transaction->source === 'import'
+                && $transaction->import_row_fingerprint !== null
+                && ! BankReconciliationMutationGuard::allowsCanonicalMutation()) {
+                throw BankReconciliationConflict::generic();
+            }
+        });
+
+        static::updating(function (self $transaction): void {
+            $reconciliationFields = [
+                'reconciliation_id',
+                'matched_journal_line_id',
+                'status',
+                'statement_import_id',
+                'import_row_fingerprint',
+                'import_row_number',
+            ];
+            if ($transaction->isDirty($reconciliationFields)
+                && ! BankReconciliationMutationGuard::allowsCanonicalMutation()) {
+                throw BankReconciliationConflict::generic();
+            }
+        });
+    }
 
     public function bankAccount(): BelongsTo
     {
@@ -45,6 +77,11 @@ class FinBankTransaction extends Model
     public function bankFeed(): BelongsTo
     {
         return $this->belongsTo(FinBankFeed::class, 'bank_feed_id');
+    }
+
+    public function statementImport(): BelongsTo
+    {
+        return $this->belongsTo(FinBankStatementImport::class, 'statement_import_id');
     }
 
     public function reconciliation(): BelongsTo

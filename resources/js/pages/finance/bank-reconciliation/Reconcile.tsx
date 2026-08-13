@@ -4,6 +4,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
     Table,
     TableBody,
     TableCell,
@@ -13,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
     ArrowRight,
     Banknote,
@@ -22,7 +33,7 @@ import {
     Sparkles,
     Unlink,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 
 interface BankTransaction {
     id: number;
@@ -63,6 +74,9 @@ interface Reconciliation {
     statement_balance: number;
     calculated_balance: number | null;
     status: string;
+    version: number;
+    integrity_state: string;
+    recovery_message: string | null;
     completed_at: string | null;
     completed_by_name: string | null;
     starting_balance: number;
@@ -105,8 +119,17 @@ export default function Reconcile({
     >(null);
     const [adjustmentAccountId, setAdjustmentAccountId] = useState<string>('');
     const [processing, setProcessing] = useState(false);
+    const [showAmendmentDialog, setShowAmendmentDialog] = useState(false);
+    const amendmentForm = useForm({
+        reason: '',
+        evidence_reference: '',
+        expected_version: reconciliation.version,
+    });
 
     const isCompleted = reconciliation.status === 'completed';
+    const canMutate =
+        reconciliation.status === 'in_progress' &&
+        reconciliation.integrity_state === 'verified';
 
     // Build a lookup for suggested matches
     const suggestedMatchMap = useMemo(() => {
@@ -129,7 +152,7 @@ export default function Reconcile({
     const isBalanced = Math.abs(difference) <= 0.01;
 
     const handleMatch = () => {
-        if (!selectedTransaction || processing) return;
+        if (!selectedTransaction || processing || !canMutate) return;
 
         setProcessing(true);
         router.post(
@@ -137,6 +160,7 @@ export default function Reconcile({
             {
                 bank_transaction_id: selectedTransaction,
                 journal_line_id: selectedJournalLine,
+                expected_version: reconciliation.version,
             },
             {
                 preserveScroll: true,
@@ -150,7 +174,7 @@ export default function Reconcile({
     };
 
     const handleSuggestedMatch = (match: SuggestedMatch) => {
-        if (processing) return;
+        if (processing || !canMutate) return;
 
         setProcessing(true);
         router.post(
@@ -158,6 +182,7 @@ export default function Reconcile({
             {
                 bank_transaction_id: match.bank_transaction_id,
                 journal_line_id: match.journal_line_id,
+                expected_version: reconciliation.version,
             },
             {
                 preserveScroll: true,
@@ -167,12 +192,15 @@ export default function Reconcile({
     };
 
     const handleUnmatch = (lineId: number) => {
-        if (processing) return;
+        if (processing || !canMutate) return;
 
         setProcessing(true);
         router.post(
             `/finance/bank-reconciliation/${reconciliation.id}/unmatch`,
-            { line_id: lineId },
+            {
+                line_id: lineId,
+                expected_version: reconciliation.version,
+            },
             {
                 preserveScroll: true,
                 onFinish: () => setProcessing(false),
@@ -181,18 +209,24 @@ export default function Reconcile({
     };
 
     const handleComplete = () => {
-        if (processing || !isBalanced) return;
+        if (
+            processing ||
+            !canMutate ||
+            !isBalanced ||
+            unreconciledTransactions.length > 0
+        )
+            return;
 
         setProcessing(true);
         router.post(
             `/finance/bank-reconciliation/${reconciliation.id}/complete`,
-            {},
+            { expected_version: reconciliation.version },
             { onFinish: () => setProcessing(false) },
         );
     };
 
     const handleMatchWithoutJournal = () => {
-        if (!selectedTransaction || processing) return;
+        if (!selectedTransaction || processing || !canMutate) return;
 
         setProcessing(true);
         router.post(
@@ -203,6 +237,7 @@ export default function Reconcile({
                 adjustment_account_id: adjustmentAccountId
                     ? Number(adjustmentAccountId)
                     : null,
+                expected_version: reconciliation.version,
             },
             {
                 preserveScroll: true,
@@ -211,6 +246,19 @@ export default function Reconcile({
                     setSelectedTransaction(null);
                     setSelectedJournalLine(null);
                     setAdjustmentAccountId('');
+                },
+            },
+        );
+    };
+
+    const handleAmendment = (event: FormEvent) => {
+        event.preventDefault();
+        amendmentForm.post(
+            `/finance/bank-reconciliation/${reconciliation.id}/amend`,
+            {
+                onSuccess: () => {
+                    setShowAmendmentDialog(false);
+                    amendmentForm.reset('reason', 'evidence_reference');
                 },
             },
         );
@@ -239,17 +287,118 @@ export default function Reconcile({
                         description={`${reconciliation.bank_account_name} — Statement date: ${reconciliation.statement_date}`}
                         actions={
                             isCompleted ? (
-                                <Badge className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">
-                                    <CheckCircle className="mr-1 h-4 w-4" />
-                                    Completed {reconciliation.completed_at}
-                                    {reconciliation.completed_by_name &&
-                                        ` by ${reconciliation.completed_by_name}`}
-                                </Badge>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Badge className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">
+                                        <CheckCircle className="mr-1 h-4 w-4" />
+                                        Completed {reconciliation.completed_at}
+                                        {reconciliation.completed_by_name &&
+                                            ` by ${reconciliation.completed_by_name}`}
+                                    </Badge>
+                                    {reconciliation.integrity_state ===
+                                        'verified' && (
+                                        <Dialog
+                                            open={showAmendmentDialog}
+                                            onOpenChange={
+                                                setShowAmendmentDialog
+                                            }
+                                        >
+                                            <DialogTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                                >
+                                                    Start correction
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <form
+                                                    onSubmit={handleAmendment}
+                                                >
+                                                    <DialogHeader>
+                                                        <DialogTitle>
+                                                            Start reconciliation
+                                                            correction
+                                                        </DialogTitle>
+                                                        <DialogDescription>
+                                                            The completed record
+                                                            remains authoritative.
+                                                            A linked correction
+                                                            requires the reason and
+                                                            evidence used by Finance.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="space-y-4 py-4">
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="reconciliation-correction-reason">
+                                                                Correction reason
+                                                            </Label>
+                                                            <Input
+                                                                id="reconciliation-correction-reason"
+                                                                value={
+                                                                    amendmentForm
+                                                                        .data
+                                                                        .reason
+                                                                }
+                                                                onChange={(e) =>
+                                                                    amendmentForm.setData(
+                                                                        'reason',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                required
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="reconciliation-correction-evidence">
+                                                                Evidence reference
+                                                            </Label>
+                                                            <Input
+                                                                id="reconciliation-correction-evidence"
+                                                                value={
+                                                                    amendmentForm
+                                                                        .data
+                                                                        .evidence_reference
+                                                                }
+                                                                onChange={(e) =>
+                                                                    amendmentForm.setData(
+                                                                        'evidence_reference',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                required
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button
+                                                            type="submit"
+                                                            disabled={
+                                                                amendmentForm.processing
+                                                            }
+                                                        >
+                                                            Start linked correction
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </form>
+                                            </DialogContent>
+                                        </Dialog>
+                                    )}
+                                </div>
                             ) : null
                         }
                     />
                 }
             >
+                {reconciliation.recovery_message && (
+                    <Card className="border-status-warning/30 bg-status-warning-bg">
+                        <CardContent className="py-4 text-sm text-status-warning">
+                            {reconciliation.recovery_message}
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
                     <Card>
@@ -317,7 +466,7 @@ export default function Reconcile({
                 </div>
 
                 {/* Action Buttons */}
-                {!isCompleted && (
+                {canMutate && (
                     <div className="flex items-center gap-3">
                         <Button
                             onClick={handleMatch}
@@ -345,21 +494,29 @@ export default function Reconcile({
                         <Button
                             variant="outline"
                             onClick={handleMatchWithoutJournal}
-                            disabled={!selectedTransaction || processing}
+                            disabled={
+                                !selectedTransaction ||
+                                !adjustmentAccountId ||
+                                processing
+                            }
                             title={
                                 adjustmentAccountId
                                     ? 'Posts a balanced adjustment journal against the chosen account'
-                                    : 'Marks reconciled without a journal'
+                                    : 'Choose an adjustment account to create the required GL posting'
                             }
                         >
                             {adjustmentAccountId
                                 ? 'Match as Adjustment'
-                                : 'Match Without Journal Entry'}
+                                : 'Match as Adjustment'}
                         </Button>
                         <div className="flex-1" />
                         <Button
                             onClick={handleComplete}
-                            disabled={!isBalanced || processing}
+                            disabled={
+                                !isBalanced ||
+                                unreconciledTransactions.length > 0 ||
+                                processing
+                            }
                             className={
                                 isBalanced
                                     ? 'bg-status-success text-white hover:bg-status-success'
@@ -373,7 +530,7 @@ export default function Reconcile({
                 )}
 
                 {/* Suggested Matches */}
-                {!isCompleted && suggestedMatches.length > 0 && (
+                {canMutate && suggestedMatches.length > 0 && (
                     <Card className="border-status-info/30 bg-status-info">
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
@@ -506,9 +663,9 @@ export default function Reconcile({
                                                             : hasSuggestion
                                                               ? 'bg-status-info hover:bg-status-info'
                                                               : 'hover:bg-muted/50'
-                                                    } ${isCompleted ? 'pointer-events-none' : ''}`}
+                                                    } ${!canMutate ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
-                                                        if (isCompleted) return;
+                                                        if (!canMutate) return;
                                                         setSelectedTransaction(
                                                             isSelected
                                                                 ? null
@@ -603,9 +760,9 @@ export default function Reconcile({
                                                         isSelected
                                                             ? 'bg-status-info hover:bg-status-info'
                                                             : 'hover:bg-muted/50'
-                                                    } ${isCompleted ? 'pointer-events-none' : ''}`}
+                                                    } ${!canMutate ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
-                                                        if (isCompleted) return;
+                                                        if (!canMutate) return;
                                                         setSelectedJournalLine(
                                                             isSelected
                                                                 ? null
@@ -660,7 +817,7 @@ export default function Reconcile({
                                         <TableHead className="text-right">
                                             Journal Amount
                                         </TableHead>
-                                        {!isCompleted && (
+                                        {canMutate && (
                                             <TableHead className="w-[80px]"></TableHead>
                                         )}
                                     </TableRow>
@@ -744,7 +901,7 @@ export default function Reconcile({
                                                       )
                                                     : '-'}
                                             </TableCell>
-                                            {!isCompleted && (
+                                            {canMutate && (
                                                 <TableCell>
                                                     <Button
                                                         variant="ghost"
