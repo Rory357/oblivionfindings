@@ -29,6 +29,7 @@ use App\Models\User;
 use App\Notifications\ShiftBroadcastNotification;
 use App\Notifications\TimesheetCreationFailedNotification;
 use App\Services\CoverageReservationService;
+use App\Services\Eligibility\AssignmentEligibilityGateway;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
 use App\Services\NotificationService;
@@ -52,6 +53,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 class ShiftController extends Controller
 {
@@ -1980,29 +1982,42 @@ class ShiftController extends Controller
         // Only allow assigning staff users
         $this->assertCanAssignShiftToUser($auth, (int) $data['user_id']);
 
-        // Full eligibility check: block assignment if any hard-stop rule fails.
-        $overrideData = null;
-        try {
-            $assignee = User::findOrFail($data['user_id']);
-            $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($shift, $assignee);
+        $assignment = DB::transaction(function () use ($auth, $data, $shift) {
+            $lockedShift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
+            $this->assertCanAccessShift($auth, $lockedShift);
 
-            if ($eligibility->hasBlocks()) {
-                return back()->withErrors([
-                    'user_id' => $eligibility->blocking_reasons[0] ?? 'This staff member cannot be assigned to the shift.',
-                ])->with('compliance_warnings', $eligibility->toArray()['compliance_warnings'] ?? []);
+            if (in_array($lockedShift->status, ['completed', 'cancelled'], true)) {
+                throw ValidationException::withMessages([
+                    'user_id' => 'This shift was changed by another scheduler and can no longer be assigned.',
+                ]);
             }
 
-            if ($eligibility->hasWarnings()) {
+            $assignee = User::staff()->lockForUpdate()->findOrFail($data['user_id']);
+            $this->assertCanAssignShiftToUser($auth, (int) $assignee->id);
+
+            $decision = app(AssignmentEligibilityGateway::class)->decide($lockedShift, $assignee);
+            if ($decision->result?->hasBlocks()) {
+                session()->flash(
+                    'compliance_warnings',
+                    $decision->result->toArray()['compliance_warnings'] ?? [],
+                );
+            }
+            $decision->assertMayAssign(
+                'user_id',
+                'This staff member cannot be assigned to the shift.',
+            );
+
+            $overrideData = null;
+            if ($decision->isWarning()) {
+                $eligibility = $decision->result;
                 if (empty($data['override_acknowledged'])) {
-                    // Return warnings to the UI for manager acknowledgement.
                     return back()
-                        ->with('eligibility_result', $eligibility->toArray())
-                        ->with('assignment_warnings', $eligibility->warnings)
+                        ->with('eligibility_result', $eligibility?->toArray() ?? [])
+                        ->with('assignment_warnings', $eligibility?->warnings ?? [])
                         ->withInput();
                 }
 
-                // Override acknowledged — validate permission and reason.
-                if (! empty($eligibility->overrideable_warnings)) {
+                if (! empty($eligibility?->overrideable_warnings)) {
                     abort_unless(
                         $auth->canDo('shifts.overrideEligibility'),
                         403,
@@ -2016,7 +2031,7 @@ class ShiftController extends Controller
                     }
 
                     $overrideData = [
-                        'user_id' => (int) $data['user_id'],
+                        'user_id' => (int) $assignee->id,
                         'overridden_by' => $auth->id,
                         'override_reason' => trim($data['override_reason']),
                         'rules_overridden' => collect($eligibility->overrideable_warnings)->pluck('rule')->values()->all(),
@@ -2024,23 +2039,22 @@ class ShiftController extends Controller
                     ];
                 }
             }
-        } catch (\Throwable $e) {
-            // Don't block assignment if eligibility service fails
-            Log::warning('Eligibility check failed during shift assignment', ['error' => $e->getMessage()]);
-        }
 
-        $reservation = app(CoverageReservationService::class)->reserveForAssignment($shift, $auth, 'assignment');
-        try {
-            app(ShiftLifecycleService::class)->assign(
-                $shift,
+            $reservation = app(CoverageReservationService::class)
+                ->reserveForAssignment($lockedShift, $auth, 'assignment');
+
+            return app(ShiftLifecycleService::class)->assign(
+                $lockedShift,
                 $auth,
-                User::findOrFail($data['user_id']),
+                $assignee,
                 $overrideData,
                 $reservation,
+                $decision,
             );
-        } catch (\Throwable $e) {
-            app(CoverageReservationService::class)->release($reservation);
-            throw $e;
+        });
+
+        if ($assignment instanceof Response) {
+            return $assignment;
         }
 
         return redirect($data['return_to'] ?? url('/operations/rostering'))->with('success', 'Shift assigned.');

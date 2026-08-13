@@ -12,18 +12,26 @@ use App\Models\Role;
 use App\Models\RosterPeriod;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\ShiftEligibilityOverride;
 use App\Models\ShiftSeries;
+use App\Models\ShiftSignalOutbox;
 use App\Models\ShiftTask;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteCoverageRequirement;
+use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\Eligibility\AssignmentEligibilityDecision;
+use App\Services\Eligibility\EligibilityResult;
 use App\Services\ShiftSignalService;
+use App\Services\ShiftStaffEligibilityService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ShiftControllerTest extends TestCase
@@ -568,6 +576,169 @@ class ShiftControllerTest extends TestCase
             'scheduled_date' => '2026-05-06',
             'assigned_to_user_id' => $this->admin->id,
             'status' => 'scheduled',
+        ]);
+    }
+
+    public function test_direct_assignment_returns_safe_503_without_side_effects_and_succeeds_on_retry(): void
+    {
+        Notification::fake();
+        $shift = $this->assignmentBoundaryShift();
+        $baseline = [
+            'audit' => AuditLog::query()->count(),
+            'timeline' => TimelineEvent::query()->count(),
+            'reservations' => CoverageReservation::query()->count(),
+            'overrides' => ShiftEligibilityOverride::query()->count(),
+            'outbox' => ShiftSignalOutbox::query()->count(),
+        ];
+        $attempt = 0;
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt): void {
+            $mock->shouldReceive('evaluate')->twice()->andReturnUsing(function () use (&$attempt) {
+                if (++$attempt === 1) {
+                    throw new \RuntimeException('private eligibility infrastructure detail');
+                }
+
+                return $this->assignmentEligibilityResult();
+            });
+        });
+
+        $this->actingAs($this->admin)
+            ->postJson(route('operations.shifts.assign', $shift), ['user_id' => $this->staff->id])
+            ->assertStatus(503)
+            ->assertJsonPath('errors.user_id.0', AssignmentEligibilityDecision::UNAVAILABLE_MESSAGE)
+            ->assertJsonMissing(['private eligibility infrastructure detail']);
+
+        $this->assertNull($shift->fresh()->user_id);
+        $this->assertSame($baseline['audit'], AuditLog::query()->count());
+        $this->assertSame($baseline['timeline'], TimelineEvent::query()->count());
+        $this->assertSame($baseline['reservations'], CoverageReservation::query()->count());
+        $this->assertSame($baseline['overrides'], ShiftEligibilityOverride::query()->count());
+        $this->assertSame($baseline['outbox'], ShiftSignalOutbox::query()->count());
+        Notification::assertNothingSent();
+
+        $this->actingAs($this->admin)
+            ->post(route('operations.shifts.assign', $shift), ['user_id' => $this->staff->id])
+            ->assertSessionHas('success');
+
+        $this->assertSame($this->staff->id, $shift->fresh()->user_id);
+        $this->assertSame(1, TimelineEvent::query()
+            ->where('source_type', Shift::class)
+            ->where('source_id', $shift->id)
+            ->where('type', 'shift_assigned')
+            ->count());
+    }
+
+    public function test_direct_assignment_hard_block_is_422_and_never_mutates_assignment_state(): void
+    {
+        $shift = $this->assignmentBoundaryShift();
+        $baseline = [
+            'timeline' => TimelineEvent::query()->count(),
+            'reservations' => CoverageReservation::query()->count(),
+            'overrides' => ShiftEligibilityOverride::query()->count(),
+        ];
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('evaluate')->once()->andReturn($this->assignmentEligibilityResult(
+                blocks: ['Current credential is missing.'],
+            ));
+        });
+
+        $this->actingAs($this->admin)
+            ->postJson(route('operations.shifts.assign', $shift), ['user_id' => $this->staff->id])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.user_id.0', 'Current credential is missing.');
+
+        $this->assertNull($shift->fresh()->user_id);
+        $this->assertSame($baseline['overrides'], ShiftEligibilityOverride::query()->count());
+        $this->assertSame($baseline['timeline'], TimelineEvent::query()->count());
+        $this->assertSame($baseline['reservations'], CoverageReservation::query()->count());
+    }
+
+    public function test_direct_warning_requires_the_governed_override_and_persists_immutable_evidence(): void
+    {
+        $shift = $this->assignmentBoundaryShift();
+        $warning = 'Would exceed the weekly fatigue warning threshold.';
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($warning): void {
+            $mock->shouldReceive('evaluate')->times(3)->andReturn(
+                $this->assignmentEligibilityResult(warnings: [$warning]),
+            );
+        });
+
+        $this->actingAs($this->admin)
+            ->from('/operations/rostering')
+            ->post(route('operations.shifts.assign', $shift), ['user_id' => $this->staff->id])
+            ->assertRedirect('/operations/rostering')
+            ->assertSessionHas('assignment_warnings', [$warning]);
+
+        $this->assertNull($shift->fresh()->user_id);
+        $this->assertDatabaseCount('shift_eligibility_overrides', 0);
+
+        $reason = 'Duty manager reviewed the warning and confirmed safe cover arrangements.';
+        $scheduler = User::factory()->create([
+            'role' => 'scheduler',
+            'approved_at' => now(),
+        ]);
+        HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $scheduler->id,
+            'employee_number' => 'EMP-SCHEDULER-'.$scheduler->id,
+            'work_email' => $scheduler->email,
+            'position_title' => 'Scheduler',
+            'position_role' => 'scheduler',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'is_active' => true,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
+        $scheduler->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'shifts.manageAny')->firstOrFail()->id => ['allowed' => true],
+        ]);
+
+        $this->actingAs($scheduler)
+            ->post(route('operations.shifts.assign', $shift), [
+                'user_id' => $this->staff->id,
+                'override_acknowledged' => true,
+                'override_reason' => $reason,
+            ])
+            ->assertForbidden();
+
+        $this->assertNull($shift->fresh()->user_id);
+        $this->assertDatabaseCount('shift_eligibility_overrides', 0);
+
+        $this->actingAs($this->admin)
+            ->post(route('operations.shifts.assign', $shift), [
+                'user_id' => $this->staff->id,
+                'override_acknowledged' => true,
+                'override_reason' => $reason,
+            ])
+            ->assertSessionHas('success');
+
+        $override = ShiftEligibilityOverride::query()->sole();
+        $this->assertSame($this->admin->id, $override->overridden_by);
+        $this->assertSame($reason, $override->override_reason);
+        $this->assertNotNull($override->created_at);
+        $this->assertSame(['fatigue_weekly'], $override->rules_overridden);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'shifteligibilityoverride.create',
+            'auditable_id' => $override->id,
+        ]);
+
+        try {
+            $override->update(['override_reason' => 'Rewritten evidence']);
+            $this->fail('Override evidence must not be updateable.');
+        } catch (\LogicException $exception) {
+            $this->assertSame('Shift eligibility override evidence is immutable.', $exception->getMessage());
+        }
+
+        try {
+            $override->fresh()->delete();
+            $this->fail('Override evidence must not be deleteable.');
+        } catch (\LogicException $exception) {
+            $this->assertSame('Shift eligibility override evidence is immutable.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseHas('shift_eligibility_overrides', [
+            'id' => $override->id,
+            'override_reason' => $reason,
         ]);
     }
 
@@ -1161,5 +1332,35 @@ class ShiftControllerTest extends TestCase
 
         $shift = Shift::latest()->first();
         $this->assertEquals($this->serviceContext->id, $shift->service_context_id);
+    }
+
+    private function assignmentBoundaryShift(): Shift
+    {
+        return Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => null,
+            'starts_at' => now()->addWeek()->setTime(9, 0),
+            'ends_at' => now()->addWeek()->setTime(13, 0),
+            'status' => 'draft',
+            'coverage_roles' => [],
+            'created_by' => $this->admin->id,
+        ]);
+    }
+
+    private function assignmentEligibilityResult(array $blocks = [], array $warnings = []): EligibilityResult
+    {
+        return new EligibilityResult(
+            is_allowed: $blocks === [],
+            blocking_reasons: $blocks,
+            warnings: $warnings,
+            checked_rules: [],
+            overrideable_warnings: $warnings === [] ? [] : [[
+                'rule' => 'fatigue_weekly',
+                'message' => $warnings[0],
+                'overrideable' => true,
+            ]],
+        );
     }
 }
