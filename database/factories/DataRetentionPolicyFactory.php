@@ -12,10 +12,11 @@ class DataRetentionPolicyFactory extends Factory
     public function definition(): array
     {
         return [
-            'model_type' => fake()->randomElement(['App\\Models\\Client', 'App\\Models\\User', 'App\\Models\\Document']),
+            'model_type' => fake()->randomElement(['App\\Models\\Client', 'App\\Models\\ClientNote', 'App\\Models\\RespiteReferral']),
             'policy_name' => fake()->sentence(3),
             'retention_period_years' => fake()->randomElement([1, 2, 5, 7]),
             'active' => true,
+            'execution_state' => 'draft',
         ];
     }
 }

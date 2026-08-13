@@ -203,19 +203,14 @@ export default function EditRetentionPolicy({ policy }: Props) {
                                 <div className="flex items-center space-x-2">
                                     <Checkbox
                                         id="legal_hold_exemption"
-                                        checked={data.legal_hold_exemption}
-                                        onCheckedChange={(checked) =>
-                                            setData(
-                                                'legal_hold_exemption',
-                                                checked as boolean,
-                                            )
-                                        }
+                                        checked
+                                        disabled
                                     />
                                     <Label
                                         htmlFor="legal_hold_exemption"
                                         className="text-sm font-normal"
                                     >
-                                        Exempt records under legal hold
+                                        Always preserve records under legal hold
                                     </Label>
                                 </div>
 

@@ -287,8 +287,8 @@ export function getPrivacyWizardConfig(
                                 required: true,
                                 placeholder: 'e.g. Client records',
                             },
-                            // FQCN values — the deletion executor resolves these via class_exists()
-                            // and only anonymises personal fields for these three record types.
+                            // Closed server-owned retention owner identifiers. The backend
+                            // rejects every identifier outside its native adapter registry.
                             {
                                 type: 'tiles',
                                 name: 'model_type',
@@ -307,12 +307,6 @@ export function getPrivacyWizardConfig(
                                         label: 'Client note',
                                         description: 'Progress & daily notes',
                                         icon: ListChecks,
-                                    },
-                                    {
-                                        key: 'App\\Models\\ClientDocument',
-                                        label: 'Client document',
-                                        description: 'Uploaded documents',
-                                        icon: FileText,
                                     },
                                 ],
                             },

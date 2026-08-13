@@ -1472,8 +1472,8 @@ class PrivacyControllerTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->post('/privacy/retention', [
-                'model_type' => 'App\\Models\\Shift',
-                'policy_name' => 'Shift Record Retention',
+                'model_type' => Client::class,
+                'policy_name' => 'Client Record Retention',
                 'description' => 'Retain shift records for 3 years.',
                 'retention_period_years' => 3,
                 'archive_after_years' => 2,
@@ -1489,8 +1489,8 @@ class PrivacyControllerTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('data_retention_policies', [
-            'model_type' => 'App\\Models\\Shift',
-            'policy_name' => 'Shift Record Retention',
+            'model_type' => Client::class,
+            'policy_name' => 'Client Record Retention',
             'retention_period_years' => 3,
             'created_by' => $this->admin->id,
         ]);
@@ -1541,6 +1541,38 @@ class PrivacyControllerTest extends TestCase
                 ->component('privacy/retention/review')
                 ->has('policies')
             );
+    }
+
+    public function test_retention_preview_and_independent_approval_use_governed_routes(): void
+    {
+        $policy = $this->createRetentionPolicy([
+            'retention_period_years' => 1,
+            'execution_state' => 'draft',
+        ]);
+        $reviewer = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $reviewer->roles()->attach(Role::where('name', 'admin')->first());
+
+        $this->actingAs($this->admin)
+            ->post("/privacy/retention/{$policy->id}/preview")
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame('previewed', $policy->fresh()->execution_state);
+
+        $this->actingAs($this->admin)
+            ->post("/privacy/retention/{$policy->id}/approve")
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $this->actingAs($reviewer)
+            ->post("/privacy/retention/{$policy->id}/approve")
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $policy->refresh();
+        $this->assertSame('approved', $policy->execution_state);
+        $this->assertSame($this->admin->id, $policy->previewed_by_user_id);
+        $this->assertSame($reviewer->id, $policy->approved_by_user_id);
     }
 
     public function test_retention_index_shows_stats(): void
@@ -1984,6 +2016,29 @@ class PrivacyControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->post('/privacy/retention', [])
             ->assertSessionHasErrors(['model_type', 'policy_name', 'retention_period_years']);
+    }
+
+    public function test_retention_store_rejects_unknown_model_and_condition_column(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/privacy/retention', [
+                'model_type' => User::class,
+                'policy_name' => 'Unsafe dynamic model',
+                'retention_period_years' => 1,
+            ])
+            ->assertSessionHasErrors(['model_type']);
+
+        $this->actingAs($this->admin)
+            ->post('/privacy/retention', [
+                'model_type' => Client::class,
+                'policy_name' => 'Unsafe condition',
+                'retention_period_years' => 1,
+                'retention_conditions' => ['email' => 'person@example.com'],
+            ])
+            ->assertSessionHasErrors(['retention_conditions']);
+
+        $this->assertDatabaseMissing('data_retention_policies', ['policy_name' => 'Unsafe dynamic model']);
+        $this->assertDatabaseMissing('data_retention_policies', ['policy_name' => 'Unsafe condition']);
     }
 
     public function test_retention_store_validates_retention_period_min(): void
@@ -2449,7 +2504,7 @@ class PrivacyControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_deletion_execute_responds(): void
+    public function test_deletion_execute_requires_an_approved_preview(): void
     {
         $policy = $this->createRetentionPolicy([
             'model_type' => Client::class,
@@ -2463,7 +2518,13 @@ class PrivacyControllerTest extends TestCase
                 'confirm' => '1',
             ])
             ->assertRedirect()
-            ->assertSessionHas('info');
+            ->assertSessionHas('error');
+
+        $this->assertDatabaseHas('data_retention_executions', [
+            'data_retention_policy_id' => $policy->id,
+            'status' => 'blocked',
+            'failure_code' => 'approval_required',
+        ]);
     }
 
     // ══════════════════════════════════════════════════

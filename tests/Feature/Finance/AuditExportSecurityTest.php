@@ -1,8 +1,8 @@
 <?php
 
+use App\Domain\Finance\Jobs\PruneFinanceAuditExportsJob;
 use App\Domain\Finance\Models\FinAuditExport;
 use App\Domain\Finance\Services\AuditExportService;
-use App\Jobs\EnforceDataRetentionJob;
 use Illuminate\Support\Facades\Storage;
 
 test('audit exports are stored encrypted and decrypted for download', function () {
@@ -67,7 +67,7 @@ test('data retention job prunes expired finance audit exports and files', functi
     Storage::disk('local')->put($expired->file_path, 'expired');
     Storage::disk('local')->put($current->file_path, 'current');
 
-    app(EnforceDataRetentionJob::class)->handle();
+    app(PruneFinanceAuditExportsJob::class)->handle();
 
     Storage::disk('local')->assertMissing($expired->file_path);
     Storage::disk('local')->assertExists($current->file_path);

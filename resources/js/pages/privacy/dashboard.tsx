@@ -349,12 +349,28 @@ export default function PrivacyDashboard({
                     router.visit(`/privacy/retention/${row.id}/edit`),
             });
             items.push({
-                icon: icon(Trash2),
-                label: 'Execute deletion',
-                sub: 'irreversible',
-                tone: 'critical',
-                onClick: () => setRowAction({ kind: 'execute', id: row.id }),
+                icon: icon(Eye),
+                label: 'Create execution preview',
+                onClick: () =>
+                    router.post(`/privacy/retention/${row.id}/preview`, {}),
             });
+            if (row.execution_state === 'previewed')
+                items.push({
+                    icon: icon(Check),
+                    label: 'Approve preview',
+                    sub: 'independent reviewer',
+                    onClick: () =>
+                        router.post(`/privacy/retention/${row.id}/approve`, {}),
+                });
+            if (row.execution_state === 'approved')
+                items.push({
+                    icon: icon(Trash2),
+                    label: 'Execute approved retention',
+                    sub: 'governed outcome',
+                    tone: 'critical',
+                    onClick: () =>
+                        setRowAction({ kind: 'execute', id: row.id }),
+                });
         }
 
         if (!items.length) return;
