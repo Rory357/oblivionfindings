@@ -41,20 +41,6 @@ class CarePlanService
         return $newVersion;
     }
 
-    public function completeReview(CarePlan $carePlan, User $reviewer): void
-    {
-        if ($carePlan->goals()->count() === 0) {
-            throw new \DomainException('Cannot activate a care plan without at least one goal.');
-        }
-
-        $carePlan->update([
-            'status' => 'active',
-            'reviewed_at' => now(),
-            'reviewed_by' => $reviewer->id,
-            'next_review_at' => now()->addMonths(6)->toDateString(),
-        ]);
-    }
-
     public function getExpiredPlans(): Collection
     {
         return CarePlan::query()
