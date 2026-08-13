@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Models\FinBankAccount;
+use App\Domain\Finance\Models\FinBankStatementImport;
 use App\Domain\Finance\Models\FinBankTransaction;
 use App\Domain\Finance\Services\BankReconciliationService;
 use App\Http\Controllers\Controller;
@@ -60,6 +61,11 @@ class BankTransactionController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $latestStatementImport = FinBankStatementImport::query()
+            ->where('organization_id', $orgId)
+            ->latest('id')
+            ->first();
+
         return Inertia::render('finance/bank-transactions/Index', [
             'transactions' => $transactions,
             'bankAccounts' => $bankAccounts,
@@ -69,6 +75,14 @@ class BankTransactionController extends Controller
                 'start_date' => $request->start_date ?? '',
                 'end_date' => $request->end_date ?? '',
             ],
+            'latestStatementImport' => $latestStatementImport ? [
+                'status' => $latestStatementImport->status,
+                'imported_count' => $latestStatementImport->imported_count,
+                'skipped_count' => $latestStatementImport->skipped_count,
+                'completed_at' => $latestStatementImport->completed_at?->format('Y-m-d H:i'),
+                'failed_at' => $latestStatementImport->failed_at?->format('Y-m-d H:i'),
+                'recovery_message' => $latestStatementImport->failure_message,
+            ] : null,
         ]);
     }
 
@@ -111,13 +125,18 @@ class BankTransactionController extends Controller
         $this->authorize('create', FinBankTransaction::class);
 
         $validated = $request->validate([
-            'bank_account_id' => ['required', 'exists:fin_bank_accounts,id'],
+            'bank_account_id' => ['required', 'integer', 'min:1'],
             'transaction_date' => ['required', 'date'],
             'amount' => ['required', 'numeric'],
             'description' => ['required', 'string', 'max:500'],
             'reference' => ['nullable', 'string', 'max:255'],
             'payee' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $ownedAccount = FinBankAccount::forOrganization($request->user()->organization_id)
+            ->whereKey($validated['bank_account_id'])
+            ->exists();
+        abort_unless($ownedAccount, 404);
 
         $validated['organization_id'] = $request->user()->organization_id;
         $validated['source'] = 'manual';
@@ -134,7 +153,7 @@ class BankTransactionController extends Controller
         $this->authorize('create', FinBankTransaction::class);
 
         $request->validate([
-            'bank_account_id' => ['required', 'exists:fin_bank_accounts,id'],
+            'bank_account_id' => ['required', 'integer', 'min:1'],
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
         ]);
 
@@ -143,10 +162,17 @@ class BankTransactionController extends Controller
         $filePath = $request->file('file')->getRealPath();
 
         try {
-            $result = $this->service->importTransactions($orgId, $bankAccountId, $filePath);
+            $result = $this->service->importTransactions(
+                $orgId,
+                $bankAccountId,
+                $filePath,
+                'csv',
+                $request->user()->id,
+                $request->file('file')->getClientOriginalName(),
+            );
         } catch (\Throwable $e) {
             return redirect()->back()
-                ->withErrors(['file' => 'Failed to import transactions: ' . $e->getMessage()]);
+                ->withErrors(['file' => 'The statement import failed and no rows were applied. Check the account and file, then retry.']);
         }
 
         return redirect()->back()

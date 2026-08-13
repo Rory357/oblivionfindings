@@ -2,10 +2,10 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Exceptions\BankReconciliationConflict;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBankReconciliation;
-use App\Domain\Finance\Models\FinBankReconciliationLine;
 use App\Domain\Finance\Services\BankReconciliationService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -73,7 +73,7 @@ class BankReconciliationController extends Controller
         $this->authorize('create', FinBankReconciliation::class);
 
         $validated = $request->validate([
-            'bank_account_id' => ['required', 'exists:fin_bank_accounts,id'],
+            'bank_account_id' => ['required', 'integer', 'min:1'],
             'statement_date' => ['required', 'date'],
             'statement_balance' => ['required', 'numeric'],
         ]);
@@ -101,7 +101,7 @@ class BankReconciliationController extends Controller
             'lines.journalLine.journal:id,journal_number,journal_date,description',
         ]);
 
-        $unreconciledItems = $this->service->getUnreconciledItems($reconciliation->bank_account_id);
+        $unreconciledItems = $this->service->getUnreconciledItems($reconciliation->bank_account_id, $reconciliation->id);
         $suggestedMatches = [];
 
         if ($reconciliation->status === 'in_progress') {
@@ -146,16 +146,7 @@ class BankReconciliationController extends Controller
             'journal_description' => $line->journal?->description,
         ]);
 
-        // Calculate the starting balance for this reconciliation
-        $previousRecon = FinBankReconciliation::where('bank_account_id', $reconciliation->bank_account_id)
-            ->where('status', 'completed')
-            ->orderByDesc('statement_date')
-            ->first();
-
         $bankAccount = FinBankAccount::find($reconciliation->bank_account_id);
-        $startingBalance = $previousRecon
-            ? (float) $previousRecon->statement_balance
-            : (float) $bankAccount->opening_balance;
 
         return Inertia::render('finance/bank-reconciliation/Reconcile', [
             'reconciliation' => [
@@ -166,9 +157,12 @@ class BankReconciliationController extends Controller
                 'statement_balance' => (float) $reconciliation->statement_balance,
                 'calculated_balance' => $reconciliation->calculated_balance ? (float) $reconciliation->calculated_balance : null,
                 'status' => $reconciliation->status,
+                'version' => $reconciliation->version,
+                'integrity_state' => $reconciliation->integrity_state,
+                'recovery_message' => $reconciliation->recovery_message,
                 'completed_at' => $reconciliation->completed_at?->format('Y-m-d H:i'),
                 'completed_by_name' => $reconciliation->completedBy?->name,
-                'starting_balance' => $startingBalance,
+                'starting_balance' => (float) $reconciliation->starting_balance,
             ],
             'matchedLines' => $matchedLines,
             'unreconciledTransactions' => $transactions,
@@ -189,17 +183,26 @@ class BankReconciliationController extends Controller
         $this->authorize('complete', $reconciliation);
 
         $validated = $request->validate([
-            'bank_transaction_id' => ['required', 'exists:fin_bank_transactions,id'],
-            'journal_line_id' => ['nullable', 'exists:fin_journal_lines,id'],
-            'adjustment_account_id' => ['nullable', 'exists:fin_accounts,id'],
+            'bank_transaction_id' => ['required', 'integer', 'min:1'],
+            'journal_line_id' => ['nullable', 'integer', 'min:1'],
+            'adjustment_account_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => ['nullable', 'integer', 'min:1'],
+            'idempotency_key' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $this->service->matchTransaction(
-            $reconciliation->id,
-            $validated['bank_transaction_id'],
-            $validated['journal_line_id'] ?? null,
-            $validated['adjustment_account_id'] ?? null,
-        );
+        try {
+            $this->service->matchTransaction(
+                $reconciliation->id,
+                $validated['bank_transaction_id'],
+                $validated['journal_line_id'] ?? null,
+                $validated['adjustment_account_id'] ?? null,
+                $request->user()->id,
+                $validated['expected_version'] ?? null,
+                $validated['idempotency_key'] ?? null,
+            );
+        } catch (BankReconciliationConflict $exception) {
+            return redirect()->back()->withErrors(['reconciliation' => $exception->getMessage()]);
+        }
 
         return redirect()->back()
             ->with('success', 'Transaction matched.');
@@ -210,16 +213,22 @@ class BankReconciliationController extends Controller
         $this->authorize('complete', $reconciliation);
 
         $request->validate([
-            'line_id' => ['required', 'exists:fin_bank_reconciliation_lines,id'],
+            'line_id' => ['required', 'integer', 'min:1'],
+            'expected_version' => ['nullable', 'integer', 'min:1'],
+            'idempotency_key' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $line = FinBankReconciliationLine::findOrFail($request->line_id);
-
-        if ($line->reconciliation_id !== $reconciliation->id) {
-            abort(403, 'Line does not belong to this reconciliation.');
+        try {
+            $this->service->unmatchTransaction(
+                $reconciliation->id,
+                (int) $request->line_id,
+                $request->user()->id,
+                $request->integer('expected_version') ?: null,
+                $request->input('idempotency_key'),
+            );
+        } catch (BankReconciliationConflict $exception) {
+            return redirect()->back()->withErrors(['reconciliation' => $exception->getMessage()]);
         }
-
-        $this->service->unmatchTransaction($line);
 
         return redirect()->back()
             ->with('success', 'Transaction unmatched.');
@@ -230,13 +239,50 @@ class BankReconciliationController extends Controller
         $this->authorize('complete', $reconciliation);
 
         try {
-            $this->service->completeReconciliation($reconciliation, $request->user()->id);
-        } catch (\InvalidArgumentException $e) {
+            $validated = $request->validate([
+                'expected_version' => ['nullable', 'integer', 'min:1'],
+                'idempotency_key' => ['nullable', 'string', 'max:255'],
+            ]);
+            $this->service->completeReconciliation(
+                $reconciliation,
+                $request->user()->id,
+                $validated['expected_version'] ?? null,
+                $validated['idempotency_key'] ?? null,
+            );
+        } catch (BankReconciliationConflict $e) {
             return redirect()->back()
                 ->withErrors(['reconciliation' => $e->getMessage()]);
         }
 
         return redirect()->route('finance.bank-reconciliation.show', $reconciliation)
             ->with('success', 'Reconciliation completed successfully.');
+    }
+
+    public function amend(Request $request, FinBankReconciliation $reconciliation)
+    {
+        $this->authorize('complete', $reconciliation);
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:1000'],
+            'evidence_reference' => ['required', 'string', 'min:3', 'max:255'],
+            'expected_version' => ['required', 'integer', 'min:1'],
+            'idempotency_key' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $amendment = $this->service->createAmendment(
+                $reconciliation,
+                $request->user()->id,
+                $validated['reason'],
+                $validated['evidence_reference'],
+                $validated['expected_version'],
+                $validated['idempotency_key'] ?? null,
+            );
+        } catch (BankReconciliationConflict $exception) {
+            return redirect()->back()->withErrors(['reconciliation' => $exception->getMessage()]);
+        }
+
+        return redirect()->route('finance.bank-reconciliation.show', $amendment)
+            ->with('success', 'Evidence-backed reconciliation correction started.');
     }
 }

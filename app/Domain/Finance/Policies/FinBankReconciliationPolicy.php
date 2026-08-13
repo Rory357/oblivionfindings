@@ -14,7 +14,8 @@ class FinBankReconciliationPolicy
 
     public function view(User $user, FinBankReconciliation $reconciliation): bool
     {
-        return $user->canDo('finance.bank.view');
+        return $user->canDo('finance.bank.view')
+            && (int) $user->organization_id === (int) $reconciliation->organization_id;
     }
 
     public function create(User $user): bool
@@ -24,6 +25,7 @@ class FinBankReconciliationPolicy
 
     public function complete(User $user, FinBankReconciliation $reconciliation): bool
     {
-        return $user->canDo('finance.bank.manage');
+        return $user->canDo('finance.bank.manage')
+            && (int) $user->organization_id === (int) $reconciliation->organization_id;
     }
 }
