@@ -273,6 +273,17 @@ class SecurityDevicesAccessService
         return $this->applyAssignedAssetPolicyScope($query, $user);
     }
 
+    /**
+     * Canonical direct-object check for the Asset register. Policies and
+     * controllers must resolve object access through the same pre-scoped SQL
+     * query used by pagination, exports, aggregate counts and pickers.
+     */
+    public function canAccessAsset(User $user, Asset $asset): bool
+    {
+        return is_numeric($asset->getKey())
+            && $this->accessibleAssets($user)->whereKey($asset->getKey())->exists();
+    }
+
     /** Canonical operational Sites available to the current actor. */
     public function accessibleSites(User $user): Builder
     {
@@ -288,7 +299,7 @@ class SecurityDevicesAccessService
     {
         $search = trim((string) $search);
 
-        return $this->assetCandidateQuery($user)
+        return $this->accessibleAssets($user)
             ->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $name) use ($search): void {
                 $name->where('name', 'like', "%{$search}%")
                     ->orWhere('asset_tag', 'like', "%{$search}%");
@@ -296,21 +307,17 @@ class SecurityDevicesAccessService
             ->orderBy('name')
             ->limit(self::ASSIGNMENT_PICKER_LIMIT)
             ->get()
-            ->filter(fn (Asset $asset): bool => Gate::forUser($user)->allows('view', $asset))
             ->values();
     }
 
     public function assignableAsset(User $user, int $id, bool $lockForUpdate = false): ?Asset
     {
-        $query = $this->assetCandidateQuery($user)->whereKey($id);
+        $query = $this->accessibleAssets($user)->whereKey($id);
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }
-        $asset = $query->first();
 
-        return $asset instanceof Asset && Gate::forUser($user)->allows('view', $asset)
-            ? $asset
-            : null;
+        return $query->first();
     }
 
     /** @return list<int> */
@@ -975,9 +982,9 @@ class SecurityDevicesAccessService
     }
 
     /**
-     * Mirror AssetPolicy's assigned-only support-worker boundary in SQL so
-     * pagination, exports and aggregate counts cannot enumerate Site inventory
-     * that the same actor cannot open directly.
+     * Apply the canonical assigned-only support-worker boundary in SQL so
+     * policies, pagination, exports and aggregate counts all resolve the same
+     * visible Asset set.
      */
     private function applyAssignedAssetPolicyScope(Builder $query, User $user): Builder
     {

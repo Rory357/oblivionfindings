@@ -18,9 +18,14 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Assets\AssetAssignmentService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class AssetMutationBoundaryTest extends TestCase
@@ -49,7 +54,10 @@ class AssetMutationBoundaryTest extends TestCase
             'assets.update',
             'clients.viewAny',
         ]);
-        $visible = Asset::factory()->forSite($this->site)->create(['name' => 'Visible Asset']);
+        $visible = Asset::factory()->forSite($this->site)->create([
+            'name' => 'Visible Asset',
+            'home_site_id' => $this->hiddenSite->id,
+        ]);
         $hidden = Asset::factory()->forSite($this->hiddenSite)->create(['name' => 'Hidden Asset']);
         $hiddenClient = Client::factory()->create(['site_id' => $this->hiddenSite->id]);
 
@@ -58,9 +66,33 @@ class AssetMutationBoundaryTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('assets.data', fn ($rows): bool => collect($rows)->pluck('id')->all() === [$visible->id])
+                ->where('assets.data.0.home_site', null)
                 ->where('sites', fn ($rows): bool => collect($rows)->pluck('id')->all() === [$this->site->id])
                 ->where('clients', [])
             );
+
+        $this->actingAs($actor)
+            ->get("/fleet-assets/assets/{$visible->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('asset.home_site_id', null)
+                ->where('asset.home_site', null));
+
+        $this->actingAs($actor)
+            ->get("/fleet-assets/assets?site_id={$this->hiddenSite->id}")
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->get("/fleet-assets/assets/{$hidden->id}")
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->get("/assets/{$hidden->id}/qr.svg")
+            ->assertNotFound();
+
+        $this->assertTrue(Gate::forUser($actor)->allows('view', $visible));
+        $this->assertTrue(Gate::forUser($actor)->allows('update', $visible));
+        $this->assertFalse(Gate::forUser($actor)->allows('view', $hidden));
+        $this->assertSame(404, Gate::forUser($actor)->inspect('view', $hidden)->status());
+        $this->assertFalse(Gate::forUser($actor)->allows('update', $hidden));
 
         $this->actingAs($actor)
             ->post('/fleet-assets/assets', $this->assetPayload([
@@ -115,8 +147,9 @@ class AssetMutationBoundaryTest extends TestCase
         $assignedClient->supportWorkers()->attach($actor->id);
         $visible = Asset::factory()->forSite($this->site)->create([
             'client_id' => $assignedClient->id,
-            'name' => 'Assigned policy asset',
+            'name' => 'Assigned quarantined asset',
             'serial_number' => 'ASSIGNED-POLICY-SERIAL',
+            'status' => 'out_of_service',
         ]);
         $unassigned = Asset::factory()->forSite($secondAccessibleSite)->create([
             'name' => 'Unassigned Site inventory',
@@ -129,7 +162,9 @@ class AssetMutationBoundaryTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('assets.data', fn ($rows): bool => collect($rows)->pluck('id')->all() === [$visible->id])
                 ->where('assets.meta.total', 1)
-                ->where('hero.total', 1));
+                ->where('hero.total', 1)
+                ->where('hero.active', 0)
+                ->where('hero.maintenance', 1));
 
         $csv = $this->actingAs($actor)
             ->get('/fleet-assets/assets?export=csv')
@@ -141,10 +176,8 @@ class AssetMutationBoundaryTest extends TestCase
             ->get("/fleet-assets/assets/{$unassigned->id}")
             ->assertNotFound();
 
-        $applicationWideViewer = $this->actor([
-            'assets.viewAny',
-            'securityDevices.devices.viewAllSites',
-        ]);
+        $applicationWideViewer = $this->actor(['assets.viewAny']);
+        $applicationWideViewer->roles()->attach(Role::query()->where('name', 'admin')->firstOrFail());
         $this->actingAs($applicationWideViewer)
             ->get('/fleet-assets/assets')
             ->assertOk()
@@ -198,10 +231,25 @@ class AssetMutationBoundaryTest extends TestCase
         ]);
 
         $access = app(SecurityDevicesAccessService::class);
-        $this->assertSame(
-            collect([$directLocal->id, $homeLocal->id, $clientLocalFallback->id])->sort()->values()->all(),
-            $access->accessibleAssets($actor)->pluck('id')->sort()->values()->all(),
-        );
+        $expectedIds = collect([$directLocal->id, $homeLocal->id, $clientLocalFallback->id])
+            ->sort()
+            ->values()
+            ->all();
+        $this->assertSame($expectedIds, $access->accessibleAssets($actor)->pluck('id')->sort()->values()->all());
+
+        foreach ([
+            $directLocal,
+            $directHiddenWithLocalFallbacks,
+            $directLocalWithConflictingClient,
+            $homeLocal,
+            $homeHiddenWithLocalClient,
+            $clientLocalFallback,
+            $unattributed,
+        ] as $asset) {
+            $expected = in_array($asset->id, $expectedIds, true);
+            $this->assertSame($expected, Gate::forUser($actor)->allows('view', $asset));
+            $this->assertSame($expected, $access->assignableAsset($actor, $asset->id) !== null);
+        }
 
         foreach ([
             $directHiddenWithLocalFallbacks,
@@ -210,6 +258,41 @@ class AssetMutationBoundaryTest extends TestCase
             $unattributed,
         ] as $hiddenAsset) {
             $this->assertNull($access->assignableAsset($actor, $hiddenAsset->id));
+        }
+    }
+
+    public function test_every_asset_object_ability_reuses_the_canonical_visibility_boundary(): void
+    {
+        $actor = $this->actor([
+            'assets.viewAny',
+            'assets.update',
+            'assets.delete',
+            'assets.inspections.record',
+            'assets.maintenance.record',
+            'assets.documents.manage',
+            'assets.ownership.manage',
+            'assets.assignments.manage',
+            'assets.geofences.manage',
+            'assets.scan.record',
+        ]);
+        $visible = Asset::factory()->forSite($this->site)->create();
+        $hidden = Asset::factory()->forSite($this->hiddenSite)->create();
+
+        foreach ([
+            'view',
+            'update',
+            'delete',
+            'recordInspection',
+            'recordMaintenance',
+            'manageDocuments',
+            'manageOwnership',
+            'manageAssignments',
+            'manageGeofences',
+            'recordScan',
+        ] as $ability) {
+            $this->assertTrue(Gate::forUser($actor)->allows($ability, $visible), "{$ability} should allow the visible Asset.");
+            $this->assertFalse(Gate::forUser($actor)->allows($ability, $hidden), "{$ability} should deny the hidden Asset.");
+            $this->assertSame(404, Gate::forUser($actor)->inspect($ability, $hidden)->status());
         }
     }
 
@@ -406,6 +489,136 @@ class AssetMutationBoundaryTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['action' => 'assets.assignment.released', 'auditable_id' => $asset->id]);
     }
 
+    public function test_competing_custody_transfers_are_serialized_and_preserve_assignment_history(): void
+    {
+        $connection = DB::connection();
+        $this->assertSame('mysql', $connection->getDriverName());
+
+        $actor = $this->actor([
+            'assets.viewAny',
+            'assets.assignments.manage',
+            'staff.viewAny',
+            'hazards.view',
+        ]);
+        $asset = Asset::factory()->forSite($this->site)->create();
+        $firstStaff = $this->staffAt($this->site);
+        $secondStaff = $this->staffAt($this->site);
+        $database = $connection->getDatabaseName();
+        $token = Str::uuid()->toString();
+        $releasePath = sys_get_temp_dir().DIRECTORY_SEPARATOR."asset-custody-release-{$token}";
+        $readyPaths = [
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."asset-custody-ready-a-{$token}",
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."asset-custody-ready-b-{$token}",
+        ];
+        $attemptPaths = [
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."asset-custody-attempt-a-{$token}",
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."asset-custody-attempt-b-{$token}",
+        ];
+        $processes = [];
+        $userIds = [$actor->id, $firstStaff->id, $secondStaff->id];
+
+        // RefreshDatabase owns the outer transaction. Commit the fixtures so
+        // independent workers can see them, then hold the canonical Asset row
+        // while both custody requests queue behind the same FOR UPDATE lock.
+        $connection->commit();
+
+        try {
+            $connection->beginTransaction();
+            Asset::query()->whereKey($asset->id)->lockForUpdate()->firstOrFail();
+
+            $processes[] = $this->startAssetCustodyWorker(
+                $asset->id,
+                $actor->id,
+                $firstStaff->id,
+                $readyPaths[0],
+                $attemptPaths[0],
+                $releasePath,
+                $database,
+            );
+            $processes[] = $this->startAssetCustodyWorker(
+                $asset->id,
+                $actor->id,
+                $secondStaff->id,
+                $readyPaths[1],
+                $attemptPaths[1],
+                $releasePath,
+                $database,
+            );
+
+            $this->waitForAssetCustodyFiles($readyPaths, 'Both custody workers did not become ready.');
+            touch($releasePath);
+            $this->waitForAssetCustodyFiles($attemptPaths, 'Both custody workers did not reach the service call.');
+            usleep(250_000);
+
+            foreach ($processes as $process) {
+                $this->assertTrue(
+                    $process->isRunning(),
+                    trim($process->getErrorOutput()) ?: 'A custody worker exited before the Asset row lock was released.',
+                );
+            }
+
+            $connection->commit();
+
+            $results = collect($processes)->map(function (Process $process): array {
+                $process->wait();
+                $this->assertTrue(
+                    $process->isSuccessful(),
+                    trim($process->getErrorOutput()) ?: 'An Asset custody worker failed.',
+                );
+
+                return json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+            });
+
+            $this->assertSame(['assigned', 'rejected'], $results->pluck('status')->sort()->values()->all());
+            $this->assertSame(1, AssetAssignment::query()->where('asset_id', $asset->id)->whereNull('released_at')->count());
+
+            $current = AssetAssignment::query()
+                ->where('asset_id', $asset->id)
+                ->whereNull('released_at')
+                ->firstOrFail();
+            $losingStaffId = $current->assignee_id === $firstStaff->id ? $secondStaff->id : $firstStaff->id;
+            $service = app(AssetAssignmentService::class);
+            $service->release($actor->fresh(), $asset->fresh(), $current);
+            $service->assign($actor->fresh(), $asset->fresh(), [
+                'assignee_type' => 'staff',
+                'assignee_id' => $losingStaffId,
+            ]);
+
+            $this->assertSame(2, AssetAssignment::query()->where('asset_id', $asset->id)->count());
+            $this->assertSame(1, AssetAssignment::query()->where('asset_id', $asset->id)->whereNull('released_at')->count());
+            $this->assertSame(1, AssetAssignment::query()->where('asset_id', $asset->id)->whereNotNull('released_at')->count());
+        } finally {
+            while ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+
+            foreach ($processes as $process) {
+                if ($process->isRunning()) {
+                    $process->stop(1);
+                }
+            }
+
+            foreach ([...$readyPaths, ...$attemptPaths, $releasePath] as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+
+            try {
+                DB::table('asset_assignments')->where('asset_id', $asset->id)->delete();
+                DB::table('audit_logs')->where('auditable_id', $asset->id)->where('action', 'like', 'assets.assignment.%')->delete();
+                DB::table('assets')->where('id', $asset->id)->delete();
+                DB::table('permission_user')->whereIn('user_id', $userIds)->delete();
+                DB::table('role_user')->whereIn('user_id', $userIds)->delete();
+                DB::table('hr_employee_profiles')->whereIn('user_id', $userIds)->delete();
+                DB::table('users')->whereIn('id', $userIds)->delete();
+                DB::table('sites')->where('id', $this->site->id)->delete();
+            } finally {
+                $connection->beginTransaction();
+            }
+        }
+    }
+
     public function test_asset_ownership_transition_validates_target_and_retains_history(): void
     {
         $actor = $this->actor(['assets.viewAny', 'assets.ownership.manage', 'clients.viewAny']);
@@ -546,6 +759,86 @@ class AssetMutationBoundaryTest extends TestCase
         ]);
 
         return $staff;
+    }
+
+    private function startAssetCustodyWorker(
+        int $assetId,
+        int $actorId,
+        int $staffId,
+        string $readyPath,
+        string $attemptPath,
+        string $releasePath,
+        string $database,
+    ): Process {
+        $worker = <<<'PHP'
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$asset = App\Models\Asset::query()->findOrFail((int) $argv[2]);
+$actor = App\Models\User::query()->findOrFail((int) $argv[3]);
+$staffId = (int) $argv[4];
+file_put_contents($argv[5], (string) Illuminate\Support\Facades\DB::selectOne('SELECT CONNECTION_ID() AS id')->id);
+$deadline = microtime(true) + 15;
+while (! is_file($argv[7])) {
+    if (microtime(true) >= $deadline) {
+        throw new RuntimeException('Timed out waiting for the custody concurrency release barrier.');
+    }
+    usleep(10_000);
+}
+file_put_contents($argv[6], 'attempting');
+try {
+    $assignment = $app->make(App\Services\Assets\AssetAssignmentService::class)->assign($actor, $asset, [
+        'assignee_type' => 'staff',
+        'assignee_id' => $staffId,
+    ]);
+    $result = ['status' => 'assigned', 'assignment_id' => $assignment->id, 'assignee_id' => $staffId];
+} catch (Illuminate\Validation\ValidationException $exception) {
+    $result = ['status' => 'rejected', 'assignee_id' => $staffId];
+}
+echo json_encode($result, JSON_THROW_ON_ERROR);
+PHP;
+
+        $process = new Process(
+            [
+                PHP_BINARY,
+                '-r',
+                $worker,
+                base_path(),
+                (string) $assetId,
+                (string) $actorId,
+                (string) $staffId,
+                $readyPath,
+                $attemptPath,
+                $releasePath,
+            ],
+            base_path(),
+            [
+                'APP_ENV' => 'testing',
+                'DB_CONNECTION' => 'mysql',
+                'DB_DATABASE' => $database,
+                'QUEUE_CONNECTION' => 'sync',
+            ],
+        );
+        $process->setTimeout(30);
+        $process->start();
+
+        return $process;
+    }
+
+    /** @param list<string> $paths */
+    private function waitForAssetCustodyFiles(array $paths, string $message): void
+    {
+        $deadline = microtime(true) + 15;
+
+        do {
+            if (collect($paths)->every(fn (string $path): bool => is_file($path))) {
+                return;
+            }
+
+            usleep(10_000);
+        } while (microtime(true) < $deadline);
+
+        throw new \RuntimeException($message);
     }
 
     /** @param array<string, mixed> $overrides @return array<string, mixed> */

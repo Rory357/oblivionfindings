@@ -69,6 +69,7 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        $this->authorize('viewAny', Asset::class);
         $hasFleetFields = $this->hasFleetFields();
 
         $eagerLoads = ['site:id,name', 'categoryRef:id,name,slug'];
@@ -79,23 +80,10 @@ class AssetController extends Controller
         $accessibleAssets = $this->deviceAccess->accessibleAssets($user);
         $query = (clone $accessibleAssets)
             ->with($eagerLoads);
-
-        // CSV export
-        if ($request->input('export') === 'csv') {
-            $exportQuery = (clone $query)->orderBy('name');
-
-            return response()->streamDownload(function () use ($exportQuery) {
-                $handle = fopen('php://output', 'w');
-                $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Manufacturer', 'Model', 'Serial Number']);
-                foreach ($exportQuery->lazy(200) as $a) {
-                    $this->putCsv($handle, [
-                        $a->name, $a->asset_tag, $a->category, $a->status,
-                        $a->site?->name ?? '', $a->manufacturer, $a->model, $a->serial_number,
-                    ]);
-                }
-                fclose($handle);
-            }, 'assets-export.csv');
-        }
+        $sites = $this->deviceAccess->accessibleSites($user)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $accessibleSiteIds = $sites->pluck('id')->map(fn ($id): int => (int) $id);
 
         // Category tab filter
         if ($request->filled('category') && $request->input('category') !== 'all') {
@@ -112,8 +100,11 @@ class AssetController extends Controller
         }
 
         // Site filter
+        $siteFilterId = null;
         if ($request->filled('site_id')) {
-            $query->where('site_id', (int) $request->input('site_id'));
+            $siteFilterId = $request->integer('site_id');
+            abort_unless($siteFilterId > 0 && $accessibleSiteIds->contains($siteFilterId), 404);
+            $query->where('site_id', $siteFilterId);
         }
 
         // Search
@@ -124,6 +115,24 @@ class AssetController extends Controller
                     ->orWhere('asset_tag', 'like', "%{$search}%")
                     ->orWhere('serial_number', 'like', "%{$search}%");
             });
+        }
+
+        // CSV export follows the same canonical authorization and requested
+        // filter scope as the paginated register.
+        if ($request->input('export') === 'csv') {
+            $exportQuery = (clone $query)->orderBy('name');
+
+            return response()->streamDownload(function () use ($exportQuery) {
+                $handle = fopen('php://output', 'w');
+                $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Manufacturer', 'Model', 'Serial Number']);
+                foreach ($exportQuery->lazy(200) as $a) {
+                    $this->putCsv($handle, [
+                        $a->name, $a->asset_tag, $a->category, $a->status,
+                        $a->site?->name ?? '', $a->manufacturer, $a->model, $a->serial_number,
+                    ]);
+                }
+                fclose($handle);
+            }, 'assets-export.csv');
         }
 
         // Sorting
@@ -146,10 +155,6 @@ class AssetController extends Controller
                 $assets->getCollection()->pluck('id'),
             )
             : collect();
-
-        $sites = $this->deviceAccess->accessibleSites($user)
-            ->orderBy('name')
-            ->get(['id', 'name']);
 
         // Asset wizard (create mode) — client picker + auto-set-site behaviour.
         $clients = $this->deviceAccess->assignableClients($user);
@@ -176,6 +181,10 @@ class AssetController extends Controller
                 ->where('inspection_due_at', '<=', now()->addDays(30))
                 ->count()
             : 0;
+        $createdAssetId = $request->integer('created') ?: null;
+        if ($createdAssetId !== null && ! (clone $accessibleAssets)->whereKey($createdAssetId)->exists()) {
+            $createdAssetId = null;
+        }
 
         return Inertia::render('fleet-assets/assets/index', [
             'hero' => [
@@ -197,10 +206,12 @@ class AssetController extends Controller
                     ] : null,
                     'status' => $a->status,
                     'site' => $a->site ? ['id' => $a->site->id, 'name' => $a->site->name] : null,
-                    'home_site' => $hasFleetFields && $a->homeSite ? [
-                        'id' => $a->homeSite->id,
-                        'name' => $a->homeSite->name,
-                    ] : null,
+                    'home_site' => $hasFleetFields
+                        && $a->homeSite
+                        && $accessibleSiteIds->contains((int) $a->home_site_id) ? [
+                            'id' => $a->homeSite->id,
+                            'name' => $a->homeSite->name,
+                        ] : null,
                     'manufacturer' => $a->manufacturer,
                     'model' => $a->model,
                     'serial_number' => $a->serial_number,
@@ -220,8 +231,11 @@ class AssetController extends Controller
             'prefill' => $prefill,
             // Set by the modal store() redirect so the wizard success pane can
             // link straight to the newly created asset.
-            'created_asset_id' => $request->integer('created') ?: null,
-            'filters' => $request->only(['category', 'status', 'search', 'site_id']),
+            'created_asset_id' => $createdAssetId,
+            'filters' => [
+                ...$request->only(['category', 'status', 'search']),
+                'site_id' => $siteFilterId,
+            ],
         ]);
     }
 
@@ -229,8 +243,8 @@ class AssetController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-
-        $asset = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey()) ?? abort(404);
+        $this->authorize('view', $asset);
+        $accessibleSiteIds = $this->deviceAccess->accessibleSiteIds($user);
         $hasFleetFields = $this->hasFleetFields();
         $hasFleetVehicleStateSnapshots = $this->hasTable('fleet_vehicle_state_snapshots');
         $hasFleetVehicleBookings = $this->hasTable('fleet_vehicle_bookings');
@@ -364,8 +378,14 @@ class AssetController extends Controller
             'registration_number' => $asset->registration_number ?? null,
             'fuel_type' => $asset->fuel_type ?? null,
             'odometer_km' => $asset->odometer_km ?? null,
-            'home_site_id' => $asset->home_site_id ?? null,
-            'home_site' => $asset->homeSite ? ['id' => $asset->homeSite->id, 'name' => $asset->homeSite->name] : null,
+            'home_site_id' => $asset->home_site_id !== null
+                && in_array((int) $asset->home_site_id, $accessibleSiteIds, true)
+                    ? $asset->home_site_id
+                    : null,
+            'home_site' => $asset->homeSite
+                && in_array((int) $asset->home_site_id, $accessibleSiteIds, true)
+                    ? ['id' => $asset->homeSite->id, 'name' => $asset->homeSite->name]
+                    : null,
             'primary_driver' => $asset->primaryDriver ? ['id' => $asset->primaryDriver->id, 'name' => $asset->primaryDriver->name] : null,
             'purchase_date' => optional($asset->purchase_date)->toDateString(),
             'warranty_expires_at' => optional($asset->warranty_expires_at)->toDateString(),
@@ -506,6 +526,8 @@ class AssetController extends Controller
      */
     public function create(Request $request)
     {
+        $this->authorize('create', Asset::class);
+
         $params = array_filter([
             'site_id' => $request->integer('site_id') ?: null,
             'client_id' => $request->integer('client_id') ?: null,
@@ -518,6 +540,7 @@ class AssetController extends Controller
     public function store(Request $request)
     {
         $user = $request->user() ?? abort(403);
+        $this->authorize('create', Asset::class);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
@@ -589,8 +612,8 @@ class AssetController extends Controller
      */
     public function edit(Request $request, Asset $asset)
     {
-        $user = $request->user() ?? abort(403);
-        $asset = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey()) ?? abort(404);
+        $request->user() ?? abort(403);
+        $this->authorize('update', $asset);
 
         return redirect()->route('fleet-assets.assets.show', ['asset' => $asset, 'edit' => 1]);
     }
@@ -598,7 +621,7 @@ class AssetController extends Controller
     public function update(Request $request, Asset $asset)
     {
         $user = $request->user() ?? abort(403);
-        $asset = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey()) ?? abort(404);
+        $this->authorize('update', $asset);
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
