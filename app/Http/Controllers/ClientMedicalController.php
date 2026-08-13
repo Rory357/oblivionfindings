@@ -308,6 +308,7 @@ class ClientMedicalController extends Controller
 
                     return back()->with('success', 'Medication updated successfully.');
                 },
+                submittedClientId: (int) $client->id,
             );
         } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
             throw $e;
@@ -806,6 +807,7 @@ class ClientMedicalController extends Controller
 
                     return back()->with('success', 'Medication removed successfully.');
                 },
+                submittedClientId: (int) $client->id,
             );
         } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
             throw $e;

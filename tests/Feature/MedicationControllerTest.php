@@ -12,6 +12,7 @@ use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -20,6 +21,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Support\EmarUrl;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
@@ -49,9 +51,13 @@ class MedicationControllerTest extends TestCase
 
     protected ServiceContext $serviceContext;
 
+    protected Carbon $workerActionAt;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->workerActionAt = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfMinute();
 
         $this->seed(RbacSeeder::class);
         $this->site = Site::factory()->create();
@@ -129,6 +135,14 @@ class MedicationControllerTest extends TestCase
                 'status' => 'in_progress',
             ]);
         }
+
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $this->supportWorker->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => $this->workerNow()->toDateString(),
+            'expiry_date' => $this->workerNow()->addYear()->toDateString(),
+        ]);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -156,6 +170,11 @@ class MedicationControllerTest extends TestCase
         ]);
     }
 
+    protected function workerNow(): Carbon
+    {
+        return $this->workerActionAt->copy();
+    }
+
     /**
      * Create a second support worker that can witness controlled drugs.
      */
@@ -179,7 +198,7 @@ class MedicationControllerTest extends TestCase
             'name' => 'Paracetamol',
             'dosage' => '500mg',
             'frequency' => 'Twice daily',
-            'dose_times' => ['08:00', '20:00'],
+            'dose_times' => [$this->workerNow()->format('H:i')],
             'is_prn' => false,
             'controlled_drug' => false,
             'active' => true,
@@ -856,7 +875,7 @@ class MedicationControllerTest extends TestCase
     {
         $this->mockNotificationService();
         $med = $this->createMedication();
-        $now = now();
+        $now = $this->workerNow();
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
@@ -904,8 +923,8 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'refused',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHasErrors('reason_code');
@@ -918,8 +937,8 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'missed',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHasErrors('reason_code');
@@ -932,8 +951,8 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'withheld',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHasErrors('reason_code');
@@ -949,8 +968,8 @@ class MedicationControllerTest extends TestCase
                 'status' => 'refused',
                 'reason_code' => 'refused',
                 'reason' => 'Client declined medication',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -983,8 +1002,7 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('error');
@@ -999,8 +1017,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'reason' => 'Headache reported by client',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1013,11 +1030,11 @@ class MedicationControllerTest extends TestCase
     public function test_administration_within_time_window_succeeds_without_reason(): void
     {
         $this->mockNotificationService();
-        $med = $this->createMedication();
 
         // Administered 15 minutes after scheduled: within window
-        $scheduled = now();
-        $administered = now()->addMinutes(15);
+        $administered = $this->workerNow();
+        $scheduled = $administered->copy()->subMinutes(15);
+        $med = $this->createMedication(['dose_times' => [$scheduled->format('H:i')]]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
@@ -1031,11 +1048,10 @@ class MedicationControllerTest extends TestCase
 
     public function test_administration_more_than_30_min_late_requires_reason(): void
     {
-        $med = $this->createMedication();
-
         // Administered 45 minutes after scheduled: outside window (>30 min late)
-        $scheduled = now()->subMinutes(45);
-        $administered = now();
+        $administered = $this->workerNow();
+        $scheduled = $administered->copy()->subMinutes(45);
+        $med = $this->createMedication(['dose_times' => [$scheduled->format('H:i')]]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
@@ -1049,11 +1065,10 @@ class MedicationControllerTest extends TestCase
 
     public function test_administration_more_than_60_min_early_requires_reason(): void
     {
-        $med = $this->createMedication();
-
         // Administered 90 minutes before scheduled: outside window (>60 min early)
-        $scheduled = now()->addMinutes(90);
-        $administered = now();
+        $administered = $this->workerNow();
+        $scheduled = $administered->copy()->addMinutes(90);
+        $med = $this->createMedication(['dose_times' => [$scheduled->format('H:i')]]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
@@ -1068,10 +1083,9 @@ class MedicationControllerTest extends TestCase
     public function test_administration_outside_time_window_succeeds_with_reason(): void
     {
         $this->mockNotificationService();
-        $med = $this->createMedication();
-
-        $scheduled = now()->subMinutes(45);
-        $administered = now();
+        $administered = $this->workerNow();
+        $scheduled = $administered->copy()->subMinutes(45);
+        $med = $this->createMedication(['dose_times' => [$scheduled->format('H:i')]]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
@@ -1087,11 +1101,11 @@ class MedicationControllerTest extends TestCase
     public function test_administration_exactly_30_min_late_succeeds_without_reason(): void
     {
         $this->mockNotificationService();
-        $med = $this->createMedication();
 
         // Exactly at the boundary (30 min): should succeed
-        $scheduled = now();
-        $administered = now()->addMinutes(30);
+        $administered = $this->workerNow();
+        $scheduled = $administered->copy()->subMinutes(30);
+        $med = $this->createMedication(['dose_times' => [$scheduled->format('H:i')]]);
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
@@ -1114,8 +1128,8 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('error');
@@ -1129,8 +1143,8 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $this->supportWorker->id,
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('error');
@@ -1147,8 +1161,8 @@ class MedicationControllerTest extends TestCase
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
                 'witness_credential' => 'password',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1170,8 +1184,8 @@ class MedicationControllerTest extends TestCase
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
                 'witness_credential' => 'password',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect();
 
@@ -1194,8 +1208,8 @@ class MedicationControllerTest extends TestCase
                 'status' => 'refused',
                 'reason_code' => 'refused',
                 'reason' => 'Client refused medication',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -1210,8 +1224,8 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $this->hrUser->id,
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('error');
@@ -2312,8 +2326,8 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'shift_id' => $shift->id,
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -2712,8 +2726,8 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $this->workerNow()->format('Y-m-d H:i:s'),
+                'administered_at' => $this->workerNow()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
@@ -2823,6 +2837,7 @@ class MedicationControllerTest extends TestCase
     public function test_full_medication_lifecycle(): void
     {
         $this->mockNotificationService();
+        $administrationAt = $this->workerNow();
 
         // 1. Create medication
         $this->actingAs($this->admin)
@@ -2830,7 +2845,7 @@ class MedicationControllerTest extends TestCase
                 'name' => 'Lifecycle Med',
                 'dosage' => '10mg',
                 'frequency' => 'Once daily',
-                'dose_times' => ['09:00'],
+                'dose_times' => [$administrationAt->format('H:i')],
                 'state' => 'active',
             ])
             ->assertRedirect()
@@ -2853,8 +2868,8 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'dose_given' => '10mg',
-                'scheduled_for' => now()->format('Y-m-d H:i:s'),
-                'administered_at' => now()->format('Y-m-d H:i:s'),
+                'scheduled_for' => $administrationAt->format('Y-m-d H:i:s'),
+                'administered_at' => $administrationAt->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
             ->assertSessionHas('success');

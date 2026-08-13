@@ -492,7 +492,7 @@ class WorkerMedsRecordDoseTest extends TestCase
                 ->where('schedule.0.round_label', 'Morning')
                 ->where('schedule.1.status', 'upcoming')
                 ->where('clients.0.name', 'Aroha Ngata')
-                ->where('witnesses.0.id', $witness->id)
+                ->where('witnesses', fn ($witnesses) => $witnesses->contains('id', $witness->id))
                 ->where('has_shift_context', true)
                 // Sidebar badge shared prop: the 08:00 slot is overdue at
                 // 09:30, the 16:00 one isn't.
@@ -507,6 +507,7 @@ class WorkerMedsRecordDoseTest extends TestCase
 
         Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => $this->worker->id,
             'starts_at' => Carbon::parse($tomorrow.' 09:00', $timezone)->utc(),

@@ -130,11 +130,10 @@ class MedicationScopeDecisionService
                 && $medication->is_prn
                 && (int) $medication->client_id === (int) $administration->client_id
             );
-            $this->assertMedicationIsActiveFor($medication, $actionAt);
-
             $client = Client::query()->whereKey($administration->client_id)->lockForUpdate()->first();
             $this->notFoundUnless($client !== null);
             [$shift, $breakGlass] = $this->resolveClientAuthority($performer, $client, $actionAt, null);
+            $this->assertMedicationIsActiveFor($medication, $actionAt);
 
             return $callback(new MedicationScopeDecision(
                 performer: $performer,
@@ -175,6 +174,7 @@ class MedicationScopeDecisionService
         Carbon $actionAt,
         Closure $callback,
         bool $requireAdministrable = false,
+        ?int $submittedClientId = null,
     ): mixed {
         return DB::transaction(function () use (
             $performer,
@@ -182,6 +182,7 @@ class MedicationScopeDecisionService
             $actionAt,
             $callback,
             $requireAdministrable,
+            $submittedClientId,
         ) {
             $medication = ClientMedication::query()
                 ->whereKey($submittedMedication->getKey())
@@ -190,13 +191,15 @@ class MedicationScopeDecisionService
                 ->lockForUpdate()
                 ->first();
             $this->notFoundUnless($medication !== null);
+            $client = Client::query()->whereKey($medication->client_id)->lockForUpdate()->first();
+            $this->notFoundUnless(
+                $client !== null
+                && ($submittedClientId === null || (int) $client->id === $submittedClientId)
+            );
+            [$shift, $breakGlass] = $this->resolveClientAuthority($performer, $client, $actionAt, null);
             if ($requireAdministrable) {
                 $this->assertMedicationIsActiveFor($medication, $actionAt);
             }
-
-            $client = Client::query()->whereKey($medication->client_id)->lockForUpdate()->first();
-            $this->notFoundUnless($client !== null);
-            [$shift, $breakGlass] = $this->resolveClientAuthority($performer, $client, $actionAt, null);
 
             return $callback(new MedicationScopeDecision(
                 performer: $performer,
