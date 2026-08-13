@@ -22,6 +22,10 @@ use App\Models\Site;
 use App\Models\SiteCoverageRequirement;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomNotificationService;
+use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\ShiftCoverageService;
+use App\Services\ShiftSignalService;
+use Database\Seeders\ShiftControlRoomSignalRegistrationSeeder;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -39,10 +43,11 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
         // inserts from `register_shift_control_room_signal_support` (signal
         // sources/types/rules) need to be re-applied so the dedupe logic
         // can match an existing rule.
-        $this->seed(\Database\Seeders\ShiftControlRoomSignalRegistrationSeeder::class);
+        $this->seed(ShiftControlRoomSignalRegistrationSeeder::class);
 
         $notifications = $this->mock(ControlRoomNotificationService::class);
         $notifications->shouldReceive('notifyAlert')->andReturnNull();
+        $notifications->shouldReceive('stageAlertNotifications')->andReturn(collect());
     }
 
     public function test_no_show_signal_emits_once_at_threshold_and_dedupes_on_rerun(): void
@@ -765,7 +770,7 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
             'starts_at' => $windowStart->toIso8601String(),
             'ends_at' => $windowEnd->toIso8601String(),
         ];
-        $coverageWindowKey = app(\App\Services\ShiftSignalService::class)->buildCoverageWindowKey($coverageWindow);
+        $coverageWindowKey = app(ShiftSignalService::class)->buildCoverageWindowKey($coverageWindow);
 
         return ControlRoomAlert::factory()->create([
             'source' => 'shift_operations',
@@ -793,9 +798,9 @@ class ShiftControlRoomSignalPipelineTest extends TestCase
     {
         $job = new ShiftAutoAlertJob;
         $job->handle(
-            app(\App\Services\ShiftSignalService::class),
-            app(\App\Services\ShiftCoverageService::class),
-            app(\App\Services\ControlRoom\SignalProcessingService::class),
+            app(ShiftSignalService::class),
+            app(ShiftCoverageService::class),
+            app(SignalProcessingService::class),
         );
     }
 }

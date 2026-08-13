@@ -53,6 +53,7 @@ class SafetySignalDeliveryRecoveryTest extends TestCase
 
         $notifications = $this->mock(ControlRoomNotificationService::class);
         $notifications->shouldReceive('notifyAlert')->andReturnNull();
+        $notifications->shouldReceive('stageAlertNotifications')->andReturn(collect());
     }
 
     public function test_source_and_outbox_intent_roll_back_together_when_outbox_persistence_fails(): void

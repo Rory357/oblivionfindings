@@ -3,14 +3,15 @@
 namespace Tests\Unit\ControlRoom;
 
 use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoom\SignalRule;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoomAlert;
 use App\Models\Shift;
-use App\Models\User;
 use App\Services\ControlRoom\ControlRoomNotificationService;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\ShiftSignalService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,10 +39,11 @@ class SignalProcessingTransitionTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $notificationService = $this->mock(ControlRoomNotificationService::class);
         $notificationService->shouldReceive('notifyAlert')->andReturnNull();
+        $notificationService->shouldReceive('stageAlertNotifications')->andReturn(collect());
 
         $this->service = new SignalProcessingService($notificationService);
 
@@ -104,7 +106,7 @@ class SignalProcessingTransitionTest extends TestCase
         // Drive the addSignalToAlert path via the public process() entry point
         // by routing the signal through the dedup window: it should correlate
         // against the existing alert rather than creating a new one.
-        $rule = \App\Models\ControlRoom\SignalRule::create([
+        $rule = SignalRule::create([
             'name' => 'Late start correlate',
             'signal_type_id' => $lateStartType->id,
             'signal_type_code' => ShiftSignalService::TYPE_LATE_START,
@@ -186,7 +188,7 @@ class SignalProcessingTransitionTest extends TestCase
             'status' => 'pending',
         ]);
 
-        \App\Models\ControlRoom\SignalRule::create([
+        SignalRule::create([
             'name' => 'Late start dedup',
             'signal_type_id' => $type->id,
             'signal_type_code' => ShiftSignalService::TYPE_LATE_START,

@@ -5,6 +5,7 @@ namespace App\Models\ControlRoom;
 use App\Models\ControlRoomAlert;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Signal extends Model
 {
@@ -88,6 +89,15 @@ class Signal extends Model
     public function correlatedAlert(): BelongsTo
     {
         return $this->belongsTo(ControlRoomAlert::class, 'correlated_alert_id');
+    }
+
+    /**
+     * The one operational alert for which this normalized signal is the
+     * immutable origin. Database uniqueness enforces the one-signal contract.
+     */
+    public function originAlert(): HasOne
+    {
+        return $this->hasOne(ControlRoomAlert::class, 'origin_signal_id');
     }
 
     public function scopePending($query)
