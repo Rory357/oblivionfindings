@@ -154,6 +154,7 @@ export function PlanEntryDialog({
         notes: entry?.notes ?? '',
         client_ids: entry?.client_ids ?? [],
         allergen_override_reason: '' as string,
+        expected_version: entry?.version ?? null,
     });
 
     const [report, setReport] = useState<ConflictReport>(EMPTY_REPORT);
@@ -183,6 +184,7 @@ export function PlanEntryDialog({
                     ? residents.map((r) => r.id)
                     : []),
             allergen_override_reason: '',
+            expected_version: entry?.version ?? null,
         });
         setReport(EMPTY_REPORT);
         setReportError(false);

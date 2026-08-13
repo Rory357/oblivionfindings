@@ -35,6 +35,7 @@ class SiteMealPlanEntry extends Model
         'servings',
         'notes',
         'client_ids',
+        'version',
         'served_at',
         'served_by',
         'created_by',
@@ -50,6 +51,7 @@ class SiteMealPlanEntry extends Model
         'served_at' => 'datetime',
         'allergen_override_at' => 'datetime',
         'takeaway_cost_cents' => 'integer',
+        'version' => 'integer',
     ];
 
     public function isTakeaway(): bool
@@ -64,7 +66,7 @@ class SiteMealPlanEntry extends Model
 
     public function allergenOverrideBy(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'allergen_override_by');
+        return $this->belongsTo(User::class, 'allergen_override_by');
     }
 
     public function site(): BelongsTo
@@ -79,12 +81,12 @@ class SiteMealPlanEntry extends Model
 
     public function servedBy(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'served_by');
+        return $this->belongsTo(User::class, 'served_by');
     }
 
     public function createdBy(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function displayName(): string
@@ -92,6 +94,7 @@ class SiteMealPlanEntry extends Model
         if ($this->recipe) {
             return $this->recipe->name;
         }
+
         return $this->ad_hoc_name ?? 'Untitled meal';
     }
 }

@@ -8,6 +8,7 @@ use App\Models\ClientMealDislike;
 use App\Models\MealDietaryTag;
 use App\Models\MealRecipe;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 class DietaryConflictChecker
 {
@@ -71,6 +72,23 @@ class DietaryConflictChecker
         CarbonInterface|string|null $onDate = null,
     ): array {
         $clientIds = array_values(array_unique(array_filter($clientIds)));
+        $clients = Client::with('mealDislikes.product')->whereIn('id', $clientIds)->get();
+
+        return $this->checkMealAgainstResolvedClients($recipe, $clients, $onDate);
+    }
+
+    /**
+     * Run the clinical gate only against Clients already resolved by the
+     * caller's authoritative aggregate boundary.
+     *
+     * @param  Collection<int, Client>  $clients
+     * @return array<string, mixed>
+     */
+    public function checkMealAgainstResolvedClients(
+        ?MealRecipe $recipe,
+        Collection $clients,
+        CarbonInterface|string|null $onDate = null,
+    ): array {
         $recipe?->loadMissing(['tags', 'ingredients.product.tags']);
 
         $recipeTagIds = $recipe ? $this->collectRecipeAllergenTagIds($recipe) : [];
@@ -80,11 +98,9 @@ class DietaryConflictChecker
         $hardBlocks = [];
         $softWarnings = [];
 
-        if (empty($clientIds)) {
+        if ($clients->isEmpty()) {
             return $this->emptyReport($recipeTagIds);
         }
-
-        $clients = Client::with('mealDislikes.product')->whereIn('id', $clientIds)->get();
 
         foreach ($clients as $client) {
             $hard = [];

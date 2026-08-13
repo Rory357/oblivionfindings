@@ -169,6 +169,7 @@ export type SourceType = 'recipe' | 'ad_hoc' | 'takeaway';
 
 export type PlanEntry = {
     id: number;
+    version: number;
     site_id: number;
     plan_date: string;
     meal_slot: MealSlot;
