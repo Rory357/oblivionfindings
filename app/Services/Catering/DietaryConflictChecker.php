@@ -2,13 +2,19 @@
 
 namespace App\Services\Catering;
 
+use App\Domain\Clinical\Services\ClientMealRestrictionProjection;
 use App\Models\Client;
 use App\Models\ClientMealDislike;
 use App\Models\MealDietaryTag;
 use App\Models\MealRecipe;
+use Carbon\CarbonInterface;
 
 class DietaryConflictChecker
 {
+    public function __construct(
+        private readonly ClientMealRestrictionProjection $restrictions,
+    ) {}
+
     /**
      * Inspect a recipe against the food allergies, dietary preferences
      * and dislikes of a set of clients.
@@ -43,14 +49,33 @@ class DietaryConflictChecker
      *
      * @param  array<int>  $clientIds
      */
-    public function checkRecipeAgainstClients(MealRecipe $recipe, array $clientIds): array
-    {
-        $clientIds = array_values(array_unique(array_filter($clientIds)));
-        $recipe->loadMissing(['tags', 'ingredients.product.tags']);
+    public function checkRecipeAgainstClients(
+        MealRecipe $recipe,
+        array $clientIds,
+        CarbonInterface|string|null $onDate = null,
+    ): array {
+        return $this->checkMealAgainstClients($recipe, $clientIds, $onDate);
+    }
 
-        $recipeTagIds = $this->collectRecipeAllergenTagIds($recipe);
+    /**
+     * Safety gate for recipe, ad-hoc and takeaway meals. The authorised
+     * clinical projection is the only restriction source; missing, stale,
+     * expired or unverifiable authority is itself a hard block.
+     *
+     * @param  array<int>  $clientIds
+     * @return array<string, mixed>
+     */
+    public function checkMealAgainstClients(
+        ?MealRecipe $recipe,
+        array $clientIds,
+        CarbonInterface|string|null $onDate = null,
+    ): array {
+        $clientIds = array_values(array_unique(array_filter($clientIds)));
+        $recipe?->loadMissing(['tags', 'ingredients.product.tags']);
+
+        $recipeTagIds = $recipe ? $this->collectRecipeAllergenTagIds($recipe) : [];
         $recipeTagsById = $this->tagLookup($recipeTagIds);
-        $haystack = $this->buildNameHaystack($recipe);
+        $haystack = $recipe ? $this->buildNameHaystack($recipe) : [];
 
         $hardBlocks = [];
         $softWarnings = [];
@@ -59,36 +84,70 @@ class DietaryConflictChecker
             return $this->emptyReport($recipeTagIds);
         }
 
-        $clients = Client::with([
-            'mealDietaryTags' => function ($q) use ($recipeTagIds) {
-                if ($recipeTagIds) {
-                    $q->whereIn('meal_dietary_tags.id', $recipeTagIds);
-                }
-            },
-            'mealDislikes.product',
-        ])->whereIn('id', $clientIds)->get();
+        $clients = Client::with('mealDislikes.product')->whereIn('id', $clientIds)->get();
 
         foreach ($clients as $client) {
             $hard = [];
             $soft = [];
+            $restriction = $this->restrictions->forClient($client, $onDate);
 
-            // 1. Tag matches (allergens + dietary tags) — driven by recipe tag intersection.
-            foreach ($client->mealDietaryTags as $tag) {
-                $entry = [
-                    'label' => $tag->label,
-                    'severity' => $tag->severity,
-                    'kind' => $tag->kind,
-                    'source' => $this->locateRecipeTagSource($tag->id, $recipeTagsById, $recipe),
+            if ($restriction['authority_status'] !== 'authorised') {
+                $hard[] = [
+                    'label' => 'Clinical meal restrictions '.str_replace('_', ' ', $restriction['authority_status']),
+                    'severity' => 'critical',
+                    'kind' => 'authority',
+                    'source' => 'clinical_restriction',
                 ];
-                if ($tag->kind === 'allergen' || $tag->severity === 'critical') {
-                    $hard[] = $entry + ['severity' => 'critical'];
-                } else {
-                    $soft[] = $entry;
+            } else {
+                $allergenIds = $restriction['allergen_tag_ids'];
+                $dietaryIds = $restriction['dietary_tag_ids'];
+
+                if (! $recipe && ($allergenIds !== [] || $dietaryIds !== [] || $restriction['texture'] !== null)) {
+                    $hard[] = [
+                        'label' => 'Ad-hoc or takeaway suitability is not clinically verified',
+                        'severity' => 'critical',
+                        'kind' => 'authority',
+                        'source' => 'unclassified_meal',
+                    ];
+                }
+
+                if ($recipe) {
+                    foreach (array_values(array_intersect($allergenIds, $recipeTagIds)) as $tagId) {
+                        $tag = $recipeTagsById[$tagId] ?? null;
+                        $hard[] = [
+                            'label' => $tag?->label ?? 'Recorded allergen',
+                            'severity' => 'critical',
+                            'kind' => 'allergen',
+                            'source' => $this->locateRecipeTagSource($tagId, $recipeTagsById, $recipe),
+                        ];
+                    }
+
+                    foreach (array_values(array_diff($dietaryIds, $recipeTagIds)) as $tagId) {
+                        $tag = MealDietaryTag::query()->find($tagId);
+                        $hard[] = [
+                            'label' => ($tag?->label ?? 'Dietary restriction').' is not confirmed by this recipe',
+                            'severity' => 'critical',
+                            'kind' => 'dietary',
+                            'source' => 'clinical_restriction',
+                        ];
+                    }
+
+                    $requiredFoodLevel = $restriction['texture']['level'] ?? null;
+                    if ($requiredFoodLevel !== null && (int) $recipe->iddsi_food_level !== (int) $requiredFoodLevel) {
+                        $hard[] = [
+                            'label' => $recipe->iddsi_food_level === null
+                                ? "IDDSI {$requiredFoodLevel} suitability is not verified for this recipe"
+                                : "Recipe IDDSI {$recipe->iddsi_food_level} conflicts with required IDDSI {$requiredFoodLevel}",
+                            'severity' => 'critical',
+                            'kind' => 'iddsi',
+                            'source' => 'clinical_restriction',
+                        ];
+                    }
                 }
             }
 
-            // 2. Dislike matches — name-based substring against haystack.
-            foreach ($client->mealDislikes as $dislike) {
+            // Dislikes remain operational preferences, not clinical authority.
+            foreach ($recipe ? $client->mealDislikes : [] as $dislike) {
                 $needle = trim(strtolower($dislike->matchTerm()));
                 if ($needle === '') {
                     continue;
@@ -104,7 +163,7 @@ class DietaryConflictChecker
                 }
             }
 
-            $clientName = trim($client->first_name . ' ' . $client->last_name);
+            $clientName = trim($client->first_name.' '.$client->last_name);
             if ($hard) {
                 $hardBlocks[] = ['client_id' => $client->id, 'client_name' => $clientName, 'matches' => $hard];
             }
@@ -114,8 +173,8 @@ class DietaryConflictChecker
         }
 
         return [
-            'has_hard_blocks' => !empty($hardBlocks),
-            'has_soft_warnings' => !empty($softWarnings),
+            'has_hard_blocks' => ! empty($hardBlocks),
+            'has_soft_warnings' => ! empty($softWarnings),
             'hard_blocks' => $hardBlocks,
             'soft_warnings' => $softWarnings,
             'recipe_tag_ids' => $recipeTagIds,
@@ -155,6 +214,7 @@ class DietaryConflictChecker
                 $haystack[] = ['text' => mb_strtolower($ingredient->free_text_name), 'source' => 'ingredient_name'];
             }
         }
+
         return $haystack;
     }
 
@@ -172,7 +232,9 @@ class DietaryConflictChecker
             // exotic punctuation.)
             // Re-fetch ingredient list cheaply by iterating the haystack.
             foreach ($haystack as $row) {
-                if ($row['source'] !== 'ingredient_name') continue;
+                if ($row['source'] !== 'ingredient_name') {
+                    continue;
+                }
                 if ($row['text'] === mb_strtolower($dislike->product?->name ?? '')) {
                     return 'product_match';
                 }
@@ -195,7 +257,10 @@ class DietaryConflictChecker
      */
     private function tagLookup(array $tagIds): array
     {
-        if (empty($tagIds)) return [];
+        if (empty($tagIds)) {
+            return [];
+        }
+
         return MealDietaryTag::whereIn('id', $tagIds)->get()->keyBy('id')->all();
     }
 
@@ -205,6 +270,7 @@ class DietaryConflictChecker
         if ($recipe->tags->contains('id', $tagId)) {
             return 'recipe_tag';
         }
+
         return 'product_tag';
     }
 

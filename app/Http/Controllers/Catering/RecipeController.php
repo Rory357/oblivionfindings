@@ -59,6 +59,7 @@ class RecipeController extends Controller
                 'description' => $data['description'] ?? null,
                 'category' => $data['category'] ?? null,
                 'serves_default' => $data['serves_default'] ?? 1,
+                'iddsi_food_level' => $data['iddsi_food_level'] ?? null,
                 'prep_minutes' => $data['prep_minutes'] ?? null,
                 'cook_minutes' => $data['cook_minutes'] ?? null,
                 'instructions' => $data['instructions'] ?? null,
@@ -89,6 +90,7 @@ class RecipeController extends Controller
             $update = [
                 'name' => $data['name'],
                 'serves_default' => $data['serves_default'] ?? 1,
+                'iddsi_food_level' => $data['iddsi_food_level'] ?? null,
                 'prep_minutes' => $data['prep_minutes'] ?? null,
                 'cook_minutes' => $data['cook_minutes'] ?? null,
                 'instructions' => $data['instructions'] ?? null,
@@ -163,6 +165,7 @@ class RecipeController extends Controller
             'description' => 'nullable|string|max:2000',
             'category' => 'nullable|string|max:80',
             'serves_default' => 'nullable|integer|min:1|max:500',
+            'iddsi_food_level' => 'nullable|integer|in:3,4,5,6,7',
             'prep_minutes' => 'nullable|integer|min:0|max:1440',
             'cook_minutes' => 'nullable|integer|min:0|max:1440',
             'instructions' => 'nullable|string|max:20000',

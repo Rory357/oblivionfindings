@@ -21,6 +21,7 @@ class MealRecipe extends Model
         'description',
         'category',
         'serves_default',
+        'iddsi_food_level',
         'prep_minutes',
         'cook_minutes',
         'instructions',
@@ -34,6 +35,7 @@ class MealRecipe extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'serves_default' => 'integer',
+        'iddsi_food_level' => 'integer',
         'prep_minutes' => 'integer',
         'cook_minutes' => 'integer',
     ];
@@ -56,8 +58,9 @@ class MealRecipe extends Model
             ->where('slug', $slug)
             ->exists()
         ) {
-            $slug = $base . '-' . $i++;
+            $slug = $base.'-'.$i++;
         }
+
         return $slug;
     }
 
@@ -73,7 +76,7 @@ class MealRecipe extends Model
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function site(): BelongsTo

@@ -21,7 +21,6 @@ class CateringPermissionsSeeder extends Seeder
             ['key' => 'sites.meals.plan', 'description' => 'Add, edit, remove planned meals'],
             ['key' => 'sites.meals.inventory.adjust', 'description' => 'Adjust site kitchen inventory'],
             ['key' => 'sites.meals.shopping.manage', 'description' => 'Generate and manage shopping lists'],
-            ['key' => 'sites.meals.allergen.override', 'description' => 'Override a hard allergen conflict when planning a meal'],
         ];
 
         foreach ($permissions as $perm) {
@@ -35,7 +34,7 @@ class CateringPermissionsSeeder extends Seeder
         if ($admin) {
             foreach ($permissions as $perm) {
                 $p = Permission::where('key', $perm['key'])->first();
-                if ($p && !$admin->permissions()->where('permissions.id', $p->id)->exists()) {
+                if ($p && ! $admin->permissions()->where('permissions.id', $p->id)->exists()) {
                     $admin->permissions()->attach($p->id);
                 }
             }
@@ -46,7 +45,7 @@ class CateringPermissionsSeeder extends Seeder
         if ($opsManager) {
             foreach ($permissions as $perm) {
                 $p = Permission::where('key', $perm['key'])->first();
-                if ($p && !$opsManager->permissions()->where('permissions.id', $p->id)->exists()) {
+                if ($p && ! $opsManager->permissions()->where('permissions.id', $p->id)->exists()) {
                     $opsManager->permissions()->attach($p->id);
                 }
             }
@@ -63,11 +62,10 @@ class CateringPermissionsSeeder extends Seeder
                 'sites.meals.plan',
                 'sites.meals.inventory.adjust',
                 'sites.meals.shopping.manage',
-                'sites.meals.allergen.override',
             ];
             foreach ($houseLeadKeys as $key) {
                 $p = Permission::where('key', $key)->first();
-                if ($p && !$houseLead->permissions()->where('permissions.id', $p->id)->exists()) {
+                if ($p && ! $houseLead->permissions()->where('permissions.id', $p->id)->exists()) {
                     $houseLead->permissions()->attach($p->id);
                 }
             }
@@ -86,7 +84,7 @@ class CateringPermissionsSeeder extends Seeder
             ];
             foreach ($careWorkerKeys as $key) {
                 $p = Permission::where('key', $key)->first();
-                if ($p && !$careWorker->permissions()->where('permissions.id', $p->id)->exists()) {
+                if ($p && ! $careWorker->permissions()->where('permissions.id', $p->id)->exists()) {
                     $careWorker->permissions()->attach($p->id);
                 }
             }

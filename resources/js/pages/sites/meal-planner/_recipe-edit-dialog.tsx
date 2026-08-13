@@ -56,6 +56,7 @@ type FormData = {
     category: string;
     scope: 'house' | 'shared';
     serves_default: number;
+    iddsi_food_level: number | null;
     prep_minutes: number | string;
     cook_minutes: number | string;
     instructions: string;
@@ -109,6 +110,7 @@ function initialData(recipe: RecipeFull | null): FormData {
             category: 'Mains',
             scope: 'house',
             serves_default: 6,
+            iddsi_food_level: null,
             prep_minutes: 10,
             cook_minutes: 20,
             instructions: '',
@@ -122,6 +124,7 @@ function initialData(recipe: RecipeFull | null): FormData {
         category: recipe.category ?? 'Mains',
         scope: recipe.scope ?? 'house',
         serves_default: recipe.serves_default ?? 6,
+        iddsi_food_level: recipe.iddsi_food_level ?? null,
         prep_minutes: recipe.prep_minutes ?? '',
         cook_minutes: recipe.cook_minutes ?? '',
         instructions: recipe.instructions ?? '',
@@ -235,6 +238,7 @@ function RecipeEditBody({
             scope: data.scope,
             site_id: data.scope === 'house' ? siteId : null,
             serves_default: data.serves_default,
+            iddsi_food_level: data.iddsi_food_level,
             prep_minutes:
                 data.prep_minutes === '' ? null : Number(data.prep_minutes),
             cook_minutes:
@@ -383,6 +387,51 @@ function RecipeEditBody({
                             }
                         />
                     </div>
+                </div>
+
+                <div>
+                    <Label>Recipe IDDSI food level</Label>
+                    <Select
+                        value={
+                            data.iddsi_food_level === null
+                                ? 'unverified'
+                                : String(data.iddsi_food_level)
+                        }
+                        onValueChange={(value) =>
+                            patch({
+                                iddsi_food_level:
+                                    value === 'unverified'
+                                        ? null
+                                        : Number(value),
+                            })
+                        }
+                    >
+                        <SelectTrigger className="frontline-focus mt-1">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="unverified">
+                                Not classified
+                            </SelectItem>
+                            <SelectItem value="7">
+                                Level 7 · Regular / Easy to chew
+                            </SelectItem>
+                            <SelectItem value="6">
+                                Level 6 · Soft &amp; Bite-sized
+                            </SelectItem>
+                            <SelectItem value="5">
+                                Level 5 · Minced &amp; Moist
+                            </SelectItem>
+                            <SelectItem value="4">Level 4 · Pureed</SelectItem>
+                            <SelectItem value="3">
+                                Level 3 · Liquidised
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        A texture-modified resident can only be assigned a
+                        recipe with the same verified level.
+                    </p>
                 </div>
 
                 {/* availability */}

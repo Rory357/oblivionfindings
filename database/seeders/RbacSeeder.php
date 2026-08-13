@@ -285,6 +285,8 @@ class RbacSeeder extends Seeder
             ['key' => 'clinical.protocols.manage', 'description' => 'Manage clinical protocols', 'group' => 'clinical', 'module' => 'Clinical'],
             ['key' => 'clinical.assessments.viewAny', 'description' => 'View the clinical risk-assessments register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.assessments.record', 'description' => 'Record clinical risk assessments (FRAT, Braden, MUST, IDDSI)', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.mealRestrictions.author', 'description' => 'Propose clinically governed resident meal restrictions', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.mealRestrictions.approve', 'description' => 'Independently approve resident meal restrictions', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.accessAllSites', 'description' => 'Apply granted clinical permissions across all Sites', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
@@ -895,6 +897,7 @@ class RbacSeeder extends Seeder
             'clinical.behaviour.viewAny',
             'clinical.monitoring.viewAny',
             'clinical.assessments.viewAny', 'clinical.assessments.record',
+            'clinical.mealRestrictions.author', 'clinical.mealRestrictions.approve',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard', 'clinical.accessAllSites',
             'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',

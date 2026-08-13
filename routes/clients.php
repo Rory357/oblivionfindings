@@ -67,9 +67,8 @@ Route::middleware(['auth'])->group(function () {
         ->whereNumber('client')
         ->name('clients.rag.ask');
 
-    // Meal preferences (food allergies, dietary tags, dislikes) — kitchen-side data,
-    // gated by sites.meals.view so kitchen / care staff can edit even without full
-    // client update rights.
+    // Meal preferences. Clinical allergy/diet restrictions are an authorised
+    // read-only projection here; meal staff can still maintain dislikes.
     Route::middleware('permission:sites.meals.view|clients.update')->group(function () {
         Route::get('/clients/{client}/meal-preferences', [ClientMealPreferencesController::class, 'show'])
             ->whereNumber('client')

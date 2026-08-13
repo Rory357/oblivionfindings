@@ -18,6 +18,7 @@ use App\Http\Controllers\Sites\SiteInspectionController;
 use App\Http\Controllers\Sites\SiteIntegrationController;
 use App\Http\Controllers\Sites\SiteMealInventoryController;
 use App\Http\Controllers\Sites\SiteMealPlanController;
+use App\Http\Controllers\Sites\SiteMealRestrictionController;
 use App\Http\Controllers\Sites\SiteMealShoppingListController;
 use App\Http\Controllers\Sites\SiteMealWeekTemplateController;
 use App\Http\Controllers\Sites\SiteReportingController;
@@ -334,6 +335,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->whereNumber('client')
                 ->name('sites.meals.residents.update')
                 ->middleware('permission:sites.meals.plan');
+            Route::post('/meal-planner/residents/{client}/restriction-discrepancies', [SiteMealRestrictionController::class, 'reportDiscrepancy'])
+                ->whereNumber('client')
+                ->name('sites.meals.restrictions.discrepancies.store');
 
             // Week templates
             Route::get('/meal-templates', [SiteMealWeekTemplateController::class, 'index'])
@@ -403,6 +407,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->name('sites.meals.shopping.destroy')
                 ->middleware('permission:sites.meals.shopping.manage');
         });
+
+        Route::post('/clinical-meal-restrictions/residents/{client}', [SiteMealRestrictionController::class, 'propose'])
+            ->whereNumber('client')
+            ->name('sites.clinical-meal-restrictions.propose')
+            ->middleware('permission:clinical.mealRestrictions.author');
+        Route::post('/clinical-meal-restrictions/residents/{client}/{restriction}/approve', [SiteMealRestrictionController::class, 'approve'])
+            ->whereNumber('client')
+            ->whereNumber('restriction')
+            ->name('sites.clinical-meal-restrictions.approve')
+            ->middleware('permission:clinical.mealRestrictions.approve');
 
         // Site Integrations
         Route::get('/integrations', [SiteIntegrationController::class, 'index'])
