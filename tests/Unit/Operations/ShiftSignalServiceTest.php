@@ -23,6 +23,7 @@ class ShiftSignalServiceTest extends TestCase
 
         $notifications = $this->mock(ControlRoomNotificationService::class);
         $notifications->shouldReceive('notifyAlert')->andReturnNull();
+        $notifications->shouldReceive('stageAlertNotifications')->andReturn(collect());
     }
 
     public function test_emit_for_shift_is_idempotent_per_shift_event_window(): void

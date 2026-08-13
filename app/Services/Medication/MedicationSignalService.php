@@ -386,16 +386,23 @@ class MedicationSignalService
         int $incidentId,
         ?ControlRoomAlert $alert = null,
     ): void {
+        if ($alert !== null
+            && (int) ($signal->alert_id ?? $signal->correlated_alert_id) !== (int) $alert->id
+        ) {
+            throw new \DomainException(
+                'Medication incident evidence does not match the signal operational alert link.',
+            );
+        }
+
         $signal->forceFill([
             'normalized_data' => array_replace(
                 (array) $signal->normalized_data,
                 ['incident_id' => $incidentId],
             ),
+            'processing_notes' => $alert === null
+                ? $signal->processing_notes
+                : 'Medication signal enriched with incident evidence',
         ])->saveQuietly();
-
-        if ($alert !== null) {
-            $signal->markProcessed($alert, 'Medication signal enriched with incident evidence');
-        }
     }
 
     /**

@@ -3,6 +3,9 @@
 namespace App\Services\ControlRoom;
 
 use App\Enums\AlertSeverity;
+use App\Jobs\Notifications\DeliverControlRoomAlertNotificationJob;
+use App\Models\Asset;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\AlertQueue;
@@ -25,6 +28,7 @@ use App\Models\FleetSignal;
 use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Models\ShiftSignal;
+use App\Models\Site;
 use App\Services\AuditLogger;
 use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Services\Incidents\IncidentJourneyService;
@@ -34,6 +38,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use Throwable;
 
 class SignalProcessingService
 {
@@ -138,19 +143,23 @@ class SignalProcessingService
      */
     public function process(Signal $signal): ?ControlRoomAlert
     {
-        if ($signal->status !== 'pending') {
-            return $signal->status === 'processed'
-                ? ($signal->alert ?? $signal->correlatedAlert)
-                : null;
-        }
-
         return DB::transaction(function () use ($signal) {
             $signal = Signal::query()->whereKey($signal->id)->lockForUpdate()->firstOrFail();
-            if ($signal->status !== 'pending') {
-                return $signal->status === 'processed'
-                    ? ($signal->alert ?? $signal->correlatedAlert)
-                    : null;
+
+            // Typed alert provenance is the durable recovery point. It wins
+            // over a stale in-memory lifecycle state left by historical or
+            // manually interrupted processing and is safe to reconcile while
+            // the source signal row is exclusively locked.
+            $originAlert = $this->lockedOriginAlertForSignal($signal);
+            if ($originAlert !== null) {
+                return $this->reconcileSignalWithOriginAlert($signal, $originAlert);
             }
+
+            if ($signal->status !== 'pending') {
+                return $this->lockedLifecycleAlertForSignal($signal);
+            }
+
+            $this->assertSignalRelationshipsAreCanonical($signal);
 
             // Check if in maintenance window
             if ($this->isInMaintenanceWindow($signal)) {
@@ -163,6 +172,7 @@ class SignalProcessingService
             if ($incident !== null) {
                 $existingAlert = $this->exactAlertForIncident($incident);
                 if ($existingAlert !== null) {
+                    $this->assertAlertCanGroupSignal($signal, $existingAlert);
                     $signal->markCorrelated($existingAlert);
                     $this->addSignalToAlert($signal, $existingAlert);
 
@@ -193,6 +203,7 @@ class SignalProcessingService
             if ($rule->deduplicate && $incident === null) {
                 $existingAlert = $this->findCorrelatedAlert($signal, $rule);
                 if ($existingAlert) {
+                    $this->assertAlertCanGroupSignal($signal, $existingAlert);
                     $signal->markCorrelated($existingAlert);
                     $this->addSignalToAlert($signal, $existingAlert);
 
@@ -215,6 +226,16 @@ class SignalProcessingService
         }
 
         return DB::transaction(function () use ($signal): int {
+            $signal = Signal::query()
+                ->whereKey($signal->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($signal->status !== 'pending') {
+                return 0;
+            }
+
+            $this->assertSignalRelationshipsAreCanonical($signal);
+
             $canonicalDeviceId = (int) data_get($signal->normalized_data, 'canonical_device_id');
             $correlationKey = $this->monitorCorrelationKey($signal);
             $legacyRecovery = data_get($signal->normalized_data, 'legacy_monitoring_recovery') === true;
@@ -306,7 +327,7 @@ class SignalProcessingService
                 try {
                     $this->process($signal);
                     $processed++;
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     Log::error('Failed to process signal', [
                         'signal_id' => $signal->id,
                         'signal_type' => $signal->signal_type_code,
@@ -314,7 +335,7 @@ class SignalProcessingService
                         'exception_class' => get_class($e),
                         'trace' => $e->getTraceAsString(),
                     ]);
-                    $signal->markFailed($e->getMessage());
+                    $this->markFailedIfStillPending((int) $signal->id, $e);
                 }
             });
 
@@ -326,6 +347,11 @@ class SignalProcessingService
      */
     protected function createAlertFromSignal(Signal $signal, ?SignalRule $rule = null): ControlRoomAlert
     {
+        $existingAlert = $this->lockedOriginAlertForSignal($signal);
+        if ($existingAlert !== null) {
+            return $this->reconcileSignalWithOriginAlert($signal, $existingAlert);
+        }
+
         $signalType = $signal->signalType;
 
         // Determine severity — normalised through canonical AlertSeverity
@@ -346,26 +372,42 @@ class SignalProcessingService
         $queue ??= TriageQueue::findForAlert($severity, $signal->signalSource?->slug ?? 'unknown', $signal->signal_type_code);
 
         // Create the alert
-        $alert = ControlRoomAlert::create([
-            'source' => $signal->signalSource?->slug ?? 'unknown',
-            'alert_type' => $alertType,
-            'severity' => $severity,
-            'status' => 'open',
-            'asset_id' => $signal->asset_id,
-            'device_id' => $signal->device_id,
-            'site_id' => $signal->site_id,
-            'client_id' => $signal->client_id,
-            'queue_id' => $queue?->id,
-            'escalation_level' => $rule?->getOutputEscalationLevel() ?? 0,
-            'triggered_at' => $signal->occurred_at,
-            'context' => [
-                'signal_id' => $signal->id,
-                'signal_type_code' => $signal->signal_type_code,
-                'signal_payload' => $signal->payload,
-                'rule_id' => $rule?->id,
-                'normalized_data' => $signal->normalized_data,
-            ],
-        ]);
+        try {
+            $alert = ControlRoomAlert::create([
+                'source' => $signal->signalSource?->slug ?? 'unknown',
+                'alert_type' => $alertType,
+                'severity' => $severity,
+                'status' => 'open',
+                'asset_id' => $signal->asset_id,
+                'origin_signal_id' => $signal->id,
+                'device_id' => $signal->device_id,
+                'site_id' => $signal->site_id,
+                'client_id' => $signal->client_id,
+                'queue_id' => $queue?->id,
+                'escalation_level' => $rule?->getOutputEscalationLevel() ?? 0,
+                'triggered_at' => $signal->occurred_at,
+                'context' => [
+                    'signal_id' => $signal->id,
+                    'signal_type_code' => $signal->signal_type_code,
+                    'signal_payload' => $signal->payload,
+                    'rule_id' => $rule?->id,
+                    'normalized_data' => $signal->normalized_data,
+                ],
+            ]);
+        } catch (QueryException $exception) {
+            if (! $this->isOriginSignalUniqueViolation($exception)) {
+                throw $exception;
+            }
+
+            $existingAlert = $this->lockedOriginAlertForSignal($signal);
+            if ($existingAlert === null) {
+                throw $exception;
+            }
+
+            return $this->reconcileSignalWithOriginAlert($signal, $existingAlert);
+        }
+
+        $this->afterOriginAlertCreated($signal, $alert);
 
         // Mark signal as processed
         $signal->markProcessed($alert);
@@ -397,7 +439,7 @@ class SignalProcessingService
         $currentShift?->incrementCreated();
 
         // Audit log
-        AuditLogger::log('controlRoom.alert.created', $alert, [
+        AuditLogger::logOrFail('controlRoom.alert.created', $alert, [
             'source' => 'signal_processing',
             'signal_id' => $signal->id,
         ]);
@@ -408,12 +450,394 @@ class SignalProcessingService
             'severity' => $severity,
         ]);
 
-        $this->notifications->notifyAlert($alert, $rule, $queue);
-
         // Run post-creation automation (auto-assign, auto-start playbook)
         app(AlertAutomationService::class)->onAlertCreated($alert);
 
+        // Notification intent commits with the alert. Dispatch occurs only
+        // after the outermost transaction commits; the scheduled recovery
+        // sweep owns any process crash or queue-dispatch interruption.
+        $this->stageAlertNotificationsAfterCommit($alert->fresh(), $rule, $queue);
+
         return $alert;
+    }
+
+    /**
+     * Failure-injection seam for proving that the origin alert and signal link
+     * share one transaction. Production implementations must not override it.
+     */
+    protected function afterOriginAlertCreated(
+        Signal $signal,
+        ControlRoomAlert $alert,
+    ): void {}
+
+    private function lockedOriginAlertForSignal(Signal $signal): ?ControlRoomAlert
+    {
+        return ControlRoomAlert::query()
+            ->where('origin_signal_id', $signal->id)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function lockedLifecycleAlertForSignal(Signal $signal): ?ControlRoomAlert
+    {
+        if ($signal->status !== 'processed') {
+            return null;
+        }
+
+        if ($signal->alert_id !== null) {
+            $alert = ControlRoomAlert::query()
+                ->whereKey($signal->alert_id)
+                ->lockForUpdate()
+                ->first();
+            if ($alert === null) {
+                throw new \DomainException('Processed signal references a missing operational alert.');
+            }
+
+            $this->assertSignalRelationshipsAreCanonical($signal);
+            $this->assertAlertMatchesSignalProvenance($signal, $alert);
+
+            $originSignalId = $this->canonicalPositiveId($alert->origin_signal_id);
+            if ($originSignalId === null) {
+                try {
+                    $alert->forceFill(['origin_signal_id' => $signal->id])->save();
+                } catch (QueryException $exception) {
+                    if (! $this->isOriginSignalUniqueViolation($exception)) {
+                        throw $exception;
+                    }
+
+                    $canonical = $this->lockedOriginAlertForSignal($signal);
+                    if ($canonical !== null && (int) $canonical->id === (int) $alert->id) {
+                        return $canonical;
+                    }
+
+                    throw new \DomainException(
+                        'Processed signal provenance conflicts with another operational alert.',
+                        previous: $exception,
+                    );
+                }
+
+                return $alert->fresh();
+            }
+
+            if ($originSignalId !== (int) $signal->id) {
+                throw new \DomainException(
+                    'Processed signal alert is owned by a different origin signal.',
+                );
+            }
+
+            return $alert;
+        }
+
+        if ($signal->correlated_alert_id === null) {
+            return null;
+        }
+
+        $alert = ControlRoomAlert::query()
+            ->whereKey($signal->correlated_alert_id)
+            ->lockForUpdate()
+            ->first();
+        if ($alert === null) {
+            throw new \DomainException('Correlated signal references a missing operational alert.');
+        }
+
+        $this->assertSignalRelationshipsAreCanonical($signal);
+        $this->assertAlertCanGroupSignal($signal, $alert);
+
+        return $alert;
+    }
+
+    private function reconcileSignalWithOriginAlert(
+        Signal $signal,
+        ControlRoomAlert $alert,
+    ): ControlRoomAlert {
+        $this->assertSignalRelationshipsAreCanonical($signal);
+        $this->assertAlertMatchesSignalProvenance($signal, $alert);
+
+        if ($signal->status === 'suppressed') {
+            throw new \DomainException(
+                'Suppressed signal cannot own an operational alert.',
+            );
+        }
+
+        if ($signal->alert_id !== null && (int) $signal->alert_id !== (int) $alert->id) {
+            throw new \DomainException(
+                'Signal provenance conflicts with its existing operational alert link.',
+            );
+        }
+
+        if ($signal->correlated_alert_id !== null) {
+            throw new \DomainException(
+                'Signal provenance conflicts with its existing correlated alert link.',
+            );
+        }
+
+        if ($signal->status !== 'processed'
+            || (int) $signal->alert_id !== (int) $alert->id
+            || $signal->correlated_alert_id !== null
+        ) {
+            $signal->forceFill([
+                'status' => 'processed',
+                'alert_id' => $alert->id,
+                'correlated_alert_id' => null,
+                'processed_at' => $signal->processed_at ?? now(),
+                'processing_notes' => $signal->status === 'processed'
+                    ? $signal->processing_notes
+                    : 'Recovered from durable signal-to-alert provenance.',
+            ])->save();
+        }
+
+        return $alert;
+    }
+
+    private function markFailedIfStillPending(int $signalId, Throwable $failure): void
+    {
+        try {
+            DB::transaction(function () use ($signalId, $failure): void {
+                $signal = Signal::query()
+                    ->whereKey($signalId)
+                    ->lockForUpdate()
+                    ->first();
+                if ($signal === null) {
+                    return;
+                }
+
+                $originAlert = $this->lockedOriginAlertForSignal($signal);
+                if ($originAlert !== null) {
+                    $this->reconcileSignalWithOriginAlert($signal, $originAlert);
+
+                    return;
+                }
+
+                if ($signal->status === 'pending') {
+                    $signal->markFailed($failure->getMessage());
+                }
+            }, self::TRANSACTION_ATTEMPTS);
+        } catch (Throwable $markFailure) {
+            // Leave the signal pending for the next scheduled pass rather than
+            // overwrite a concurrently committed success or guess at state.
+            Log::critical('Failed to persist Control Room signal failure state', [
+                'signal_id' => $signalId,
+                'processing_exception' => $failure::class,
+                'failure_state_exception' => $markFailure::class,
+                'error' => $markFailure->getMessage(),
+            ]);
+        }
+    }
+
+    private function assertSignalRelationshipsAreCanonical(Signal $signal): void
+    {
+        $siteId = $this->optionalCanonicalId($signal->site_id, 'Signal Site');
+        $clientId = $this->optionalCanonicalId($signal->client_id, 'Signal client');
+        $assetId = $this->optionalCanonicalId($signal->asset_id, 'Signal asset');
+        $deviceId = $this->optionalCanonicalId($signal->device_id, 'Signal device');
+        $sourceId = $this->optionalCanonicalId($signal->signal_source_id, 'Signal source');
+        $signalTypeId = $this->optionalCanonicalId($signal->signal_type_id, 'Signal type');
+
+        if ($siteId !== null && ! Site::query()->whereKey($siteId)->exists()) {
+            throw new \DomainException('Signal Site relationship does not exist.');
+        }
+
+        $client = $clientId === null
+            ? null
+            : Client::withTrashed()->find($clientId);
+        if ($clientId !== null && $client === null) {
+            throw new \DomainException('Signal client relationship does not exist.');
+        }
+        if ($siteId !== null
+            && $client?->site_id !== null
+            && (int) $client->site_id !== $siteId
+        ) {
+            throw new \DomainException('Signal client belongs to a different Site.');
+        }
+
+        if ($sourceId !== null && $signal->signalSource === null) {
+            throw new \DomainException('Signal source relationship does not exist.');
+        }
+        if ($signalTypeId !== null && $signal->signalType === null) {
+            throw new \DomainException('Signal type relationship does not exist.');
+        }
+        if ($signal->signalType !== null
+            && $signal->signalType->code !== $signal->signal_type_code
+        ) {
+            throw new \DomainException('Signal type code does not match its canonical relationship.');
+        }
+
+        $asset = $assetId === null ? null : Asset::query()->find($assetId);
+        if ($assetId !== null && $asset === null) {
+            throw new \DomainException('Signal asset relationship does not exist.');
+        }
+        if ($asset !== null && $siteId !== null) {
+            $assetSiteIds = collect([$asset->site_id, $asset->home_site_id])
+                ->filter(fn ($id): bool => $this->canonicalPositiveId($id) !== null)
+                ->map(fn ($id): int => (int) $id)
+                ->unique();
+            if ($assetSiteIds->isNotEmpty() && ! $assetSiteIds->contains($siteId)) {
+                throw new \DomainException('Signal asset belongs to a different Site.');
+            }
+        }
+        if ($asset?->client_id !== null
+            && $clientId !== null
+            && (int) $asset->client_id !== $clientId
+        ) {
+            throw new \DomainException('Signal asset belongs to a different client.');
+        }
+
+        $device = $deviceId === null ? null : Device::withTrashed()->find($deviceId);
+        if ($deviceId !== null && $device === null) {
+            throw new \DomainException('Signal device relationship does not exist.');
+        }
+        $this->assertOptionalRelationshipMatch(
+            $device?->site_id,
+            $siteId,
+            'Signal device belongs to a different Site.',
+        );
+        $this->assertOptionalRelationshipMatch(
+            $device?->client_id,
+            $clientId,
+            'Signal device belongs to a different client.',
+        );
+        $this->assertOptionalRelationshipMatch(
+            $device?->asset_id,
+            $assetId,
+            'Signal device belongs to a different asset.',
+        );
+        $this->assertOptionalRelationshipMatch(
+            $device?->signal_source_id,
+            $sourceId,
+            'Signal device belongs to a different source.',
+        );
+
+        $normalized = is_array($signal->normalized_data) ? $signal->normalized_data : [];
+        $this->assertNormalizedRelationshipMatch($normalized, 'site_id', $siteId, 'Site');
+        $this->assertNormalizedRelationshipMatch($normalized, 'client_id', $clientId, 'client');
+    }
+
+    private function assertAlertMatchesSignalProvenance(
+        Signal $signal,
+        ControlRoomAlert $alert,
+    ): void {
+        foreach ([
+            'site_id' => 'Site',
+            'client_id' => 'client',
+            'asset_id' => 'asset',
+            'device_id' => 'device',
+        ] as $column => $label) {
+            if (! $this->nullableCanonicalIdMatches($alert->{$column}, $this->canonicalPositiveId($signal->{$column}))) {
+                throw new \DomainException(
+                    "Origin alert {$label} provenance does not match its signal.",
+                );
+            }
+        }
+    }
+
+    private function assertAlertCanGroupSignal(
+        Signal $signal,
+        ControlRoomAlert $alert,
+    ): void {
+        foreach ([
+            'site_id' => 'Site',
+            'client_id' => 'client',
+            'asset_id' => 'asset',
+            'device_id' => 'device',
+        ] as $column => $label) {
+            $signalId = $this->canonicalPositiveId($signal->{$column});
+            $alertId = $this->canonicalPositiveId($alert->{$column});
+            if ($signalId !== null && $alertId !== null && $signalId !== $alertId) {
+                throw new \DomainException(
+                    "Correlated alert {$label} provenance does not match its signal.",
+                );
+            }
+        }
+    }
+
+    private function assertOptionalRelationshipMatch(
+        mixed $relatedValue,
+        ?int $signalValue,
+        string $message,
+    ): void {
+        $relatedId = $this->canonicalPositiveId($relatedValue);
+        if ($relatedId !== null && $signalValue !== null && $relatedId !== $signalValue) {
+            throw new \DomainException($message);
+        }
+    }
+
+    private function assertNormalizedRelationshipMatch(
+        array $normalized,
+        string $key,
+        ?int $expected,
+        string $label,
+    ): void {
+        if (! array_key_exists($key, $normalized) || $normalized[$key] === null) {
+            return;
+        }
+
+        $actual = $this->canonicalPositiveId($normalized[$key]);
+        if ($actual === null) {
+            throw new \DomainException("Signal normalized {$label} relationship is malformed.");
+        }
+
+        if ($expected !== null && $actual !== $expected) {
+            throw new \DomainException("Signal normalized {$label} belongs to a different relationship.");
+        }
+    }
+
+    private function optionalCanonicalId(mixed $value, string $label): ?int
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $id = $this->canonicalPositiveId($value);
+        if ($id === null) {
+            throw new \DomainException("{$label} relationship is malformed.");
+        }
+
+        return $id;
+    }
+
+    private function stageAlertNotificationsAfterCommit(
+        ControlRoomAlert $alert,
+        ?SignalRule $rule,
+        ?TriageQueue $queue,
+    ): void {
+        $communicationIds = $this->notifications
+            ->stageAlertNotifications($alert, $rule, $queue)
+            ->reject(fn ($communication): bool => $communication->superseded_at !== null
+                || (int) $communication->retry_count >= 3
+                || ! in_array($communication->status, ['pending', 'failed'], true))
+            ->pluck('id')
+            ->map(fn (int|string $id): int => (int) $id)
+            ->all();
+        if ($communicationIds === []) {
+            return;
+        }
+
+        DB::afterCommit(function () use ($communicationIds): void {
+            foreach ($communicationIds as $communicationId) {
+                try {
+                    DeliverControlRoomAlertNotificationJob::dispatch($communicationId);
+                } catch (Throwable $exception) {
+                    // The pending outbox row is already durable. The scheduled
+                    // recovery job will retry it without recreating the alert.
+                    Log::error('Control Room signal alert notification dispatch failed', [
+                        'communication_id' => $communicationId,
+                        'exception' => $exception::class,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        });
+    }
+
+    private function isOriginSignalUniqueViolation(QueryException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return (string) $exception->getCode() === '23000'
+            && (
+                str_contains($message, 'cr_alerts_origin_signal_uq')
+                || str_contains($message, 'control_room_alerts.origin_signal_id')
+            );
     }
 
     /**

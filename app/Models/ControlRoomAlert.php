@@ -93,6 +93,7 @@ class ControlRoomAlert extends Model
         'status',
         'asset_id',
         'fleet_signal_id',
+        'origin_signal_id',
         'device_id',
         'queue_id',
         'playbook_run_id',
@@ -171,6 +172,16 @@ class ControlRoomAlert extends Model
     public function fleetSignal(): BelongsTo
     {
         return $this->belongsTo(FleetSignal::class, 'fleet_signal_id');
+    }
+
+    /**
+     * Immutable typed provenance for the normalized signal that created this
+     * operational alert. Grouped follow-up signals continue to use their
+     * correlated_alert_id link and never replace this owner.
+     */
+    public function originSignal(): BelongsTo
+    {
+        return $this->belongsTo(Signal::class, 'origin_signal_id');
     }
 
     /**
