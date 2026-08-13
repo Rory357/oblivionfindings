@@ -9,6 +9,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -49,6 +50,13 @@ class WorkerMedsRecordDoseTest extends TestCase
 
         $this->worker = $this->makeRoleUser('support_worker');
         $this->grantPermissions($this->worker, ['medications.administer.record']);
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $this->worker->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+        ]);
 
         $this->serviceContext = ServiceContext::factory()->create([
             'name' => 'Record Dose',

@@ -5,9 +5,15 @@ namespace App\Services;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
+use Carbon\CarbonInterface;
 
 class CoverageRoleService
 {
+    public function __construct(
+        private readonly MedicationAdministratorCompetencyPolicy $medicationCompetency,
+    ) {}
+
     /**
      * @return array<string, string>
      */
@@ -50,12 +56,17 @@ class CoverageRoleService
             ->all();
     }
 
-    public function userHasRole(User $user, string $roleKey): bool
+    public function userHasRole(
+        User $user,
+        string $roleKey,
+        ?Shift $shift = null,
+        ?CarbonInterface $effectiveAt = null,
+    ): bool
     {
         return match ($roleKey) {
             'caregiver' => true,
             'driver' => $this->userCanDrive($user),
-            'med_competent' => $this->userIsMedicationCompetent($user),
+            'med_competent' => $this->userIsMedicationCompetent($user, $shift, $effectiveAt),
             default => false,
         };
     }
@@ -134,14 +145,16 @@ class CoverageRoleService
         return $eligibility->status === 'eligible' && (bool) $eligibility->can_drive_clients;
     }
 
-    protected function userIsMedicationCompetent(User $user): bool
+    protected function userIsMedicationCompetent(
+        User $user,
+        ?Shift $shift = null,
+        ?CarbonInterface $effectiveAt = null,
+    ): bool
     {
-        if ($user->canDo('medications.administer.record')) {
-            return true;
-        }
+        $siteId = $shift?->site_id ?: $shift?->client?->site_id;
+        $moment = $effectiveAt ?: $shift?->ends_at ?: now();
 
-        return $user->relationLoaded('medicationCompetencyAssessments')
-            ? $user->medicationCompetencyAssessments->contains(fn ($assessment) => method_exists($assessment, 'isPassed') ? $assessment->isPassed() : $assessment->status === 'passed')
-            : $user->medicationCompetencyAssessments()->active()->exists();
+        return $this->medicationCompetency
+            ->evaluate($user, $siteId ? (int) $siteId : null, $moment)['allowed'];
     }
 }

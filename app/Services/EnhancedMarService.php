@@ -10,10 +10,10 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
-use App\Models\MedicationCompetencyAssessment;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
+use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +34,8 @@ class EnhancedMarService
         MarScheduleService $scheduleService,
         MedicationSafetyService $safetyService,
         MedicationScanVerificationService $scanVerificationService,
-        MedicationRuleService $ruleService
+        MedicationRuleService $ruleService,
+        protected MedicationAdministratorCompetencyPolicy $medicationCompetencyPolicy,
     ) {
         $this->scheduleService = $scheduleService;
         $this->safetyService = $safetyService;
@@ -617,11 +618,6 @@ class EnhancedMarService
             return $witnessValidation;
         }
 
-        $competencyValidation = $this->validateAdministratorCompetency($data, $userId);
-        if ($competencyValidation !== null) {
-            return $competencyValidation;
-        }
-
         $covertValidation = $this->validateCovertAuthorisation($medication, $data);
         if ($covertValidation !== null) {
             return $covertValidation;
@@ -682,6 +678,19 @@ class EnhancedMarService
                         'error' => 'Medication order is awaiting verification before it can be administered.',
                         'error_field' => 'approval_status',
                     ];
+                }
+
+                // Establish the worker/competency serialization boundary after
+                // the medication lock. Assessment and exemption writes take the
+                // same user-row lock, so expiry/revocation cannot race the write.
+                $competencyValidation = $this->validateAdministratorCompetency(
+                    $client,
+                    $data,
+                    $userId,
+                    true,
+                );
+                if ($competencyValidation !== null) {
+                    return $competencyValidation;
                 }
 
                 if ($clientRequestUuid !== null) {
@@ -816,6 +825,19 @@ class EnhancedMarService
 
                 if (! $admin->service_context_id) {
                     $admin->service_context_id = $client->service_context_id ?: ServiceContext::defaultId();
+                }
+
+                // Re-evaluate at the server-authoritative persistence point in
+                // case a finite exemption expired while safety checks ran. The
+                // locks acquired above remain held until this transaction ends.
+                $competencyValidation = $this->validateAdministratorCompetency(
+                    $client,
+                    $data,
+                    $userId,
+                    true,
+                );
+                if ($competencyValidation !== null) {
+                    return $competencyValidation;
                 }
 
                 $admin->save();
@@ -1111,36 +1133,46 @@ class EnhancedMarService
     }
 
     /**
-     * Block a "given" administration when the administering user's LATEST
-     * medication competency assessment is failed or expired. Staff with no
-     * assessment on file stay permission-gated only (canDo), so admins and
-     * clinical managers who are not on the competency register are unaffected,
-     * and recording a refusal/missed dose (documentation) is never blocked.
+     * Block a "given" administration unless the shared fail-closed competency
+     * policy allows it. Recording a refusal/missed dose remains documentation
+     * and is not represented as medication administration competence.
      */
-    private function validateAdministratorCompetency(array $data, int $userId): ?array
+    private function validateAdministratorCompetency(
+        Client $client,
+        array $data,
+        int $userId,
+        bool $lockForUpdate = false,
+    ): ?array
     {
         if (($data['status'] ?? null) !== 'given') {
             return null;
         }
 
-        $latest = MedicationCompetencyAssessment::query()
-            ->where('user_id', $userId)
-            ->orderByDesc('assessment_date')
-            ->orderByDesc('id')
-            ->first();
+        $user = User::query()->find($userId);
+        if (! $user) {
+            return [
+                'success' => false,
+                'error' => 'You cannot sign this dose as given — your staff record is unavailable.',
+                'error_field' => 'status',
+            ];
+        }
 
-        if (! $latest || $latest->isPassed()) {
+        $decision = $this->medicationCompetencyPolicy->evaluate(
+            $user,
+            $client->site_id ? (int) $client->site_id : null,
+            now(),
+            $lockForUpdate,
+        );
+
+        if ($decision['allowed']) {
             return null;
         }
 
-        $why = $latest->status !== 'passed'
-            ? 'your latest medication competency assessment is recorded as "'.str_replace('_', ' ', (string) $latest->status).'"'
-            : 'your medication competency expired on '.$latest->expiry_date?->format('d/m/Y');
-
         return [
             'success' => false,
-            'error' => 'You cannot sign this dose as given — '.$why.'. Ask a competency assessor to reassess you before administering medications.',
+            'error' => 'You cannot sign this dose as given — '.$decision['message'].' Ask a competency assessor to reassess you before administering medications.',
             'error_field' => 'status',
+            'competency_state' => $decision['state'],
         ];
     }
 

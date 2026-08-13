@@ -147,6 +147,7 @@ class ShiftCoverageService
                 'staff:id,name',
                 'staff.hrDriverEligibility',
                 'staff.medicationCompetencyAssessments',
+                'staff.medicationCompetencyExemptions',
                 'serviceContext:id,name,type',
                 'site:id,name,type',
             ])
@@ -391,7 +392,12 @@ class ShiftCoverageService
 
             foreach ($roleRequirements as $roleRequirement) {
                 $assignedRoleCount = $assignedShifts
-                    ->filter(fn (Shift $shift) => $shift->staff && $this->coverageRoles->userHasRole($shift->staff, $roleRequirement['key']))
+                    ->filter(fn (Shift $shift) => $shift->staff && $this->coverageRoles->userHasRole(
+                        $shift->staff,
+                        $roleRequirement['key'],
+                        $shift,
+                        $cursor,
+                    ))
                     ->count();
                 $openRoleCount = $openShifts
                     ->filter(fn (Shift $shift) => collect($shift->coverage_roles ?? [])->contains($roleRequirement['key']))

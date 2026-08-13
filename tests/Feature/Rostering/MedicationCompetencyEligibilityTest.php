@@ -2,6 +2,8 @@
 
 use App\Models\Client;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationCompetencyExemption;
+use App\Models\Permission;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
@@ -86,4 +88,105 @@ test('a competency expiring within the warning window warns but does not block',
 
     expect(collect($result['blocked_reasons'])->implode(' '))->not->toContain('Medication competency expired');
     expect(collect($result['warning_reasons'])->implode(' '))->toContain('Medication competency expires');
+});
+
+test('medication permission alone does not satisfy medication coverage eligibility', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $shift = makeMedicationShift($site, $client);
+    $staff = User::factory()->create();
+    $permission = Permission::query()->firstOrCreate(
+        ['key' => 'medications.administer.record'],
+        [
+            'description' => 'Record medication administrations',
+            'group' => 'medications',
+            'module' => 'Clinical',
+        ],
+    );
+    $staff->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+
+    $result = app(ShiftStaffEligibilityService::class)->evaluate($shift, $staff)->toArray();
+    $rule = collect($result['checked_rules'])->firstWhere('rule', 'medication_competency');
+
+    expect($staff->canDo('medications.administer.record'))->toBeTrue()
+        ->and($rule['passed'])->toBeFalse()
+        ->and($rule['overrideable'])->toBeFalse()
+        ->and($rule['competency_state'])->toBe('unassessed');
+});
+
+test('a passed medication competency with no expiry blocks medication coverage eligibility', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $shift = makeMedicationShift($site, $client);
+    $staff = User::factory()->create();
+    MedicationCompetencyAssessment::create([
+        'user_id' => $staff->id,
+        'assessment_type' => 'annual',
+        'status' => 'passed',
+        'assessment_date' => now()->toDateString(),
+        'expiry_date' => null,
+    ]);
+
+    $result = app(ShiftStaffEligibilityService::class)->evaluate($shift, $staff)->toArray();
+    $rule = collect($result['checked_rules'])->firstWhere('rule', 'medication_competency');
+
+    expect($rule['passed'])->toBeFalse()
+        ->and($rule['overrideable'])->toBeFalse()
+        ->and($rule['competency_state'])->toBe('missing_expiry');
+});
+
+test('a failed medication competency blocks medication coverage eligibility', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $shift = makeMedicationShift($site, $client);
+    $staff = User::factory()->create();
+    MedicationCompetencyAssessment::create([
+        'user_id' => $staff->id,
+        'assessment_type' => 'initial',
+        'status' => 'failed',
+        'assessment_date' => now()->toDateString(),
+        'expiry_date' => now()->addYear()->toDateString(),
+    ]);
+
+    $result = app(ShiftStaffEligibilityService::class)->evaluate($shift, $staff)->toArray();
+    $rule = collect($result['checked_rules'])->firstWhere('rule', 'medication_competency');
+
+    expect($rule['passed'])->toBeFalse()
+        ->and($rule['overrideable'])->toBeFalse()
+        ->and($rule['competency_state'])->toBe('failed');
+});
+
+test('a finite explicit site exemption satisfies the same medication coverage policy', function () {
+    $site = Site::factory()->create();
+    $otherSite = Site::factory()->create();
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $shift = makeMedicationShift($site, $client);
+    $staff = User::factory()->create();
+    $approver = User::factory()->create();
+
+    $exemption = MedicationCompetencyExemption::create([
+        'user_id' => $staff->id,
+        'site_id' => $site->id,
+        'scope' => MedicationCompetencyExemption::SCOPE_ADMINISTRATION,
+        'reason' => 'Short-term supervised operational coverage approved after clinical review.',
+        'approved_by' => $approver->id,
+        'approved_at' => now(),
+        'starts_at' => now(),
+        'expires_at' => now()->addWeek(),
+    ]);
+
+    $result = app(ShiftStaffEligibilityService::class)->evaluate($shift, $staff)->toArray();
+    $rule = collect($result['checked_rules'])->firstWhere('rule', 'medication_competency');
+
+    expect($rule['competency_state'])->toBe('exempt')
+        ->and($rule['exemption_id'])->toBe($exemption->id)
+        ->and(collect($result['blocked_reasons'])->implode(' '))->not->toContain('medication competency');
+
+    $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
+    $otherShift = makeMedicationShift($otherSite, $otherClient);
+    $otherResult = app(ShiftStaffEligibilityService::class)->evaluate($otherShift, $staff)->toArray();
+    $otherRule = collect($otherResult['checked_rules'])->firstWhere('rule', 'medication_competency');
+
+    expect($otherRule['passed'])->toBeFalse()
+        ->and($otherRule['competency_state'])->toBe('unassessed');
 });

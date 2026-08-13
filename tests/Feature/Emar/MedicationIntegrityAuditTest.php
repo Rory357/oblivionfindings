@@ -22,8 +22,8 @@ use Tests\TestCase;
  *    hardcoded to 1) and write that quantity to the CD register entry.
  *  - CD destructions write a 'disposal' register exit entry and cannot
  *    destroy more than is on hand.
- *  - A failed/expired latest competency assessment blocks signing a dose as
- *    given (staff with no assessment on file stay permission-gated only).
+ *  - Medication-administrator competency fails closed for absent, incomplete,
+ *    failed, and expired assessments.
  *  - Missed-dose incidents fire from the shared EnhancedMarService path, so
  *    every recording surface (My Day, guided rounds, MAR) raises them.
  */
@@ -37,6 +37,7 @@ class MedicationIntegrityAuditTest extends TestCase
 
         $user = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $user->roles()->syncWithoutDetaching([Role::where('name', 'admin')->first()->id]);
+        $this->recordValidCompetency($user);
 
         $witness = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
         $this->grantPermissions($witness, ['medications.controlled.witness']);
@@ -172,6 +173,7 @@ class MedicationIntegrityAuditTest extends TestCase
             'approval_status' => 'verified',
         ]);
 
+        $user->medicationCompetencyAssessments()->delete();
         MedicationCompetencyAssessment::create([
             'user_id' => $user->id,
             'assessment_type' => 'initial',
@@ -198,9 +200,10 @@ class MedicationIntegrityAuditTest extends TestCase
         $this->assertTrue($refusal['success'], $refusal['error'] ?? '');
     }
 
-    public function test_no_competency_on_file_stays_permission_gated_only(): void
+    public function test_no_competency_on_file_blocks_signing_a_dose_as_given(): void
     {
         ['user' => $user, 'client' => $client] = $this->setupClinic();
+        $user->medicationCompetencyAssessments()->delete();
         $medication = ClientMedication::create([
             'client_id' => $client->id,
             'name' => 'Paracetamol',
@@ -219,7 +222,45 @@ class MedicationIntegrityAuditTest extends TestCase
             'reason' => 'Pain',
         ], $user->id);
 
-        $this->assertTrue($result['success'], $result['error'] ?? '');
+        $this->assertFalse($result['success']);
+        $this->assertSame('unassessed', $result['competency_state']);
+        $this->assertStringContainsString('No medication competency assessment', $result['error']);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
+    }
+
+    public function test_passed_competency_without_expiry_blocks_signing_a_dose_as_given(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->setupClinic();
+        $user->medicationCompetencyAssessments()->delete();
+        MedicationCompetencyAssessment::create([
+            'user_id' => $user->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->toDateString(),
+            'expiry_date' => null,
+        ]);
+        $medication = ClientMedication::create([
+            'client_id' => $client->id,
+            'name' => 'Paracetamol',
+            'dosage' => '500mg',
+            'frequency' => 'PRN',
+            'is_prn' => true,
+            'prn_reason' => 'Pain',
+            'controlled_drug' => false,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+        ]);
+
+        $result = app(EnhancedMarService::class)->recordAdministration($client, $medication, [
+            'status' => 'given',
+            'reason' => 'Pain',
+        ], $user->id);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('missing_expiry', $result['competency_state']);
+        $this->assertStringContainsString('no expiry date', $result['error']);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 
     public function test_missed_dose_raises_incident_from_shared_service_path(): void
@@ -303,5 +344,16 @@ class MedicationIntegrityAuditTest extends TestCase
             ->all();
 
         $user->permissionOverrides()->syncWithoutDetaching($permissionMap);
+    }
+
+    private function recordValidCompetency(User $user): void
+    {
+        MedicationCompetencyAssessment::create([
+            'user_id' => $user->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+        ]);
     }
 }

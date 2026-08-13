@@ -9,6 +9,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\MedicationAllergy;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Site;
@@ -62,6 +63,8 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
         $this->worker = $this->makeActor('support_worker', $site);
         $this->manager = $this->makeActor('provider_manager', $site);
         $this->witness = $this->makeActor('support_worker', $site, 'witness-secret');
+        $this->recordValidCompetency($this->worker);
+        $this->recordValidCompetency($this->manager);
 
         $this->client->supportWorkers()->syncWithoutDetaching([
             $this->worker->id,
@@ -428,6 +431,17 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
         ];
     }
 
+    private function recordValidCompetency(User $user): void
+    {
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $user->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+        ]);
+    }
+
     private function overrideReason(): array
     {
         return [
@@ -464,6 +478,20 @@ class MedicationsSafetyOverrideAuthorizationTest extends TestCase
     ): Process {
         $worker = <<<'PHP'
 require $argv[1].'/vendor/autoload.php';
+spl_autoload_register(static function (string $class) use ($argv): void {
+    foreach (['App\\' => 'app', 'Database\\' => 'database'] as $prefix => $directory) {
+        if (! str_starts_with($class, $prefix)) {
+            continue;
+        }
+
+        $path = $argv[1].'/'.$directory.'/'.str_replace('\\', '/', substr($class, strlen($prefix))).'.php';
+        if (is_file($path)) {
+            require $path;
+        }
+
+        return;
+    }
+}, true, true);
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 $client = App\Models\Client::query()->findOrFail((int) $argv[2]);

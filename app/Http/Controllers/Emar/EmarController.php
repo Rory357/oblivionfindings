@@ -3530,7 +3530,17 @@ class EmarController extends Controller
         $validated['can_administer_unsupervised'] = (bool) ($validated['can_administer_unsupervised'] ?? false);
         $validated['can_witness_controlled'] = (bool) ($validated['can_witness_controlled'] ?? false);
 
-        MedicationCompetencyAssessment::create($validated);
+        DB::transaction(function () use ($validated): void {
+            // Medication administration locks the same staff row before its
+            // final competency decision. Serializing assessment creation here
+            // closes the no-record/first-assessment race.
+            User::query()
+                ->whereKey($validated['user_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            MedicationCompetencyAssessment::create($validated);
+        });
 
         return redirect()->back();
     }
@@ -3584,26 +3594,55 @@ class EmarController extends Controller
             'topical_competent', 'covert_admin_knowledge', 'error_reporting', 'allergy_awareness',
         ];
 
-        if (collect($booleanFields)->contains(fn ($field) => array_key_exists($field, $validated))) {
-            $merged = array_merge($assessment->only($booleanFields), $validated);
-            $totalScore = collect($booleanFields)->filter(fn ($field) => ! empty($merged[$field]))->count();
-            $validated['total_score'] = $totalScore;
-            $validated['pass_threshold'] = 10;
-            $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
-        }
+        DB::transaction(function () use ($assessment, $validated, $booleanFields): void {
+            $userIds = array_values(array_unique(array_map('intval', [
+                $assessment->user_id,
+                $validated['user_id'] ?? $assessment->user_id,
+            ])));
 
-        if (! array_key_exists('expiry_date', $validated) && ! empty($validated['assessment_date'])) {
-            $validated['expiry_date'] = Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
-        }
+            User::query()
+                ->whereIn('id', $userIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id']);
 
-        $assessment->update($validated);
+            $locked = MedicationCompetencyAssessment::query()
+                ->whereKey($assessment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (collect($booleanFields)->contains(fn ($field) => array_key_exists($field, $validated))) {
+                $merged = array_merge($locked->only($booleanFields), $validated);
+                $totalScore = collect($booleanFields)->filter(fn ($field) => ! empty($merged[$field]))->count();
+                $validated['total_score'] = $totalScore;
+                $validated['pass_threshold'] = 10;
+                $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
+            }
+
+            if (! array_key_exists('expiry_date', $validated) && ! empty($validated['assessment_date'])) {
+                $validated['expiry_date'] = Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
+            }
+
+            $locked->update($validated);
+        });
 
         return redirect()->back();
     }
 
     public function destroyCompetency(MedicationCompetencyAssessment $assessment)
     {
-        $assessment->delete();
+        DB::transaction(function () use ($assessment): void {
+            User::query()
+                ->whereKey($assessment->user_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            MedicationCompetencyAssessment::query()
+                ->whereKey($assessment->id)
+                ->lockForUpdate()
+                ->firstOrFail()
+                ->delete();
+        });
 
         return redirect()->back();
     }

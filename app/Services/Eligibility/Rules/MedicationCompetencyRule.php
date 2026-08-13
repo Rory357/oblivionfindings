@@ -2,23 +2,15 @@
 
 namespace App\Services\Eligibility\Rules;
 
-use App\Models\MedicationCompetencyAssessment;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\CoverageRoleService;
-use Carbon\Carbon;
-use Carbon\CarbonInterface;
+use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 
 /**
  * When a shift requires the 'med_competent' coverage role, validates that the
- * staff member's medication competency assessment is current — not failed and
- * not expired before the shift starts.
- *
- * Complements CoverageRoleService, whose med_competent check passes on the
- * `medications.administer.record` permission alone (permission ≠ current
- * competency). This rule adds the temporal expiry dimension the roster
- * otherwise ignores, so a worker with a lapsed assessment is flagged before
- * they're assigned a medication shift.
+ * staff member satisfies the same fail-closed medication-administrator policy
+ * enforced when an eMAR administration is persisted.
  */
 class MedicationCompetencyRule implements EligibilityRuleInterface
 {
@@ -26,6 +18,7 @@ class MedicationCompetencyRule implements EligibilityRuleInterface
 
     public function __construct(
         protected CoverageRoleService $coverageRoles,
+        protected MedicationAdministratorCompetencyPolicy $competencyPolicy,
     ) {}
 
     public function evaluate(Shift $shift, User $user): array
@@ -35,75 +28,49 @@ class MedicationCompetencyRule implements EligibilityRuleInterface
             return self::pass();
         }
 
-        $latest = $user->relationLoaded('medicationCompetencyAssessments')
-            ? $user->medicationCompetencyAssessments
-                ->sortByDesc(fn ($a) => [$a->assessment_date, $a->id])
-                ->first()
-            : MedicationCompetencyAssessment::query()
-                ->where('user_id', $user->id)
-                ->orderByDesc('assessment_date')
-                ->orderByDesc('id')
-                ->first();
+        $siteId = $shift->site_id ?: $shift->client?->site_id;
+        $effectiveAt = $shift->ends_at ?: $shift->starts_at ?: now();
+        $decision = $this->competencyPolicy->evaluate(
+            $user,
+            $siteId ? (int) $siteId : null,
+            $effectiveAt,
+        );
 
-        // No assessment on file — the coverage-role check covers the hard block;
-        // surface an explicit informational message for the roster card.
-        if (! $latest) {
-            return [
-                'rule' => 'medication_competency',
-                'passed' => false,
-                'severity' => 'warning',
-                'overrideable' => true,
-                'message' => 'No medication competency assessment on file.',
-            ];
-        }
-
-        if ($latest->status !== 'passed') {
+        if (! $decision['allowed']) {
             return [
                 'rule' => 'medication_competency',
                 'passed' => false,
                 'severity' => 'block',
                 'overrideable' => false,
-                'message' => 'Medication competency is recorded as "'.str_replace('_', ' ', (string) $latest->status).'".',
+                'message' => $decision['message'],
+                'competency_state' => $decision['state'],
             ];
         }
 
-        if (! $latest->expiry_date) {
-            return self::pass();
-        }
-
-        $expiry = $latest->expiry_date instanceof CarbonInterface
-            ? $latest->expiry_date
-            : Carbon::parse($latest->expiry_date);
-
-        $shiftStart = $shift->starts_at instanceof CarbonInterface
-            ? $shift->starts_at
-            : Carbon::parse($shift->starts_at);
-
-        if ($expiry->lt($shiftStart)) {
-            return [
-                'rule' => 'medication_competency',
-                'passed' => false,
-                'severity' => 'block',
-                'overrideable' => false,
-                'message' => "Medication competency expired on {$expiry->format('j M Y')}.",
-            ];
-        }
-
-        // Whole days from the shift start to the (not-yet-passed) expiry.
-        // Computed off the day boundaries so the sign is unambiguous.
-        $daysUntilExpiry = $shiftStart->copy()->startOfDay()->diffInDays($expiry->copy()->startOfDay());
+        $validUntil = $decision['valid_until'];
+        $daysUntilExpiry = $effectiveAt->copy()->startOfDay()
+            ->diffInDays($validUntil->copy()->startOfDay());
 
         if ($daysUntilExpiry <= self::EXPIRY_WARNING_DAYS) {
+            $subject = $decision['state'] === 'exempt'
+                ? 'Medication competency exemption'
+                : 'Medication competency';
+
             return [
                 'rule' => 'medication_competency',
                 'passed' => false,
                 'severity' => 'warning',
                 'overrideable' => true,
-                'message' => "Medication competency expires on {$expiry->format('j M Y')} (within ".self::EXPIRY_WARNING_DAYS.' days).',
+                'message' => "{$subject} expires on {$validUntil->format('j M Y')} (within ".self::EXPIRY_WARNING_DAYS.' days).',
+                'competency_state' => $decision['state'],
+                'exemption_id' => $decision['exemption_id'],
             ];
         }
 
-        return self::pass();
+        return array_merge(self::pass(), [
+            'competency_state' => $decision['state'],
+            'exemption_id' => $decision['exemption_id'],
+        ]);
     }
 
     /**
