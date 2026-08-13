@@ -35,6 +35,8 @@ type ClientFund = {
     name: string;
     fund_type: string;
     balance: number;
+    available_balance: number;
+    reconciliation_status: 'clear' | 'review' | 'mismatch' | string;
     low_balance_threshold: number | null;
     transaction_count: number;
     client: { id: number; first_name: string; last_name: string } | null;
@@ -71,7 +73,8 @@ export default function ClientFundsIndex({
     filters = {} as any,
     stats = {} as any,
 }: Props) {
-    const { labels } = usePage().props as any;
+    const { labels, auth } = usePage().props as any;
+    const canManage = Boolean(auth?.can?.client_funds?.manage);
     const clientSingular = labels?.['client.singular'] ?? 'Client';
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
     const updateFilters = (key: string, value: string | null) => {
@@ -157,12 +160,14 @@ export default function ClientFundsIndex({
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button asChild size="sm">
-                        <Link href="/operations/client-funds/create">
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            New Fund
-                        </Link>
-                    </Button>
+                    {canManage && (
+                        <Button asChild size="sm">
+                            <Link href="/operations/client-funds/create">
+                                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                New Fund
+                            </Link>
+                        </Button>
+                    )}
                 </div>
 
                 {/* List */}
@@ -179,11 +184,13 @@ export default function ClientFundsIndex({
                                     {clientSingular.toLowerCase()} fund to get
                                     started.
                                 </p>
-                                <Button asChild size="sm" className="mt-4">
-                                    <Link href="/operations/client-funds/create">
-                                        Create Fund
-                                    </Link>
-                                </Button>
+                                {canManage && (
+                                    <Button asChild size="sm" className="mt-4">
+                                        <Link href="/operations/client-funds/create">
+                                            Create Fund
+                                        </Link>
+                                    </Button>
+                                )}
                             </CardContent>
                         </Card>
                     )}
@@ -227,6 +234,18 @@ export default function ClientFundsIndex({
                                                     className="h-4 px-1.5 text-[9px]"
                                                 >
                                                     Low Balance
+                                                </Badge>
+                                            )}
+                                            {fund.reconciliation_status !==
+                                                'clear' && (
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="h-4 px-1.5 text-[9px]"
+                                                >
+                                                    {fund.reconciliation_status ===
+                                                    'mismatch'
+                                                        ? 'Mismatch'
+                                                        : 'Review'}
                                                 </Badge>
                                             )}
                                         </div>

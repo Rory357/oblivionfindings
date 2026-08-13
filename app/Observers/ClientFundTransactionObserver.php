@@ -12,13 +12,32 @@ class ClientFundTransactionObserver implements ShouldHandleEventsAfterCommit
 {
     public function created(ClientFundTransaction $transaction): void
     {
-        if ($transaction->journal_id !== null) {
+        $this->dispatchApprovedTransaction($transaction);
+    }
+
+    public function updated(ClientFundTransaction $transaction): void
+    {
+        if (! $transaction->wasChanged('status') || $transaction->status !== 'approved') {
+            return;
+        }
+
+        $this->dispatchApprovedTransaction($transaction);
+    }
+
+    private function dispatchApprovedTransaction(ClientFundTransaction $transaction): void
+    {
+        if ($transaction->status !== 'approved'
+            || $transaction->balance_effect_applied_at === null
+            || $transaction->journal_id !== null
+            || $transaction->source_type === 'client_fund_transfer_counterpart') {
             return;
         }
 
         $hasCanonicalClientSite = ClientFundTransaction::query()
             ->whereKey($transaction->id)
             ->whereHas('fund.client', fn ($clientQuery) => $clientQuery
+                ->whereColumn('clients.id', 'client_fund_transactions.client_id')
+                ->whereColumn('clients.site_id', 'client_fund_transactions.site_id')
                 ->whereNotNull('site_id')
                 ->whereHas('site', fn ($siteQuery) => $siteQuery
                     ->active()

@@ -83,6 +83,8 @@ class OperationsPermissionsSeeder extends Seeder
 
             // Client Funds
             ['key' => 'client_funds.manage', 'description' => 'Manage Client Funds'],
+            ['key' => 'client_funds.approve', 'description' => 'Approve Client Fund Transactions'],
+            ['key' => 'client_funds.viewAllSites', 'description' => 'View Client Funds Across All Sites'],
 
             // Custom Forms
             ['key' => 'custom_forms.viewAny', 'description' => 'View Custom Forms'],

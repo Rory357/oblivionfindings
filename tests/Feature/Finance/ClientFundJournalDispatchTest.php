@@ -53,11 +53,16 @@ class ClientFundJournalDispatchTest extends TestCase
         ]);
 
         $credit = $fund->transactions()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'status' => 'approved',
             'transaction_type' => 'credit',
             'amount' => 100,
             'running_balance' => 100,
             'description' => 'Cash deposit',
             'transaction_date' => now()->toDateString(),
+            'approved_at' => now(),
+            'balance_effect_applied_at' => now(),
         ]);
 
         // RefreshDatabase holds an outer transaction open, so an after-commit
@@ -80,11 +85,16 @@ class ClientFundJournalDispatchTest extends TestCase
         ));
 
         $debit = $fund->transactions()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'status' => 'approved',
             'transaction_type' => 'debit',
             'amount' => 40,
             'running_balance' => 60,
             'description' => 'Activity payment',
             'transaction_date' => now()->toDateString(),
+            'approved_at' => now(),
+            'balance_effect_applied_at' => now(),
         ]);
 
         PostClientFundJournalJob::dispatchSync($debit);

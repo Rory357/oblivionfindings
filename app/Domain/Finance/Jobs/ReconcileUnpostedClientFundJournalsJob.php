@@ -33,6 +33,9 @@ class ReconcileUnpostedClientFundJournalsJob implements ShouldBeUnique, ShouldQu
 
         ClientFundTransaction::query()
             ->whereNull('journal_id')
+            ->where('status', 'approved')
+            ->whereNotNull('balance_effect_applied_at')
+            ->where('source_type', '!=', 'client_fund_transfer_counterpart')
             ->whereHas('fund.client', fn ($clientQuery) => $clientQuery
                 ->whereNotNull('site_id')
                 ->whereHas('site', fn ($siteQuery) => $siteQuery
@@ -40,7 +43,7 @@ class ReconcileUnpostedClientFundJournalsJob implements ShouldBeUnique, ShouldQu
                     ->notArchived()
                     ->whereNull('archived_at')))
             ->where('amount', '!=', 0)
-            ->where('created_at', '<=', now()->subMinute())
+            ->where('approved_at', '<=', now()->subMinute())
             ->orderBy('id')
             ->chunkById(100, function ($transactions) use (&$redispatched): void {
                 foreach ($transactions as $transaction) {

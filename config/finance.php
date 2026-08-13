@@ -4,6 +4,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Client money governance
+    |--------------------------------------------------------------------------
+    |
+    | Client-held money is never an ordinary administrative balance. Debits,
+    | transfers and reversals always require an independent checker. Credits
+    | at or above the threshold do too. A negative balance is prohibited unless
+    | a separately governed product workflow has explicitly authorized a limit
+    | on that fund; the normal Client Funds UI cannot set that policy state.
+    |
+    */
+
+    'client_funds' => [
+        'currency' => env('FINANCE_CLIENT_FUNDS_CURRENCY', 'NZD'),
+        'approval_threshold' => env('FINANCE_CLIENT_FUNDS_APPROVAL_THRESHOLD', '500.00'),
+        'sensitive_transaction_types' => ['debit', 'transfer', 'reversal', 'transfer_reversal'],
+        'site_bypass_permission' => 'client_funds.viewAllSites',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | GL Account Code Mappings for Operational Financial Events
     |--------------------------------------------------------------------------
     |
