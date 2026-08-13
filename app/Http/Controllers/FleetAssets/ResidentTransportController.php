@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\FleetAssets;
 
-use App\Http\Controllers\Concerns\HandlesMedicationSync;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
@@ -11,11 +11,9 @@ use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
 use App\Models\Shift;
 use App\Models\User;
-use App\Services\AuditLogger;
-use App\Services\CoverageRoleService;
-use App\Services\MedicationIncidentIntegrationService;
+use App\Services\Fleet\ResidentTransportJourneyScope;
+use App\Services\Fleet\ResidentTransportJourneyService;
 use App\Services\MedicationScanVerificationService;
-use App\Services\ShiftOperationalSnapshotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -24,23 +22,15 @@ use Inertia\Inertia;
 
 class ResidentTransportController extends Controller
 {
-    use HandlesMedicationSync;
-
     public function __construct(
-        protected CoverageRoleService $coverageRoles,
-        protected ShiftOperationalSnapshotService $snapshots,
         protected MedicationScanVerificationService $scanVerificationService,
-    ) {
-    }
+        protected ResidentTransportJourneyScope $journeyScope,
+        protected ResidentTransportJourneyService $journeys,
+    ) {}
 
     private function canManageMedicationTransit(?User $user): bool
     {
-        return (bool) $user && (
-            $user->canDo('fleet.medication.manage')
-            || $user->canDo('medications.administer.record')
-            || $user->canDo('medications.stock.update')
-            || $user->canDo('clients.update')
-        );
+        return $this->journeyScope->canManageMedicationTransit($user);
     }
 
     private function assertCanManageMedicationTransit(Request $request): void
@@ -63,129 +53,11 @@ class ResidentTransportController extends Controller
         return $payload;
     }
 
-    private function resolveTransitMedication(Client $client, ?int $medicationId): ?ClientMedication
-    {
-        if (! $medicationId) {
-            return null;
-        }
-
-        return ClientMedication::query()
-            ->where('client_id', $client->id)
-            ->find($medicationId);
-    }
-
-    private function verifyMedicationScanOrFail(
-        Client $client,
-        ClientMedication $medication,
-        array $payload,
-        string $errorKey = 'scan_code'
-    ): array {
-        if (! ($payload['scan_verified'] ?? false) || blank($payload['scan_code'] ?? null)) {
-            throw ValidationException::withMessages([
-                $errorKey => 'Verify the medication code before continuing.',
-            ]);
-        }
-
-        $result = $this->scanVerificationService->verify(
-            $client,
-            $medication,
-            (string) $payload['scan_code']
-        );
-
-        if (! $result['matched']) {
-            throw ValidationException::withMessages([
-                $errorKey => $result['message'],
-            ]);
-        }
-
-        if (
-            filled($payload['scan_match_source'] ?? null)
-            && ($payload['scan_match_source'] ?? null) !== $result['match_source']
-        ) {
-            throw ValidationException::withMessages([
-                $errorKey => 'The medication verification needs to be repeated.',
-            ]);
-        }
-
-        return [
-            'scan_source' => $payload['scan_source'] ?? 'manual',
-            'scan_match_source' => $result['match_source'],
-            'scan_match_label' => $result['match_label'],
-            'scan_code_suffix' => substr(
-                $this->scanVerificationService->normalize((string) $payload['scan_code']),
-                -6
-            ),
-        ];
-    }
-
-    private function createTransitMedicationLog(
-        FleetResidentTransport $transport,
-        Client $client,
-        Request $request,
-        array $payload,
-        ?ClientMedication $medication = null,
-        ?array $scanAudit = null
-    ): FleetMedicationTransitLog {
-        $isControlledDrug = (bool) ($medication?->controlled_drug ?? $payload['is_controlled_drug'] ?? false);
-
-        $attributes = [
-            'transport_id' => $transport->id,
-            'client_id' => $client->id,
-            'medication_id' => $medication?->id ?? ($payload['medication_id'] ?? null),
-            'medication_name' => $medication
-                ? trim($medication->name . ($medication->dosage ? ' ' . $medication->dosage : ''))
-                : $payload['medication_name'],
-            'is_controlled_drug' => $isControlledDrug,
-            'packed_by_user_id' => $request->user()->id,
-            'packed_at' => now(),
-            'notes' => $payload['notes'] ?? null,
-        ];
-
-        if ($this->supportsPackedWitnessName()) {
-            $attributes['packed_witness_name'] = filled($payload['witness_name'] ?? null)
-                ? trim((string) $payload['witness_name'])
-                : null;
-        }
-
-        $log = FleetMedicationTransitLog::create($attributes);
-
-        AuditLogger::log('fleet.medication.pack', $log, array_filter([
-            'transport_id' => $transport->id,
-            'client_id' => $client->id,
-            'client_medication_id' => $medication?->id,
-            'medication_name' => $log->medication_name,
-            'controlled_drug' => $isControlledDrug,
-            'packed_witness_name' => $log->packed_witness_name,
-            'scan_source' => $scanAudit['scan_source'] ?? null,
-            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
-            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
-            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
-        ], fn ($value) => $value !== null && $value !== ''));
-
-        if ($isControlledDrug) {
-            app(MedicationIncidentIntegrationService::class)->handleTransitException($log);
-        }
-
-        return $log;
-    }
-
-    private function supportsPackedWitnessName(): bool
-    {
-        static $supportsPackedWitnessName = null;
-
-        if ($supportsPackedWitnessName === null) {
-            $supportsPackedWitnessName = Schema::hasTable('fleet_medication_transit_logs')
-                && Schema::hasColumn('fleet_medication_transit_logs', 'packed_witness_name');
-        }
-
-        return $supportsPackedWitnessName;
-    }
-
     public function index(Request $request)
     {
         $formOptions = $this->formOptions($request);
 
-        if (!Schema::hasTable('fleet_resident_transports')) {
+        if (! Schema::hasTable('fleet_resident_transports')) {
             return Inertia::render('fleet-assets/transports/index', [
                 'transports' => [
                     'data' => [],
@@ -219,12 +91,17 @@ class ResidentTransportController extends Controller
                 'shift.serviceContext:id,name',
                 'serviceContext:id,name',
             ]);
+        $this->journeyScope->applyTransportScope($query, $request->user());
 
         if ($request->filled('transport_type')) {
             $query->where('transport_type', $request->input('transport_type'));
         }
 
         if ($request->filled('asset_id')) {
+            abort_unless(
+                collect($formOptions['vehicles'])->contains('id', (int) $request->input('asset_id')),
+                404,
+            );
             $query->where('asset_id', (int) $request->input('asset_id'));
         }
 
@@ -233,7 +110,7 @@ class ResidentTransportController extends Controller
         }
 
         if ($request->filled('search')) {
-            $query->where('resident_name', 'like', '%' . $request->input('search') . '%');
+            $query->where('resident_name', 'like', '%'.$request->input('search').'%');
         }
 
         if ($request->filled('date_from')) {
@@ -241,13 +118,15 @@ class ResidentTransportController extends Controller
         }
 
         if ($request->filled('date_to')) {
-            $query->where('departed_at', '<=', $request->input('date_to') . ' 23:59:59');
+            $query->where('departed_at', '<=', $request->input('date_to').' 23:59:59');
         }
 
         // CSV export
         if ($request->input('export') === 'csv') {
             $exportQuery = (clone $query)->latest('departed_at');
-            return response()->streamDownload(function () use ($exportQuery) {
+            $canViewCareContext = $this->journeyScope->canViewResidentCareContext($request->user());
+
+            return response()->streamDownload(function () use ($exportQuery, $canViewCareContext) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['ID', 'Vehicle', 'Driver', 'Resident', 'Type', 'Pickup', 'Dropoff', 'Departed', 'Arrived', 'Duration (min)', 'Passengers', 'Supervisor', 'Status', 'Notes']);
                 foreach ($exportQuery->lazy(200) as $t) {
@@ -266,13 +145,13 @@ class ResidentTransportController extends Controller
                         optional($t->arrived_at)->format('Y-m-d H:i') ?? '',
                         $duration,
                         $t->passengers_count,
-                        $t->supervisor_name ?? '',
+                        $canViewCareContext ? ($t->supervisor_name ?? '') : '',
                         $t->status,
-                        $t->notes ?? '',
+                        $canViewCareContext ? ($t->notes ?? '') : '',
                     ]);
                 }
                 fclose($handle);
-            }, 'resident-transports-' . now()->format('Y-m-d') . '.csv');
+            }, 'resident-transports-'.now()->format('Y-m-d').'.csv');
         }
 
         $transports = $query->latest('departed_at')->paginate(25)->withQueryString();
@@ -283,6 +162,7 @@ class ResidentTransportController extends Controller
 
         $monthQuery = FleetResidentTransport::query()
             ->whereBetween('departed_at', [$monthStart, $monthEnd]);
+        $this->journeyScope->applyTransportScope($monthQuery, $request->user());
 
         $totalThisMonth = (clone $monthQuery)->count();
         $residentsThisMonth = (clone $monthQuery)->distinct('resident_name')->count('resident_name');
@@ -325,10 +205,10 @@ class ResidentTransportController extends Controller
                     'departed_at' => optional($t->departed_at)->toISOString(),
                     'arrived_at' => optional($t->arrived_at)->toISOString(),
                     'passengers_count' => $t->passengers_count,
-                    'supervisor_name' => $t->supervisor_name,
+                    'supervisor_name' => null,
                     'status' => $t->status,
                     'duration_minutes' => $t->duration_minutes,
-                    'notes' => $t->notes,
+                    'notes' => null,
                     'created_at' => optional($t->created_at)->toISOString(),
                 ])->values(),
                 'links' => $transports->linkCollection()->toArray(),
@@ -346,98 +226,129 @@ class ResidentTransportController extends Controller
                 'avg_duration_minutes' => round((float) ($avgDuration ?? 0), 1),
                 'most_active_vehicle' => $mostActiveVehicleName,
             ],
-            'hero' => [
-                'today' => FleetResidentTransport::query()->whereDate('departed_at', today())->count(),
-                'in_progress' => FleetResidentTransport::query()->where('status', 'in_progress')->count(),
-                'completed_7d' => FleetResidentTransport::query()
-                    ->where('status', 'completed')
-                    ->where('departed_at', '>=', now()->subDays(7))
-                    ->count(),
-                'with_medications_7d' => Schema::hasTable('fleet_medication_transit_logs')
-                    ? FleetMedicationTransitLog::query()
-                        ->where('created_at', '>=', now()->subDays(7))
-                        ->distinct('transport_id')
-                        ->count('transport_id')
-                    : 0,
-            ],
+            'hero' => $this->transportHero($request),
             ...$formOptions,
         ]);
     }
 
+    private function transportHero(Request $request): array
+    {
+        $base = FleetResidentTransport::query();
+        $this->journeyScope->applyTransportScope($base, $request->user());
+
+        $withMedications = 0;
+        if (
+            Schema::hasTable('fleet_medication_transit_logs')
+            && $this->journeyScope->canViewMedicationTransit($request->user())
+        ) {
+            $medications = FleetMedicationTransitLog::query()
+                ->where('created_at', '>=', now()->subDays(7));
+            $this->journeyScope->applyMedicationTransitScope($medications, $request->user());
+            $withMedications = $medications->distinct('transport_id')->count('transport_id');
+        }
+
+        return [
+            'today' => (clone $base)->whereDate('departed_at', today())->count(),
+            'in_progress' => (clone $base)->where('status', 'in_progress')->count(),
+            'completed_7d' => (clone $base)
+                ->where('status', 'completed')
+                ->where('departed_at', '>=', now()->subDays(7))
+                ->count(),
+            'with_medications_7d' => $withMedications,
+        ];
+    }
+
     private function formOptions(Request $request): array
     {
-        $vehicles = Asset::vehicles()
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get(['id', 'name', 'asset_tag']);
+        $actor = $request->user();
+        $selectedShift = null;
+        $selectedClient = null;
 
-        $selectedShift = $request->filled('shift_id')
-            ? Shift::query()
-                ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceContext:id,name'])
-                ->find($request->input('shift_id'))
-            : null;
+        if ($request->filled('shift_id')) {
+            $selectedShift = $this->journeyScope->shiftFor($actor, (int) $request->input('shift_id'));
+            $selectedShift->load(['client:id,first_name,last_name,site_id', 'staff:id,name', 'serviceContext:id,name']);
+            abort_unless($selectedShift->client_id && $selectedShift->client, 404);
+            abort_unless((int) $selectedShift->user_id === (int) $actor->id, 404);
+            $selectedClient = $this->journeyScope->clientFor($actor, (int) $selectedShift->client_id);
+            if ($request->filled('client_id')) {
+                abort_unless((int) $request->input('client_id') === (int) $selectedClient->id, 404);
+            }
+        } elseif ($request->filled('client_id')) {
+            $selectedClient = $this->journeyScope->clientFor($actor, (int) $request->input('client_id'));
+        }
 
-        $recentResidents = Schema::hasTable('fleet_resident_transports')
-            ? FleetResidentTransport::query()
+        $vehicleQuery = Asset::query()->vehicles()->where('status', 'active')->orderBy('name');
+        $this->journeyScope->applyVehicleScope($vehicleQuery, $actor);
+        if ($selectedClient?->site_id) {
+            $siteId = (int) $selectedClient->site_id;
+            $clientId = (int) $selectedClient->id;
+            $vehicleQuery->where(function ($vehicle) use ($siteId): void {
+                $vehicle->where('site_id', $siteId)
+                    ->orWhere(fn ($homeSite) => $homeSite->whereNull('site_id')->where('home_site_id', $siteId));
+            })->where(fn ($residentBinding) => $residentBinding
+                ->whereNull('client_id')
+                ->orWhere('client_id', $clientId));
+        } else {
+            $vehicleQuery->whereNull('client_id');
+        }
+        $vehicles = $vehicleQuery->limit(200)->get(['id', 'name', 'asset_tag']);
+
+        $recentResidents = collect();
+        if (Schema::hasTable('fleet_resident_transports')) {
+            $recentQuery = FleetResidentTransport::query()
                 ->select('resident_name')
                 ->distinct()
                 ->orderBy('resident_name')
-                ->limit(100)
-                ->pluck('resident_name')
-            : collect();
-
-        $clients = Schema::hasTable('clients')
-            ? Client::query()
-                ->orderBy('first_name')
-                ->limit(200)
-                ->get(['id', 'first_name', 'last_name'])
-                ->map(fn ($client) => [
-                    'id' => $client->id,
-                    'name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
-                ])->values()
-            : collect();
-
-        $shifts = Shift::query()
-            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
-            ->where('ends_at', '>=', now()->subHours(12))
-            ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceContext:id,name'])
-            ->orderBy('starts_at')
-            ->limit(100)
-            ->get()
-            ->map(fn ($shift) => [
-                'id' => $shift->id,
-                'client_id' => $shift->client_id,
-                'client_name' => $shift->client
-                    ? trim(($shift->client->first_name ?? '') . ' ' . ($shift->client->last_name ?? ''))
-                    : null,
-                'staff_name' => $shift->staff?->name,
-                'starts_at' => optional($shift->starts_at)->toISOString(),
-                'ends_at' => optional($shift->ends_at)->toISOString(),
-                'status' => $shift->status,
-                'shift_type' => $shift->shift_type ?? 'standard',
-                'location' => $shift->location,
-                'service_context' => $shift->serviceContext?->name,
-            ])->values();
-
-        $clientId = $selectedShift?->client_id
-            ?: ($request->filled('client_id') ? (int) $request->input('client_id') : null);
-        $scanClient = $selectedShift?->client;
-        if (! $scanClient && $clientId) {
-            $scanClient = Client::query()->find($clientId, ['id']);
+                ->limit(100);
+            $this->journeyScope->applyTransportScope($recentQuery, $actor);
+            $recentResidents = $recentQuery->pluck('resident_name');
         }
 
+        $clientQuery = Client::query()->orderBy('first_name')->limit(200);
+        $this->journeyScope->applyClientScope($clientQuery, $actor);
+        $clients = $clientQuery
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($client) => [
+                'id' => $client->id,
+                'name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
+            ])->values();
+
+        $shiftQuery = Shift::query()
+            ->whereNotNull('client_id')
+            ->where('user_id', $actor->id)
+            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
+            ->where('ends_at', '>=', now()->subHours(12))
+            ->with(['client:id,first_name,last_name,site_id', 'staff:id,name', 'serviceContext:id,name'])
+            ->orderBy('starts_at')
+            ->limit(100);
+        $this->journeyScope->applyShiftScope($shiftQuery, $actor);
+        if ($selectedClient) {
+            $shiftQuery->where('client_id', $selectedClient->id);
+        }
+        $shifts = $shiftQuery->get()->map(fn ($shift) => [
+            'id' => $shift->id,
+            'client_id' => $shift->client_id,
+            'client_name' => $shift->client
+                ? trim(($shift->client->first_name ?? '').' '.($shift->client->last_name ?? ''))
+                : null,
+            'staff_name' => $shift->staff?->name,
+            'starts_at' => optional($shift->starts_at)->toISOString(),
+            'ends_at' => optional($shift->ends_at)->toISOString(),
+            'status' => $shift->status,
+            'shift_type' => $shift->shift_type ?? 'standard',
+            'location' => $shift->location,
+            'service_context' => $shift->serviceContext?->name,
+        ])->values();
+
         $clientMedications = collect();
-        if ($clientId && Schema::hasTable('client_medications')) {
+        if ($selectedClient && $this->canManageMedicationTransit($actor) && Schema::hasTable('client_medications')) {
             $clientMedications = ClientMedication::query()
-                ->where('client_id', $clientId)
-                ->where('active', true)
-                ->whereNull('ceased_at')
-                ->where(fn ($query) => $query
-                    ->where('is_prn', true)
-                    ->orWhereNotNull('dose_times'))
+                ->active()
+                ->where('client_id', $selectedClient->id)
+                ->where(fn ($query) => $query->where('is_prn', true)->orWhereNotNull('dose_times'))
                 ->get([
-                    'id', 'name', 'dosage', 'frequency', 'is_prn',
-                    'controlled_drug', 'dose_times', 'route', 'instructions',
+                    'id', 'client_id', 'name', 'dosage', 'frequency', 'is_prn',
+                    'controlled_drug', 'witness_required', 'dose_times', 'route', 'instructions',
                     'barcode', 'nzulm_code',
                 ])
                 ->map(fn ($medication) => [
@@ -447,12 +358,11 @@ class ResidentTransportController extends Controller
                     'frequency' => $medication->frequency,
                     'is_prn' => (bool) $medication->is_prn,
                     'controlled_drug' => (bool) $medication->controlled_drug,
+                    'witness_required' => $medication->requiresWitness(),
                     'dose_times' => $medication->dose_times,
                     'route' => $medication->route,
                     'instructions' => $medication->instructions,
-                    'scan_verification' => $scanClient
-                        ? $this->buildMedicationScanPayload($scanClient, $medication)
-                        : null,
+                    'scan_verification' => $this->buildMedicationScanPayload($selectedClient, $medication),
                 ]);
         }
 
@@ -482,8 +392,8 @@ class ResidentTransportController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'asset_id' => ['required', 'integer', 'exists:assets,id'],
-            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'asset_id' => ['required', 'integer'],
+            'shift_id' => ['nullable', 'integer'],
             'resident_name' => ['required', 'string', 'max:255'],
             'transport_type' => ['required', 'string', 'in:medical,respite,community,shopping,appointment,social,other'],
             'pickup_location' => ['nullable', 'string', 'max:255'],
@@ -492,11 +402,12 @@ class ResidentTransportController extends Controller
             'passengers_count' => ['nullable', 'integer', 'min:1', 'max:20'],
             'supervisor_name' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'booking_id' => ['nullable', 'integer', 'exists:fleet_vehicle_bookings,id'],
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            // Medications to pack
+            'booking_id' => ['nullable', 'integer'],
+            'client_id' => ['nullable', 'integer'],
+            'client_request_uuid' => ['nullable', 'uuid'],
             'medications' => ['nullable', 'array'],
-            'medications.*.medication_id' => ['required', 'integer', 'exists:client_medications,id'],
+            'medications.*.medication_id' => ['required', 'integer'],
+            'medications.*.medication_order_version_id' => ['nullable', 'integer'],
             'medications.*.medication_name' => ['required', 'string', 'max:255'],
             'medications.*.is_controlled_drug' => ['required', 'boolean'],
             'medications.*.witness_name' => ['nullable', 'string', 'max:255'],
@@ -510,144 +421,16 @@ class ResidentTransportController extends Controller
             $this->assertCanManageMedicationTransit($request);
         }
 
-        $shift = null;
-        if (! empty($data['shift_id'])) {
-            $shift = Shift::query()->with(['client:id,first_name,last_name,site_id', 'staff:id,name', 'serviceContext:id,name'])->findOrFail($data['shift_id']);
-
-            if (! empty($data['client_id']) && $shift->client_id && (int) $data['client_id'] !== (int) $shift->client_id) {
-                throw ValidationException::withMessages([
-                    'shift_id' => 'The selected shift does not match the selected resident.',
-                ]);
-            }
-
-            $departedAt = \Illuminate\Support\Carbon::parse($data['departed_at']);
-            $allowedStart = $shift->starts_at?->copy()->subHours(2);
-            $allowedEnd = $shift->ends_at?->copy()->addHours(2);
-
-            if (($allowedStart && $departedAt->lt($allowedStart)) || ($allowedEnd && $departedAt->gt($allowedEnd))) {
-                throw ValidationException::withMessages([
-                    'departed_at' => 'Transport must align with the linked shift window. Use a time within two hours of the shift boundary or unlink the transport from the shift.',
-                ]);
-            }
-
-            if (! $this->coverageRoles->userHasRole($request->user(), 'driver')) {
-                throw ValidationException::withMessages([
-                    'asset_id' => 'Only staff with current driver eligibility can log a resident transport against a shift.',
-                ]);
-            }
-
-            if ($shift->client_id) {
-                $data['client_id'] = $shift->client_id;
-                $data['resident_id'] = $shift->client_id;
-                $data['resident_name'] = trim(($shift->client?->first_name ?? '') . ' ' . ($shift->client?->last_name ?? ''));
-            }
-
-            $data['service_context_id'] = $shift->service_context_id;
-            $data['pickup_location'] = $data['pickup_location'] ?: $shift->location;
-        } elseif (! empty($data['client_id'])) {
-            $data['resident_id'] = $data['client_id'];
-        }
-
-        $medicationClient = null;
-        $preparedTransitMedications = [];
-
-        if (! empty($data['medications'])) {
-            if (empty($data['client_id'])) {
-                throw ValidationException::withMessages([
-                    'medications' => 'Select a resident before packing medications for transport.',
-                ]);
-            }
-
-            $medicationClient = Client::query()->findOrFail((int) $data['client_id']);
-            foreach ($data['medications'] as $med) {
-                $medication = $this->resolveTransitMedication(
-                    $medicationClient,
-                    isset($med['medication_id']) ? (int) $med['medication_id'] : null,
-                );
-
-                if (($med['medication_id'] ?? null) && ! $medication) {
-                    throw ValidationException::withMessages([
-                        'medications' => 'One or more selected medications do not belong to this resident.',
-                    ]);
-                }
-
-                $isControlledDrug = (bool) ($medication?->controlled_drug ?? $med['is_controlled_drug']);
-
-                if ($isControlledDrug && blank($med['witness_name'] ?? null)) {
-                    throw ValidationException::withMessages([
-                        'medications' => 'Controlled drugs require a packing witness name before transport can be logged.',
-                    ]);
-                }
-
-                $preparedTransitMedications[] = [
-                    'payload' => $med,
-                    'medication' => $medication,
-                    'scan_audit' => $medication
-                        ? $this->verifyMedicationScanOrFail($medicationClient, $medication, $med, 'medications')
-                        : null,
-                ];
-            }
-        }
-
-        $data['driver_user_id'] = $request->user()->id;
-        $data['status'] = 'in_progress';
-        $data['passengers_count'] = $data['passengers_count'] ?? 1;
-        $clientSnapshot = ! $shift && ! empty($data['client_id'])
-            ? $this->snapshots->snapshotForClient(
-                Client::query()->with(['site:id,name', 'serviceContext:id,name'])->find((int) $data['client_id']),
-                $request->user(),
-                $data['pickup_location'] ?? null,
-            )
-            : null;
-        $transport = DB::transaction(function () use (
-            $data,
-            $shift,
-            $request,
-            $clientSnapshot,
-            $preparedTransitMedications,
-            $medicationClient
-        ) {
-            $transport = FleetResidentTransport::create([
-                ...collect($data)->except(['medications', 'client_id'])->toArray(),
-                ...($shift
-                    ? $this->snapshots->transportSnapshotForShift($shift, $request->user())
-                    : [
-                        'site_id' => $clientSnapshot['site_id'] ?? null,
-                        'site_name_snapshot' => $clientSnapshot['site_name'] ?? null,
-                        'shift_location_snapshot' => $clientSnapshot['location'] ?? null,
-                        'service_context_name_snapshot' => $clientSnapshot['service_context_name'] ?? null,
-                        'driver_name_snapshot' => $clientSnapshot['staff_name'] ?? $request->user()->name,
-                    ]),
-            ]);
-
-            if ($medicationClient && Schema::hasTable('fleet_medication_transit_logs')) {
-                foreach ($preparedTransitMedications as $preparedMedication) {
-                    $this->createTransitMedicationLog(
-                        $transport,
-                        $medicationClient,
-                        $request,
-                        $preparedMedication['payload'],
-                        $preparedMedication['medication'],
-                        $preparedMedication['scan_audit'],
-                    );
-                }
-            }
-
-            return $transport;
-        });
-
-        AuditLogger::log('fleet.transport.create', $transport, [
-            'asset_id' => $data['asset_id'],
-            'resident_name' => $data['resident_name'],
-            'medications_packed' => count($data['medications'] ?? []),
-        ]);
+        $result = $this->journeys->create($request->user(), $data);
+        $transport = $result['transport'];
 
         return redirect()->route('fleet-assets.transports.show', $transport)
-            ->with('success', 'Transport log created.');
+            ->with('success', $result['replayed'] ? 'Transport log already created.' : 'Transport log created.');
     }
 
     public function show(Request $request, FleetResidentTransport $transport)
     {
+        $transport = $this->journeyScope->transportFor($request->user(), (int) $transport->id);
         $transport->load(['asset:id,name,asset_tag', 'driver:id,name,email', 'booking']);
         $transport->load([
             'shift:id,client_id,user_id,starts_at,ends_at,shift_type,location,service_context_id',
@@ -660,7 +443,7 @@ class ResidentTransportController extends Controller
         // Reads from canonical device linked to the transport vehicle via device_asset_links.
         $vehiclePosition = null;
         if ($transport->status === 'in_progress' && $transport->asset_id) {
-            $vehicleDevice = \App\Domain\SecurityDevices\Models\DeviceAssetLink::query()
+            $vehicleDevice = DeviceAssetLink::query()
                 ->active()
                 ->forAsset($transport->asset_id)
                 ->with('device')
@@ -693,8 +476,13 @@ class ResidentTransportController extends Controller
 
         // Care needs (from client support plan if available)
         $careNeeds = [];
+        $canViewCareContext = $this->journeyScope->canViewResidentCareContext($request->user());
         $clientId = $transport->resident_id;
-        if ($clientId && Schema::hasTable('client_support_plan_items')) {
+        if (
+            $clientId
+            && $canViewCareContext
+            && Schema::hasTable('client_support_plan_items')
+        ) {
             $careNeeds = DB::table('client_support_plan_items')
                 ->where('client_id', $clientId)
                 ->whereIn('category', ['transport', 'mobility'])
@@ -710,16 +498,16 @@ class ResidentTransportController extends Controller
         }
 
         $canManageMedicationTransit = $this->canManageMedicationTransit($request->user());
-        $transportClient = $transport->resident_id
-            ? Client::query()->find($transport->resident_id, ['id', 'first_name', 'last_name'])
+        $canViewMedicationTransit = $this->journeyScope->canViewMedicationTransit($request->user());
+        $transportClient = $transport->resident_id && $canViewMedicationTransit
+            ? $this->journeyScope->clientFor($request->user(), (int) $transport->resident_id)
             : null;
 
         $availableMedications = [];
-        if ($transportClient && Schema::hasTable('client_medications')) {
+        if ($transportClient && $canManageMedicationTransit && Schema::hasTable('client_medications')) {
             $availableMedications = ClientMedication::query()
+                ->active()
                 ->where('client_id', $transportClient->id)
-                ->where('active', true)
-                ->whereNull('ceased_at')
                 ->where(function ($query) {
                     $query->where('is_prn', true)
                         ->orWhereNotNull('dose_times');
@@ -731,6 +519,7 @@ class ResidentTransportController extends Controller
                     'frequency',
                     'is_prn',
                     'controlled_drug',
+                    'witness_required',
                     'dose_times',
                     'route',
                     'instructions',
@@ -742,6 +531,7 @@ class ResidentTransportController extends Controller
                     'frequency' => $medication->frequency,
                     'is_prn' => (bool) $medication->is_prn,
                     'controlled_drug' => (bool) $medication->controlled_drug,
+                    'witness_required' => $medication->requiresWitness(),
                     'dose_times' => $medication->dose_times,
                     'route' => $medication->route,
                     'instructions' => $medication->instructions,
@@ -752,8 +542,8 @@ class ResidentTransportController extends Controller
         }
 
         $transitLogs = [];
-        if (Schema::hasTable('fleet_medication_transit_logs')) {
-            $transitLogs = FleetMedicationTransitLog::query()
+        if ($canViewMedicationTransit && Schema::hasTable('fleet_medication_transit_logs')) {
+            $transitQuery = FleetMedicationTransitLog::query()
                 ->with([
                     'client:id,first_name,last_name',
                     'medication:id,client_id,name,dosage,barcode,nzulm_code',
@@ -762,17 +552,19 @@ class ResidentTransportController extends Controller
                     'witnessedBy:id,name',
                 ])
                 ->where('transport_id', $transport->id)
-                ->orderByDesc('packed_at')
-                ->get()
+                ->orderByDesc('packed_at');
+            $this->journeyScope->applyMedicationTransitScope($transitQuery, $request->user());
+            $transitLogs = $transitQuery->get()
                 ->map(fn ($log) => [
                     'id' => $log->id,
                     'client' => $log->client ? [
                         'id' => $log->client->id,
-                        'name' => trim(($log->client->first_name ?? '') . ' ' . ($log->client->last_name ?? '')),
+                        'name' => trim(($log->client->first_name ?? '').' '.($log->client->last_name ?? '')),
                     ] : null,
                     'medication_id' => $log->medication_id,
                     'medication_name' => $log->medication_name,
                     'is_controlled_drug' => $log->is_controlled_drug,
+                    'witness_required' => $log->witness_required,
                     'packed_witness_name' => $log->packed_witness_name,
                     'packed_by' => $log->packedBy ? [
                         'id' => $log->packedBy->id,
@@ -800,9 +592,8 @@ class ResidentTransportController extends Controller
         }
 
         $witnesses = $canManageMedicationTransit
-            ? User::query()
-                ->orderBy('name')
-                ->get(['id', 'name'])
+            ? $this->journeyScope
+                ->medicationWitnessesForSite((int) $transport->site_id, (int) $request->user()->id)
                 ->map(fn ($user) => [
                     'id' => $user->id,
                     'name' => $user->name,
@@ -823,7 +614,7 @@ class ResidentTransportController extends Controller
                 'driver' => $transport->driver ? [
                     'id' => $transport->driver->id,
                     'name' => $transport->driver->name,
-                    'email' => $transport->driver->email,
+                    'email' => $canViewCareContext ? $transport->driver->email : null,
                 ] : null,
                 'booking' => $transport->booking ? [
                     'id' => $transport->booking->id,
@@ -847,8 +638,8 @@ class ResidentTransportController extends Controller
                 'departed_at' => optional($transport->departed_at)->toISOString(),
                 'arrived_at' => optional($transport->arrived_at)->toISOString(),
                 'passengers_count' => $transport->passengers_count,
-                'supervisor_name' => $transport->supervisor_name,
-                'notes' => $transport->notes,
+                'supervisor_name' => $canViewCareContext ? $transport->supervisor_name : null,
+                'notes' => $canViewCareContext ? $transport->notes : null,
                 'status' => $transport->status,
                 'duration_minutes' => $transport->duration_minutes,
                 'created_at' => optional($transport->created_at)->toISOString(),
@@ -856,11 +647,11 @@ class ResidentTransportController extends Controller
             'vehicle_position' => $vehiclePosition,
             'pre_check_status' => $preCheckStatus,
             'care_needs' => $careNeeds,
-            'completion_blockers' => $this->getCompletionBlockers($transport),
+            'completion_blockers' => $this->getCompletionBlockers($request, $transport),
             'medication_context' => [
                 'client' => $transportClient ? [
                     'id' => $transportClient->id,
-                    'name' => trim(($transportClient->first_name ?? '') . ' ' . ($transportClient->last_name ?? '')),
+                    'name' => trim(($transportClient->first_name ?? '').' '.($transportClient->last_name ?? '')),
                 ] : null,
                 'available_medications' => $availableMedications,
                 'transit_logs' => $transitLogs,
@@ -870,7 +661,7 @@ class ResidentTransportController extends Controller
         ]);
     }
 
-    private function getCompletionBlockers(FleetResidentTransport $transport): array
+    private function getCompletionBlockers(Request $request, FleetResidentTransport $transport): array
     {
         $blockers = [];
 
@@ -879,8 +670,9 @@ class ResidentTransportController extends Controller
         }
 
         if (Schema::hasTable('fleet_medication_transit_logs')) {
-            $unresolvedMeds = FleetMedicationTransitLog::query()
-                ->where('transport_id', $transport->id)
+            $unresolvedQuery = FleetMedicationTransitLog::query()->where('transport_id', $transport->id);
+            $this->journeyScope->applyMedicationTransitScope($unresolvedQuery, $request->user());
+            $unresolvedMeds = $unresolvedQuery
                 ->whereNull('administered_at')
                 ->whereNull('returned_to_house_at')
                 ->count();
@@ -893,8 +685,9 @@ class ResidentTransportController extends Controller
                 ];
             }
 
-            $controlledMissingWitness = FleetMedicationTransitLog::query()
-                ->where('transport_id', $transport->id)
+            $controlledQuery = FleetMedicationTransitLog::query()->where('transport_id', $transport->id);
+            $this->journeyScope->applyMedicationTransitScope($controlledQuery, $request->user());
+            $controlledMissingWitness = $controlledQuery
                 ->where('is_controlled_drug', true)
                 ->whereNotNull('administered_at')
                 ->whereNull('witnessed_by_user_id')
@@ -914,32 +707,21 @@ class ResidentTransportController extends Controller
 
     public function complete(Request $request, FleetResidentTransport $transport)
     {
+        $transport = $this->journeyScope->mutableTransportFor($request->user(), (int) $transport->id);
         $data = $request->validate([
             'arrived_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'client_request_uuid' => ['nullable', 'uuid'],
         ]);
 
-        // Verify all medications are accounted for (administered or returned)
-        $unresolvedMeds = FleetMedicationTransitLog::query()
-            ->where('transport_id', $transport->id)
-            ->whereNull('administered_at')
-            ->whereNull('returned_to_house_at')
-            ->count();
-
-        if ($unresolvedMeds > 0) {
-            return back()->with('error', "Cannot complete transport: {$unresolvedMeds} medication(s) still unresolved. All medications must be administered or returned to house first.");
+        try {
+            $result = $this->journeys->complete($request->user(), (int) $transport->id, $data);
+        } catch (ValidationException $exception) {
+            return back()->with('error', collect($exception->errors())->flatten()->first());
         }
 
-        $transport->update([
-            'status' => 'completed',
-            'arrived_at' => $data['arrived_at'] ?? now(),
-            'notes' => $data['notes'] ?? $transport->notes,
-        ]);
-
-        AuditLogger::log('fleet.transport.complete', $transport);
-
-        return redirect()->route('fleet-assets.transports.show', $transport)
-            ->with('success', 'Transport marked as completed.');
+        return redirect()->route('fleet-assets.transports.show', $result['transport'])
+            ->with('success', $result['replayed'] ? 'Transport was already marked as completed.' : 'Transport marked as completed.');
     }
 
     /* ------------------------------------------------------------------
@@ -948,15 +730,22 @@ class ResidentTransportController extends Controller
 
     public function medicationIndex(Request $request)
     {
+        abort_unless(
+            $this->journeyScope->canViewMedicationTransit($request->user()),
+            403,
+            'You do not have permission to view medications in transit.',
+        );
         $selectedTransport = null;
 
         if ($request->filled('transport_id') && Schema::hasTable('fleet_resident_transports')) {
-            $selectedTransport = FleetResidentTransport::query()
-                ->with(['asset:id,name,asset_tag'])
-                ->find((int) $request->input('transport_id'));
+            $selectedTransport = $this->journeyScope->transportFor(
+                $request->user(),
+                (int) $request->input('transport_id'),
+            );
+            $selectedTransport->load(['asset:id,name,asset_tag']);
         }
 
-        if (!Schema::hasTable('fleet_medication_transit_logs')) {
+        if (! Schema::hasTable('fleet_medication_transit_logs')) {
             return Inertia::render('fleet-assets/transports/medications', [
                 'logs' => ['data' => [], 'links' => [], 'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0]],
                 'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status', 'transport_id']),
@@ -993,12 +782,14 @@ class ResidentTransportController extends Controller
                 'witnessedBy:id,name',
                 'medication',
             ]);
+        $this->journeyScope->applyMedicationTransitScope($query, $request->user());
 
         if ($request->filled('transport_id')) {
             $query->where('transport_id', (int) $request->input('transport_id'));
         }
 
         if ($request->filled('client_id')) {
+            $this->journeyScope->clientFor($request->user(), (int) $request->input('client_id'));
             $query->where('client_id', (int) $request->input('client_id'));
         }
 
@@ -1007,7 +798,7 @@ class ResidentTransportController extends Controller
         }
 
         if ($request->filled('date_to')) {
-            $query->where('packed_at', '<=', $request->input('date_to') . ' 23:59:59');
+            $query->where('packed_at', '<=', $request->input('date_to').' 23:59:59');
         }
 
         if ($request->filled('status')) {
@@ -1024,13 +815,14 @@ class ResidentTransportController extends Controller
         // CSV export for compliance
         if ($request->input('export') === 'csv') {
             $exportQuery = (clone $query)->latest('packed_at');
+
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
                 $this->putCsv($handle, ['ID', 'Resident', 'Medication', 'Controlled Drug', 'Packed By', 'Packing Witness', 'Packed At', 'Administered By', 'Administered At', 'Witnessed By', 'Returned At', 'Notes']);
                 foreach ($exportQuery->lazy(200) as $log) {
                     $this->putCsv($handle, [
                         $log->id,
-                        trim(($log->client?->first_name ?? '') . ' ' . ($log->client?->last_name ?? '')),
+                        trim(($log->client?->first_name ?? '').' '.($log->client?->last_name ?? '')),
                         $log->medication_name,
                         $log->is_controlled_drug ? 'Yes' : 'No',
                         $log->packedBy?->name ?? '',
@@ -1044,26 +836,35 @@ class ResidentTransportController extends Controller
                     ]);
                 }
                 fclose($handle);
-            }, 'medication-transit-audit-' . now()->format('Y-m-d') . '.csv');
+            }, 'medication-transit-audit-'.now()->format('Y-m-d').'.csv');
         }
 
         $logs = $query->latest('packed_at')->paginate(25)->withQueryString();
 
         // Stats
         $today = now()->startOfDay();
-        $totalPackedToday = FleetMedicationTransitLog::where('packed_at', '>=', $today)->count();
-        $controlledDrugsOut = FleetMedicationTransitLog::where('is_controlled_drug', true)
+        $statsQuery = FleetMedicationTransitLog::query();
+        $this->journeyScope->applyMedicationTransitScope($statsQuery, $request->user());
+        $totalPackedToday = (clone $statsQuery)->where('packed_at', '>=', $today)->count();
+        $controlledDrugsOut = (clone $statsQuery)
+            ->where('is_controlled_drug', true)
+            ->whereNull('administered_at')
             ->whereNull('returned_to_house_at')
             ->count();
-        $awaitingReturn = FleetMedicationTransitLog::whereNull('returned_to_house_at')->count();
+        $awaitingReturn = (clone $statsQuery)
+            ->whereNull('administered_at')
+            ->whereNull('returned_to_house_at')
+            ->count();
 
         $clients = [];
         if (Schema::hasTable('clients')) {
-            $clients = Client::query()->orderBy('first_name')->limit(200)
+            $clientQuery = Client::query()->orderBy('first_name')->limit(200);
+            $this->journeyScope->applyClientScope($clientQuery, $request->user());
+            $clients = $clientQuery
                 ->get(['id', 'first_name', 'last_name'])
                 ->map(fn ($c) => [
                     'id' => $c->id,
-                    'name' => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+                    'name' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
                 ]);
         }
 
@@ -1086,11 +887,12 @@ class ResidentTransportController extends Controller
                     ] : null,
                     'client' => $log->client ? [
                         'id' => $log->client->id,
-                        'name' => trim(($log->client->first_name ?? '') . ' ' . ($log->client->last_name ?? '')),
+                        'name' => trim(($log->client->first_name ?? '').' '.($log->client->last_name ?? '')),
                     ] : null,
                     'medication_id' => $log->medication_id,
                     'medication_name' => $log->medication_name,
                     'is_controlled_drug' => $log->is_controlled_drug,
+                    'witness_required' => $log->witness_required,
                     'packed_witness_name' => $log->packed_witness_name,
                     'packed_by' => $log->packedBy ? ['id' => $log->packedBy->id, 'name' => $log->packedBy->name] : null,
                     'packed_at' => optional($log->packed_at)->toISOString(),
@@ -1113,7 +915,10 @@ class ResidentTransportController extends Controller
             ],
             'filters' => $request->only(['date_from', 'date_to', 'client_id', 'status', 'transport_id']),
             'clients' => $clients,
-            'witnesses' => User::query()->orderBy('name')->get(['id', 'name'])->map(fn ($user) => [
+            'witnesses' => $this->journeyScope->medicationWitnessesFor(
+                $request->user(),
+                (int) $request->user()->id,
+            )->map(fn ($user) => [
                 'id' => $user->id,
                 'name' => $user->name,
             ])->values(),
@@ -1141,10 +946,12 @@ class ResidentTransportController extends Controller
     public function packMedication(Request $request, FleetResidentTransport $transport)
     {
         $this->assertCanManageMedicationTransit($request);
+        $transport = $this->journeyScope->transportFor($request->user(), (int) $transport->id);
 
         $data = $request->validate([
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
-            'medication_id' => ['nullable', 'integer', 'exists:client_medications,id'],
+            'client_id' => ['required', 'integer'],
+            'medication_id' => ['required', 'integer'],
+            'medication_order_version_id' => ['nullable', 'integer'],
             'medication_name' => ['required', 'string', 'max:255'],
             'is_controlled_drug' => ['required', 'boolean'],
             'witness_name' => ['nullable', 'string', 'max:255'],
@@ -1159,54 +966,12 @@ class ResidentTransportController extends Controller
             'queued_offline' => ['nullable', 'boolean'],
         ]);
 
-        $scope = "fleet-medication-pack:{$transport->id}";
-
-        if (
-            $this->medicationSyncRequested($data)
-            && ($cached = $this->getCachedMedicationSyncResponse($scope, $data))
-        ) {
-            return response()->json($cached);
-        }
-
-        $client = Client::query()->findOrFail((int) $data['client_id']);
-
-        if ($transport->resident_id && (int) $transport->resident_id !== (int) $client->id) {
-            throw ValidationException::withMessages([
-                'client_id' => 'Only medications for the resident assigned to this transport can be packed here.',
-            ]);
-        }
-
-        $medication = $this->resolveTransitMedication(
-            $client,
-            isset($data['medication_id']) ? (int) $data['medication_id'] : null,
-        );
-
-        if (($data['medication_id'] ?? null) && ! $medication) {
-            throw ValidationException::withMessages([
-                'medication_id' => 'The selected medication does not belong to this resident.',
-            ]);
-        }
-
-        $isControlledDrug = (bool) ($medication?->controlled_drug ?? $data['is_controlled_drug']);
-
-        if ($isControlledDrug && blank($data['witness_name'] ?? null)) {
-            throw ValidationException::withMessages([
-                'witness_name' => 'Controlled drugs require a packing witness name.',
-            ]);
-        }
-
-        $scanAudit = $medication
-            ? $this->verifyMedicationScanOrFail($client, $medication, $data)
-            : null;
-
-        $log = $this->createTransitMedicationLog(
-            $transport,
-            $client,
-            $request,
+        $result = $this->journeys->packMedication(
+            $request->user(),
+            (int) $transport->id,
             $data,
-            $medication,
-            $scanAudit,
         );
+        $log = $result['log'];
 
         $payload = [
             'success' => true,
@@ -1221,18 +986,10 @@ class ResidentTransportController extends Controller
             ],
         ];
 
-        if ($this->medicationSyncRequested($data)) {
-            return response()->json(
-                $this->rememberMedicationSyncResponse(
-                    $scope,
-                    $data,
-                    $this->withMedicationSync(
-                        $payload,
-                        $data,
-                        $this->medicationProcessedStatus($data),
-                    ),
-                ),
-            );
+        if (filled($data['client_request_uuid'] ?? null)) {
+            $payload['sync'] = $this->syncPayload($data, $result['replayed']);
+
+            return response()->json($payload);
         }
 
         return back()->with('success', 'Medication packed for transit.');
@@ -1241,9 +998,11 @@ class ResidentTransportController extends Controller
     public function administerMedication(Request $request, FleetMedicationTransitLog $log)
     {
         $this->assertCanManageMedicationTransit($request);
+        $log = $this->journeyScope->medicationTransitLogFor($request->user(), (int) $log->id);
 
         $rules = [
-            'witnessed_by_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'witnessed_by_user_id' => ['nullable', 'integer'],
+            'witness_credential' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'scan_code' => ['nullable', 'string', 'max:255'],
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
@@ -1255,84 +1014,14 @@ class ResidentTransportController extends Controller
             'queued_offline' => ['nullable', 'boolean'],
         ];
 
-        // NZ regulation: controlled drugs require a witness
-        if ($log->is_controlled_drug) {
-            $rules['witnessed_by_user_id'] = ['required', 'integer', 'exists:users,id'];
-        }
-
         $data = $request->validate($rules);
 
-        $scope = "fleet-medication-administer:{$log->id}";
-
-        if (
-            $this->medicationSyncRequested($data)
-            && ($cached = $this->getCachedMedicationSyncResponse($scope, $data))
-        ) {
-            return response()->json($cached);
-        }
-
-        if ($log->returned_to_house_at) {
-            $message = 'This medication was already returned before the current administration request could be applied.';
-
-            if ($this->medicationSyncRequested($data)) {
-                return response()->json(
-                    $this->buildMedicationConflictPayload($data, $message),
-                    409,
-                );
-            }
-
-            return back()->with('error', $message);
-        }
-
-        if ($log->administered_at) {
-            $message = 'This medication administration was already recorded before the current request could be applied.';
-
-            if ($this->medicationSyncRequested($data)) {
-                return response()->json(
-                    $this->buildMedicationConflictPayload($data, $message),
-                    409,
-                );
-            }
-
-            return back()->with('error', $message);
-        }
-
-        if (
-            $log->is_controlled_drug
-            && isset($data['witnessed_by_user_id'])
-            && (int) $data['witnessed_by_user_id'] === (int) $request->user()->id
-        ) {
-            throw ValidationException::withMessages([
-                'witnessed_by_user_id' => 'Witness must be a different user.',
-            ]);
-        }
-
-        $log->loadMissing(['client', 'medication']);
-        $scanAudit = ($log->client && $log->medication)
-            ? $this->verifyMedicationScanOrFail($log->client, $log->medication, $data)
-            : null;
-
-        $log->update([
-            'administered_at' => now(),
-            'administered_by_user_id' => $request->user()->id,
-            'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
-            'notes' => $data['notes'] ?? $log->notes,
-        ]);
-
-        AuditLogger::log('fleet.medication.administer', $log, [
-            'medication_name' => $log->medication_name,
-            'controlled_drug' => $log->is_controlled_drug,
-            'scan_source' => $scanAudit['scan_source'] ?? null,
-            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
-            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
-            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
-        ]);
-
-        app(MedicationIncidentIntegrationService::class)->resolveTransitException(
-            $log,
-            'Medication administered during transit.',
-            $request->user()->id
+        $result = $this->journeys->administerMedication(
+            $request->user(),
+            (int) $log->id,
+            $data,
         );
+        $log = $result['log'];
 
         $payload = [
             'success' => true,
@@ -1345,18 +1034,10 @@ class ResidentTransportController extends Controller
             ],
         ];
 
-        if ($this->medicationSyncRequested($data)) {
-            return response()->json(
-                $this->rememberMedicationSyncResponse(
-                    $scope,
-                    $data,
-                    $this->withMedicationSync(
-                        $payload,
-                        $data,
-                        $this->medicationProcessedStatus($data),
-                    ),
-                ),
-            );
+        if (filled($data['client_request_uuid'] ?? null)) {
+            $payload['sync'] = $this->syncPayload($data, $result['replayed']);
+
+            return response()->json($payload);
         }
 
         return back()->with('success', 'Medication administration recorded.');
@@ -1365,6 +1046,7 @@ class ResidentTransportController extends Controller
     public function returnMedication(Request $request, FleetMedicationTransitLog $log)
     {
         $this->assertCanManageMedicationTransit($request);
+        $log = $this->journeyScope->medicationTransitLogFor($request->user(), (int) $log->id);
 
         $data = $request->validate([
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -1378,51 +1060,12 @@ class ResidentTransportController extends Controller
             'queued_offline' => ['nullable', 'boolean'],
         ]);
 
-        $scope = "fleet-medication-return:{$log->id}";
-
-        if (
-            $this->medicationSyncRequested($data)
-            && ($cached = $this->getCachedMedicationSyncResponse($scope, $data))
-        ) {
-            return response()->json($cached);
-        }
-
-        if ($log->returned_to_house_at) {
-            $message = 'This medication return was already recorded before the current request could be applied.';
-
-            if ($this->medicationSyncRequested($data)) {
-                return response()->json(
-                    $this->buildMedicationConflictPayload($data, $message),
-                    409,
-                );
-            }
-
-            return back()->with('error', $message);
-        }
-
-        $log->loadMissing(['client', 'medication']);
-        $scanAudit = ($log->client && $log->medication)
-            ? $this->verifyMedicationScanOrFail($log->client, $log->medication, $data)
-            : null;
-
-        $log->update([
-            'returned_to_house_at' => now(),
-            'notes' => $data['notes'] ?? $log->notes,
-        ]);
-
-        AuditLogger::log('fleet.medication.return', $log, [
-            'medication_name' => $log->medication_name,
-            'scan_source' => $scanAudit['scan_source'] ?? null,
-            'scan_match_source' => $scanAudit['scan_match_source'] ?? null,
-            'scan_match_label' => $scanAudit['scan_match_label'] ?? null,
-            'entered_code_suffix' => $scanAudit['scan_code_suffix'] ?? null,
-        ]);
-
-        app(MedicationIncidentIntegrationService::class)->resolveTransitException(
-            $log,
-            'Medication returned from transit.',
-            $request->user()->id
+        $result = $this->journeys->returnMedication(
+            $request->user(),
+            (int) $log->id,
+            $data,
         );
+        $log = $result['log'];
 
         $payload = [
             'success' => true,
@@ -1434,21 +1077,26 @@ class ResidentTransportController extends Controller
             ],
         ];
 
-        if ($this->medicationSyncRequested($data)) {
-            return response()->json(
-                $this->rememberMedicationSyncResponse(
-                    $scope,
-                    $data,
-                    $this->withMedicationSync(
-                        $payload,
-                        $data,
-                        $this->medicationProcessedStatus($data),
-                    ),
-                ),
-            );
+        if (filled($data['client_request_uuid'] ?? null)) {
+            $payload['sync'] = $this->syncPayload($data, $result['replayed']);
+
+            return response()->json($payload);
         }
 
         return back()->with('success', 'Medication returned to house.');
+    }
+
+    private function syncPayload(array $data, bool $replayed): array
+    {
+        return array_filter([
+            'status' => $replayed ? 'duplicate' : (($data['queued_offline'] ?? false) ? 'synced' : 'processed'),
+            'duplicate' => $replayed,
+            'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+            'client_request_uuid' => $data['client_request_uuid'] ?? null,
+            'captured_offline_at' => $data['captured_offline_at'] ?? null,
+            'origin_device_id' => $data['origin_device_id'] ?? null,
+            'message' => $replayed ? 'This medication request was already processed.' : null,
+        ], fn ($value) => $value !== null);
     }
 
     /* ------------------------------------------------------------------
@@ -1457,6 +1105,7 @@ class ResidentTransportController extends Controller
 
     public function preCheck(Request $request, FleetResidentTransport $transport)
     {
+        $transport = $this->journeyScope->transportFor($request->user(), (int) $transport->id);
         $transport->load(['asset:id,name,asset_tag']);
 
         // Check if pre-check already completed
@@ -1472,13 +1121,19 @@ class ResidentTransportController extends Controller
         $emergencyContacts = [];
         $medications = [];
 
-        $client = $transport->resident_id ? \App\Models\Client::find($transport->resident_id) : null;
+        $client = $transport->resident_id
+            ? $this->journeyScope->clientFor($request->user(), (int) $transport->resident_id)
+            : null;
 
         if ($client) {
             // Care needs from support plan
-            if (Schema::hasTable('client_support_plan_items')) {
+            if (
+                $this->journeyScope->canViewResidentCareContext($request->user())
+                && Schema::hasTable('client_support_plan_items')
+            ) {
                 $careNeeds = DB::table('client_support_plan_items')
                     ->where('client_id', $client->id)
+                    ->whereIn('category', ['transport', 'mobility'])
                     ->select('id', 'label', 'notes')
                     ->limit(20)
                     ->get()
@@ -1491,7 +1146,10 @@ class ResidentTransportController extends Controller
             }
 
             // Emergency contacts
-            if (Schema::hasTable('client_emergency_contacts')) {
+            if (
+                $this->journeyScope->canViewResidentCareContext($request->user())
+                && Schema::hasTable('client_emergency_contacts')
+            ) {
                 $emergencyContacts = DB::table('client_emergency_contacts')
                     ->where('client_id', $client->id)
                     ->select('name', 'relation', 'phone')
@@ -1506,10 +1164,13 @@ class ResidentTransportController extends Controller
             }
 
             // Medications
-            if (Schema::hasTable('client_medications')) {
-                $medications = DB::table('client_medications')
+            if (
+                $this->journeyScope->canViewMedicationTransit($request->user())
+                && Schema::hasTable('client_medications')
+            ) {
+                $medications = ClientMedication::query()
+                    ->active()
                     ->where('client_id', $client->id)
-                    ->where('is_active', true)
                     ->select('name', 'dosage', 'frequency')
                     ->limit(20)
                     ->get()
@@ -1543,30 +1204,20 @@ class ResidentTransportController extends Controller
 
     public function savePreCheck(Request $request, FleetResidentTransport $transport)
     {
+        $transport = $this->journeyScope->mutableTransportFor($request->user(), (int) $transport->id);
         $data = $request->validate([
             'checks' => ['required', 'array'],
             'checks.*' => ['nullable', 'boolean'],
+            'client_request_uuid' => ['nullable', 'uuid'],
         ]);
 
-        // Store the pre-check result
-        if (Schema::hasTable('fleet_transport_pre_checks')) {
-            DB::table('fleet_transport_pre_checks')->updateOrInsert(
-                ['transport_id' => $transport->id],
-                [
-                    'checks' => json_encode($data['checks']),
-                    'completed_by_user_id' => $request->user()->id,
-                    'completed_at' => now(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]
-            );
-        }
+        $result = $this->journeys->savePreCheck(
+            $request->user(),
+            (int) $transport->id,
+            $data,
+        );
 
-        AuditLogger::log('fleet.transport.pre_check', $transport, [
-            'checks' => $data['checks'],
-        ]);
-
-        return redirect()->route('fleet-assets.transports.show', $transport)
-            ->with('success', 'Pre-transport safety check completed.');
+        return redirect()->route('fleet-assets.transports.show', $result['transport'])
+            ->with('success', $result['replayed'] ? 'Pre-transport safety check was already completed.' : 'Pre-transport safety check completed.');
     }
 }

@@ -192,6 +192,7 @@ export default function TransportShow({
     const completeForm = useForm({
         arrived_at: toDatetimeLocal(new Date()),
         notes: '',
+        client_request_uuid: crypto.randomUUID(),
     });
 
     useEffect(() => {

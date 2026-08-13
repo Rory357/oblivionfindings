@@ -122,6 +122,7 @@ export default function TransportPreCheck({
     });
 
     const [submitting, setSubmitting] = useState(false);
+    const [clientRequestUuid] = useState(() => crypto.randomUUID());
 
     const toggleCheck = (key: string, value: boolean) => {
         setChecks((prev) => ({ ...prev, [key]: value }));
@@ -139,7 +140,7 @@ export default function TransportPreCheck({
         setSubmitting(true);
         router.post(
             `/fleet-assets/transports/${t.id}/pre-check`,
-            { checks },
+            { checks, client_request_uuid: clientRequestUuid },
             {
                 preserveScroll: true,
                 onFinish: () => setSubmitting(false),

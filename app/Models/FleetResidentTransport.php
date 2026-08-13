@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyStorageContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FleetResidentTransport extends Model
 {
@@ -14,6 +15,7 @@ class FleetResidentTransport extends Model
 
     protected $fillable = [
         'asset_id',
+        'journey_uuid',
         'booking_id',
         'shift_id',
         'site_id',
@@ -30,6 +32,7 @@ class FleetResidentTransport extends Model
         'supervisor_name',
         'notes',
         'status',
+        'version',
         'review_required',
         'review_reason',
         'review_flagged_at',
@@ -46,6 +49,7 @@ class FleetResidentTransport extends Model
         'passengers_count' => 'integer',
         'review_required' => 'boolean',
         'review_flagged_at' => 'datetime',
+        'version' => 'integer',
     ];
 
     public function asset(): BelongsTo
@@ -88,9 +92,14 @@ class FleetResidentTransport extends Model
         return $this->belongsTo(Client::class, 'resident_id');
     }
 
+    public function events(): HasMany
+    {
+        return $this->hasMany(FleetResidentTransportEvent::class, 'transport_id');
+    }
+
     public function getDurationMinutesAttribute(): ?float
     {
-        if (!$this->departed_at || !$this->arrived_at) {
+        if (! $this->departed_at || ! $this->arrived_at) {
             return null;
         }
 

@@ -50,6 +50,7 @@ export type ClientMedication = {
     frequency: string | null;
     is_prn: boolean;
     controlled_drug: boolean;
+    witness_required: boolean;
     dose_times: string[] | null;
     route: string | null;
     instructions: string | null;
@@ -207,6 +208,7 @@ export function TransportWizard({
             medication_id: number;
             medication_name: string;
             is_controlled_drug: boolean;
+            witness_required: boolean;
             witness_name: string;
             scan_code: string | null;
             scan_source: 'manual' | 'scanner' | null;
@@ -227,6 +229,9 @@ export function TransportWizard({
     >({});
     const [submitMode, setSubmitMode] = useState<'transport' | 'pack'>(
         'transport',
+    );
+    const [clientRequestUuid, setClientRequestUuid] = useState(() =>
+        crypto.randomUUID(),
     );
     const [stepIndex, setStepIndex] = useState(0);
 
@@ -392,6 +397,8 @@ export function TransportWizard({
                               medication_name:
                                   m.name + (m.dosage ? ` ${m.dosage}` : ''),
                               is_controlled_drug: m.controlled_drug,
+                              witness_required:
+                                  m.witness_required || m.controlled_drug,
                               witness_name: witnessNames[m.id] ?? '',
                               scan_code:
                                   scanCaptures[m.id]?.code?.trim() || null,
@@ -416,7 +423,7 @@ export function TransportWizard({
 
             if (mode === 'pack') {
                 const missingWitness = medications.find(
-                    (m) => m.is_controlled_drug && !m.witness_name.trim(),
+                    (m) => m.witness_required && !m.witness_name.trim(),
                 );
                 if (missingWitness) {
                     form.setError(
@@ -453,10 +460,14 @@ export function TransportWizard({
             form.transform((data) => ({
                 ...data,
                 medications,
+                client_request_uuid: clientRequestUuid,
             }));
             form.post('/fleet-assets/transports', {
                 preserveScroll: true,
-                onSuccess: onClose,
+                onSuccess: () => {
+                    setClientRequestUuid(crypto.randomUUID());
+                    onClose();
+                },
                 onFinish: () => {
                     form.transform((data) => data);
                     setSubmitMode('transport');
@@ -470,6 +481,7 @@ export function TransportWizard({
             scanCaptures,
             selectedMedIds,
             witnessNames,
+            clientRequestUuid,
         ],
     );
 
@@ -1079,14 +1091,15 @@ export function TransportWizard({
                                                     </div>
                                                 </div>
 
-                                                {/* Witness field for controlled drugs */}
+                                                {/* Witness field for orders that require a second checker */}
                                                 {isSelected &&
-                                                    med.controlled_drug && (
+                                                    (med.witness_required ||
+                                                        med.controlled_drug) && (
                                                         <div className="mt-3 ml-7">
                                                             <label className="text-xs font-medium text-status-critical dark:text-status-critical">
-                                                                Witness Required
-                                                                for Controlled
-                                                                Drug *
+                                                                {med.controlled_drug
+                                                                    ? 'Witness Required for Controlled Drug *'
+                                                                    : 'Witness Required *'}
                                                             </label>
                                                             <Input
                                                                 value={

@@ -45,6 +45,7 @@ export type TransportMedicationOption = {
     frequency: string | null;
     is_prn: boolean;
     controlled_drug: boolean;
+    witness_required: boolean;
     dose_times: string[] | null;
     route: string | null;
     instructions: string | null;
@@ -66,6 +67,7 @@ export type TransportMedicationLog = {
     medication_id: number | null;
     medication_name: string;
     is_controlled_drug: boolean;
+    witness_required: boolean;
     packed_witness_name?: string | null;
     packed_by: { id: number; name: string } | null;
     packed_at: string | null;
@@ -151,10 +153,12 @@ export function buildPackMedicationPayload({
 
 export function buildAdministerMedicationPayload({
     witnessedByUserId,
+    witnessCredential,
     notes,
     scan,
 }: {
     witnessedByUserId: string;
+    witnessCredential: string;
     notes: string;
     scan: MedicationScanCapture;
 }) {
@@ -162,6 +166,7 @@ export function buildAdministerMedicationPayload({
         witnessed_by_user_id: witnessedByUserId
             ? Number(witnessedByUserId)
             : null,
+        witness_credential: witnessCredential.trim() || null,
         notes: notes.trim() || null,
         ...toMedicationScanPayload(scan),
     };
@@ -230,7 +235,10 @@ export function PackMedicationWizard({
             ) ?? null,
         [form.data.medication_id, medications],
     );
-    const requiresWitness = !!selectedMedication?.controlled_drug;
+    const requiresWitness = !!(
+        selectedMedication?.witness_required ||
+        selectedMedication?.controlled_drug
+    );
     const requiresScan = !!selectedMedication?.scan_verification;
     const canContinue =
         !!client &&
@@ -570,14 +578,19 @@ export function AdministerTransportMedicationWizard({
     const [submitting, setSubmitting] = useState(false);
     const form = useForm({
         witnessed_by_user_id: '',
+        witness_credential: '',
         notes: '',
         scan_code: '',
     });
-    const requiresWitness = !!log?.is_controlled_drug;
+    const requiresWitness = !!(
+        log?.witness_required || log?.is_controlled_drug
+    );
     const requiresScan = !!log?.scan_verification;
     const canContinue =
         !!log &&
-        (!requiresWitness || !!form.data.witnessed_by_user_id) &&
+        (!requiresWitness ||
+            (!!form.data.witnessed_by_user_id &&
+                !!form.data.witness_credential.trim())) &&
         (!requiresScan || hasVerifiedMedicationScan(scanCapture));
 
     const reset = () => {
@@ -599,6 +612,7 @@ export function AdministerTransportMedicationWizard({
                 `/fleet-assets/medication-transit/${log.id}/administer`,
                 buildAdministerMedicationPayload({
                     witnessedByUserId: form.data.witnessed_by_user_id,
+                    witnessCredential: form.data.witness_credential,
                     notes: form.data.notes,
                     scan: scanCapture,
                 }),
@@ -726,6 +740,27 @@ export function AdministerTransportMedicationWizard({
                                 {form.errors.witnessed_by_user_id ? (
                                     <p className="text-sm text-destructive">
                                         {form.errors.witnessed_by_user_id}
+                                    </p>
+                                ) : null}
+                                <Label htmlFor="administer-witness-credential">
+                                    Witness password / PIN
+                                </Label>
+                                <Input
+                                    id="administer-witness-credential"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    value={form.data.witness_credential}
+                                    onChange={(event) => {
+                                        form.clearErrors('witness_credential');
+                                        form.setData(
+                                            'witness_credential',
+                                            event.target.value,
+                                        );
+                                    }}
+                                />
+                                {form.errors.witness_credential ? (
+                                    <p className="text-sm text-destructive">
+                                        {form.errors.witness_credential}
                                     </p>
                                 ) : null}
                             </div>
