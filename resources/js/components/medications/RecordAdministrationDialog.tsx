@@ -152,6 +152,8 @@ export default function RecordAdministrationDialog({
     const [bloodPressureSystolic, setBloodPressureSystolic] = useState('');
     const [bloodPressureDiastolic, setBloodPressureDiastolic] = useState('');
     const [showOverride, setShowOverride] = useState(false);
+    const [overrideReasonCode, setOverrideReasonCode] = useState('');
+    const [overrideReason, setOverrideReason] = useState('');
     const [specialistFields, setSpecialistFields] = useState<
         Record<string, unknown>
     >({});
@@ -184,6 +186,8 @@ export default function RecordAdministrationDialog({
             setBloodPressureSystolic('');
             setBloodPressureDiastolic('');
             setShowOverride(false);
+            setOverrideReasonCode('');
+            setOverrideReason('');
             setSpecialistFields({});
             setScanCode('');
             setScanStatus('idle');
@@ -223,6 +227,13 @@ export default function RecordAdministrationDialog({
     const canSubmit = useMemo(() => {
         if (!safetyCheck) return false;
         if (safetyCheck.blocked && !showOverride) return false;
+        if (
+            showOverride &&
+            (!safetyCheck.can_override_safety ||
+                !overrideReasonCode ||
+                overrideReason.trim().length < 10)
+        )
+            return false;
         if (status !== 'given' && !reasonCode) return false;
         if (reasonCode === 'other' && !reason.trim()) return false;
         if (status === 'given' && medication?.is_prn && !reason.trim())
@@ -263,6 +274,8 @@ export default function RecordAdministrationDialog({
         medication,
         needsScanVerification,
         needsWitness,
+        overrideReason,
+        overrideReasonCode,
         pulseBpm,
         quantityAdministered,
         reason,
@@ -304,7 +317,10 @@ export default function RecordAdministrationDialog({
         };
 
         if (showOverride) {
-            data.override_safety = true;
+            data.safety_override = {
+                reason_code: overrideReasonCode,
+                reason: overrideReason.trim(),
+            };
         }
 
         if (
@@ -423,11 +439,60 @@ export default function RecordAdministrationDialog({
                     <SafetyCheckPanel
                         safetyCheck={safetyCheck}
                         onOverride={
-                            safetyCheck?.blocked
+                            safetyCheck?.blocked &&
+                            safetyCheck.can_override_safety
                                 ? () => setShowOverride(true)
                                 : undefined
                         }
                     />
+
+                    {showOverride && (
+                        <div className="space-y-3 rounded-md border border-status-critical/30 bg-status-critical-bg p-4">
+                            <div>
+                                <div className="font-medium text-status-critical">
+                                    Safety override authorisation
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    Record the clinical basis for proceeding
+                                    despite this specific blocked check.
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Override reason *</Label>
+                                <Select
+                                    value={overrideReasonCode}
+                                    onValueChange={setOverrideReasonCode}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select reason..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {safetyCheck?.override_reason_options?.map(
+                                            (option) => (
+                                                <SelectItem
+                                                    key={option.value}
+                                                    value={option.value}
+                                                >
+                                                    {option.label}
+                                                </SelectItem>
+                                            ),
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Clinical rationale *</Label>
+                                <Textarea
+                                    value={overrideReason}
+                                    onChange={(event) =>
+                                        setOverrideReason(event.target.value)
+                                    }
+                                    placeholder="Who provided direction and why is administration clinically necessary?"
+                                    className="min-h-[72px]"
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {medication.is_prn && prnData && (
                         <PrnHistoryPanel
