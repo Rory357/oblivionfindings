@@ -101,7 +101,7 @@ class ControlRoomDiscussionControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/control-room/discussions/{$discussion->id}", [
+            ->put("/control-room/alerts/{$discussion->alert_id}/discussions/{$discussion->id}", [
                 'content' => 'Edited',
             ])
             ->assertOk();
@@ -122,7 +122,7 @@ class ControlRoomDiscussionControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/control-room/discussions/{$discussion->id}", [
+            ->put("/control-room/alerts/{$discussion->alert_id}/discussions/{$discussion->id}", [
                 'content' => 'Should not be allowed',
             ])
             ->assertForbidden();
@@ -139,7 +139,7 @@ class ControlRoomDiscussionControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->delete("/control-room/discussions/{$discussion->id}")
+            ->delete("/control-room/alerts/{$discussion->alert_id}/discussions/{$discussion->id}")
             ->assertOk();
 
         $this->assertSame('[deleted]', $discussion->fresh()->content);
@@ -156,7 +156,7 @@ class ControlRoomDiscussionControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->delete("/control-room/discussions/{$discussion->id}")
+            ->delete("/control-room/alerts/{$discussion->alert_id}/discussions/{$discussion->id}")
             ->assertOk();
 
         $this->assertSame('[deleted]', $discussion->fresh()->content);

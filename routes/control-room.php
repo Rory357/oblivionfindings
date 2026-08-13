@@ -143,14 +143,17 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/alerts/{alert}/tasks', [ControlRoomTaskController::class, 'store'])
             ->whereNumber('alert')
             ->name('control-room.tasks.store');
-        Route::put('/control-room/tasks/{task}', [ControlRoomTaskController::class, 'update'])
+        Route::put('/control-room/alerts/{alert}/tasks/{task}', [ControlRoomTaskController::class, 'update'])
+            ->whereNumber(['alert', 'task'])
             ->name('control-room.tasks.update');
-        Route::post('/control-room/tasks/{task}/status', [ControlRoomTaskController::class, 'updateStatus'])
+        Route::post('/control-room/alerts/{alert}/tasks/{task}/status', [ControlRoomTaskController::class, 'updateStatus'])
+            ->whereNumber(['alert', 'task'])
             ->name('control-room.tasks.status');
-        Route::post('/control-room/tasks/{task}/transfer-to-health-safety', [ControlRoomTaskController::class, 'transferToHealthSafety'])
-            ->whereNumber('task')
+        Route::post('/control-room/alerts/{alert}/tasks/{task}/transfer-to-health-safety', [ControlRoomTaskController::class, 'transferToHealthSafety'])
+            ->whereNumber(['alert', 'task'])
             ->name('control-room.tasks.transfer-to-health-safety');
-        Route::delete('/control-room/tasks/{task}', [ControlRoomTaskController::class, 'destroy'])
+        Route::delete('/control-room/alerts/{alert}/tasks/{task}', [ControlRoomTaskController::class, 'destroy'])
+            ->whereNumber(['alert', 'task'])
             ->name('control-room.tasks.destroy');
         Route::post('/control-room/alerts/{alert}/tasks/reorder', [ControlRoomTaskController::class, 'reorder'])
             ->whereNumber('alert')
@@ -301,15 +304,20 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/alerts/{alert}/evidence', [ControlRoomEvidenceController::class, 'storePack'])
             ->whereNumber('alert')
             ->name('control-room.evidence.store-pack');
-        Route::post('/control-room/evidence/{pack}/items', [ControlRoomEvidenceController::class, 'storeItem'])
+        Route::post('/control-room/alerts/{alert}/evidence/{pack}/items', [ControlRoomEvidenceController::class, 'storeItem'])
+            ->whereNumber(['alert', 'pack'])
             ->name('control-room.evidence.store-item');
-        Route::delete('/control-room/evidence/items/{item}', [ControlRoomEvidenceController::class, 'destroyItem'])
+        Route::delete('/control-room/alerts/{alert}/evidence/{pack}/items/{item}', [ControlRoomEvidenceController::class, 'destroyItem'])
+            ->whereNumber(['alert', 'pack', 'item'])
             ->name('control-room.evidence.destroy-item');
-        Route::get('/control-room/evidence/items/{item}/download', [ControlRoomEvidenceController::class, 'downloadItem'])
+        Route::get('/control-room/alerts/{alert}/evidence/{pack}/items/{item}/download', [ControlRoomEvidenceController::class, 'downloadItem'])
+            ->whereNumber(['alert', 'pack', 'item'])
             ->name('control-room.evidence.download-item');
-        Route::post('/control-room/evidence/{pack}/complete', [ControlRoomEvidenceController::class, 'completePack'])
+        Route::post('/control-room/alerts/{alert}/evidence/{pack}/complete', [ControlRoomEvidenceController::class, 'completePack'])
+            ->whereNumber(['alert', 'pack'])
             ->name('control-room.evidence.complete-pack');
-        Route::get('/control-room/evidence/{pack}/export', [ControlRoomEvidenceController::class, 'export'])
+        Route::get('/control-room/alerts/{alert}/evidence/{pack}/export', [ControlRoomEvidenceController::class, 'export'])
+            ->whereNumber(['alert', 'pack'])
             ->name('control-room.evidence.export');
     });
 
@@ -391,11 +399,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/alerts/{alert}/playbook/start', [ControlRoomPlaybookController::class, 'startRun'])
             ->whereNumber('alert')
             ->name('control-room.alerts.playbook.start');
-        Route::post('/control-room/alerts/{alert}/playbook/advance', [ControlRoomPlaybookController::class, 'advanceStep'])
-            ->whereNumber('alert')
+        Route::post('/control-room/alerts/{alert}/playbook-runs/{run}/advance', [ControlRoomPlaybookController::class, 'advanceStep'])
+            ->whereNumber(['alert', 'run'])
             ->name('control-room.alerts.playbook.advance');
-        Route::post('/control-room/alerts/{alert}/playbook/skip', [ControlRoomPlaybookController::class, 'skipStep'])
-            ->whereNumber('alert')
+        Route::post('/control-room/alerts/{alert}/playbook-runs/{run}/skip', [ControlRoomPlaybookController::class, 'skipStep'])
+            ->whereNumber(['alert', 'run'])
             ->name('control-room.alerts.playbook.skip');
     });
 
@@ -408,10 +416,12 @@ Route::middleware(['auth'])->group(function () {
         ->whereNumber('alert')
         ->middleware('permission:controlRoom.alerts.manage')
         ->name('control-room.discussions.store');
-    Route::put('/control-room/discussions/{discussion}', [ControlRoomDiscussionController::class, 'update'])
+    Route::put('/control-room/alerts/{alert}/discussions/{discussion}', [ControlRoomDiscussionController::class, 'update'])
+        ->whereNumber(['alert', 'discussion'])
         ->middleware('permission:controlRoom.alerts.manage')
         ->name('control-room.discussions.update');
-    Route::delete('/control-room/discussions/{discussion}', [ControlRoomDiscussionController::class, 'destroy'])
+    Route::delete('/control-room/alerts/{alert}/discussions/{discussion}', [ControlRoomDiscussionController::class, 'destroy'])
+        ->whereNumber(['alert', 'discussion'])
         ->middleware('permission:controlRoom.alerts.manage')
         ->name('control-room.discussions.destroy');
 
@@ -426,8 +436,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/alerts/{alert}/watchers/toggle', [ControlRoomWatcherController::class, 'toggle'])
             ->whereNumber('alert')
             ->name('control-room.watchers.toggle');
-        Route::delete('/control-room/alerts/{alert}/watchers/{userId}', [ControlRoomWatcherController::class, 'destroy'])
-            ->whereNumber('alert')
+        Route::delete('/control-room/alerts/{alert}/watchers/{watcher}', [ControlRoomWatcherController::class, 'destroy'])
+            ->whereNumber(['alert', 'watcher'])
             ->name('control-room.watchers.destroy');
     });
 
@@ -439,12 +449,14 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/alerts/{alert}/time-entries/start', [ControlRoomTimeEntryController::class, 'start'])
             ->whereNumber('alert')
             ->name('control-room.time-entries.start');
-        Route::post('/control-room/time-entries/{entry}/stop', [ControlRoomTimeEntryController::class, 'stop'])
+        Route::post('/control-room/alerts/{alert}/time-entries/{entry}/stop', [ControlRoomTimeEntryController::class, 'stop'])
+            ->whereNumber(['alert', 'entry'])
             ->name('control-room.time-entries.stop');
         Route::post('/control-room/alerts/{alert}/time-entries', [ControlRoomTimeEntryController::class, 'store'])
             ->whereNumber('alert')
             ->name('control-room.time-entries.store');
-        Route::delete('/control-room/time-entries/{entry}', [ControlRoomTimeEntryController::class, 'destroy'])
+        Route::delete('/control-room/alerts/{alert}/time-entries/{entry}', [ControlRoomTimeEntryController::class, 'destroy'])
+            ->whereNumber(['alert', 'entry'])
             ->name('control-room.time-entries.destroy');
     });
 });

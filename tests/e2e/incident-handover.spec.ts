@@ -85,7 +85,7 @@ test.describe('desktop incident handover journeys', () => {
         };
         await postLaravel(
             page,
-            `/control-room/evidence/${packs.packs[0].id}/items`,
+            `/control-room/alerts/${alert.id}/evidence/${packs.packs[0].id}/items`,
             {
                 item_type: 'note',
                 content: 'Bathroom rail photographed before repair.',
@@ -482,7 +482,7 @@ echo json_encode(['id' => $signal->id], JSON_THROW_ON_ERROR);
         ).json()) as { packs: Array<{ id: number }> };
         await postLaravel(
             page,
-            `/control-room/evidence/${packs.packs[0].id}/items`,
+            `/control-room/alerts/${alert.id}/evidence/${packs.packs[0].id}/items`,
             {
                 item_type: 'note',
                 content: 'Fall sensor confidence 98%; bathroom zone.',

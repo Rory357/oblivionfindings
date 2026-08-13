@@ -3,18 +3,24 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\PlaybookRun;
-use App\Models\ControlRoom\PlaybookRunStep;
 use App\Models\ControlRoom\PlaybookStep;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ControlRoomPlaybookController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
+
+    private const TRANSACTION_ATTEMPTS = 3;
+
     /**
      * List playbooks with category/active filters.
      */
@@ -27,9 +33,9 @@ class ControlRoomPlaybookController extends Controller
 
         $query = Playbook::query()
             ->withCount(['steps', 'runs'])
-            ->with(['runs' => fn($q) => $q->latest()->limit(1)]);
+            ->with(['runs' => fn ($q) => $q->latest()->limit(1)]);
 
-        if (!empty($filters['category'])) {
+        if (! empty($filters['category'])) {
             $query->where('category', $filters['category']);
         }
 
@@ -37,7 +43,7 @@ class ControlRoomPlaybookController extends Controller
             $query->where('is_active', $filters['is_active'] === '1' || $filters['is_active'] === 'true');
         }
 
-        $playbooks = $query->orderBy('name')->get()->map(fn(Playbook $pb) => [
+        $playbooks = $query->orderBy('name')->get()->map(fn (Playbook $pb) => [
             'id' => $pb->id,
             'name' => $pb->name,
             'code' => $pb->code,
@@ -86,7 +92,7 @@ class ControlRoomPlaybookController extends Controller
             ->latest()
             ->limit(10)
             ->get()
-            ->map(fn(PlaybookRun $run) => [
+            ->map(fn (PlaybookRun $run) => [
                 'id' => $run->id,
                 'alert_id' => $run->alert_id,
                 'alert' => $run->alert ? [
@@ -142,7 +148,7 @@ class ControlRoomPlaybookController extends Controller
                 ] : null,
                 'created_at' => $playbook->created_at?->toISOString(),
                 'updated_at' => $playbook->updated_at?->toISOString(),
-                'steps' => $playbook->steps->map(fn(PlaybookStep $step) => [
+                'steps' => $playbook->steps->map(fn (PlaybookStep $step) => [
                     'id' => $step->id,
                     'order' => $step->order,
                     'title' => $step->title,
@@ -317,7 +323,7 @@ class ControlRoomPlaybookController extends Controller
             $playbook->steps()->whereNotIn('id', $existingStepIds)->delete();
 
             foreach ($data['steps'] as $index => $stepData) {
-                if (!empty($stepData['id'])) {
+                if (! empty($stepData['id'])) {
                     PlaybookStep::where('id', $stepData['id'])
                         ->where('playbook_id', $playbook->id)
                         ->update([
@@ -355,7 +361,7 @@ class ControlRoomPlaybookController extends Controller
             'version' => $playbook->version,
         ]);
 
-        return back()->with('success', 'Playbook updated to version ' . $playbook->fresh()->version . '.');
+        return back()->with('success', 'Playbook updated to version '.$playbook->fresh()->version.'.');
     }
 
     /**
@@ -364,7 +370,7 @@ class ControlRoomPlaybookController extends Controller
      */
     private function generatePlaybookCode(string $name): string
     {
-        $base = \Illuminate\Support\Str::of($name)->slug('_')->limit(40, '')->value();
+        $base = Str::of($name)->slug('_')->limit(40, '')->value();
         if ($base === '') {
             $base = 'playbook';
         }
@@ -388,7 +394,7 @@ class ControlRoomPlaybookController extends Controller
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
 
         $playbook->update([
-            'is_active' => !$playbook->is_active,
+            'is_active' => ! $playbook->is_active,
             'updated_by_user_id' => $user->id,
         ]);
 
@@ -407,6 +413,7 @@ class ControlRoomPlaybookController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $this->assertCanAccessAlert($user, $alert);
 
         $data = $request->validate([
             'playbook_id' => ['required', 'integer', 'exists:control_room_playbooks,id'],
@@ -414,22 +421,29 @@ class ControlRoomPlaybookController extends Controller
 
         $playbook = Playbook::findOrFail($data['playbook_id']);
 
-        if (!$playbook->is_active) {
+        if (! $playbook->is_active) {
             return back()->withErrors(['playbook' => 'Cannot start an inactive playbook.']);
         }
 
-        // Check if alert already has an active playbook run
-        if ($alert->playbook_run_id) {
-            $existingRun = PlaybookRun::find($alert->playbook_run_id);
-            if ($existingRun && in_array($existingRun->status, ['pending', 'in_progress'])) {
-                return back()->withErrors(['playbook' => 'Alert already has an active playbook run.']);
+        $run = DB::transaction(function () use ($playbook, $alert, $user): PlaybookRun {
+            $lockedAlert = $this->nestedAlertResources()->alert($user, $alert, true);
+            if ($lockedAlert->playbook_run_id) {
+                $existingRun = $this->nestedAlertResources()->playbookRun(
+                    $user,
+                    $lockedAlert,
+                    (int) $lockedAlert->playbook_run_id,
+                    true,
+                );
+                if (in_array($existingRun->status, ['pending', 'in_progress'], true)) {
+                    throw ValidationException::withMessages([
+                        'playbook' => 'Alert already has an active playbook run.',
+                    ]);
+                }
             }
-        }
 
-        $run = DB::transaction(function () use ($playbook, $alert, $user) {
             $run = PlaybookRun::create([
                 'playbook_id' => $playbook->id,
-                'alert_id' => $alert->id,
+                'alert_id' => $lockedAlert->id,
                 'status' => 'pending',
                 'current_step' => 0,
                 'completed_steps' => 0,
@@ -438,16 +452,16 @@ class ControlRoomPlaybookController extends Controller
 
             $run->start($user);
 
-            $alert->update(['playbook_run_id' => $run->id]);
+            $lockedAlert->update(['playbook_run_id' => $run->id]);
+
+            AuditLogger::log('controlRoom.playbook.startRun', $lockedAlert, [
+                'alert_id' => $lockedAlert->id,
+                'playbook_id' => $playbook->id,
+                'run_id' => $run->id,
+            ]);
 
             return $run;
-        });
-
-        AuditLogger::log('controlRoom.playbook.startRun', $alert, [
-            'alert_id' => $alert->id,
-            'playbook_id' => $playbook->id,
-            'run_id' => $run->id,
-        ]);
+        }, self::TRANSACTION_ATTEMPTS);
 
         return back()->with('success', 'Playbook run started.');
     }
@@ -455,10 +469,12 @@ class ControlRoomPlaybookController extends Controller
     /**
      * Advance current step in the playbook run.
      */
-    public function advanceStep(Request $request, ControlRoomAlert $alert)
+    public function advanceStep(Request $request, ControlRoomAlert $alert, int $run)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $runId = $run;
+        $this->nestedAlertResources()->playbookRun($user, $alert, $runId);
 
         $data = $request->validate([
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -466,97 +482,120 @@ class ControlRoomPlaybookController extends Controller
             'evidence' => ['nullable', 'array'],
         ]);
 
-        $run = PlaybookRun::where('alert_id', $alert->id)
-            ->where('status', 'in_progress')
-            ->firstOrFail();
-
-        $currentStep = $run->steps()->where('status', 'in_progress')->first();
-
-        if ($currentStep) {
-            $currentStep->complete($user, $data['notes'] ?? null, $data['evidence'] ?? null);
-
-            if (!empty($data['decision_taken'])) {
-                $currentStep->recordDecision($data['decision_taken'], $user);
+        $completed = DB::transaction(function () use ($alert, $data, $runId, $user): bool {
+            $run = $this->nestedAlertResources()->playbookRun($user, $alert, $runId, true);
+            if ($run->status !== PlaybookRun::STATUS_IN_PROGRESS) {
+                throw ValidationException::withMessages([
+                    'playbook' => 'This playbook run is no longer active.',
+                ]);
             }
 
-            // advanceToNextStep() only counts a step it completes itself; this
-            // one was completed above (to attach notes/evidence), so count it here.
-            $run->increment('completed_steps');
-        }
+            $currentStep = $run->steps()
+                ->where('status', 'in_progress')
+                ->lockForUpdate()
+                ->first();
 
-        $nextStep = $run->advanceToNextStep();
+            if ($currentStep) {
+                $currentStep->complete($user, $data['notes'] ?? null, $data['evidence'] ?? null);
 
-        if (!$nextStep) {
-            $run->complete($user);
+                if (! empty($data['decision_taken'])) {
+                    $currentStep->recordDecision($data['decision_taken'], $user);
+                }
 
-            AuditLogger::log('controlRoom.playbook.runCompleted', $alert, [
+                // advanceToNextStep() only counts a step it completes itself;
+                // this one was completed above to attach notes/evidence.
+                $run->increment('completed_steps');
+            }
+
+            $nextStep = $run->advanceToNextStep();
+            if (! $nextStep) {
+                $run->complete($user);
+                AuditLogger::log('controlRoom.playbook.runCompleted', $alert, [
+                    'alert_id' => $alert->id,
+                    'run_id' => $run->id,
+                ]);
+
+                return true;
+            }
+
+            AuditLogger::log('controlRoom.playbook.advanceStep', $alert, [
                 'alert_id' => $alert->id,
                 'run_id' => $run->id,
+                'step' => $nextStep->order,
             ]);
 
-            return back()->with('success', 'Playbook run completed.');
-        }
+            return false;
+        }, self::TRANSACTION_ATTEMPTS);
 
-        AuditLogger::log('controlRoom.playbook.advanceStep', $alert, [
-            'alert_id' => $alert->id,
-            'run_id' => $run->id,
-            'step' => $nextStep->order,
-        ]);
-
-        return back()->with('success', 'Step completed, advanced to next step.');
+        return back()->with(
+            'success',
+            $completed ? 'Playbook run completed.' : 'Step completed, advanced to next step.',
+        );
     }
 
     /**
      * Skip the current step.
      */
-    public function skipStep(Request $request, ControlRoomAlert $alert)
+    public function skipStep(Request $request, ControlRoomAlert $alert, int $run)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $runId = $run;
+        $this->nestedAlertResources()->playbookRun($user, $alert, $runId);
 
         $data = $request->validate([
             'reason' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $run = PlaybookRun::where('alert_id', $alert->id)
-            ->where('status', 'in_progress')
-            ->firstOrFail();
+        DB::transaction(function () use ($alert, $data, $runId, $user): void {
+            $run = $this->nestedAlertResources()->playbookRun($user, $alert, $runId, true);
+            if ($run->status !== PlaybookRun::STATUS_IN_PROGRESS) {
+                throw ValidationException::withMessages([
+                    'playbook' => 'This playbook run is no longer active.',
+                ]);
+            }
 
-        $currentStep = $run->steps()->where('status', 'in_progress')->first();
+            $currentStep = $run->steps()
+                ->where('status', 'in_progress')
+                ->lockForUpdate()
+                ->first();
+            if (! $currentStep) {
+                throw ValidationException::withMessages([
+                    'step' => 'No active step to skip.',
+                ]);
+            }
 
-        if (!$currentStep) {
-            return back()->withErrors(['step' => 'No active step to skip.']);
-        }
+            $playbookStep = $currentStep->step;
+            if ($playbookStep && $playbookStep->is_required && $playbookStep->is_blocking) {
+                throw ValidationException::withMessages([
+                    'step' => 'This step is required and blocking. It cannot be skipped.',
+                ]);
+            }
 
-        // Check if step is required and blocking
-        $playbookStep = $currentStep->step;
-        if ($playbookStep && $playbookStep->is_required && $playbookStep->is_blocking) {
-            return back()->withErrors(['step' => 'This step is required and blocking. It cannot be skipped.']);
-        }
+            // A skipped step is not a completed one — the progress counter
+            // only tracks steps that were actually done.
+            $currentStep->skip($user, $data['reason'] ?? null);
+            $nextStep = $run->steps()
+                ->where('status', 'pending')
+                ->orderBy('order')
+                ->lockForUpdate()
+                ->first();
 
-        // A skipped step is not a completed one — the progress counter only
-        // tracks steps that were actually done.
-        $currentStep->skip($user, $data['reason'] ?? null);
+            if ($nextStep) {
+                $nextStep->update([
+                    'status' => 'in_progress',
+                    'started_at' => now(),
+                ]);
+                $run->update(['current_step' => $nextStep->order]);
+            } else {
+                $run->complete($user);
+            }
 
-        $nextStep = $run->steps()
-            ->where('status', 'pending')
-            ->orderBy('order')
-            ->first();
-
-        if ($nextStep) {
-            $nextStep->update([
-                'status' => 'in_progress',
-                'started_at' => now(),
+            AuditLogger::log('controlRoom.playbook.skipStep', $alert, [
+                'alert_id' => $alert->id,
+                'run_id' => $run->id,
             ]);
-            $run->update(['current_step' => $nextStep->order]);
-        } else {
-            $run->complete($user);
-        }
-
-        AuditLogger::log('controlRoom.playbook.skipStep', $alert, [
-            'alert_id' => $alert->id,
-            'run_id' => $run->id,
-        ]);
+        }, self::TRANSACTION_ATTEMPTS);
 
         return back()->with('success', 'Step skipped.');
     }

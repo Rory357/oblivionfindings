@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ControlRoom\Concerns\AuthorizesControlRoomAlertAccess;
 use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
@@ -20,6 +21,8 @@ use InvalidArgumentException;
 
 class ControlRoomEscalationController extends Controller
 {
+    use AuthorizesControlRoomAlertAccess;
+
     private const TRANSACTION_ATTEMPTS = 3;
 
     private const QUEUE_CAPACITY = 20;
@@ -186,12 +189,7 @@ class ControlRoomEscalationController extends Controller
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->siteAccess()->assertCanAccessAlert(
-            $user,
-            $alert,
-            $this->alertBypassPermissions(),
-            'You are not authorized to acknowledge this alert.',
-        );
+        $this->assertCanAccessAlert($user, $alert);
 
         try {
             $lifecycle->acknowledge($alert, $user);
@@ -212,13 +210,7 @@ class ControlRoomEscalationController extends Controller
 
         try {
             DB::transaction(function () use ($alert, $user): void {
-                $lockedAlert = $this->lockAlert($alert);
-                $this->siteAccess()->assertCanAccessAlert(
-                    $user,
-                    $lockedAlert,
-                    $this->alertBypassPermissions(),
-                    'You are not authorized to assign this alert.',
-                );
+                $lockedAlert = $this->nestedAlertResources()->alert($user, $alert, true);
                 $this->assertActionable($lockedAlert, 'assign');
 
                 $lockedAlert->update([
@@ -255,13 +247,7 @@ class ControlRoomEscalationController extends Controller
 
         try {
             $targetQueue = DB::transaction(function () use ($alert, $user, $validated): TriageQueue {
-                $lockedAlert = $this->lockAlert($alert);
-                $this->siteAccess()->assertCanAccessAlert(
-                    $user,
-                    $lockedAlert,
-                    $this->alertBypassPermissions(),
-                    'You are not authorized to move this alert.',
-                );
+                $lockedAlert = $this->nestedAlertResources()->alert($user, $alert, true);
                 $this->assertActionable($lockedAlert, 'move');
                 if ($lockedAlert->queue_id !== null) {
                     $currentQueue = TriageQueue::query()
@@ -331,21 +317,7 @@ class ControlRoomEscalationController extends Controller
         [$escalatedCount, $skippedCount] = DB::transaction(function () use ($alertIds, $user, $validated): array {
             // Lock alerts first, in a stable order, before touching queue history.
             // This makes the site and actionable checks authoritative at write time.
-            $alertsQuery = ControlRoomAlert::query()
-                ->whereIn('id', $alertIds)
-                ->orderBy('id');
-            $this->siteAccess()->applyAlertScope(
-                $alertsQuery,
-                $user,
-                $this->alertBypassPermissions(),
-            );
-            $alerts = $alertsQuery->lockForUpdate()->get()->keyBy('id');
-
-            abort_if(
-                $alerts->count() !== $alertIds->count(),
-                403,
-                'You are not authorized to escalate one or more selected alerts.',
-            );
+            $alerts = $this->nestedAlertResources()->alerts($user, $alertIds, true);
 
             $escalatedCount = 0;
             $skippedCount = 0;
@@ -427,13 +399,6 @@ class ControlRoomEscalationController extends Controller
         }
 
         return redirect()->back()->with('success', $message);
-    }
-
-    protected function lockAlert(ControlRoomAlert $alert): ControlRoomAlert
-    {
-        return ControlRoomAlert::query()
-            ->lockForUpdate()
-            ->findOrFail($alert->getKey());
     }
 
     protected function assertActionable(ControlRoomAlert $alert, string $action): void

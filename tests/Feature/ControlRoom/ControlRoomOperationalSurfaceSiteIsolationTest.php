@@ -75,15 +75,15 @@ class ControlRoomOperationalSurfaceSiteIsolationTest extends TestCase
 
         $this->actingAs($operator)
             ->post("/control-room/escalations/{$hidden->id}/acknowledge")
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($operator)
             ->post("/control-room/escalations/{$hidden->id}/assign-to-me")
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($operator)
             ->post("/control-room/escalations/{$hidden->id}/move", [
                 'target_queue_id' => $tier2->id,
             ])
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($operator)
             ->post('/control-room/escalations/bulk-escalate', [
                 'alert_ids' => [$visible->id, $hidden->id],

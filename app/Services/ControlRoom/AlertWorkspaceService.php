@@ -153,7 +153,7 @@ class AlertWorkspaceService
         $linkedOperationalEvidence = $this->linkedEvidence->present(
             $alert,
             $user,
-            fn ($item): string => "/control-room/evidence/items/{$item->id}/download",
+            fn ($item): string => "/control-room/alerts/{$alert->id}/evidence/{$item->evidence_pack_id}/items/{$item->id}/download",
         );
 
         return [
@@ -282,7 +282,9 @@ class AlertWorkspaceService
                     // Note items keep their text here — without it the row reads
                     // just "Note" and the content is unreadable after adding.
                     'description' => $i->description,
-                    'download_url' => $i->storage_path ? "/control-room/evidence/items/{$i->id}/download" : null,
+                    'download_url' => $i->storage_path
+                        ? "/control-room/alerts/{$alert->id}/evidence/{$p->id}/items/{$i->id}/download"
+                        : null,
                     'created_at' => optional($i->created_at)->toISOString(),
                 ])->values(),
             ])->values(),

@@ -226,7 +226,7 @@ echo json_encode([
 `).id;
         await postLaravel(
             page,
-            `/control-room/evidence/${reopenPackId}/items`,
+            `/control-room/alerts/${reopenId}/evidence/${reopenPackId}/items`,
             {
                 item_type: 'note',
                 content: 'Original evidence remains attached after reopen.',

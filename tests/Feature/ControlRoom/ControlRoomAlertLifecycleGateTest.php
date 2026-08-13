@@ -115,7 +115,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         $task = $this->makeTask($alert, AlertTask::STATUS_IN_PROGRESS);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/transfer-to-health-safety")
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety")
             ->assertRedirect()
             ->assertSessionDoesntHaveErrors();
 
@@ -363,13 +363,13 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         $task = $this->makeTask($alert, AlertTask::STATUS_OPEN);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/status", ['status' => AlertTask::STATUS_CANCELLED])
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/status", ['status' => AlertTask::STATUS_CANCELLED])
             ->assertSessionHasErrors('reason');
 
         $this->assertSame(AlertTask::STATUS_OPEN, $task->fresh()->status);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/status", [
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/status", [
                 'status' => AlertTask::STATUS_CANCELLED,
                 'reason' => 'No longer needed after the site lead confirmed the control.',
             ])
@@ -439,7 +439,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
             'due_at' => now()->addDays(5),
         ]);
 
-        $url = "/control-room/tasks/{$task->id}/transfer-to-health-safety";
+        $url = "/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety";
 
         $this->actingAs($this->admin)->post($url)->assertRedirect()->assertSessionDoesntHaveErrors();
         $firstActionId = $task->fresh()->transferred_to_hs_corrective_action_id;
@@ -490,7 +490,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         $task = $this->makeTask($alert, AlertTask::STATUS_IN_PROGRESS);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/transfer-to-health-safety")
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety")
             ->assertRedirect()
             ->assertSessionHasErrors('task');
 
@@ -509,7 +509,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         $task = $this->makeTask($alert, AlertTask::STATUS_IN_PROGRESS, ['due_at' => null]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/transfer-to-health-safety")
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety")
             ->assertRedirect()
             ->assertSessionHasErrors('task');
 
@@ -525,7 +525,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
             'control_room_alert_id' => $alert->id,
         ]);
         $task = $this->makeTask($alert, AlertTask::STATUS_IN_PROGRESS);
-        $url = "/control-room/tasks/{$task->id}/transfer-to-health-safety";
+        $url = "/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety";
 
         $this->actingAs($this->admin)->post($url)->assertSessionDoesntHaveErrors();
         HsCorrectiveAction::query()
@@ -562,7 +562,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/transfer-to-health-safety")
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety")
             ->assertRedirect()
             ->assertSessionHasErrors('task');
 
@@ -588,7 +588,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         $task = $this->makeTask($alert, AlertTask::STATUS_IN_PROGRESS);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/transfer-to-health-safety")
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety")
             ->assertRedirect()
             ->assertSessionHasErrors('task');
 
@@ -621,7 +621,7 @@ class ControlRoomAlertLifecycleGateTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/transfer-to-health-safety")
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety")
             ->assertRedirect()
             ->assertSessionDoesntHaveErrors();
 

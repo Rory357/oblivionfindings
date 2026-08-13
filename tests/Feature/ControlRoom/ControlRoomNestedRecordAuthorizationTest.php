@@ -4,11 +4,16 @@ namespace Tests\Feature\ControlRoom;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\ControlRoom\AlertDiscussion;
+use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoom\AlertWatcher;
 use App\Models\ControlRoom\EvidenceItem;
 use App\Models\ControlRoom\EvidencePack;
+use App\Models\ControlRoom\Playbook;
+use App\Models\ControlRoom\PlaybookRun;
+use App\Models\ControlRoom\PlaybookStep;
 use App\Models\ControlRoom\TimeEntry;
+use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Role;
@@ -98,7 +103,62 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
             'time entry store' => ['time_entry_store'],
             'time entry stop' => ['time_entry_stop'],
             'time entry destroy' => ['time_entry_destroy'],
+            'escalation move' => ['escalation_move'],
+            'playbook start' => ['playbook_start'],
+            'playbook advance' => ['playbook_advance'],
+            'playbook skip' => ['playbook_skip'],
         ];
+    }
+
+    #[DataProvider('mismatchedChildOperations')]
+    public function test_child_id_must_belong_to_the_supplied_visible_alert(string $operation): void
+    {
+        [$method, $uri, $payload, $expectsNoFileResponse] = $this->prepareMismatchedOperation($operation);
+        $visibleBefore = $this->snapshotAlertData($this->visibleAlert);
+        $hiddenBefore = $this->snapshotAlertData($this->hiddenAlert);
+
+        $response = $this->dispatch($method, $uri, $payload);
+
+        $response->assertNotFound();
+        if ($expectsNoFileResponse) {
+            $this->assertFalse($response->headers->has('content-disposition'));
+        }
+        $this->assertSame($visibleBefore, $this->snapshotAlertData($this->visibleAlert));
+        $this->assertSame($hiddenBefore, $this->snapshotAlertData($this->hiddenAlert));
+    }
+
+    public static function mismatchedChildOperations(): array
+    {
+        return [
+            'task' => ['task'],
+            'discussion' => ['discussion'],
+            'evidence pack' => ['evidence_pack'],
+            'evidence item' => ['evidence_item'],
+            'evidence item download' => ['evidence_item_download'],
+            'watcher' => ['watcher'],
+            'time entry' => ['time_entry'],
+            'playbook run advance' => ['playbook_run_advance'],
+            'playbook run skip' => ['playbook_run_skip'],
+        ];
+    }
+
+    public function test_mixed_visible_and_hidden_bulk_escalation_is_rejected_atomically(): void
+    {
+        [$currentQueue] = $this->activeEscalationQueues();
+        $this->visibleAlert->update(['queue_id' => $currentQueue->id]);
+        $this->hiddenAlert->update(['queue_id' => $currentQueue->id]);
+        $visibleBefore = $this->snapshotAlertData($this->visibleAlert);
+        $hiddenBefore = $this->snapshotAlertData($this->hiddenAlert);
+
+        $this->actingAs($this->operator)
+            ->post('/control-room/escalations/bulk-escalate', [
+                'alert_ids' => [$this->visibleAlert->id, $this->hiddenAlert->id],
+                'reason' => 'Mixed scope must be atomic.',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame($visibleBefore, $this->snapshotAlertData($this->visibleAlert));
+        $this->assertSame($hiddenBefore, $this->snapshotAlertData($this->hiddenAlert));
     }
 
     #[DataProvider('crossAlertForeignKeys')]
@@ -243,6 +303,9 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
             'captured_at' => now(),
             'captured_by_user_id' => $globalOperator->id,
         ]);
+        [$currentQueue, $targetQueue] = $this->activeEscalationQueues();
+        $this->hiddenAlert->update(['queue_id' => $currentQueue->id]);
+        $run = $this->playbookRunFor($this->hiddenAlert);
 
         $this->actingAs($globalOperator)
             ->getJson("/control-room/alerts/{$this->hiddenAlert->id}/tasks")
@@ -250,15 +313,27 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
             ->assertJsonCount(1, 'tasks');
 
         $this->actingAs($globalOperator)
-            ->post("/control-room/tasks/{$task->id}/status", ['status' => 'completed'])
+            ->post("/control-room/alerts/{$this->hiddenAlert->id}/tasks/{$task->id}/status", ['status' => 'completed'])
             ->assertRedirect();
 
         $this->actingAs($globalOperator)
-            ->get("/control-room/evidence/items/{$item->id}/download")
+            ->get("/control-room/alerts/{$this->hiddenAlert->id}/evidence/{$pack->id}/items/{$item->id}/download")
             ->assertOk()
             ->assertDownload('global-proof.txt');
 
+        $this->actingAs($globalOperator)
+            ->post("/control-room/escalations/{$this->hiddenAlert->id}/move", [
+                'target_queue_id' => $targetQueue->id,
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($globalOperator)
+            ->post("/control-room/alerts/{$this->hiddenAlert->id}/playbook-runs/{$run->id}/advance")
+            ->assertRedirect();
+
         $this->assertSame('completed', $task->fresh()->status);
+        $this->assertSame($targetQueue->id, $this->hiddenAlert->fresh()->queue_id);
+        $this->assertSame(PlaybookRun::STATUS_COMPLETED, $run->fresh()->status);
     }
 
     private function prepareDeniedOperation(string $operation): array
@@ -306,15 +381,149 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
             ], false],
             'time_entry_stop' => $this->timeEntryOperation('POST', true),
             'time_entry_destroy' => $this->timeEntryOperation('DELETE', false),
+            'escalation_move' => $this->hiddenEscalationMove(),
+            'playbook_start' => $this->hiddenPlaybookStart(),
+            'playbook_advance' => $this->hiddenPlaybookOperation('advance'),
+            'playbook_skip' => $this->hiddenPlaybookOperation('skip'),
             default => throw new \InvalidArgumentException("Unknown denied operation [{$operation}]."),
         };
+    }
+
+    private function prepareMismatchedOperation(string $operation): array
+    {
+        $visibleId = $this->visibleAlert->id;
+
+        return match ($operation) {
+            'task' => $this->mismatchedTaskOperation($visibleId),
+            'discussion' => $this->mismatchedDiscussionOperation($visibleId),
+            'evidence_pack' => $this->mismatchedEvidencePackOperation($visibleId),
+            'evidence_item' => $this->mismatchedEvidenceItemOperation($visibleId),
+            'evidence_item_download' => $this->mismatchedEvidenceItemOperation($visibleId, true),
+            'watcher' => $this->mismatchedWatcherOperation($visibleId),
+            'time_entry' => $this->mismatchedTimeEntryOperation($visibleId),
+            'playbook_run_advance' => $this->mismatchedPlaybookRunOperation($visibleId, 'advance'),
+            'playbook_run_skip' => $this->mismatchedPlaybookRunOperation($visibleId, 'skip'),
+            default => throw new \InvalidArgumentException("Unknown mismatch operation [{$operation}]."),
+        };
+    }
+
+    private function mismatchedTaskOperation(int $visibleAlertId): array
+    {
+        $task = $this->taskFor($this->hiddenAlert, $this->operator);
+
+        return [
+            'PUT',
+            "/control-room/alerts/{$visibleAlertId}/tasks/{$task->id}",
+            ['title' => 'Cross-alert overwrite'],
+            false,
+        ];
+    }
+
+    private function mismatchedDiscussionOperation(int $visibleAlertId): array
+    {
+        $discussion = AlertDiscussion::query()->create([
+            'alert_id' => $this->hiddenAlert->id,
+            'user_id' => $this->operator->id,
+            'content' => 'Hidden discussion',
+            'type' => 'comment',
+            'is_internal' => true,
+        ]);
+
+        return [
+            'PUT',
+            "/control-room/alerts/{$visibleAlertId}/discussions/{$discussion->id}",
+            ['content' => 'Cross-alert overwrite'],
+            false,
+        ];
+    }
+
+    private function mismatchedEvidencePackOperation(int $visibleAlertId): array
+    {
+        $pack = $this->packFor($this->hiddenAlert, $this->operator);
+
+        return [
+            'POST',
+            "/control-room/alerts/{$visibleAlertId}/evidence/{$pack->id}/complete",
+            [],
+            false,
+        ];
+    }
+
+    private function mismatchedEvidenceItemOperation(int $visibleAlertId, bool $download = false): array
+    {
+        $pack = $this->packFor($this->hiddenAlert, $this->operator);
+        $path = 'evidence/mismatched-proof.txt';
+        Storage::disk('local')->put($path, 'mismatched proof');
+        $item = EvidenceItem::query()->create([
+            'evidence_pack_id' => $pack->id,
+            'type' => 'document',
+            'title' => 'mismatched-proof.txt',
+            'storage_path' => $path,
+            'mime_type' => 'text/plain',
+            'file_size' => 16,
+            'captured_at' => now(),
+            'captured_by_user_id' => $this->operator->id,
+        ]);
+
+        return [
+            $download ? 'GET' : 'DELETE',
+            "/control-room/alerts/{$visibleAlertId}/evidence/{$pack->id}/items/{$item->id}".($download ? '/download' : ''),
+            [],
+            $download,
+        ];
+    }
+
+    private function mismatchedWatcherOperation(int $visibleAlertId): array
+    {
+        $watcher = AlertWatcher::query()->create([
+            'alert_id' => $this->hiddenAlert->id,
+            'user_id' => User::factory()->create()->id,
+            'added_by_user_id' => $this->operator->id,
+        ]);
+        $this->hiddenAlert->update(['watchers_count' => 1]);
+
+        return [
+            'DELETE',
+            "/control-room/alerts/{$visibleAlertId}/watchers/{$watcher->id}",
+            [],
+            false,
+        ];
+    }
+
+    private function mismatchedTimeEntryOperation(int $visibleAlertId): array
+    {
+        $entry = TimeEntry::query()->create([
+            'alert_id' => $this->hiddenAlert->id,
+            'user_id' => $this->operator->id,
+            'started_at' => now()->subMinutes(10),
+            'duration_minutes' => 0,
+        ]);
+
+        return [
+            'POST',
+            "/control-room/alerts/{$visibleAlertId}/time-entries/{$entry->id}/stop",
+            [],
+            false,
+        ];
+    }
+
+    private function mismatchedPlaybookRunOperation(int $visibleAlertId, string $action): array
+    {
+        $run = $this->playbookRunFor($this->hiddenAlert);
+
+        return [
+            'POST',
+            "/control-room/alerts/{$visibleAlertId}/playbook-runs/{$run->id}/{$action}",
+            [],
+            false,
+        ];
     }
 
     private function taskOperation(string $method, string $segment, array $payload = [], string $suffix = ''): array
     {
         $task = $this->taskFor($this->hiddenAlert, $this->operator);
 
-        return [$method, "/control-room/{$segment}/{$task->id}{$suffix}", $payload, false];
+        return [$method, "/control-room/alerts/{$this->hiddenAlert->id}/{$segment}/{$task->id}{$suffix}", $payload, false];
     }
 
     private function prepareDeniedTaskReorder(): array
@@ -335,7 +544,12 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
     ): array {
         $pack = $this->packFor($this->hiddenAlert, $this->operator);
 
-        return [$method, "/control-room/evidence/{$pack->id}/{$suffix}", $payload, $expectsNoFileResponse];
+        return [
+            $method,
+            "/control-room/alerts/{$this->hiddenAlert->id}/evidence/{$pack->id}/{$suffix}",
+            $payload,
+            $expectsNoFileResponse,
+        ];
     }
 
     private function evidenceItemOperation(string $method, bool $download = false): array
@@ -355,7 +569,12 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
         ]);
         $suffix = $download ? '/download' : '';
 
-        return [$method, "/control-room/evidence/items/{$item->id}{$suffix}", [], $download];
+        return [
+            $method,
+            "/control-room/alerts/{$this->hiddenAlert->id}/evidence/{$pack->id}/items/{$item->id}{$suffix}",
+            [],
+            $download,
+        ];
     }
 
     private function discussionOperation(string $method, array $payload = []): array
@@ -368,7 +587,12 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
             'is_internal' => true,
         ]);
 
-        return [$method, "/control-room/discussions/{$discussion->id}", $payload, false];
+        return [
+            $method,
+            "/control-room/alerts/{$this->hiddenAlert->id}/discussions/{$discussion->id}",
+            $payload,
+            false,
+        ];
     }
 
     private function prepareDeniedWatcherDestroy(): array
@@ -394,7 +618,104 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
             'duration_minutes' => $running ? 0 : 10,
         ]);
 
-        return [$method, "/control-room/time-entries/{$entry->id}".($running ? '/stop' : ''), [], false];
+        return [
+            $method,
+            "/control-room/alerts/{$this->hiddenAlert->id}/time-entries/{$entry->id}".($running ? '/stop' : ''),
+            [],
+            false,
+        ];
+    }
+
+    private function hiddenEscalationMove(): array
+    {
+        [, $targetQueue] = $this->activeEscalationQueues();
+
+        return [
+            'POST',
+            "/control-room/escalations/{$this->hiddenAlert->id}/move",
+            ['target_queue_id' => $targetQueue->id],
+            false,
+        ];
+    }
+
+    private function hiddenPlaybookStart(): array
+    {
+        $playbook = $this->playbook();
+
+        return [
+            'POST',
+            "/control-room/alerts/{$this->hiddenAlert->id}/playbook/start",
+            ['playbook_id' => $playbook->id],
+            false,
+        ];
+    }
+
+    private function hiddenPlaybookOperation(string $action): array
+    {
+        $run = $this->playbookRunFor($this->hiddenAlert);
+
+        return [
+            'POST',
+            "/control-room/alerts/{$this->hiddenAlert->id}/playbook-runs/{$run->id}/{$action}",
+            [],
+            false,
+        ];
+    }
+
+    /**
+     * @return array{TriageQueue, TriageQueue}
+     */
+    private function activeEscalationQueues(): array
+    {
+        $target = TriageQueue::query()->create([
+            'name' => 'Priority response',
+            'code' => 'priority-response-'.str()->random(8),
+            'tier' => 2,
+            'is_active' => true,
+        ]);
+        $current = TriageQueue::query()->create([
+            'name' => 'Initial triage',
+            'code' => 'initial-triage-'.str()->random(8),
+            'tier' => 1,
+            'is_active' => true,
+            'escalate_to_queue_id' => $target->id,
+        ]);
+
+        return [$current, $target];
+    }
+
+    private function playbook(): Playbook
+    {
+        $playbook = Playbook::query()->create([
+            'code' => 'nested-auth-'.str()->random(8),
+            'name' => 'Nested authorization playbook',
+            'category' => 'safety',
+            'is_active' => true,
+        ]);
+        PlaybookStep::query()->create([
+            'playbook_id' => $playbook->id,
+            'order' => 0,
+            'title' => 'Verify the alert',
+            'type' => 'task',
+        ]);
+
+        return $playbook;
+    }
+
+    private function playbookRunFor(ControlRoomAlert $alert): PlaybookRun
+    {
+        $run = PlaybookRun::query()->create([
+            'playbook_id' => $this->playbook()->id,
+            'alert_id' => $alert->id,
+            'status' => PlaybookRun::STATUS_PENDING,
+            'current_step' => 0,
+            'completed_steps' => 0,
+            'total_steps' => 1,
+        ]);
+        $run->start($this->operator);
+        $alert->update(['playbook_run_id' => $run->id]);
+
+        return $run;
     }
 
     private function prepareCrossAlertInjection(string $operation, ControlRoomAlert $otherAlert): array
@@ -424,7 +745,11 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
         $task = $this->taskFor($this->visibleAlert, $this->operator);
         $parent = $this->taskFor($otherAlert, $this->operator);
 
-        return ['PUT', "/control-room/tasks/{$task->id}", ['parent_task_id' => $parent->id]];
+        return [
+            'PUT',
+            "/control-room/alerts/{$this->visibleAlert->id}/tasks/{$task->id}",
+            ['parent_task_id' => $parent->id],
+        ];
     }
 
     private function crossAlertDiscussionParent(ControlRoomAlert $otherAlert): array
@@ -477,7 +802,7 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
     {
         $task = $this->taskFor($this->visibleAlert, $this->operator);
 
-        return ['PUT', "/control-room/tasks/{$task->id}", [
+        return ['PUT', "/control-room/alerts/{$this->visibleAlert->id}/tasks/{$task->id}", [
             'assigned_to_user_id' => $recipient->id,
         ]];
     }
@@ -508,15 +833,33 @@ class ControlRoomNestedRecordAuthorizationTest extends TestCase
     private function snapshotAlertData(ControlRoomAlert $alert): array
     {
         $packIds = EvidencePack::query()->where('alert_id', $alert->id)->pluck('id');
+        $runIds = PlaybookRun::query()->where('alert_id', $alert->id)->pluck('id');
 
         return [
-            'alert' => $alert->fresh()->only(['watchers_count', 'time_spent_minutes']),
+            'alert' => $alert->fresh()->only([
+                'watchers_count',
+                'time_spent_minutes',
+                'queue_id',
+                'escalation_level',
+                'escalated_at',
+                'escalated_by_user_id',
+                'playbook_run_id',
+                'context',
+            ]),
             'tasks' => AlertTask::query()->where('alert_id', $alert->id)->orderBy('id')->get()->toArray(),
             'packs' => EvidencePack::query()->where('alert_id', $alert->id)->orderBy('id')->get()->toArray(),
             'items' => EvidenceItem::query()->whereIn('evidence_pack_id', $packIds)->orderBy('id')->get()->toArray(),
             'discussions' => AlertDiscussion::query()->where('alert_id', $alert->id)->orderBy('id')->get()->toArray(),
             'watchers' => AlertWatcher::query()->where('alert_id', $alert->id)->orderBy('id')->get()->toArray(),
             'time_entries' => TimeEntry::query()->where('alert_id', $alert->id)->orderBy('id')->get()->toArray(),
+            'queue_history' => AlertQueue::query()->where('alert_id', $alert->id)->orderBy('id')->get()->toArray(),
+            'playbook_runs' => PlaybookRun::query()->where('alert_id', $alert->id)->orderBy('id')->get()->toArray(),
+            'playbook_steps' => DB::table('control_room_playbook_run_steps')
+                ->whereIn('playbook_run_id', $runIds)
+                ->orderBy('id')
+                ->get()
+                ->map(fn ($row) => (array) $row)
+                ->all(),
             'audit_count' => DB::table('audit_logs')->count(),
             'files' => collect(Storage::disk('local')->allFiles())->sort()->values()->all(),
         ];

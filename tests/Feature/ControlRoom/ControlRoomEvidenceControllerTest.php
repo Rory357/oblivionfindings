@@ -98,7 +98,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/evidence/{$pack->id}/items", [
+            ->post("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items", [
                 'item_type' => 'note',
                 'content' => 'A handwritten observation typed into the system',
             ])
@@ -124,7 +124,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/evidence/{$pack->id}/items", [
+            ->post("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items", [
                 'item_type' => 'note',
                 'content' => 'Call log: reached on the landline, all well.',
             ])
@@ -149,7 +149,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/evidence/{$pack->id}/items", [
+            ->post("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items", [
                 'item_type' => 'note',
                 'content' => 'Should be rejected',
             ])
@@ -167,7 +167,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/evidence/{$pack->id}/complete")
+            ->post("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/complete")
             ->assertRedirect();
 
         $this->assertSame('complete', $pack->fresh()->status);
@@ -184,7 +184,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/evidence/{$pack->id}/complete")
+            ->post("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/complete")
             ->assertSessionHasErrors('pack');
     }
 
@@ -201,7 +201,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/evidence/{$pack->id}/items", [
+            ->post("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items", [
                 'file' => UploadedFile::fake()->image('door-photo.png'),
             ])
             ->assertRedirect();
@@ -209,7 +209,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
         $item = EvidenceItem::query()->where('evidence_pack_id', $pack->id)->firstOrFail();
 
         $this->actingAs($this->admin)
-            ->get("/control-room/evidence/items/{$item->id}/download")
+            ->get("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items/{$item->id}/download")
             ->assertOk()
             ->assertDownload('door-photo.png');
     }
@@ -235,12 +235,12 @@ class ControlRoomEvidenceControllerTest extends TestCase
 
         // A note has no stored file to download.
         $this->actingAs($this->admin)
-            ->get("/control-room/evidence/items/{$note->id}/download")
+            ->get("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items/{$note->id}/download")
             ->assertNotFound();
 
         $stranger = User::factory()->create(['approved_at' => now()]);
         $this->actingAs($stranger)
-            ->get("/control-room/evidence/items/{$note->id}/download")
+            ->get("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items/{$note->id}/download")
             ->assertForbidden();
     }
 
@@ -283,7 +283,10 @@ class ControlRoomEvidenceControllerTest extends TestCase
         $this->assertNull($noteRow['download_url']);
 
         $fileRow = $items->firstWhere('id', $file->id);
-        $this->assertSame("/control-room/evidence/items/{$file->id}/download", $fileRow['download_url']);
+        $this->assertSame(
+            "/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items/{$file->id}/download",
+            $fileRow['download_url'],
+        );
     }
 
     public function test_destroy_item_removes_item_from_collecting_pack(): void
@@ -306,7 +309,7 @@ class ControlRoomEvidenceControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->delete("/control-room/evidence/items/{$item->id}")
+            ->delete("/control-room/alerts/{$pack->alert_id}/evidence/{$pack->id}/items/{$item->id}")
             ->assertRedirect();
 
         $this->assertDatabaseMissing('control_room_evidence_items', ['id' => $item->id]);

@@ -95,7 +95,7 @@ class ControlRoomTimeEntryControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/time-entries/{$entry->id}/stop", ['description' => 'Triage time'])
+            ->post("/control-room/alerts/{$entry->alert_id}/time-entries/{$entry->id}/stop", ['description' => 'Triage time'])
             ->assertOk();
 
         $entry->refresh();
@@ -118,7 +118,7 @@ class ControlRoomTimeEntryControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->postJson("/control-room/time-entries/{$entry->id}/stop")
+            ->postJson("/control-room/alerts/{$entry->alert_id}/time-entries/{$entry->id}/stop")
             ->assertStatus(422);
     }
 
@@ -159,7 +159,7 @@ class ControlRoomTimeEntryControllerTest extends TestCase
         $this->alert->update(['time_spent_minutes' => 10]);
 
         $this->actingAs($this->admin)
-            ->delete("/control-room/time-entries/{$entry->id}")
+            ->delete("/control-room/alerts/{$entry->alert_id}/time-entries/{$entry->id}")
             ->assertOk();
 
         $this->assertDatabaseMissing('control_room_time_entries', ['id' => $entry->id]);

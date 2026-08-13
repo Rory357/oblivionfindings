@@ -90,7 +90,7 @@ class ControlRoomTaskController extends Controller
         }
 
         DB::transaction(function () use ($alert, $data, $user): void {
-            $lockedAlert = $this->lockAlert($alert);
+            $lockedAlert = $this->nestedAlertResources()->alert($user, $alert, true);
             if ($lockedAlert->isTerminal()) {
                 throw ValidationException::withMessages([
                     'alert' => 'Operational tasks cannot be created for a resolved, closed, or dismissed alert.',
@@ -135,12 +135,12 @@ class ControlRoomTaskController extends Controller
     /**
      * Update a task's fields.
      */
-    public function update(Request $request, AlertTask $task)
+    public function update(Request $request, ControlRoomAlert $alert, int $task)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $alert = $task->alert;
-        $this->assertCanAccessAlert($user, $alert);
+        $taskId = $task;
+        $task = $this->nestedAlertResources()->task($user, $alert, $taskId);
 
         $data = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:200'],
@@ -162,9 +162,9 @@ class ControlRoomTaskController extends Controller
             $this->assertCanAssignAlertToUser($user, (int) $data['assigned_to_user_id']);
         }
 
-        DB::transaction(function () use ($alert, $task, $data): void {
-            $lockedAlert = $this->lockAlert($alert);
-            $lockedTask = $this->lockTaskForAlert($task, $lockedAlert);
+        DB::transaction(function () use ($alert, $data, $taskId, $user): void {
+            $lockedTask = $this->nestedAlertResources()->task($user, $alert, $taskId, true);
+            $lockedAlert = $lockedTask->alert;
             $this->assertAlertAllowsTaskMutation($lockedAlert, 'alert');
             $this->assertTaskIsMutable($lockedTask);
 
@@ -191,12 +191,14 @@ class ControlRoomTaskController extends Controller
      */
     public function updateStatus(
         Request $request,
-        AlertTask $task,
+        ControlRoomAlert $alert,
+        int $task,
         ControlRoomAlertLifecycleService $lifecycle,
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessAlert($user, $task->alert);
+        $taskId = $task;
+        $task = $this->nestedAlertResources()->task($user, $alert, $taskId);
 
         $data = $request->validate([
             'status' => ['required', Rule::in([
@@ -226,9 +228,9 @@ class ControlRoomTaskController extends Controller
             return back()->with('success', 'Task cancelled.');
         }
 
-        DB::transaction(function () use ($task, $newStatus, $user): void {
-            $lockedAlert = $this->lockAlertForTask($task);
-            $lockedTask = $this->lockTaskForAlert($task, $lockedAlert);
+        DB::transaction(function () use ($alert, $newStatus, $taskId, $user): void {
+            $lockedTask = $this->nestedAlertResources()->task($user, $alert, $taskId, true);
+            $lockedAlert = $lockedTask->alert;
             $this->assertAlertAllowsTaskMutation($lockedAlert, 'status');
             $this->assertTaskIsMutable($lockedTask);
 
@@ -258,12 +260,13 @@ class ControlRoomTaskController extends Controller
      */
     public function transferToHealthSafety(
         Request $request,
-        AlertTask $task,
+        ControlRoomAlert $alert,
+        int $task,
         ControlRoomAlertLifecycleService $lifecycle,
     ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessAlert($user, $task->alert);
+        $task = $this->nestedAlertResources()->task($user, $alert, $task);
 
         $request->validate([
             'hs_event_id' => ['prohibited'],
@@ -281,17 +284,16 @@ class ControlRoomTaskController extends Controller
     /**
      * Delete a task.
      */
-    public function destroy(Request $request, AlertTask $task)
+    public function destroy(Request $request, ControlRoomAlert $alert, int $task)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $taskId = $task;
+        $this->nestedAlertResources()->task($user, $alert, $taskId);
 
-        $alert = $task->alert;
-        $this->assertCanAccessAlert($user, $alert);
-
-        DB::transaction(function () use ($alert, $task): void {
-            $lockedAlert = $this->lockAlert($alert);
-            $lockedTask = $this->lockTaskForAlert($task, $lockedAlert);
+        DB::transaction(function () use ($alert, $taskId, $user): void {
+            $lockedTask = $this->nestedAlertResources()->task($user, $alert, $taskId, true);
+            $lockedAlert = $lockedTask->alert;
             $this->assertAlertAllowsTaskMutation($lockedAlert, 'alert');
             $this->assertTaskIsMutable($lockedTask);
             throw ValidationException::withMessages([
@@ -322,7 +324,7 @@ class ControlRoomTaskController extends Controller
         ]);
 
         DB::transaction(function () use ($alert, $data, $user): void {
-            $lockedAlert = $this->lockAlert($alert);
+            $lockedAlert = $this->nestedAlertResources()->alert($user, $alert, true);
             $this->assertAlertAllowsTaskMutation($lockedAlert, 'alert');
             $lockedTasks = AlertTask::query()
                 ->where('alert_id', $lockedAlert->id)
@@ -361,31 +363,6 @@ class ControlRoomTaskController extends Controller
         }, self::TRANSACTION_ATTEMPTS);
 
         return back()->with('success', 'Tasks reordered.');
-    }
-
-    private function lockAlert(ControlRoomAlert $alert): ControlRoomAlert
-    {
-        return ControlRoomAlert::query()
-            ->whereKey($alert->id)
-            ->lockForUpdate()
-            ->firstOrFail();
-    }
-
-    private function lockAlertForTask(AlertTask $task): ControlRoomAlert
-    {
-        return ControlRoomAlert::query()
-            ->whereKey($task->alert_id)
-            ->lockForUpdate()
-            ->firstOrFail();
-    }
-
-    private function lockTaskForAlert(AlertTask $task, ControlRoomAlert $alert): AlertTask
-    {
-        return AlertTask::query()
-            ->whereKey($task->id)
-            ->where('alert_id', $alert->id)
-            ->lockForUpdate()
-            ->firstOrFail();
     }
 
     private function assertTaskParentDoesNotCreateCycle(AlertTask $task, ?int $parentTaskId): void

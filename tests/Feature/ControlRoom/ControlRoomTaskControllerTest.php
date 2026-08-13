@@ -120,7 +120,7 @@ class ControlRoomTaskControllerTest extends TestCase
             ->assertSessionHasErrors('alert');
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$completedTask->id}/status", [
+            ->post("/control-room/alerts/{$completedTask->alert_id}/tasks/{$completedTask->id}/status", [
                 'status' => AlertTask::STATUS_OPEN,
             ])
             ->assertSessionHasErrors('status');
@@ -138,7 +138,7 @@ class ControlRoomTaskControllerTest extends TestCase
         $this->resolveAlert();
 
         $this->actingAs($this->admin)
-            ->put("/control-room/tasks/{$task->id}", ['title' => 'Rewritten history'])
+            ->put("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}", ['title' => 'Rewritten history'])
             ->assertSessionHasErrors('alert');
 
         $this->assertSame('Historical task', $task->fresh()->title);
@@ -150,7 +150,7 @@ class ControlRoomTaskControllerTest extends TestCase
         $this->resolveAlert();
 
         $this->actingAs($this->admin)
-            ->delete("/control-room/tasks/{$task->id}")
+            ->delete("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}")
             ->assertSessionHasErrors('alert');
 
         $this->assertDatabaseHas('control_room_alert_tasks', ['id' => $task->id]);
@@ -178,7 +178,7 @@ class ControlRoomTaskControllerTest extends TestCase
         $this->resolveAlert();
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/status", [
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/status", [
                 'status' => AlertTask::STATUS_CANCELLED,
                 'reason' => 'Attempted after the alert was resolved.',
             ])
@@ -196,7 +196,7 @@ class ControlRoomTaskControllerTest extends TestCase
         $this->resolveAlert();
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/transfer-to-health-safety")
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/transfer-to-health-safety")
             ->assertSessionHasErrors('task');
 
         $this->assertSame(AlertTask::STATUS_OPEN, $task->fresh()->status);
@@ -216,13 +216,13 @@ class ControlRoomTaskControllerTest extends TestCase
 
         $task = AlertTask::query()->where('title', 'Lock-order task')->firstOrFail();
         $updateQueries = $this->captureDatabaseQueries(fn () => $this->actingAs($this->admin)
-            ->put("/control-room/tasks/{$task->id}", ['title' => 'Lock-order task updated'])
+            ->put("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}", ['title' => 'Lock-order task updated'])
             ->assertRedirect()
             ->assertSessionDoesntHaveErrors());
         $this->assertAlertLockPrecedesTaskLock($updateQueries, 'update');
 
         $statusQueries = $this->captureDatabaseQueries(fn () => $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/status", [
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/status", [
                 'status' => AlertTask::STATUS_IN_PROGRESS,
             ])
             ->assertRedirect()
@@ -238,7 +238,7 @@ class ControlRoomTaskControllerTest extends TestCase
             'sort_order' => 2,
         ]);
         $deleteQueries = $this->captureDatabaseQueries(fn () => $this->actingAs($this->admin)
-            ->delete("/control-room/tasks/{$deleteTask->id}")
+            ->delete("/control-room/alerts/{$deleteTask->alert_id}/tasks/{$deleteTask->id}")
             ->assertRedirect()
             ->assertSessionHasErrors('task'));
         $this->assertAlertLockPrecedesTaskLock($deleteQueries, 'delete');
@@ -273,7 +273,7 @@ class ControlRoomTaskControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/status", ['status' => 'completed'])
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/status", ['status' => 'completed'])
             ->assertRedirect();
 
         $task->refresh();
@@ -296,19 +296,19 @@ class ControlRoomTaskControllerTest extends TestCase
         $activeTask = $this->makeTask('Active task', 2);
 
         $this->actingAs($this->admin)
-            ->put("/control-room/tasks/{$terminalTask->id}", [
+            ->put("/control-room/alerts/{$terminalTask->alert_id}/tasks/{$terminalTask->id}", [
                 'title' => 'Rewritten terminal history',
             ])
             ->assertSessionHasErrors('task');
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$terminalTask->id}/status", [
+            ->post("/control-room/alerts/{$terminalTask->alert_id}/tasks/{$terminalTask->id}/status", [
                 'status' => AlertTask::STATUS_OPEN,
             ])
             ->assertSessionHasErrors('task');
 
         $this->actingAs($this->admin)
-            ->delete("/control-room/tasks/{$terminalTask->id}")
+            ->delete("/control-room/alerts/{$terminalTask->alert_id}/tasks/{$terminalTask->id}")
             ->assertSessionHasErrors('task');
 
         $this->actingAs($this->admin)
@@ -337,7 +337,7 @@ class ControlRoomTaskControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/tasks/{$task->id}/status", ['status' => 'invalid'])
+            ->post("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}/status", ['status' => 'invalid'])
             ->assertSessionHasErrors('status');
     }
 
@@ -384,7 +384,7 @@ class ControlRoomTaskControllerTest extends TestCase
         ])->save();
 
         $this->actingAs($this->admin)
-            ->delete("/control-room/tasks/{$task->id}")
+            ->delete("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}")
             ->assertRedirect()
             ->assertSessionHasErrors([
                 'task' => 'Tasks are part of the alert history and cannot be deleted. Complete, cancel with a reason, or transfer active tasks instead.',
@@ -453,7 +453,7 @@ class ControlRoomTaskControllerTest extends TestCase
         $auditCount = DB::table('audit_logs')->count();
 
         $response = $this->actingAs($this->admin)
-            ->putJson("/control-room/tasks/{$task->id}", [
+            ->putJson("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}", [
                 'parent_task_id' => $task->id,
             ]);
 
@@ -484,7 +484,7 @@ class ControlRoomTaskControllerTest extends TestCase
         $auditCount = DB::table('audit_logs')->count();
 
         $response = $this->actingAs($this->admin)
-            ->putJson("/control-room/tasks/{$ancestor->id}", [
+            ->putJson("/control-room/alerts/{$ancestor->alert_id}/tasks/{$ancestor->id}", [
                 'parent_task_id' => $descendant->id,
             ]);
 
@@ -590,14 +590,14 @@ class ControlRoomTaskControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->put("/control-room/tasks/{$task->id}", [
+            ->put("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}", [
                 'parent_task_id' => $secondParent->id,
             ])
             ->assertRedirect();
         $this->assertSame($secondParent->id, $task->fresh()->parent_task_id);
 
         $this->actingAs($this->admin)
-            ->put("/control-room/tasks/{$task->id}", [
+            ->put("/control-room/alerts/{$task->alert_id}/tasks/{$task->id}", [
                 'description' => null,
                 'assigned_to_user_id' => null,
                 'due_at' => null,

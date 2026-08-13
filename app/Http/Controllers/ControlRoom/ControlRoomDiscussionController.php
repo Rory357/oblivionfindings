@@ -10,6 +10,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ControlRoomDiscussionController extends Controller
@@ -128,55 +129,74 @@ class ControlRoomDiscussionController extends Controller
     /**
      * Edit a discussion entry (own only).
      */
-    public function update(Request $request, AlertDiscussion $discussion)
+    public function update(Request $request, ControlRoomAlert $alert, int $discussion)
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->assertCanAccessAlert($user, $discussion->alert);
+        $discussionId = $discussion;
+        $discussion = $this->nestedAlertResources()->discussion($user, $alert, $discussionId);
         abort_unless($discussion->user_id === $user->id, 403);
 
         $data = $request->validate([
             'content' => ['required', 'string', 'max:5000'],
         ]);
 
-        $discussion->update([
-            'content' => $data['content'],
-            'edited_at' => now(),
-        ]);
+        DB::transaction(function () use ($alert, $data, $discussionId, $user): void {
+            $locked = $this->nestedAlertResources()->discussion($user, $alert, $discussionId, true);
+            abort_unless($locked->user_id === $user->id, 403);
 
-        AuditLogger::log('controlRoom.discussion.updated', $discussion->alert, [
-            'alert_id' => $discussion->alert_id,
-            'discussion_id' => $discussion->id,
-        ]);
+            $locked->update([
+                'content' => $data['content'],
+                'edited_at' => now(),
+            ]);
+
+            AuditLogger::log('controlRoom.discussion.updated', $alert, [
+                'alert_id' => $alert->id,
+                'discussion_id' => $locked->id,
+            ]);
+        }, 3);
 
         if ($request->header('X-Inertia')) {
             return $this->inertiaOrJson($request, 'Comment updated.');
         }
 
-        return response()->json(['discussion' => $discussion->fresh()]);
+        return response()->json([
+            'discussion' => $this->nestedAlertResources()->discussion($user, $alert, $discussionId),
+        ]);
     }
 
     /**
      * Soft-delete a discussion (own or manager).
      */
-    public function destroy(Request $request, AlertDiscussion $discussion)
+    public function destroy(Request $request, ControlRoomAlert $alert, int $discussion)
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->assertCanAccessAlert($user, $discussion->alert);
+        $discussionId = $discussion;
+        $discussion = $this->nestedAlertResources()->discussion($user, $alert, $discussionId);
         $isOwner = $user && $discussion->user_id === $user->id;
         $canManage = $user && $user->canDo('controlRoom.alerts.manage');
         abort_unless($isOwner || $canManage, 403);
 
-        $discussion->update([
-            'content' => '[deleted]',
-            'attachments' => null,
-        ]);
+        DB::transaction(function () use ($alert, $discussionId, $user): void {
+            $locked = $this->nestedAlertResources()->discussion($user, $alert, $discussionId, true);
+            $isOwner = $locked->user_id === $user->id;
+            abort_unless($isOwner || $user->canDo('controlRoom.alerts.manage'), 403);
 
-        AuditLogger::log('controlRoom.discussion.deleted', $discussion->alert, [
-            'alert_id' => $discussion->alert_id,
-            'discussion_id' => $discussion->id,
-        ]);
+            if ($locked->content === '[deleted]' && $locked->attachments === null) {
+                return;
+            }
+
+            $locked->update([
+                'content' => '[deleted]',
+                'attachments' => null,
+            ]);
+
+            AuditLogger::log('controlRoom.discussion.deleted', $alert, [
+                'alert_id' => $alert->id,
+                'discussion_id' => $locked->id,
+            ]);
+        }, 3);
 
         if ($request->header('X-Inertia')) {
             return $this->inertiaOrJson($request, 'Comment deleted.');

@@ -10,6 +10,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ControlRoomWatcherController extends Controller
 {
@@ -122,31 +123,25 @@ class ControlRoomWatcherController extends Controller
     /**
      * Remove a watcher from an alert.
      */
-    public function destroy(Request $request, ControlRoomAlert $alert, int $userId)
+    public function destroy(Request $request, ControlRoomAlert $alert, int $watcher)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessAlert($user, $alert);
+        $watcherId = $watcher;
+        $this->nestedAlertResources()->watcher($user, $alert, $watcherId);
 
-        $watcher = AlertWatcher::where('alert_id', $alert->id)
-            ->where('user_id', $userId)
-            ->first();
+        DB::transaction(function () use ($alert, $user, $watcherId): void {
+            $locked = $this->nestedAlertResources()->watcher($user, $alert, $watcherId, true);
+            $watcherUserId = $locked->user_id;
 
-        if (! $watcher) {
-            if ($request->header('X-Inertia')) {
-                return back()->withErrors(['alert' => 'That person is not watching this alert.']);
-            }
+            $locked->delete();
+            $locked->alert()->decrement('watchers_count');
 
-            return response()->json(['message' => 'Watcher not found.'], 404);
-        }
-
-        $watcher->delete();
-        $alert->decrement('watchers_count');
-
-        AuditLogger::log('controlRoom.watcher.removed', $alert, [
-            'alert_id' => $alert->id,
-            'watcher_user_id' => $userId,
-        ]);
+            AuditLogger::log('controlRoom.watcher.removed', $alert, [
+                'alert_id' => $alert->id,
+                'watcher_user_id' => $watcherUserId,
+            ]);
+        }, 3);
 
         return $this->inertiaOrJson($request, 'Watcher removed.');
     }
