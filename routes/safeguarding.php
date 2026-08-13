@@ -1,12 +1,12 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\SafeguardingConcernController;
-use App\Http\Controllers\SafeguardingInvestigationController;
-use App\Http\Controllers\SafeguardingExternalReportController;
-use App\Http\Controllers\SafeguardingRiskAssessmentController;
 use App\Http\Controllers\SafeguardingActionPlanController;
 use App\Http\Controllers\SafeguardingAttachmentController;
+use App\Http\Controllers\SafeguardingConcernController;
+use App\Http\Controllers\SafeguardingExternalReportController;
+use App\Http\Controllers\SafeguardingInvestigationController;
+use App\Http\Controllers\SafeguardingRiskAssessmentController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * Safeguarding & Allegations Management Routes
@@ -14,7 +14,6 @@ use App\Http\Controllers\SafeguardingAttachmentController;
  * Handles safeguarding concerns, investigations, external reports,
  * risk assessments, and action plans for protecting vulnerable adults.
  */
-
 Route::middleware(['auth'])->group(function () {
     // Safeguarding concerns - Create routes must come before wildcard routes
     Route::middleware('permission:safeguarding.create')->group(function () {
@@ -61,6 +60,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/safeguarding/{concern}/investigations', [SafeguardingInvestigationController::class, 'store'])
             ->name('safeguarding.investigations.store');
         Route::put('/safeguarding/{concern}/investigations/{investigation}', [SafeguardingInvestigationController::class, 'update'])
+            ->scopeBindings()
             ->name('safeguarding.investigations.update');
     });
 
@@ -69,6 +69,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/safeguarding/{concern}/external-reports', [SafeguardingExternalReportController::class, 'store'])
             ->name('safeguarding.externalReports.store');
         Route::put('/safeguarding/{concern}/external-reports/{report}', [SafeguardingExternalReportController::class, 'update'])
+            ->scopeBindings()
             ->name('safeguarding.externalReports.update');
     });
 
@@ -80,15 +81,19 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/safeguarding/{concern}/attachments', [SafeguardingAttachmentController::class, 'store'])
         ->name('safeguarding.attachments.store');
     Route::get('/safeguarding/{concern}/attachments/{attachment}/download', [SafeguardingAttachmentController::class, 'download'])
+        ->scopeBindings()
         ->name('safeguarding.attachments.download');
     Route::delete('/safeguarding/{concern}/attachments/{attachment}', [SafeguardingAttachmentController::class, 'destroy'])
+        ->scopeBindings()
         ->name('safeguarding.attachments.destroy');
 
     // Action plans
     Route::post('/safeguarding/{concern}/action-plans', [SafeguardingActionPlanController::class, 'store'])
         ->name('safeguarding.actionPlans.store');
     Route::put('/safeguarding/{concern}/action-plans/{actionPlan}', [SafeguardingActionPlanController::class, 'update'])
+        ->scopeBindings()
         ->name('safeguarding.actionPlans.update');
     Route::post('/safeguarding/{concern}/action-plans/{actionPlan}/complete', [SafeguardingActionPlanController::class, 'complete'])
+        ->scopeBindings()
         ->name('safeguarding.actionPlans.complete');
 });

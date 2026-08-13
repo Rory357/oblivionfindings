@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\SafeguardingConcern;
 use App\Models\SafeguardingInvestigation;
-use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -49,7 +48,9 @@ class SafeguardingInvestigationController extends Controller
      */
     public function update(Request $request, SafeguardingConcern $concern, SafeguardingInvestigation $investigation): RedirectResponse
     {
-        $this->authorize('investigate', $concern);
+        $actualConcern = $investigation->concern()->firstOrFail();
+        abort_unless($actualConcern->is($concern), 404);
+        $this->authorize('investigate', $actualConcern);
 
         $validated = $request->validate([
             'status' => 'nullable|in:planned,in_progress,paused,completed,abandoned,pending,cancelled,on_hold',

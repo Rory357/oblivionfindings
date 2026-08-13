@@ -50,8 +50,9 @@ class SafeguardingAttachmentController extends Controller
 
     public function download(Request $request, SafeguardingConcern $concern, SafeguardingAttachment $attachment): StreamedResponse
     {
-        $this->authorize('view', $concern);
-        abort_unless((int) $attachment->safeguarding_concern_id === (int) $concern->id, 404);
+        $actualConcern = $attachment->concern()->firstOrFail();
+        abort_unless($actualConcern->is($concern), 404);
+        $this->authorize('view', $actualConcern);
 
         // Sensitive evidence is need-to-know.
         if ($attachment->is_sensitive) {
@@ -69,8 +70,9 @@ class SafeguardingAttachmentController extends Controller
 
     public function destroy(Request $request, SafeguardingConcern $concern, SafeguardingAttachment $attachment): RedirectResponse
     {
-        $this->authorize('update', $concern);
-        abort_unless((int) $attachment->safeguarding_concern_id === (int) $concern->id, 404);
+        $actualConcern = $attachment->concern()->firstOrFail();
+        abort_unless($actualConcern->is($concern), 404);
+        $this->authorize('update', $actualConcern);
 
         $disk = $attachment->disk ?: 'private';
         if ($attachment->path && Storage::disk($disk)->exists($attachment->path)) {
