@@ -12,8 +12,7 @@ class AssetGeofenceController extends Controller
 {
     public function store(Request $request, Asset $asset)
     {
-        $this->authorize('view', $asset);
-        abort_unless($request->user()?->canDo('assets.geofences.manage'), 403);
+        $this->authorize('manageGeofences', $asset);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:150'],
@@ -43,8 +42,7 @@ class AssetGeofenceController extends Controller
 
     public function destroy(Request $request, Asset $asset, AssetGeofence $geofence)
     {
-        $this->authorize('view', $asset);
-        abort_unless($request->user()?->canDo('assets.geofences.manage'), 403);
+        $this->authorize('manageGeofences', $asset);
 
         if ($geofence->asset_id !== $asset->id) {
             abort(404);

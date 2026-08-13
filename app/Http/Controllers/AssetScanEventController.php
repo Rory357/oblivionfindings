@@ -11,8 +11,7 @@ class AssetScanEventController extends Controller
 {
     public function store(Request $request, Asset $asset)
     {
-        $this->authorize('view', $asset);
-        abort_unless($request->user()?->canDo('assets.scan.record'), 403);
+        $this->authorize('recordScan', $asset);
 
         $data = $request->validate([
             'qr_token' => ['required', 'string', 'max:64'],

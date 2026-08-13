@@ -15,7 +15,7 @@ class AssetAssignmentController extends Controller
 
     public function store(Request $request, Asset $asset)
     {
-        abort_unless($request->user()?->canDo('assets.assignments.manage'), 403);
+        $this->authorize('manageAssignments', $asset);
 
         $data = $request->validate([
             'assignee_type' => ['required', 'in:staff,client,whanau'],
@@ -31,7 +31,7 @@ class AssetAssignmentController extends Controller
 
     public function release(Request $request, Asset $asset, AssetAssignment $assignment)
     {
-        abort_unless($request->user()?->canDo('assets.assignments.manage'), 403);
+        $this->authorize('manageAssignments', $asset);
 
         $this->assignments->release($request->user(), $asset, $assignment);
 

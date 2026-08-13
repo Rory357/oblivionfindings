@@ -14,7 +14,7 @@ class AssetOwnershipController extends Controller
 
     public function store(Request $request, Asset $asset)
     {
-        abort_unless($request->user()?->canDo('assets.ownership.manage'), 403);
+        $this->authorize('manageOwnership', $asset);
 
         $data = $request->validate([
             'owner_type' => ['required', 'in:site,client'],

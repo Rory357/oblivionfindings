@@ -2,9 +2,10 @@
 
 namespace App\Policies;
 
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
-use App\Models\Client;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 class AssetPolicy
 {
@@ -13,54 +14,11 @@ class AssetPolicy
         return $user->canDo('assets.viewAny') || $user->canDo('assets.viewAssigned');
     }
 
-    public function view(User $user, Asset $asset): bool
+    public function view(User $user, Asset $asset): Response
     {
-        if ($user->canDo('assets.viewAny')) {
-            return true;
-        }
-
-        // Assigned-only access for support workers:
-        if (!$user->canDo('assets.viewAssigned')) {
-            return false;
-        }
-
-        // If the asset is linked to a client, allow access if the user is assigned to
-        // that client OR is assigned to any client at the same site (Option C).
-        if ($asset->client_id) {
-            if (!$user->hasRole('support_worker')) {
-                return false;
-            }
-
-            $assignedToClient = Client::query()
-                ->whereKey($asset->client_id)
-                ->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
-                ->exists();
-
-            if ($assignedToClient) {
-                return true;
-            }
-
-            // If the asset is stored at a site, allow if the worker is assigned to any client at that site.
-            if ($asset->site_id) {
-                return Client::query()
-                    ->where('site_id', $asset->site_id)
-                    ->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
-                    ->exists();
-            }
-
-            return false;
-        }
-
-        // If it's a site-level asset, allow if the user is assigned to ANY client at that site.
-        if ($asset->site_id) {
-            return $user->hasRole('support_worker')
-                && Client::query()
-                    ->where('site_id', $asset->site_id)
-                    ->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
-                    ->exists();
-        }
-
-        return false;
+        return $this->access()->canAccessAsset($user, $asset)
+            ? Response::allow()
+            : Response::denyAsNotFound();
     }
 
     public function create(User $user): bool
@@ -68,29 +26,64 @@ class AssetPolicy
         return $user->canDo('assets.create');
     }
 
-    public function update(User $user, Asset $asset): bool
+    public function update(User $user, Asset $asset): Response
     {
-        // Update is allowed if they have the permission and can view the asset.
-        return $user->canDo('assets.update') && $this->view($user, $asset);
+        return $this->objectAction($user, $asset, 'assets.update');
     }
 
-    public function delete(User $user, Asset $asset): bool
+    public function delete(User $user, Asset $asset): Response
     {
-        return $user->canDo('assets.delete') && $this->view($user, $asset);
+        return $this->objectAction($user, $asset, 'assets.delete');
     }
 
-    public function recordInspection(User $user, Asset $asset): bool
+    public function recordInspection(User $user, Asset $asset): Response
     {
-        return $user->canDo('assets.inspections.record') && $this->view($user, $asset);
+        return $this->objectAction($user, $asset, 'assets.inspections.record');
     }
 
-    public function recordMaintenance(User $user, Asset $asset): bool
+    public function recordMaintenance(User $user, Asset $asset): Response
     {
-        return $user->canDo('assets.maintenance.record') && $this->view($user, $asset);
+        return $this->objectAction($user, $asset, 'assets.maintenance.record');
     }
 
-    public function manageDocuments(User $user, Asset $asset): bool
+    public function manageDocuments(User $user, Asset $asset): Response
     {
-        return $user->canDo('assets.documents.manage') && $this->view($user, $asset);
+        return $this->objectAction($user, $asset, 'assets.documents.manage');
+    }
+
+    public function manageOwnership(User $user, Asset $asset): Response
+    {
+        return $this->objectAction($user, $asset, 'assets.ownership.manage');
+    }
+
+    public function manageAssignments(User $user, Asset $asset): Response
+    {
+        return $this->objectAction($user, $asset, 'assets.assignments.manage');
+    }
+
+    public function manageGeofences(User $user, Asset $asset): Response
+    {
+        return $this->objectAction($user, $asset, 'assets.geofences.manage');
+    }
+
+    public function recordScan(User $user, Asset $asset): Response
+    {
+        return $this->objectAction($user, $asset, 'assets.scan.record');
+    }
+
+    private function objectAction(User $user, Asset $asset, string $permission): Response
+    {
+        if (! $this->access()->canAccessAsset($user, $asset)) {
+            return Response::denyAsNotFound();
+        }
+
+        return $user->canDo($permission)
+            ? Response::allow()
+            : Response::deny();
+    }
+
+    private function access(): SecurityDevicesAccessService
+    {
+        return app(SecurityDevicesAccessService::class);
     }
 }
