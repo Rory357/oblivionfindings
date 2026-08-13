@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\Medication\SafetyOverrideReason;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
@@ -31,6 +32,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationException;
 
 class MedicationsApiController extends Controller
@@ -310,6 +312,7 @@ class MedicationsApiController extends Controller
             'record' => $user->canDo('medications.administer.record')
                 || $user->canDo('clients.update')
                 || $user->canDo('medications.orders.manage'),
+            'override_safety' => $user->canDo('medications.administer.override_safety'),
             'correct' => $user->canDo('medications.administer.correct') || $user->canDo('clients.update'),
             'witness' => $user->canDo('medications.controlled.witness'),
         ];
@@ -354,7 +357,11 @@ class MedicationsApiController extends Controller
 
         $check = $this->safetyService->performSafetyCheck($client, $medication);
 
-        return response()->json($check);
+        return response()->json([
+            ...$check,
+            'can_override_safety' => $request->user()->canDo('medications.administer.override_safety'),
+            'override_reason_options' => SafetyOverrideReason::options(),
+        ]);
     }
 
     /**
@@ -623,7 +630,7 @@ class MedicationsApiController extends Controller
         $this->authorize('viewMedications', $client);
         abort_unless($medication->client_id === $client->id, 404);
         $user = $request->user();
-        
+
         abort_unless(
             $user->canDo('medications.administer.record')
                 || $user->canDo('clients.update')
@@ -650,7 +657,12 @@ class MedicationsApiController extends Controller
             'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
             'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
             'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
-            'override_safety' => ['nullable', 'boolean'],
+            // The legacy client boolean was an authority-confusion flaw. An
+            // override is now a structured, capability-checked request.
+            'override_safety' => ['prohibited'],
+            'safety_override' => ['sometimes', 'array:reason_code,reason', 'required_array_keys:reason_code,reason'],
+            'safety_override.reason_code' => ['required_with:safety_override', new Enum(SafetyOverrideReason::class)],
+            'safety_override.reason' => ['required_with:safety_override', 'string', 'min:10', 'max:1000'],
             'override_window' => ['nullable', 'boolean'],
             'client_request_uuid' => ['nullable', 'uuid'],
             'captured_offline_at' => ['nullable', 'date'],
@@ -661,6 +673,14 @@ class MedicationsApiController extends Controller
             'scan_verified' => ['nullable', 'boolean'],
             'scan_match_source' => ['nullable', 'string', 'max:50'],
         ]);
+
+        if (array_key_exists('safety_override', $data)) {
+            abort_unless(
+                $user->canDo('medications.administer.override_safety'),
+                403,
+                'You do not have permission to authorise a blocked medication safety check.'
+            );
+        }
 
         if ($cached = $this->getCachedIdempotentResponse('administration', $data)) {
             return response()->json($cached);

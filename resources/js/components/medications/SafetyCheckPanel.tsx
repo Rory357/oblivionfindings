@@ -31,6 +31,11 @@ export interface SafetyCheck {
     warnings: SafetyWarning[];
     can_proceed: boolean;
     requires_acknowledgment: boolean;
+    can_override_safety?: boolean;
+    override_reason_options?: Array<{
+        value: string;
+        label: string;
+    }>;
 }
 
 interface Props {
@@ -201,18 +206,20 @@ export default function SafetyCheckPanel({
                     </div>
                 )}
 
-                {!safetyCheck.can_proceed && onOverride && (
-                    <div className="flex justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onOverride}
-                            className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                        >
-                            Override (Manager Required)
-                        </Button>
-                    </div>
-                )}
+                {!safetyCheck.can_proceed &&
+                    safetyCheck.can_override_safety &&
+                    onOverride && (
+                        <div className="flex justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onOverride}
+                                className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
+                            >
+                                Authorise safety override
+                            </Button>
+                        </div>
+                    )}
 
                 {safetyCheck.can_proceed &&
                     safetyCheck.warnings.length === 0 && (

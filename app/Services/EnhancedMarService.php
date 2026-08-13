@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Enums\Medication\NotGivenReason;
+use App\Enums\Medication\SafetyOverrideReason;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
@@ -561,6 +562,11 @@ class EnhancedMarService
         int $userId,
         ?int $shiftId = null
     ): array {
+        $overrideValidation = $this->validateSafetyOverrideRequest($data, $userId);
+        if ($overrideValidation !== null) {
+            return $overrideValidation;
+        }
+
         $clientRequestUuid = trim((string) ($data['client_request_uuid'] ?? '')) ?: null;
         if ($clientRequestUuid !== null) {
             $existing = ClientMedicationAdministration::withTrashed()
@@ -621,49 +627,6 @@ class EnhancedMarService
             return $covertValidation;
         }
 
-        // Validate safety check (including dose validation)
-        $safetyCheck = $this->safetyService->performSafetyCheck(
-            $client,
-            $medication,
-            null,
-            $data['dose_given'] ?? null
-        );
-
-        if ($safetyCheck['blocked'] && ! ($data['override_safety'] ?? false)) {
-            // A blocked PRN over its 24h limit is an incident-worthy event no
-            // matter which surface attempted it (MAR wizard, My Day, guided
-            // round). Fire it here — the shared choke point — deduped so a
-            // worker re-tapping doesn't raise duplicates.
-            if ($medication->is_prn && $medication->fresh()->isPrnBlocked()) {
-                $attemptId = trim((string) ($data['client_request_uuid'] ?? ''));
-                if ($attemptId === '') {
-                    $attemptId = (string) Str::uuid();
-                }
-
-                app(MedicationIncidentIntegrationService::class)
-                    ->handlePrnOverLimit(
-                        $client,
-                        $medication->fresh(),
-                        $userId,
-                        $attemptId,
-                    );
-            }
-
-            return [
-                'success' => false,
-                'error' => $safetyCheck['block_reason'],
-                'error_field' => 'client_medication_id',
-                'safety_check' => $safetyCheck,
-            ];
-        }
-
-        // A blocked safety check that proceeds via override_safety must leave a
-        // durable trace on the MAR record — a silent override is an audit gap.
-        if ($safetyCheck['blocked'] && ($data['override_safety'] ?? false)) {
-            $overrideNote = '⚠ Safety check overridden by recorder: '.($safetyCheck['block_reason'] ?? 'blocked');
-            $data['notes'] = trim(($data['notes'] ?? '') === '' ? $overrideNote : $data['notes']."\n".$overrideNote);
-        }
-
         // Validate time window for scheduled doses
         $scheduledFor = isset($data['scheduled_for'])
             ? $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for'])
@@ -692,7 +655,7 @@ class EnhancedMarService
         }
 
         try {
-            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck, $witnessValidation, $clientRequestUuid) {
+            $result = DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $scheduledFor, $adminAt, $windowCheck, $witnessValidation, $clientRequestUuid) {
                 $shift = null;
                 if ($shiftId !== null) {
                     $shift = Shift::query()
@@ -729,6 +692,68 @@ class EnhancedMarService
                     if ($existing !== null) {
                         return $this->completedClientRequestResult($existing, $client, $medication);
                     }
+                }
+
+                // The medication row serializes safety evaluation and record
+                // creation for the same order. Recompute after acquiring the
+                // lock so a stale client check or concurrent PRN dose cannot be
+                // used as the authority for an override.
+                $safetyCheck = $this->safetyService->performSafetyCheck(
+                    $client,
+                    $medication,
+                    null,
+                    $data['dose_given'] ?? null,
+                );
+                $override = $data['safety_override'] ?? null;
+
+                if (! $safetyCheck['blocked'] && is_array($override)) {
+                    return [
+                        'success' => false,
+                        'error' => 'The medication safety check is no longer blocked. Refresh the check before continuing.',
+                        'error_field' => 'safety_override',
+                        'safety_check' => $safetyCheck,
+                    ];
+                }
+
+                $prnOverLimitAttempt = $safetyCheck['blocked']
+                    && $medication->is_prn
+                    && $medication->isPrnBlocked();
+
+                if ($safetyCheck['blocked'] && ! is_array($override)) {
+                    return [
+                        'success' => false,
+                        'error' => $safetyCheck['block_reason'],
+                        'error_field' => 'client_medication_id',
+                        'safety_check' => $safetyCheck,
+                        'prn_over_limit_attempt' => $prnOverLimitAttempt,
+                    ];
+                }
+
+                $overrideAudit = null;
+                if ($safetyCheck['blocked']) {
+                    $failedChecks = $this->failedSafetyChecks($safetyCheck);
+                    $reason = SafetyOverrideReason::from($override['reason_code']);
+                    $reasonDetail = trim($override['reason']);
+                    $overrideAudit = [
+                        'actor_id' => $userId,
+                        'client_id' => $client->id,
+                        'client_medication_id' => $medication->id,
+                        'client_request_uuid' => $clientRequestUuid,
+                        'reason_code' => $reason->value,
+                        'reason' => $reasonDetail,
+                        'block_reason' => $safetyCheck['block_reason'],
+                        'failed_check_types' => array_values(array_unique(array_column($failedChecks, 'type'))),
+                        'failed_check_fingerprint' => $this->safetyCheckFingerprint($client, $medication, $safetyCheck, $failedChecks),
+                    ];
+                    $overrideNote = sprintf(
+                        'Safety override authorised (%s): %s. Blocked check: %s',
+                        $reason->label(),
+                        $reasonDetail,
+                        $safetyCheck['block_reason'] ?? 'blocked',
+                    );
+                    $data['notes'] = trim(($data['notes'] ?? '') === ''
+                        ? $overrideNote
+                        : $data['notes']."\n".$overrideNote);
                 }
 
                 if ($scheduledFor && ! $medication->is_prn) {
@@ -795,6 +820,17 @@ class EnhancedMarService
 
                 $admin->save();
 
+                if ($overrideAudit !== null) {
+                    AuditLogger::logOrFail(
+                        'medications.safety_override.authorized',
+                        $admin,
+                        [
+                            ...$overrideAudit,
+                            'administration_id' => $admin->id,
+                        ],
+                    );
+                }
+
                 if ($admin->status === 'given') {
                     $this->mirrorClinicalObservations($admin, $medication, $data, $userId);
                 }
@@ -814,6 +850,7 @@ class EnhancedMarService
                     'success' => true,
                     'administration' => $admin,
                     'safety_check' => $safetyCheck,
+                    'prn_over_limit_attempt' => $prnOverLimitAttempt,
                 ];
             });
         } catch (QueryException $exception) {
@@ -830,6 +867,17 @@ class EnhancedMarService
 
             $result = $this->completedClientRequestResult($existing, $client, $medication);
         }
+
+        if ($result['prn_over_limit_attempt'] ?? false) {
+            $attemptId = $clientRequestUuid ?: (string) Str::uuid();
+            app(MedicationIncidentIntegrationService::class)->handlePrnOverLimit(
+                $client,
+                $medication->fresh(),
+                $userId,
+                $attemptId,
+            );
+        }
+        unset($result['prn_over_limit_attempt']);
 
         return $this->finalizeAdministrationResult(
             $result,
@@ -915,6 +963,83 @@ class EnhancedMarService
         if ($admin->late_minutes && $admin->late_minutes > 120) {
             $incidents->handleLateDose($admin, $admin->late_minutes);
         }
+    }
+
+    private function validateSafetyOverrideRequest(array $data, int $userId): ?array
+    {
+        if (! array_key_exists('safety_override', $data)) {
+            return null;
+        }
+
+        $override = $data['safety_override'];
+        if (! is_array($override)) {
+            return [
+                'success' => false,
+                'error' => 'Provide a structured safety override reason.',
+                'error_field' => 'safety_override',
+            ];
+        }
+
+        $actor = User::query()->find($userId);
+        if (! $actor?->canDo('medications.administer.override_safety')) {
+            return [
+                'success' => false,
+                'status' => 403,
+                'error' => 'You do not have permission to authorise a blocked medication safety check.',
+                'error_field' => 'safety_override',
+            ];
+        }
+
+        if (! SafetyOverrideReason::tryFrom((string) ($override['reason_code'] ?? ''))) {
+            return [
+                'success' => false,
+                'error' => 'Select a valid safety override reason.',
+                'error_field' => 'safety_override.reason_code',
+            ];
+        }
+
+        if (mb_strlen(trim((string) ($override['reason'] ?? ''))) < 10) {
+            return [
+                'success' => false,
+                'error' => 'Explain the clinical basis for the safety override.',
+                'error_field' => 'safety_override.reason',
+            ];
+        }
+
+        return null;
+    }
+
+    private function failedSafetyChecks(array $safetyCheck): array
+    {
+        $failedChecks = collect($safetyCheck['warnings'] ?? [])
+            ->filter(fn ($warning) => is_array($warning) && ($warning['severity'] ?? null) === 'danger')
+            ->map(fn (array $warning) => [
+                'type' => (string) ($warning['type'] ?? 'blocked'),
+                'message' => (string) ($warning['message'] ?? $safetyCheck['block_reason'] ?? 'Blocked'),
+                'details' => $warning['details'] ?? [],
+            ])
+            ->values()
+            ->all();
+
+        return $failedChecks ?: [[
+            'type' => 'blocked',
+            'message' => (string) ($safetyCheck['block_reason'] ?? 'Blocked'),
+            'details' => [],
+        ]];
+    }
+
+    private function safetyCheckFingerprint(
+        Client $client,
+        ClientMedication $medication,
+        array $safetyCheck,
+        array $failedChecks,
+    ): string {
+        return hash('sha256', json_encode([
+            'client_id' => $client->id,
+            'client_medication_id' => $medication->id,
+            'block_reason' => $safetyCheck['block_reason'] ?? null,
+            'failed_checks' => $failedChecks,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
     private function validateNotGivenReason(array $data): ?array
