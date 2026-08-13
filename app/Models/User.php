@@ -435,6 +435,11 @@ class User extends Authenticatable
         return $this->hasMany(MedicationCompetencyAssessment::class);
     }
 
+    public function medicationCompetencyExemptions()
+    {
+        return $this->hasMany(MedicationCompetencyExemption::class);
+    }
+
     // ── Fleet relationships ──────────────────────────────────────────────────
 
     public function fleetDriverSessions()

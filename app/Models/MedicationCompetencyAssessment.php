@@ -84,10 +84,8 @@ class MedicationCompetencyAssessment extends Model
     public function scopeActive($query)
     {
         return $query->where('status', 'passed')
-            ->where(function ($q) {
-                $q->whereNull('expiry_date')
-                    ->orWhere('expiry_date', '>=', now()->toDateString());
-            });
+            ->whereNotNull('expiry_date')
+            ->where('expiry_date', '>=', now()->toDateString());
     }
 
     public function scopeExpired($query)
@@ -103,12 +101,15 @@ class MedicationCompetencyAssessment extends Model
 
     public function isExpired(): bool
     {
-        return $this->expiry_date && $this->expiry_date->isPast();
+        return $this->expiry_date !== null
+            && $this->expiry_date->copy()->endOfDay()->isPast();
     }
 
     public function isPassed(): bool
     {
-        return $this->status === 'passed' && ! $this->isExpired();
+        return $this->status === 'passed'
+            && $this->expiry_date !== null
+            && ! $this->isExpired();
     }
 
     public function getCompetencyAreasAttribute(): array

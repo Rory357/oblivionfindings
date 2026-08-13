@@ -113,6 +113,8 @@ class ShiftStaffEligibilityService
                 'hrEmployeeProfile',
                 'hrComplianceStatuses.requirement:id,code,name,hard_stop,is_active',
                 'hrDriverEligibility',
+                'medicationCompetencyAssessments',
+                'medicationCompetencyExemptions',
             ]);
 
         // Batch-load each candidate's active shifts (non-cancelled/non-completed,
@@ -351,7 +353,7 @@ class ShiftStaffEligibilityService
         $missingLabels = [];
 
         foreach ($requiredRoles as $role) {
-            if ($this->coverageRoles->userHasRole($user, $role['key'])) {
+            if ($this->coverageRoles->userHasRole($user, $role['key'], $shift)) {
                 $matchedRoles[] = $role;
             } else {
                 $missingLabels[] = $role['label'];
