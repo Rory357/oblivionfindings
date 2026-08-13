@@ -14,7 +14,6 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetSignal;
-use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertWorklistPresenter;
@@ -30,7 +29,6 @@ use App\Services\Incidents\IncidentJourneyService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -50,9 +48,10 @@ class ControlRoomAlertController extends Controller
         AlertWorklistQuery $worklists,
         AlertWorklistPresenter $presenter,
         ControlRoomHandoverScopeService $handoverScope,
+        ControlRoomAlertAccessService $alertAccess,
     ) {
         $user = $request->user();
-        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+        abort_unless($user && $alertAccess->canList($user), 403);
 
         $requestedLens = (string) $request->input('lens', 'active');
         $status = (string) $request->input('status', '');
@@ -123,58 +122,7 @@ class ControlRoomAlertController extends Controller
             ]);
         });
 
-        // Stats (unfiltered counts)
-        $statsBase = ControlRoomAlert::query();
-        $this->siteAccess()->applyAlertScope($statsBase, $user, $this->alertBypassPermissions());
-
-        // The five tab counts mirror the worklist, which hides currently-snoozed
-        // alerts — so they exclude snoozed too. Snoozed gets its own count/tab.
-        $stats = [
-            'total' => (clone $statsBase)->actionable()->notSnoozed()->count(),
-            'open' => (clone $statsBase)->notSnoozed()->where('status', 'open')->count(),
-            'critical' => (clone $statsBase)->notSnoozed()->where('severity', 'critical')->actionable()->count(),
-            'in_triage' => (clone $statsBase)->where('status', 'triaging')->count(),
-            'assigned_to_me' => (clone $statsBase)->notSnoozed()->where('assigned_to_user_id', $user->id)->actionable()->count(),
-            'unassigned' => (clone $statsBase)->notSnoozed()->whereNull('assigned_to_user_id')->actionable()->count(),
-            'snoozed' => (clone $statsBase)->snoozed()->count(),
-            'history' => (clone $statsBase)->whereIn('status', ControlRoomAlert::TERMINAL_STATUSES)->count(),
-            'sla_breached' => (clone $statsBase)->actionable()
-                ->whereHas('sla', fn ($q) => $q->breached())
-                ->count(),
-        ];
-
-        $staff = $this->assignableStaff($user);
-
-        $latestAlertQuery = ControlRoomAlert::query()
-            ->actionable();
-        $this->siteAccess()->applyAlertScope($latestAlertQuery, $user, $this->alertBypassPermissions());
-
-        // Triage queue summary — compact overview for operators
-        $queues = TriageQueue::active()
-            ->withCount(['alerts as active_alert_count' => function ($query) use ($user) {
-                $query->actionable();
-                $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions());
-            }])
-            ->orderBy('tier')
-            ->get(['id', 'name', 'tier', 'code'])
-            ->map(fn ($q) => [
-                'id' => $q->id,
-                'name' => $q->name,
-                'tier' => $q->tier,
-                'active_alerts' => $q->active_alert_count,
-            ]);
-
-        $clientsQuery = Client::query()->orderBy('first_name');
-        $this->siteAccess()->applyClientScope($clientsQuery, $user, $this->alertBypassPermissions());
-        $clients = $clientsQuery->get(['id', 'first_name', 'last_name'])
-            ->map(fn (Client $client) => [
-                'id' => $client->id,
-                'name' => trim($client->first_name.' '.$client->last_name),
-            ]);
-
-        $sitesQuery = Site::query()->orderBy('name');
-        $this->siteAccess()->applySiteScope($sitesQuery, $user, $this->alertBypassPermissions());
-        $sites = $sitesQuery->get(['id', 'name']);
+        $viewContext = $worklists->viewContextFor($user);
 
         return Inertia::render('control-room/alerts/index', [
             'alerts' => $alerts,
@@ -187,22 +135,11 @@ class ControlRoomAlertController extends Controller
                 'direction' => $sortDir,
                 'label' => $sortLabel,
             ],
-            'stats' => $stats,
-            'queues' => $queues,
-            'staff' => $staff,
-            // For the New-alert wizard (manual alert creation).
-            'clients' => $clients,
-            'sites' => $sites,
-            'can' => [
-                'manage' => $user->canDo('controlRoom.alerts.manage'),
-                'assign' => $user->canDo('controlRoom.alerts.assign'),
-                'create' => $user->canDo('controlRoom.alerts.create'),
-            ],
+            ...$viewContext,
             // Polling metadata — frontend can use these to detect stale data.
             // latest_alert_at: timestamp of the most recently triggered unresolved alert.
             // If this changes between polls, the list has new data.
             'server_time' => now()->toISOString(),
-            'latest_alert_at' => $latestAlertQuery->max('updated_at'),
             // Workspace-over-list: when ?alert= is present the workspace dialog
             // opens over this page (Inertia partial-reloads only this prop).
             'detail' => fn () => $request->filled('alert')
@@ -319,9 +256,10 @@ class ControlRoomAlertController extends Controller
             'alert_ids.*' => ['integer'],
         ]);
 
-        $alerts = ControlRoomAlert::whereIn('id', $data['alert_ids'])
-            ->tap(fn ($query) => $this->siteAccess()->applyAlertScope($query, $user, $this->alertBypassPermissions()))
-            ->get();
+        $alerts = app(ControlRoomAlertNestedResourceResolver::class)->alerts(
+            $user,
+            $data['alert_ids'],
+        );
 
         $count = 0;
         $skipped = 0;
@@ -1297,17 +1235,5 @@ class ControlRoomAlertController extends Controller
         );
 
         return $assignee;
-    }
-
-    protected function assignableStaff(User $user): Collection
-    {
-        if (! $user->canDo('controlRoom.alerts.assign') && ! $user->canDo('controlRoom.alerts.manage')) {
-            return collect();
-        }
-
-        $staffQuery = User::staff()->orderBy('name');
-        $this->siteAccess()->applyControlRoomAssigneeScope($staffQuery, $user, $this->alertBypassPermissions());
-
-        return $staffQuery->get(['id', 'name', 'email']);
     }
 }

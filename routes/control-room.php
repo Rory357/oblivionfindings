@@ -44,10 +44,13 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:controlRoom.viewAny')->group(function () {
         Route::get('/control-room', ControlRoomDashboardController::class)
             ->name('control-room.index');
-
-        Route::get('/control-room/alerts', [ControlRoomAlertController::class, 'index'])
-            ->name('control-room.alerts.index');
     });
+
+    // The alert worklist is also the read-only monitoring surface granted by
+    // controlRoom.alerts.view; it does not grant dashboard or mutation access.
+    Route::get('/control-room/alerts', [ControlRoomAlertController::class, 'index'])
+        ->middleware('permission:controlRoom.viewAny|controlRoom.alerts.view|controlRoom.alerts.manage')
+        ->name('control-room.alerts.index');
 
     // Direct alert reads use the centralized view/manage decision so the
     // narrower controlRoom.alerts.view permission can open a read-only alert,
