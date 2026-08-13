@@ -101,8 +101,6 @@ const EMPTY_REPORT: ConflictReport = {
     recipe_tag_ids: [],
 };
 
-const OVERRIDE_MIN_CHARS = 10;
-
 export function PlanEntryDialog({
     open,
     onClose,
@@ -114,7 +112,6 @@ export function PlanEntryDialog({
     initialRecipeId,
     recipes,
     residents,
-    canOverride,
 }: {
     open: boolean;
     onClose: () => void;
@@ -200,16 +197,13 @@ export function PlanEntryDialog({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, entry?.id]);
 
-    // Live conflict preview — debounced. Only meaningful for recipe-backed meals.
+    // Live clinical conflict preview — debounced for every resident-assigned meal.
     useEffect(() => {
         if (!open) return;
-        if (form.data.source_type !== 'recipe') {
-            setReport(EMPTY_REPORT);
-            return;
-        }
-        const recipeId = form.data.recipe_id;
+        const recipeId =
+            form.data.source_type === 'recipe' ? form.data.recipe_id : null;
         const clientIds = form.data.client_ids ?? [];
-        if (!recipeId || clientIds.length === 0) {
+        if (clientIds.length === 0) {
             setReport(EMPTY_REPORT);
             return;
         }
@@ -220,6 +214,7 @@ export function PlanEntryDialog({
                 .post(`/sites/${siteId}/meal-planner/check-conflicts`, {
                     recipe_id: recipeId,
                     client_ids: clientIds,
+                    plan_date: form.data.plan_date,
                 })
                 .then((res) => {
                     if (cancelled) return;
@@ -247,17 +242,15 @@ export function PlanEntryDialog({
         form.data.source_type,
         form.data.recipe_id,
         form.data.client_ids,
+        form.data.plan_date,
     ]);
 
     // Explicit, non-debounced re-check (the "Retry check" button + submit-time re-verify).
     function retryCheck() {
-        const recipeId = form.data.recipe_id;
+        const recipeId =
+            form.data.source_type === 'recipe' ? form.data.recipe_id : null;
         const clientIds = form.data.client_ids ?? [];
-        if (
-            form.data.source_type !== 'recipe' ||
-            !recipeId ||
-            clientIds.length === 0
-        ) {
+        if (clientIds.length === 0) {
             setReport(EMPTY_REPORT);
             setReportError(false);
             return;
@@ -267,6 +260,7 @@ export function PlanEntryDialog({
             .post(`/sites/${siteId}/meal-planner/check-conflicts`, {
                 recipe_id: recipeId,
                 client_ids: clientIds,
+                plan_date: form.data.plan_date,
             })
             .then((res) => {
                 setReport(res.data ?? EMPTY_REPORT);
@@ -320,9 +314,6 @@ export function PlanEntryDialog({
 
     const hasHard = report.has_hard_blocks;
     const hasSoft = report.has_soft_warnings;
-    const overrideValid =
-        form.data.allergen_override_reason.trim().length >= OVERRIDE_MIN_CHARS;
-    const blockedByRole = hasHard && !canOverride;
     // A failed allergen check on a house meal with residents must hard-block Save.
     const blockedByCheckError =
         reportError &&
@@ -330,9 +321,8 @@ export function PlanEntryDialog({
         (form.data.client_ids ?? []).length > 0;
     const saveDisabled =
         form.processing ||
-        blockedByRole ||
+        hasHard ||
         blockedByCheckError ||
-        (hasHard && canOverride && !overrideValid) ||
         (hasSoft && !acknowledgedSoft && !hasHard);
 
     function submit(e: React.FormEvent) {
@@ -345,15 +335,15 @@ export function PlanEntryDialog({
             announce("Couldn't save the meal — try again");
             // server may have detected a conflict the client missed —
             // re-run the preview so the warning surfaces (fail closed if it errors)
-            if (
-                form.data.source_type === 'recipe' &&
-                form.data.recipe_id &&
-                (form.data.client_ids ?? []).length > 0
-            ) {
+            if ((form.data.client_ids ?? []).length > 0) {
                 axios
                     .post(`/sites/${siteId}/meal-planner/check-conflicts`, {
-                        recipe_id: form.data.recipe_id,
+                        recipe_id:
+                            form.data.source_type === 'recipe'
+                                ? form.data.recipe_id
+                                : null,
                         client_ids: form.data.client_ids,
+                        plan_date: form.data.plan_date,
                     })
                     .then((res) => {
                         setReport(res.data ?? EMPTY_REPORT);
@@ -960,10 +950,7 @@ export function PlanEntryDialog({
                                     className="h-4 w-4"
                                     aria-hidden="true"
                                 />{' '}
-                                Allergy alert —{' '}
-                                {canOverride
-                                    ? 'override required to save'
-                                    : 'this meal is unsafe for a resident'}
+                                Clinical safety block — resolve before saving
                             </div>
                             <ul className="space-y-1.5 text-status-critical">
                                 {report.hard_blocks.map((panel) => {
@@ -1004,51 +991,18 @@ export function PlanEntryDialog({
                                     );
                                 })}
                             </ul>
-                            {canOverride ? (
-                                <div className="mt-3">
-                                    <Label className="text-xs font-medium text-status-critical">
-                                        Override reason (min{' '}
-                                        {OVERRIDE_MIN_CHARS} chars, logged)
-                                    </Label>
-                                    <Textarea
-                                        value={
-                                            form.data.allergen_override_reason
-                                        }
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'allergen_override_reason',
-                                                e.target.value,
-                                            )
-                                        }
-                                        rows={2}
-                                        placeholder="e.g. Cook plates a separate gluten-free, dairy-free portion for Mila from the same base"
-                                        className="mt-1"
-                                    />
-                                    <div className="mt-1 text-xs text-status-critical/80">
-                                        {
-                                            form.data.allergen_override_reason.trim()
-                                                .length
-                                        }{' '}
-                                        / {OVERRIDE_MIN_CHARS} chars
-                                        {overrideValid && ' ✓'}
-                                    </div>
-                                </div>
-                            ) : (
-                                <GuardrailCard
-                                    unstyled
-                                    className="mt-3 flex items-start gap-2 rounded-md border border-status-critical/40 bg-card/60 p-2 text-xs text-status-critical"
-                                >
-                                    <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                    <span>
-                                        Your role cannot override an allergen
-                                        conflict. Ask a{' '}
-                                        <strong>Service Manager</strong> or{' '}
-                                        <strong>Registered Nurse</strong> to
-                                        plan this meal, or choose a safe
-                                        alternative.
-                                    </span>
-                                </GuardrailCard>
-                            )}
+                            <GuardrailCard
+                                unstyled
+                                className="mt-3 flex items-start gap-2 rounded-md border border-status-critical/40 bg-card/60 p-2 text-xs text-status-critical"
+                            >
+                                <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                <span>
+                                    Clinical meal restrictions cannot be
+                                    overridden in meal planning. Choose a
+                                    verified safe meal or report a discrepancy
+                                    for clinical review.
+                                </span>
+                            </GuardrailCard>
                         </div>
                     )}
 
@@ -1146,13 +1100,11 @@ export function PlanEntryDialog({
                             >
                                 {blockedByCheckError
                                     ? 'Re-check before saving'
-                                    : blockedByRole
-                                      ? 'Cannot override'
-                                      : hasHard
-                                        ? 'Override and save'
-                                        : isNew
-                                          ? 'Add meal'
-                                          : 'Save'}
+                                    : hasHard
+                                      ? 'Resolve safety block'
+                                      : isNew
+                                        ? 'Add meal'
+                                        : 'Save'}
                             </Button>
                         </div>
                     </DialogFooter>

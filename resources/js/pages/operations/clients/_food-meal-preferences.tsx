@@ -10,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { formatDateOnly } from '@/lib/datetime';
 import { ConfirmAction } from '@/pages/sites/_confirm-action';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
@@ -48,6 +49,15 @@ type Bundle = {
     dislikes: Dislike[];
     tag_catalogue: { allergens: Tag[]; preferences: Tag[] };
     products: ProductOpt[];
+    restrictions_read_only: boolean;
+    restriction_authority: {
+        status: string;
+        version: number | null;
+        effective_from: string | null;
+        effective_until: string | null;
+        review_due_at: string | null;
+        approved_by: { id: number; name: string } | null;
+    };
 };
 
 function tagBadgeStyle(tag: Tag): React.CSSProperties {
@@ -68,7 +78,6 @@ export function FoodMealPreferences({
 }) {
     const [bundle, setBundle] = useState<Bundle | null>(null);
     const [showAdd, setShowAdd] = useState(false);
-    const [busy, setBusy] = useState(false);
 
     const reload = () => {
         axios
@@ -91,26 +100,6 @@ export function FoodMealPreferences({
         );
     }
 
-    function toggleTag(kind: 'allergens' | 'preferences', tagId: number) {
-        if (!canEdit) return;
-        const current = new Set([
-            ...bundle!.allergens.map((t) => t.id),
-            ...bundle!.preferences.map((t) => t.id),
-        ]);
-        if (current.has(tagId)) current.delete(tagId);
-        else current.add(tagId);
-        setBusy(true);
-        router.put(
-            `/clients/${clientId}/meal-preferences/tags`,
-            { tag_ids: Array.from(current) },
-            {
-                preserveScroll: true,
-                onSuccess: () => reload(),
-                onFinish: () => setBusy(false),
-            },
-        );
-    }
-
     return (
         <Card className="border-primary/30">
             <CardContent className="space-y-4 p-4">
@@ -119,10 +108,27 @@ export function FoodMealPreferences({
                         <Utensils className="h-3.5 w-3.5" /> Food &amp; Meal
                         Preferences
                     </p>
-                    {canEdit && (
-                        <Badge variant="outline" className="text-[10px]">
-                            Used for meal-planner warnings
-                        </Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                        Clinically governed · read only
+                    </Badge>
+                </div>
+
+                <div className="rounded-md border border-primary/30 bg-primary/5 p-2 text-xs">
+                    <strong>
+                        {bundle.restriction_authority.status === 'authorised'
+                            ? `Authorised version ${bundle.restriction_authority.version}`
+                            : `Meal restriction status: ${bundle.restriction_authority.status.replaceAll('_', ' ')}`}
+                    </strong>
+                    {bundle.restriction_authority.approved_by && (
+                        <span>
+                            {' '}
+                            by {bundle.restriction_authority.approved_by.name};
+                            review by{' '}
+                            {formatDateOnly(
+                                bundle.restriction_authority.review_due_at,
+                            )}
+                            .
+                        </span>
                     )}
                 </div>
 
@@ -131,14 +137,18 @@ export function FoodMealPreferences({
                     title="Food allergies"
                     icon={ShieldAlert}
                     tone="critical"
-                    hint="Hard-block warning at meal time — override requires a logged reason."
+                    hint="Authorised clinical safety data. Changes require a separate clinical author and approver."
                 >
                     <TagPicker
                         catalogue={bundle.tag_catalogue.allergens}
                         selected={bundle.allergens}
-                        canEdit={canEdit}
-                        onToggle={(id) => toggleTag('allergens', id)}
-                        emptyLabel="No food allergies recorded."
+                        canEdit={false}
+                        onToggle={() => undefined}
+                        emptyLabel={
+                            bundle.restriction_authority.status === 'authorised'
+                                ? 'No food allergies in the authorised record.'
+                                : 'Unavailable until a clinical restriction is authorised.'
+                        }
                     />
                 </Section>
 
@@ -147,14 +157,18 @@ export function FoodMealPreferences({
                     title="Dietary preferences"
                     icon={Utensils}
                     tone="info"
-                    hint="Soft warning at meal time — staff can plan anyway after reviewing."
+                    hint="Authorised dietary restrictions consumed by meal planning."
                 >
                     <TagPicker
                         catalogue={bundle.tag_catalogue.preferences}
                         selected={bundle.preferences}
-                        canEdit={canEdit}
-                        onToggle={(id) => toggleTag('preferences', id)}
-                        emptyLabel="No dietary preferences recorded."
+                        canEdit={false}
+                        onToggle={() => undefined}
+                        emptyLabel={
+                            bundle.restriction_authority.status === 'authorised'
+                                ? 'No dietary restrictions in the authorised record.'
+                                : 'Unavailable until a clinical restriction is authorised.'
+                        }
                     />
                 </Section>
 

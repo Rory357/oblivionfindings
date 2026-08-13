@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Domain\Clinical\Models\ClientMealRestriction;
+use App\Domain\Clinical\Models\ClientMealRestrictionDiscrepancy;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
@@ -446,5 +448,15 @@ class Client extends Model
     public function mealDislikes()
     {
         return $this->hasMany(ClientMealDislike::class);
+    }
+
+    public function mealRestrictions()
+    {
+        return $this->hasMany(ClientMealRestriction::class);
+    }
+
+    public function mealRestrictionDiscrepancies()
+    {
+        return $this->hasMany(ClientMealRestrictionDiscrepancy::class);
     }
 }

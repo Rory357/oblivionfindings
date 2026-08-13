@@ -17,6 +17,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { formatDateOnly } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 import {
@@ -1091,61 +1093,79 @@ function ResidentChip({
 function ResidentEditDialog({
     siteId,
     resident,
-    dietaryTags,
-    iddsiLevels,
     onClose,
     onSaved,
 }: {
     siteId: number;
     resident: Resident;
-    dietaryTags: { id: number; label: string; kind: 'allergen' | 'dietary' }[];
-    iddsiLevels: IddsiLevel[];
     onClose: () => void;
     onSaved: () => void;
 }) {
-    const allergenTags = dietaryTags.filter((t) => t.kind === 'allergen');
-    const dietaryTagOpts = dietaryTags.filter((t) => t.kind === 'dietary');
-    const [tagIds, setTagIds] = useState<number[]>([
-        ...resident.allergen_tag_ids,
-        ...resident.dietary_tag_ids,
-    ]);
     const [dislikes, setDislikes] = useState(resident.dislikes.join(', '));
-    const [textureLevel, setTextureLevel] = useState<number>(
-        resident.texture?.level ?? 7,
-    );
-    const [fluids, setFluids] = useState(resident.fluids ?? '');
     const [saving, setSaving] = useState(false);
-
-    function toggle(id: number) {
-        setTagIds((cur) =>
-            cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id],
-        );
-    }
+    const [reportDetails, setReportDetails] = useState('');
+    const [reportReplayKey, setReportReplayKey] = useState(() =>
+        crypto.randomUUID(),
+    );
+    const [reporting, setReporting] = useState(false);
+    const authority = resident.restriction_authority ?? {
+        status: 'missing' as const,
+        restriction_id: null,
+        version: null,
+        effective_from: null,
+        effective_until: null,
+        review_due_at: null,
+        approved_at: null,
+        approved_by: null,
+        open_discrepancies: 0,
+    };
+    const authorityReady = authority.status === 'authorised';
 
     async function save() {
         setSaving(true);
-        const lvl = iddsiLevels.find((l) => l.level === Number(textureLevel));
         try {
             await axios.put(
                 `/sites/${siteId}/meal-planner/residents/${resident.id}`,
                 {
-                    tag_ids: tagIds,
                     dislikes: dislikes
                         .split(',')
                         .map((s) => s.trim())
                         .filter(Boolean),
-                    iddsi_level: lvl && lvl.level < 7 ? lvl.level : null,
-                    iddsi_label: lvl && lvl.level < 7 ? lvl.label : null,
-                    fluids: fluids.trim() || null,
                 },
             );
-            toast.success('Resident dietary profile updated');
+            toast.success('Resident meal preferences updated');
             onSaved();
             onClose();
         } catch {
-            toast.error('Could not save profile');
+            toast.error('Could not save meal preferences');
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function reportDiscrepancy() {
+        const details = reportDetails.trim();
+        if (details.length < 10) {
+            toast.error('Add enough detail for the clinical reviewer');
+            return;
+        }
+        setReporting(true);
+        try {
+            await axios.post(
+                `/sites/${siteId}/meal-planner/residents/${resident.id}/restriction-discrepancies`,
+                {
+                    details,
+                    idempotency_key: reportReplayKey,
+                },
+            );
+            toast.success('Discrepancy reported for clinical review');
+            setReportDetails('');
+            setReportReplayKey(crypto.randomUUID());
+            onSaved();
+        } catch {
+            toast.error('Could not report the discrepancy');
+        } finally {
+            setReporting(false);
         }
     }
 
@@ -1154,50 +1174,76 @@ function ResidentEditDialog({
             <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Pencil className="h-4 w-4 text-sites" /> Edit{' '}
-                        {resident.name}
+                        <ShieldCheck className="h-4 w-4 text-sites" />{' '}
+                        {resident.name} · meal safety
                     </DialogTitle>
                     <DialogDescription>
-                        Dietary profile used for live allergen checks across the
-                        meal plan.
+                        Clinical restrictions are read-only here. Meal planners
+                        can update dislikes or report a discrepancy.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                    <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-2.5 text-xs text-muted-foreground">
-                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <GuardrailCard
+                        unstyled
+                        className={cn(
+                            'flex items-start gap-2 rounded-lg border p-3 text-xs',
+                            authorityReady
+                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                : 'border-status-critical/40 bg-status-critical-bg text-status-critical',
+                        )}
+                    >
+                        {authorityReady ? (
+                            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                        ) : (
+                            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        )}
                         <span>
-                            Allergen changes immediately re-check every planned
-                            meal for this resident.
+                            <strong>
+                                {authorityReady
+                                    ? `Clinically authorised · version ${authority.version}`
+                                    : `Meal planning blocked · ${authority.status.replaceAll('_', ' ')}`}
+                            </strong>
+                            {authorityReady && authority.approved_by && (
+                                <>
+                                    {' '}
+                                    by {authority.approved_by.name}. Effective{' '}
+                                    {formatDateOnly(authority.effective_from)}
+                                    {authority.effective_until
+                                        ? ` to ${formatDateOnly(authority.effective_until)}`
+                                        : ''}
+                                    ; review by{' '}
+                                    {formatDateOnly(authority.review_due_at)}.
+                                </>
+                            )}
+                            {authority.open_discrepancies > 0 && (
+                                <>
+                                    {' '}
+                                    {authority.open_discrepancies}{' '}
+                                    {authority.open_discrepancies === 1
+                                        ? 'open discrepancy'
+                                        : 'open discrepancies'}
+                                    .
+                                </>
+                            )}
                         </span>
-                    </div>
+                    </GuardrailCard>
                     <div>
                         <Label className="mb-1.5 block">Allergens</Label>
                         <div className="flex flex-wrap gap-1.5">
-                            {allergenTags.map((a) => {
-                                const sel = tagIds.includes(a.id);
-                                return (
-                                    <Button
-                                        unstyled
-                                        key={a.id}
-                                        type="button"
-                                        onClick={() => toggle(a.id)}
-                                        className={cn(
-                                            'rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors',
-                                            sel
-                                                ? 'border-status-critical bg-status-critical-bg text-status-critical'
-                                                : 'border-border bg-card text-muted-foreground hover:bg-accent',
-                                        )}
-                                    >
-                                        {sel && (
-                                            <Check className="mr-0.5 inline h-3 w-3" />
-                                        )}
-                                        {a.label}
-                                    </Button>
-                                );
-                            })}
-                            {allergenTags.length === 0 && (
+                            {resident.allergens.map((allergen) => (
+                                <span
+                                    key={allergen}
+                                    className="rounded-full border border-status-critical bg-status-critical-bg px-2.5 py-1 text-[12px] font-medium text-status-critical"
+                                >
+                                    <ShieldAlert className="mr-1 inline h-3 w-3" />
+                                    {allergen}
+                                </span>
+                            ))}
+                            {resident.allergens.length === 0 && (
                                 <span className="text-xs text-muted-foreground">
-                                    No allergen tags configured.
+                                    {authorityReady
+                                        ? 'No meal allergens in the authorised record.'
+                                        : 'Unavailable until a clinical restriction is authorised.'}
                                 </span>
                             )}
                         </div>
@@ -1207,61 +1253,42 @@ function ResidentEditDialog({
                             Dietary requirements
                         </Label>
                         <div className="flex flex-wrap gap-1.5">
-                            {dietaryTagOpts.map((d) => {
-                                const sel = tagIds.includes(d.id);
-                                return (
-                                    <Button
-                                        unstyled
-                                        key={d.id}
-                                        type="button"
-                                        onClick={() => toggle(d.id)}
-                                        className={cn(
-                                            'rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors',
-                                            sel
-                                                ? 'border-sites bg-sites-bg text-sites-deep'
-                                                : 'border-border bg-card text-muted-foreground hover:bg-accent',
-                                        )}
-                                    >
-                                        {sel && (
-                                            <Check className="mr-0.5 inline h-3 w-3" />
-                                        )}
-                                        {d.label}
-                                    </Button>
-                                );
-                            })}
+                            {resident.dietary.map((requirement) => (
+                                <span
+                                    key={requirement}
+                                    className="rounded-full border border-sites bg-sites-bg px-2.5 py-1 text-[12px] font-medium text-sites-deep"
+                                >
+                                    {requirement}
+                                </span>
+                            ))}
+                            {resident.dietary.length === 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                    {authorityReady
+                                        ? 'No additional dietary restrictions recorded.'
+                                        : 'Unavailable until a clinical restriction is authorised.'}
+                                </span>
+                            )}
                         </div>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
+                        <div className="rounded-lg border border-border bg-muted/30 p-3">
                             <Label>Texture (IDDSI)</Label>
-                            <Select
-                                value={String(textureLevel)}
-                                onValueChange={(v) =>
-                                    setTextureLevel(Number(v))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {iddsiLevels.map((l) => (
-                                        <SelectItem
-                                            key={l.level}
-                                            value={String(l.level)}
-                                        >
-                                            Level {l.level} · {l.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <p className="mt-1 text-sm font-medium">
+                                {authorityReady && resident.texture
+                                    ? `Level ${resident.texture.level} · ${resident.texture.label}`
+                                    : authorityReady
+                                      ? 'No texture modification recorded'
+                                      : 'Unavailable pending clinical authority'}
+                            </p>
                         </div>
-                        <div>
+                        <div className="rounded-lg border border-border bg-muted/30 p-3">
                             <Label>Fluids</Label>
-                            <Input
-                                value={fluids}
-                                onChange={(e) => setFluids(e.target.value)}
-                                placeholder="e.g. Mildly thick (L2)"
-                            />
+                            <p className="mt-1 text-sm font-medium">
+                                {authorityReady
+                                    ? (resident.fluids ??
+                                      'No thickened-fluid restriction recorded')
+                                    : 'Unavailable pending clinical authority'}
+                            </p>
                         </div>
                     </div>
                     <div>
@@ -1277,13 +1304,46 @@ function ResidentEditDialog({
                             placeholder="e.g. Mushrooms, Olives"
                         />
                     </div>
+                    <div className="rounded-lg border border-border p-3">
+                        <Label
+                            htmlFor={`meal-restriction-discrepancy-${resident.id}`}
+                        >
+                            Report a discrepancy
+                        </Label>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Describe what differs from the authorised
+                            instructions. This reports the issue; it does not
+                            change the restriction.
+                        </p>
+                        <Textarea
+                            id={`meal-restriction-discrepancy-${resident.id}`}
+                            className="mt-2 min-h-24"
+                            value={reportDetails}
+                            onChange={(event) =>
+                                setReportDetails(event.target.value)
+                            }
+                            placeholder="e.g. The signed kitchen instruction says IDDSI level 5, but this record shows level 6."
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="frontline-focus frontline-tap mt-2"
+                            disabled={
+                                reporting || reportDetails.trim().length < 10
+                            }
+                            onClick={reportDiscrepancy}
+                        >
+                            <TriangleAlert className="mr-1.5 h-4 w-4" />
+                            Report for clinical review
+                        </Button>
+                    </div>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
                     <Button onClick={save} disabled={saving}>
-                        <Check className="mr-1.5 h-4 w-4" /> Save profile
+                        <Check className="mr-1.5 h-4 w-4" /> Save preferences
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -2237,8 +2297,6 @@ export default function CalendarGrid(props: CalendarGridProps) {
         residents,
         recipeMap,
         templates,
-        iddsiLevels,
-        dietaryTags,
         budgetCents,
         canPlan,
         rangeLabel,
@@ -3015,8 +3073,6 @@ export default function CalendarGrid(props: CalendarGridProps) {
                 <ResidentEditDialog
                     siteId={siteId}
                     resident={editResident}
-                    dietaryTags={dietaryTags}
-                    iddsiLevels={iddsiLevels}
                     onClose={() => setEditResident(null)}
                     onSaved={props.onResidentSaved}
                 />

@@ -76,6 +76,7 @@ export type RecipeOption = {
     name: string;
     slug: string;
     serves_default: number;
+    iddsi_food_level?: number | null;
     tag_ids?: number[];
 };
 
@@ -109,6 +110,24 @@ export type Resident = {
     dislike_product_ids: number[];
     texture: { level: number; label: string } | null;
     fluids: string | null;
+    restriction_authority?: {
+        status:
+            | 'authorised'
+            | 'missing'
+            | 'pending_approval'
+            | 'not_effective'
+            | 'expired'
+            | 'stale'
+            | 'invalid';
+        restriction_id: number | null;
+        version: number | null;
+        effective_from: string | null;
+        effective_until: string | null;
+        review_due_at: string | null;
+        approved_at: string | null;
+        approved_by: { id: number; name: string } | null;
+        open_discrepancies: number;
+    };
 };
 
 export type WeekTemplateMeal = {

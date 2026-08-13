@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Clinical\Services\ClientMealRestrictionProjection;
 use App\Models\Client;
 use App\Models\ClientMealDislike;
 use App\Models\MealDietaryTag;
@@ -10,6 +11,10 @@ use Illuminate\Http\Request;
 
 class ClientMealPreferencesController extends Controller
 {
+    public function __construct(
+        private readonly ClientMealRestrictionProjection $restrictionProjection,
+    ) {}
+
     /**
      * Returns the resident's food & meal preferences for the
      * "Food & Meal Preferences" card on the client profile page.
@@ -17,12 +22,20 @@ class ClientMealPreferencesController extends Controller
     public function show(Client $client)
     {
         $this->authorize('manageMeals', $client);
-        $client->load(['mealDietaryTags', 'mealDislikes.product:id,name,default_unit']);
+        $client->load(['mealDislikes.product:id,name,default_unit']);
+        $restriction = $this->restrictionProjection->forClient($client);
+        $selectedTags = MealDietaryTag::query()
+            ->whereIn('id', array_values(array_unique([
+                ...$restriction['allergen_tag_ids'],
+                ...$restriction['dietary_tag_ids'],
+            ])))
+            ->get()
+            ->keyBy('id');
 
         return response()->json([
             'client_id' => $client->id,
-            'allergens' => $client->mealDietaryTags->where('kind', 'allergen')->values()->map(fn (MealDietaryTag $t) => $this->tagPayload($t)),
-            'preferences' => $client->mealDietaryTags->where('kind', 'dietary')->values()->map(fn (MealDietaryTag $t) => $this->tagPayload($t)),
+            'allergens' => collect($restriction['allergen_tag_ids'])->map(fn (int $id) => $this->tagPayload($selectedTags[$id]))->values(),
+            'preferences' => collect($restriction['dietary_tag_ids'])->map(fn (int $id) => $this->tagPayload($selectedTags[$id]))->values(),
             'dislikes' => $client->mealDislikes->map(fn (ClientMealDislike $d) => [
                 'id' => $d->id,
                 'product_id' => $d->product_id,
@@ -35,19 +48,22 @@ class ClientMealPreferencesController extends Controller
                 'preferences' => MealDietaryTag::where('kind', 'dietary')->orderBy('label')->get()->map(fn ($t) => $this->tagPayload($t)),
             ],
             'products' => MealProduct::active()->orderBy('name')->get(['id', 'name', 'default_unit']),
+            'restrictions_read_only' => true,
+            'restriction_authority' => [
+                'status' => $restriction['authority_status'],
+                'version' => $restriction['version'],
+                'effective_from' => $restriction['effective_from'],
+                'effective_until' => $restriction['effective_until'],
+                'review_due_at' => $restriction['review_due_at'],
+                'approved_by' => $restriction['approved_by'],
+            ],
         ]);
     }
 
     public function syncTags(Request $request, Client $client)
     {
         $this->authorize('manageMeals', $client);
-        $data = $request->validate([
-            'tag_ids' => 'nullable|array',
-            'tag_ids.*' => 'integer|exists:meal_dietary_tags,id',
-        ]);
-        $client->mealDietaryTags()->sync($data['tag_ids'] ?? []);
-
-        return back()->with('status', 'Dietary tags updated');
+        abort(409, 'Clinical meal restrictions are read-only here; use the independent clinical approval workflow.');
     }
 
     public function storeDislike(Request $request, Client $client)

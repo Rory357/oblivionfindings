@@ -43,6 +43,8 @@ class ClinicalPermissionsSeeder extends Seeder
             // Assessments & Risk (FRAT / Braden / MUST / IDDSI)
             ['key' => 'clinical.assessments.viewAny', 'description' => 'View the clinical risk-assessments register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.assessments.record', 'description' => 'Record clinical risk assessments (FRAT, Braden, MUST, IDDSI)', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.mealRestrictions.author', 'description' => 'Propose clinically governed resident meal restrictions', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.mealRestrictions.approve', 'description' => 'Independently approve resident meal restrictions', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Module access
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
@@ -114,6 +116,8 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.monitoring.viewAny',
             'clinical.assessments.viewAny',
             'clinical.assessments.record',
+            'clinical.mealRestrictions.author',
+            'clinical.mealRestrictions.approve',
             'clinical.events.record',
             'clinical.events.review',
             'clinical.events.escalate',
