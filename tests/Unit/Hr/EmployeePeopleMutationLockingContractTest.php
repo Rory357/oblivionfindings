@@ -54,7 +54,7 @@ test('People mutations use one documented lock order and retry deadlocks', funct
     $root = dirname(__DIR__, 3);
     $controller = file_get_contents($root.'/app/Http/Controllers/Hr/EmployeeProfileController.php');
 
-    expect($controller)->toContain('LOCK ORDER: all affected Users by ID, all affected Profiles by ID, then');
+    expect($controller)->toContain('LOCK ORDER: intake replay mutex when applicable, all affected Users by');
     foreach (['resendInvite', 'store', 'setActive', 'rehire', 'bulkAction', 'update'] as $method) {
         expect(employeePeopleMethodSource($controller, $method))->toContain('attempts: 3');
     }

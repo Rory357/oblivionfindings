@@ -7,8 +7,10 @@ use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Http\Controllers\Hr\EmployeeProfileController;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -33,53 +35,15 @@ class EmployeeIntakeService
      */
     private const EXTERNAL_PERSONA_ROLES = ['client', 'next_of_kin'];
 
-    /**
-     * RBAC level at/above which a role is system-administrator grade
-     * (RbacSeeder: admin = 100; execs/board sit below).
-     */
     private const ADMIN_LEVEL_THRESHOLD = 100;
 
     public function __construct(
         private readonly OnboardingService $onboarding,
         private readonly HrWebhookService $webhooks,
         private readonly PeopleMutationLockService $mutationLocks,
+        private readonly EmployeeRoleAssignmentService $roleAssignments,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
-
-    /**
-     * D-2 privilege-escalation guard for both intake doors: an admin-grade role
-     * can only be assigned by an actor who already holds admin, and external
-     * portal personas can never be minted as employees. Throws the same
-     * exception type the intake callers already surface as a flash.
-     *
-     * @throws \InvalidArgumentException
-     */
-    private function assertRoleAssignable(?string $roleName, int $actorId, ?User $actor = null): void
-    {
-        if ($roleName === null || $roleName === '') {
-            return;
-        }
-
-        if (in_array($roleName, self::EXTERNAL_PERSONA_ROLES, true)) {
-            throw new \InvalidArgumentException(
-                "The '{$roleName}' role is an external portal persona and cannot be assigned through employee intake."
-            );
-        }
-
-        $role = Role::query()->where('name', $roleName)->first();
-        $isAdminGrade = $roleName === 'admin'
-            || ($role && (int) ($role->level ?? 0) >= self::ADMIN_LEVEL_THRESHOLD);
-
-        if (! $isAdminGrade) {
-            return;
-        }
-
-        $actor ??= User::find($actorId);
-        if (! $actor || ! ($actor->role === 'admin' || $actor->hasRole('admin'))) {
-            throw new \InvalidArgumentException(
-                'Only an administrator can assign an administrator-level role.'
-            );
-        }
-    }
 
     /**
      * Existing logins may only be linked after the caller has proved their
@@ -141,7 +105,8 @@ class EmployeeIntakeService
         string $source = 'manual',
         ?int $authorizedExistingUserId = null,
     ): HrEmployeeProfile {
-        $resolvedExistingUserId = User::query()->where('email', $email)->value('id');
+        $email = Str::lower(trim($email));
+        $profileAttributes = $this->normalizeSiteAssignment($profileAttributes);
 
         /** @var array{user: User, profile: HrEmployeeProfile, linkedExisting: bool} $written */
         $written = DB::transaction(function () use (
@@ -151,21 +116,27 @@ class EmployeeIntakeService
             $profileAttributes,
             $actorId,
             $authorizedExistingUserId,
-            $resolvedExistingUserId,
+            $sendInvite,
+            $source,
         ) {
+            // The hashed replay key is the first lock for intake. It serializes
+            // same-email requests even when no User row exists yet.
+            $this->acquireIntakeLock('email:'.$email);
+            $resolvedExistingUserId = User::query()->where('email', $email)->value('id');
             $locks = $this->mutationLocks->lock(
                 [$actorId, $authorizedExistingUserId, $resolvedExistingUserId],
             );
             $actor = $locks['users']->get($actorId);
             abort_unless($actor, 403);
-            $this->assertRoleAssignable($roleName, $actorId, $actor);
+            $role = $this->roleAssignments->assertAssignable($roleName, $actor);
+            $this->assertSiteAssignmentIsAvailable($actor, $profileAttributes);
 
             // 1. Resolve the user by email — link an existing account instead of
             //    erroring/duplicating; create one otherwise.
             $user = $resolvedExistingUserId
                 ? $locks['users']->get((int) $resolvedExistingUserId)
                 : null;
-            if ($user && $user->email !== $email) {
+            if ($user && Str::lower(trim($user->email)) !== $email) {
                 throw new \InvalidArgumentException('This existing email cannot be linked through employee intake.');
             }
             $linkedExisting = $user !== null;
@@ -199,10 +170,7 @@ class EmployeeIntakeService
                 $user->forceFill($updates)->save();
             }
 
-            $role = Role::query()->where('name', $roleName)->first();
-            if ($role) {
-                $user->roles()->sync([$role->id]);
-            }
+            $user->roles()->sync([$role->id]);
 
             // 2. Upsert the single profile per user (user_id is UNIQUE). Only
             //    stamp employee_number / created_by on first creation.
@@ -231,26 +199,28 @@ class EmployeeIntakeService
                 ]);
             }
 
+            // Identity, profile, role/Site provenance, and this explicit audit
+            // record either commit together or all roll back.
+            AuditLogger::logOrFail('user.employee_intake', $user, [
+                'actor_id' => $actorId,
+                'employee_profile_id' => $profile->id,
+                'source' => $source,
+                'linked_existing_user' => $linkedExisting,
+                'role' => $roleName,
+                'primary_site_id' => $profile->primary_site_id,
+                'secondary_site_ids' => $profile->secondary_site_ids ?? [],
+                'approved' => (bool) $user->approved_at,
+                'invite_requested' => $sendInvite,
+            ]);
+
             return ['user' => $user, 'profile' => $profile, 'linkedExisting' => $linkedExisting];
         }, attempts: 3);
 
         $user = $written['user'];
         $profile = $written['profile'];
 
-        DB::afterCommit(function () use ($actorId, $profile, $roleName, $sendInvite, $source, $startOnboarding, $user, $written): void {
+        DB::afterCommit(function () use ($actorId, $profile, $sendInvite, $source, $startOnboarding, $user, $written): void {
             // --- Best-effort side-effects (post-commit; never block the hire) ---
-
-            // D-3: the USER write (account minted/linked, role set, login approved) is
-            // audited explicitly — User deliberately doesn't carry AuditableChanges
-            // (that would log every login-token touch). AuditLogger never throws,
-            // and uses actor_id when no HTTP request user exists.
-            AuditLogger::log('user.employee_intake', $user, [
-                'actor_id' => $actorId,
-                'source' => $source,
-                'linked_existing_user' => $written['linkedExisting'],
-                'role' => $roleName,
-                'approved' => (bool) $user->approved_at,
-            ]);
 
             // 3. Onboarding parity (toggle; idempotent).
             if ($startOnboarding) {
@@ -336,10 +306,6 @@ class EmployeeIntakeService
         // describe the same role even when the legacy users.role value differs.
         $roleName = $attributes['position_role'] ?? $profile->position_role ?? $profile->user?->role;
 
-        // Same D-2 guard as intake, on the role this re-hire would restore/attach
-        // (step 3 below re-syncs the RBAC pivot for the resolved role).
-        $this->assertRoleAssignable($roleName, $actorId);
-
         $newStart = Carbon::parse($attributes['start_date'])->startOfDay();
 
         $profileId = (int) $profile->id;
@@ -360,7 +326,7 @@ class EmployeeIntakeService
             }
             $profile->setRelation('user', $profileUser);
             $roleName = $attributes['position_role'] ?? $profile->position_role ?? $profileUser?->role;
-            $this->assertRoleAssignable($roleName, $actorId, $actor);
+            $role = $this->roleAssignments->assertAssignable((string) $roleName, $actor);
 
             // 0. Close out any leaver workflow still open from the previous
             //    stint — rehiring supersedes it, and leaving it open would
@@ -423,10 +389,7 @@ class EmployeeIntakeService
                     if ($user->role !== $roleName) {
                         $user->forceFill(['role' => $roleName])->save();
                     }
-                    $role = Role::query()->where('name', $roleName)->first();
-                    if ($role) {
-                        $user->roles()->sync([$role->id]);
-                    }
+                    $user->roles()->sync([$role->id]);
                 }
             }
 
@@ -516,8 +479,108 @@ class EmployeeIntakeService
     /** Next sequential employee number, e.g. EMP-00042. */
     public function generateEmployeeNumber(): string
     {
+        // Different-email hires share this second mutex, so max(id)+1 remains
+        // collision-free under concurrent MySQL transactions.
+        $this->acquireIntakeLock('employee-number-sequence');
         $next = (int) (HrEmployeeProfile::withTrashed()->max('id') ?? 0) + 1;
 
-        return 'EMP-'.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+        do {
+            $candidate = 'EMP-'.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+            $next++;
+        } while (HrEmployeeProfile::withTrashed()->where('employee_number', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    /**
+     * New active staff always have one Primary Site. Keep this invariant in
+     * the canonical service as well as the rendered and request contracts.
+     *
+     * @param  array<string, mixed>  $profileAttributes
+     * @return array<string, mixed>
+     */
+    private function normalizeSiteAssignment(array $profileAttributes): array
+    {
+        $primarySiteId = filter_var(
+            $profileAttributes['primary_site_id'] ?? null,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]],
+        );
+        if ($primarySiteId === false) {
+            throw new \InvalidArgumentException('A Primary Site is required for an active employee.');
+        }
+
+        $rawSecondarySiteIds = $profileAttributes['secondary_site_ids'] ?? [];
+        if (! is_array($rawSecondarySiteIds)) {
+            throw new \InvalidArgumentException('The selected employee Site assignment is unavailable.');
+        }
+
+        $secondarySiteIds = [];
+        foreach ($rawSecondarySiteIds as $siteId) {
+            $normalized = filter_var($siteId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($normalized === false) {
+                throw new \InvalidArgumentException('The selected employee Site assignment is unavailable.');
+            }
+            $secondarySiteIds[] = $normalized;
+        }
+
+        if (count($secondarySiteIds) !== count(array_unique($secondarySiteIds))
+            || in_array($primarySiteId, $secondarySiteIds, true)) {
+            throw new \InvalidArgumentException('The selected employee Site assignment is unavailable.');
+        }
+
+        $profileAttributes['primary_site_id'] = $primarySiteId;
+        $profileAttributes['secondary_site_ids'] = array_values($secondarySiteIds);
+
+        return $profileAttributes;
+    }
+
+    /**
+     * Revalidate active and authorised Site IDs in the identity transaction.
+     * Hidden, stale, or archived IDs all fail with the same privacy-safe error.
+     *
+     * @param  array<string, mixed>  $profileAttributes
+     */
+    private function assertSiteAssignmentIsAvailable(User $actor, array $profileAttributes): void
+    {
+        $requestedSiteIds = collect([
+            $profileAttributes['primary_site_id'],
+            ...$profileAttributes['secondary_site_ids'],
+        ])->sort()->values();
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $actor,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
+        $matchedSiteCount = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('id', $requestedSiteIds)
+            ->whereIn('id', $accessibleSiteIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id'])
+            ->count();
+
+        if ($matchedSiteCount !== $requestedSiteIds->count()) {
+            throw new \InvalidArgumentException('The selected employee Site assignment is unavailable.');
+        }
+    }
+
+    /**
+     * Acquire a durable, privacy-safe row mutex in the current transaction.
+     */
+    public function acquireIntakeLock(string $key): void
+    {
+        $keyHash = hash('sha256', $key);
+        DB::table('hr_employee_intake_locks')->insertOrIgnore([
+            'key_hash' => $keyHash,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('hr_employee_intake_locks')
+            ->where('key_hash', $keyHash)
+            ->lockForUpdate()
+            ->first();
     }
 }

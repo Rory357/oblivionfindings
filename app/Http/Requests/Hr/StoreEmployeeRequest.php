@@ -4,15 +4,21 @@ namespace App\Http\Requests\Hr;
 
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\EmployeeRoleAssignmentService;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class StoreEmployeeRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
+        if (is_string($this->input('email'))) {
+            $this->merge(['email' => Str::lower(trim($this->input('email')))]);
+        }
+
         if ($this->has('team')) {
             $team = $this->input('team');
             if (is_string($team) || $team === null) {
@@ -29,10 +35,16 @@ class StoreEmployeeRequest extends FormRequest
     public function rules(): array
     {
         $siteAccess = app(UserSiteAccessService::class);
-        $accessibleSiteIds = $siteAccess->accessibleSiteIds($this->user());
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds(
+            $this->user(),
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
         $managerQuery = User::query();
-        $siteAccess->applyStaffScope($managerQuery, $this->user());
+        $siteAccess->applyHrEmployeeStaffScope($managerQuery, $this->user());
         $accessibleManagerIds = $managerQuery->pluck('users.id')->all();
+        $assignableRoleNames = $this->user()
+            ? app(EmployeeRoleAssignmentService::class)->assignableRoleNames($this->user())
+            : [];
         $accessibleDepartmentIds = HrDepartment::query()
             ->where('is_active', true)
             ->where(function ($query) use ($accessibleSiteIds): void {
@@ -52,7 +64,7 @@ class StoreEmployeeRequest extends FormRequest
             // controller gates silent overwrite behind `link_existing`.
             'email' => ['required', 'email', 'max:255'],
             'preferred_name' => ['nullable', 'string', 'max:255'],
-            'role' => ['nullable', 'string', 'exists:roles,name'],
+            'role' => ['required', 'string', Rule::in($assignableRoleNames)],
             'position_id' => ['nullable', 'integer', 'exists:hr_positions,id'],
             'position_title' => ['nullable', 'string', 'max:255'],
             'employment_type' => ['nullable', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])],
@@ -67,6 +79,15 @@ class StoreEmployeeRequest extends FormRequest
             'primary_site_id' => [
                 'required',
                 'integer',
+                Rule::exists('sites', 'id')->where(
+                    fn ($query) => $query->whereIn('id', $accessibleSiteIds),
+                ),
+            ],
+            'secondary_site_ids' => ['nullable', 'array'],
+            'secondary_site_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::notIn([(int) $this->input('primary_site_id')]),
                 Rule::exists('sites', 'id')->where(
                     fn ($query) => $query->whereIn('id', $accessibleSiteIds),
                 ),

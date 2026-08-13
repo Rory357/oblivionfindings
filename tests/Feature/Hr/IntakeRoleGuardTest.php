@@ -14,9 +14,9 @@ use Illuminate\Support\Facades\Notification;
  *
  * EmployeeIntakeService::intake()/rehire() used to assign ANY existing role
  * (validated only as `exists:roles,name`), so anyone with hr.employees.manage
- * could mint an `admin` login. The guard (assertRoleAssignable):
- *   - admin-grade roles (RBAC level >= 100, i.e. `admin`) are assignable only
- *     when the ACTOR already holds admin (legacy role string or RBAC pivot);
+ * could mint a more privileged login. The grant boundary now:
+ *   - keeps administrator-grade assignment behind administrator authority;
+ *   - keeps Clinical Lead behind its explicit grant permission;
  *   - external portal personas (`client`, `next_of_kin`) are never assignable
  *     through employee intake, for anyone.
  * Blocked paths throw InvalidArgumentException, which every intake caller
@@ -54,6 +54,7 @@ function hrCloseoutIntake(User $actor, string $roleName, string $email): HrEmplo
             'position_title' => 'Guard Test',
             'position_role' => $roleName,
             'employment_type' => 'full_time',
+            'primary_site_id' => $actor->hrEmployeeProfile()->value('primary_site_id'),
             'start_date' => now()->toDateString(),
         ],
         actorId: $actor->id,
@@ -68,6 +69,13 @@ test('C2: a non-admin actor cannot intake an employee as admin', function () {
 
     // Nothing was written — the guard fires before the user/profile transaction.
     expect(User::query()->where('email', 'blocked.admin@example.test')->exists())->toBeFalse();
+});
+
+test('C2: an HR actor cannot grant the higher Clinical Lead role', function () {
+    expect(fn () => hrCloseoutIntake($this->hrActor, 'clinical_lead', 'blocked.clinical@example.test'))
+        ->toThrow(InvalidArgumentException::class, 'not allowed');
+
+    expect(User::query()->where('email', 'blocked.clinical@example.test')->exists())->toBeFalse();
 });
 
 test('C2: an admin actor can still intake an admin (allowed path)', function () {

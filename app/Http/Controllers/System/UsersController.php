@@ -159,26 +159,37 @@ class UsersController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('settings.access.manage'), 403);
 
-        $clients = Client::orderBy('first_name')
+        if ($request->query('type') === 'staff') {
+            abort_unless($user->canDo('hr.employees.manage'), 403);
+
+            return redirect()->to(route('hr.people.index', [
+                'create' => 'staff',
+            ], absolute: false));
+        }
+
+        $canCreateClient = $user->canDo('clients.create');
+        $canManageEmployees = $user->canDo('hr.employees.manage');
+        $clientQuery = Client::query()
+            ->orderBy('first_name')
             ->orderBy('last_name')
             ->whereNot(function ($q) {
                 $q->where('first_name', 'Fleet')->where('last_name', 'Operations');
-            })
-            ->get(['id', 'first_name', 'last_name', 'nhi_number']);
-
-        $roles = Role::orderByDesc('level')
-            ->orderBy('label')
-            ->get(['id', 'name', 'label', 'level', 'type']);
+            });
+        $clients = $canCreateClient
+            ? app(UserSiteAccessService::class)
+                ->applyClientScope($clientQuery, $user, ['clients.viewAny'])
+                ->get(['id', 'first_name', 'last_name', 'nhi_number'])
+            : collect();
 
         return Inertia::render('system/users/Create', [
             'clients' => $clients,
-            'roles' => $roles,
             'can' => [
-                'createStaff' => false,
-                'createClient' => $user->canDo('clients.create'),
-                'manageEmployees' => $user->canDo('hr.employees.manage'),
+                'createClient' => $canCreateClient,
+                'manageEmployees' => $canManageEmployees,
             ],
-            'staffLifecycleHref' => route('hr.people.index', absolute: false),
+            'staffLifecycleHref' => $canManageEmployees
+                ? route('hr.people.index', ['create' => 'staff'], absolute: false)
+                : null,
         ]);
     }
 
@@ -198,45 +209,46 @@ class UsersController extends Controller
 
         abort_unless($user->canDo('clients.create'), 403);
 
+        $accessibleClientQuery = app(UserSiteAccessService::class)
+            ->applyClientScope(Client::query(), $user, ['clients.viewAny']);
+        $accessibleClientIds = $accessibleClientQuery->pluck('clients.id')->all();
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => ['required', 'string', 'min:8'],
-            'user_type' => ['required', 'in:staff,client,next_of_kin'],
-            'role_ids' => ['array'],
-            'role_ids.*' => ['integer', 'exists:roles,id'],
+            'user_type' => ['required', 'in:client,next_of_kin'],
             // Client specific
             'client.nhi_number' => ['required_if:user_type,client', 'nullable', 'string', Rule::unique('clients', 'nhi_number')],
             'client.first_name' => ['required_if:user_type,client', 'nullable', 'string'],
             'client.last_name' => ['required_if:user_type,client', 'nullable', 'string'],
             'client.date_of_birth' => ['nullable', 'date'],
             // Next of Kin specific
-            'next_of_kin.client_id' => ['required_if:user_type,next_of_kin', 'nullable', 'integer', 'exists:clients,id'],
+            'next_of_kin.client_id' => [
+                'required_if:user_type,next_of_kin',
+                'nullable',
+                'integer',
+                Rule::exists('clients', 'id')->where(
+                    fn ($query) => $query->whereIn('id', $accessibleClientIds),
+                ),
+            ],
             'next_of_kin.relationship' => ['required_if:user_type,next_of_kin', 'nullable', 'string', Rule::enum(NextOfKinRelationship::class)],
             'next_of_kin.is_primary_contact' => ['boolean'],
             'next_of_kin.is_emergency_contact' => ['boolean'],
         ]);
 
         DB::transaction(function () use ($data, $user): void {
+            $portalRoleName = $data['user_type'] === 'client' ? 'client' : 'next_of_kin';
+            $portalRole = Role::query()->where('name', $portalRoleName)->firstOrFail();
             $newUser = User::create([
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
+                'role' => $portalRoleName,
                 'approved_at' => now(),
                 'approved_by' => $user->id,
             ]);
-
-            if (! empty($data['role_ids'])) {
-                $newUser->roles()->sync($data['role_ids']);
-                $primaryRole = $newUser->roles()->orderByDesc('level')->first();
-                $newUser->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
-            } elseif ($data['user_type'] === 'next_of_kin') {
-                $nokRole = Role::where('name', 'next_of_kin')->first();
-                if ($nokRole) {
-                    $newUser->roles()->sync([$nokRole->id]);
-                    $newUser->forceFill(['role' => 'next_of_kin'])->save();
-                }
-            }
+            $newUser->roles()->sync([$portalRole->id]);
 
             if ($data['user_type'] === 'client') {
                 Client::create([
@@ -261,7 +273,7 @@ class UsersController extends Controller
             AuditLogger::log('user.created', $newUser, [
                 'created_by' => $user->id,
                 'user_type' => $data['user_type'],
-                'role_ids' => $data['role_ids'] ?? [],
+                'role_ids' => [$portalRole->id],
             ]);
 
         });

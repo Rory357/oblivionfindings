@@ -19,6 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { STAFF_CREATION_INTENT } from '@/lib/hr/staff-creation-workflow';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { User, UserCircle, UserPlus, Users } from 'lucide-react';
@@ -37,56 +38,40 @@ type Client = {
     nhi_number?: string | null;
 };
 
-type Role = {
-    id: number;
-    name: string;
-    label: string;
-    level: number;
-    type: 'system' | 'custom';
-};
-
 type Props = {
     clients: Client[];
-    roles: Role[];
     can: {
-        createStaff: boolean;
         createClient: boolean;
         manageEmployees: boolean;
     };
-    staffLifecycleHref: string;
+    staffLifecycleHref: string | null;
 };
 
 export default function CreateUser({
     clients,
-    roles,
     can,
     staffLifecycleHref,
 }: Props) {
     const { url } = usePage();
     const urlParams = new URLSearchParams(url.split('?')[1]);
-    const typeParam = urlParams.get('type') as
-        | 'staff'
-        | 'client'
-        | 'next_of_kin'
-        | null;
+    const typeParam = urlParams.get('type') as 'client' | 'next_of_kin' | null;
 
     // Determine allowed types based on permissions
     const allowedTypes = [
-        can.createStaff ? 'staff' : null,
         can.createClient ? 'client' : null,
         can.createClient ? 'next_of_kin' : null, // Next of kin requires client permission
-    ].filter(Boolean) as Array<'staff' | 'client' | 'next_of_kin'>;
+    ].filter(Boolean) as Array<'client' | 'next_of_kin'>;
 
     // Default to first allowed type if URL param not allowed
-    const defaultType = allowedTypes[0] || 'staff';
+    const defaultType = allowedTypes[0] || 'client';
     const initialType =
-        typeParam && allowedTypes.includes(typeParam as any)
-            ? (typeParam as 'staff' | 'client' | 'next_of_kin')
+        typeParam && allowedTypes.includes(typeParam)
+            ? (typeParam as 'client' | 'next_of_kin')
             : defaultType;
 
-    const [userType, setUserType] = useState<
-        'staff' | 'client' | 'next_of_kin'
-    >(initialType);
+    const [userType, setUserType] = useState<'client' | 'next_of_kin'>(
+        initialType,
+    );
 
     const form = useForm({
         name: '',
@@ -94,11 +79,6 @@ export default function CreateUser({
         password: '',
         password_confirmation: '',
         user_type: initialType,
-        role_ids: [] as number[],
-        // Staff specific
-        'staff.job_title': '',
-        'staff.department': '',
-        'staff.employee_id': '',
         // Client specific
         'client.nhi_number': '',
         'client.first_name': '',
@@ -148,16 +128,6 @@ export default function CreateUser({
                                 and role stay in one complete record.
                             </CardDescription>
                         </CardHeader>
-                        {can.manageEmployees && (
-                            <CardContent>
-                                <Button asChild variant="outline">
-                                    <Link href={staffLifecycleHref}>
-                                        <Users className="mr-2 h-4 w-4" />
-                                        Open HR People
-                                    </Link>
-                                </Button>
-                            </CardContent>
-                        )}
                     </Card>
 
                     {/* User Type Selection */}
@@ -172,13 +142,13 @@ export default function CreateUser({
                             <div
                                 className={`grid gap-4 ${
                                     [
-                                        can.createStaff,
+                                        can.manageEmployees,
                                         can.createClient,
                                         can.createClient,
                                     ].filter(Boolean).length === 3
                                         ? 'grid-cols-3'
                                         : [
-                                                can.createStaff,
+                                                can.manageEmployees,
                                                 can.createClient,
                                                 can.createClient,
                                             ].filter(Boolean).length === 2
@@ -186,29 +156,28 @@ export default function CreateUser({
                                           : 'grid-cols-1'
                                 }`}
                             >
-                                {can.createStaff && (
+                                {can.manageEmployees && staffLifecycleHref && (
                                     <Button
-                                        type="button"
+                                        asChild
                                         variant="outline"
-                                        onClick={() => {
-                                            setUserType('staff');
-                                            form.setData('user_type', 'staff');
-                                        }}
-                                        className={`h-auto flex-col justify-between rounded-md border-2 p-4 whitespace-normal transition-colors ${
-                                            userType === 'staff'
-                                                ? 'border-primary bg-primary/5'
-                                                : 'border-muted bg-transparent hover:bg-muted'
-                                        }`}
+                                        className="h-auto flex-col justify-between rounded-md border-2 border-muted bg-transparent p-4 whitespace-normal transition-colors hover:bg-muted"
                                     >
-                                        <Users className="mb-3 h-6 w-6" />
-                                        <div className="text-center">
-                                            <div className="font-medium">
-                                                Staff
+                                        <Link
+                                            href={staffLifecycleHref}
+                                            data-workflow={
+                                                STAFF_CREATION_INTENT
+                                            }
+                                        >
+                                            <Users className="mb-3 h-6 w-6" />
+                                            <div className="text-center">
+                                                <div className="font-medium">
+                                                    Staff
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    Create in HR People
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                Employee account
-                                            </div>
-                                        </div>
+                                        </Link>
                                     </Button>
                                 )}
                                 {can.createClient && (
@@ -269,341 +238,100 @@ export default function CreateUser({
                     </Card>
 
                     {/* Basic Information */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Basic Information</CardTitle>
-                            <CardDescription>
-                                Enter the user&apos;s account details.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Full Name</Label>
-                                    <Input
-                                        id="name"
-                                        value={form.data.name}
-                                        onChange={(e) =>
-                                            form.setData('name', e.target.value)
-                                        }
-                                        placeholder="John Doe"
-                                    />
-                                    <InputError message={form.errors.name} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email Address</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={form.data.email}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'email',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="john@example.com"
-                                    />
-                                    <InputError message={form.errors.email} />
-                                </div>
-                            </div>
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <Label htmlFor="password">Password</Label>
-                                    <Input
-                                        id="password"
-                                        type="password"
-                                        value={form.data.password}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'password',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    <InputError
-                                        message={form.errors.password}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="password_confirmation">
-                                        Confirm Password
-                                    </Label>
-                                    <Input
-                                        id="password_confirmation"
-                                        type="password"
-                                        value={form.data.password_confirmation}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'password_confirmation',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Type-Specific Information */}
-                    {userType === 'staff' && (
-                        <>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Employment Details</CardTitle>
-                                    <CardDescription>
-                                        Enter the staff member&apos;s employment
-                                        information.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="employee_id">
-                                                Employee ID
-                                            </Label>
-                                            <Input
-                                                id="employee_id"
-                                                value={
-                                                    form.data[
-                                                        'staff.employee_id'
-                                                    ]
-                                                }
-                                                onChange={(e) =>
-                                                    setNestedData(
-                                                        'staff.employee_id',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="EMP001"
-                                            />
-                                            <InputError
-                                                message={
-                                                    form.errors[
-                                                        'staff.employee_id'
-                                                    ]
-                                                }
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="job_title">
-                                                Job Title *
-                                            </Label>
-                                            <Input
-                                                id="job_title"
-                                                value={
-                                                    form.data['staff.job_title']
-                                                }
-                                                onChange={(e) =>
-                                                    setNestedData(
-                                                        'staff.job_title',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Support Worker"
-                                            />
-                                            <InputError
-                                                message={
-                                                    form.errors[
-                                                        'staff.job_title'
-                                                    ]
-                                                }
-                                            />
-                                        </div>
-                                    </div>
+                    {can.createClient ? (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Basic Information</CardTitle>
+                                <CardDescription>
+                                    Enter the user&apos;s account details.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
-                                        <Label htmlFor="department">
-                                            Department
-                                        </Label>
+                                        <Label htmlFor="name">Full Name</Label>
                                         <Input
-                                            id="department"
-                                            value={
-                                                form.data['staff.department']
-                                            }
+                                            id="name"
+                                            value={form.data.name}
                                             onChange={(e) =>
-                                                setNestedData(
-                                                    'staff.department',
+                                                form.setData(
+                                                    'name',
                                                     e.target.value,
                                                 )
                                             }
-                                            placeholder="Clinical Services"
+                                            placeholder="John Doe"
                                         />
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Role Assignment</CardTitle>
-                                    <CardDescription>
-                                        Assign roles to this staff member.
-                                        Defaults to Support Worker if none
-                                        selected.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <Label>Select Roles</Label>
-                                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                {roles
-                                                    .filter(
-                                                        (r) =>
-                                                            r.type === 'system',
-                                                    )
-                                                    .map((role) => {
-                                                        const checked =
-                                                            form.data.role_ids.includes(
-                                                                role.id,
-                                                            );
-                                                        return (
-                                                            <label
-                                                                key={role.id}
-                                                                className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors ${
-                                                                    checked
-                                                                        ? 'border-primary bg-primary/5'
-                                                                        : 'border-muted hover:bg-muted'
-                                                                }`}
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    className="h-4 w-4"
-                                                                    checked={
-                                                                        checked
-                                                                    }
-                                                                    onChange={(
-                                                                        e,
-                                                                    ) => {
-                                                                        const next =
-                                                                            e
-                                                                                .target
-                                                                                .checked
-                                                                                ? [
-                                                                                      ...form
-                                                                                          .data
-                                                                                          .role_ids,
-                                                                                      role.id,
-                                                                                  ]
-                                                                                : form.data.role_ids.filter(
-                                                                                      (
-                                                                                          id,
-                                                                                      ) =>
-                                                                                          id !==
-                                                                                          role.id,
-                                                                                  );
-                                                                        form.setData(
-                                                                            'role_ids',
-                                                                            next,
-                                                                        );
-                                                                    }}
-                                                                />
-                                                                <div className="flex-1">
-                                                                    <div className="text-sm font-medium">
-                                                                        {
-                                                                            role.label
-                                                                        }
-                                                                    </div>
-                                                                    <div className="text-xs text-muted-foreground">
-                                                                        Level{' '}
-                                                                        {
-                                                                            role.level
-                                                                        }
-                                                                    </div>
-                                                                </div>
-                                                            </label>
-                                                        );
-                                                    })}
-                                            </div>
-                                        </div>
-                                        {roles.some(
-                                            (r) => r.type === 'custom',
-                                        ) && (
-                                            <div className="space-y-2 pt-2">
-                                                <Label>Custom Roles</Label>
-                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                    {roles
-                                                        .filter(
-                                                            (r) =>
-                                                                r.type ===
-                                                                'custom',
-                                                        )
-                                                        .map((role) => {
-                                                            const checked =
-                                                                form.data.role_ids.includes(
-                                                                    role.id,
-                                                                );
-                                                            return (
-                                                                <label
-                                                                    key={
-                                                                        role.id
-                                                                    }
-                                                                    className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 transition-colors ${
-                                                                        checked
-                                                                            ? 'border-primary bg-primary/5'
-                                                                            : 'border-muted hover:bg-muted'
-                                                                    }`}
-                                                                >
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="h-4 w-4"
-                                                                        checked={
-                                                                            checked
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) => {
-                                                                            const next =
-                                                                                e
-                                                                                    .target
-                                                                                    .checked
-                                                                                    ? [
-                                                                                          ...form
-                                                                                              .data
-                                                                                              .role_ids,
-                                                                                          role.id,
-                                                                                      ]
-                                                                                    : form.data.role_ids.filter(
-                                                                                          (
-                                                                                              id,
-                                                                                          ) =>
-                                                                                              id !==
-                                                                                              role.id,
-                                                                                      );
-                                                                            form.setData(
-                                                                                'role_ids',
-                                                                                next,
-                                                                            );
-                                                                        }}
-                                                                    />
-                                                                    <div className="flex-1">
-                                                                        <div className="text-sm font-medium">
-                                                                            {
-                                                                                role.label
-                                                                            }
-                                                                        </div>
-                                                                        <div className="text-xs text-muted-foreground">
-                                                                            Level{' '}
-                                                                            {
-                                                                                role.level
-                                                                            }
-                                                                        </div>
-                                                                    </div>
-                                                                </label>
-                                                            );
-                                                        })}
-                                                </div>
-                                            </div>
-                                        )}
                                         <InputError
-                                            message={form.errors.role_ids}
+                                            message={form.errors.name}
                                         />
                                     </div>
-                                </CardContent>
-                            </Card>
-                        </>
-                    )}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">
+                                            Email Address
+                                        </Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            value={form.data.email}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'email',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="john@example.com"
+                                        />
+                                        <InputError
+                                            message={form.errors.email}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="password">
+                                            Password
+                                        </Label>
+                                        <Input
+                                            id="password"
+                                            type="password"
+                                            value={form.data.password}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'password',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        <InputError
+                                            message={form.errors.password}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="password_confirmation">
+                                            Confirm Password
+                                        </Label>
+                                        <Input
+                                            id="password_confirmation"
+                                            type="password"
+                                            value={
+                                                form.data.password_confirmation
+                                            }
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'password_confirmation',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : null}
 
-                    {userType === 'client' && (
+                    {/* Portal-specific information */}
+
+                    {can.createClient && userType === 'client' && (
                         <Card>
                             <CardHeader>
                                 <CardTitle>Client Information</CardTitle>
@@ -707,7 +435,7 @@ export default function CreateUser({
                         </Card>
                     )}
 
-                    {userType === 'next_of_kin' && (
+                    {can.createClient && userType === 'next_of_kin' && (
                         <Card>
                             <CardHeader>
                                 <CardTitle>Next of Kin Information</CardTitle>
@@ -892,16 +620,18 @@ export default function CreateUser({
                     )}
 
                     {/* Submit */}
-                    <div className="flex items-center justify-end gap-4">
-                        <Link href="/system/users">
-                            <Button type="button" variant="outline">
-                                Cancel
+                    {can.createClient ? (
+                        <div className="flex items-center justify-end gap-4">
+                            <Link href="/system/users">
+                                <Button type="button" variant="outline">
+                                    Cancel
+                                </Button>
+                            </Link>
+                            <Button type="submit" disabled={form.processing}>
+                                Create User
                             </Button>
-                        </Link>
-                        <Button type="submit" disabled={form.processing}>
-                            Create User
-                        </Button>
-                    </div>
+                        </div>
+                    ) : null}
                 </form>
             </PageLayout>
         </AppLayout>

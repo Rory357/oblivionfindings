@@ -17,6 +17,7 @@ import {
 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { employeeCreationIsComplete } from '@/lib/hr/staff-creation-workflow';
 import { cn } from '@/lib/utils';
 
 import { PeoplePicker, type PersonOption } from './people-picker';
@@ -104,12 +105,15 @@ export function AddEmployeeDialog({
         name: '',
         email: '',
         preferred_name: '',
-        role: 'support_worker',
+        role: formData.roles.some((role) => role.value === 'support_worker')
+            ? 'support_worker'
+            : (formData.roles[0]?.value ?? ''),
         position_id: '',
         employment_type: 'full_time',
         department_id: '',
         team: '',
         primary_site_id: '',
+        secondary_site_ids: [] as number[],
         manager_user_id: '',
         start_date: '',
         work_phone: '',
@@ -165,10 +169,32 @@ export function AddEmployeeDialog({
         });
     };
 
-    const canSubmit =
-        form.data.name.trim() !== '' &&
-        form.data.email.trim() !== '' &&
-        form.data.primary_site_id !== '';
+    const canSubmit = employeeCreationIsComplete({
+        name: form.data.name,
+        email: form.data.email,
+        role: form.data.role,
+        primarySiteId: form.data.primary_site_id,
+    });
+
+    const selectPrimarySite = (siteId: string) => {
+        form.setData((current) => ({
+            ...current,
+            primary_site_id: siteId,
+            secondary_site_ids: current.secondary_site_ids.filter(
+                (id) => String(id) !== siteId,
+            ),
+        }));
+    };
+
+    const toggleSecondarySite = (siteId: number) => {
+        const selected = form.data.secondary_site_ids.includes(siteId);
+        form.setData(
+            'secondary_site_ids',
+            selected
+                ? form.data.secondary_site_ids.filter((id) => id !== siteId)
+                : [...form.data.secondary_site_ids, siteId],
+        );
+    };
 
     const managerOptions: PersonOption[] = formData.managers.map((m) => ({
         value: m.value,
@@ -195,6 +221,11 @@ export function AddEmployeeDialog({
     const needsVisa = VISA_STATUSES.includes(form.data.work_rights_status);
     const linkConflict =
         form.errors.email?.includes('Link to existing') ?? false;
+    const secondarySiteError =
+        form.errors.secondary_site_ids ??
+        Object.entries(form.errors).find(([key]) =>
+            key.startsWith('secondary_site_ids.'),
+        )?.[1];
 
     const positionLabel =
         formData.positions.find((p) => String(p.id) === form.data.position_id)
@@ -205,6 +236,10 @@ export function AddEmployeeDialog({
     const siteLabel =
         sites.find((s) => String(s.id) === form.data.primary_site_id)?.name ??
         '—';
+    const additionalSiteLabels = sites
+        .filter((site) => form.data.secondary_site_ids.includes(site.id))
+        .map((site) => site.name)
+        .join(', ');
     const managerLabel =
         formData.managers.find((m) => m.value === form.data.manager_user_id)
             ?.label ?? '—';
@@ -352,10 +387,14 @@ export function AddEmployeeDialog({
                     <StepHead
                         icon={Briefcase}
                         title="Role & placement"
-                        blurb="Set their access role, position, and where they work. All optional — you can refine later."
+                        blurb="Choose their access role and Primary site. Other job details can be refined later."
                     />
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Access role" error={form.errors.role}>
+                        <Field
+                            label="Access role"
+                            required
+                            error={form.errors.role}
+                        >
                             <SelectInput
                                 value={form.data.role}
                                 onChange={(v) => form.setData('role', v)}
@@ -416,9 +455,7 @@ export function AddEmployeeDialog({
                         >
                             <SelectInput
                                 value={form.data.primary_site_id}
-                                onChange={(v) =>
-                                    form.setData('primary_site_id', v)
-                                }
+                                onChange={selectPrimarySite}
                                 placeholder="Select a site"
                                 options={sites.map((s) => ({
                                     value: String(s.id),
@@ -426,6 +463,49 @@ export function AddEmployeeDialog({
                                 }))}
                             />
                         </Field>
+                        {sites.length > 1 ? (
+                            <Field
+                                label="Additional sites"
+                                hint="optional"
+                                span
+                                error={secondarySiteError}
+                            >
+                                <div className="flex flex-wrap gap-2">
+                                    {sites
+                                        .filter(
+                                            (site) =>
+                                                String(site.id) !==
+                                                form.data.primary_site_id,
+                                        )
+                                        .map((site) => {
+                                            const selected =
+                                                form.data.secondary_site_ids.includes(
+                                                    site.id,
+                                                );
+                                            return (
+                                                <button
+                                                    key={site.id}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        toggleSecondarySite(
+                                                            site.id,
+                                                        )
+                                                    }
+                                                    aria-pressed={selected}
+                                                    className={cn(
+                                                        'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                                                        selected
+                                                            ? 'border-primary bg-primary/10 text-primary'
+                                                            : 'border-border text-muted-foreground hover:bg-muted',
+                                                    )}
+                                                >
+                                                    {site.name}
+                                                </button>
+                                            );
+                                        })}
+                                </div>
+                            </Field>
+                        ) : null}
                         <Field
                             label="Team"
                             hint="optional"
@@ -659,6 +739,10 @@ export function AddEmployeeDialog({
                             />
                             <ReviewRow label="Team" value={form.data.team} />
                             <ReviewRow label="Site" value={siteLabel} />
+                            <ReviewRow
+                                label="Additional sites"
+                                value={additionalSiteLabels}
+                            />
                             <ReviewRow
                                 label="Start date"
                                 value={form.data.start_date}

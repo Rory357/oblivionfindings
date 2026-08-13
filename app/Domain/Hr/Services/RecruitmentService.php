@@ -614,12 +614,4 @@ class RecruitmentService
             throw new \LogicException('Offer must be accepted before this stage.');
         }
     }
-
-    protected function generateEmployeeNumber(): string
-    {
-        $prefix = (string) config('hr.employee_number_prefix', 'EMP');
-        $latestId = (int) (HrEmployeeProfile::query()->max('id') ?? 0) + 1;
-
-        return $prefix.str_pad((string) $latestId, 5, '0', STR_PAD_LEFT);
-    }
 }

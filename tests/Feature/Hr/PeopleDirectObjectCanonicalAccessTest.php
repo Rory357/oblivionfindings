@@ -259,7 +259,11 @@ test('employee creation requires accessible Site provenance', function () {
 });
 
 test('employee intake cannot link or overwrite an existing hidden Site profile by email', function () {
-    $hidden = peopleDirectUser('Hidden Existing Intake Person', $this->hiddenSite);
+    $hidden = peopleDirectUser(
+        'Hidden Existing Intake Person',
+        $this->hiddenSite,
+        userOverrides: ['email' => 'hidden-existing-intake-MIXED@example.test'],
+    );
     $profile = $hidden->hrEmployeeProfile;
     $originalTitle = $profile->position_title;
 

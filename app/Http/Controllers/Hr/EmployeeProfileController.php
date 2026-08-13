@@ -25,6 +25,7 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Notifications\EmployeeInviteNotification;
 use App\Domain\Hr\Services\EmployeeIntakeService;
+use App\Domain\Hr\Services\EmployeeRoleAssignmentService;
 use App\Domain\Hr\Services\HrEquipmentAccessProjectionService;
 use App\Domain\Hr\Services\OrgChartService;
 use App\Domain\Hr\Services\PeopleMutationLockService;
@@ -33,7 +34,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\StoreEmployeeRequest;
 use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
 use App\Models\ProcedureAcknowledgement;
-use App\Models\Role;
 use App\Models\SafeWorkProcedure;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
@@ -42,11 +42,13 @@ use App\Models\WorkplaceInjury;
 use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -224,7 +226,11 @@ class EmployeeProfileController extends Controller
             })
             ->withQueryString();
 
-        $sitesQuery = Site::query()->orderBy('name');
+        $sitesQuery = Site::query()
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->orderBy('name');
         $siteAccess->applySiteScope(
             $sitesQuery,
             $user,
@@ -290,8 +296,14 @@ class EmployeeProfileController extends Controller
                 ->get(['id', 'name'])
                 ->map(fn ($u) => ['value' => (string) $u->id, 'label' => $u->name])
                 ->values(),
-            'roles' => Role::query()->orderBy('name')->get(['name'])
-                ->map(fn ($r) => ['value' => $r->name, 'label' => ucwords(str_replace('_', ' ', $r->name))])
+            'roles' => app(EmployeeRoleAssignmentService::class)
+                ->assignableRoles($user)
+                ->orderBy('label')
+                ->get(['name', 'label'])
+                ->map(fn ($role) => [
+                    'value' => $role->name,
+                    'label' => $role->label ?: ucwords(str_replace('_', ' ', $role->name)),
+                ])
                 ->values(),
             'employmentTypes' => collect(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])
                 ->map(fn ($v) => ['value' => $v, 'label' => ucwords(str_replace('_', ' ', $v))])
@@ -476,6 +488,9 @@ class EmployeeProfileController extends Controller
                 'manage' => $user->canDo('hr.employees.manage'),
                 'recruit' => $user->canDo('hr.recruitment.manage'),
             ],
+            'creationIntent' => $canManage && $request->query('create') === 'staff'
+                ? 'staff'
+                : null,
         ]);
     }
 
@@ -656,6 +671,14 @@ class EmployeeProfileController extends Controller
         ]);
     }
 
+    private function isDuplicateIdentityException(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $driverCode = (int) ($exception->errorInfo[1] ?? 0);
+
+        return $sqlState === '23000' && $driverCode === 1062;
+    }
+
     /** @return list<array<string, mixed>> */
     private function shapedEmploymentHistory(mixed $history): array
     {
@@ -674,8 +697,9 @@ class EmployeeProfileController extends Controller
     }
 
     /**
-     * LOCK ORDER: all affected Users by ID, all affected Profiles by ID, then
-     * Site/department/offer destinations by ID.
+     * LOCK ORDER: intake replay mutex when applicable, all affected Users by
+     * ID, all affected Profiles by ID, then Site/department/offer destinations
+     * by ID.
      *
      * @param  iterable<int>  $userIds
      * @param  iterable<int>  $profileIds
@@ -830,6 +854,7 @@ class EmployeeProfileController extends Controller
 
         try {
             $profile = DB::transaction(function () use ($actorId, $data, $existingUserId, $intake, $managerUserId, $request): HrEmployeeProfile {
+                $intake->acquireIntakeLock('email:'.$data['email']);
                 $locks = $this->lockPeopleMutationGraph([$actorId, $existingUserId, $managerUserId]);
                 [$actor, $siteAccess] = $this->lockedPeopleMutationActor($locks, $actorId);
                 $accessibleSiteIds = $siteAccess->accessibleSiteIds(
@@ -838,7 +863,7 @@ class EmployeeProfileController extends Controller
                 );
 
                 $existingUser = $existingUserId ? $locks['users']->get((int) $existingUserId) : null;
-                if ($existingUser && $existingUser->email !== $data['email']) {
+                if ($existingUser && Str::lower(trim($existingUser->email)) !== $data['email']) {
                     throw ValidationException::withMessages([
                         'email' => 'This existing email cannot be linked through employee intake.',
                     ]);
@@ -873,13 +898,29 @@ class EmployeeProfileController extends Controller
                     $this->invalidSelection('manager_user_id');
                 }
 
-                $primarySite = Site::query()
+                $requestedSiteIds = collect([
+                    (int) $data['primary_site_id'],
+                    ...array_map('intval', $data['secondary_site_ids'] ?? []),
+                ])->unique()->sort()->values();
+                $lockedSites = Site::query()
                     ->active()
                     ->notArchived()
-                    ->whereKey($data['primary_site_id'])
+                    ->whereNull('archived_at')
+                    ->whereIn('id', $requestedSiteIds)
                     ->whereIn('id', $accessibleSiteIds)
+                    ->orderBy('id')
                     ->lockForUpdate()
-                    ->first();
+                    ->get()
+                    ->keyBy('id');
+                if ($lockedSites->count() !== $requestedSiteIds->count()) {
+                    $missingSiteIds = $requestedSiteIds->diff($lockedSites->keys());
+                    $this->invalidSelection(
+                        $missingSiteIds->contains((int) $data['primary_site_id'])
+                            ? 'primary_site_id'
+                            : 'secondary_site_ids',
+                    );
+                }
+                $primarySite = $lockedSites->get((int) $data['primary_site_id']);
                 if (! $primarySite) {
                     $this->invalidSelection('primary_site_id');
                 }
@@ -903,7 +944,7 @@ class EmployeeProfileController extends Controller
                         ->value('title');
                 }
 
-                $roleName = $data['role'] ?? 'support_worker';
+                $roleName = $data['role'];
 
                 return $intake->intake(
                     name: $data['name'],
@@ -919,6 +960,10 @@ class EmployeeProfileController extends Controller
                         'department' => $department?->name,
                         'team' => HrEmployeeProfile::canonicalTeam($data['team'] ?? null),
                         'primary_site_id' => $primarySite->id,
+                        'secondary_site_ids' => collect($data['secondary_site_ids'] ?? [])
+                            ->map(fn ($siteId) => (int) $siteId)
+                            ->values()
+                            ->all(),
                         'manager_user_id' => $managerUserId,
                         'start_date' => $data['start_date'] ?? now()->toDateString(),
                         'work_phone' => $data['work_phone'] ?? null,
@@ -935,9 +980,24 @@ class EmployeeProfileController extends Controller
                 );
             }, attempts: 3);
         } catch (\InvalidArgumentException $e) {
-            $field = str_contains(strtolower($e->getMessage()), 'existing') ? 'email' : 'role';
+            $message = strtolower($e->getMessage());
+            $field = str_contains($message, 'existing')
+                ? 'email'
+                : (str_contains($message, 'site') ? 'primary_site_id' : 'role');
 
             return back()->withInput()->withErrors([$field => $e->getMessage()]);
+        } catch (QueryException $e) {
+            if (! $this->isDuplicateIdentityException($e)) {
+                throw $e;
+            }
+
+            $field = str_contains(strtolower($e->getMessage()), 'employee_number')
+                ? 'employee_number'
+                : 'email';
+
+            return back()->withInput()->withErrors([
+                $field => 'An employee identity already uses these details.',
+            ]);
         }
 
         return redirect()

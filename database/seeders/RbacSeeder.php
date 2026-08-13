@@ -381,6 +381,7 @@ class RbacSeeder extends Seeder
             ['key' => 'hr.employees.viewOwn', 'description' => 'View own employee profile', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.employees.viewAllSites', 'description' => 'View employee profiles across all sites when paired with employee view access', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.employees.manage', 'description' => 'Manage employee profiles', 'group' => 'hr', 'module' => 'HR'],
+            ['key' => 'hr.employees.assignClinicalLead', 'description' => 'Grant the Clinical Lead employee access role', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.employees.viewFinancial', 'description' => 'View employee financial details', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.employees.viewRestricted', 'description' => 'View restricted HR notes', 'group' => 'hr', 'module' => 'HR'],
             ['key' => 'hr.compliance.view', 'description' => 'View HR compliance dashboard', 'group' => 'hr', 'module' => 'HR'],

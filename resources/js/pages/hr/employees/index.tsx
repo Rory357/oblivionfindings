@@ -34,6 +34,7 @@ import {
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
 import AppLayout from '@/layouts/app-layout';
+import { STAFF_CREATION_INTENT } from '@/lib/hr/staff-creation-workflow';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { Briefcase, Building2, Network, Pin, Star, Users } from 'lucide-react';
@@ -72,6 +73,7 @@ interface Props {
     orgPeople: OrgPerson[];
     canOrgManage: boolean;
     can: { manage: boolean; recruit: boolean };
+    creationIntent: typeof STAFF_CREATION_INTENT | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -109,8 +111,11 @@ export default function EmployeesIndex({
     orgPeople,
     canOrgManage,
     can,
+    creationIntent,
 }: Props) {
-    const [addOpen, setAddOpen] = useState(false);
+    const [addOpen, setAddOpen] = useState(
+        creationIntent === STAFF_CREATION_INTENT,
+    );
     const [triageOpen, setTriageOpen] = useState(false);
     const [triageRail, setTriageRail] = useState<TriageRail>('compliance');
     const [tab, setTab] = useHrTab('people');
@@ -128,6 +133,15 @@ export default function EmployeesIndex({
     // sets one); the page still opens to People via useHrTab's default.
     const [defaultTab, setDefaultTab] = useState<string>('');
     const [tabCtx, setTabCtx] = useState<ShiftCtxState | null>(null);
+
+    const closeAddEmployee = () => {
+        setAddOpen(false);
+        if (creationIntent !== STAFF_CREATION_INTENT) return;
+
+        const url = new URL(window.location.href);
+        url.searchParams.delete('create');
+        window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+    };
 
     // Restore persisted default view + pinned tabs. The stored default is only
     // applied when opened without an explicit ?tab= — switched after mount so
@@ -471,7 +485,7 @@ export default function EmployeesIndex({
             {formData ? (
                 <AddEmployeeDialog
                     open={addOpen}
-                    onClose={() => setAddOpen(false)}
+                    onClose={closeAddEmployee}
                     formData={formData}
                     departments={departments}
                     sites={sites}

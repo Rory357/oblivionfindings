@@ -146,7 +146,7 @@ test('storeProbation with an extend recommendation moves probation_end_date and 
 /* ── Item 4: intake seeds the compliance display matrix ──────────────────── */
 
 test('employee intake seeds hr_staff_compliance_status rows for the new hire', function () {
-    $actor = af2HrUser();
+    $actor = af2HrUser($this->site);
 
     $requirement = HrComplianceRequirement::query()->create([
         'code' => 'FA-AF2',
@@ -168,7 +168,13 @@ test('employee intake seeds hr_staff_compliance_status rows for the new hire', f
         'New Hire',
         'new.hire.af2@example.test',
         'support_worker',
-        ['position_title' => 'Support Worker', 'position_role' => 'support_worker', 'employment_type' => 'full_time', 'start_date' => now()->toDateString()],
+        [
+            'position_title' => 'Support Worker',
+            'position_role' => 'support_worker',
+            'employment_type' => 'full_time',
+            'primary_site_id' => $this->site->id,
+            'start_date' => now()->toDateString(),
+        ],
         $actor->id,
         startOnboarding: false,
         sendInvite: false,

@@ -50,6 +50,7 @@ test('C3: employee intake writes a user audit entry with the actor and role', fu
             'position_title' => 'Support Worker',
             'position_role' => 'support_worker',
             'employment_type' => 'full_time',
+            'primary_site_id' => $this->site->id,
             'start_date' => now()->toDateString(),
         ],
         actorId: $this->actor->id,
