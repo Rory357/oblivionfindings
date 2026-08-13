@@ -65,7 +65,7 @@ class ClientCostService
      */
     public function calculate(int $clientId, Carbon $from, Carbon $to): array
     {
-        $client = Client::withTrashed()->findOrFail($clientId);
+        $client = Client::query()->findOrFail($clientId);
 
         // 1. Direct costs
         $direct = $this->calculateDirectCosts($clientId, $from, $to);
@@ -99,7 +99,7 @@ class ClientCostService
     {
         $trend = [];
         $current = $from->copy()->startOfMonth();
-        $client = Client::withTrashed()->findOrFail($clientId);
+        $client = Client::query()->findOrFail($clientId);
 
         while ($current->lte($to)) {
             $monthStart = $current->copy()->startOfMonth();

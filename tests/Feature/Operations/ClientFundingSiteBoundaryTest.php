@@ -205,11 +205,11 @@ it('denies direct Client financial views outside the user Site boundary', functi
 
     $this->actingAs($user)
         ->get(route('finance.clients.financials', $otherClient))
-        ->assertForbidden();
+        ->assertNotFound();
     $this->actingAs($user)
         ->get(route('finance.clients.financials', $siteLessClient))
-        ->assertForbidden();
+        ->assertNotFound();
     $this->actingAs($user)
         ->get(route('finance.api.clients.ledger', $otherClient))
-        ->assertForbidden();
+        ->assertNotFound();
 });

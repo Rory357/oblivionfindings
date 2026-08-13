@@ -112,13 +112,15 @@ class BudgetVarianceService
     /**
      * Variance across all sites for a period (organisation level).
      */
-    public function organisationVariance(?int $tenantId, string $fromPeriod, string $toPeriod): array
+    public function organisationVariance(?array $siteIds, string $fromPeriod, string $toPeriod): array
     {
-        $query = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $query->forTenant($tenantId);
-        }
-        $sites = $query->get();
+        $sites = Site::query()
+            ->when($siteIds !== null, fn ($query) => $query->whereIn('id', $siteIds))
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('type', ['house', 'facility'])
+            ->get();
 
         $siteResults = [];
         $orgTotalPlanned = '0';

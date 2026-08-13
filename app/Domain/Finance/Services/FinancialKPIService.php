@@ -27,29 +27,36 @@ class FinancialKPIService
     /**
      * All KPIs for an organisation.
      */
-    public function getAll(?int $tenantId, ?Carbon $from = null, ?Carbon $to = null): array
+    public function getAll(
+        array $siteIds,
+        array $clientIds,
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+    ): array
     {
         $to = $to ?? Carbon::now();
         $from = $from ?? $to->copy()->subMonths(1)->startOfMonth();
 
         return [
             'period' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
-            'site_kpis' => $this->siteKPIs($tenantId, $from, $to),
-            'client_kpis' => $this->clientKPIs($tenantId, $from, $to),
-            'staffing_kpis' => $this->staffingKPIs($tenantId, $from, $to),
+            'site_kpis' => $this->siteKPIs($siteIds, $from, $to),
+            'client_kpis' => $this->clientKPIs($clientIds, $from, $to),
+            'staffing_kpis' => $this->staffingKPIs($siteIds, $from, $to),
         ];
     }
 
     /**
      * Site-level KPIs.
      */
-    public function siteKPIs(?int $tenantId, Carbon $from, Carbon $to): array
+    public function siteKPIs(array $siteIds, Carbon $from, Carbon $to): array
     {
-        $sites = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $sites->forTenant($tenantId);
-        }
-        $sites = $sites->get();
+        $sites = Site::query()
+            ->whereIn('id', $siteIds)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('type', ['house', 'facility'])
+            ->get();
 
         if ($sites->isEmpty()) {
             return [
@@ -122,17 +129,15 @@ class FinancialKPIService
     /**
      * Client-level KPIs.
      */
-    public function clientKPIs(?int $tenantId, Carbon $from, Carbon $to): array
+    public function clientKPIs(array $clientIds, Carbon $from, Carbon $to): array
     {
-        $query = Client::query()->where(function ($q) {
-            $q->where('status', 'active')->orWhereNull('status');
-        });
-
-        if ($tenantId) {
-            $query->whereHas('site', fn ($q) => $q->forTenant($tenantId));
-        }
-
-        $clients = $query->limit(100)->get(); // Cap for performance
+        $clients = Client::query()
+            ->whereIn('id', $clientIds)
+            ->where(function ($query) {
+                $query->where('status', 'active')->orWhereNull('status');
+            })
+            ->limit(100)
+            ->get(); // Cap for performance
 
         if ($clients->isEmpty()) {
             return [
@@ -195,13 +200,17 @@ class FinancialKPIService
     /**
      * Staffing KPIs: wages, on-costs, total staffing, on-cost percentage.
      */
-    public function staffingKPIs(?int $tenantId, Carbon $from, Carbon $to): array
+    public function staffingKPIs(array $siteIds, Carbon $from, Carbon $to): array
     {
-        $sites = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $sites->forTenant($tenantId);
-        }
-        $siteIds = $sites->pluck('id')->toArray();
+        $siteIds = Site::query()
+            ->whereIn('id', $siteIds)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('type', ['house', 'facility'])
+            ->pluck('id')
+            ->map(fn ($siteId): int => (int) $siteId)
+            ->all();
 
         if (empty($siteIds)) {
             return [

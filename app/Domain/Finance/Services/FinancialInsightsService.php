@@ -6,6 +6,7 @@ use App\Domain\Finance\Models\SiteBudgetLine;
 use App\Models\Client;
 use App\Models\ServiceAgreement;
 use App\Models\Site;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -36,7 +37,7 @@ class FinancialInsightsService
      *
      * @return array<int, array{type: string, severity: string, message: string, data: array}>
      */
-    public function generate(?int $tenantId): array
+    public function generate(array $siteIds, array $clientIds): array
     {
         $now = Carbon::now();
         $currentFrom = $now->copy()->subMonth()->startOfMonth();
@@ -47,12 +48,12 @@ class FinancialInsightsService
 
         $insights = [];
 
-        $insights = array_merge($insights, $this->siteCostInsights($tenantId, $currentFrom, $currentTo, $previousFrom, $previousTo));
-        $insights = array_merge($insights, $this->clientFundingInsights($tenantId, $currentFrom, $currentTo));
-        $insights = array_merge($insights, $this->utilityCostInsights($tenantId, $currentFrom, $currentTo, $previousFrom, $previousTo));
-        $insights = array_merge($insights, $this->budgetVarianceInsights($tenantId, $currentPeriod));
-        $insights = array_merge($insights, $this->forecastOverrunInsights($tenantId));
-        $insights = array_merge($insights, $this->staffingCostInsights($tenantId, $currentFrom, $currentTo));
+        $insights = array_merge($insights, $this->siteCostInsights($siteIds, $currentFrom, $currentTo, $previousFrom, $previousTo));
+        $insights = array_merge($insights, $this->clientFundingInsights($clientIds, $currentFrom, $currentTo));
+        $insights = array_merge($insights, $this->utilityCostInsights($siteIds, $currentFrom, $currentTo, $previousFrom, $previousTo));
+        $insights = array_merge($insights, $this->budgetVarianceInsights($siteIds, $currentPeriod));
+        $insights = array_merge($insights, $this->forecastOverrunInsights($siteIds));
+        $insights = array_merge($insights, $this->staffingCostInsights($siteIds, $currentFrom, $currentTo));
 
         // Sort by severity: critical first, then warning, then info
         $severityOrder = ['critical' => 0, 'warning' => 1, 'info' => 2];
@@ -65,17 +66,13 @@ class FinancialInsightsService
     /*  Site Cost Insights                                                 */
     /* ------------------------------------------------------------------ */
 
-    private function siteCostInsights(?int $tenantId, Carbon $currentFrom, Carbon $currentTo, Carbon $previousFrom, Carbon $previousTo): array
+    private function siteCostInsights(array $siteIds, Carbon $currentFrom, Carbon $currentTo, Carbon $previousFrom, Carbon $previousTo): array
     {
         $thresholds = config('finance.insight_thresholds', []);
         $costIncreasePct = (float) ($thresholds['site_cost_increase_warning_pct'] ?? 15);
         $costIncreaseCriticalPct = (float) ($thresholds['site_cost_increase_critical_pct'] ?? 30);
 
-        $sites = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $sites->forTenant($tenantId);
-        }
-        $sites = $sites->get();
+        $sites = $this->sites($siteIds)->get();
 
         $insights = [];
 
@@ -125,19 +122,19 @@ class FinancialInsightsService
     /*  Client Funding Insights                                            */
     /* ------------------------------------------------------------------ */
 
-    private function clientFundingInsights(?int $tenantId, Carbon $from, Carbon $to): array
+    private function clientFundingInsights(array $clientIds, Carbon $from, Carbon $to): array
     {
         $thresholds = config('finance.insight_thresholds', []);
         $gapWarningWeekly = (float) ($thresholds['client_funding_gap_warning_weekly'] ?? 200);
         $gapCriticalWeekly = (float) ($thresholds['client_funding_gap_critical_weekly'] ?? 500);
 
-        $query = Client::query()->where(function ($q) {
-            $q->where('status', 'active')->orWhereNull('status');
-        });
-        if ($tenantId) {
-            $query->whereHas('site', fn ($q) => $q->forTenant($tenantId));
-        }
-        $clients = $query->limit(100)->get();
+        $clients = Client::query()
+            ->whereIn('id', $clientIds)
+            ->where(function ($query) {
+                $query->where('status', 'active')->orWhereNull('status');
+            })
+            ->limit(100)
+            ->get();
 
         $periodDays = max($from->diffInDays($to) + 1, 1);
         $periodWeeks = max($periodDays / 7, 1);
@@ -192,16 +189,12 @@ class FinancialInsightsService
     /*  Utility Trend Insights                                             */
     /* ------------------------------------------------------------------ */
 
-    private function utilityCostInsights(?int $tenantId, Carbon $currentFrom, Carbon $currentTo, Carbon $previousFrom, Carbon $previousTo): array
+    private function utilityCostInsights(array $siteIds, Carbon $currentFrom, Carbon $currentTo, Carbon $previousFrom, Carbon $previousTo): array
     {
         $thresholds = config('finance.insight_thresholds', []);
         $utilityIncreasePct = (float) ($thresholds['utility_increase_warning_pct'] ?? 20);
 
-        $sites = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $sites->forTenant($tenantId);
-        }
-        $sites = $sites->get();
+        $sites = $this->sites($siteIds)->get();
 
         $insights = [];
 
@@ -241,17 +234,13 @@ class FinancialInsightsService
     /*  Budget Variance Insights (NEW — PR7)                               */
     /* ------------------------------------------------------------------ */
 
-    private function budgetVarianceInsights(?int $tenantId, string $period): array
+    private function budgetVarianceInsights(array $siteIds, string $period): array
     {
         $thresholds = config('finance.insight_thresholds', []);
         $approachingPct = (float) ($thresholds['budget_approaching_pct'] ?? 85);
         $overBudgetPct = (float) ($thresholds['budget_over_pct'] ?? 100);
 
-        $sites = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $sites->forTenant($tenantId);
-        }
-        $sites = $sites->get();
+        $sites = $this->sites($siteIds)->get();
 
         $insights = [];
 
@@ -318,13 +307,9 @@ class FinancialInsightsService
     /*  Forecast Overrun Insights (NEW — PR7)                              */
     /* ------------------------------------------------------------------ */
 
-    private function forecastOverrunInsights(?int $tenantId): array
+    private function forecastOverrunInsights(array $siteIds): array
     {
-        $sites = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $sites->forTenant($tenantId);
-        }
-        $sites = $sites->get();
+        $sites = $this->sites($siteIds)->get();
 
         $insights = [];
 
@@ -366,17 +351,16 @@ class FinancialInsightsService
     /*  Staffing Cost Insights (NEW — PR10)                                */
     /* ------------------------------------------------------------------ */
 
-    private function staffingCostInsights(?int $tenantId, Carbon $from, Carbon $to): array
+    private function staffingCostInsights(array $siteIds, Carbon $from, Carbon $to): array
     {
         $thresholds = config('finance.insight_thresholds', []);
         $highOncostPct = (float) ($thresholds['employer_oncost_high_pct'] ?? 12);
         $highStaffingPct = (float) ($thresholds['staffing_pct_of_total_warning'] ?? 75);
 
-        $sites = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $sites->forTenant($tenantId);
-        }
-        $siteIds = $sites->pluck('id')->toArray();
+        $siteIds = $this->sites($siteIds)
+            ->pluck('id')
+            ->map(fn ($siteId): int => (int) $siteId)
+            ->all();
 
         if (empty($siteIds)) {
             return [];
@@ -462,5 +446,15 @@ class FinancialInsightsService
         }
 
         return $total;
+    }
+
+    private function sites(array $siteIds): Builder
+    {
+        return Site::query()
+            ->whereIn('id', $siteIds)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('type', ['house', 'facility']);
     }
 }

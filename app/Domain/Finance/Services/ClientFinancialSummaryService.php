@@ -26,7 +26,9 @@ class ClientFinancialSummaryService
     {
         $to = $to ?? Carbon::now();
         $from = $from ?? $to->copy()->subMonths(1)->startOfMonth();
-        $client = Client::withTrashed()->findOrFail($clientId);
+        // Financial Insights never exposes a deleted Client as an interactive
+        // object, including to users with global finance scope.
+        $client = Client::query()->findOrFail($clientId);
 
         $ledger = $this->ledgerService->getLedger($clientId, $from, $to, withRunningBalance: true);
         $cost = $this->costService->calculate($clientId, $from, $to);
@@ -94,7 +96,7 @@ class ClientFinancialSummaryService
 
         $cards = [];
         foreach ($clientIds as $clientId) {
-            $client = Client::withTrashed()->find($clientId);
+            $client = Client::query()->find($clientId);
             if (! $client) {
                 continue;
             }

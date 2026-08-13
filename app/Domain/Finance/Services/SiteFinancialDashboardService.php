@@ -85,18 +85,19 @@ class SiteFinancialDashboardService
     /**
      * Compact summary for multi-site overview.
      */
-    public function getSiteSummaries(?int $tenantId, ?Carbon $from = null, ?Carbon $to = null): array
+    public function getSiteSummaries(array $siteIds, ?Carbon $from = null, ?Carbon $to = null): array
     {
         $to = $to ?? Carbon::now();
         $from = $from ?? $to->copy()->subMonths(1)->startOfMonth();
 
-        $query = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $query->forTenant($tenantId);
-        }
-
-        $sites = $query->get();
-        $siteIds = $sites->pluck('id')->toArray();
+        $sites = Site::query()
+            ->whereIn('id', $siteIds)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('type', ['house', 'facility'])
+            ->get();
+        $siteIds = $sites->pluck('id')->map(fn ($siteId): int => (int) $siteId)->all();
 
         // Batch staffing costs for all sites in one query
         $staffingBySite = $this->staffingCostService->perSiteComparison($siteIds, $from, $to);
