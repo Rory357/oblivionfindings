@@ -14,9 +14,10 @@ use App\Models\MealRecipe;
 use App\Models\Site;
 use App\Models\SiteMealPlanEntry;
 use App\Models\SiteMealWeekTemplate;
-use App\Services\Catering\InventoryMovementRecorder;
 use App\Services\Catering\MealCostCalculator;
+use App\Services\Catering\MealServiceCommand;
 use App\Services\Catering\SiteMealPlanAggregate;
+use App\Services\Catering\UnsafeMealServiceReversal;
 use App\Services\UserSiteAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -42,7 +43,7 @@ class SiteMealPlanController extends Controller
     public function __construct(
         private readonly SiteMealPlanAggregate $aggregate,
         private MealCostCalculator $costCalculator,
-        private InventoryMovementRecorder $inventory,
+        private MealServiceCommand $mealService,
         private readonly UserSiteAccessService $siteAccess,
         private readonly ClientMealRestrictionProjection $restrictionProjection,
     ) {}
@@ -391,39 +392,14 @@ class SiteMealPlanController extends Controller
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
 
-        return DB::transaction(function () use ($request, $site, $entry) {
-            $locked = SiteMealPlanEntry::query()
-                ->whereKey($entry->id)
-                ->where('site_id', $site->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        $result = $this->mealService->serve($site->id, $entry->id, (int) auth()->id());
+        if ($result->status === 'already_served') {
+            return $this->inertiaOrJson($request, 'Already served');
+        }
 
-            if ($locked->served_at) {
-                return $this->inertiaOrJson($request, 'Already served');
-            }
-
-            $resolved = $this->aggregate->resolve(
-                $site,
-                $locked->recipe_id ? (int) $locked->recipe_id : null,
-                $locked->client_ids ?? [],
-                $locked->plan_date,
-                $request->user(),
-                true,
-            );
-            $this->aggregate->assertClinicallySafe($resolved);
-
-            $locked->update([
-                'served_at' => now(),
-                'served_by' => auth()->id(),
-                'version' => $locked->version + 1,
-            ]);
-
-            $count = $this->applyServeStock($site, $locked, $resolved['recipe'], -1);
-
-            return $this->inertiaOrJson($request, $count > 0
-                ? "Served · {$count} ingredient".($count === 1 ? '' : 's').' deducted from stock'
-                : 'Marked as served');
-        }, 3);
+        return $this->inertiaOrJson($request, $result->movementCount > 0
+            ? "Served · {$result->movementCount} ingredient".($result->movementCount === 1 ? '' : 's').' deducted from stock'
+            : 'Marked as served');
     }
 
     public function unserve(Request $request, Site $site, SiteMealPlanEntry $entry)
@@ -432,80 +408,19 @@ class SiteMealPlanController extends Controller
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
 
-        return DB::transaction(function () use ($request, $site, $entry) {
-            $locked = SiteMealPlanEntry::query()
-                ->whereKey($entry->id)
-                ->where('site_id', $site->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-
-            if (! $locked->served_at) {
-                return $this->inertiaOrJson($request, 'Not served');
-            }
-
-            $resolved = $this->aggregate->resolve(
-                $site,
-                $locked->recipe_id ? (int) $locked->recipe_id : null,
-                $locked->client_ids ?? [],
-                $locked->plan_date,
-                $request->user(),
-                true,
-            );
-            $count = $this->applyServeStock($site, $locked, $resolved['recipe'], 1);
-
-            $locked->update([
-                'served_at' => null,
-                'served_by' => null,
-                'version' => $locked->version + 1,
-            ]);
-
-            return $this->inertiaOrJson($request, $count > 0 ? 'Un-served · stock restored' : 'Marked not served');
-        }, 3);
-    }
-
-    /**
-     * Adjust inventory for a recipe meal being served (sign -1) or
-     * un-served (+1). Scales each tracked ingredient by servings ÷ default.
-     * Returns the number of inventory movements written.
-     */
-    private function applyServeStock(
-        Site $site,
-        SiteMealPlanEntry $entry,
-        ?MealRecipe $recipe,
-        int $sign,
-    ): int {
-        if ($entry->source_type !== 'recipe' || ! $entry->recipe_id) {
-            return 0;
-        }
-        if (! $recipe || (int) $recipe->id !== (int) $entry->recipe_id || $recipe->ingredients->isEmpty()) {
-            return 0;
-        }
-        $base = max(1, (int) $recipe->serves_default);
-        $scale = ((int) ($entry->servings ?: $base)) / $base;
-        $touched = 0;
-        foreach ($recipe->ingredients as $ing) {
-            if (! $ing->product_id) {
-                continue;
-            }
-            $delta = $sign * ((float) $ing->quantity) * $scale;
-            if ($delta === 0.0) {
-                continue;
-            }
-            $this->inventory->record(
-                site: $site,
-                productId: $ing->product_id,
-                delta: $delta,
-                unit: $ing->unit,
-                reason: 'plan_consumption',
-                referenceType: SiteMealPlanEntry::class,
-                referenceId: $entry->id,
-                performedBy: auth()->id(),
-                note: ($sign < 0 ? 'Served: ' : 'Un-served: ').$entry->displayName(),
-            );
-            $touched++;
+        try {
+            $result = $this->mealService->unserve($site->id, $entry->id, (int) auth()->id());
+        } catch (UnsafeMealServiceReversal $exception) {
+            abort(409, $exception->getMessage());
         }
 
-        return $touched;
+        if ($result->status === 'not_served') {
+            return $this->inertiaOrJson($request, 'Not served');
+        }
+
+        return $this->inertiaOrJson($request, $result->movementCount > 0
+            ? 'Un-served · stock restored'
+            : 'Marked not served');
     }
 
     public function saveSettings(Request $request, Site $site)

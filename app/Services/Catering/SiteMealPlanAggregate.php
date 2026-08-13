@@ -65,6 +65,7 @@ class SiteMealPlanAggregate
 
         $residentQuery = $this->residentQuery($site, $actor)
             ->whereIn('id', $ids)
+            ->orderBy('clients.id')
             ->with('mealDislikes.product');
         if ($lockForUpdate) {
             $residentQuery->lockForUpdate();
