@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Respite;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
-use App\Models\BehaviourSupportPlan;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\DataBreachLog;
@@ -18,6 +17,7 @@ use App\Models\RestraintEvent;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\References\ReferenceNumberGenerator;
 use App\Services\Respite\RespiteShiftSync;
+use App\Services\Respite\RespiteStayScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -29,9 +29,15 @@ use Inertia\Response;
 
 class RespiteStayController extends Controller
 {
-    public function index(): Response
+    public function __construct(
+        private readonly RespiteStayScope $stayScope,
+    ) {}
+
+    public function index(Request $request): Response
     {
-        $stays = RespiteStay::with(['client', 'booking'])
+        $stays = RespiteStay::query()
+            ->with(['client', 'booking'])
+            ->tap(fn ($query) => $this->stayScope->applyAccessibleStayScope($query, $request))
             ->latest()
             ->paginate(25);
 
@@ -75,6 +81,7 @@ class RespiteStayController extends Controller
 
     public function show(RespiteStay $stay): Response
     {
+        $stay = $this->stayScope->resolveAuthorizedStay(request(), (int) $stay->id);
         $stay->load([
             'client',
             'booking.coordinator',
@@ -85,7 +92,10 @@ class RespiteStayController extends Controller
             'riskPlanActivations',
             'createdByUser',
         ]);
-        $this->authorize('view', $stay->client);
+        $this->stayScope->assertStayRecords($stay);
+        if ($stay->evidencePack) {
+            $this->stayScope->assertEvidenceGraph($stay, $stay->evidencePack, null);
+        }
 
         return Inertia::render('respite/stays/show', [
             'stay' => $stay,
@@ -298,11 +308,8 @@ class RespiteStayController extends Controller
 
     public function recordRestraint(Request $request, RespiteStay $stay): RedirectResponse
     {
-        $stay->loadMissing('client', 'booking');
-        $this->authorize('view', $stay->client);
-
         $validated = $request->validate([
-            'behaviour_support_plan_id' => 'nullable|exists:behaviour_support_plans,id',
+            'behaviour_support_plan_id' => 'nullable|integer',
             'started_at' => 'required|date',
             'ended_at' => 'nullable|date|after_or_equal:started_at',
             'duration_minutes' => 'nullable|integer|min:0',
@@ -319,34 +326,47 @@ class RespiteStayController extends Controller
             'within_support_plan' => 'nullable|boolean',
             'deviation_reason' => 'nullable|string',
             'authorised_by' => 'nullable|exists:users,id',
-            'related_incident_id' => 'nullable|exists:client_incidents,id',
+            'related_incident_id' => 'nullable|integer',
         ]);
 
-        $started = Carbon::parse($validated['started_at']);
-        $ended = isset($validated['ended_at']) ? Carbon::parse($validated['ended_at']) : null;
-        $withinSupportPlan = (bool) ($validated['within_support_plan'] ?? true);
-        $behaviourSupportPlanId = $validated['behaviour_support_plan_id'] ?? null;
+        $event = DB::transaction(function () use ($request, $stay, $validated): RestraintEvent {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true);
+            $started = Carbon::parse($validated['started_at']);
+            $ended = isset($validated['ended_at']) ? Carbon::parse($validated['ended_at']) : null;
+            $withinSupportPlan = (bool) ($validated['within_support_plan'] ?? true);
+            $behaviourSupportPlanId = isset($validated['behaviour_support_plan_id'])
+                ? (int) $validated['behaviour_support_plan_id']
+                : null;
 
-        if ($withinSupportPlan && ! $behaviourSupportPlanId) {
-            $behaviourSupportPlanId = $this->activeBehaviourSupportPlanId($stay);
-        }
+            if ($behaviourSupportPlanId !== null) {
+                $behaviourSupportPlanId = $this->stayScope
+                    ->currentPlan($stay, $behaviourSupportPlanId, 'behaviour_support_plan_id', true)
+                    ->id;
+            } elseif ($withinSupportPlan) {
+                $behaviourSupportPlanId = $this->stayScope->currentPlanId($stay, true);
+            }
 
-        $event = RestraintEvent::create([
-            ...$validated,
-            'behaviour_support_plan_id' => $behaviourSupportPlanId,
-            'stay_id' => $stay->id,
-            'client_id' => $stay->client_id,
-            'site_id' => $stay->booking?->location_id ?: $stay->client?->site_id,
-            'duration_minutes' => $validated['duration_minutes'] ?? ($ended ? $started->diffInMinutes($ended) : null),
-            'injury_occurred' => (bool) ($validated['injury_occurred'] ?? false),
-            'within_support_plan' => $withinSupportPlan,
-            'created_by' => auth()->id(),
-        ]);
+            if (! empty($validated['related_incident_id'])) {
+                $this->stayScope->incident($stay, (int) $validated['related_incident_id'], 'related_incident_id', true);
+            }
+
+            return RestraintEvent::create([
+                ...$validated,
+                'behaviour_support_plan_id' => $behaviourSupportPlanId,
+                'stay_id' => $stay->id,
+                'client_id' => $stay->client_id,
+                'site_id' => $this->stayScope->siteId($stay),
+                'duration_minutes' => $validated['duration_minutes'] ?? ($ended ? $started->diffInMinutes($ended) : null),
+                'injury_occurred' => (bool) ($validated['injury_occurred'] ?? false),
+                'within_support_plan' => $withinSupportPlan,
+                'created_by' => $request->user()?->id,
+            ]);
+        }, 3);
 
         event(new RespiteEvent('respite.stay.restraint_recorded', [
             'id' => $event->id,
-            'stay_id' => $stay->id,
-            'client_id' => $stay->client_id,
+            'stay_id' => $event->stay_id,
+            'client_id' => $event->client_id,
         ]));
 
         return back()->with('success', 'Restraint event recorded.');
@@ -354,9 +374,6 @@ class RespiteStayController extends Controller
 
     public function recordIncident(Request $request, RespiteStay $stay): RedirectResponse
     {
-        $stay->loadMissing(['client', 'booking']);
-        $this->authorize('view', $stay->client);
-
         $validated = $request->validate([
             'type' => 'required|string|max:255',
             'severity' => 'required|in:low,medium,high,critical',
@@ -376,8 +393,9 @@ class RespiteStayController extends Controller
         ]);
 
         $actor = $request->user();
-        $siteId = $stay->booking?->location_id ?: $stay->client?->site_id;
-        $incident = DB::transaction(function () use ($actor, $siteId, $stay, $validated): ClientIncident {
+        $incident = DB::transaction(function () use ($actor, $request, $stay, $validated): ClientIncident {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true);
+            $siteId = $this->stayScope->siteId($stay);
             $incident = ClientIncident::create([
                 'client_id' => $stay->client_id,
                 'site_id' => $siteId,
@@ -447,8 +465,8 @@ class RespiteStayController extends Controller
 
         event(new RespiteEvent('respite.stay.incident_recorded', [
             'id' => $incident->id,
-            'stay_id' => $stay->id,
-            'client_id' => $stay->client_id,
+            'stay_id' => $incident->respite_stay_id,
+            'client_id' => $incident->client_id,
         ]));
 
         return back()->with('success', 'Incident recorded.');
@@ -670,15 +688,5 @@ class RespiteStayController extends Controller
             ->where('client_id', $clientId)
             ->active()
             ->exists();
-    }
-
-    private function activeBehaviourSupportPlanId(RespiteStay $stay): ?int
-    {
-        return BehaviourSupportPlan::query()
-            ->where('client_id', $stay->client_id)
-            ->where('status', 'active')
-            ->orderByRaw('review_date is null')
-            ->orderBy('review_date')
-            ->value('id');
     }
 }

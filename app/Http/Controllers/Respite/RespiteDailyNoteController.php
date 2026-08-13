@@ -9,6 +9,7 @@ use App\Models\RespiteAuditLog;
 use App\Models\RespiteDailyNote;
 use App\Models\RespiteStay;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Respite\RespiteStayScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,10 +18,15 @@ use Inertia\Response;
 
 class RespiteDailyNoteController extends Controller
 {
+    public function __construct(
+        private readonly RespiteStayScope $stayScope,
+    ) {}
+
     public function index(Request $request): Response
     {
         $notes = RespiteDailyNote::query()
             ->with(['stay.client', 'linkedIncident'])
+            ->whereHas('stay', fn ($stays) => $this->stayScope->applyAccessibleStayScope($stays, $request))
             ->when($request->stay_id, fn ($q, $stayId) => $q->where('stay_id', $stayId))
             ->when($request->client_id, fn ($q, $clientId) => $q->where('client_id', $clientId))
             ->when($request->date, fn ($q, $date) => $q->forDate($date))
@@ -32,6 +38,11 @@ class RespiteDailyNoteController extends Controller
             ->orderByDesc('note_date')
             ->orderByDesc('created_at')
             ->paginate(20);
+
+        $notes->getCollection()->each(function (RespiteDailyNote $note) use ($request): void {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $note->stay_id);
+            $this->stayScope->dailyNote($stay, (int) $note->id, null);
+        });
 
         return Inertia::render('respite/daily-notes/index', [
             'notes' => $notes,
@@ -45,6 +56,7 @@ class RespiteDailyNoteController extends Controller
     {
         $stays = RespiteStay::query()
             ->with('client')
+            ->tap(fn ($query) => $this->stayScope->applyAccessibleStayScope($query, $request))
             ->whereIn('status', ['admitted', 'active', 'extended'])
             ->orderByDesc('created_at')
             ->get();
@@ -62,8 +74,8 @@ class RespiteDailyNoteController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'stay_id' => 'required|exists:respite_stays,id',
-            'client_id' => 'required|exists:clients,id',
+            'stay_id' => 'required|integer',
+            'client_id' => 'required|integer',
             'note_date' => 'required|date',
             'shift_period' => 'required|in:morning,afternoon,evening,night,all_day',
             'mood' => 'nullable|in:very_low,low,neutral,good,excellent',
@@ -83,24 +95,38 @@ class RespiteDailyNoteController extends Controller
             'personal_care_notes' => 'nullable|string|max:2000',
             'nutrition_notes' => 'nullable|string|max:2000',
             'incident_occurred' => 'boolean',
-            'linked_incident_id' => 'nullable|exists:client_incidents,id',
+            'linked_incident_id' => 'nullable|integer',
             'sensitive_flag' => 'boolean',
         ]);
 
-        $validated['created_by'] = auth()->id();
+        $note = DB::transaction(function () use ($request, $validated): RespiteDailyNote {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $validated['stay_id'], true);
+            $this->stayScope->assertSubmittedClient($stay, $validated['client_id']);
 
-        $note = RespiteDailyNote::create($validated);
-        $this->createIncidentFromNoteWhenNeeded($note);
+            if (! empty($validated['linked_incident_id'])) {
+                $this->stayScope->incident($stay, (int) $validated['linked_incident_id'], 'linked_incident_id', true);
+            }
 
-        RespiteAuditLog::log(
-            $note,
-            RespiteAuditLog::ACTION_CREATED,
-            auth()->id(),
-            null,
-            array_diff_key($validated, ['observations' => null, 'concerns' => null]),
-            null,
-            RespiteAuditLog::CATEGORY_STAY
-        );
+            $attributes = $validated;
+            $attributes['stay_id'] = $stay->id;
+            $attributes['client_id'] = $stay->client_id;
+            $attributes['created_by'] = $request->user()?->id;
+
+            $note = RespiteDailyNote::create($attributes);
+            $this->createIncidentFromNoteWhenNeeded($note, $stay);
+
+            RespiteAuditLog::log(
+                $note,
+                RespiteAuditLog::ACTION_CREATED,
+                $request->user()?->id,
+                null,
+                array_diff_key($attributes, ['observations' => null, 'concerns' => null]),
+                null,
+                RespiteAuditLog::CATEGORY_STAY
+            );
+
+            return $note->fresh();
+        }, 3);
 
         event(new RespiteEvent('respite.daily_note.created', [
             'id' => $note->id,
@@ -117,6 +143,8 @@ class RespiteDailyNoteController extends Controller
 
     public function show(RespiteDailyNote $dailyNote): Response
     {
+        $stay = $this->stayScope->resolveAuthorizedStay(request(), (int) $dailyNote->stay_id);
+        $dailyNote = $this->stayScope->dailyNote($stay, (int) $dailyNote->id, null);
         $dailyNote->load(['stay.client', 'linkedIncident', 'creator']);
 
         RespiteAuditLog::log(
@@ -138,11 +166,6 @@ class RespiteDailyNoteController extends Controller
 
     public function update(Request $request, RespiteDailyNote $dailyNote): RedirectResponse
     {
-        $oldValues = $dailyNote->only([
-            'mood', 'appetite', 'sleep_quality', 'engagement', 'mobility',
-            'concerns', 'incident_occurred', 'sensitive_flag',
-        ]);
-
         $validated = $request->validate([
             'mood' => 'nullable|in:very_low,low,neutral,good,excellent',
             'appetite' => 'nullable|in:none,minimal,fair,good,excellent',
@@ -161,23 +184,39 @@ class RespiteDailyNoteController extends Controller
             'personal_care_notes' => 'nullable|string|max:2000',
             'nutrition_notes' => 'nullable|string|max:2000',
             'incident_occurred' => 'sometimes|boolean',
-            'linked_incident_id' => 'nullable|exists:client_incidents,id',
+            'linked_incident_id' => 'nullable|integer',
             'sensitive_flag' => 'sometimes|boolean',
         ]);
 
-        $validated['updated_by'] = auth()->id();
-        $dailyNote->update($validated);
-        $this->createIncidentFromNoteWhenNeeded($dailyNote->fresh());
+        $dailyNote = DB::transaction(function () use ($request, $dailyNote, $validated): RespiteDailyNote {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $dailyNote->stay_id, true);
+            $lockedNote = $this->stayScope->dailyNote($stay, (int) $dailyNote->id, null, true);
+            $oldValues = $lockedNote->only([
+                'mood', 'appetite', 'sleep_quality', 'engagement', 'mobility',
+                'concerns', 'incident_occurred', 'sensitive_flag',
+            ]);
 
-        RespiteAuditLog::log(
-            $dailyNote,
-            RespiteAuditLog::ACTION_UPDATED,
-            auth()->id(),
-            $oldValues,
-            array_intersect_key($validated, $oldValues),
-            null,
-            RespiteAuditLog::CATEGORY_STAY
-        );
+            if (! empty($validated['linked_incident_id'])) {
+                $this->stayScope->incident($stay, (int) $validated['linked_incident_id'], 'linked_incident_id', true);
+            }
+
+            $attributes = $validated;
+            $attributes['updated_by'] = $request->user()?->id;
+            $lockedNote->update($attributes);
+            $this->createIncidentFromNoteWhenNeeded($lockedNote, $stay);
+
+            RespiteAuditLog::log(
+                $lockedNote,
+                RespiteAuditLog::ACTION_UPDATED,
+                $request->user()?->id,
+                $oldValues,
+                array_intersect_key($attributes, $oldValues),
+                null,
+                RespiteAuditLog::CATEGORY_STAY
+            );
+
+            return $lockedNote->fresh();
+        }, 3);
 
         event(new RespiteEvent('respite.daily_note.updated', [
             'id' => $dailyNote->id,
@@ -189,12 +228,16 @@ class RespiteDailyNoteController extends Controller
 
     public function forStay(RespiteStay $stay): Response
     {
+        $stay = $this->stayScope->resolveAuthorizedStay(request(), (int) $stay->id);
         $notes = RespiteDailyNote::query()
             ->where('stay_id', $stay->id)
+            ->where('client_id', $stay->client_id)
             ->with('linkedIncident')
             ->orderByDesc('note_date')
             ->orderByDesc('created_at')
             ->get();
+
+        $notes->each(fn (RespiteDailyNote $note) => $this->stayScope->dailyNote($stay, (int) $note->id, null));
 
         $wellbeingTrend = $notes->map(fn ($note) => [
             'date' => $note->note_date->format('Y-m-d'),
@@ -211,26 +254,38 @@ class RespiteDailyNoteController extends Controller
         ]);
     }
 
-    public function withConcerns(): Response
+    public function withConcerns(Request $request): Response
     {
         $notes = RespiteDailyNote::query()
             ->withConcerns()
+            ->whereHas('stay', fn ($stays) => $this->stayScope->applyAccessibleStayScope($stays, $request))
             ->with(['stay.client'])
             ->orderByDesc('note_date')
             ->paginate(20);
+
+        $notes->getCollection()->each(function (RespiteDailyNote $note) use ($request): void {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $note->stay_id);
+            $this->stayScope->dailyNote($stay, (int) $note->id, null);
+        });
 
         return Inertia::render('respite/daily-notes/with-concerns', [
             'notes' => $notes,
         ]);
     }
 
-    public function withIncidents(): Response
+    public function withIncidents(Request $request): Response
     {
         $notes = RespiteDailyNote::query()
             ->withIncidents()
+            ->whereHas('stay', fn ($stays) => $this->stayScope->applyAccessibleStayScope($stays, $request))
             ->with(['stay.client', 'linkedIncident'])
             ->orderByDesc('note_date')
             ->paginate(20);
+
+        $notes->getCollection()->each(function (RespiteDailyNote $note) use ($request): void {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $note->stay_id);
+            $this->stayScope->dailyNote($stay, (int) $note->id, null);
+        });
 
         return Inertia::render('respite/daily-notes/with-incidents', [
             'notes' => $notes,
@@ -292,51 +347,39 @@ class RespiteDailyNoteController extends Controller
         ];
     }
 
-    private function createIncidentFromNoteWhenNeeded(RespiteDailyNote $note): void
+    private function createIncidentFromNoteWhenNeeded(RespiteDailyNote $note, RespiteStay $stay): void
     {
-        DB::transaction(function () use ($note): void {
-            $lockedNote = RespiteDailyNote::query()
-                ->whereKey($note->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        if (! $note->incident_occurred || $note->linked_incident_id) {
+            return;
+        }
 
-            if (! $lockedNote->incident_occurred || $lockedNote->linked_incident_id) {
-                return;
-            }
+        $actor = auth()->user();
+        $incident = ClientIncident::create([
+            'client_id' => $stay->client_id,
+            'site_id' => $this->stayScope->siteId($stay),
+            'reported_by' => $actor?->id,
+            'respite_stay_id' => $stay->id,
+            'type' => 'daily_note',
+            'severity' => $note->sensitive_flag ? 'medium' : 'low',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'occurred_at' => $note->note_date,
+            'title' => 'Daily note incident flag',
+            'description' => $note->concerns ?: $note->observations ?: 'Incident was flagged from a respite daily note.',
+            'requires_followup' => (bool) $note->sensitive_flag,
+            'metadata' => [
+                'source' => 'respite_daily_note',
+                'daily_note_id' => $note->id,
+                'stay_id' => $stay->id,
+            ],
+        ]);
 
-            $lockedNote->loadMissing(['client:id,site_id', 'stay.booking', 'stay.client:id,site_id']);
-            $siteId = $lockedNote->stay?->booking?->location_id
-                ?: $lockedNote->stay?->client?->site_id
-                ?: $lockedNote->client?->site_id;
-            $actor = auth()->user();
+        $journey = app(IncidentJourneyService::class)
+            ->ensureForSubmittedIncident($incident, $actor);
 
-            $incident = ClientIncident::create([
-                'client_id' => $lockedNote->client_id,
-                'site_id' => $siteId,
-                'reported_by' => $actor?->id,
-                'respite_stay_id' => $lockedNote->stay_id,
-                'type' => 'daily_note',
-                'severity' => $lockedNote->sensitive_flag ? 'medium' : 'low',
-                'status' => 'submitted',
-                'submitted_at' => now(),
-                'occurred_at' => $lockedNote->note_date,
-                'title' => 'Daily note incident flag',
-                'description' => $lockedNote->concerns ?: $lockedNote->observations ?: 'Incident was flagged from a respite daily note.',
-                'requires_followup' => (bool) $lockedNote->sensitive_flag,
-                'metadata' => [
-                    'source' => 'respite_daily_note',
-                    'daily_note_id' => $lockedNote->id,
-                    'stay_id' => $lockedNote->stay_id,
-                ],
-            ]);
-
-            $journey = app(IncidentJourneyService::class)
-                ->ensureForSubmittedIncident($incident, $actor);
-
-            $lockedNote->forceFill([
-                'linked_incident_id' => $journey->incident->id,
-                'updated_by' => $actor?->id,
-            ])->save();
-        }, 3);
+        $note->forceFill([
+            'linked_incident_id' => $journey->incident->id,
+            'updated_by' => $actor?->id,
+        ])->save();
     }
 }

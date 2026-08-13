@@ -262,9 +262,12 @@ class RespiteNzWorkflowCompletionTest extends TestCase
 
     public function test_evidence_pack_manifest_blocks_sealing_until_required_items_complete(): void
     {
-        $client = Client::factory()->create();
+        $site = Site::factory()->create();
+        $this->grantAdminSiteAccess($site);
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $booking = RespiteBooking::factory()->create([
             'client_id' => $client->id,
+            'location_id' => $site->id,
             'consent_authority' => null,
         ]);
         $stay = RespiteStay::create([

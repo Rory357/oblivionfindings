@@ -8,17 +8,18 @@ use App\Models\BehaviourSupportPlan;
 use App\Models\BehaviourSupportPlanReview;
 use App\Models\Client;
 use App\Models\ClientIncident;
-use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
 use App\Models\RestraintEventAttachment;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Respite\RespiteStayScope;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -31,6 +32,7 @@ class RestraintController extends Controller
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly RespiteStayScope $stayScope,
     ) {}
 
     private const RESTRAINT_TYPES = ['physical', 'chemical', 'mechanical', 'seclusion', 'environmental'];
@@ -473,52 +475,85 @@ class RestraintController extends Controller
             'related_incident_id' => 'nullable|integer',
         ]);
 
-        $client = $this->resolveAccessibleClient($request, (int) $validated['client_id']);
-        $siteId = (int) ($validated['site_id'] ?? $client->site_id);
-        abort_unless($siteId > 0 && $siteId === (int) $client->site_id, 403, UserSiteAccessService::DEFAULT_MESSAGE);
-        $this->siteAccess->assertCanAccessHealthSafetySiteId($request->user(), $siteId);
-        $validated['site_id'] = $siteId;
+        $event = DB::transaction(function () use ($request, $validated): RestraintEvent {
+            $stay = ! empty($validated['stay_id'])
+                ? $this->stayScope->lockCanonicalStay((int) $validated['stay_id'])
+                : null;
+            if ($stay) {
+                $client = $this->resolveAccessibleClient($request, (int) $stay->client_id);
+                $siteId = $this->stayScope->siteId($stay);
+                $this->siteAccess->assertCanAccessHealthSafetySiteId($request->user(), $siteId);
+                $this->stayScope->assertSubmittedClient($stay, $validated['client_id']);
+                if (array_key_exists('site_id', $validated)) {
+                    $this->stayScope->assertSubmittedSite($stay, $validated['site_id']);
+                }
+            } else {
+                $client = $this->resolveAccessibleClient($request, (int) $validated['client_id']);
+                $siteId = (int) ($validated['site_id'] ?? $client->site_id);
+                abort_unless($siteId > 0 && $siteId === (int) $client->site_id, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+                $this->siteAccess->assertCanAccessHealthSafetySiteId($request->user(), $siteId);
+            }
 
-        if (! empty($validated['behaviour_support_plan_id'])) {
-            $plan = $this->resolveAccessiblePlan($request, (int) $validated['behaviour_support_plan_id']);
-            abort_unless((int) $plan->client_id === (int) $client->id, 403, UserSiteAccessService::DEFAULT_MESSAGE);
-        }
-        if (! empty($validated['stay_id'])) {
-            $stay = RespiteStay::query()->whereKey((int) $validated['stay_id'])->where('client_id', $client->id)->firstOrFail();
-            abort_unless((int) $stay->client_id === (int) $client->id, 404);
-        }
-        $this->assertIncidentAtEventContext(
-            $request,
-            isset($validated['related_incident_id']) ? (int) $validated['related_incident_id'] : null,
-            $client->id,
-            $siteId,
-        );
-        foreach ($validated['staff_involved'] ?? [] as $staffId) {
-            $this->siteAccess->assertCanUseCurrentStaffAtSite($request->user(), (int) $staffId, $siteId, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
-        }
-        if (! empty($validated['authorised_by'])) {
-            $this->siteAccess->assertCanUseCurrentStaffAtSite($request->user(), (int) $validated['authorised_by'], $siteId, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
-        }
+            $planId = ! empty($validated['behaviour_support_plan_id'])
+                ? (int) $validated['behaviour_support_plan_id']
+                : null;
 
-        // Derive duration server-side when both ends are known and it wasn't supplied.
-        if (empty($validated['duration_minutes']) && ! empty($validated['ended_at'])) {
-            $validated['duration_minutes'] = Carbon::parse($validated['started_at'])
-                ->diffInMinutes(Carbon::parse($validated['ended_at']));
-        }
+            if ($stay && $planId !== null) {
+                $planId = $this->stayScope->currentPlan($stay, $planId, 'behaviour_support_plan_id', true)->id;
+            } elseif ($stay && ($validated['within_support_plan'] ?? true)) {
+                $planId = $this->stayScope->currentPlanId($stay, true);
+            } elseif ($planId !== null || ($validated['within_support_plan'] ?? true)) {
+                $plan = $this->behaviourSupportPlanQuery($request)
+                    ->where('client_id', $client->id)
+                    ->where('status', 'active')
+                    ->where(function (Builder $plans): void {
+                        $plans->whereNull('developed_at')->orWhereDate('developed_at', '<=', today());
+                    })
+                    ->where(function (Builder $plans): void {
+                        $plans->whereNull('review_date')->orWhereDate('review_date', '>=', today());
+                    })
+                    ->when($planId !== null, fn (Builder $plans) => $plans->whereKey($planId))
+                    ->lockForUpdate()
+                    ->first();
 
-        // Mirror the respite active-BSP auto-link (RespiteStayController@recordRestraint):
-        // an in-plan restraint with no explicit plan links to the client's active BSP, so
-        // the shared wizard (incl. the respite entry point) keeps that behaviour.
-        if (empty($validated['behaviour_support_plan_id']) && ($validated['within_support_plan'] ?? true)) {
-            $validated['behaviour_support_plan_id'] = $this->behaviourSupportPlanQuery($request)
-                ->where('client_id', $validated['client_id'])
-                ->where('status', 'active')
-                ->value('id');
-        }
+                if (! $plan && $planId !== null) {
+                    throw ValidationException::withMessages([
+                        'behaviour_support_plan_id' => 'An active, current behaviour support plan for this resident is required.',
+                    ]);
+                }
+                $planId = $plan?->id;
+            }
 
-        $validated['created_by'] = $request->user()->id;
+            if ($stay && ! empty($validated['related_incident_id'])) {
+                $this->stayScope->incident($stay, (int) $validated['related_incident_id'], 'related_incident_id', true);
+            } else {
+                $this->assertIncidentAtEventContext(
+                    $request,
+                    isset($validated['related_incident_id']) ? (int) $validated['related_incident_id'] : null,
+                    $client->id,
+                    $siteId,
+                );
+            }
+            foreach ($validated['staff_involved'] ?? [] as $staffId) {
+                $this->siteAccess->assertCanUseCurrentStaffAtSite($request->user(), (int) $staffId, $siteId, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+            }
+            if (! empty($validated['authorised_by'])) {
+                $this->siteAccess->assertCanUseCurrentStaffAtSite($request->user(), (int) $validated['authorised_by'], $siteId, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+            }
 
-        $event = RestraintEvent::create($validated);
+            $attributes = $validated;
+            $attributes['client_id'] = $client->id;
+            $attributes['site_id'] = $siteId;
+            $attributes['stay_id'] = $stay?->id;
+            $attributes['behaviour_support_plan_id'] = $planId;
+            if (empty($attributes['duration_minutes']) && ! empty($attributes['ended_at'])) {
+                $attributes['duration_minutes'] = Carbon::parse($attributes['started_at'])
+                    ->diffInMinutes(Carbon::parse($attributes['ended_at']));
+            }
+            $attributes['created_by'] = $request->user()->id;
+
+            return RestraintEvent::create($attributes);
+        }, 3);
 
         if ($request->boolean('stay')) {
             return back()->with('success', 'Restraint event recorded.');
