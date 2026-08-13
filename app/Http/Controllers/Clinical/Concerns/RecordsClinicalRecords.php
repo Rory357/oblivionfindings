@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Clinical\Concerns;
 use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Services\ClinicalAttachmentService;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Enums\AlertSeverity;
+use App\Models\Client;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -29,7 +31,7 @@ trait RecordsClinicalRecords
      *
      * @return array<string, mixed>
      */
-    protected function validateObservationInput(Request $request, User $user): array
+    protected function validateObservationInput(Request $request, User $user, Client $client): array
     {
         if (! $user->canDo('clinical.observations.record') && ! $user->canDo('clinical.observations.recordClinical')) {
             abort(403);
@@ -40,7 +42,7 @@ trait RecordsClinicalRecords
             'data' => ['present', 'array'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'recorded_at' => ['nullable', 'date'],
-            'protocol_schedule_id' => ['nullable', 'integer', 'exists:clinical_protocol_schedules,id'],
+            'protocol_schedule_id' => ['nullable', 'integer'],
             // Flag-on-entry → pushes the record to the RN sign-off queue.
             'is_flagged' => ['nullable', 'boolean'],
             'flagged_reason' => ['nullable', 'string', 'max:500'],
@@ -51,6 +53,15 @@ trait RecordsClinicalRecords
         // Vitals & Pain are clinical observations — gate behind the clinical ability.
         if ($type->requiresClinicalPermission() && ! $user->canDo('clinical.observations.recordClinical')) {
             abort(403, 'Clinical observation permission required for '.$type->label());
+        }
+
+        if (! empty($validated['protocol_schedule_id'])) {
+            app(ClinicalSiteAccessService::class)->assertCanUseProtocolSchedule(
+                $user,
+                $client,
+                (int) $validated['protocol_schedule_id'],
+                $type->value,
+            );
         }
 
         return $validated;

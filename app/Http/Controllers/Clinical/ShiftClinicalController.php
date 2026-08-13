@@ -7,10 +7,12 @@ use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
 use App\Domain\Clinical\Services\ClinicalProtocolService;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Enums\AlertSeverity;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Shift;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +23,7 @@ class ShiftClinicalController extends Controller
         protected ClinicalObservationService $observationService,
         protected ClinicalEventService $eventService,
         protected ClinicalProtocolService $protocolService,
+        protected ClinicalSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -60,12 +63,12 @@ class ShiftClinicalController extends Controller
         }
 
         $validated = $request->validate([
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
+            'client_id' => ['nullable', 'integer'],
             'observation_type' => ['required', Rule::in(array_column(ObservationType::cases(), 'value'))],
             'data' => ['present', 'array'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'recorded_at' => ['nullable', 'date'],
-            'protocol_schedule_id' => ['nullable', 'integer', 'exists:clinical_protocol_schedules,id'],
+            'protocol_schedule_id' => ['nullable', 'integer'],
         ]);
 
         $type = ObservationType::from($validated['observation_type']);
@@ -74,7 +77,16 @@ class ShiftClinicalController extends Controller
             abort(403, 'Clinical observation permission required for '.$type->label());
         }
 
-        $client = $this->resolveObservationClient($shift, $validated['client_id'] ?? null);
+        $client = $this->resolveObservationClient($shift, $validated['client_id'] ?? null, $user);
+
+        if (! empty($validated['protocol_schedule_id'])) {
+            $this->siteAccess->assertCanUseProtocolSchedule(
+                $user,
+                $client,
+                (int) $validated['protocol_schedule_id'],
+                $type->value,
+            );
+        }
 
         try {
             $observation = $this->observationService->record(
@@ -99,12 +111,13 @@ class ShiftClinicalController extends Controller
         return back()->with('success', $type->label().' recorded successfully.');
     }
 
-    protected function resolveObservationClient(Shift $shift, ?int $clientId): Client
+    protected function resolveObservationClient(Shift $shift, ?int $clientId, User $user): Client
     {
         $shift->loadMissing('client');
 
         if ($clientId) {
             $client = Client::query()->findOrFail($clientId);
+            $this->siteAccess->assertCanAccessClient($user, $client);
 
             if ((int) $client->id === (int) $shift->client_id) {
                 return $client;
@@ -191,6 +204,19 @@ class ShiftClinicalController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('shifts.viewAny') || $auth->canDo('shifts.viewAssigned')), 403);
+
+        $this->siteAccess->assertCanAccessShift($auth, $shift);
+
+        $shift->loadMissing('client');
+        if ($shift->client) {
+            $this->siteAccess->assertCanAccessClient($auth, $shift->client);
+            abort_if(
+                $shift->site_id
+                && (int) $shift->client->site_id !== (int) $shift->site_id,
+                403,
+                'The shift client does not belong to the shift Site.',
+            );
+        }
 
         if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);

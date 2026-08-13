@@ -4,7 +4,9 @@ namespace Tests\Feature\Policies;
 
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Policies\ClinicalProtocolPolicy;
+use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -17,12 +19,16 @@ class ClinicalProtocolPolicyTest extends TestCase
 
     protected ClinicalProtocolPolicy $policy;
 
+    protected Client $siteClient;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
-        $this->policy = new ClinicalProtocolPolicy();
+        $this->policy = app(ClinicalProtocolPolicy::class);
+        $site = Site::factory()->create(['is_active' => true]);
+        $this->siteClient = Client::factory()->create(['site_id' => $site->id]);
     }
 
     protected function createUserWithRole(string $roleName): User
@@ -96,14 +102,14 @@ class ClinicalProtocolPolicyTest extends TestCase
     public function test_support_worker_cannot_update_protocols(): void
     {
         $user = $this->createUserWithRole('support_worker');
-        $protocol = ClinicalProtocol::factory()->create();
+        $protocol = ClinicalProtocol::factory()->create(['client_id' => $this->siteClient->id]);
         $this->assertFalse($this->policy->update($user, $protocol));
     }
 
     public function test_clinical_lead_can_update_protocols(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $protocol = ClinicalProtocol::factory()->create();
+        $protocol = ClinicalProtocol::factory()->create(['client_id' => $this->siteClient->id]);
         $this->assertTrue($this->policy->update($user, $protocol));
     }
 
@@ -112,14 +118,14 @@ class ClinicalProtocolPolicyTest extends TestCase
     public function test_support_worker_cannot_delete_protocols(): void
     {
         $user = $this->createUserWithRole('support_worker');
-        $protocol = ClinicalProtocol::factory()->create();
+        $protocol = ClinicalProtocol::factory()->create(['client_id' => $this->siteClient->id]);
         $this->assertFalse($this->policy->delete($user, $protocol));
     }
 
     public function test_clinical_lead_can_delete_protocols(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $protocol = ClinicalProtocol::factory()->create();
+        $protocol = ClinicalProtocol::factory()->create(['client_id' => $this->siteClient->id]);
         $this->assertTrue($this->policy->delete($user, $protocol));
     }
 }

@@ -46,6 +46,7 @@ class ClinicalPermissionsSeeder extends Seeder
 
             // Module access
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.accessAllSites', 'description' => 'Apply granted clinical permissions across all Sites', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Medication verification and administration-rule governance
             ['key' => 'medications.orders.verify', 'description' => 'Verify medication orders before administration', 'group' => 'medications', 'module' => 'Clinical'],
@@ -119,11 +120,18 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.protocols.viewAny',
             'clinical.protocols.manage',
             'clinical.dashboard',
+            'clinical.accessAllSites',
             'medications.orders.verify',
             'medications.settings.manage',
         ]);
 
-        // Coordinator: same as clinical lead
+        // Admin remains an explicit central role when this focused seeder is run
+        // independently of RbacSeeder's "all permissions" synchronisation.
+        $syncPermissions(Role::where('name', 'admin')->first(), [
+            'clinical.accessAllSites',
+        ]);
+
+        // Coordinator: full clinical capabilities, restricted to assigned Sites.
         $syncPermissions(Role::where('name', 'coordinator')->first(), [
             'clinical.observations.viewAny',
             'clinical.observations.record',
@@ -144,7 +152,7 @@ class ClinicalPermissionsSeeder extends Seeder
             'medications.settings.manage',
         ]);
 
-        // Provider Manager: full access
+        // Provider Manager: central access is carried separately by sites.viewAll.
         $syncPermissions(Role::where('name', 'provider_manager')->first(), [
             'clinical.observations.viewAny',
             'clinical.observations.record',

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Clinical\Services;
 
+use App\Domain\Clinical\Enums\BehaviourFunction;
 use App\Domain\Clinical\Enums\ClinicalAssessmentType;
 use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ClinicalRiskBand;
@@ -13,7 +14,6 @@ use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
 use App\Domain\Clinical\Models\ClinicalRiskAssessment;
-use App\Domain\Clinical\Enums\BehaviourFunction;
 use App\Enums\AlertSeverity;
 use App\Models\BehaviourAbcEntry;
 use App\Models\CarePlan;
@@ -25,11 +25,12 @@ use App\Models\ClientSeizureEntry;
 use App\Models\ClientSleepEntry;
 use App\Models\MedicationPrnEffectiveness;
 use App\Models\RestraintEvent;
+use App\Models\Site;
 use App\Models\User;
-use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * Lightweight dashboard metrics for the Health & Clinical module.
@@ -39,10 +40,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class ClinicalDashboardService
 {
-    private const CLIENT_SITE_BYPASS_PERMISSIONS = ['clients.viewAny'];
-
     public function __construct(
-        private readonly UserSiteAccessService $siteAccess,
+        private readonly ClinicalSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -58,22 +57,26 @@ class ClinicalDashboardService
      *     clients_on_watch: int,
      * }
      */
-    public function getKpis(): array
+    public function getKpis(User $user): array
     {
         $now = Carbon::now();
+        $protocols = fn (): Builder => $this->siteAccess->applyProtocolScope(ClinicalProtocol::query(), $user);
+        $observations = fn (): Builder => $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $user);
+        $schedules = fn (): Builder => $this->siteAccess->applyScheduleScope(ClinicalProtocolSchedule::query(), $user);
+        $events = fn (): Builder => $this->siteAccess->applyEventScope(ClinicalEvent::query(), $user);
 
         return [
-            'protocols_active' => ClinicalProtocol::active()->count(),
-            'clients_on_watch' => $this->clientsOnWatchCount(),
-            'observations_today' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->startOfDay())->count(),
-            'observations_7d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(7))->count(),
-            'schedules_due' => ClinicalProtocolSchedule::pending()->count(),
-            'schedules_overdue' => ClinicalProtocolSchedule::overdue()->count(),
-            'events_30d' => ClinicalEvent::where('occurred_at', '>=', $now->copy()->subDays(30))->count(),
-            'events_high_severity_30d' => ClinicalEvent::where('occurred_at', '>=', $now->copy()->subDays(30))
+            'protocols_active' => $protocols()->active()->count(),
+            'clients_on_watch' => $this->clientsOnWatchCount($user),
+            'observations_today' => $observations()->where('recorded_at', '>=', $now->copy()->startOfDay())->count(),
+            'observations_7d' => $observations()->where('recorded_at', '>=', $now->copy()->subDays(7))->count(),
+            'schedules_due' => $schedules()->pending()->count(),
+            'schedules_overdue' => $schedules()->overdue()->count(),
+            'events_30d' => $events()->where('occurred_at', '>=', $now->copy()->subDays(30))->count(),
+            'events_high_severity_30d' => $events()->where('occurred_at', '>=', $now->copy()->subDays(30))
                 ->whereIn('severity', [AlertSeverity::HIGH, AlertSeverity::CRITICAL])
                 ->count(),
-            'compliance_rate_30d' => $this->calculateComplianceRate($now->copy()->subDays(30), $now),
+            'compliance_rate_30d' => $this->calculateComplianceRate($user, $now->copy()->subDays(30), $now),
         ];
     }
 
@@ -85,20 +88,24 @@ class ClinicalDashboardService
      * @param  array{schedules_overdue?: int}|null  $kpis  optional pre-computed getKpis() result
      * @return array<string, int>
      */
-    public function getTabCounts(?array $kpis = null): array
+    public function getTabCounts(User $user, ?array $kpis = null): array
     {
-        $kpis ??= $this->getKpis();
+        $kpis ??= $this->getKpis($user);
         $now = Carbon::now();
 
         return [
             // Observations needing attention = overdue protocol schedules to record.
             'observations' => $kpis['schedules_overdue'] ?? 0,
             // Clinical events awaiting RN sign-off (last 30 days).
-            'clinical_events' => ClinicalEvent::whereNull('reviewed_at')
+            'clinical_events' => $this->siteAccess->applyEventScope(ClinicalEvent::query(), $user)
+                ->whereNull('reviewed_at')
                 ->where('occurred_at', '>=', $now->copy()->subDays(30))
                 ->count(),
             // Assessments due for review (review date reached).
-            'assessments' => ClinicalRiskAssessment::reviewDue()->count(),
+            'assessments' => $this->siteAccess
+                ->applyClientOwnedScope(ClinicalRiskAssessment::query(), $user)
+                ->reviewDue()
+                ->count(),
         ];
     }
 
@@ -107,9 +114,9 @@ class ClinicalDashboardService
      * days) carries a NEWS2 band of Medium or High. Latest-per-client is resolved
      * in PHP over the bounded recent-vitals set.
      */
-    private function clientsOnWatchCount(): int
+    private function clientsOnWatchCount(User $user): int
     {
-        return $this->latestVitalsPerClient()
+        return $this->latestVitalsPerClient($user)
             ->filter(fn ($rows) => $rows->first()->news2_band instanceof News2Band
                 && $rows->first()->news2_band->isOnWatch())
             ->count();
@@ -122,9 +129,9 @@ class ClinicalDashboardService
      *
      * @return array<int, array{client_id: int, client_name: string, site: ?string, news2_score: int, news2_band: string, band_label: string, recorded_at: string, sparkline: array<int, int>}>
      */
-    public function getDeteriorationWatch(int $limit = 10): array
+    public function getDeteriorationWatch(User $user, int $limit = 10): array
     {
-        return $this->latestVitalsPerClient()
+        return $this->latestVitalsPerClient($user)
             ->filter(fn ($rows) => $rows->first()->news2_band instanceof News2Band
                 && $rows->first()->news2_band->isOnWatch())
             ->map(function ($rows) {
@@ -158,11 +165,13 @@ class ClinicalDashboardService
      *
      * @return array{allergies: array, disabilities: array, blood_type: ?string, baseline_vitals: ?array, active_protocols: array}
      */
-    public function getClinicalCard(Client $client): array
+    public function getClinicalCard(User $user, Client $client): array
     {
+        $this->siteAccess->assertCanAccessClient($user, $client);
+
         $profile = ClientMedicalProfile::where('client_id', $client->id)->first();
 
-        $latestVitals = ClinicalObservation::query()
+        $latestVitals = $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $user)
             ->forClient($client->id)
             ->where('observation_type', ObservationType::Vitals->value)
             ->orderByDesc('recorded_at')
@@ -179,7 +188,7 @@ class ClinicalDashboardService
                 'news2_band' => $latestVitals->news2_band?->value,
                 'news2_band_label' => $latestVitals->news2_band?->label(),
             ] : null,
-            'active_protocols' => ClinicalProtocol::query()
+            'active_protocols' => $this->siteAccess->applyProtocolScope(ClinicalProtocol::query(), $user)
                 ->where('client_id', $client->id)
                 ->where('is_active', true)
                 ->orderBy('observation_type')
@@ -211,9 +220,9 @@ class ClinicalDashboardService
      * Recent vitals (with a NEWS2 band), grouped by client and ordered newest
      * first within each group — the shared basis for the watch count + list.
      */
-    private function latestVitalsPerClient(): \Illuminate\Support\Collection
+    private function latestVitalsPerClient(User $user): Collection
     {
-        return ClinicalObservation::query()
+        return $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $user)
             ->where('observation_type', ObservationType::Vitals->value)
             ->whereNotNull('news2_band')
             ->where('recorded_at', '>=', Carbon::now()->subDays(7))
@@ -228,9 +237,9 @@ class ClinicalDashboardService
      *
      * @return array<int, array{id: int, protocol_name: string, observation_type: string, observation_type_label: string, client_name: string, client_id: int, due_at: string, hours_overdue: int}>
      */
-    public function getOverdueItems(int $limit = 20): array
+    public function getOverdueItems(User $user, int $limit = 20): array
     {
-        return ClinicalProtocolSchedule::query()
+        return $this->siteAccess->applyScheduleScope(ClinicalProtocolSchedule::query(), $user)
             ->overdue()
             ->with(['protocol.client:id,first_name,last_name'])
             ->orderBy('due_at')
@@ -260,9 +269,9 @@ class ClinicalDashboardService
      *
      * @return array<int, array{id: int, event_type: string, event_type_label: string, severity: string, client_name: string, client_id: int, occurred_at: string, status: string}>
      */
-    public function getRecentEvents(int $limit = 10): array
+    public function getRecentEvents(User $user, int $limit = 10): array
     {
-        return ClinicalEvent::query()
+        return $this->siteAccess->applyEventScope(ClinicalEvent::query(), $user)
             ->where('occurred_at', '>=', now()->subDays(30))
             ->with(['client:id,first_name,last_name', 'reporter:id,name'])
             ->orderByDesc('occurred_at')
@@ -292,9 +301,9 @@ class ClinicalDashboardService
      *
      * @return array<int, array{id: int, observation_type: string, observation_type_label: string, client_name: string, recorder_name: string|null, recorded_at: string}>
      */
-    public function getRecentObservations(int $limit = 10): array
+    public function getRecentObservations(User $user, int $limit = 10): array
     {
-        return ClinicalObservation::query()
+        return $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $user)
             ->with(['client:id,first_name,last_name', 'recorder:id,name'])
             ->orderByDesc('recorded_at')
             ->limit($limit)
@@ -327,9 +336,9 @@ class ClinicalDashboardService
      *     date_to?: string|null,
      * } $filters
      */
-    public function getObservationRegister(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    public function getObservationRegister(User $user, array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
-        return ClinicalObservation::query()
+        return $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $user)
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'recorder:id,name',
@@ -346,7 +355,7 @@ class ClinicalDashboardService
                 }
             })
             ->when($filters['recorded_by'] ?? null, fn ($q, $id) => $q->where('recorded_by', $id))
-            ->when($filters['site_id'] ?? null, fn ($q, $id) => $q->where('site_id', $id))
+            ->when($filters['site_id'] ?? null, fn ($q, $id) => $q->whereHas('client', fn ($clients) => $clients->where('site_id', $id)))
             ->when($filters['date_from'] ?? null, fn ($q, $d) => $q->where('recorded_at', '>=', Carbon::parse($d)->startOfDay()))
             ->when($filters['date_to'] ?? null, fn ($q, $d) => $q->where('recorded_at', '<=', Carbon::parse($d)->endOfDay()))
             ->orderByDesc('recorded_at')
@@ -359,11 +368,12 @@ class ClinicalDashboardService
      *
      * @return array{total_7d: int, total_30d: int, by_type: array<string, int>}
      */
-    public function getObservationRegisterStats(): array
+    public function getObservationRegisterStats(User $user): array
     {
         $now = Carbon::now();
+        $scope = fn (): Builder => $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $user);
 
-        $byType = ClinicalObservation::query()
+        $byType = $scope()
             ->where('recorded_at', '>=', $now->copy()->subDays(30))
             ->selectRaw('observation_type, COUNT(*) as count')
             ->groupBy('observation_type')
@@ -371,8 +381,8 @@ class ClinicalDashboardService
             ->toArray();
 
         return [
-            'total_7d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(7))->count(),
-            'total_30d' => ClinicalObservation::where('recorded_at', '>=', $now->copy()->subDays(30))->count(),
+            'total_7d' => $scope()->where('recorded_at', '>=', $now->copy()->subDays(7))->count(),
+            'total_30d' => $scope()->where('recorded_at', '>=', $now->copy()->subDays(30))->count(),
             'by_type' => $byType,
         ];
     }
@@ -382,14 +392,14 @@ class ClinicalDashboardService
      *
      * @param  array{client_id?: int|null, behaviour_function?: string|null, intensity?: string|null, site_id?: int|null, date_from?: string|null, date_to?: string|null}  $filters
      */
-    public function getBehaviourRegister(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    public function getBehaviourRegister(User $user, array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
-        return BehaviourAbcEntry::query()
+        return $this->siteAccess->applyClientRecordScope(BehaviourAbcEntry::query(), $user)
             ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'recorder:id,name'])
             ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
             ->when($filters['behaviour_function'] ?? null, fn ($q, $f) => $q->where('behaviour_function', $f))
             ->when($filters['intensity'] ?? null, fn ($q, $i) => $q->where('intensity', $i))
-            ->when($filters['site_id'] ?? null, fn ($q, $id) => $q->where('site_id', $id))
+            ->when($filters['site_id'] ?? null, fn ($q, $id) => $q->whereHas('client', fn ($clients) => $clients->where('site_id', $id)))
             ->when($filters['date_from'] ?? null, fn ($q, $d) => $q->where('occurred_at', '>=', Carbon::parse($d)->startOfDay()))
             ->when($filters['date_to'] ?? null, fn ($q, $d) => $q->where('occurred_at', '<=', Carbon::parse($d)->endOfDay()))
             ->orderByDesc('occurred_at')
@@ -403,29 +413,30 @@ class ClinicalDashboardService
      *
      * @return array{total_7d: int, total_30d: int, escalated_30d: int, harm_30d: int, function_breakdown: array<string, int>, intensity_mix: array<string, int>}
      */
-    public function getBehaviourRegisterStats(): array
+    public function getBehaviourRegisterStats(User $user): array
     {
         $now = Carbon::now();
         $from = $now->copy()->subDays(30);
+        $scope = fn (): Builder => $this->siteAccess->applyClientRecordScope(BehaviourAbcEntry::query(), $user);
 
-        $functionBreakdown = BehaviourAbcEntry::where('occurred_at', '>=', $from)
+        $functionBreakdown = $scope()->where('occurred_at', '>=', $from)
             ->whereNotNull('behaviour_function')
             ->selectRaw('behaviour_function, COUNT(*) as count')
             ->groupBy('behaviour_function')
             ->pluck('count', 'behaviour_function')
             ->toArray();
 
-        $intensityMix = BehaviourAbcEntry::where('occurred_at', '>=', $from)
+        $intensityMix = $scope()->where('occurred_at', '>=', $from)
             ->selectRaw('intensity, COUNT(*) as count')
             ->groupBy('intensity')
             ->pluck('count', 'intensity')
             ->toArray();
 
         return [
-            'total_7d' => BehaviourAbcEntry::where('occurred_at', '>=', $now->copy()->subDays(7))->count(),
-            'total_30d' => BehaviourAbcEntry::where('occurred_at', '>=', $from)->count(),
-            'escalated_30d' => BehaviourAbcEntry::where('occurred_at', '>=', $from)->where('escalated', true)->count(),
-            'harm_30d' => BehaviourAbcEntry::where('occurred_at', '>=', $from)->where('harm_occurred', true)->count(),
+            'total_7d' => $scope()->where('occurred_at', '>=', $now->copy()->subDays(7))->count(),
+            'total_30d' => $scope()->where('occurred_at', '>=', $from)->count(),
+            'escalated_30d' => $scope()->where('occurred_at', '>=', $from)->where('escalated', true)->count(),
+            'harm_30d' => $scope()->where('occurred_at', '>=', $from)->where('harm_occurred', true)->count(),
             'function_breakdown' => $functionBreakdown,
             'intensity_mix' => $intensityMix,
         ];
@@ -436,10 +447,15 @@ class ClinicalDashboardService
      *
      * @return array<string, mixed>
      */
-    public function getBehaviourFilterOptions(): array
+    public function getBehaviourFilterOptions(User $user): array
     {
         return [
-            'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'clients' => $this->siteAccess->applyClientScope(Client::query(), $user)
+                ->orderBy('first_name')
+                ->get(['id', 'first_name', 'last_name']),
+            'sites' => $this->siteAccess->applySiteScope(Site::query(), $user)
+                ->orderBy('name')
+                ->get(['id', 'name']),
             'functions' => BehaviourFunction::options(),
             'intensities' => collect(BehaviourAbcEntry::INTENSITIES)->map(fn ($i) => ['value' => $i, 'label' => ucfirst($i)])->values(),
         ];
@@ -454,11 +470,7 @@ class ClinicalDashboardService
     public function getAssessmentsRegister(User $user, array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
         return ClinicalRiskAssessment::query()
-            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
-                $clientQuery,
-                $user,
-                self::CLIENT_SITE_BYPASS_PERMISSIONS,
-            ))
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope($clientQuery, $user))
             ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'assessor:id,name'])
             ->withCount('attachments')
             ->when($filters['client_id'] ?? null, fn ($q, $id) => $q->where('client_id', $id))
@@ -478,11 +490,7 @@ class ClinicalDashboardService
     public function getAssessmentsRegisterStats(User $user): array
     {
         $scope = fn () => ClinicalRiskAssessment::query()
-            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
-                $clientQuery,
-                $user,
-                self::CLIENT_SITE_BYPASS_PERMISSIONS,
-            ));
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope($clientQuery, $user));
 
         return [
             'total' => $scope()->count(),
@@ -505,7 +513,7 @@ class ClinicalDashboardService
     {
         return [
             'clients' => $this->siteAccess
-                ->applyClientScope(Client::query(), $user, self::CLIENT_SITE_BYPASS_PERMISSIONS)
+                ->applyClientScope(Client::query(), $user)
                 ->orderBy('first_name')
                 ->get(['id', 'first_name', 'last_name']),
             'types' => array_map(fn (ClinicalAssessmentType $t) => [
@@ -534,11 +542,7 @@ class ClinicalDashboardService
     {
         $activePlans = fn (): Builder => CarePlan::query()
             ->where('status', 'active')
-            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope(
-                $clientQuery,
-                $user,
-                self::CLIENT_SITE_BYPASS_PERMISSIONS,
-            ));
+            ->whereHas('client', fn (Builder $clientQuery) => $this->siteAccess->applyClientScope($clientQuery, $user));
 
         $plans = $activePlans()
             ->with(['client:id,first_name,last_name', 'reviewer:id,name'])
@@ -571,21 +575,21 @@ class ClinicalDashboardService
     /**
      * Cross-client Health Monitoring rollup (fluid / bowel / seizure / sleep).
      * Reads the per-client capture stores directly (decision #3: read both stores,
-     * don't migrate); all four carry organization_id so org-scoping is direct.
+     * don't migrate); Client Site ownership is the authorization boundary.
      * NB sleep keys on slept_at, not occurred_at.
      *
      * @param  array{client_id?: int|null}  $filters
      * @return array<string, mixed>
      */
-    public function getMonitoringRollup(int $organizationId, array $filters = []): array
+    public function getMonitoringRollup(User $user, array $filters = []): array
     {
         $clientId = $filters['client_id'] ?? null;
         $now = Carbon::now();
         $from = $now->copy()->subDays(30);
         $sevenDays = $now->copy()->subDays(7);
 
-        $scoped = fn (string $model) => $model::query()
-            ->where('organization_id', $organizationId)
+        $scoped = fn (string $model) => $this->siteAccess
+            ->applyClientOwnedScope($model::query(), $user)
             ->when($clientId, fn ($q, $id) => $q->where('client_id', $id));
 
         $clientName = fn ($e) => $e->client ? trim("{$e->client->first_name} {$e->client->last_name}") : 'Unknown';
@@ -612,17 +616,13 @@ class ClinicalDashboardService
 
     /**
      * Read-only Restraint register lens (links out to /health-safety/restraints).
-     * RestraintEvent has no organization_id — scope through the client to avoid a
-     * cross-tenant leak.
+     * RestraintEvent has no Site column, so scope through its canonical Client.
      *
      * @return array{events: array<int, array<string, mixed>>, stats: array{total_30d: int, off_plan: int, with_injury: int, review_due: int}}
      */
-    public function getRestraintLens(int $organizationId): array
+    public function getRestraintLens(User $user): array
     {
-        $orgClient = fn ($q) => $q->where('organization_id', $organizationId);
-
-        $events = RestraintEvent::query()
-            ->whereHas('client', $orgClient)
+        $events = $this->siteAccess->applyClientOwnedScope(RestraintEvent::query(), $user)
             ->with(['client:id,first_name,last_name', 'authorisedBy:id,name'])
             ->orderByDesc('started_at')
             ->limit(50)
@@ -640,7 +640,7 @@ class ClinicalDashboardService
                 'client' => $r->client ? ['id' => $r->client->id, 'name' => trim("{$r->client->first_name} {$r->client->last_name}")] : null,
             ]);
 
-        $scope = fn () => RestraintEvent::query()->whereHas('client', $orgClient);
+        $scope = fn (): Builder => $this->siteAccess->applyClientOwnedScope(RestraintEvent::query(), $user);
 
         return [
             'events' => $events->all(),
@@ -662,8 +662,10 @@ class ClinicalDashboardService
      *
      * @return array<int, array{key: string, tone: string, title: string, body: string, metrics: array<int, array{label: string, value: string}>, link: array{href: string, label: string}|null}>
      */
-    public function getTrendSignals(Client $client, \DateTimeInterface $from, \DateTimeInterface $to): array
+    public function getTrendSignals(User $user, Client $client, \DateTimeInterface $from, \DateTimeInterface $to): array
     {
+        $this->siteAccess->assertCanAccessClient($user, $client);
+
         $signals = [];
 
         // ── PRN reliance alongside escalating behaviour ──────────────────────
@@ -676,7 +678,7 @@ class ClinicalDashboardService
             ->whereBetween('created_at', [$from, $to])
             ->count();
 
-        $escalatedBehaviour = BehaviourAbcEntry::query()
+        $escalatedBehaviour = $this->siteAccess->applyClientRecordScope(BehaviourAbcEntry::query(), $user)
             ->where('client_id', $client->id)
             ->whereBetween('occurred_at', [$from, $to])
             ->where('escalated', true)
@@ -702,7 +704,7 @@ class ClinicalDashboardService
         // A meaningful weight decline (≥2% across the window — the MUST screening
         // threshold of concern) paired with recent fluid intake, prompting a MUST
         // screen rather than asserting malnutrition.
-        $weights = ClinicalObservation::query()
+        $weights = $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $user)
             ->forClient($client->id)
             ->where('observation_type', ObservationType::Weight->value)
             ->whereBetween('recorded_at', [$from, $to])
@@ -744,7 +746,7 @@ class ClinicalDashboardService
         // ── Falls → Health & Safety linkage ──────────────────────────────────
         // Surface falls in the window and how many auto-linked to an H&S event;
         // repeated falls warrant a FRAT review.
-        $falls = ClinicalEvent::query()
+        $falls = $this->siteAccess->applyEventScope(ClinicalEvent::query(), $user)
             ->where('client_id', $client->id)
             ->where('event_type', ClinicalEventType::Fall->value)
             ->whereBetween('occurred_at', [$from, $to])
@@ -785,9 +787,9 @@ class ClinicalDashboardService
      *     date_to?: string|null,
      * } $filters
      */
-    public function getEventRegister(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    public function getEventRegister(User $user, array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
-        return ClinicalEvent::query()
+        return $this->siteAccess->applyEventScope(ClinicalEvent::query(), $user)
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'client.site:id,name',
@@ -805,16 +807,8 @@ class ClinicalDashboardService
                 }
             })
             ->when($filters['severity'] ?? null, fn ($q, $severity) => $q->where('severity', $severity))
-            ->when($filters['site_id'] ?? null, function ($q, $siteId) {
-                $q->where(function ($siteQuery) use ($siteId) {
-                    $siteQuery->where('site_id', $siteId)
-                        ->orWhere(function ($legacySiteQuery) use ($siteId) {
-                            $legacySiteQuery
-                                ->whereNull('site_id')
-                                ->whereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId));
-                        });
-                });
-            })
+            ->when($filters['site_id'] ?? null, fn ($q, $siteId) => $q
+                ->whereHas('client', fn ($clientQuery) => $clientQuery->where('site_id', $siteId)))
             ->when($filters['follow_up_status'] ?? null, function ($q, $status) {
                 match ($status) {
                     'none' => $q->where('requires_followup', false),
@@ -845,18 +839,19 @@ class ClinicalDashboardService
      *
      * @return array{total_7d: int, total_30d: int, pending_follow_ups: int, unreviewed: int}
      */
-    public function getEventRegisterStats(): array
+    public function getEventRegisterStats(User $user): array
     {
         $now = Carbon::now();
+        $scope = fn (): Builder => $this->siteAccess->applyEventScope(ClinicalEvent::query(), $user);
 
         return [
-            'total_7d' => ClinicalEvent::where('occurred_at', '>=', $now->copy()->subDays(7))->count(),
-            'total_30d' => ClinicalEvent::where('occurred_at', '>=', $now->copy()->subDays(30))->count(),
-            'pending_follow_ups' => ClinicalEvent::query()
+            'total_7d' => $scope()->where('occurred_at', '>=', $now->copy()->subDays(7))->count(),
+            'total_30d' => $scope()->where('occurred_at', '>=', $now->copy()->subDays(30))->count(),
+            'pending_follow_ups' => $scope()
                 ->where('requires_followup', true)
                 ->whereNull('followup_completed_at')
                 ->count(),
-            'unreviewed' => ClinicalEvent::query()
+            'unreviewed' => $scope()
                 ->whereNull('reviewed_at')
                 ->count(),
         ];
@@ -872,11 +867,11 @@ class ClinicalDashboardService
      *     status?: string|null,
      * } $filters
      */
-    public function getProtocolRegister(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    public function getProtocolRegister(User $user, array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
         $now = Carbon::now();
 
-        return ClinicalProtocol::query()
+        return $this->siteAccess->applyProtocolScope(ClinicalProtocol::query(), $user)
             ->with([
                 'client:id,first_name,last_name',
                 'creator:id,name',
@@ -924,13 +919,13 @@ class ClinicalDashboardService
      *     compliance_rate_30d: float,
      * }
      */
-    public function getProtocolRegisterStats(): array
+    public function getProtocolRegisterStats(User $user): array
     {
-        $kpis = $this->getKpis();
+        $kpis = $this->getKpis($user);
 
         return [
             'active_protocols' => $kpis['protocols_active'],
-            'inactive_protocols' => ClinicalProtocol::query()
+            'inactive_protocols' => $this->siteAccess->applyProtocolScope(ClinicalProtocol::query(), $user)
                 ->where('is_active', false)
                 ->count(),
             'schedules_due' => $kpis['schedules_due'],
@@ -939,9 +934,9 @@ class ClinicalDashboardService
         ];
     }
 
-    protected function calculateComplianceRate(Carbon $from, Carbon $to): float
+    protected function calculateComplianceRate(User $user, Carbon $from, Carbon $to): float
     {
-        $total = ClinicalProtocolSchedule::query()
+        $total = $this->siteAccess->applyScheduleScope(ClinicalProtocolSchedule::query(), $user)
             ->whereBetween('due_at', [$from, $to])
             ->count();
 
@@ -949,7 +944,7 @@ class ClinicalDashboardService
             return 100.0;
         }
 
-        $completed = ClinicalProtocolSchedule::query()
+        $completed = $this->siteAccess->applyScheduleScope(ClinicalProtocolSchedule::query(), $user)
             ->whereBetween('due_at', [$from, $to])
             ->where('status', 'completed')
             ->count();

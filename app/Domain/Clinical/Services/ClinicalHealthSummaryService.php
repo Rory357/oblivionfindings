@@ -5,7 +5,6 @@ namespace App\Domain\Clinical\Services;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
-use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
 use App\Models\Client;
 
 /**
@@ -18,6 +17,7 @@ class ClinicalHealthSummaryService
 {
     public function __construct(
         protected ClinicalProtocolService $protocolService,
+        protected ClinicalSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -48,7 +48,7 @@ class ClinicalHealthSummaryService
         $result = [];
 
         foreach (ObservationType::cases() as $type) {
-            $latest = ClinicalObservation::query()
+            $latest = $this->siteAccess->applyClientRecordIntegrity(ClinicalObservation::query())
                 ->forClient($client->id)
                 ->ofType($type)
                 ->orderByDesc('recorded_at')
@@ -72,7 +72,7 @@ class ClinicalHealthSummaryService
      */
     public function getRecentEvents(Client $client, int $days = 30): array
     {
-        $events = ClinicalEvent::query()
+        $events = $this->siteAccess->applyClientRecordIntegrity(ClinicalEvent::query())
             ->forClient($client->id)
             ->where('occurred_at', '>=', now()->subDays($days))
             ->orderByDesc('occurred_at')
@@ -80,11 +80,11 @@ class ClinicalHealthSummaryService
             ->get();
 
         return [
-            'count' => ClinicalEvent::query()
+            'count' => $this->siteAccess->applyClientRecordIntegrity(ClinicalEvent::query())
                 ->forClient($client->id)
                 ->where('occurred_at', '>=', now()->subDays($days))
                 ->count(),
-            'high_severity_count' => ClinicalEvent::query()
+            'high_severity_count' => $this->siteAccess->applyClientRecordIntegrity(ClinicalEvent::query())
                 ->forClient($client->id)
                 ->where('occurred_at', '>=', now()->subDays($days))
                 ->highSeverity()

@@ -5,6 +5,7 @@ namespace Tests\Feature\Domain\Clinical;
 use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -36,7 +37,7 @@ class HealthClinicalBehaviourTest extends TestCase
 
     public function test_behaviour_register_renders(): void
     {
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
         BehaviourAbcEntry::factory()->create(['client_id' => $client->id]);
 
         $this->actingAs($this->userWithRole('clinical_lead'))

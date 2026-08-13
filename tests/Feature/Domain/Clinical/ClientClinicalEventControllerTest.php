@@ -39,13 +39,6 @@ class ClientClinicalEventControllerTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
-
-        return $user;
-    }
-
-    public function test_support_worker_can_record_event_for_assigned_client(): void
-    {
-        $user = $this->createUserWithRole('support_worker');
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
             'primary_site_id' => $this->site->id,
@@ -54,6 +47,13 @@ class ClientClinicalEventControllerTest extends TestCase
             'end_date' => null,
             'is_active' => true,
         ]);
+
+        return $user;
+    }
+
+    public function test_support_worker_can_record_event_for_assigned_client(): void
+    {
+        $user = $this->createUserWithRole('support_worker');
         $this->client->supportWorkers()->attach($user);
 
         $response = $this->actingAs($user)

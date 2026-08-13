@@ -11,6 +11,7 @@ use App\Models\Client;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\Timeline\TimelineEmitter;
 use App\Support\WorkerClock;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,7 @@ class ClinicalObservationService
     public function __construct(
         protected News2Scorer $news2Scorer,
         protected ClinicalSignalService $signalService,
+        protected ClinicalSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -48,6 +50,29 @@ class ClinicalObservationService
 
         $input['data'] = $this->validateDataForType($type, $input['data']);
 
+        $clientSiteId = (int) ($client->site_id ?? 0);
+        $shiftSiteId = (int) ($shift?->site_id ?? 0);
+
+        if ($shift && $shiftSiteId > 0 && $clientSiteId !== $shiftSiteId) {
+            throw ValidationException::withMessages([
+                'client_id' => 'The selected client does not belong to the shift Site.',
+            ]);
+        }
+
+        if (! empty($input['protocol_schedule_id'])) {
+            $schedule = ClinicalProtocolSchedule::query()
+                ->with('protocol:id,client_id,observation_type')
+                ->find((int) $input['protocol_schedule_id']);
+
+            if (! $schedule
+                || (int) $schedule->protocol?->client_id !== (int) $client->id
+                || $schedule->protocol?->observation_type !== $type) {
+                throw ValidationException::withMessages([
+                    'protocol_schedule_id' => 'Select a protocol schedule for this client and observation type.',
+                ]);
+            }
+        }
+
         // NEWS2 is computed on write for vitals so registers/trends/the watchlist
         // can read the stored score + band without recomputation.
         $news2 = $type === ObservationType::Vitals
@@ -57,7 +82,7 @@ class ClinicalObservationService
         $observation = ClinicalObservation::create([
             'client_id' => $client->id,
             'shift_id' => $shift?->id,
-            'site_id' => $shift?->site_id ?? $client->site_id,
+            'site_id' => $shiftSiteId > 0 ? $shiftSiteId : $client->site_id,
             'recorded_by' => $recorder->id,
             'observation_type' => $type,
             'recorded_at' => WorkerClock::toUtc($input['recorded_at'] ?? null) ?? now(),
@@ -103,7 +128,7 @@ class ClinicalObservationService
      */
     public function getLatest(Client $client, ?ObservationType $type = null, int $limit = 10): Collection
     {
-        return ClinicalObservation::query()
+        return $this->siteAccess->applyClientRecordIntegrity(ClinicalObservation::query())
             ->forClient($client->id)
             ->when($type, fn ($q) => $q->ofType($type))
             ->orderByDesc('recorded_at')
@@ -122,7 +147,7 @@ class ClinicalObservationService
         \DateTimeInterface $from,
         \DateTimeInterface $to,
     ): Collection {
-        return ClinicalObservation::query()
+        return $this->siteAccess->applyClientRecordIntegrity(ClinicalObservation::query())
             ->forClient($client->id)
             ->ofType($type)
             ->recordedBetween($from, $to)
@@ -252,8 +277,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function validateVitals(array &$data, array &$errors): void
     {
@@ -289,8 +314,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function validateWeight(array &$data, array &$errors): void
     {
@@ -298,8 +323,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function validateBowel(array &$data, array &$errors): void
     {
@@ -307,8 +332,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function validateSleep(array &$data, array &$errors): void
     {
@@ -319,8 +344,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function validateFluidIntake(array &$data, array &$errors): void
     {
@@ -329,8 +354,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function validatePain(array &$data, array &$errors): void
     {
@@ -339,8 +364,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function numericField(
         array &$data,
@@ -380,8 +405,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function integerField(
         array &$data,
@@ -416,9 +441,9 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
-     * @param array<int, string> $allowed
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
+     * @param  array<int, string>  $allowed
      */
     protected function enumField(array &$data, array &$errors, string $field, array $allowed): void
     {
@@ -439,8 +464,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function timeField(array &$data, array &$errors, string $field): void
     {
@@ -461,8 +486,8 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
-     * @param array<string, string> $errors
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $errors
      */
     protected function stringField(array &$data, array &$errors, string $field, int $max): void
     {
@@ -483,7 +508,7 @@ class ClinicalObservationService
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      */
     protected function hasValue(array $data, string $field): bool
     {
@@ -504,7 +529,7 @@ class ClinicalObservationService
 
     protected function createTimelineEvent(ClinicalObservation $observation, User $recorder): TimelineEvent
     {
-        return app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        return app(TimelineEmitter::class)->record([
             'type' => self::TIMELINE_TYPE_OBSERVATION,
             'source_type' => ClinicalObservation::class,
             'source_id' => $observation->id,
@@ -513,7 +538,7 @@ class ClinicalObservationService
             'client_id' => $observation->client_id,
             'shift_id' => $observation->shift_id,
             'site_id' => $observation->site_id,
-            'subject' => $observation->observation_type->label() . ' recorded',
+            'subject' => $observation->observation_type->label().' recorded',
             'body' => $this->buildTimelineBody($observation),
             'meta' => [
                 'observation_id' => $observation->id,
@@ -559,7 +584,7 @@ class ClinicalObservationService
             ObservationType::Weight => isset($data['weight_kg']) ? "{$data['weight_kg']} kg" : '',
             ObservationType::Bowel => isset($data['bristol_type']) ? "Bristol type {$data['bristol_type']}" : '',
             ObservationType::Sleep => implode(', ', array_filter([
-                isset($data['quality']) ? ucfirst($data['quality']) . ' sleep' : null,
+                isset($data['quality']) ? ucfirst($data['quality']).' sleep' : null,
                 isset($data['interruptions']) && $data['interruptions'] > 0 ? "{$data['interruptions']} interruptions" : null,
             ])),
             ObservationType::FluidIntake => implode(', ', array_filter([

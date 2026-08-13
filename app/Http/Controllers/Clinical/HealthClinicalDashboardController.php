@@ -13,6 +13,7 @@ use App\Domain\Clinical\Services\ClinicalAssessmentService;
 use App\Domain\Clinical\Services\ClinicalDashboardService;
 use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Enums\AlertSeverity;
 use App\Http\Controllers\Clinical\Concerns\RecordsClinicalRecords;
 use App\Http\Controllers\Controller;
@@ -25,6 +26,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Response;
 
 class HealthClinicalDashboardController extends Controller
 {
@@ -35,56 +37,61 @@ class HealthClinicalDashboardController extends Controller
         private readonly ClinicalObservationService $observationService,
         private readonly ClinicalEventService $eventService,
         private readonly ClinicalAssessmentService $assessmentService,
+        private readonly ClinicalSiteAccessService $siteAccess,
     ) {}
 
-    public function index(Request $request): \Inertia\Response
+    public function index(Request $request): Response
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.dashboard'), 403);
 
-        $kpis = $this->dashboardService->getKpis();
+        $kpis = $this->dashboardService->getKpis($auth);
 
         return inertia('health-clinical/index', [
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
-            'deterioration_watch' => $this->dashboardService->getDeteriorationWatch(),
-            'overdue_items' => $this->dashboardService->getOverdueItems(),
-            'recent_events' => $this->dashboardService->getRecentEvents(),
-            'recent_observations' => $this->dashboardService->getRecentObservations(),
+            'tab_counts' => $this->dashboardService->getTabCounts($auth, $kpis),
+            'deterioration_watch' => $this->dashboardService->getDeteriorationWatch($auth),
+            'overdue_items' => $this->dashboardService->getOverdueItems($auth),
+            'recent_events' => $this->dashboardService->getRecentEvents($auth),
+            'recent_observations' => $this->dashboardService->getRecentObservations($auth),
         ]);
     }
 
     /**
      * Cross-client observation register — paginated, filterable.
      */
-    public function observations(Request $request): \Inertia\Response
+    public function observations(Request $request): Response
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.observations.viewAny'), 403);
 
         $filters = $request->validate([
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'observation_type' => ['nullable', 'string', 'in:' . implode(',', array_column(ObservationType::cases(), 'value'))],
+            'observation_type' => ['nullable', 'string', 'in:'.implode(',', array_column(ObservationType::cases(), 'value'))],
             'recorded_by' => ['nullable', 'integer', 'exists:users,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
+        $this->assertFilterScope($auth, $filters);
 
-        $observations = $this->dashboardService->getObservationRegister($filters);
-        $stats = $this->dashboardService->getObservationRegisterStats();
-        $kpis = $this->dashboardService->getKpis();
+        $observations = $this->dashboardService->getObservationRegister($auth, $filters);
+        $stats = $this->dashboardService->getObservationRegisterStats($auth);
+        $kpis = $this->dashboardService->getKpis($auth);
 
         return inertia('health-clinical/observations', [
             'observations' => $observations,
             'stats' => $stats,
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'tab_counts' => $this->dashboardService->getTabCounts($auth, $kpis),
             'filters' => $filters,
             'filter_options' => [
-                'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
-                'sites' => Site::query()->orderBy('name')->get(['id', 'name']),
-                'staff' => User::query()->whereHas('roles')->orderBy('name')->get(['id', 'name']),
+                'clients' => $this->siteAccess->applyClientScope(Client::query(), $auth)
+                    ->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+                'sites' => $this->siteAccess->applySiteScope(Site::query(), $auth)
+                    ->orderBy('name')->get(['id', 'name']),
+                'staff' => $this->siteAccess->applyStaffScope(User::query(), $auth)
+                    ->orderBy('name')->get(['id', 'name']),
                 'observation_types' => collect(ObservationType::cases())->map(fn ($t) => [
                     'value' => $t->value,
                     'label' => $t->label(),
@@ -96,41 +103,44 @@ class HealthClinicalDashboardController extends Controller
     /**
      * Cross-client clinical event register — paginated, filterable.
      */
-    public function events(Request $request): \Inertia\Response
+    public function events(Request $request): Response
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.events.viewAny'), 403);
 
         $filters = $request->validate([
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'event_type' => ['nullable', 'string', 'in:' . implode(',', array_map(
+            'event_type' => ['nullable', 'string', 'in:'.implode(',', array_map(
                 fn (ClinicalEventType $type) => $type->value,
                 ClinicalEventType::cases()
             ))],
-            'severity' => ['nullable', 'string', 'in:' . implode(',', AlertSeverity::ALL)],
+            'severity' => ['nullable', 'string', 'in:'.implode(',', AlertSeverity::ALL)],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'follow_up_status' => ['nullable', 'string', 'in:none,required,pending,completed'],
             'review_status' => ['nullable', 'string', 'in:reviewed,unreviewed'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
+        $this->assertFilterScope($auth, $filters);
 
         $eventTypes = collect(ClinicalEventType::cases())->map(fn (ClinicalEventType $type) => [
             'value' => $type->value,
             'label' => $type->label(),
         ])->values();
 
-        $kpis = $this->dashboardService->getKpis();
+        $kpis = $this->dashboardService->getKpis($auth);
 
         return inertia('health-clinical/Events', [
-            'events' => $this->dashboardService->getEventRegister($filters),
-            'stats' => $this->dashboardService->getEventRegisterStats(),
+            'events' => $this->dashboardService->getEventRegister($auth, $filters),
+            'stats' => $this->dashboardService->getEventRegisterStats($auth),
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'tab_counts' => $this->dashboardService->getTabCounts($auth, $kpis),
             'filters' => $filters,
             'filter_options' => [
-                'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
-                'sites' => Site::query()->orderBy('name')->get(['id', 'name']),
+                'clients' => $this->siteAccess->applyClientScope(Client::query(), $auth)
+                    ->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+                'sites' => $this->siteAccess->applySiteScope(Site::query(), $auth)
+                    ->orderBy('name')->get(['id', 'name']),
                 'event_types' => $eventTypes,
                 'severities' => collect(AlertSeverity::ALL)->map(fn (string $severity) => [
                     'value' => $severity,
@@ -154,7 +164,7 @@ class HealthClinicalDashboardController extends Controller
     /**
      * Cross-client Behaviour (ABC) register — paginated, filterable.
      */
-    public function behaviour(Request $request): \Inertia\Response
+    public function behaviour(Request $request): Response
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.behaviour.viewAny'), 403);
@@ -167,8 +177,9 @@ class HealthClinicalDashboardController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
+        $this->assertFilterScope($auth, $filters);
 
-        $entries = $this->dashboardService->getBehaviourRegister($filters)
+        $entries = $this->dashboardService->getBehaviourRegister($auth, $filters)
             ->through(fn (BehaviourAbcEntry $e) => [
                 'id' => $e->id,
                 'occurred_at' => $e->occurred_at?->toISOString(),
@@ -194,17 +205,17 @@ class HealthClinicalDashboardController extends Controller
                 'recorder' => $e->recorder ? ['id' => $e->recorder->id, 'name' => $e->recorder->name] : null,
             ]);
 
-        $kpis = $this->dashboardService->getKpis();
+        $kpis = $this->dashboardService->getKpis($auth);
 
         return inertia('health-clinical/Behaviour', [
             'entries' => $entries,
-            'stats' => $this->dashboardService->getBehaviourRegisterStats(),
+            'stats' => $this->dashboardService->getBehaviourRegisterStats($auth),
             'filters' => $filters,
-            'filter_options' => $this->dashboardService->getBehaviourFilterOptions(),
+            'filter_options' => $this->dashboardService->getBehaviourFilterOptions($auth),
             // Read-only Restraint register lens (managed in Health & Safety).
-            'restraint' => $this->dashboardService->getRestraintLens((int) ($auth->organization_id ?? 0)),
+            'restraint' => $this->dashboardService->getRestraintLens($auth),
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'tab_counts' => $this->dashboardService->getTabCounts($auth, $kpis),
         ]);
     }
 
@@ -213,40 +224,42 @@ class HealthClinicalDashboardController extends Controller
      * for review/sign-off and links out to /operations/care-plans (the system of
      * record) — no create/edit here.
      */
-    public function carePlans(Request $request): \Inertia\Response
+    public function carePlans(Request $request): Response
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.dashboard'), 403);
 
         $lens = $this->dashboardService->getCarePlanLens($auth);
-        $kpis = $this->dashboardService->getKpis();
+        $kpis = $this->dashboardService->getKpis($auth);
 
         return inertia('health-clinical/CarePlans', [
             'plans' => $lens['plans'],
             'stats' => $lens['stats'],
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'tab_counts' => $this->dashboardService->getTabCounts($auth, $kpis),
         ]);
     }
 
     /**
      * Cross-client Health Monitoring rollup (fluid / bowel / seizure / sleep).
      */
-    public function healthMonitoring(Request $request): \Inertia\Response
+    public function healthMonitoring(Request $request): Response
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.monitoring.viewAny'), 403);
 
         $filters = $request->validate(['client_id' => ['nullable', 'integer', 'exists:clients,id']]);
+        $this->assertFilterScope($auth, $filters);
 
-        $kpis = $this->dashboardService->getKpis();
+        $kpis = $this->dashboardService->getKpis($auth);
 
         return inertia('health-clinical/HealthMonitoring', [
-            'rollup' => $this->dashboardService->getMonitoringRollup((int) ($auth->organization_id ?? 0), $filters),
+            'rollup' => $this->dashboardService->getMonitoringRollup($auth, $filters),
             'filters' => $filters,
-            'clients' => Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
+            'clients' => $this->siteAccess->applyClientScope(Client::query(), $auth)
+                ->orderBy('first_name')->get(['id', 'first_name', 'last_name']),
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'tab_counts' => $this->dashboardService->getTabCounts($auth, $kpis),
         ]);
     }
 
@@ -254,7 +267,7 @@ class HealthClinicalDashboardController extends Controller
      * Module-level Trends tab — pick a client, see their NEWS2 / vitals / weight /
      * pain / fluid trends. Reuses ClinicalObservationService::buildTrendSets.
      */
-    public function trends(Request $request): \Inertia\Response
+    public function trends(Request $request): Response
     {
         $auth = $request->user();
         abort_unless($auth && (
@@ -270,10 +283,9 @@ class HealthClinicalDashboardController extends Controller
 
         $client = isset($validated['client_id']) ? Client::find($validated['client_id']) : null;
 
-        // Assignment guard: a viewAssigned-only user may only chart a client they
-        // can view (mirrors HealthClinicalClientTrendsController::show) — without
-        // this, a client_id swap would leak any client's vitals/NEWS2.
-        if ($client && ! $auth->canDo('clinical.observations.viewAny')) {
+        // Capability and Site scope are independent. Even viewAny users must pass
+        // the canonical Client Site policy before any PHI is read.
+        if ($client) {
             $this->authorize('view', $client);
         }
 
@@ -287,13 +299,13 @@ class HealthClinicalDashboardController extends Controller
         // Cross-module context signals (PRN↔behaviour, weight↔nutrition, falls→H&S)
         // for the selected client over the same window.
         $trendSignals = $client
-            ? $this->dashboardService->getTrendSignals($client, $from, $to)
+            ? $this->dashboardService->getTrendSignals($auth, $client, $from, $to)
             : [];
 
-        $kpis = $this->dashboardService->getKpis();
+        $kpis = $this->dashboardService->getKpis($auth);
 
         // Assigned-only users only see their own clients in the picker (no roster leak).
-        $clients = Client::query()
+        $clients = $this->siteAccess->applyClientScope(Client::query(), $auth)
             ->when(
                 ! $auth->canDo('clinical.observations.viewAny'),
                 fn ($query) => $query->whereHas('supportWorkers', fn ($q) => $q->whereKey($auth->id)),
@@ -312,7 +324,7 @@ class HealthClinicalDashboardController extends Controller
             'trend_sets' => $trendSets,
             'trend_signals' => $trendSignals,
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'tab_counts' => $this->dashboardService->getTabCounts($auth, $kpis),
         ]);
     }
 
@@ -329,7 +341,7 @@ class HealthClinicalDashboardController extends Controller
         $client = Client::findOrFail($request->integer('client_id'));
         $this->authorize('view', $client);
 
-        $validated = $this->validateObservationInput($request, $user);
+        $validated = $this->validateObservationInput($request, $user, $client);
         $type = ObservationType::from($validated['observation_type']);
 
         $this->observationService->record($client, $user, $validated);
@@ -362,7 +374,7 @@ class HealthClinicalDashboardController extends Controller
      * Cross-client Assessments & Risk register (FRAT / Braden / MUST / IDDSI).
      * Canonical Client Site access is applied before serialisation.
      */
-    public function assessments(Request $request): \Inertia\Response
+    public function assessments(Request $request): Response
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('clinical.assessments.viewAny'), 403);
@@ -373,6 +385,7 @@ class HealthClinicalDashboardController extends Controller
             'risk_band' => ['nullable', Rule::in(array_column(ClinicalRiskBand::cases(), 'value'))],
             'review_due' => ['nullable', 'boolean'],
         ]);
+        $this->assertFilterScope($auth, $filters);
 
         $records = $this->dashboardService->getAssessmentsRegister($auth, $filters)
             ->through(fn (ClinicalRiskAssessment $a) => [
@@ -405,7 +418,7 @@ class HealthClinicalDashboardController extends Controller
                 ] : null,
             ]);
 
-        $kpis = $this->dashboardService->getKpis();
+        $kpis = $this->dashboardService->getKpis($auth);
 
         return inertia('health-clinical/Assessments', [
             'records' => $records,
@@ -413,7 +426,7 @@ class HealthClinicalDashboardController extends Controller
             'filters' => $filters,
             'filter_options' => $this->dashboardService->getAssessmentsFilterOptions($auth),
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'tab_counts' => $this->dashboardService->getTabCounts($auth, $kpis),
         ]);
     }
 
@@ -513,7 +526,7 @@ class HealthClinicalDashboardController extends Controller
 
         $q = trim((string) $request->input('q', ''));
 
-        $clients = Client::query()
+        $clients = $this->siteAccess->applyClientScope(Client::query(), $user)
             // Assigned-only users may only search/pick clients they can view — never leak
             // other clients' names/NHI through the wizard picker.
             ->when(
@@ -561,7 +574,7 @@ class HealthClinicalDashboardController extends Controller
             || $user->canDo('clinical.observations.recordClinical')
         ), 403);
 
-        return response()->json($this->dashboardService->getClinicalCard($client));
+        return response()->json($this->dashboardService->getClinicalCard($user, $client));
     }
 
     /**
@@ -572,6 +585,7 @@ class HealthClinicalDashboardController extends Controller
      */
     public function reviewEvent(Request $request, ClinicalEvent $event): RedirectResponse
     {
+        $this->siteAccess->assertCanAccessEvent($request->user(), $event);
         $this->authorize('view', $event->loadMissing('client')->client);
         $this->eventService->review($event, $request->user());
 
@@ -583,6 +597,7 @@ class HealthClinicalDashboardController extends Controller
      */
     public function completeEventFollowup(Request $request, ClinicalEvent $event): RedirectResponse
     {
+        $this->siteAccess->assertCanAccessEvent($request->user(), $event);
         $this->authorize('view', $event->loadMissing('client')->client);
         $this->eventService->completeFollowup($event, $request->user());
 
@@ -594,9 +609,28 @@ class HealthClinicalDashboardController extends Controller
      */
     public function escalateEvent(Request $request, ClinicalEvent $event): RedirectResponse
     {
+        $this->siteAccess->assertCanAccessEvent($request->user(), $event);
         $this->authorize('view', $event->loadMissing('client')->client);
         $this->eventService->escalate($event, $request->user());
 
         return back()->with('success', 'Clinical event escalated to on-call leadership.');
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function assertFilterScope(User $user, array $filters): void
+    {
+        if (! empty($filters['client_id'])) {
+            $this->siteAccess->assertCanAccessClient(
+                $user,
+                Client::query()->findOrFail((int) $filters['client_id']),
+            );
+        }
+
+        if (! empty($filters['site_id'])) {
+            $this->siteAccess->assertCanAccessSite(
+                $user,
+                Site::query()->findOrFail((int) $filters['site_id']),
+            );
+        }
     }
 }

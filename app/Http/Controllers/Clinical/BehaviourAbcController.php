@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Clinical;
 
 use App\Domain\Clinical\Enums\BehaviourFunction;
 use App\Domain\Clinical\Services\ClinicalAttachmentService;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
@@ -23,6 +24,7 @@ class BehaviourAbcController extends Controller
     public function __construct(
         protected BehaviourAbcService $service,
         protected ClientProfileSectionAccess $sectionAccess,
+        protected ClinicalSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -33,7 +35,7 @@ class BehaviourAbcController extends Controller
         $this->authorize('view', $client);
         $this->ensureCanView($request, $client);
 
-        $entries = BehaviourAbcEntry::query()
+        $entries = $this->siteAccess->applyClientRecordScope(BehaviourAbcEntry::query(), $request->user())
             ->forClient($client->id)
             ->recent()
             ->with('recorder:id,name')
@@ -72,6 +74,7 @@ class BehaviourAbcController extends Controller
         $this->authorize('view', $client);
         $this->ensureCanView($request, $client);
         abort_unless($abc->client_id === $client->id, 404);
+        $this->assertCanAccessEntry($request, $abc);
 
         $abc->load(['recorder:id,name', 'carePlan:id,title', 'followupCompleter:id,name']);
 
@@ -83,6 +86,7 @@ class BehaviourAbcController extends Controller
         $this->authorize('view', $client);
         $this->ensureCanView($request, $client);
         abort_unless($abc->client_id === $client->id, 404);
+        $this->assertCanAccessEntry($request, $abc);
         $this->ensureCanCorrect($request);
 
         $validated = $this->validatePayload($request, $client, isUpdate: true);
@@ -101,6 +105,7 @@ class BehaviourAbcController extends Controller
         $this->authorize('view', $client);
         $this->ensureCanView($request, $client);
         abort_unless($abc->client_id === $client->id, 404);
+        $this->assertCanAccessEntry($request, $abc);
         $this->ensureCanCorrect($request);
 
         $abc->delete();
@@ -132,6 +137,17 @@ class BehaviourAbcController extends Controller
     {
         abort_unless(
             (bool) $request->user()?->canDo('clinical.observations.correct'),
+            403,
+        );
+    }
+
+    private function assertCanAccessEntry(Request $request, BehaviourAbcEntry $entry): void
+    {
+        abort_unless(
+            $this->siteAccess->applyClientRecordScope(
+                BehaviourAbcEntry::query()->whereKey($entry->getKey()),
+                $request->user(),
+            )->exists(),
             403,
         );
     }

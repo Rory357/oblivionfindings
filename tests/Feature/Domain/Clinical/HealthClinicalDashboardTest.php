@@ -2,15 +2,13 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
-use App\Domain\Clinical\Enums\ClinicalEventType;
-use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
-use App\Enums\AlertSeverity;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -21,11 +19,14 @@ class HealthClinicalDashboardTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
+        $this->site = Site::factory()->create(['is_active' => true]);
     }
 
     protected function createUserWithRole(string $roleName): User
@@ -92,7 +93,7 @@ class HealthClinicalDashboardTest extends TestCase
     public function test_dashboard_returns_kpis(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->vitals()->create([
             'client_id' => $client->id,
@@ -117,7 +118,7 @@ class HealthClinicalDashboardTest extends TestCase
     public function test_dashboard_returns_overdue_items(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         $protocol = ClinicalProtocol::factory()->create([
             'client_id' => $client->id,
@@ -139,7 +140,7 @@ class HealthClinicalDashboardTest extends TestCase
     public function test_dashboard_returns_recent_events(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->fall()->create([
             'client_id' => $client->id,
@@ -158,7 +159,7 @@ class HealthClinicalDashboardTest extends TestCase
     public function test_dashboard_returns_recent_observations(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->weight()->create([
             'client_id' => $client->id,

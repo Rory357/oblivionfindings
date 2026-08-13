@@ -22,7 +22,9 @@ class ClinicalObservationServiceTest extends TestCase
     use RefreshDatabase;
 
     protected ClinicalObservationService $service;
+
     protected Client $client;
+
     protected User $recorder;
 
     protected function setUp(): void
@@ -219,7 +221,12 @@ class ClinicalObservationServiceTest extends TestCase
 
     public function test_does_not_complete_already_completed_schedule(): void
     {
-        $schedule = ClinicalProtocolSchedule::factory()->completed()->create();
+        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $this->client->id,
+        ]);
+        $schedule = ClinicalProtocolSchedule::factory()->completed()->create([
+            'clinical_protocol_id' => $protocol->id,
+        ]);
         $originalCompletedBy = $schedule->completed_by;
 
         $this->service->record($this->client, $this->recorder, [

@@ -4,8 +4,10 @@ namespace Tests\Feature\Domain\Clinical;
 
 use App\Domain\Clinical\Enums\News2Band;
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use App\Notifications\Clinical\ClinicalWatchDigestNotification;
 use Database\Seeders\ClinicalPermissionsSeeder;
@@ -37,8 +39,13 @@ class ClinicalDeteriorationRemindersTest extends TestCase
 
     private function onWatchVitals(Client $client, User $recorder): void
     {
+        if (! $client->site_id) {
+            $client->update(['site_id' => Site::factory()->create(['is_active' => true])->id]);
+        }
+
         ClinicalObservation::factory()->vitals()->create([
             'client_id' => $client->id,
+            'site_id' => $client->site_id,
             'recorded_by' => $recorder->id,
             'recorded_at' => now(),
             'news2_score' => 6,
@@ -85,5 +92,33 @@ class ClinicalDeteriorationRemindersTest extends TestCase
         $this->artisan('clinical:deterioration-reminders')->assertSuccessful();
 
         Notification::assertNotSentTo($worker, ClinicalWatchDigestNotification::class);
+    }
+
+    public function test_site_restricted_oversight_digest_excludes_another_sites_watch_count(): void
+    {
+        Notification::fake();
+
+        $siteA = Site::factory()->create(['is_active' => true]);
+        $siteB = Site::factory()->create(['is_active' => true]);
+        $coordinator = $this->createUserWithRole('coordinator');
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $coordinator->id,
+            'primary_site_id' => $siteA->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+
+        $this->onWatchVitals(Client::factory()->create(['site_id' => $siteA->id]), $coordinator);
+        $this->onWatchVitals(Client::factory()->create(['site_id' => $siteB->id]), $coordinator);
+
+        $this->artisan('clinical:deterioration-reminders')->assertSuccessful();
+
+        Notification::assertSentTo(
+            $coordinator,
+            ClinicalWatchDigestNotification::class,
+            fn (ClinicalWatchDigestNotification $notification) => $notification->clientsOnWatch === 1,
+        );
     }
 }

@@ -6,6 +6,7 @@ use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Services\ClinicalEventService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Http\Controllers\Clinical\Concerns\RecordsClinicalRecords;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -18,6 +19,7 @@ class ClientClinicalController extends Controller
     public function __construct(
         protected ClinicalObservationService $observationService,
         protected ClinicalEventService $eventService,
+        protected ClinicalSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -27,7 +29,7 @@ class ClientClinicalController extends Controller
     {
         $this->authorize('view', $client);
 
-        $query = ClinicalObservation::query()
+        $query = $this->siteAccess->applyObservationScope(ClinicalObservation::query(), $request->user())
             ->forClient($client->id)
             ->with('recorder:id,name')
             ->orderByDesc('recorded_at');
@@ -62,7 +64,7 @@ class ClientClinicalController extends Controller
         $this->authorize('view', $client);
 
         $user = $request->user();
-        $validated = $this->validateObservationInput($request, $user);
+        $validated = $this->validateObservationInput($request, $user, $client);
         $type = ObservationType::from($validated['observation_type']);
 
         $observation = $this->observationService->record($client, $user, $validated);
@@ -75,7 +77,7 @@ class ClientClinicalController extends Controller
             ], 201);
         }
 
-        return back()->with('success', $type->label() . ' recorded successfully.');
+        return back()->with('success', $type->label().' recorded successfully.');
     }
 
     /**
