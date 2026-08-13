@@ -23,7 +23,7 @@ class HrDocumentAccessService
     /** @return Builder<HrDocument> */
     public function applySiteDocumentScope(Builder $query, User $viewer): Builder
     {
-        $historicalUserIds = $this->siteAccess->applyHistoricalStaffSiteScope(
+        $historicalUserIds = $this->siteAccess->applyHistoricalHrEmployeeStaffScope(
             User::query()->select('users.id'),
             $viewer,
         );
@@ -54,7 +54,7 @@ class HrDocumentAccessService
     /** @return Builder<HrEmployeeProfile> */
     public function applyCurrentProfileScope(Builder $query, User $viewer): Builder
     {
-        $currentUserIds = $this->siteAccess->applyStaffScope(
+        $currentUserIds = $this->siteAccess->applyHrEmployeeStaffScope(
             User::query()->select('users.id'),
             $viewer,
         );
@@ -65,7 +65,7 @@ class HrDocumentAccessService
     /** @return Builder<HrEmployeeProfile> */
     public function applyHistoricalProfileScope(Builder $query, User $viewer): Builder
     {
-        $historicalUserIds = $this->siteAccess->applyHistoricalStaffSiteScope(
+        $historicalUserIds = $this->siteAccess->applyHistoricalHrEmployeeStaffScope(
             User::query()->select('users.id'),
             $viewer,
         );

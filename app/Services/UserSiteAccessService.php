@@ -31,6 +31,15 @@ class UserSiteAccessService
      */
     public const HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
 
+    /**
+     * Explicit application-wide People/profile read boundary for central HR,
+     * administrators, and auditors. Broad employee-view permissions alone do
+     * not imply access beyond a viewer's approved Sites.
+     *
+     * @var array<int, string>
+     */
+    public const HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS = ['hr.employees.viewAllSites'];
+
     /** @var array<string, bool> */
     private array $clientIncidentSiteColumnCache = [];
 
@@ -1061,6 +1070,32 @@ SQL;
     }
 
     /**
+     * Scope current approved staff through the explicit HR all-Sites
+     * permission without ever relaxing canonical Site provenance.
+     */
+    public function applyHrEmployeeStaffScope(Builder $query, ?User $user): Builder
+    {
+        $query->staff()
+            ->whereNotNull($query->qualifyColumn('approved_at'))
+            ->whereHas('hrEmployeeProfile', fn (Builder $profileQuery) => $this->applyCurrentEmployeeProfileScope($profileQuery));
+
+        $siteIds = $this->accessibleSiteIds($user, self::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteIds): void {
+            $profileQuery->where(function (Builder $siteQuery) use ($siteIds): void {
+                $siteQuery->whereIn('primary_site_id', $siteIds);
+
+                foreach ($siteIds as $siteId) {
+                    $siteQuery->orWhereJsonContains('secondary_site_ids', $siteId);
+                }
+            });
+        });
+    }
+
+    /**
      * Validate that a selected person is current approved staff assigned to the
      * exact injury Site. Application-wide visibility never relaxes that
      * staff-to-Site provenance invariant.
@@ -1126,6 +1161,30 @@ SQL;
     }
 
     /**
+     * Scope retained employee provenance through the explicit HR all-Sites
+     * permission while continuing to reject missing or invalid Site identity.
+     */
+    public function applyHistoricalHrEmployeeStaffScope(Builder $query, ?User $user): Builder
+    {
+        $siteIds = $this->accessibleSiteIds($user, self::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $profiles = HrEmployeeProfile::withTrashed()
+            ->select('user_id')
+            ->where(function (Builder $siteQuery) use ($siteIds): void {
+                $siteQuery->whereIn('primary_site_id', $siteIds);
+
+                foreach ($siteIds as $siteId) {
+                    $siteQuery->orWhereJsonContains('secondary_site_ids', $siteId);
+                }
+            });
+
+        return $query->whereIn($query->qualifyColumn('id'), $profiles);
+    }
+
+    /**
      * Scope employee profiles to current approved staff at a Site visible to
      * the viewer. This is the canonical picker and profile-mutation boundary.
      *
@@ -1140,6 +1199,17 @@ SQL;
             User::query()->select('users.id'),
             $viewer,
             $bypassPermissions,
+        );
+
+        return $query->whereIn($query->qualifyColumn('user_id'), $currentStaff);
+    }
+
+    /** Scope current employee profiles through the canonical HR Site boundary. */
+    public function applyCurrentHrEmployeeProfileScope(Builder $query, ?User $viewer): Builder
+    {
+        $currentStaff = $this->applyHrEmployeeStaffScope(
+            User::query()->select('users.id'),
+            $viewer,
         );
 
         return $query->whereIn($query->qualifyColumn('user_id'), $currentStaff);
@@ -1161,6 +1231,17 @@ SQL;
             User::query()->select('users.id'),
             $viewer,
             $bypassPermissions,
+        );
+
+        return $query->whereIn($query->qualifyColumn('user_id'), $historicalStaff);
+    }
+
+    /** Scope retained employee profiles through the canonical HR Site boundary. */
+    public function applyHistoricalHrEmployeeProfileScope(Builder $query, ?User $viewer): Builder
+    {
+        $historicalStaff = $this->applyHistoricalHrEmployeeStaffScope(
+            User::query()->select('users.id'),
+            $viewer,
         );
 
         return $query->whereIn($query->qualifyColumn('user_id'), $historicalStaff);

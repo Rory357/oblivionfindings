@@ -61,7 +61,12 @@ class EmployeeProfileController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
         $siteAccess = app(UserSiteAccessService::class);
-        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds(
+            $user,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
+        $canViewFinancial = $user->canDo('hr.employees.viewFinancial');
+        $canViewRestricted = $user->canDo('hr.employees.viewRestricted');
 
         $search = trim((string) $request->query('q', ''));
         $status = $request->query('status'); // 'active', 'inactive', or null for all
@@ -111,11 +116,13 @@ class EmployeeProfileController extends Controller
             ->with(['hrEmployeeProfile' => fn ($profileQuery) => $profileQuery
                 ->withTrashed()
                 ->with('primarySite:id,name')]);
-        $siteAccess->applyHistoricalStaffSiteScope($profiles, $user);
+        $siteAccess->applyHistoricalHrEmployeeStaffScope($profiles, $user);
         $profiles = $profiles
             ->when($search !== '', fn ($q) => $q->where(function ($inner) use ($search) {
                 $inner->where('users.name', 'like', "%{$search}%")
-                    ->orWhere('users.email', 'like', "%{$search}%");
+                    ->orWhereHas('hrEmployeeProfile', fn ($profileQuery) => $profileQuery
+                        ->withTrashed()
+                        ->where('work_email', 'like', "%{$search}%"));
             })
             )
             ->when($status === 'active', fn ($q) => $q->where(function ($statusQuery) {
@@ -169,7 +176,7 @@ class EmployeeProfileController extends Controller
             ->orderBy('users.name')
             ->orderBy('users.id')
             ->paginate(20)
-            ->through(function (User $staffUser) use ($accessibleSiteIds) {
+            ->through(function (User $staffUser) use ($accessibleSiteIds, $canViewFinancial, $canViewRestricted) {
                 $profile = $staffUser->hrEmployeeProfile;
                 $isActive = $profile !== null
                     && ! $profile->trashed()
@@ -193,10 +200,10 @@ class EmployeeProfileController extends Controller
                     // for former employees.
                     'end_date' => $profile && ! $isActive ? $profile->end_date?->toDateString() : null,
                     'position_role' => $profile && ! $isActive ? $profile->position_role : null,
-                    'hours_per_week' => $profile && ! $isActive && $profile->hours_per_week !== null
+                    'hours_per_week' => $profile && ! $isActive && $canViewFinancial && $profile->hours_per_week !== null
                         ? (float) $profile->hours_per_week
                         : null,
-                    'employment_history' => $profile && ! $isActive
+                    'employment_history' => $profile && ! $isActive && $canViewRestricted
                         ? $this->shapedEmploymentHistory($profile->employment_history)
                         : null,
                     // Directory-tab card fields (single source — the standalone directory is folded in).
@@ -207,7 +214,7 @@ class EmployeeProfileController extends Controller
                     'user' => [
                         'id' => $staffUser->id,
                         'name' => $staffUser->name,
-                        'email' => $staffUser->email,
+                        'email' => $profile?->work_email,
                     ],
                     'primary_site' => $primarySite ? [
                         'id' => $primarySite->id,
@@ -218,7 +225,11 @@ class EmployeeProfileController extends Controller
             ->withQueryString();
 
         $sitesQuery = Site::query()->orderBy('name');
-        $siteAccess->applySiteScope($sitesQuery, $user);
+        $siteAccess->applySiteScope(
+            $sitesQuery,
+            $user,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
         $sites = $sitesQuery->get(['id', 'name']);
 
         // Summary stats for mini dashboard
@@ -249,7 +260,7 @@ class EmployeeProfileController extends Controller
             ->whereNull('last_login_at')
             ->whereHas('hrEmployeeProfile', fn ($p) => $p
                 ->where('is_active', true));
-        $siteAccess->applyHistoricalStaffSiteScope($pendingInvitesQuery, $user);
+        $siteAccess->applyHistoricalHrEmployeeStaffScope($pendingInvitesQuery, $user);
         $pendingInvites = $pendingInvitesQuery->count();
 
         // Employment type breakdown
@@ -506,7 +517,7 @@ class EmployeeProfileController extends Controller
             ->whereNull('last_login_at')
             ->whereHas('hrEmployeeProfile', fn ($p) => $p
                 ->where('is_active', true));
-        $siteAccess->applyHistoricalStaffSiteScope($invites, $viewer);
+        $siteAccess->applyHistoricalHrEmployeeStaffScope($invites, $viewer);
         $invites = $invites
             ->with('hrEmployeeProfile:id,user_id,position_title')
             ->orderBy('name')
@@ -545,7 +556,7 @@ class EmployeeProfileController extends Controller
     private function visibleStaffQuery(User $viewer, UserSiteAccessService $siteAccess): Builder
     {
         $query = User::query()->staff();
-        $siteAccess->applyHistoricalStaffSiteScope($query, $viewer);
+        $siteAccess->applyHistoricalHrEmployeeStaffScope($query, $viewer);
 
         return $query;
     }
@@ -554,7 +565,7 @@ class EmployeeProfileController extends Controller
     private function currentVisibleStaffQuery(User $viewer, UserSiteAccessService $siteAccess): Builder
     {
         $query = User::query();
-        $siteAccess->applyStaffScope($query, $viewer);
+        $siteAccess->applyHrEmployeeStaffScope($query, $viewer);
 
         return $query;
     }
@@ -609,7 +620,10 @@ class EmployeeProfileController extends Controller
 
         abort_unless(
             $assignedSiteIds->isNotEmpty()
-                && $assignedSiteIds->diff($siteAccess->accessibleSiteIds($viewer))->isEmpty(),
+                && $assignedSiteIds->diff($siteAccess->accessibleSiteIds(
+                    $viewer,
+                    UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+                ))->isEmpty(),
             404,
         );
     }
@@ -619,7 +633,10 @@ class EmployeeProfileController extends Controller
         User $viewer,
         UserSiteAccessService $siteAccess,
     ): Builder {
-        $accessibleSiteIds = $siteAccess->accessibleSiteIds($viewer);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds(
+            $viewer,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
 
         return HrDepartment::query()
             ->where('is_active', true)
@@ -710,7 +727,7 @@ class EmployeeProfileController extends Controller
         );
 
         $managerQuery = User::query()->whereKey($manager->id);
-        $siteAccess->applyStaffScope($managerQuery, $actor);
+        $siteAccess->applyHrEmployeeStaffScope($managerQuery, $actor);
 
         return $managerQuery->exists() ? $manager : null;
     }
@@ -815,7 +832,10 @@ class EmployeeProfileController extends Controller
             $profile = DB::transaction(function () use ($actorId, $data, $existingUserId, $intake, $managerUserId, $request): HrEmployeeProfile {
                 $locks = $this->lockPeopleMutationGraph([$actorId, $existingUserId, $managerUserId]);
                 [$actor, $siteAccess] = $this->lockedPeopleMutationActor($locks, $actorId);
-                $accessibleSiteIds = $siteAccess->accessibleSiteIds($actor);
+                $accessibleSiteIds = $siteAccess->accessibleSiteIds(
+                    $actor,
+                    UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+                );
 
                 $existingUser = $existingUserId ? $locks['users']->get((int) $existingUserId) : null;
                 if ($existingUser && $existingUser->email !== $data['email']) {
@@ -999,7 +1019,10 @@ class EmployeeProfileController extends Controller
                 'nullable',
                 'integer',
                 function (string $attribute, mixed $value, \Closure $fail) use ($siteAccess, $user): void {
-                    if (! in_array((int) $value, $siteAccess->accessibleSiteIds($user), true)) {
+                    if (! in_array((int) $value, $siteAccess->accessibleSiteIds(
+                        $user,
+                        UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+                    ), true)) {
                         $fail('The selected primary site is invalid.');
                     }
                 },
@@ -1035,7 +1058,10 @@ class EmployeeProfileController extends Controller
                 if (! empty($attributes['primary_site_id'])) {
                     $site = Site::query()
                         ->whereKey($attributes['primary_site_id'])
-                        ->whereIn('id', $siteAccess->accessibleSiteIds($user))
+                        ->whereIn('id', $siteAccess->accessibleSiteIds(
+                            $user,
+                            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+                        ))
                         ->lockForUpdate()
                         ->first();
                     if (! $site) {
@@ -1111,7 +1137,10 @@ class EmployeeProfileController extends Controller
             if ($data['action'] === 'assign_site') {
                 $site = Site::query()
                     ->whereKey($data['site_id'])
-                    ->whereIn('id', $siteAccess->accessibleSiteIds($user))
+                    ->whereIn('id', $siteAccess->accessibleSiteIds(
+                        $user,
+                        UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+                    ))
                     ->lockForUpdate()
                     ->first();
                 if (! $site) {
@@ -1168,20 +1197,38 @@ class EmployeeProfileController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
         $siteAccess = app(UserSiteAccessService::class);
-        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds(
+            $user,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
         $this->assertProfileReadAccess($user, $profile, $siteAccess);
         $accessibleDepartmentIds = $this->accessibleDepartmentsQuery($user, $siteAccess)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
+        $canViewRestricted = $user->canDo('hr.employees.viewRestricted');
+        $canViewCompliance = $user->canDo('hr.compliance.view');
+        $canViewLeave = $user->canDo('hr.leave.viewAny');
+        $canViewOnboarding = $user->canDo('hr.onboarding.view');
+        $canViewPerformance = $user->canDo('hr.performance.view')
+            || $user->canDo('hr.performance.manage');
+        $canViewTraining = $user->canDo('hr.training.view')
+            || $user->canDo('competency.viewAny');
+        $canViewDriver = $user->canDo('hr.driver.view');
+        $canViewVetting = $user->canDo('hr.vetting.view');
+        $canViewDocuments = $user->canDo('hr.documents.view');
+        $canViewPolicies = $user->canDo('hr.policies.view');
 
-        $profile->load([
+        $profileRelations = [
             'user:id,name,email',
             'primarySite:id,name',
             'departmentRelation:id,name',
-            'documents',
             'offer:id,application_id,position_title,proposed_start_date,employment_type',
-        ]);
+        ];
+        if ($canViewDocuments) {
+            $profileRelations[] = 'documents';
+        }
+        $profile->load($profileRelations);
 
         $userId = $profile->user_id;
         $canViewInjuries = $user->canDo('hazards.view');
@@ -1252,8 +1299,10 @@ class EmployeeProfileController extends Controller
             ->map(fn ($r) => ['id' => $r->id, 'name' => $r->user?->name ?? 'Unknown', 'position_title' => $r->position_title]);
 
         // Compliance
-        $rawStatuses = HrStaffComplianceStatus::where('user_id', $userId)
-            ->with('requirement:id,code,name,category,check_type,hard_stop')->get();
+        $rawStatuses = $canViewCompliance
+            ? HrStaffComplianceStatus::where('user_id', $userId)
+                ->with('requirement:id,code,name,category,check_type,hard_stop')->get()
+            : collect();
 
         $complianceStatuses = $rawStatuses->map(fn ($s) => [
             'id' => $s->id, 'requirement_name' => $s->requirement?->name ?? '', 'requirement_type' => $s->requirement?->check_type ?? '',
@@ -1269,41 +1318,47 @@ class EmployeeProfileController extends Controller
         ];
 
         // Leave
-        $leaveBalances = HrLeaveBalance::where('user_id', $userId)->where('year', now()->year)->get()
-            ->map(fn ($lb) => [
-                'id' => $lb->id, 'leave_type' => $lb->leave_type,
-                'accrued_hours' => (float) $lb->accrued_hours, 'used_hours' => (float) $lb->used_hours,
-                'balance_hours' => (float) $lb->balance_hours,
-                'as_at_date' => $lb->last_synced_at?->toDateString() ?? now()->toDateString(),
-            ]);
+        $leaveBalances = $canViewLeave
+            ? HrLeaveBalance::where('user_id', $userId)->where('year', now()->year)->get()
+                ->map(fn ($lb) => [
+                    'id' => $lb->id, 'leave_type' => $lb->leave_type,
+                    'accrued_hours' => (float) $lb->accrued_hours, 'used_hours' => (float) $lb->used_hours,
+                    'balance_hours' => (float) $lb->balance_hours,
+                    'as_at_date' => $lb->last_synced_at?->toDateString() ?? now()->toDateString(),
+                ])
+            : collect();
 
-        $recentLeaveRequests = HrLeaveRequest::where('user_id', $userId)
-            ->orderByDesc('created_at')->limit(10)->get()
-            ->map(fn ($lr) => [
-                'id' => $lr->id, 'leave_type' => $lr->leave_type, 'status' => $lr->status,
-                'starts_at' => $lr->starts_at?->toDateString(), 'ends_at' => $lr->ends_at?->toDateString(),
-                'hours_requested' => (float) ($lr->hours_requested ?? 0),
-            ]);
+        $recentLeaveRequests = $canViewLeave
+            ? HrLeaveRequest::where('user_id', $userId)
+                ->orderByDesc('created_at')->limit(10)->get()
+                ->map(fn ($lr) => [
+                    'id' => $lr->id, 'leave_type' => $lr->leave_type, 'status' => $lr->status,
+                    'starts_at' => $lr->starts_at?->toDateString(), 'ends_at' => $lr->ends_at?->toDateString(),
+                    'hours_requested' => (float) ($lr->hours_requested ?? 0),
+                ])
+            : collect();
 
         // Onboarding
-        $onboardingChecklists = HrOnboardingChecklist::where('employee_profile_id', $profile->id)
-            ->with(['tasks' => fn ($q) => $q->orderBy('category')->orderBy('sort_order')])
-            ->orderByDesc('created_at')->get()
-            ->map(fn ($cl) => [
-                'id' => $cl->id, 'name' => $cl->template_key ?? 'Onboarding Checklist',
-                'status' => $cl->status, 'due_date' => $cl->due_date?->toDateString(),
-                'started_at' => $cl->started_at?->toDateString(), 'completed_at' => $cl->completed_at?->toDateString(),
-                'tasks' => $cl->tasks->map(fn ($t) => [
-                    'id' => $t->id, 'category' => $t->category, 'title' => $t->title,
-                    'description' => $t->description, 'is_required' => (bool) $t->is_required,
-                    'status' => $t->status, 'assigned_to_role' => $t->assigned_to_role,
-                    'sign_off_required' => (bool) $t->sign_off_required,
-                    'completed_at' => $t->completed_at?->toDateString(),
-                ])->values(),
-            ]);
+        $onboardingChecklists = $canViewOnboarding
+            ? HrOnboardingChecklist::where('employee_profile_id', $profile->id)
+                ->with(['tasks' => fn ($q) => $q->orderBy('category')->orderBy('sort_order')])
+                ->orderByDesc('created_at')->get()
+                ->map(fn ($cl) => [
+                    'id' => $cl->id, 'name' => $cl->template_key ?? 'Onboarding Checklist',
+                    'status' => $cl->status, 'due_date' => $cl->due_date?->toDateString(),
+                    'started_at' => $cl->started_at?->toDateString(), 'completed_at' => $cl->completed_at?->toDateString(),
+                    'tasks' => $cl->tasks->map(fn ($t) => [
+                        'id' => $t->id, 'category' => $t->category, 'title' => $t->title,
+                        'description' => $t->description, 'is_required' => (bool) $t->is_required,
+                        'status' => $t->status, 'assigned_to_role' => $t->assigned_to_role,
+                        'sign_off_required' => (bool) $t->sign_off_required,
+                        'completed_at' => $t->completed_at?->toDateString(),
+                    ])->values(),
+                ])
+            : collect();
 
         // Performance reviews (restricted)
-        $performanceReviews = $user->canDo('hr.employees.viewRestricted')
+        $performanceReviews = $canViewRestricted && $canViewPerformance
             ? HrPerformanceReview::where('employee_user_id', $userId)
                 ->with('reviewer:id,name')->orderByDesc('review_period_end')->limit(10)->get()
                 ->map(fn ($r) => [
@@ -1318,106 +1373,124 @@ class EmployeeProfileController extends Controller
             : collect();
 
         // Probation reviews
-        $probationReviews = HrProbationReview::where('employee_user_id', $userId)
-            ->with('reviewer:id,name')->orderBy('review_number')->get()
-            ->map(fn ($r) => [
-                'id' => $r->id, 'review_number' => $r->review_number, 'review_date' => $r->review_date?->toDateString(),
-                'status' => $r->status, 'recommendation' => $r->recommendation,
-                'reviewer_name' => $r->reviewer?->name, 'extension_weeks' => $r->extension_weeks,
-            ]);
+        $probationReviews = $canViewPerformance
+            ? HrProbationReview::where('employee_user_id', $userId)
+                ->with('reviewer:id,name')->orderBy('review_number')->get()
+                ->map(fn ($r) => [
+                    'id' => $r->id, 'review_number' => $r->review_number, 'review_date' => $r->review_date?->toDateString(),
+                    'status' => $r->status, 'recommendation' => $r->recommendation,
+                    'reviewer_name' => $r->reviewer?->name, 'extension_weeks' => $r->extension_weeks,
+                ])
+            : collect();
 
         // PIPs
-        $pips = HrPerformanceImprovementPlan::where('employee_user_id', $userId)
-            ->with('milestones')->orderByDesc('start_date')->limit(5)->get()
-            ->map(fn ($p) => [
-                'id' => $p->id, 'title' => $p->title, 'status' => $p->status, 'reason' => $p->reason,
-                'start_date' => $p->start_date?->toDateString(), 'end_date' => $p->end_date?->toDateString(),
-                'outcome' => $p->outcome,
-                'milestones' => $p->milestones->map(fn ($m) => [
-                    'id' => $m->id, 'title' => $m->title, 'due_date' => $m->due_date?->toDateString(),
-                    'status' => $m->status, 'outcome' => $m->outcome,
-                ])->values(),
-            ]);
+        $pips = $canViewPerformance
+            ? HrPerformanceImprovementPlan::where('employee_user_id', $userId)
+                ->with('milestones')->orderByDesc('start_date')->limit(5)->get()
+                ->map(fn ($p) => [
+                    'id' => $p->id, 'title' => $p->title, 'status' => $p->status, 'reason' => $p->reason,
+                    'start_date' => $p->start_date?->toDateString(), 'end_date' => $p->end_date?->toDateString(),
+                    'outcome' => $p->outcome,
+                    'milestones' => $p->milestones->map(fn ($m) => [
+                        'id' => $m->id, 'title' => $m->title, 'due_date' => $m->due_date?->toDateString(),
+                        'status' => $m->status, 'outcome' => $m->outcome,
+                    ])->values(),
+                ])
+            : collect();
 
         // Development goals
-        $developmentGoals = HrDevelopmentGoal::where('employee_user_id', $userId)
-            ->orderByDesc('created_at')->limit(10)->get()
-            ->map(fn ($g) => [
-                'id' => $g->id, 'title' => $g->title, 'status' => $g->status,
-                'progress_percent' => $g->progress_percent ?? 0,
-                'due_date' => $g->due_date?->toDateString(),
-                'category' => $g->category,
-                'competency_area' => $g->competency_area,
-            ]);
+        $developmentGoals = $canViewPerformance
+            ? HrDevelopmentGoal::where('employee_user_id', $userId)
+                ->orderByDesc('created_at')->limit(10)->get()
+                ->map(fn ($g) => [
+                    'id' => $g->id, 'title' => $g->title, 'status' => $g->status,
+                    'progress_percent' => $g->progress_percent ?? 0,
+                    'due_date' => $g->due_date?->toDateString(),
+                    'category' => $g->category,
+                    'competency_area' => $g->competency_area,
+                ])
+            : collect();
 
         // Performance summary
-        $activeGoals = HrDevelopmentGoal::where('employee_user_id', $userId)
-            ->whereIn('status', ['not_started', 'in_progress', 'blocked']);
+        $activeGoals = $canViewPerformance
+            ? HrDevelopmentGoal::where('employee_user_id', $userId)
+                ->whereIn('status', ['not_started', 'in_progress', 'blocked'])
+            : null;
         $performanceSummary = [
             'latest_rating' => $performanceReviews->first()['overall_rating'] ?? null,
             'next_review_date' => $performanceReviews->pluck('next_review_date')->filter()->sort()->first(),
-            'active_goals_count' => (clone $activeGoals)->count(),
-            'active_goals_avg' => (int) round((clone $activeGoals)->avg('progress_percent') ?? 0),
+            'active_goals_count' => $activeGoals ? (clone $activeGoals)->count() : 0,
+            'active_goals_avg' => $activeGoals ? (int) round((clone $activeGoals)->avg('progress_percent') ?? 0) : 0,
             'has_active_pip' => $pips->whereIn('status', ['active', 'in_progress'])->isNotEmpty(),
         ];
 
         // Training
-        $courseEnrollments = HrCourseEnrollment::where('user_id', $userId)
-            ->with('course:id,title,category,duration_hours')->orderByDesc('enrolled_at')->limit(20)->get()
-            ->map(fn ($e) => [
-                'id' => $e->id, 'course_name' => $e->course?->title, 'category' => $e->course?->category,
-                'status' => $e->status, 'enrolled_at' => $e->enrolled_at?->toDateString(),
-                'completed_at' => $e->completed_at?->toDateString(), 'score' => $e->score,
-            ]);
+        $courseEnrollments = $canViewTraining
+            ? HrCourseEnrollment::where('user_id', $userId)
+                ->with('course:id,title,category,duration_hours')->orderByDesc('enrolled_at')->limit(20)->get()
+                ->map(fn ($e) => [
+                    'id' => $e->id, 'course_name' => $e->course?->title, 'category' => $e->course?->category,
+                    'status' => $e->status, 'enrolled_at' => $e->enrolled_at?->toDateString(),
+                    'completed_at' => $e->completed_at?->toDateString(), 'score' => $e->score,
+                ])
+            : collect();
 
         // Skills
-        $employeeSkills = HrEmployeeSkill::where('employee_profile_id', $profile->id)
-            ->with('skill:id,name,category')->get()
-            ->map(fn ($s) => [
-                'id' => $s->id, 'skill_name' => $s->skill?->name, 'category' => $s->skill?->category,
-                'proficiency_level' => $s->proficiency_level, 'self_assessed' => (bool) $s->self_assessed,
-            ]);
+        $employeeSkills = $canViewTraining
+            ? HrEmployeeSkill::where('employee_profile_id', $profile->id)
+                ->with('skill:id,name,category')->get()
+                ->map(fn ($s) => [
+                    'id' => $s->id, 'skill_name' => $s->skill?->name, 'category' => $s->skill?->category,
+                    'proficiency_level' => $s->proficiency_level, 'self_assessed' => (bool) $s->self_assessed,
+                ])
+            : collect();
 
         // Competency assessments
-        $competencyAssessments = HrCompetencyAssessment::where('employee_profile_id', $profile->id)
-            ->with('competency:id,name,category')->orderByDesc('assessment_date')->limit(20)->get()
-            ->map(fn ($a) => [
-                'id' => $a->id, 'competency_name' => $a->competency?->name, 'category' => $a->competency?->category,
-                'proficiency_level' => $a->assessed_level, 'target_level' => $a->target_level,
-                'assessment_date' => $a->assessment_date?->toDateString(),
-            ]);
+        $competencyAssessments = $canViewTraining
+            ? HrCompetencyAssessment::where('employee_profile_id', $profile->id)
+                ->with('competency:id,name,category')->orderByDesc('assessment_date')->limit(20)->get()
+                ->map(fn ($a) => [
+                    'id' => $a->id, 'competency_name' => $a->competency?->name, 'category' => $a->competency?->category,
+                    'proficiency_level' => $a->assessed_level, 'target_level' => $a->target_level,
+                    'assessment_date' => $a->assessment_date?->toDateString(),
+                ])
+            : collect();
 
         // Driver eligibility
         $driverData = null;
-        try {
-            $driverEligibility = HrDriverEligibility::where('user_id', $userId)->first();
-            if ($driverEligibility) {
-                $driverData = [
-                    'id' => $driverEligibility->id, 'status' => $driverEligibility->status,
-                    'licence_number' => $driverEligibility->licence_number, 'licence_class' => $driverEligibility->licence_class,
-                    'licence_endorsements' => $driverEligibility->licence_endorsements,
-                    'licence_expires_at' => $driverEligibility->licence_expires_at?->toDateString(),
-                    'can_drive_clients' => (bool) $driverEligibility->can_drive_clients,
-                    'incident_free_since' => $driverEligibility->incident_free_since?->toDateString(),
-                    'next_review_at' => $driverEligibility->next_review_at?->toDateString(),
-                ];
+        if ($canViewDriver) {
+            try {
+                $driverEligibility = HrDriverEligibility::where('user_id', $userId)->first();
+                if ($driverEligibility) {
+                    $driverData = [
+                        'id' => $driverEligibility->id, 'status' => $driverEligibility->status,
+                        'licence_number' => $driverEligibility->licence_number, 'licence_class' => $driverEligibility->licence_class,
+                        'licence_endorsements' => $driverEligibility->licence_endorsements,
+                        'licence_expires_at' => $driverEligibility->licence_expires_at?->toDateString(),
+                        'can_drive_clients' => (bool) $driverEligibility->can_drive_clients,
+                        'incident_free_since' => $driverEligibility->incident_free_since?->toDateString(),
+                        'next_review_at' => $driverEligibility->next_review_at?->toDateString(),
+                    ];
+                }
+            } catch (\Exception $e) {
+                // Table may not exist yet
             }
-        } catch (\Exception $e) {
-            // Table may not exist yet
         }
 
         // Vetting / background checks
-        $backgroundChecks = StaffBackgroundCheck::where('user_id', $userId)
-            ->orderByDesc('check_date')->get()
-            ->map(fn ($c) => [
-                'id' => $c->id, 'check_type' => $c->check_type, 'status' => $c->status,
-                'provider' => $c->provider, 'reference_number' => $c->reference_number,
-                'check_date' => $c->check_date?->toDateString(), 'expires_at' => $c->expires_at?->toDateString(),
-                'risk_decision' => $c->risk_decision,
-            ]);
+        $backgroundChecks = $canViewVetting
+            ? StaffBackgroundCheck::where('user_id', $userId)
+                ->orderByDesc('check_date')->get()
+                ->map(fn ($c) => [
+                    'id' => $c->id, 'check_type' => $c->check_type, 'status' => $c->status,
+                    'provider' => $c->provider, 'reference_number' => $c->reference_number,
+                    'check_date' => $c->check_date?->toDateString(), 'expires_at' => $c->expires_at?->toDateString(),
+                    'risk_decision' => $c->risk_decision,
+                ])
+            : collect();
 
         // Supervision notes (restricted)
-        $supervisionNotes = $user->canDo('hr.employees.viewRestricted')
+        $supervisionNotes = $canViewRestricted && $canViewPerformance
             ? HrSupervisionNote::where('employee_user_id', $userId)
                 ->with('supervisor:id,name')->orderByDesc('session_date')->limit(10)->get()
                 ->map(fn ($n) => [
@@ -1429,7 +1502,7 @@ class EmployeeProfileController extends Controller
             : collect();
 
         // Cases (restricted — disciplinary / HR cases)
-        $cases = $user->canDo('hr.employees.viewRestricted')
+        $cases = $canViewRestricted && $user->canDo('hr.cases.view')
             ? HrCase::where('user_id', $userId)
                 ->with('assignedTo:id,name')->orderByDesc('opened_at')->limit(10)->get()
                 ->map(fn ($c) => [
@@ -1445,12 +1518,14 @@ class EmployeeProfileController extends Controller
         $equipmentAccess = app(HrEquipmentAccessProjectionService::class)->present($user, $profile);
 
         // Policy attestations
-        $policyAttestations = HrPolicyAttestation::where('user_id', $userId)
-            ->with('policy:id,title')->orderByDesc('attested_at')->limit(20)->get()
-            ->map(fn ($a) => [
-                'id' => $a->id, 'policy_name' => $a->policy?->title,
-                'attested_at' => $a->attested_at?->toDateString(),
-            ]);
+        $policyAttestations = $canViewPolicies
+            ? HrPolicyAttestation::where('user_id', $userId)
+                ->with('policy:id,title')->orderByDesc('attested_at')->limit(20)->get()
+                ->map(fn ($a) => [
+                    'id' => $a->id, 'policy_name' => $a->policy?->title,
+                    'attested_at' => $a->attested_at?->toDateString(),
+                ])
+            : collect();
 
         return Inertia::render('hr/employees/show', [
             'profile' => [
@@ -1468,9 +1543,11 @@ class EmployeeProfileController extends Controller
                 'is_active' => (bool) $profile->is_active,
                 'start_date' => $profile->start_date?->toDateString(),
                 'end_date' => $profile->end_date?->toDateString(),
-                'probation_end_date' => $profile->probation_end_date?->toDateString(),
-                'hours_per_week' => $profile->hours_per_week,
-                'employment_history' => $this->shapedEmploymentHistory($profile->employment_history),
+                'probation_end_date' => $canViewPerformance ? $profile->probation_end_date?->toDateString() : null,
+                'hours_per_week' => $user->canDo('hr.employees.viewFinancial') ? $profile->hours_per_week : null,
+                'employment_history' => $canViewRestricted
+                    ? $this->shapedEmploymentHistory($profile->employment_history)
+                    : [],
                 'pay_rate' => $user->canDo('hr.employees.viewFinancial') ? $profile->hourly_rate : null,
                 'pay_frequency' => $user->canDo('hr.employees.viewFinancial') ? $profile->pay_frequency : null,
                 'bio' => $profile->bio,
@@ -1479,24 +1556,36 @@ class EmployeeProfileController extends Controller
                 'is_first_aider' => (bool) $profile->is_first_aider,
                 'is_fire_warden' => (bool) $profile->is_fire_warden,
                 'can_drive_clients' => (bool) $profile->can_drive_clients,
-                'work_rights_status' => $profile->work_rights_status,
-                'visa_type' => $profile->visa_type,
-                'visa_expires_at' => $profile->visa_expires_at?->toDateString(),
-                'notes' => $profile->notes,
-                'emergency_contact_name' => $profile->emergency_contact_name ?? ($profile->emergency_contacts[0]['name'] ?? null),
-                'emergency_contact_phone' => $profile->emergency_contact_phone ?? ($profile->emergency_contacts[0]['phone'] ?? null),
-                'emergency_contact_relationship' => $profile->emergency_contact_relationship ?? ($profile->emergency_contacts[0]['relationship'] ?? null),
-                'user' => ['id' => $profile->user->id, 'name' => $profile->user->name, 'email' => $profile->user->email],
+                'work_rights_status' => $canViewRestricted ? $profile->work_rights_status : null,
+                'visa_type' => $canViewRestricted ? $profile->visa_type : null,
+                'visa_expires_at' => $canViewRestricted ? $profile->visa_expires_at?->toDateString() : null,
+                'notes' => $canViewRestricted ? $profile->notes : null,
+                'emergency_contact_name' => $canViewRestricted
+                    ? $profile->emergency_contact_name ?? ($profile->emergency_contacts[0]['name'] ?? null)
+                    : null,
+                'emergency_contact_phone' => $canViewRestricted
+                    ? $profile->emergency_contact_phone ?? ($profile->emergency_contacts[0]['phone'] ?? null)
+                    : null,
+                'emergency_contact_relationship' => $canViewRestricted
+                    ? $profile->emergency_contact_relationship ?? ($profile->emergency_contacts[0]['relationship'] ?? null)
+                    : null,
+                'user' => [
+                    'id' => $profile->user->id,
+                    'name' => $profile->user->name,
+                    'email' => $profile->work_email ?? ($canViewRestricted ? $profile->user->email : ''),
+                ],
                 'primary_site' => $profile->primarySite
                     && in_array((int) $profile->primary_site_id, $accessibleSiteIds, true)
                         ? ['id' => $profile->primarySite->id, 'name' => $profile->primarySite->name]
                         : null,
-                'documents' => $profile->documents->map(fn ($d) => [
-                    'id' => $d->id, 'title' => $d->title, 'category' => $d->category,
-                    'original_name' => $d->original_name, 'created_at' => $d->created_at?->toDateString(),
-                    'expires_at' => $d->expires_at?->toDateString(),
-                    'signed_by_employee' => (bool) $d->signed_by_employee,
-                ])->values(),
+                'documents' => $canViewDocuments
+                    ? $profile->documents->map(fn ($d) => [
+                        'id' => $d->id, 'title' => $d->title, 'category' => $d->category,
+                        'original_name' => $d->original_name, 'created_at' => $d->created_at?->toDateString(),
+                        'expires_at' => $d->expires_at?->toDateString(),
+                        'signed_by_employee' => (bool) $d->signed_by_employee,
+                    ])->values()
+                    : [],
             ],
             'tenure' => $tenure,
             'manager' => $manager,
@@ -1532,7 +1621,7 @@ class EmployeeProfileController extends Controller
                 : [],
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
-                'viewSensitive' => $user->canDo('hr.employees.viewRestricted'),
+                'viewSensitive' => $canViewRestricted,
                 'viewInjuries' => $canViewInjuries,
             ],
         ]);
@@ -1577,7 +1666,10 @@ class EmployeeProfileController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
         $siteAccess = app(UserSiteAccessService::class);
-        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds(
+            $user,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
         $this->assertProfileReadAccess($user, $profile, $siteAccess);
         $accessibleDepartmentIds = $this->accessibleDepartmentsQuery($user, $siteAccess)
             ->pluck('id')
@@ -1716,7 +1808,10 @@ class EmployeeProfileController extends Controller
                 ->active()
                 ->notArchived()
                 ->whereIn('id', $finalSiteIds)
-                ->whereIn('id', $siteAccess->accessibleSiteIds($user))
+                ->whereIn('id', $siteAccess->accessibleSiteIds(
+                    $user,
+                    UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+                ))
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->pluck('id')

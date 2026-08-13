@@ -42,6 +42,10 @@ class HrApiController extends Controller
             'q' => ['nullable', 'string', 'max:100'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
 
         $employees = HrEmployeeProfile::query()
             ->select($this->employeeColumns())
@@ -52,7 +56,10 @@ class HrApiController extends Controller
             ))
             ->orderBy('employee_number')
             ->paginate($this->perPage($filters));
-        $this->present($employees, HrApiPresenter::employee(...));
+        $this->present(
+            $employees,
+            fn (HrEmployeeProfile $employee): array => HrApiPresenter::employee($employee, $accessibleSiteIds),
+        );
 
         return response()->json($employees);
     }
@@ -61,14 +68,19 @@ class HrApiController extends Controller
     {
         $user = $request->user();
         abort_unless($user?->canDo('hr.employees.viewAny'), 403);
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $user,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
 
         $employee = HrEmployeeProfile::query()
             ->select($this->employeeColumns())
             ->whereIn('user_id', $this->visibleCurrentStaffUserIds($user))
             ->with(['user:id,name,email', 'primarySite:id,name'])
-            ->findOrFail($id);
+            ->find($id);
+        abort_unless($employee, 404);
 
-        return response()->json(HrApiPresenter::employee($employee));
+        return response()->json(HrApiPresenter::employee($employee, $accessibleSiteIds));
     }
 
     /* ------------------------------------------------------------------ */
@@ -127,7 +139,7 @@ class HrApiController extends Controller
 
         $staffQuery = $this->currentStaffQuery()->whereKey($userId);
         if ((int) $userId !== (int) $user->id) {
-            $this->siteAccess->applyStaffScope($staffQuery, $user);
+            $this->siteAccess->applyHrEmployeeStaffScope($staffQuery, $user);
         }
         $isStaffMember = $staffQuery->exists();
         abort_unless($isStaffMember, 404);
@@ -272,7 +284,7 @@ class HrApiController extends Controller
     {
         $query = $this->currentStaffQuery()->select('users.id');
 
-        return $this->siteAccess->applyStaffScope($query, $viewer);
+        return $this->siteAccess->applyHrEmployeeStaffScope($query, $viewer);
     }
 
     /** @return list<string> */

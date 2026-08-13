@@ -21,8 +21,11 @@ use DateTimeInterface;
 final class HrApiPresenter
 {
     /** @return array<string, mixed> */
-    public static function employee(HrEmployeeProfile $profile): array
+    public static function employee(HrEmployeeProfile $profile, ?array $accessibleSiteIds = null): array
     {
+        $visiblePrimarySite = $accessibleSiteIds === null
+            || in_array((int) $profile->primary_site_id, $accessibleSiteIds, true);
+
         return [
             'id' => (int) $profile->id,
             'user_id' => (int) $profile->user_id,
@@ -36,10 +39,16 @@ final class HrApiPresenter
             'start_date' => self::date($profile->start_date),
             'end_date' => self::date($profile->end_date),
             'is_active' => (bool) $profile->is_active,
-            'primary_site_id' => self::integer($profile->primary_site_id),
+            'primary_site_id' => $visiblePrimarySite ? self::integer($profile->primary_site_id) : null,
             'secondary_site_ids' => collect($profile->secondary_site_ids ?? [])
                 ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
                 ->map(fn (mixed $id): int => (int) $id)
+                ->when(
+                    $accessibleSiteIds !== null,
+                    fn ($siteIds) => $siteIds->filter(
+                        fn (int $siteId): bool => in_array($siteId, $accessibleSiteIds, true),
+                    ),
+                )
                 ->unique()
                 ->values()
                 ->all(),
@@ -49,8 +58,12 @@ final class HrApiPresenter
             'department_id' => self::integer($profile->department_id),
             'team' => $profile->team,
             'preferred_name' => $profile->preferred_name,
-            'user' => self::user($profile->user),
-            'primary_site' => self::site($profile->primarySite),
+            'user' => $profile->user ? [
+                'id' => (int) $profile->user->id,
+                'name' => $profile->user->name,
+                'email' => $profile->work_email,
+            ] : null,
+            'primary_site' => $visiblePrimarySite ? self::site($profile->primarySite) : null,
         ];
     }
 

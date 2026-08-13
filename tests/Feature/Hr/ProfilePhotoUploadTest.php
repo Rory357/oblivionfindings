@@ -4,6 +4,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\HrProfilePhotoStorageService;
 use App\Domain\Hr\Services\PeopleMutationLockService;
 use App\Http\Controllers\Hr\DirectoryController;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -62,6 +63,9 @@ beforeEach(function () {
     $this->hr = User::factory()->create(['role' => 'hr', 'approved_at' => now()]);
     $this->hr->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->first()->id,
+    ]);
+    $this->hr->permissionOverrides()->syncWithoutDetaching([
+        Permission::query()->where('key', 'hr.employees.viewAllSites')->firstOrFail()->id => ['allowed' => false],
     ]);
     $this->allowedSite = Site::factory()->create(['name' => 'Allowed Photo Site']);
     $this->hiddenSite = Site::factory()->create(['name' => 'Hidden Photo Site']);

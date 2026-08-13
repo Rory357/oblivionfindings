@@ -23,6 +23,7 @@ beforeEach(function (): void {
     $this->manager->permissionOverrides()->syncWithoutDetaching([
         Permission::query()->where('key', 'hr.settings.manage')->firstOrFail()->id => ['allowed' => true],
         Permission::query()->where('key', 'hr.employees.viewAny')->firstOrFail()->id => ['allowed' => true],
+        Permission::query()->where('key', 'hr.employees.viewAllSites')->firstOrFail()->id => ['allowed' => false],
         Permission::query()->where('key', 'hr.employees.manage')->firstOrFail()->id => ['allowed' => true],
     ]);
     $this->allowedStaff = customFieldStaff('Allowed Custom Fields Staff', $this->allowedSite);

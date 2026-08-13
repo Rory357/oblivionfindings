@@ -32,6 +32,12 @@ beforeEach(function () {
     $this->manager->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
     ]);
+    $allSites = Permission::query()
+        ->where('key', 'hr.employees.viewAllSites')
+        ->firstOrFail();
+    $this->manager->permissionOverrides()->syncWithoutDetaching([
+        $allSites->id => ['allowed' => false],
+    ]);
     peopleDirectProfile($this->manager, $this->allowedSite, [
         'employee_number' => 'EMP-DIRECT-MANAGER',
         'position_role' => 'hr',

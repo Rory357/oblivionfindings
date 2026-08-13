@@ -63,7 +63,10 @@ class DirectoryController extends Controller
         $profile->load('user:id,name', 'primarySite:id,name', 'departmentRelation:id,name');
         abort_unless($profile->user, 404);
 
-        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds(
+            $user,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
         $visiblePrimarySite = $profile->primarySite
             && in_array((int) $profile->primary_site_id, $accessibleSiteIds, true)
                 ? $profile->primarySite
@@ -482,7 +485,7 @@ class DirectoryController extends Controller
         UserSiteAccessService $siteAccess,
     ): Builder {
         $query = User::query();
-        $siteAccess->applyStaffScope($query, $viewer);
+        $siteAccess->applyHrEmployeeStaffScope($query, $viewer);
 
         return $query;
     }
