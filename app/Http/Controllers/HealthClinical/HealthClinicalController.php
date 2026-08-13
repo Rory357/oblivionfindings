@@ -9,6 +9,7 @@ use App\Models\Client;
 use App\Services\HealthClinical\HealthSummaryService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Per-client clinical health summary.
@@ -27,7 +28,7 @@ class HealthClinicalController extends Controller
         private readonly HealthSummaryService $summaryService,
     ) {}
 
-    public function clientSummary(Request $request, Client $client): \Inertia\Response
+    public function clientSummary(Request $request, Client $client): Response
     {
         $auth = $request->user();
         abort_unless(
@@ -38,11 +39,9 @@ class HealthClinicalController extends Controller
             403
         );
 
-        if (! $auth->canDo('clinical.observations.viewAny')) {
-            $this->authorize('view', $client);
-        }
+        $this->authorize('view', $client);
 
-        $summary = $this->summaryService->forClient($client->id);
+        $summary = $this->summaryService->forClient($auth, $client);
 
         return Inertia::render('health-clinical/ClientSummary', [
             'client' => $client->only(['id', 'first_name', 'last_name']),

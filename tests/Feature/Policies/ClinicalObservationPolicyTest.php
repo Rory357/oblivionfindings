@@ -2,9 +2,7 @@
 
 namespace Tests\Feature\Policies;
 
-use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Policies\ClinicalObservationPolicy;
-use App\Models\Client;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
@@ -23,7 +21,7 @@ class ClinicalObservationPolicyTest extends TestCase
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
-        $this->policy = new ClinicalObservationPolicy();
+        $this->policy = app(ClinicalObservationPolicy::class);
     }
 
     protected function createUserWithRole(string $roleName): User

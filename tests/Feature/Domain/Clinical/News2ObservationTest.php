@@ -7,7 +7,9 @@ use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Services\ClinicalDashboardService;
 use App\Domain\Clinical\Services\ClinicalObservationService;
 use App\Domain\Clinical\Services\ClinicalSignalService;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,15 +23,26 @@ class News2ObservationTest extends TestCase
     use RefreshDatabase;
 
     protected ClinicalObservationService $service;
+
     protected Client $client;
+
     protected User $recorder;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->service = app(ClinicalObservationService::class);
-        $this->client = Client::factory()->create();
+        $site = Site::factory()->create(['is_active' => true]);
+        $this->client = Client::factory()->create(['site_id' => $site->id]);
         $this->recorder = User::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->recorder->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
     }
 
     /**
@@ -123,13 +136,13 @@ class News2ObservationTest extends TestCase
         ]);
 
         // A second client recording normal vitals is NOT on watch.
-        $stable = Client::factory()->create();
+        $stable = Client::factory()->create(['site_id' => $this->client->site_id]);
         $this->service->record($stable, $this->recorder, [
             'observation_type' => ObservationType::Vitals,
             'data' => $this->vitals(),
         ]);
 
-        $kpis = app(ClinicalDashboardService::class)->getKpis();
+        $kpis = app(ClinicalDashboardService::class)->getKpis($this->recorder);
         $this->assertSame(1, $kpis['clients_on_watch']);
     }
 
@@ -147,7 +160,7 @@ class News2ObservationTest extends TestCase
             'recorded_at' => now()->toDateTimeString(),
         ]);
 
-        $kpis = app(ClinicalDashboardService::class)->getKpis();
+        $kpis = app(ClinicalDashboardService::class)->getKpis($this->recorder);
         $this->assertSame(0, $kpis['clients_on_watch']);
     }
 }

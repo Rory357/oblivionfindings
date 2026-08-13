@@ -2,11 +2,10 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
-use App\Domain\Clinical\Enums\ObservationType;
-use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Domain\Clinical\Models\ClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\Shift;
@@ -22,8 +21,12 @@ class ShiftClinicalControllerTest extends TestCase
     use RefreshDatabase;
 
     protected Client $client;
+
     protected Shift $shift;
+
     protected User $staffUser;
+
+    protected Site $site;
 
     protected function setUp(): void
     {
@@ -31,11 +34,14 @@ class ShiftClinicalControllerTest extends TestCase
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
 
-        $this->client = Client::factory()->create();
+        $this->site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $this->client = Client::factory()->create(['site_id' => $this->site->id]);
         $this->staffUser = $this->createUserWithRole('coordinator');
+        $this->giveSiteAccess($this->staffUser, $this->site);
 
         $this->shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staffUser->id,
             'starts_at' => now(),
             'ends_at' => now()->addHours(8),
@@ -55,6 +61,30 @@ class ShiftClinicalControllerTest extends TestCase
         }
 
         return $user;
+    }
+
+    protected function giveSiteAccess(User $user, Site $site): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+    }
+
+    protected function addSecondarySiteAccess(User $user, Site $site): void
+    {
+        $profile = $user->hrEmployeeProfile()->firstOrFail();
+        $secondary = collect($profile->secondary_site_ids ?? [])
+            ->push($site->id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $profile->update(['secondary_site_ids' => $secondary]);
     }
 
     // ── GET due observations ─────────────────────────────────────────────
@@ -155,6 +185,7 @@ class ShiftClinicalControllerTest extends TestCase
         $site = Site::factory()->create(['type' => 'house']);
         $residentA = Client::factory()->create(['site_id' => $site->id]);
         $residentB = Client::factory()->create(['site_id' => $site->id]);
+        $this->addSecondarySiteAccess($this->staffUser, $site);
         $shift = Shift::factory()->create([
             'client_id' => $residentA->id,
             'site_id' => $site->id,
@@ -191,6 +222,7 @@ class ShiftClinicalControllerTest extends TestCase
         $site = Site::factory()->create(['type' => 'house']);
         $residentA = Client::factory()->create(['site_id' => $site->id]);
         $offSiteResident = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+        $this->addSecondarySiteAccess($this->staffUser, $site);
         $shift = Shift::factory()->create([
             'client_id' => $residentA->id,
             'site_id' => $site->id,
@@ -206,8 +238,7 @@ class ShiftClinicalControllerTest extends TestCase
                 'observation_type' => 'weight',
                 'data' => ['weight_kg' => 68.4],
             ])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('client_id');
+            ->assertForbidden();
 
         $this->assertDatabaseCount('clinical_observations', 0);
     }
@@ -385,9 +416,11 @@ class ShiftClinicalControllerTest extends TestCase
     public function test_support_worker_assigned_to_shift_can_record(): void
     {
         $worker = $this->createUserWithRole('support_worker');
+        $this->giveSiteAccess($worker, $this->site);
 
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $worker->id,
             'starts_at' => now(),
             'ends_at' => now()->addHours(8),
@@ -405,9 +438,11 @@ class ShiftClinicalControllerTest extends TestCase
     public function test_support_worker_cannot_record_clinical_type_from_shift(): void
     {
         $worker = $this->createUserWithRole('support_worker');
+        $this->giveSiteAccess($worker, $this->site);
 
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $worker->id,
             'starts_at' => now(),
             'ends_at' => now()->addHours(8),

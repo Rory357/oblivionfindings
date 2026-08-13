@@ -285,6 +285,7 @@ class RbacSeeder extends Seeder
             ['key' => 'clinical.assessments.viewAny', 'description' => 'View the clinical risk-assessments register', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.assessments.record', 'description' => 'Record clinical risk assessments (FRAT, Braden, MUST, IDDSI)', 'group' => 'clinical', 'module' => 'Health & Clinical'],
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+            ['key' => 'clinical.accessAllSites', 'description' => 'Apply granted clinical permissions across all Sites', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Incidents
             ['key' => 'incidents.viewAny', 'description' => 'View all incidents', 'group' => 'incidents', 'module' => 'Compliance'],
@@ -893,7 +894,7 @@ class RbacSeeder extends Seeder
             'clinical.monitoring.viewAny',
             'clinical.assessments.viewAny', 'clinical.assessments.record',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
-            'clinical.dashboard',
+            'clinical.dashboard', 'clinical.accessAllSites',
             'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
             'medications.administer.record', 'medications.administer.override_safety', 'medications.audit.view',
             'clients.viewAny',

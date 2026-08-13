@@ -19,11 +19,14 @@ class EventRegisterTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
+        $this->site = Site::factory()->create();
     }
 
     protected function createUserWithRole(string $roleName): User
@@ -99,8 +102,8 @@ class EventRegisterTest extends TestCase
     public function test_filter_by_client(): void
     {
         $lead = $this->createUserWithRole('clinical_lead');
-        $clientA = Client::factory()->create();
-        $clientB = Client::factory()->create();
+        $clientA = Client::factory()->create(['site_id' => $this->site->id]);
+        $clientB = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->create([
             'client_id' => $clientA->id,
@@ -112,7 +115,7 @@ class EventRegisterTest extends TestCase
         ]);
 
         $this->actingAs($lead)
-            ->get('/health-clinical/events?client_id=' . $clientA->id)
+            ->get('/health-clinical/events?client_id='.$clientA->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('events.data', 1)
@@ -122,7 +125,7 @@ class EventRegisterTest extends TestCase
     public function test_filter_by_event_type(): void
     {
         $lead = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->fall()->create([
             'client_id' => $client->id,
@@ -134,7 +137,7 @@ class EventRegisterTest extends TestCase
         ]);
 
         $this->actingAs($lead)
-            ->get('/health-clinical/events?event_type=' . ClinicalEventType::Fall->value)
+            ->get('/health-clinical/events?event_type='.ClinicalEventType::Fall->value)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('events.data', 1)
@@ -145,7 +148,7 @@ class EventRegisterTest extends TestCase
     public function test_filter_by_severity(): void
     {
         $lead = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->create([
             'client_id' => $client->id,
@@ -158,7 +161,7 @@ class EventRegisterTest extends TestCase
         ]);
 
         $this->actingAs($lead)
-            ->get('/health-clinical/events?severity=' . AlertSeverity::CRITICAL)
+            ->get('/health-clinical/events?severity='.AlertSeverity::CRITICAL)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('events.data', 1)
@@ -169,7 +172,7 @@ class EventRegisterTest extends TestCase
     public function test_filter_by_date_range(): void
     {
         $lead = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->create([
             'client_id' => $client->id,
@@ -183,7 +186,7 @@ class EventRegisterTest extends TestCase
         ]);
 
         $this->actingAs($lead)
-            ->get('/health-clinical/events?date_from=' . now()->subDays(2)->toDateString() . '&date_to=' . now()->toDateString())
+            ->get('/health-clinical/events?date_from='.now()->subDays(2)->toDateString().'&date_to='.now()->toDateString())
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('events.data', 1)
@@ -210,7 +213,7 @@ class EventRegisterTest extends TestCase
         ]);
 
         $this->actingAs($lead)
-            ->get('/health-clinical/events?site_id=' . $siteA->id)
+            ->get('/health-clinical/events?site_id='.$siteA->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('events.data', 1)
@@ -221,7 +224,7 @@ class EventRegisterTest extends TestCase
     public function test_filter_by_pending_follow_up_status(): void
     {
         $lead = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->withFollowup()->create([
             'client_id' => $client->id,
@@ -247,7 +250,7 @@ class EventRegisterTest extends TestCase
     public function test_filter_by_review_status(): void
     {
         $lead = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->create([
             'client_id' => $client->id,
@@ -279,7 +282,7 @@ class EventRegisterTest extends TestCase
     public function test_register_paginates_at_25(): void
     {
         $lead = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->count(30)->create([
             'client_id' => $client->id,
@@ -299,7 +302,7 @@ class EventRegisterTest extends TestCase
     public function test_stats_include_counts_for_follow_up_and_review_backlog(): void
     {
         $lead = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalEvent::factory()->withFollowup()->create([
             'client_id' => $client->id,

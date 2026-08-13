@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Domain\Clinical;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\Shift;
@@ -54,6 +55,14 @@ class ShiftClinicalEventControllerTest extends TestCase
         if ($role) {
             $user->roles()->attach($role);
         }
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
 
         return $user;
     }

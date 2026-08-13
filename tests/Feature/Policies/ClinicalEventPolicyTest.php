@@ -21,7 +21,7 @@ class ClinicalEventPolicyTest extends TestCase
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
-        $this->policy = new ClinicalEventPolicy();
+        $this->policy = app(ClinicalEventPolicy::class);
     }
 
     protected function createUserWithRole(string $roleName): User

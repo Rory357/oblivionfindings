@@ -26,7 +26,9 @@ class ClinicalObservationServiceTest extends TestCase
     use RefreshDatabase;
 
     protected ClinicalObservationService $service;
+
     protected Client $client;
+
     protected User $recorder;
 
     protected function setUp(): void

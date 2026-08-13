@@ -8,13 +8,9 @@ use App\Services\UserSiteAccessService;
 
 class ClientPolicy
 {
-    private const CLIENT_VIEW_BYPASS_PERMISSIONS = ['clients.viewAny'];
-
-    private const MEDICATION_OPERATIONS_BYPASS_PERMISSIONS = [
-        'medications.stock.update',
-        'medications.audit.view',
-        'medications.reports.export',
-        'reports.viewAny',
+    private const SITE_SCOPE_BYPASS_PERMISSIONS = [
+        'clinical.accessAllSites',
+        'sites.viewAll',
     ];
 
     public function __construct(
@@ -36,7 +32,7 @@ class ClientPolicy
             return $this->canAccessClientSite(
                 $user,
                 $client,
-                self::CLIENT_VIEW_BYPASS_PERMISSIONS,
+                self::SITE_SCOPE_BYPASS_PERMISSIONS,
             );
         }
 
@@ -59,14 +55,19 @@ class ClientPolicy
             return false;
         }
 
-        $hasMedicationOperationsAccess = collect(self::MEDICATION_OPERATIONS_BYPASS_PERMISSIONS)
+        $hasMedicationOperationsAccess = collect([
+            'medications.stock.update',
+            'medications.audit.view',
+            'medications.reports.export',
+            'reports.viewAny',
+        ])
             ->contains(fn (string $permission): bool => $user->canDo($permission));
 
         if ($hasMedicationOperationsAccess) {
             return $this->canAccessClientSite(
                 $user,
                 $client,
-                self::MEDICATION_OPERATIONS_BYPASS_PERMISSIONS,
+                self::SITE_SCOPE_BYPASS_PERMISSIONS,
             );
         }
 
@@ -74,7 +75,7 @@ class ClientPolicy
             return $this->canAccessClientSite(
                 $user,
                 $client,
-                self::CLIENT_VIEW_BYPASS_PERMISSIONS,
+                self::SITE_SCOPE_BYPASS_PERMISSIONS,
             );
         }
 
@@ -103,13 +104,13 @@ class ClientPolicy
     public function manageBreakGlass(User $user, Client $client): bool
     {
         return ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view'))
-            && $this->canAccessClientSite($user, $client, ['medications.audit.view']);
+            && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
     }
 
     public function reviewBreakGlass(User $user, Client $client): bool
     {
         return $user->canDo('medications.audit.view')
-            && $this->canAccessClientSite($user, $client, ['medications.audit.view']);
+            && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
     }
 
     public function create(User $user): bool
@@ -120,19 +121,19 @@ class ClientPolicy
     public function update(User $user, Client $client): bool
     {
         return $user->canDo('clients.update')
-            && $this->canAccessClientSite($user, $client, ['clients.update']);
+            && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
     }
 
     public function delete(User $user, Client $client): bool
     {
         return $user->canDo('clients.delete')
-            && $this->canAccessClientSite($user, $client, ['clients.delete']);
+            && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
     }
 
     public function manageMeals(User $user, Client $client): bool
     {
         return ($user->canDo('sites.meals.view') || $user->canDo('clients.update'))
-            && $this->canAccessClientSite($user, $client, ['clients.update']);
+            && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
     }
 
     /** @param array<int, string> $bypassPermissions */

@@ -67,6 +67,7 @@ it('permits an assigned worker with current access to the clients Site', functio
 it('fails closed for Site-less clients even with application-wide staff permission', function () {
     $manager = User::factory()->create(['role' => 'provider_manager']);
     grantClientPolicySitePermission($manager, 'clients.viewAny');
+    grantClientPolicySitePermission($manager, 'sites.viewAll');
     $client = Client::factory()->create(['site_id' => null]);
 
     expect($manager->can('view', $client))->toBeFalse();
@@ -79,6 +80,7 @@ it('fails closed for Site-less clients even with application-wide staff permissi
 it('allows explicit application-wide permission across active Sites only', function () {
     $manager = User::factory()->create(['role' => 'provider_manager']);
     grantClientPolicySitePermission($manager, 'clients.viewAny');
+    grantClientPolicySitePermission($manager, 'sites.viewAll');
     $activeSite = Site::factory()->create();
     $inactiveSite = Site::factory()->create(['is_active' => false]);
     $activeClient = Client::factory()->create(['site_id' => $activeSite->id]);
@@ -157,6 +159,7 @@ it('rejects a key worker who is not current at the selected Site during intake',
 it('revalidates the existing key worker when a clients Site changes', function () {
     $manager = User::factory()->create(['role' => 'provider_manager']);
     grantClientPolicySitePermission($manager, 'clients.update');
+    grantClientPolicySitePermission($manager, 'sites.viewAll');
     $originalSite = Site::factory()->create();
     $newSite = Site::factory()->create();
     $worker = User::factory()->create(['role' => 'support_worker']);

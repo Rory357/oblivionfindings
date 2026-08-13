@@ -5,7 +5,10 @@ namespace App\Services\HealthClinical;
 use App\Domain\Clinical\Models\ClinicalEvent as DomainClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation as DomainClinicalObservation;
 use App\Domain\Clinical\Models\ClinicalProtocol as DomainClinicalProtocol;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
+use App\Models\Client;
 use App\Models\ClientMedicalProfile;
+use App\Models\User;
 
 /**
  * Aggregates clinical data for a client into a health summary.
@@ -15,9 +18,14 @@ use App\Models\ClientMedicalProfile;
  */
 class HealthSummaryService
 {
-    public function forClient(int $clientId): array
+    public function __construct(
+        private readonly ClinicalSiteAccessService $siteAccess,
+    ) {}
+
+    public function forClient(User $user, Client $client): array
     {
-        $profile = ClientMedicalProfile::where('client_id', $clientId)->first();
+        $this->siteAccess->assertCanAccessClient($user, $client);
+        $profile = ClientMedicalProfile::where('client_id', $client->id)->first();
 
         return [
             'medical_profile' => $profile ? [
@@ -27,16 +35,16 @@ class HealthSummaryService
                 'disabilities' => $profile->disabilities,
                 'blood_type' => $profile->blood_type,
             ] : null,
-            'recent_observations' => $this->recentObservations($clientId),
-            'active_protocols' => $this->activeProtocols($clientId),
-            'recent_events' => $this->recentEvents($clientId),
+            'recent_observations' => $this->recentObservations($user, $client),
+            'active_protocols' => $this->activeProtocols($user, $client),
+            'recent_events' => $this->recentEvents($user, $client),
         ];
     }
 
-    private function recentObservations(int $clientId): array
+    private function recentObservations(User $user, Client $client): array
     {
-        return DomainClinicalObservation::query()
-            ->forClient($clientId)
+        return $this->siteAccess->applyObservationScope(DomainClinicalObservation::query(), $user)
+            ->forClient($client->id)
             ->where('recorded_at', '>=', now()->subDays(7))
             ->with('recorder:id,name')
             ->orderByDesc('recorded_at')
@@ -52,10 +60,10 @@ class HealthSummaryService
             ->toArray();
     }
 
-    private function activeProtocols(int $clientId): array
+    private function activeProtocols(User $user, Client $client): array
     {
-        return DomainClinicalProtocol::query()
-            ->where('client_id', $clientId)
+        return $this->siteAccess->applyProtocolScope(DomainClinicalProtocol::query(), $user)
+            ->where('client_id', $client->id)
             ->where('is_active', true)
             ->with(['creator:id,name', 'schedules'])
             ->orderBy('observation_type')
@@ -84,10 +92,10 @@ class HealthSummaryService
             ->toArray();
     }
 
-    private function recentEvents(int $clientId): array
+    private function recentEvents(User $user, Client $client): array
     {
-        return DomainClinicalEvent::query()
-            ->forClient($clientId)
+        return $this->siteAccess->applyEventScope(DomainClinicalEvent::query(), $user)
+            ->forClient($client->id)
             ->where('occurred_at', '>=', now()->subDays(30))
             ->with('reporter:id,name')
             ->orderByDesc('occurred_at')

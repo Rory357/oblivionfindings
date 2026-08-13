@@ -18,11 +18,14 @@ class ObservationRegisterTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
+        $this->site = Site::factory()->create();
     }
 
     protected function createUserWithRole(string $roleName): User
@@ -99,7 +102,7 @@ class ObservationRegisterTest extends TestCase
     public function test_register_shows_observations(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->count(3)->create([
             'client_id' => $client->id,
@@ -119,8 +122,8 @@ class ObservationRegisterTest extends TestCase
     public function test_filter_by_client(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $clientA = Client::factory()->create();
-        $clientB = Client::factory()->create();
+        $clientA = Client::factory()->create(['site_id' => $this->site->id]);
+        $clientB = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->create([
             'client_id' => $clientA->id,
@@ -132,7 +135,7 @@ class ObservationRegisterTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get('/health-clinical/observations?client_id=' . $clientA->id)
+            ->get('/health-clinical/observations?client_id='.$clientA->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('observations.data', 1)
@@ -142,7 +145,7 @@ class ObservationRegisterTest extends TestCase
     public function test_filter_by_observation_type(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->create([
             'client_id' => $client->id,
@@ -166,7 +169,7 @@ class ObservationRegisterTest extends TestCase
     public function test_filter_by_date_range(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->create([
             'client_id' => $client->id,
@@ -180,7 +183,7 @@ class ObservationRegisterTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get('/health-clinical/observations?date_from=' . now()->subDays(2)->toDateString() . '&date_to=' . now()->toDateString())
+            ->get('/health-clinical/observations?date_from='.now()->subDays(2)->toDateString().'&date_to='.now()->toDateString())
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('observations.data', 1)
@@ -206,7 +209,7 @@ class ObservationRegisterTest extends TestCase
         ]);
 
         $this->actingAs($user)
-            ->get('/health-clinical/observations?site_id=' . $siteA->id)
+            ->get('/health-clinical/observations?site_id='.$siteA->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('observations.data', 1)
@@ -218,7 +221,7 @@ class ObservationRegisterTest extends TestCase
         $lead = $this->createUserWithRole('clinical_lead');
         $workerA = $this->createUserWithRole('support_worker');
         $workerB = $this->createUserWithRole('support_worker');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->create([
             'client_id' => $client->id,
@@ -230,7 +233,7 @@ class ObservationRegisterTest extends TestCase
         ]);
 
         $this->actingAs($lead)
-            ->get('/health-clinical/observations?recorded_by=' . $workerA->id)
+            ->get('/health-clinical/observations?recorded_by='.$workerA->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->has('observations.data', 1)
@@ -251,7 +254,7 @@ class ObservationRegisterTest extends TestCase
     public function test_register_paginates_at_25(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->count(30)->create([
             'client_id' => $client->id,
@@ -273,7 +276,7 @@ class ObservationRegisterTest extends TestCase
     public function test_stats_include_counts(): void
     {
         $user = $this->createUserWithRole('clinical_lead');
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         ClinicalObservation::factory()->count(3)->create([
             'client_id' => $client->id,

@@ -6,8 +6,11 @@ use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Services\ClinicalDashboardService;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,6 +20,7 @@ class HealthClinicalProtocolController extends Controller
 {
     public function __construct(
         private readonly ClinicalDashboardService $dashboardService,
+        private readonly ClinicalSiteAccessService $siteAccess,
     ) {}
 
     public function index(Request $request): Response
@@ -30,19 +34,26 @@ class HealthClinicalProtocolController extends Controller
             'status' => ['nullable', 'string', 'in:active,inactive'],
         ]);
 
+        if (! empty($filters['client_id'])) {
+            $this->siteAccess->assertCanAccessClient(
+                $request->user(),
+                Client::query()->findOrFail((int) $filters['client_id']),
+            );
+        }
+
         $protocols = $this->dashboardService
-            ->getProtocolRegister($filters)
+            ->getProtocolRegister($request->user(), $filters)
             ->through(fn (ClinicalProtocol $protocol) => $this->serializeProtocol($protocol));
 
-        $kpis = $this->dashboardService->getKpis();
+        $kpis = $this->dashboardService->getKpis($request->user());
 
         return inertia('health-clinical/Protocols', [
             'protocols' => $protocols,
-            'stats' => $this->dashboardService->getProtocolRegisterStats(),
+            'stats' => $this->dashboardService->getProtocolRegisterStats($request->user()),
             'kpis' => $kpis,
-            'tab_counts' => $this->dashboardService->getTabCounts($kpis),
+            'tab_counts' => $this->dashboardService->getTabCounts($request->user(), $kpis),
             'filters' => $filters,
-            'filter_options' => $this->filterOptions(),
+            'filter_options' => $this->filterOptions($request->user()),
             'can_manage' => $request->user()?->canDo('clinical.protocols.manage') ?? false,
         ]);
     }
@@ -52,7 +63,7 @@ class HealthClinicalProtocolController extends Controller
         $this->authorize('create', ClinicalProtocol::class);
 
         return inertia('health-clinical/protocols/Create', [
-            'form_options' => $this->formOptions(),
+            'form_options' => $this->formOptions($request->user()),
         ]);
     }
 
@@ -94,7 +105,7 @@ class HealthClinicalProtocolController extends Controller
 
         return inertia('health-clinical/protocols/Edit', [
             'protocol' => $this->serializeProtocol($protocol),
-            'form_options' => $this->formOptions(),
+            'form_options' => $this->formOptions($request->user()),
             'can_edit_structure' => ((int) $protocol->schedules_count) === 0,
         ]);
     }
@@ -130,16 +141,16 @@ class HealthClinicalProtocolController extends Controller
 
     /**
      * @return array{
-     *     clients: \Illuminate\Database\Eloquent\Collection<int, Client>,
+     *     clients: Collection<int, Client>,
      *     observation_types: array<int, array{value: string, label: string}>,
      *     frequencies: array<int, array{value: string, label: string}>,
      *     statuses: array<int, array{value: string, label: string}>,
      * }
      */
-    private function filterOptions(): array
+    private function filterOptions(User $user): array
     {
         return [
-            'clients' => Client::query()
+            'clients' => $this->siteAccess->applyClientScope(Client::query(), $user)
                 ->orderBy('first_name')
                 ->get(['id', 'first_name', 'last_name']),
             'observation_types' => $this->observationTypeOptions(),
@@ -153,15 +164,15 @@ class HealthClinicalProtocolController extends Controller
 
     /**
      * @return array{
-     *     clients: \Illuminate\Database\Eloquent\Collection<int, Client>,
+     *     clients: Collection<int, Client>,
      *     observation_types: array<int, array{value: string, label: string}>,
      *     frequencies: array<int, array{value: string, label: string}>,
      * }
      */
-    private function formOptions(): array
+    private function formOptions(User $user): array
     {
         return [
-            'clients' => Client::query()
+            'clients' => $this->siteAccess->applyClientScope(Client::query(), $user)
                 ->orderBy('first_name')
                 ->get(['id', 'first_name', 'last_name']),
             'observation_types' => $this->observationTypeOptions(),

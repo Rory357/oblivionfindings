@@ -6,6 +6,7 @@ use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Models\Client;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\ClinicalPermissionsSeeder;
 use Database\Seeders\RbacSeeder;
@@ -32,6 +33,8 @@ class GovernanceDeepLinkRegressionTest extends TestCase
 {
     use RefreshDatabase;
 
+    private Site $site;
+
     /**
      * The frozen governance deep-link event types (see
      * ClinicalGovernanceAutomationService source_href values).
@@ -43,6 +46,7 @@ class GovernanceDeepLinkRegressionTest extends TestCase
         parent::setUp();
         $this->seed(RbacSeeder::class);
         $this->seed(ClinicalPermissionsSeeder::class);
+        $this->site = Site::factory()->create();
     }
 
     protected function createClinicalLead(): User
@@ -69,7 +73,7 @@ class GovernanceDeepLinkRegressionTest extends TestCase
     public function test_governance_deep_link_loads_and_filters(string $eventType): void
     {
         $lead = $this->createClinicalLead();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $this->site->id]);
 
         // The targeted event type within the window…
         ClinicalEvent::factory()->create([

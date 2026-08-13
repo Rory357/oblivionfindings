@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Clinical\Concerns;
 use App\Domain\Clinical\Enums\ClinicalEventType;
 use App\Domain\Clinical\Enums\ObservationType;
 use App\Domain\Clinical\Services\ClinicalAttachmentService;
+use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Enums\AlertSeverity;
+use App\Models\Client;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -29,7 +31,7 @@ trait RecordsClinicalRecords
      *
      * @return array<string, mixed>
      */
-    protected function validateObservationInput(Request $request, User $user): array
+    protected function validateObservationInput(Request $request, User $user, Client $client): array
     {
         if (! $user->canDo('clinical.observations.record') && ! $user->canDo('clinical.observations.recordClinical')) {
             abort(403);
@@ -54,6 +56,14 @@ trait RecordsClinicalRecords
         // Vitals & Pain are clinical observations — gate behind the clinical ability.
         if ($type->requiresClinicalPermission() && ! $user->canDo('clinical.observations.recordClinical')) {
             abort(403, 'Clinical observation permission required for '.$type->label());
+        }
+
+        if (! empty($validated['protocol_schedule_id'])) {
+            app(ClinicalSiteAccessService::class)->assertCanUseProtocolSchedule(
+                $user,
+                $client,
+                (int) $validated['protocol_schedule_id'],
+            );
         }
 
         return $validated;
