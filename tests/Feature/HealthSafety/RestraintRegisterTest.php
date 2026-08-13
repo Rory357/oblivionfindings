@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\HealthSafety;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\BehaviourSupportPlan;
 use App\Models\BehaviourSupportPlanReview;
 use App\Models\Client;
+use App\Models\ClientIncident;
+use App\Models\Permission;
 use App\Models\RestraintEvent;
 use App\Models\RestraintEventAttachment;
 use App\Models\Role;
@@ -50,6 +53,49 @@ class RestraintRegisterTest extends TestCase
         }
 
         return $user;
+    }
+
+    /** @param list<string> $permissions */
+    private function siteBoundUser(Site $site, array $permissions): User
+    {
+        $user = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
+        $role = Role::query()->create([
+            'name' => 'restraint_site_'.str()->uuid(),
+            'label' => 'Restraint Site Test',
+            'level' => 50,
+            'type' => 'custom',
+        ]);
+        $role->permissions()->sync(Permission::query()->whereIn('key', $permissions)->pluck('id'));
+        $user->roles()->attach($role);
+
+        return $user;
+    }
+
+    private function clientAt(Site $site): Client
+    {
+        return Client::factory()->create(['site_id' => $site->id]);
+    }
+
+    private function eventFor(Client $client, array $attributes = []): RestraintEvent
+    {
+        return RestraintEvent::factory()->create(array_merge([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+        ], $attributes));
+    }
+
+    private function incidentFor(Client $client): ClientIncident
+    {
+        return ClientIncident::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+        ]);
     }
 
     /* ---- Register payload + permissions ---- */
@@ -102,6 +148,124 @@ class RestraintRegisterTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_two_site_register_counts_pickers_and_export_use_the_hs_site_contract(): void
+    {
+        $siteA = Site::factory()->create(['name' => 'Allowed House']);
+        $siteB = Site::factory()->create(['name' => 'Hidden House']);
+        $viewer = $this->siteBoundUser($siteA, ['restraints.view', 'restraints.manage']);
+        $clientA = $this->clientAt($siteA);
+        $clientB = $this->clientAt($siteB);
+        $eventA = $this->eventFor($clientA, ['started_at' => now()->subDay()]);
+        $eventB = $this->eventFor($clientB, ['started_at' => now()->subDay()]);
+        BehaviourSupportPlan::factory()->create(['client_id' => $clientA->id, 'status' => 'active']);
+        BehaviourSupportPlan::factory()->create(['client_id' => $clientB->id, 'status' => 'active']);
+        $incidentA = ClientIncident::factory()->create(['client_id' => $clientA->id, 'site_id' => $siteA->id]);
+        $incidentB = ClientIncident::factory()->create(['client_id' => $clientB->id, 'site_id' => $siteB->id]);
+        $staffA = $this->siteBoundUser($siteA, []);
+        $staffB = $this->siteBoundUser($siteB, []);
+
+        $this->actingAs($viewer)
+            ->get('/health-safety/restraints?period=all')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('events.data', 1)
+                ->where('events.data.0.id', $eventA->id)
+                ->has('plans.data', 1)
+                ->where('tabCounts.events.all', 1)
+                ->where('tabCounts.plans.all', 1)
+                ->where('hero.live.events_30d', 1)
+                ->where('sites', fn ($sites) => collect($sites)->pluck('id')->all() === [$siteA->id])
+                ->where('clients', fn ($clients) => collect($clients)->pluck('id')->contains($clientA->id)
+                    && ! collect($clients)->pluck('id')->contains($clientB->id))
+                ->where('incidents', fn ($incidents) => collect($incidents)->pluck('id')->contains($incidentA->id)
+                    && ! collect($incidents)->pluck('id')->contains($incidentB->id))
+                ->where('staff', fn ($staff) => collect($staff)->pluck('id')->contains($staffA->id)
+                    && ! collect($staff)->pluck('id')->contains($staffB->id)));
+
+        $csv = $this->actingAs($viewer)
+            ->get('/health-safety/restraints/export?lens=events')
+            ->assertOk()
+            ->streamedContent();
+        $this->assertStringContainsString($eventA->reference_number, $csv);
+        $this->assertStringNotContainsString($eventB->reference_number, $csv);
+
+        $this->actingAs($viewer)->get('/health-safety/restraints?site_id='.$siteB->id)->assertForbidden();
+        $this->actingAs($viewer)->get('/health-safety/restraints?client_id='.$clientB->id)->assertForbidden();
+        $this->actingAs($viewer)->get('/health-safety/restraints/export?site_id='.$siteB->id)->assertForbidden();
+    }
+
+    public function test_wrong_site_restraint_objects_are_not_found_and_cannot_be_mutated(): void
+    {
+        Storage::fake('private');
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $viewer = $this->siteBoundUser($siteA, [
+            'restraints.view',
+            'restraints.create',
+            'restraints.review',
+            'restraints.manage',
+        ]);
+        $clientB = $this->clientAt($siteB);
+        $eventB = $this->eventFor($clientB, ['severity' => 'high', 'reviewed_at' => null]);
+        $planB = BehaviourSupportPlan::factory()->create(['client_id' => $clientB->id, 'status' => 'draft']);
+        $incidentB = ClientIncident::factory()->create(['client_id' => $clientB->id, 'site_id' => $siteB->id]);
+        $attachment = RestraintEventAttachment::query()->create([
+            'restraint_event_id' => $eventB->id,
+            'disk' => 'private',
+            'original_name' => 'hidden-evidence.pdf',
+            'path' => 'restraint_attachments/hidden-evidence.pdf',
+            'mime' => 'application/pdf',
+            'size' => 100,
+        ]);
+
+        $this->actingAs($viewer)->get('/health-safety/restraints/clients/'.$clientB->id.'/summary')->assertNotFound();
+        $this->actingAs($viewer)->put('/health-safety/restraints/events/'.$eventB->id, ['severity' => 'critical'])->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/restraints/events/'.$eventB->id.'/link-incident', ['related_incident_id' => $incidentB->id])->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/restraints/plans/'.$planB->id.'/activate')->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/restraints/plans/'.$planB->id.'/review', ['outcome' => 'continued'])->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/restraints/events/'.$eventB->id.'/attachments', [])->assertNotFound();
+        $this->actingAs($viewer)->get('/health-safety/restraints/events/'.$eventB->id.'/attachments/'.$attachment->id.'/download')->assertNotFound();
+        $this->actingAs($viewer)->delete('/health-safety/restraints/events/'.$eventB->id.'/attachments/'.$attachment->id)->assertNotFound();
+
+        $this->assertSame('high', $eventB->fresh()->severity);
+        $this->assertNull($eventB->fresh()->reviewed_at);
+        $this->assertNull($eventB->fresh()->related_incident_id);
+        $this->assertSame('draft', $planB->fresh()->status);
+        $this->assertDatabaseHas('restraint_event_attachments', ['id' => $attachment->id]);
+        $this->assertDatabaseCount('behaviour_support_plan_reviews', 0);
+    }
+
+    public function test_named_global_hs_permission_bypasses_site_scope_but_manage_alone_does_not(): void
+    {
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $clientA = $this->clientAt($siteA);
+        $clientB = $this->clientAt($siteB);
+        $eventA = $this->eventFor($clientA);
+        $eventB = $this->eventFor($clientB, ['severity' => 'high']);
+        $restricted = $this->siteBoundUser($siteA, ['restraints.view', 'restraints.manage']);
+        $global = $this->siteBoundUser($siteA, [
+            'restraints.view',
+            'restraints.manage',
+            'healthSafety.viewAllSites',
+        ]);
+
+        $this->actingAs($restricted)
+            ->get('/health-safety/restraints?period=all')
+            ->assertInertia(fn (Assert $page) => $page->has('events.data', 1)->where('events.data.0.id', $eventA->id));
+        $this->actingAs($restricted)
+            ->put('/health-safety/restraints/events/'.$eventB->id, ['severity' => 'critical'])
+            ->assertNotFound();
+
+        $this->actingAs($global)
+            ->get('/health-safety/restraints?period=all')
+            ->assertInertia(fn (Assert $page) => $page->has('events.data', 2)->where('tabCounts.events.all', 2));
+        $this->actingAs($global)
+            ->put('/health-safety/restraints/events/'.$eventB->id, ['severity' => 'critical'])
+            ->assertRedirect();
+        $this->assertSame('critical', $eventB->fresh()->severity);
+    }
+
     public function test_detail_loads_when_event_param_present(): void
     {
         $event = RestraintEvent::factory()->create();
@@ -121,7 +285,7 @@ class RestraintRegisterTest extends TestCase
 
     public function test_store_event_records_and_derives_duration(): void
     {
-        $client = Client::factory()->create();
+        $client = $this->clientAt(Site::factory()->create());
 
         $this->actingAs($this->officer())->post('/health-safety/restraints/events', [
             'client_id' => $client->id,
@@ -142,7 +306,7 @@ class RestraintRegisterTest extends TestCase
 
     public function test_in_plan_event_auto_links_clients_active_plan(): void
     {
-        $client = Client::factory()->create();
+        $client = $this->clientAt(Site::factory()->create());
         $activePlan = BehaviourSupportPlan::factory()->create(['client_id' => $client->id, 'status' => 'active']);
         BehaviourSupportPlan::factory()->draft()->create(['client_id' => $client->id]);
 
@@ -211,9 +375,9 @@ class RestraintRegisterTest extends TestCase
 
     public function test_link_incident_attaches_same_client_incident(): void
     {
-        $client = Client::factory()->create();
+        $client = $this->clientAt(Site::factory()->create());
         $event = RestraintEvent::factory()->create(['client_id' => $client->id, 'related_incident_id' => null]);
-        $incident = \App\Models\ClientIncident::factory()->create(['client_id' => $client->id]);
+        $incident = $this->incidentFor($client);
 
         $this->actingAs($this->officer())
             ->from('/health-safety/restraints')
@@ -226,9 +390,12 @@ class RestraintRegisterTest extends TestCase
 
     public function test_link_incident_rejects_cross_client_incident(): void
     {
-        $event = RestraintEvent::factory()->create(['client_id' => Client::factory()->create()->id, 'related_incident_id' => null]);
+        $site = Site::factory()->create();
+        $eventClient = $this->clientAt($site);
+        $otherClient = $this->clientAt($site);
+        $event = $this->eventFor($eventClient, ['related_incident_id' => null]);
         // An incident belonging to a DIFFERENT client must not be linkable.
-        $otherClientIncident = \App\Models\ClientIncident::factory()->create(['client_id' => Client::factory()->create()->id]);
+        $otherClientIncident = $this->incidentFor($otherClient);
 
         $this->actingAs($this->officer())
             ->from('/health-safety/restraints')
@@ -241,8 +408,8 @@ class RestraintRegisterTest extends TestCase
 
     public function test_link_incident_can_be_removed(): void
     {
-        $client = Client::factory()->create();
-        $incident = \App\Models\ClientIncident::factory()->create(['client_id' => $client->id]);
+        $client = $this->clientAt(Site::factory()->create());
+        $incident = $this->incidentFor($client);
         $event = RestraintEvent::factory()->create(['client_id' => $client->id, 'related_incident_id' => $incident->id]);
 
         $this->actingAs($this->officer())
@@ -256,9 +423,9 @@ class RestraintRegisterTest extends TestCase
 
     public function test_link_incident_requires_review_permission(): void
     {
-        $client = Client::factory()->create();
+        $client = $this->clientAt(Site::factory()->create());
         $event = RestraintEvent::factory()->create(['client_id' => $client->id]);
-        $incident = \App\Models\ClientIncident::factory()->create(['client_id' => $client->id]);
+        $incident = $this->incidentFor($client);
 
         $this->actingAs($this->supportWorker())
             ->post('/health-safety/restraints/events/'.$event->id.'/link-incident', [
@@ -342,7 +509,7 @@ class RestraintRegisterTest extends TestCase
 
     public function test_client_summary_returns_active_plan_and_recent_events(): void
     {
-        $client = Client::factory()->create();
+        $client = $this->clientAt(Site::factory()->create());
         $plan = BehaviourSupportPlan::factory()->create(['client_id' => $client->id, 'status' => 'active']);
         RestraintEvent::factory()->create(['client_id' => $client->id]);
 

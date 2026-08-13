@@ -8,11 +8,14 @@ use App\Models\BehaviourSupportPlan;
 use App\Models\BehaviourSupportPlanReview;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
 use App\Models\RestraintEventAttachment;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +28,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class RestraintController extends Controller
 {
     use ServesPrivateAttachments;
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
 
     private const RESTRAINT_TYPES = ['physical', 'chemical', 'mechanical', 'seclusion', 'environmental'];
 
@@ -57,6 +64,13 @@ class RestraintController extends Controller
             'to' => $request->get('to'),
         ];
 
+        if ($filters['site_id'] !== null) {
+            $this->siteAccess->assertCanAccessHealthSafetySiteId($request->user(), $filters['site_id']);
+        }
+        if ($filters['client_id'] !== null) {
+            $this->assertCanAccessClientId($request, $filters['client_id']);
+        }
+
         // The hero period pills map to a "from" date; an explicit from wins. The UI
         // defaults the pill to "30 days", so a null period resolves to the same 30-day
         // window (only the explicit "all" pill clears it) — pill and data agree.
@@ -68,7 +82,7 @@ class RestraintController extends Controller
         };
 
         // ---- Events (filtered base, then per-tab) ----
-        $eventsBase = fn () => RestraintEvent::query()
+        $eventsBase = fn () => $this->restraintEventQuery($request)
             ->when($filters['client_id'], fn ($q) => $q->where('client_id', $filters['client_id']))
             ->when($filters['site_id'], fn ($q) => $q->where('site_id', $filters['site_id']))
             ->when($filters['restraint_type'], fn ($q) => $q->where('restraint_type', $filters['restraint_type']))
@@ -95,8 +109,9 @@ class RestraintController extends Controller
         };
 
         // ---- Plans (filtered base, then per-tab) ----
-        $plansBase = fn () => BehaviourSupportPlan::query()
+        $plansBase = fn () => $this->behaviourSupportPlanQuery($request)
             ->when($filters['client_id'], fn ($q) => $q->where('client_id', $filters['client_id']))
+            ->when($filters['site_id'], fn ($q) => $q->whereHas('client', fn ($client) => $client->where('site_id', $filters['site_id'])))
             ->when($filters['restraint_type'], fn ($q) => $q->where('restrictive_practice_type', $filters['restraint_type']))
             ->when($effectiveFrom, fn ($q) => $q->where('created_at', '>=', $effectiveFrom))
             ->when($filters['to'], fn ($q) => $q->where('created_at', '<=', $filters['to']))
@@ -155,14 +170,17 @@ class RestraintController extends Controller
                     'archived' => $applyPlanTab($plansBase(), 'archived')->count(),
                 ],
             ],
-            'hero' => $this->heroBlock(),
+            'hero' => $this->heroBlock($request),
             'filters' => $filters,
-            'clients' => Client::select('id', 'first_name', 'last_name', 'site_id')->orderBy('last_name')->get()
+            'clients' => $this->clientQuery($request)
+                ->select('id', 'first_name', 'last_name', 'site_id')
+                ->orderBy('last_name')
+                ->get()
                 ->map(fn ($c) => ['id' => $c->id, 'name' => trim("{$c->first_name} {$c->last_name}"), 'site_id' => $c->site_id]),
-            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
-            'incidents' => $this->recentIncidentsForPicker(),
-            'plansForPicker' => BehaviourSupportPlan::query()
+            'sites' => $this->siteQuery($request)->select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
+            'staff' => $this->staffQuery($request)->select('id', 'name')->orderBy('name')->get(),
+            'incidents' => $this->recentIncidentsForPicker($request),
+            'plansForPicker' => $this->behaviourSupportPlanQuery($request)
                 ->where('status', '!=', 'archived')
                 ->orderByDesc('created_at')
                 ->get(['id', 'reference_number', 'client_id', 'title', 'status', 'restrictive_practice_type'])
@@ -183,13 +201,15 @@ class RestraintController extends Controller
         ]);
     }
 
-    private function heroBlock(): array
+    private function heroBlock(Request $request): array
     {
         $p30 = now()->subDays(30);
         $p60 = now()->subDays(60);
 
-        $events30 = RestraintEvent::where('started_at', '>=', $p30)->count();
-        $eventsPrev30 = RestraintEvent::whereBetween('started_at', [$p60, $p30])->count();
+        $events = fn (): Builder => $this->restraintEventQuery($request);
+        $plans = fn (): Builder => $this->behaviourSupportPlanQuery($request);
+        $events30 = $events()->where('started_at', '>=', $p30)->count();
+        $eventsPrev30 = $events()->whereBetween('started_at', [$p60, $p30])->count();
         $reduction = $eventsPrev30 > 0
             ? (int) round((($events30 - $eventsPrev30) / $eventsPrev30) * 100)
             : 0;
@@ -198,26 +218,26 @@ class RestraintController extends Controller
 
         // Clients with restraint events but no active behaviour support plan — a
         // least-restrictive-practice compliance gap (restrained without a current plan).
-        $clientsWithEvents = RestraintEvent::query()->distinct()->pluck('client_id');
-        $clientsWithActiveBsp = BehaviourSupportPlan::where('status', 'active')->distinct()->pluck('client_id');
+        $clientsWithEvents = $events()->distinct()->pluck('client_id');
+        $clientsWithActiveBsp = $plans()->where('status', 'active')->distinct()->pluck('client_id');
         $clientsNoActiveBsp = $clientsWithEvents->diff($clientsWithActiveBsp)->count();
 
         return [
             'live' => [
                 'events_30d' => $events30,
-                'out_of_plan' => RestraintEvent::where('started_at', '>=', $p30)->where('within_support_plan', false)->count(),
-                'injuries' => RestraintEvent::where('started_at', '>=', $p30)->where('injury_occurred', true)->count(),
-                'critical' => RestraintEvent::where('started_at', '>=', $p30)->where('severity', 'critical')->count(),
+                'out_of_plan' => $events()->where('started_at', '>=', $p30)->where('within_support_plan', false)->count(),
+                'injuries' => $events()->where('started_at', '>=', $p30)->where('injury_occurred', true)->count(),
+                'critical' => $events()->where('started_at', '>=', $p30)->where('severity', 'critical')->count(),
             ],
             'attention' => [
-                'unreviewed' => RestraintEvent::whereNull('reviewed_at')->count(),
-                'plans_review_due' => BehaviourSupportPlan::where('status', 'active')->whereNotNull('review_date')->where('review_date', '<=', $reviewDueWindow)->count(),
-                'plans_under_review' => BehaviourSupportPlan::where('status', 'under_review')->count(),
+                'unreviewed' => $events()->whereNull('reviewed_at')->count(),
+                'plans_review_due' => $plans()->where('status', 'active')->whereNotNull('review_date')->where('review_date', '<=', $reviewDueWindow)->count(),
+                'plans_under_review' => $plans()->where('status', 'under_review')->count(),
                 'clients_no_active_bsp' => $clientsNoActiveBsp,
             ],
             'badges' => [
-                'unreviewed' => RestraintEvent::whereNull('reviewed_at')->count(),
-                'plans_overdue' => BehaviourSupportPlan::where('status', 'active')->whereNotNull('review_date')->where('review_date', '<', now())->count(),
+                'unreviewed' => $events()->whereNull('reviewed_at')->count(),
+                'plans_overdue' => $plans()->where('status', 'active')->whereNotNull('review_date')->where('review_date', '<', now())->count(),
                 'nga_paerewa_certified' => true,
                 'reduction_trend_pct' => $reduction,
             ],
@@ -242,7 +262,7 @@ class RestraintController extends Controller
 
     private function eventDetail(int $id, Request $request): ?array
     {
-        $e = RestraintEvent::with([
+        $e = $this->restraintEventQuery($request)->with([
             'client:id,first_name,last_name',
             'site:id,name',
             'behaviourSupportPlan:id,reference_number,title,status',
@@ -257,9 +277,9 @@ class RestraintController extends Controller
         }
 
         $staff = collect($e->staff_involved ?? []);
-        $staffNames = $staff->isNotEmpty()
-            ? User::whereIn('id', $staff->filter(fn ($v) => is_numeric($v))->all())->pluck('name', 'id')
-            : collect();
+        $staffQuery = $this->staffQuery($request)
+            ->whereIn('id', $staff->filter(fn ($v) => is_numeric($v))->all());
+        $staffNames = $staff->isNotEmpty() ? $staffQuery->pluck('name', 'id') : collect();
 
         return [
             'kind' => 'event',
@@ -282,8 +302,8 @@ class RestraintController extends Controller
             'within_support_plan' => (bool) $e->within_support_plan,
             'deviation_reason' => $e->deviation_reason,
             'staff_involved' => $staff->map(fn ($v) => [
-                'id' => is_numeric($v) ? (int) $v : null,
-                'name' => is_numeric($v) ? ($staffNames[(int) $v] ?? "User #{$v}") : (string) $v,
+                'id' => is_numeric($v) && $staffNames->has((int) $v) ? (int) $v : null,
+                'name' => is_numeric($v) ? ($staffNames[(int) $v] ?? 'Staff member unavailable') : (string) $v,
             ])->values(),
             'authorised_by' => $e->authorisedBy ? ['id' => $e->authorisedBy->id, 'name' => $e->authorisedBy->name] : null,
             'plan' => $e->behaviourSupportPlan ? [
@@ -327,7 +347,7 @@ class RestraintController extends Controller
 
     private function planDetail(int $id, Request $request): ?array
     {
-        $p = BehaviourSupportPlan::with([
+        $p = $this->behaviourSupportPlanQuery($request)->with([
             'client:id,first_name,last_name',
             'developedBy:id,name',
             'statusChangedBy:id,name',
@@ -357,7 +377,9 @@ class RestraintController extends Controller
             'developed_at' => $p->developed_at,
             'status_changed_at' => $p->status_changed_at,
             'status_changed_by' => $p->statusChangedBy ? ['id' => $p->statusChangedBy->id, 'name' => $p->statusChangedBy->name] : null,
-            'events_count' => $p->restraintEvents()->count(),
+            'events_count' => $this->siteAccess
+                ->applyRestraintEventScope($p->restraintEvents()->getQuery(), $request->user())
+                ->count(),
             'reviews' => $p->reviews->map(fn (BehaviourSupportPlanReview $r) => [
                 'id' => $r->id,
                 'outcome' => $r->outcome,
@@ -382,13 +404,15 @@ class RestraintController extends Controller
     public function clientSummary(Request $request, Client $client): JsonResponse
     {
         abort_unless($this->canView($request), 403);
+        $client = $this->resolveAccessibleClient($request, $client->id);
 
-        $plan = BehaviourSupportPlan::where('client_id', $client->id)
+        $plan = $this->behaviourSupportPlanQuery($request)->where('client_id', $client->id)
             ->where('status', 'active')
             ->orderByDesc('created_at')
             ->first();
 
-        $events = RestraintEvent::where('client_id', $client->id)
+        $eventsQuery = $this->restraintEventQuery($request)->where('client_id', $client->id);
+        $events = (clone $eventsQuery)
             ->orderByDesc('started_at')
             ->limit(5)
             ->get();
@@ -412,7 +436,7 @@ class RestraintController extends Controller
                 'injury_occurred' => (bool) $e->injury_occurred,
                 'reviewed_at' => $e->reviewed_at,
             ])->values(),
-            'total_events' => RestraintEvent::where('client_id', $client->id)->count(),
+            'total_events' => $eventsQuery->count(),
         ]);
     }
 
@@ -425,10 +449,10 @@ class RestraintController extends Controller
         abort_unless($this->canCreate($request), 403);
 
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'behaviour_support_plan_id' => 'nullable|exists:behaviour_support_plans,id',
-            'stay_id' => 'nullable|exists:respite_stays,id',
-            'site_id' => 'nullable|exists:sites,id',
+            'client_id' => 'required|integer',
+            'behaviour_support_plan_id' => 'nullable|integer',
+            'stay_id' => 'nullable|integer',
+            'site_id' => 'nullable|integer',
             'started_at' => 'required|date',
             'ended_at' => 'nullable|date|after:started_at',
             'duration_minutes' => 'nullable|integer|min:0',
@@ -438,15 +462,43 @@ class RestraintController extends Controller
             'de_escalation_attempted' => 'required|string',
             'restraint_description' => 'required|string',
             'staff_involved' => 'nullable|array',
+            'staff_involved.*' => 'integer',
             'person_response' => 'nullable|string',
             'post_incident_support' => 'nullable|string',
             'injury_occurred' => 'boolean',
             'injury_details' => 'nullable|string|required_if:injury_occurred,true',
             'within_support_plan' => 'boolean',
             'deviation_reason' => 'nullable|string|required_if:within_support_plan,false',
-            'authorised_by' => 'nullable|exists:users,id',
-            'related_incident_id' => 'nullable|exists:client_incidents,id',
+            'authorised_by' => 'nullable|integer',
+            'related_incident_id' => 'nullable|integer',
         ]);
+
+        $client = $this->resolveAccessibleClient($request, (int) $validated['client_id']);
+        $siteId = (int) ($validated['site_id'] ?? $client->site_id);
+        abort_unless($siteId > 0 && $siteId === (int) $client->site_id, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        $this->siteAccess->assertCanAccessHealthSafetySiteId($request->user(), $siteId);
+        $validated['site_id'] = $siteId;
+
+        if (! empty($validated['behaviour_support_plan_id'])) {
+            $plan = $this->resolveAccessiblePlan($request, (int) $validated['behaviour_support_plan_id']);
+            abort_unless((int) $plan->client_id === (int) $client->id, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        }
+        if (! empty($validated['stay_id'])) {
+            $stay = RespiteStay::query()->whereKey((int) $validated['stay_id'])->where('client_id', $client->id)->firstOrFail();
+            abort_unless((int) $stay->client_id === (int) $client->id, 404);
+        }
+        $this->assertIncidentAtEventContext(
+            $request,
+            isset($validated['related_incident_id']) ? (int) $validated['related_incident_id'] : null,
+            $client->id,
+            $siteId,
+        );
+        foreach ($validated['staff_involved'] ?? [] as $staffId) {
+            $this->siteAccess->assertCanUseCurrentStaffAtSite($request->user(), (int) $staffId, $siteId, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+        }
+        if (! empty($validated['authorised_by'])) {
+            $this->siteAccess->assertCanUseCurrentStaffAtSite($request->user(), (int) $validated['authorised_by'], $siteId, UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+        }
 
         // Derive duration server-side when both ends are known and it wasn't supplied.
         if (empty($validated['duration_minutes']) && ! empty($validated['ended_at'])) {
@@ -458,7 +510,8 @@ class RestraintController extends Controller
         // an in-plan restraint with no explicit plan links to the client's active BSP, so
         // the shared wizard (incl. the respite entry point) keeps that behaviour.
         if (empty($validated['behaviour_support_plan_id']) && ($validated['within_support_plan'] ?? true)) {
-            $validated['behaviour_support_plan_id'] = BehaviourSupportPlan::where('client_id', $validated['client_id'])
+            $validated['behaviour_support_plan_id'] = $this->behaviourSupportPlanQuery($request)
+                ->where('client_id', $validated['client_id'])
                 ->where('status', 'active')
                 ->value('id');
         }
@@ -479,9 +532,10 @@ class RestraintController extends Controller
     public function updateEvent(Request $request, RestraintEvent $event): RedirectResponse
     {
         abort_unless($this->canReview($request), 403);
+        $event = $this->resolveAccessibleEvent($request, $event->id);
 
         $validated = $request->validate([
-            'reviewed_by' => 'nullable|exists:users,id',
+            'reviewed_by' => 'nullable|integer',
             'reviewed_at' => 'nullable|date',
             'review_notes' => 'nullable|string',
             'lessons_learned' => 'nullable|string',
@@ -489,6 +543,15 @@ class RestraintController extends Controller
             'severity' => 'nullable|in:'.implode(',', self::SEVERITIES),
             'post_incident_support' => 'nullable|string',
         ]);
+
+        if (! empty($validated['reviewed_by'])) {
+            $this->siteAccess->assertCanUseCurrentStaffAtSite(
+                $request->user(),
+                (int) $validated['reviewed_by'],
+                (int) $event->site_id,
+                UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+            );
+        }
 
         // Stamp reviewer/time exactly once — on first review. Later edits (e.g.
         // correcting lessons_learned via "Update review") must not overwrite the
@@ -522,21 +585,22 @@ class RestraintController extends Controller
     public function linkIncident(Request $request, RestraintEvent $event): RedirectResponse
     {
         abort_unless($this->canReview($request), 403);
+        $event = $this->resolveAccessibleEvent($request, $event->id);
 
         $validated = $request->validate([
-            'related_incident_id' => 'nullable|exists:client_incidents,id',
+            'related_incident_id' => 'nullable|integer',
         ]);
 
         // Data integrity: a restraint event can only point at an incident raised
         // for the same client. Without this guard a reviewer could cross-link
         // two unrelated people's records.
         if (! empty($validated['related_incident_id'])) {
-            $incident = ClientIncident::find($validated['related_incident_id']);
-            if ($incident && (int) $incident->client_id !== (int) $event->client_id) {
-                throw ValidationException::withMessages([
-                    'related_incident_id' => 'The incident must belong to the same client as the restraint event.',
-                ]);
-            }
+            $this->assertIncidentAtEventContext(
+                $request,
+                (int) $validated['related_incident_id'],
+                (int) $event->client_id,
+                (int) $event->site_id,
+            );
         }
 
         $event->update([
@@ -559,19 +623,30 @@ class RestraintController extends Controller
         abort_unless($this->canCreate($request), 403);
 
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
+            'client_id' => 'required|integer',
             'title' => 'required|string|max:255',
             'triggers' => 'nullable|string',
             'de_escalation_strategies' => 'nullable|string',
             'approved_interventions' => 'nullable|string',
             'prohibited_interventions' => 'nullable|string',
             'restrictive_practice_type' => 'nullable|in:'.implode(',', self::RESTRAINT_TYPES),
-            'developed_by' => 'nullable|exists:users,id',
+            'developed_by' => 'nullable|integer',
             'developed_at' => 'nullable|date',
             'review_date' => 'nullable|date',
             'status' => 'nullable|in:'.implode(',', self::PLAN_STATUSES),
             'notes' => 'nullable|string',
         ]);
+
+        $client = $this->resolveAccessibleClient($request, (int) $validated['client_id']);
+        abort_unless((int) $client->site_id > 0, 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        if (! empty($validated['developed_by'])) {
+            $this->siteAccess->assertCanUseCurrentStaffAtSite(
+                $request->user(),
+                (int) $validated['developed_by'],
+                (int) $client->site_id,
+                UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+            );
+        }
 
         $validated['created_by'] = $request->user()->id;
         $validated['status'] = $validated['status'] ?? 'draft';
@@ -588,6 +663,7 @@ class RestraintController extends Controller
     public function updatePlan(Request $request, BehaviourSupportPlan $plan): RedirectResponse
     {
         abort_unless($this->canManage($request), 403);
+        $plan = $this->resolveAccessiblePlan($request, $plan->id);
 
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
@@ -596,11 +672,20 @@ class RestraintController extends Controller
             'approved_interventions' => 'nullable|string',
             'prohibited_interventions' => 'nullable|string',
             'restrictive_practice_type' => 'nullable|in:'.implode(',', self::RESTRAINT_TYPES),
-            'developed_by' => 'nullable|exists:users,id',
+            'developed_by' => 'nullable|integer',
             'developed_at' => 'nullable|date',
             'review_date' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
+
+        if (! empty($validated['developed_by'])) {
+            $this->siteAccess->assertCanUseCurrentStaffAtSite(
+                $request->user(),
+                (int) $validated['developed_by'],
+                (int) $plan->client()->value('site_id'),
+                UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+            );
+        }
 
         $validated['updated_by'] = $request->user()->id;
 
@@ -612,6 +697,7 @@ class RestraintController extends Controller
     public function activatePlan(Request $request, BehaviourSupportPlan $plan): RedirectResponse
     {
         abort_unless($this->canManage($request), 403);
+        $plan = $this->resolveAccessiblePlan($request, $plan->id);
         $this->transitionPlan($plan, 'active', $request->user()->id);
 
         return back()->with('success', 'Plan activated.');
@@ -620,6 +706,7 @@ class RestraintController extends Controller
     public function submitPlanReview(Request $request, BehaviourSupportPlan $plan): RedirectResponse
     {
         abort_unless($this->canManage($request), 403);
+        $plan = $this->resolveAccessiblePlan($request, $plan->id);
         $this->transitionPlan($plan, 'under_review', $request->user()->id);
 
         return back()->with('success', 'Plan submitted for review.');
@@ -628,6 +715,7 @@ class RestraintController extends Controller
     public function archivePlan(Request $request, BehaviourSupportPlan $plan): RedirectResponse
     {
         abort_unless($this->canManage($request), 403);
+        $plan = $this->resolveAccessiblePlan($request, $plan->id);
         $this->transitionPlan($plan, 'archived', $request->user()->id);
 
         return back()->with('success', 'Plan archived.');
@@ -636,6 +724,7 @@ class RestraintController extends Controller
     public function reviewPlan(Request $request, BehaviourSupportPlan $plan): RedirectResponse
     {
         abort_unless($this->canReview($request), 403);
+        $plan = $this->resolveAccessiblePlan($request, $plan->id);
 
         $validated = $request->validate([
             'outcome' => 'required|in:continued,modified,reduced,discontinued,escalated',
@@ -689,6 +778,7 @@ class RestraintController extends Controller
     public function storeAttachment(Request $request, RestraintEvent $event): RedirectResponse
     {
         abort_unless($this->canCreate($request), 403);
+        $event = $this->resolveAccessibleEvent($request, $event->id);
 
         $data = $request->validate([
             'file' => ['required', 'file', 'max:10240'],
@@ -718,6 +808,7 @@ class RestraintController extends Controller
     public function destroyAttachment(Request $request, RestraintEvent $event, RestraintEventAttachment $attachment): RedirectResponse
     {
         abort_unless($this->canManage($request), 403);
+        $event = $this->resolveAccessibleEvent($request, $event->id);
         abort_unless((int) $attachment->restraint_event_id === (int) $event->id, 404);
 
         $disk = $attachment->disk ?: 'private';
@@ -732,6 +823,7 @@ class RestraintController extends Controller
     public function downloadAttachment(Request $request, RestraintEvent $event, RestraintEventAttachment $attachment): StreamedResponse
     {
         abort_unless($this->canView($request), 403);
+        $event = $this->resolveAccessibleEvent($request, $event->id);
         abort_unless((int) $attachment->restraint_event_id === (int) $event->id, 404);
 
         // Private disk + nosniff + CSP sandbox — see ServesPrivateAttachments.
@@ -755,17 +847,27 @@ class RestraintController extends Controller
         $from = $request->get('from');
         $to = $request->get('to');
         $clientId = $request->get('client_id');
-        $siteId = $request->get('site_id');
+        $siteId = $request->filled('site_id') ? (int) $request->get('site_id') : null;
         $type = $request->get('restraint_type');
+
+        if ($siteId !== null) {
+            $this->siteAccess->assertCanAccessHealthSafetySiteId($request->user(), $siteId);
+        }
+        if ($clientId !== null) {
+            $this->assertCanAccessClientId($request, (int) $clientId);
+        }
+
+        $eventQuery = $this->restraintEventQuery($request);
+        $planQuery = $this->behaviourSupportPlanQuery($request);
 
         $filename = "restraint-{$lens}-".now()->format('Y-m-d').'.csv';
 
-        return response()->streamDownload(function () use ($lens, $from, $to, $clientId, $siteId, $type) {
+        return response()->streamDownload(function () use ($lens, $from, $to, $clientId, $siteId, $type, $eventQuery, $planQuery) {
             $out = fopen('php://output', 'w');
 
             if ($lens === 'plans') {
                 $this->putCsv($out, ['Reference', 'Client', 'Title', 'Status', 'Restrictive practice', 'Review date', 'Review state']);
-                BehaviourSupportPlan::with('client:id,first_name,last_name')
+                $planQuery->with('client:id,first_name,last_name')
                     ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
                     ->when($type, fn ($q) => $q->where('restrictive_practice_type', $type))
                     ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
@@ -786,7 +888,7 @@ class RestraintController extends Controller
                     });
             } else {
                 $this->putCsv($out, ['Reference', 'Client', 'Site', 'Type', 'Severity', 'Started', 'Ended', 'Duration (min)', 'Within plan', 'Injury', 'Reviewed']);
-                RestraintEvent::with(['client:id,first_name,last_name', 'site:id,name'])
+                $eventQuery->with(['client:id,first_name,last_name', 'site:id,name'])
                     ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
                     ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
                     ->when($type, fn ($q) => $q->where('restraint_type', $type))
@@ -819,6 +921,105 @@ class RestraintController extends Controller
     /* ================================================================== */
     /*  Serializers + helpers */
     /* ================================================================== */
+
+    private function restraintEventQuery(Request $request): Builder
+    {
+        return $this->siteAccess->applyRestraintEventScope(
+            RestraintEvent::query(),
+            $request->user(),
+        );
+    }
+
+    private function behaviourSupportPlanQuery(Request $request): Builder
+    {
+        return $this->siteAccess->applyBehaviourSupportPlanScope(
+            BehaviourSupportPlan::query(),
+            $request->user(),
+        );
+    }
+
+    private function clientQuery(Request $request): Builder
+    {
+        return $this->siteAccess->applyClientScope(
+            Client::query(),
+            $request->user(),
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    private function siteQuery(Request $request): Builder
+    {
+        return $this->siteAccess->applySiteScope(
+            Site::query(),
+            $request->user(),
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    private function staffQuery(Request $request): Builder
+    {
+        return $this->siteAccess->applyStaffScope(
+            User::query(),
+            $request->user(),
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    private function resolveAccessibleEvent(Request $request, int $eventId): RestraintEvent
+    {
+        return $this->restraintEventQuery($request)->findOrFail($eventId);
+    }
+
+    private function resolveAccessiblePlan(Request $request, int $planId): BehaviourSupportPlan
+    {
+        return $this->behaviourSupportPlanQuery($request)->findOrFail($planId);
+    }
+
+    private function resolveAccessibleClient(Request $request, int $clientId): Client
+    {
+        return $this->clientQuery($request)->findOrFail($clientId);
+    }
+
+    private function assertCanAccessClientId(Request $request, int $clientId): void
+    {
+        $this->siteAccess->assertCanAccessClientId(
+            $request->user(),
+            $clientId,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+    }
+
+    private function assertIncidentAtEventContext(
+        Request $request,
+        ?int $incidentId,
+        int $clientId,
+        int $siteId,
+    ): void {
+        if ($incidentId === null) {
+            return;
+        }
+
+        $query = ClientIncident::query();
+        $this->siteAccess->applyClientIncidentScope(
+            $query,
+            $request->user(),
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+        $incident = $query->findOrFail($incidentId);
+
+        try {
+            $incidentSiteId = $this->siteAccess->effectiveClientIncidentSiteId($incident);
+        } catch (\LogicException) {
+            abort(404);
+        }
+
+        abort_unless($incidentSiteId === $siteId, 404);
+        if ((int) $incident->client_id !== $clientId) {
+            throw ValidationException::withMessages([
+                'related_incident_id' => 'The incident must belong to the same client as the restraint event.',
+            ]);
+        }
+    }
 
     private function serializeEventRow(RestraintEvent $e): array
     {
@@ -888,9 +1089,16 @@ class RestraintController extends Controller
             ->all();
     }
 
-    private function recentIncidentsForPicker(): array
+    private function recentIncidentsForPicker(Request $request): array
     {
-        return ClientIncident::query()
+        $query = ClientIncident::query();
+        $this->siteAccess->applyClientIncidentScope(
+            $query,
+            $request->user(),
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+
+        return $query
             ->select('id', 'reference_number', 'client_id', 'type', 'occurred_at')
             ->orderByDesc('occurred_at')
             ->limit(100)

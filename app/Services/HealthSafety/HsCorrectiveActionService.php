@@ -670,7 +670,7 @@ class HsCorrectiveActionService
             $query,
             $event,
             $actor,
-            ['healthSafety.viewAllSites'],
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
         );
         $owner = $query->first();
 

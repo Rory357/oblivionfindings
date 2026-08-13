@@ -464,7 +464,7 @@ class RbacSeeder extends Seeder
             ['key' => 'hazards.close', 'description' => 'Close/resolve hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage', 'description' => 'Edit and update hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage_types', 'description' => 'Manage hazard type catalog', 'group' => 'hazards', 'module' => 'Compliance'],
-            ['key' => 'healthSafety.viewAllSites', 'description' => 'View health and safety records across all sites', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.viewAllSites', 'description' => 'Application-wide H&S Site access when paired with the relevant H&S capability', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.overrideClosure', 'description' => 'Override blocked H&S event closure with a recorded reason', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Restraints & Behaviour Support

@@ -38,7 +38,7 @@ class ReturnToWorkController extends Controller
 {
     use ServesPrivateAttachments;
 
-    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS;
 
     /** Canonical injury_type → human label (15 enum values). */
     private const TYPE_LABELS = [
@@ -850,11 +850,14 @@ class ReturnToWorkController extends Controller
 
     private function assertCanAccessInjury(Request $request, WorkplaceInjury $injury): void
     {
-        $this->siteAccess->assertCanAccessWorkplaceInjury(
+        $query = WorkplaceInjury::query()->whereKey($injury->id);
+        $this->siteAccess->applyWorkplaceInjuryScope(
+            $query,
             $request->user(),
-            $injury,
             self::SITE_BYPASS_PERMISSIONS,
         );
+
+        abort_unless($query->exists(), 404);
     }
 
     private function assertWriteContext(

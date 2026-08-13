@@ -12,13 +12,24 @@ class RestraintEventFactory extends Factory
 {
     protected $model = RestraintEvent::class;
 
+    public function configure(): static
+    {
+        return $this->afterMaking(function (RestraintEvent $event): void {
+            if ($event->client_id && $event->client?->site_id) {
+                $event->site_id = $event->client->site_id;
+            }
+        });
+    }
+
     public function definition(): array
     {
         $startedAt = fake()->dateTimeBetween('-1 month', 'now');
 
         return [
-            'client_id' => Client::factory(),
             'site_id' => Site::factory(),
+            'client_id' => fn (array $attributes) => Client::factory()->create([
+                'site_id' => $attributes['site_id'],
+            ])->id,
             'started_at' => $startedAt,
             'ended_at' => (clone $startedAt)->modify('+'.fake()->numberBetween(1, 30).' minutes'),
             'duration_minutes' => fake()->numberBetween(1, 30),

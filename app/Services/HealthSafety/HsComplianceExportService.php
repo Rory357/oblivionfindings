@@ -28,7 +28,7 @@ use Illuminate\Database\Eloquent\Builder;
 class HsComplianceExportService
 {
     /** @var list<string> */
-    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS;
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,

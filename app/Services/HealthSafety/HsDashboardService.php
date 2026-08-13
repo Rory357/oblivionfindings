@@ -531,7 +531,7 @@ class HsDashboardService
             $this->siteAccess->applyHsRiskAssessmentScope(
                 $query,
                 $viewer,
-                ['healthSafety.viewAllSites'],
+                UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
             );
 
             if ($siteId === null) {
@@ -610,7 +610,7 @@ class HsDashboardService
             $this->siteAccess->applyHsEventScope(
                 $query,
                 $viewer,
-                ['healthSafety.viewAllSites'],
+                UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
             );
         }
 

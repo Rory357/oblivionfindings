@@ -176,10 +176,10 @@ class InjuriesControllerTest extends TestCase
 
         $this->actingAs($viewer)
             ->get('/health-safety/injuries?injury='.$hidden->id)
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($viewer)
             ->get('/health-safety/injuries?injury='.$missingSite->id)
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($viewer)
             ->get('/health-safety/injuries?site_id='.$hiddenSite->id)
             ->assertForbidden();
@@ -204,20 +204,20 @@ class InjuriesControllerTest extends TestCase
             'disk' => 'private',
         ]);
 
-        $this->actingAs($viewer)->get('/health-safety/injuries/'.$injury->id)->assertForbidden();
-        $this->actingAs($viewer)->put('/health-safety/injuries/'.$injury->id, ['lost_time_days' => 2])->assertForbidden();
-        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/status', ['status' => 'closed'])->assertForbidden();
-        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/rtw-plans', [])->assertForbidden();
-        $this->actingAs($viewer)->put('/health-safety/injuries/rtw-plans/'.$plan->id, ['status' => 'completed'])->assertForbidden();
-        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/capacity-assessments', [])->assertForbidden();
-        $this->actingAs($viewer)->post('/health-safety/injuries/rtw-plans/'.$plan->id.'/modified-duties', [])->assertForbidden();
-        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/attachments', [])->assertForbidden();
+        $this->actingAs($viewer)->get('/health-safety/injuries/'.$injury->id)->assertNotFound();
+        $this->actingAs($viewer)->put('/health-safety/injuries/'.$injury->id, ['lost_time_days' => 2])->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/status', ['status' => 'closed'])->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/rtw-plans', [])->assertNotFound();
+        $this->actingAs($viewer)->put('/health-safety/injuries/rtw-plans/'.$plan->id, ['status' => 'completed'])->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/capacity-assessments', [])->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/injuries/rtw-plans/'.$plan->id.'/modified-duties', [])->assertNotFound();
+        $this->actingAs($viewer)->post('/health-safety/injuries/'.$injury->id.'/attachments', [])->assertNotFound();
         $this->actingAs($viewer)
             ->get('/health-safety/injuries/'.$injury->id.'/attachments/'.$attachment->id.'/download')
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($viewer)
             ->delete('/health-safety/injuries/'.$injury->id.'/attachments/'.$attachment->id)
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_store_rejects_cross_site_staff_incident_and_conflicting_client_provenance(): void

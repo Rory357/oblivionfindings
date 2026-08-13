@@ -1216,7 +1216,7 @@ class HsEventController extends Controller
      */
     private function hsEventBypassPermissions(): array
     {
-        return ['healthSafety.viewAllSites'];
+        return UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS;
     }
 
     /**

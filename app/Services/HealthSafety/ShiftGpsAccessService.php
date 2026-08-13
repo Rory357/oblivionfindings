@@ -12,7 +12,7 @@ final class ShiftGpsAccessService
 {
     private const LIVE_SESSION_STATUSES = ['active', 'overdue', 'emergency'];
 
-    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS;
 
     private const FRESH_LOCATION_MINUTES = 15;
 
