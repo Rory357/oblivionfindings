@@ -10,6 +10,7 @@ enum DeviceStatus: string
     case Maintenance = 'maintenance';
     case Decommissioned = 'decommissioned';
     case InStock = 'in_stock';
+    case Quarantined = 'quarantined';
     case Lost = 'lost';
 
     public function label(): string
@@ -21,6 +22,7 @@ enum DeviceStatus: string
             self::Maintenance => 'Maintenance',
             self::Decommissioned => 'Decommissioned',
             self::InStock => 'In Stock',
+            self::Quarantined => 'Quarantined',
             self::Lost => 'Lost',
         };
     }
@@ -32,6 +34,6 @@ enum DeviceStatus: string
 
     public function isRetired(): bool
     {
-        return in_array($this, [self::Decommissioned, self::Lost], true);
+        return in_array($this, [self::Decommissioned, self::Quarantined, self::Lost], true);
     }
 }

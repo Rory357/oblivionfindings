@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\ControlRoom;
 
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoomAlert;
@@ -102,7 +103,10 @@ class ControlRoomDeviceController extends Controller
         $query->orderByDesc('control_room_devices.last_signal_at')
             ->orderBy('control_room_devices.id');
 
-        $devices = $query->paginate(48)->through(fn (Device $device): array => $this->presenter->list($device));
+        $devices = $query->paginate(48)->through(fn (Device $device): array => $this->presenter->list(
+            $device,
+            $this->visibility->canViewPersonalLocation($user, $device),
+        ));
 
         // Statistics follow the same visible Site and selected-Site boundary.
         $totalSources = (clone $baseQuery)->count();
@@ -173,6 +177,19 @@ class ControlRoomDeviceController extends Controller
                     'last_seen_at',
                 ]),
         ]);
+        $canViewPersonalLocation = $this->visibility->canViewPersonalLocation($user, $device);
+        $isPersonalTracker = $device->type === Device::TYPE_PERSONAL_TRACKER
+            || ($device->canonicalDevice?->domain === 'tracking' && $device->client_id !== null);
+        $personalAssignment = null;
+        $visibleClient = null;
+        $trackingPrivacy = app(PersonalTrackingPrivacyService::class);
+        if ($isPersonalTracker && $canViewPersonalLocation && $device->client_id) {
+            $visibleClient = $this->visibility->visibleClient($user, (int) $device->client_id);
+            $personalAssignment = $visibleClient
+                ? $trackingPrivacy->authorisedClientAssignment($visibleClient)
+                : null;
+            $canViewPersonalLocation = $personalAssignment !== null;
+        }
 
         $site = $device->site_id
             ? $this->visibility->visibleSites($user)->whereKey($device->site_id)->first(['id', 'name'])
@@ -184,6 +201,35 @@ class ControlRoomDeviceController extends Controller
         // Recent signals (last 50).
         $signals = $device->signals()
             ->with(['alert:id,reference_number', 'correlatedAlert:id,reference_number'])
+            ->when($isPersonalTracker && ! $canViewPersonalLocation, fn ($query) => $query->whereRaw('1 = 0'))
+            ->when(
+                $isPersonalTracker && $personalAssignment,
+                fn ($query) => $query->where(
+                    'occurred_at',
+                    '>=',
+                    $personalAssignment->collection_started_at ?? $personalAssignment->assigned_at,
+                ),
+            )
+            ->when(
+                ! $isPersonalTracker && $device->canonical_device_id,
+                function ($query) use ($device, $visibleSiteIds): void {
+                    $query->whereExists(function ($assignments) use ($device, $visibleSiteIds): void {
+                        $assignments->selectRaw('1')
+                            ->from('device_assignments')
+                            ->where('device_assignments.device_id', $device->canonical_device_id)
+                            ->whereIn('device_assignments.custody_site_id', $visibleSiteIds)
+                            ->whereColumn('device_assignments.assigned_at', '<=', 'control_room_signals.occurred_at')
+                            ->where(function ($window): void {
+                                $window->whereNull('device_assignments.released_at')
+                                    ->orWhereColumn('device_assignments.released_at', '>', 'control_room_signals.occurred_at');
+                            })
+                            ->where(function ($site): void {
+                                $site->whereNull('control_room_signals.site_id')
+                                    ->orWhereColumn('device_assignments.custody_site_id', 'control_room_signals.site_id');
+                            });
+                    });
+                },
+            )
             ->where(function ($query) use ($visibleSiteIds): void {
                 $query->whereNull('site_id');
                 if ($visibleSiteIds !== []) {
@@ -197,8 +243,17 @@ class ControlRoomDeviceController extends Controller
 
         // Linked alerts (last 20).
         $alertQuery = ControlRoomAlert::query()->where('device_id', $device->id);
-        $this->siteAccess->applyAlertScope($alertQuery, $user, ['reports.viewAny']);
+        $this->siteAccess->applyAlertSiteScopeForSiteIds($alertQuery, $visibleSiteIds);
         $alerts = $alertQuery
+            ->when($isPersonalTracker && ! $canViewPersonalLocation, fn ($query) => $query->whereRaw('1 = 0'))
+            ->when(
+                $isPersonalTracker && $personalAssignment,
+                fn ($query) => $query->where(
+                    'triggered_at',
+                    '>=',
+                    $personalAssignment->collection_started_at ?? $personalAssignment->assigned_at,
+                ),
+            )
             ->orderByDesc('triggered_at')
             ->limit(20)
             ->get()
@@ -211,9 +266,28 @@ class ControlRoomDeviceController extends Controller
                 'triggered_at' => $a->triggered_at?->toISOString(),
             ]);
 
+        // Re-check after reading the governed rows. A withdrawal or transfer
+        // racing this request must clear the prepared location response rather
+        // than return data authorised from a stale in-memory assignment.
+        if ($isPersonalTracker) {
+            $currentAssignment = $visibleClient
+                ? $trackingPrivacy->authorisedClientAssignment($visibleClient)
+                : null;
+            $canViewPersonalLocation = $personalAssignment
+                && $currentAssignment
+                && (int) $currentAssignment->id === (int) $personalAssignment->id
+                && (int) $currentAssignment->device_id === (int) $personalAssignment->device_id
+                && (int) $currentAssignment->consent_id === (int) $personalAssignment->consent_id
+                && $this->visibility->canViewPersonalLocation($user, $device);
+            if (! $canViewPersonalLocation) {
+                $signals = collect();
+                $alerts = collect();
+            }
+        }
+
         return Inertia::render('control-room/devices/show', [
             'device' => [
-                ...$this->presenter->detail($device),
+                ...$this->presenter->detail($device, $canViewPersonalLocation),
                 'signal_source' => $device->signalSource ? [
                     'id' => $device->signalSource->id,
                     'name' => $device->signalSource->name,

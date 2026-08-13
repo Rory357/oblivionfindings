@@ -5,7 +5,6 @@ namespace App\Http\Controllers\FleetAssets;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
-use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Domain\SecurityDevices\Services\PersonalTrackingLocationExportService;
 use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -25,6 +24,8 @@ use App\Services\Queclink\LocateNowService;
 use App\Services\Tracking\GeofenceStatusService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -33,7 +34,6 @@ use Inertia\Inertia;
 class ResidentTrackingController extends Controller
 {
     public function __construct(
-        private readonly DeviceRegistryService $registry,
         private readonly DeviceAssignmentService $assignmentService,
         private readonly GeofenceStatusService $geofenceStatus,
         private readonly SecurityDevicesAccessService $deviceAccess,
@@ -98,13 +98,14 @@ class ResidentTrackingController extends Controller
 
                 return $assignment !== null
                     && $client !== null
-                    && $this->trackingPrivacy->assignmentAuthorisesClient($assignment, $client);
+                    && $this->trackingPrivacy->assignmentAuthorisesResidentLocation($assignment, $client);
             });
         $consentedClientIds = $clientDevices
             ->map(fn (Device $device): int => (int) $device->assignments->first()->assignable_id)
             ->unique()
             ->values()
             ->all();
+        $residentAlertBindings = $this->residentAlertBindings($clientDevices);
 
         // Load active outings.
         $activeOutingClientIds = [];
@@ -161,8 +162,8 @@ class ResidentTrackingController extends Controller
         try {
             if (Schema::hasTable('control_room_alerts')) {
                 $recentAlertQuery = ControlRoomAlert::whereIn('source', ['tracker', 'resident_tracker', 'geofence'])
-                    ->actionable()
-                    ->whereIn('client_id', $consentedClientIds);
+                    ->actionable();
+                $this->applyResidentAlertAuthority($recentAlertQuery, $residentAlertBindings);
                 $recentAlerts = $recentAlertQuery->latest()->limit(5)->get()
                     ->map(function ($alert) {
                         $client = $alert->client_id ? Client::find($alert->client_id) : null;
@@ -226,8 +227,8 @@ class ResidentTrackingController extends Controller
             if (Schema::hasTable('control_room_alerts')) {
                 $alertBase = ControlRoomAlert::query()
                     ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
-                    ->whereNotNull('client_id')
-                    ->whereIn('client_id', $consentedClientIds);
+                    ->whereNotNull('client_id');
+                $this->applyResidentAlertAuthority($alertBase, $residentAlertBindings);
                 $activeAlertCount = (clone $alertBase)->actionable()->count();
                 $wandering7d = (clone $alertBase)
                     ->whereIn('alert_type', ['geofence_breach', 'wandering'])
@@ -269,7 +270,7 @@ class ResidentTrackingController extends Controller
             // Wandering-alerts tab payload (merged from the retired
             // /fleet-assets/wandering-alerts page) — only when the tab is open.
             'wandering' => $tab === 'wandering'
-                ? $this->wanderingPayload($request, $consentedClientIds)
+                ? $this->wanderingPayload($request, $clientDevices, $residentAlertBindings)
                 : null,
             // Assign-tracker modal payload (retired /resident-tracking/assign
             // page) — only when opened via ?new=1.
@@ -285,7 +286,7 @@ class ResidentTrackingController extends Controller
      * Wandering-alerts tab payload — ported from the retired
      * WanderingAlertController index.
      */
-    private function wanderingPayload(Request $request, array $consentedClientIds): array
+    private function wanderingPayload(Request $request, Collection $clientDevices, array $residentAlertBindings): array
     {
         if (! Schema::hasTable('control_room_alerts')) {
             return [
@@ -298,7 +299,7 @@ class ResidentTrackingController extends Controller
         $query = ControlRoomAlert::query()
             ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
             ->whereNotNull('client_id');
-        $query->whereIn('client_id', $consentedClientIds);
+        $this->applyResidentAlertAuthority($query, $residentAlertBindings);
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
@@ -318,15 +319,7 @@ class ResidentTrackingController extends Controller
             ->keyBy('id');
 
         // Canonical tracking devices assigned to these clients for last-known location.
-        $devicesByClient = $this->deviceAccess->visibleDevices($request->user())
-            ->where('domain', 'tracking')
-            ->whereHas('assignments', function ($q) use ($clientIds) {
-                $q->active()
-                    ->where('assignable_type', 'client')
-                    ->whereIn('assignable_id', $clientIds);
-            })
-            ->with(['assignments' => fn ($q) => $q->active()->where('assignable_type', 'client')])
-            ->get()
+        $devicesByClient = $clientDevices
             ->keyBy(fn (Device $d) => $d->assignments->first()?->assignable_id);
 
         $alertData = $alerts->getCollection()->map(function ($alert) use ($clients, $devicesByClient) {
@@ -360,7 +353,7 @@ class ResidentTrackingController extends Controller
         $alertBase = ControlRoomAlert::query()
             ->whereIn('source', ['tracker', 'geofence', 'resident_tracker'])
             ->whereNotNull('client_id');
-        $alertBase->whereIn('client_id', $consentedClientIds);
+        $this->applyResidentAlertAuthority($alertBase, $residentAlertBindings);
 
         return [
             'alerts' => [
@@ -402,7 +395,7 @@ class ResidentTrackingController extends Controller
 
         // Clients already tracked (have an active tracking device assignment).
         $trackedClientIds = DeviceAssignment::query()
-            ->active()
+            ->current()
             ->where('assignable_type', 'client')
             ->whereIn('assignable_id', $authorizedClientIds)
             ->whereHas('device', fn ($q) => $q
@@ -492,47 +485,57 @@ class ResidentTrackingController extends Controller
     public function assign(Request $request)
     {
         $data = $request->validate([
-            'tracker_id' => ['required', 'integer', 'exists:devices,id'],
-            'client_id' => ['required', 'integer', 'exists:clients,id'],
-            // Optional: an explicit consent record gathered alongside the
-            // assign form. When omitted we look up any existing valid Fleet
-            // Tracking consent for the client. The service still rejects
-            // client+tracking assignments with no resolvable consent.
-            'consent_id' => ['nullable', 'integer', 'exists:client_consents,id'],
+            'tracker_id' => ['required', 'integer', 'min:1'],
+            'client_id' => ['required', 'integer', 'min:1'],
+            // Optional: an explicit resident-location consent gathered alongside
+            // the form. When omitted, the current personal-tracker consent is used.
+            'consent_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $user = $request->user();
 
+        $client = Client::query()
+            ->whereIn('id', $this->getAuthorizedClientIds($user))
+            ->find($data['client_id']);
+        abort_unless($client, 404);
+
+        $device = $this->deviceAccess->visibleDevices($user)
+            ->where('domain', 'tracking')
+            ->where('status', '!=', 'quarantined')
+            ->find($data['tracker_id']);
+        abort_unless($device, 404);
+
         try {
-            DB::transaction(function () use ($data, $user): void {
-                $client = Client::query()
-                    ->whereIn('id', $this->getAuthorizedClientIds($user))
-                    ->lockForUpdate()
-                    ->find($data['client_id']);
-                abort_unless($client, 403);
-
-                $device = $this->deviceAccess->visibleDevices($user)
-                    ->where('domain', 'tracking')
-                    ->lockForUpdate()
-                    ->find($data['tracker_id']);
-                abort_unless($device, 403);
-
-                if ($device->assignments()->active()->lockForUpdate()->first()) {
-                    throw ValidationException::withMessages([
-                        'tracker_id' => 'This tracker is already assigned. Unassign it before assigning it to another resident.',
-                    ]);
-                }
-
-                $consentId = $this->resolveTrackingConsentId($client, $data['consent_id'] ?? null);
-
-                $this->assignmentService->assign(
-                    device: $device,
-                    assignableType: DeviceAssignment::TARGET_CLIENT,
-                    assignableId: $client->id,
-                    assignedByUserId: $user->id,
-                    consentId: $consentId,
-                );
-            });
+            $consentId = $this->resolveTrackingConsentId($client, $data['consent_id'] ?? null);
+            $this->assignmentService->assign(
+                device: $device,
+                assignableType: DeviceAssignment::TARGET_CLIENT,
+                assignableId: $client->id,
+                assignedByUserId: $user->id,
+                consentId: $consentId,
+                replaceExisting: false,
+                authorizeLockedDevice: function (Device $lockedDevice) use ($user, $client): void {
+                    abort_unless(
+                        in_array((int) $client->id, $this->getAuthorizedClientIds($user), true),
+                        404,
+                    );
+                    $this->deviceAccess->assertCanViewDevice($user, $lockedDevice);
+                    $this->deviceAccess->assertCanAssignTarget(
+                        $user,
+                        $lockedDevice,
+                        DeviceAssignment::TARGET_CLIENT,
+                        (int) $client->id,
+                    );
+                },
+                validateLockedConsent: function (?ClientConsent $lockedConsent): void {
+                    if (! $lockedConsent
+                        || ! ConsentValidationService::isValidResidentLocationConsent($lockedConsent)) {
+                        throw new \InvalidArgumentException(
+                            'Resident tracking requires an active Personal Tracker (Wandering Risk) consent.',
+                        );
+                    }
+                },
+            );
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['tracker_id' => $e->getMessage()]);
         }
@@ -545,31 +548,25 @@ class ResidentTrackingController extends Controller
     {
         $user = $request->user();
 
-        DB::transaction(function () use ($device, $user): void {
-            $lockedDevice = $this->deviceAccess->visibleDevices($user)
-                ->lockForUpdate()
-                ->find($device->id);
-            abort_unless($lockedDevice, 403);
-
-            $this->deviceAccess->assertCanManageActiveAssignment($user, $lockedDevice, true);
-
-            $activeClientAssignment = $lockedDevice->assignments()
-                ->active()
-                ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
-                ->lockForUpdate()
-                ->first();
-            abort_unless(
-                $activeClientAssignment
-                    && in_array(
-                        (int) $activeClientAssignment->assignable_id,
-                        $this->getAuthorizedClientIds($user),
-                        true,
-                    ),
-                403,
-            );
-
-            $this->assignmentService->release($lockedDevice, $user->id);
-        });
+        abort_unless($this->deviceAccess->visibleDevices($user)->whereKey($device->id)->exists(), 404);
+        $this->assignmentService->release(
+            $device,
+            $user->id,
+            function (Device $lockedDevice) use ($user): void {
+                $this->deviceAccess->assertCanViewDevice($user, $lockedDevice);
+                $assignments = $this->deviceAccess->assertCanManageActiveAssignment($user, $lockedDevice, true);
+                $activeClientAssignment = $assignments->first(fn (DeviceAssignment $assignment): bool => $assignment->assignable_type === DeviceAssignment::TARGET_CLIENT);
+                abort_unless(
+                    $activeClientAssignment
+                        && in_array(
+                            (int) $activeClientAssignment->assignable_id,
+                            $this->getAuthorizedClientIds($user),
+                            true,
+                        ),
+                    404,
+                );
+            },
+        );
 
         return redirect()->route('fleet-assets.resident-tracking.index', ['new' => 1])
             ->with('success', 'Tracker unassigned from resident.');
@@ -582,7 +579,7 @@ class ResidentTrackingController extends Controller
         // Once they pass, conceal a Client outside the user's Site/object
         // scope so this direct location-history route cannot confirm it exists.
         $this->assertCanDiscoverClientHistory($user, $client);
-        $assignment = $this->assertHasActiveTrackingConsent($client);
+        $assignment = $this->assertHasActiveTrackingConsent($user, $client);
         $device = $assignment->device;
 
         // Range pills: today | 24h | 7d | 30d | custom. Default 24h.
@@ -591,6 +588,11 @@ class ResidentTrackingController extends Controller
             $range,
             $request->input('date_from'),
             $request->input('date_to'),
+        );
+        [$dateFrom, $dateTo] = $this->boundHistoryRangeToAssignment(
+            $assignment,
+            $dateFrom,
+            $dateTo,
         );
 
         $eventTypesInput = $request->input('event_types');
@@ -606,6 +608,14 @@ class ResidentTrackingController extends Controller
 
         $locations = app(IntegrationEventHistoryService::class)
             ->forDevice($device, $filters, true, $assignment->retention_days);
+        $currentAssignment = $this->trackingPrivacy->authorisedClientAssignment($client);
+        abort_unless(
+            $currentAssignment
+                && (int) $currentAssignment->id === (int) $assignment->id
+                && (int) $currentAssignment->device_id === (int) $assignment->device_id
+                && (int) $currentAssignment->consent_id === (int) $assignment->consent_id,
+            403,
+        );
 
         $availableEventTypes = $locations
             ->pluck('event_type')
@@ -668,6 +678,11 @@ class ResidentTrackingController extends Controller
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
         $assignment = $this->trackingPrivacy->authorisedClientAssignment($client);
+        if ($assignment && (! $this->deviceAccess->visibleDevices($user)
+            ->whereKey($assignment->device_id)
+            ->exists() || ! $this->deviceAccess->canAccessCurrentAssignment($user, $assignment))) {
+            $assignment = null;
+        }
 
         return response()->json([
             'active' => $assignment !== null,
@@ -682,6 +697,7 @@ class ResidentTrackingController extends Controller
     {
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
+        $this->assertHasActiveTrackingConsent($user, $client);
         $data = $request->validate([
             'reason' => ['required', 'string', 'min:3', 'max:500'],
             'date_from' => ['required', 'date', 'before_or_equal:today'],
@@ -714,11 +730,32 @@ class ResidentTrackingController extends Controller
         }
     }
 
+    private function boundHistoryRangeToAssignment(
+        DeviceAssignment $assignment,
+        mixed $dateFrom,
+        mixed $dateTo,
+    ): array {
+        $collectionStart = $assignment->collection_started_at ?? $assignment->assigned_at;
+        abort_unless($collectionStart, 403);
+
+        $from = $dateFrom ? Carbon::parse((string) $dateFrom) : $collectionStart->copy();
+        $to = $dateTo ? Carbon::parse((string) $dateTo) : now();
+
+        if ($from->lt($collectionStart)) {
+            $from = $collectionStart->copy();
+        }
+        if ($to->gt(now())) {
+            $to = now();
+        }
+
+        return [$from->toDateTimeString(), $to->toDateTimeString()];
+    }
+
     public function locateNow(Request $request, Client $client, LocateNowService $locateNow)
     {
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
-        $assignment = $this->assertHasActiveTrackingConsent($client);
+        $assignment = $this->assertHasActiveTrackingConsent($user, $client);
         $device = $assignment->device;
 
         if (! $device) {
@@ -742,39 +779,112 @@ class ResidentTrackingController extends Controller
     ) {
         $user = $request->user();
         $this->assertCanAccessClient($user, $client);
-        $this->assertHasActiveTrackingConsent($client);
+        $assignment = $this->assertHasActiveTrackingConsent($user, $client);
 
-        $this->acknowledgePanicForClient($client, $user, $lifecycle);
+        $this->acknowledgePanicForClient($client, $assignment, $user, $lifecycle);
 
         return back()->with('success', 'Panic acknowledged.');
     }
 
     private function acknowledgePanicForClient(
         Client $client,
+        DeviceAssignment $assignment,
         User $actor,
         ControlRoomAlertLifecycleService $lifecycle,
     ): void {
-        DB::transaction(function () use ($client, $actor, $lifecycle): void {
-            $device = $this->registry
-                ->forClient($client->id)
-                ->where('domain', 'tracking')
-                ->first();
-
-            if ($device) {
-                $meta = $device->meta ?? [];
-                $meta['panic_active'] = false;
-                $meta['panic_acknowledged_at'] = now()->toISOString();
-                $meta['panic_acknowledged_by'] = $actor->id;
-                $device->forceFill(['meta' => $meta])->save();
+        DB::transaction(function () use ($client, $assignment, $actor, $lifecycle): void {
+            $lockedConsent = ClientConsent::query()
+                ->with('consentType')
+                ->lockForUpdate()
+                ->find($assignment->consent_id);
+            $device = Device::query()->lockForUpdate()->find($assignment->device_id);
+            $lockedClient = Client::query()->lockForUpdate()->find($client->id);
+            $lockedAssignment = DeviceAssignment::query()->lockForUpdate()->find($assignment->id);
+            if ($lockedAssignment) {
+                $lockedAssignment->setRelation('consent', $lockedConsent);
+                $lockedAssignment->setRelation('device', $device);
             }
+            abort_unless(
+                $device
+                    && $lockedClient
+                    && $lockedAssignment
+                    && (int) $lockedAssignment->consent_id === (int) $lockedConsent?->id
+                    && $this->trackingPrivacy->assignmentAuthorisesResidentLocation(
+                        $lockedAssignment,
+                        $lockedClient,
+                    ),
+                403,
+            );
+
+            $meta = $device->meta ?? [];
+            $meta['panic_active'] = false;
+            $meta['panic_acknowledged_at'] = now()->toISOString();
+            $meta['panic_acknowledged_by'] = $actor->id;
+            $device->forceFill(['meta' => $meta])->save();
 
             if (Schema::hasTable('control_room_alerts')) {
-                ControlRoomAlert::query()
+                $alerts = ControlRoomAlert::query()
                     ->where('client_id', $client->id)
                     ->whereIn('source', ['tracker', 'resident_tracker'])
-                    ->where('status', ControlRoomAlert::STATUS_OPEN)
-                    ->get()
-                    ->each(fn (ControlRoomAlert $alert) => $lifecycle->acknowledge($alert, $actor));
+                    ->where('status', ControlRoomAlert::STATUS_OPEN);
+                $this->applyResidentAlertAuthority($alerts, [[
+                    'client_id' => (int) $lockedClient->id,
+                    'device_id' => (int) $lockedAssignment->device_id,
+                    'collection_started_at' => $lockedAssignment->collection_started_at
+                        ?? $lockedAssignment->assigned_at,
+                ]]);
+                $alerts->get()->each(fn (ControlRoomAlert $alert) => $lifecycle->acknowledge($alert, $actor));
+            }
+        });
+    }
+
+    /**
+     * @param  Collection<int, Device>  $devices
+     * @return list<array{client_id: int, device_id: int, collection_started_at: mixed}>
+     */
+    private function residentAlertBindings(Collection $devices): array
+    {
+        return $devices
+            ->map(function (Device $device): ?array {
+                $assignment = $device->assignments->first();
+                $collectionStartedAt = $assignment?->collection_started_at ?? $assignment?->assigned_at;
+                if (! $assignment || ! $collectionStartedAt) {
+                    return null;
+                }
+
+                return [
+                    'client_id' => (int) $assignment->assignable_id,
+                    'device_id' => (int) $assignment->device_id,
+                    'collection_started_at' => $collectionStartedAt,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<array{client_id: int, device_id: int, collection_started_at: mixed}>  $bindings
+     */
+    private function applyResidentAlertAuthority(Builder $query, array $bindings): Builder
+    {
+        if ($bindings === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $authority) use ($bindings): void {
+            foreach ($bindings as $index => $binding) {
+                $method = $index === 0 ? 'where' : 'orWhere';
+                $authority->{$method}(function (Builder $resident) use ($binding): void {
+                    $resident->where('control_room_alerts.client_id', $binding['client_id'])
+                        ->where('control_room_alerts.triggered_at', '>=', $binding['collection_started_at'])
+                        ->whereExists(fn ($projection) => $projection
+                            ->selectRaw('1')
+                            ->from('control_room_devices')
+                            ->whereColumn('control_room_devices.id', 'control_room_alerts.device_id')
+                            ->where('control_room_devices.client_id', $binding['client_id'])
+                            ->where('control_room_devices.canonical_device_id', $binding['device_id']));
+                });
             }
         });
     }
@@ -846,7 +956,7 @@ class ResidentTrackingController extends Controller
     {
         abort_unless(
             in_array((int) $client->id, $this->getAuthorizedClientIds($user), true),
-            403,
+            404,
         );
     }
 
@@ -858,10 +968,17 @@ class ResidentTrackingController extends Controller
         );
     }
 
-    private function assertHasActiveTrackingConsent(Client $client): DeviceAssignment
+    private function assertHasActiveTrackingConsent(User $user, Client $client): DeviceAssignment
     {
         $assignment = $this->trackingPrivacy->authorisedClientAssignment($client);
-        abort_unless($assignment, 403);
+        abort_unless(
+            $assignment
+                && $this->deviceAccess->visibleDevices($user)
+                    ->whereKey($assignment->device_id)
+                    ->exists()
+                && $this->deviceAccess->canAccessCurrentAssignment($user, $assignment),
+            403,
+        );
 
         return $assignment;
     }
@@ -880,12 +997,11 @@ class ResidentTrackingController extends Controller
     {
         $candidate = $requestedConsentId
             ? ClientConsent::query()->find($requestedConsentId)
-            : ConsentValidationService::latestValidTrackingConsentForClient($client);
+            : ConsentValidationService::latestValidResidentLocationConsentForClient($client);
 
         $consent = $candidate
             ? $this->validTrackingConsentQuery($client)
                 ->whereKey($candidate->id)
-                ->lockForUpdate()
                 ->first()
             : null;
 
@@ -911,22 +1027,14 @@ class ResidentTrackingController extends Controller
             ->where('status', 'given')
             ->whereNull('withdrawn_at')
             ->whereNull('superseded_by_consent_id')
+            ->where('given_at', '<=', now())
             ->where(function (Builder $expiry): void {
                 $expiry->whereNull('expires_at')
                     ->orWhere('expires_at', '>', now());
             })
-            ->whereHas('consentType', function (Builder $type): void {
-                $type->where('active', true)
-                    ->where(function (Builder $tracking): void {
-                        $tracking->whereIn('name', [
-                            'Fleet Tracking',
-                            'Personal Tracker (Wandering Risk)',
-                            'Asset Location Tracking (Safety)',
-                        ])->orWhere('name', 'like', '%Tracking%')
-                            ->orWhere('name', 'like', '%Tracker%')
-                            ->orWhere('name', 'like', '%Location%');
-                    });
-            });
+            ->whereHas('consentType', fn (Builder $type): Builder => $type
+                ->where('active', true)
+                ->where('name', 'Personal Tracker (Wandering Risk)'));
     }
 
     private function latestLocateCommandStatus(Device $device): ?string

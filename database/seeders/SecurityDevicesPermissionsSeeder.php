@@ -25,7 +25,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.viewAny', 'description' => 'Access the Security & Devices module', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.view', 'description' => 'View device inventory', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.viewAllSites', 'description' => 'View devices across all operational Sites', 'group' => 'security_devices', 'module' => 'Security & Devices'],
-            ['key' => 'securityDevices.devices.viewUnassigned', 'description' => 'View unassigned device stock', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.devices.viewUnassigned', 'description' => 'View unassigned stock at authorised Sites; unknown or quarantined stock also requires all-Sites access', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.create', 'description' => 'Register new devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.update', 'description' => 'Edit device records', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.devices.delete', 'description' => 'Decommission or delete devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],

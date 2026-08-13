@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -13,6 +14,7 @@ use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
@@ -82,15 +84,19 @@ class SecurityDevicesAccessService
 
     public function canViewUnassigned(User $user): bool
     {
-        return $user->canDo('securityDevices.devices.viewUnassigned')
-            || $user->canDo('assets.trackers.manage');
+        return $user->canDo('securityDevices.devices.viewUnassigned');
+    }
+
+    public function canViewQuarantined(User $user): bool
+    {
+        return $this->canViewAllSites($user) && $this->canViewUnassigned($user);
     }
 
     public function unassignedTrackingDevicesForClient(User $user, Client $client): Builder
     {
         $query = $this->visibleDevices($user)
             ->where('domain', 'tracking')
-            ->whereNotIn('status', ['decommissioned', 'lost'])
+            ->whereNotIn('status', ['decommissioned', 'quarantined', 'lost'])
             ->whereNotNull('legacy_location_hardware_id')
             ->whereDoesntHave('assignments', fn (Builder $assignment): Builder => $assignment->active())
             ->whereDoesntHave('activeAssetLinks');
@@ -348,7 +354,7 @@ class SecurityDevicesAccessService
         $staffIds = array_values(array_unique([(int) $user->getKey(), ...$this->accessibleAssignedStaffIds($user)]));
         $assetIds = $this->accessibleAssetIds($user);
 
-        $query = Device::query()->where(function (Builder $visibility) use (
+        $query = Device::query()->where(function (Builder $availability) use (
             $user,
             $siteIds,
             $roomIds,
@@ -356,35 +362,67 @@ class SecurityDevicesAccessService
             $staffIds,
             $assetIds,
         ): void {
-            $visibility->whereHas('assignments', function (Builder $assignment) use (
+            $availability->where(function (Builder $normal) use (
+                $user,
                 $siteIds,
                 $roomIds,
                 $clientIds,
                 $staffIds,
                 $assetIds,
             ): void {
-                $assignment->active()->where(function (Builder $target) use (
-                    $siteIds,
-                    $roomIds,
-                    $clientIds,
-                    $staffIds,
-                    $assetIds,
-                ): void {
-                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_SITE, $siteIds, false);
-                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_ROOM, $roomIds);
-                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_CLIENT, $clientIds);
-                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_STAFF, $staffIds);
-                    $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_VEHICLE, $assetIds);
-                });
+                $normal->where('status', '!=', DeviceStatus::Quarantined->value)
+                    ->where(function (Builder $visibility) use (
+                        $user,
+                        $siteIds,
+                        $roomIds,
+                        $clientIds,
+                        $staffIds,
+                        $assetIds,
+                    ): void {
+                        $visibility->whereHas('assignments', function (Builder $assignment) use (
+                            $siteIds,
+                            $roomIds,
+                            $clientIds,
+                            $staffIds,
+                            $assetIds,
+                        ): void {
+                            $assignment->active()->whereIn('custody_site_id', $siteIds);
+                            $this->applyCurrentCustodyIntegrity($assignment);
+                            $assignment->where(function (Builder $target) use (
+                                $siteIds,
+                                $roomIds,
+                                $clientIds,
+                                $staffIds,
+                                $assetIds,
+                            ): void {
+                                $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_SITE, $siteIds, false);
+                                $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_ROOM, $roomIds);
+                                $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_CLIENT, $clientIds);
+                                $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_STAFF, $staffIds);
+                                $this->addAssignmentTargetBranch($target, DeviceAssignment::TARGET_VEHICLE, $assetIds);
+                            });
+                        });
+
+                        if ($assetIds !== []) {
+                            $visibility->orWhereHas('activeAssetLinks', fn (Builder $link): Builder => $link->whereIn('asset_id', $assetIds));
+                        }
+
+                        if ($this->canViewUnassigned($user)) {
+                            $visibility->orWhere(function (Builder $stock) use ($user, $siteIds): void {
+                                $stock->whereDoesntHave('assignments', fn (Builder $assignment) => $assignment->active())
+                                    ->whereDoesntHave('activeAssetLinks');
+                                if (! $this->canViewAllSites($user)) {
+                                    $this->applyLastKnownCustodyScope($stock, $siteIds);
+                                }
+                            });
+                        }
+                    });
             });
 
-            if ($assetIds !== []) {
-                $visibility->orWhereHas('activeAssetLinks', fn (Builder $link): Builder => $link->whereIn('asset_id', $assetIds));
-            }
-
-            if ($this->canViewUnassigned($user)) {
-                $visibility->orWhere(function (Builder $stock): void {
-                    $stock->whereDoesntHave('assignments', fn (Builder $assignment) => $assignment->active())
+            if ($this->canViewQuarantined($user)) {
+                $availability->orWhere(function (Builder $quarantine): void {
+                    $quarantine->where('status', DeviceStatus::Quarantined->value)
+                        ->whereDoesntHave('assignments', fn (Builder $assignment) => $assignment->active())
                         ->whereDoesntHave('activeAssetLinks');
                 });
             }
@@ -398,6 +436,14 @@ class SecurityDevicesAccessService
         $this->excludeUnauthorizedAssignments($query, DeviceAssignment::TARGET_CLIENT, $clientIds);
         $this->excludeUnauthorizedAssignments($query, DeviceAssignment::TARGET_STAFF, $staffIds);
         $this->excludeUnauthorizedAssignments($query, DeviceAssignment::TARGET_VEHICLE, $assetIds);
+        $query->whereDoesntHave('assignments', function (Builder $assignment) use ($siteIds): void {
+            $assignment->active()->where(function (Builder $custody) use ($siteIds): void {
+                $custody->whereNull('custody_site_id');
+                if ($siteIds !== []) {
+                    $custody->orWhereNotIn('custody_site_id', $siteIds);
+                }
+            });
+        });
         if ($assetIds === []) {
             $query->whereDoesntHave('activeAssetLinks');
         } else {
@@ -455,7 +501,9 @@ class SecurityDevicesAccessService
                 $staffIds,
                 $assetIds,
             ): void {
-                $assignment->active()->where(function (Builder $target) use (
+                $assignment->active()->where('custody_site_id', $siteId);
+                $this->applyCurrentCustodyIntegrity($assignment);
+                $assignment->where(function (Builder $target) use (
                     $siteId,
                     $roomIds,
                     $clientIds,
@@ -475,6 +523,68 @@ class SecurityDevicesAccessService
                     'activeAssetLinks',
                     fn (Builder $link): Builder => $link->whereIn('asset_id', $assetIds),
                 );
+            }
+        });
+    }
+
+    /**
+     * Apply immutable custody windows to event/telemetry history. Current
+     * Device visibility must not expose observations recorded under another
+     * Site's custody, while released history remains available to the Site and
+     * record class that owned it at that time.
+     */
+    public function applyTemporalEventCustodyScope(
+        Builder|Relation $query,
+        User $user,
+        string $deviceColumn = 'device_events.device_id',
+        string $occurredAtColumn = 'device_events.occurred_at',
+    ): Builder|Relation {
+        $siteIds = $this->accessibleSiteIds($user);
+        $targetTypes = [DeviceAssignment::TARGET_SITE, DeviceAssignment::TARGET_ROOM];
+        if ($user->canDo('clients.viewAny')) {
+            $targetTypes[] = DeviceAssignment::TARGET_CLIENT;
+        }
+        if ($user->canDo('staff.viewAny') && $user->canDo('hazards.view')) {
+            $targetTypes[] = DeviceAssignment::TARGET_STAFF;
+        }
+        if ($user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny')) {
+            $targetTypes[] = DeviceAssignment::TARGET_VEHICLE;
+        }
+
+        if ($siteIds === [] && ! $this->canViewQuarantined($user)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $custody) use (
+            $siteIds,
+            $targetTypes,
+            $deviceColumn,
+            $occurredAtColumn,
+            $user,
+        ): void {
+            $effectiveAssignment = function ($assignment, bool $authorised) use (
+                $siteIds,
+                $targetTypes,
+                $deviceColumn,
+                $occurredAtColumn,
+            ): void {
+                $assignment->selectRaw('1')
+                    ->from('device_assignments as custody_history')
+                    ->whereColumn('custody_history.device_id', $deviceColumn)
+                    ->whereColumn('custody_history.assigned_at', '<=', $occurredAtColumn)
+                    ->where(function ($window) use ($occurredAtColumn): void {
+                        $window->whereNull('custody_history.released_at')
+                            ->orWhereColumn('custody_history.released_at', '>', $occurredAtColumn);
+                    });
+                if ($authorised) {
+                    $assignment->whereIn('custody_history.custody_site_id', $siteIds)
+                        ->whereIn('custody_history.assignable_type', $targetTypes);
+                }
+            };
+
+            $custody->whereExists(fn ($assignment) => $effectiveAssignment($assignment, true));
+            if ($this->canViewQuarantined($user)) {
+                $custody->orWhereNotExists(fn ($assignment) => $effectiveAssignment($assignment, false));
             }
         });
     }
@@ -547,7 +657,9 @@ class SecurityDevicesAccessService
                 $staffIds,
                 $assetIds,
             ): void {
-                $assignment->active()->where(function (Builder $target) use (
+                $assignment->active()->whereIn('custody_site_id', $siteIds);
+                $this->applyCurrentCustodyIntegrity($assignment);
+                $assignment->where(function (Builder $target) use (
                     $siteIds,
                     $roomIds,
                     $clientIds,
@@ -575,6 +687,17 @@ class SecurityDevicesAccessService
             DeviceAssignment::TARGET_VEHICLE => $assetIds,
         ] as $targetType => $authorizedIds) {
             $this->excludeUnauthorizedAssignments($query, $targetType, $authorizedIds);
+        }
+        $query->whereDoesntHave('assignments', function (Builder $assignment) use ($siteIds): void {
+            $assignment->active()->where(function (Builder $custody) use ($siteIds): void {
+                $custody->whereNull('custody_site_id');
+                if ($siteIds !== []) {
+                    $custody->orWhereNotIn('custody_site_id', $siteIds);
+                }
+            });
+        });
+        if (! $this->canViewQuarantined($user)) {
+            $query->where('status', '!=', DeviceStatus::Quarantined->value);
         }
         if ($assetIds === []) {
             $query->whereDoesntHave('activeAssetLinks');
@@ -758,12 +881,7 @@ class SecurityDevicesAccessService
 
         $assignments = $query->get();
         foreach ($assignments as $assignment) {
-            abort_unless($this->canAccessAssignmentTarget(
-                $user,
-                $device,
-                $assignment->assignable_type,
-                (int) $assignment->assignable_id,
-            ), 404);
+            abort_unless($this->canAccessCurrentAssignment($user, $assignment), 404);
         }
 
         return $assignments;
@@ -779,11 +897,7 @@ class SecurityDevicesAccessService
 
         $assignments = $query->get();
         foreach ($assignments as $assignment) {
-            abort_unless($this->canAccessHistoricalAssignmentTarget(
-                $user,
-                $assignment->assignable_type,
-                (int) $assignment->assignable_id,
-            ), 404);
+            abort_unless($this->canAccessCurrentAssignment($user, $assignment), 404);
         }
 
         return $assignments;
@@ -791,6 +905,11 @@ class SecurityDevicesAccessService
 
     public function canAccessAssignmentTarget(User $user, Device $device, string $targetType, int $targetId): bool
     {
+        $targetSiteId = app(DeviceCustodySiteResolver::class)->tryResolve($targetType, $targetId);
+        if ($targetSiteId === null || ! $this->siteIsAccessible($user, $targetSiteId)) {
+            return false;
+        }
+
         return match ($targetType) {
             DeviceAssignment::TARGET_SITE => $this->siteIsAccessible($user, $targetId),
             DeviceAssignment::TARGET_ROOM => SiteRoom::query()
@@ -803,6 +922,35 @@ class SecurityDevicesAccessService
             DeviceAssignment::TARGET_VEHICLE => $this->canUseAsset($user, $targetId, true),
             default => false,
         };
+    }
+
+    public function canAccessCurrentAssignment(User $user, DeviceAssignment $assignment): bool
+    {
+        return $assignment->released_at === null
+            && $assignment->assigned_at?->lessThanOrEqualTo(now())
+            && is_numeric($assignment->custody_site_id)
+            && $this->siteIsAccessible($user, (int) $assignment->custody_site_id)
+            && app(DeviceCustodySiteResolver::class)->assignmentMatchesCurrentTarget($assignment)
+            && $this->canAccessAssignmentTarget(
+                $user,
+                $assignment->device ?? new Device(['id' => $assignment->device_id]),
+                (string) $assignment->assignable_type,
+                (int) $assignment->assignable_id,
+            );
+    }
+
+    public function canAccessHistoricalAssignment(User $user, DeviceAssignment $assignment): bool
+    {
+        return $assignment->released_at !== null
+            && is_numeric($assignment->custody_site_id)
+            && $this->siteIsAccessible($user, (int) $assignment->custody_site_id)
+            && match ((string) $assignment->assignable_type) {
+                DeviceAssignment::TARGET_SITE, DeviceAssignment::TARGET_ROOM => true,
+                DeviceAssignment::TARGET_CLIENT => $user->canDo('clients.viewAny'),
+                DeviceAssignment::TARGET_STAFF => $user->canDo('staff.viewAny') && $user->canDo('hazards.view'),
+                DeviceAssignment::TARGET_VEHICLE => $user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny'),
+                default => false,
+            };
     }
 
     public function assertCanUseAsset(User $user, Device $device, int $assetId): void
@@ -826,6 +974,7 @@ class SecurityDevicesAccessService
         $siteIds = $this->accessibleSiteIds($user);
 
         return Client::query()
+            ->where('status', 'active')
             ->whereNotNull('site_id')
             ->when($siteIds === [], fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
             ->when($siteIds !== [], fn (Builder $query): Builder => $query->whereIn('site_id', $siteIds))
@@ -1032,5 +1181,123 @@ class SecurityDevicesAccessService
                 $assignment->whereNotIn('assignable_id', $authorizedIds);
             }
         });
+    }
+
+    private function applyLastKnownCustodyScope(Builder $query, array $siteIds): void
+    {
+        if ($siteIds === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($siteIds), '?'));
+        $query->where(function (Builder $stock) use ($siteIds, $placeholders): void {
+            $stock->whereRaw(
+                "(SELECT history.custody_site_id FROM device_assignments AS history
+                    WHERE history.device_id = devices.id
+                    ORDER BY history.assigned_at DESC, history.id DESC LIMIT 1) IN ({$placeholders})",
+                $siteIds,
+            )->orWhere(function (Builder $neverAssigned) use ($siteIds): void {
+                $neverAssigned->whereDoesntHave('assignments')
+                    ->whereExists(fn ($hardware) => $hardware
+                        ->selectRaw('1')
+                        ->from('location_hardware')
+                        ->whereColumn('location_hardware.id', 'devices.legacy_location_hardware_id')
+                        ->whereIn('location_hardware.site_id', $siteIds)
+                        ->where('location_hardware.status', '!=', LocationHardware::STATUS_RETIRED)
+                        ->whereNull('location_hardware.deleted_at'));
+            });
+        });
+    }
+
+    /**
+     * Current custody is authoritative only while the live target still
+     * resolves to the immutable Site snapshot recorded on the assignment.
+     */
+    private function applyCurrentCustodyIntegrity(Builder $query): void
+    {
+        $query->where('assigned_at', '<=', now())
+            ->whereNotNull('custody_site_id')->where(function (Builder $integrity): void {
+                $integrity->where(function (Builder $site): void {
+                    $site->where('assignable_type', DeviceAssignment::TARGET_SITE)
+                        ->whereColumn('assignable_id', 'custody_site_id');
+                })->orWhere(function (Builder $room): void {
+                    $room->where('assignable_type', DeviceAssignment::TARGET_ROOM)
+                        ->whereExists(fn ($rooms) => $rooms
+                            ->selectRaw('1')
+                            ->from('site_rooms')
+                            ->whereColumn('site_rooms.id', 'device_assignments.assignable_id')
+                            ->whereColumn('site_rooms.site_id', 'device_assignments.custody_site_id'));
+                })->orWhere(function (Builder $client): void {
+                    $client->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                        ->whereExists(fn ($clients) => $clients
+                            ->selectRaw('1')
+                            ->from('clients')
+                            ->whereColumn('clients.id', 'device_assignments.assignable_id')
+                            ->whereColumn('clients.site_id', 'device_assignments.custody_site_id')
+                            ->where('clients.status', 'active')
+                            ->whereNull('clients.deleted_at'));
+                })->orWhere(function (Builder $staff): void {
+                    $staff->where('assignable_type', DeviceAssignment::TARGET_STAFF)
+                        ->whereExists(fn ($profiles) => $profiles
+                            ->selectRaw('1')
+                            ->from('hr_employee_profiles')
+                            ->whereColumn('hr_employee_profiles.user_id', 'device_assignments.assignable_id')
+                            ->whereColumn('hr_employee_profiles.primary_site_id', 'device_assignments.custody_site_id')
+                            ->where('hr_employee_profiles.is_active', true)
+                            ->whereNull('hr_employee_profiles.deleted_at')
+                            ->where(fn ($dates) => $dates->whereNull('start_date')->orWhereDate('start_date', '<=', today()))
+                            ->where(fn ($dates) => $dates->whereNull('end_date')->orWhereDate('end_date', '>=', today())));
+                })->orWhere(function (Builder $vehicle): void {
+                    $vehicle->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
+                        ->whereExists(function ($assets): void {
+                            $assets->selectRaw('1')
+                                ->from('assets')
+                                ->whereColumn('assets.id', 'device_assignments.assignable_id')
+                                ->where('assets.status', 'active')
+                                ->where(function ($category): void {
+                                    $category->whereRaw('LOWER(assets.category) = ?', ['vehicle'])
+                                        ->orWhereExists(fn ($categories) => $categories
+                                            ->selectRaw('1')
+                                            ->from('asset_categories')
+                                            ->whereColumn('asset_categories.id', 'assets.asset_category_id')
+                                            ->whereRaw('LOWER(asset_categories.slug) = ?', ['vehicle']));
+                                })
+                                ->where(function ($site): void {
+                                    $site->whereColumn('assets.site_id', 'device_assignments.custody_site_id')
+                                        ->orWhere(function ($home): void {
+                                            $home->whereNull('assets.site_id')
+                                                ->whereColumn('assets.home_site_id', 'device_assignments.custody_site_id');
+                                        })
+                                        ->orWhere(function ($client): void {
+                                            $client->whereNull('assets.site_id')
+                                                ->whereNull('assets.home_site_id')
+                                                ->whereExists(fn ($clients) => $clients
+                                                    ->selectRaw('1')
+                                                    ->from('clients')
+                                                    ->whereColumn('clients.id', 'assets.client_id')
+                                                    ->whereColumn('clients.site_id', 'device_assignments.custody_site_id')
+                                                    ->where('clients.status', 'active')
+                                                    ->whereNull('clients.deleted_at'));
+                                        });
+                                })
+                                ->where(function ($homeAgreement): void {
+                                    $homeAgreement->whereNull('assets.home_site_id')
+                                        ->orWhereColumn('assets.home_site_id', 'device_assignments.custody_site_id');
+                                })
+                                ->where(function ($clientAgreement): void {
+                                    $clientAgreement->whereNull('assets.client_id')
+                                        ->orWhereExists(fn ($clients) => $clients
+                                            ->selectRaw('1')
+                                            ->from('clients')
+                                            ->whereColumn('clients.id', 'assets.client_id')
+                                            ->whereColumn('clients.site_id', 'device_assignments.custody_site_id')
+                                            ->where('clients.status', 'active')
+                                            ->whereNull('clients.deleted_at'));
+                                });
+                        });
+                });
+            });
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Models;
 
 use App\Domain\SecurityDevices\Enums\AssignmentType;
+use App\Domain\SecurityDevices\Services\DeviceCustodySiteResolver;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientConsent;
@@ -24,6 +25,7 @@ class DeviceAssignment extends Model
         'device_id',
         'assignable_type',
         'assignable_id',
+        'custody_site_id',
         'assignment_type',
         'assigned_at',
         'expected_return_at',
@@ -56,6 +58,14 @@ class DeviceAssignment extends Model
     protected static function booted(): void
     {
         static::creating(function (self $assignment): void {
+            if ($assignment->custody_site_id === null
+                && in_array($assignment->assignable_type, self::VALID_TARGETS, true)
+                && is_numeric($assignment->assignable_id)) {
+                $assignment->custody_site_id = app(DeviceCustodySiteResolver::class)->tryResolve(
+                    (string) $assignment->assignable_type,
+                    (int) $assignment->assignable_id,
+                );
+            }
             $assignment->applyPersonalTrackingGovernanceDefaults();
         });
     }
@@ -127,6 +137,22 @@ class DeviceAssignment extends Model
     public function scopeReleased($query)
     {
         return $query->whereNotNull('released_at');
+    }
+
+    public function scopeCurrent($query)
+    {
+        return $query
+            ->whereNull('released_at')
+            ->where('assigned_at', '<=', now());
+    }
+
+    public function scopeEffectiveAt($query, \DateTimeInterface $at)
+    {
+        return $query
+            ->where('assigned_at', '<=', $at)
+            ->where(function ($window) use ($at): void {
+                $window->whereNull('released_at')->orWhere('released_at', '>', $at);
+            });
     }
 
     public function scopeCollectionActive($query)

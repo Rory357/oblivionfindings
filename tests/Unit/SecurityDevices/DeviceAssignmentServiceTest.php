@@ -11,6 +11,7 @@ use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -118,7 +119,10 @@ class DeviceAssignmentServiceTest extends TestCase
     {
         $device = Device::factory()->create();
         $site = Site::factory()->create();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create([
+            'site_id' => Site::factory()->create()->id,
+            'status' => 'active',
+        ]);
         $user = User::factory()->create();
         $assignment = $this->service->assign(
             $device,
@@ -150,8 +154,103 @@ class DeviceAssignmentServiceTest extends TestCase
         $newAssignment = $this->service->transfer($device, DeviceAssignment::TARGET_SITE, $siteB->id, $user->id);
 
         $this->assertEquals($siteB->id, $newAssignment->assignable_id);
+        $this->assertEquals($siteB->id, $newAssignment->custody_site_id);
         $this->assertEquals(1, $device->assignments()->active()->count());
         $this->assertEquals(2, $device->assignments()->count()); // history preserved
+        $this->assertEquals($siteA->id, $device->assignments()->released()->sole()->custody_site_id);
+    }
+
+    public function test_stale_transfer_race_serializes_on_device_and_preserves_the_winner_and_history(): void
+    {
+        $device = Device::factory()->create();
+        $siteA = Site::factory()->create();
+        $siteB = Site::factory()->create();
+        $siteC = Site::factory()->create();
+        $user = User::factory()->create();
+        $initial = $this->service->assign($device, DeviceAssignment::TARGET_SITE, $siteA->id, $user->id);
+        $staleDevice = Device::query()->findOrFail($device->id);
+
+        $winner = $this->service->transfer(
+            $device,
+            DeviceAssignment::TARGET_SITE,
+            $siteB->id,
+            $user->id,
+        );
+
+        try {
+            $this->service->transfer(
+                $staleDevice,
+                DeviceAssignment::TARGET_SITE,
+                $siteC->id,
+                $user->id,
+                authorizeLockedDevice: function (Device $lockedDevice) use ($initial): void {
+                    $active = $lockedDevice->assignments()
+                        ->whereNull('released_at')
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                    if ((int) $active->id !== (int) $initial->id) {
+                        throw new \RuntimeException('Stale transfer lost the custody race.');
+                    }
+                },
+            );
+            $this->fail('The stale transfer should not replace the winning custody row.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Stale transfer lost the custody race.', $exception->getMessage());
+        }
+
+        $active = $device->assignments()->whereNull('released_at')->sole();
+        $this->assertSame($winner->id, $active->id);
+        $this->assertSame($siteB->id, (int) $active->custody_site_id);
+        $this->assertSame(2, $device->assignments()->count());
+        $this->assertSame($siteA->id, (int) $initial->fresh()->custody_site_id);
+        $this->assertNotNull($initial->fresh()->released_at);
+    }
+
+    public function test_purpose_validation_failure_rolls_back_without_releasing_current_custody(): void
+    {
+        $device = Device::factory()->tracking()->create();
+        $site = Site::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $user = User::factory()->create();
+        $current = $this->service->assign(
+            $device,
+            DeviceAssignment::TARGET_SITE,
+            $site->id,
+            $user->id,
+        );
+        $genericConsent = ClientConsent::query()->create([
+            'client_id' => $client->id,
+            'consent_type_id' => ConsentType::factory()->create([
+                'name' => 'Fleet Tracking',
+                'active' => true,
+            ])->id,
+            'status' => 'given',
+            'given_at' => now()->subDay(),
+            'expires_at' => now()->addMonth(),
+        ]);
+
+        try {
+            $this->service->transfer(
+                $device,
+                DeviceAssignment::TARGET_CLIENT,
+                $client->id,
+                $user->id,
+                consentId: $genericConsent->id,
+                validateLockedConsent: function (?ClientConsent $lockedConsent): void {
+                    if (! $lockedConsent
+                        || ! ConsentValidationService::isValidResidentLocationConsent($lockedConsent)) {
+                        throw new \InvalidArgumentException('Consent purpose rejected under lock.');
+                    }
+                },
+            );
+            $this->fail('A generic consent must not replace current custody for resident tracking.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame('Consent purpose rejected under lock.', $exception->getMessage());
+        }
+
+        $this->assertNull($current->fresh()->released_at);
+        $this->assertSame(1, $device->assignments()->whereNull('released_at')->count());
+        $this->assertSame(1, $device->assignments()->count());
     }
 
     public function test_loan_assignment_with_expected_return_date(): void
@@ -177,7 +276,10 @@ class DeviceAssignmentServiceTest extends TestCase
     public function test_client_assignment_requires_consent(): void
     {
         $device = Device::factory()->tracking()->create();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create([
+            'site_id' => Site::factory()->create()->id,
+            'status' => 'active',
+        ]);
         $user = User::factory()->create();
 
         $this->expectException(\InvalidArgumentException::class);
@@ -194,7 +296,10 @@ class DeviceAssignmentServiceTest extends TestCase
     public function test_client_assignment_succeeds_with_consent(): void
     {
         $device = Device::factory()->tracking()->create();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create([
+            'site_id' => Site::factory()->create()->id,
+            'status' => 'active',
+        ]);
         $user = User::factory()->create();
         $consent = ClientConsent::create([
             'client_id' => $client->id,

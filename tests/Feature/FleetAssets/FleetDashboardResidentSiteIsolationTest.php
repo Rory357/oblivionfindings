@@ -12,6 +12,7 @@ use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
+use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetFuelLog;
 use App\Models\FleetOuting;
@@ -409,7 +410,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
                 'client_id' => $localClient->id,
                 'consent_id' => $localConsent->id,
             ])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->actingAs($manager)
             ->post('/fleet-assets/resident-tracking/assign', [
@@ -417,7 +418,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
                 'client_id' => $outsideClient->id,
                 'consent_id' => $outsideConsent->id,
             ])
-            ->assertForbidden();
+            ->assertNotFound();
 
         $this->actingAs($manager)
             ->post('/fleet-assets/resident-tracking/assign', [
@@ -448,7 +449,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
         $this->actingAs($manager)
             ->post("/fleet-assets/resident-tracking/{$outsideDevice->id}/unassign")
-            ->assertForbidden();
+            ->assertNotFound();
         $this->assertDatabaseHas('device_assignments', [
             'device_id' => $outsideDevice->id,
             'assignable_type' => DeviceAssignment::TARGET_CLIENT,
@@ -458,10 +459,10 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
         $this->actingAs($manager)
             ->post("/fleet-assets/resident-tracking/{$outsideClient->id}/locate-now")
-            ->assertForbidden();
+            ->assertNotFound();
         $this->actingAs($manager)
             ->post("/fleet-assets/resident-tracking/{$outsideClient->id}/acknowledge-panic")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_resident_location_surfaces_fail_closed_after_tracking_consent_is_withdrawn(): void
@@ -544,10 +545,27 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
         ]);
         $this->assignDeviceToClient($withdrawnDevice, $withdrawnClient, $withdrawnConsent);
         $this->assignDeviceToClient($consentedDevice, $consentedClient, $activeConsent);
+        $withdrawnProjection = ControlRoomDevice::query()->create([
+            'name' => 'Withdrawn resident alert projection',
+            'type' => ControlRoomDevice::TYPE_PERSONAL_TRACKER,
+            'site_id' => $this->localSite->id,
+            'client_id' => $withdrawnClient->id,
+            'canonical_device_id' => $withdrawnDevice->id,
+            'status' => 'online',
+        ]);
+        $consentedProjection = ControlRoomDevice::query()->create([
+            'name' => 'Consented resident alert projection',
+            'type' => ControlRoomDevice::TYPE_PERSONAL_TRACKER,
+            'site_id' => $this->localSite->id,
+            'client_id' => $consentedClient->id,
+            'canonical_device_id' => $consentedDevice->id,
+            'status' => 'online',
+        ]);
 
         $withdrawnAlert = ControlRoomAlert::factory()->open()->create([
             'site_id' => $this->localSite->id,
             'client_id' => $withdrawnClient->id,
+            'device_id' => $withdrawnProjection->id,
             'source' => 'tracker',
             'alert_type' => 'wandering',
             'triggered_at' => now()->subMinute(),
@@ -561,6 +579,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
         $visibleAlert = ControlRoomAlert::factory()->open()->create([
             'site_id' => $this->localSite->id,
             'client_id' => $consentedClient->id,
+            'device_id' => $consentedProjection->id,
             'source' => 'tracker',
             'alert_type' => 'wandering',
             'triggered_at' => now(),
@@ -913,10 +932,10 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
     private function createTrackingConsent(Client $client, array $overrides = []): ClientConsent
     {
         $type = ConsentType::query()->firstOrCreate(
-            ['name' => 'Fleet Tracking'],
+            ['name' => 'Personal Tracker (Wandering Risk)'],
             [
                 'category' => 'operational',
-                'description' => 'Fleet location tracking',
+                'description' => 'Resident personal location tracking',
                 'purpose' => 'Resident tracker safety',
                 'legal_basis' => 'consent',
                 'allows_withdrawal' => true,

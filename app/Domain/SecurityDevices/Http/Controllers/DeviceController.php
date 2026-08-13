@@ -183,7 +183,10 @@ class DeviceController extends Controller
             'createdBy',
         ];
         if ($canViewEvents) {
-            $relations['events'] = fn ($q) => $q->latest('occurred_at')->limit(20);
+            $relations['events'] = fn ($q) => $this->access
+                ->applyTemporalEventCustodyScope($q, $user)
+                ->latest('occurred_at')
+                ->limit(20);
             $relations['monitors'] = fn ($q) => $q
                 ->with([
                     'profile' => fn ($profile) => $profile
@@ -199,12 +202,9 @@ class DeviceController extends Controller
         $device->load($relations);
 
         $device->setRelation('assignments', $device->assignments
-            ->filter(fn ($assignment): bool => $this->access->canAccessAssignmentTarget(
-                $user,
-                $device,
-                $assignment->assignable_type,
-                (int) $assignment->assignable_id,
-            ))
+            ->filter(fn ($assignment): bool => $assignment->released_at === null
+                ? $this->access->canAccessCurrentAssignment($user, $assignment)
+                : $this->access->canAccessHistoricalAssignment($user, $assignment))
             ->values());
         $accessibleAssetIds = $this->access->accessibleAssetIds($user);
         $device->setRelation('activeAssetLinks', $device->activeAssetLinks

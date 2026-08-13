@@ -3,14 +3,17 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\LocationHardware;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -76,13 +79,157 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
     {
         $site = Site::factory()->create();
         $viewer = $this->viewer('support_worker', $site);
-        $unassigned = Device::factory()->create(['name' => 'Unassigned stock']);
+        $unassigned = $this->assignedDevice($site, ['name' => 'Known Site stock']);
+        $unassigned->assignments()->update([
+            'released_at' => now(),
+            'released_by_user_id' => $viewer->id,
+        ]);
 
         $this->grant($viewer, 'securityDevices.devices.update');
         $this->assertFalse($this->access->visibleDevices($viewer)->whereKey($unassigned->id)->exists());
 
         $this->grant($viewer, 'securityDevices.devices.viewUnassigned');
         $this->assertTrue($this->access->visibleDevices($viewer)->whereKey($unassigned->id)->exists());
+    }
+
+    public function test_unassigned_and_quarantined_stock_require_explicit_temporal_custody(): void
+    {
+        $visibleSite = Site::factory()->create();
+        $hiddenSite = Site::factory()->create();
+        $viewer = $this->viewer('facilities_manager', $visibleSite);
+
+        $visible = $this->assignedDevice($visibleSite, ['name' => 'Released local stock']);
+        $visible->assignments()->update(['released_at' => now()]);
+        $hidden = $this->assignedDevice($hiddenSite, ['name' => 'Released foreign stock']);
+        $hidden->assignments()->update(['released_at' => now()]);
+        $unknown = Device::factory()->create(['name' => 'Unknown stock']);
+        $localHardware = LocationHardware::query()->create([
+            'site_id' => $visibleSite->id,
+            'provider' => 'manual',
+            'category' => LocationHardware::CATEGORY_TRACKER,
+            'name' => 'Released local hardware custody',
+            'status' => LocationHardware::STATUS_ONLINE,
+        ]);
+        $localNewStock = Device::factory()->tracking()->create([
+            'name' => 'New local stock',
+            'legacy_location_hardware_id' => $localHardware->id,
+        ]);
+        $foreignHardware = LocationHardware::query()->create([
+            'site_id' => $hiddenSite->id,
+            'provider' => 'manual',
+            'category' => LocationHardware::CATEGORY_TRACKER,
+            'name' => 'Foreign hardware custody',
+            'status' => LocationHardware::STATUS_ONLINE,
+        ]);
+        $foreignNewStock = Device::factory()->tracking()->create([
+            'name' => 'New foreign stock',
+            'legacy_location_hardware_id' => $foreignHardware->id,
+        ]);
+        $quarantined = Device::factory()->create([
+            'name' => 'Quarantined stock',
+            'status' => DeviceStatus::Quarantined,
+        ]);
+
+        $ids = $this->access->visibleDevices($viewer)->pluck('id')->all();
+        $this->assertContains($visible->id, $ids);
+        $this->assertContains($localNewStock->id, $ids);
+        $this->assertNotContains($hidden->id, $ids);
+        $this->assertNotContains($foreignNewStock->id, $ids);
+        $this->assertNotContains($unknown->id, $ids);
+        $this->assertNotContains($quarantined->id, $ids);
+
+        foreach ([$hidden, $unknown, $quarantined] as $concealed) {
+            $this->actingAs($viewer)
+                ->get("/security-devices/devices/{$concealed->id}")
+                ->assertNotFound();
+        }
+    }
+
+    public function test_explicit_global_role_can_see_unknown_and_quarantined_stock(): void
+    {
+        $admin = $this->viewer('admin');
+        $unknown = Device::factory()->create(['name' => 'Global unknown stock']);
+        $quarantined = Device::factory()->create([
+            'name' => 'Global quarantined stock',
+            'status' => DeviceStatus::Quarantined,
+        ]);
+
+        $this->assertTrue($this->access->canViewAllSites($admin));
+        $this->assertTrue($this->access->canViewUnassigned($admin));
+        $this->assertTrue($this->access->visibleDevices($admin)->whereKey($unknown->id)->exists());
+        $this->assertTrue($this->access->visibleDevices($admin)->whereKey($quarantined->id)->exists());
+    }
+
+    public function test_current_custody_fails_closed_but_historical_site_snapshot_remains_stable(): void
+    {
+        $originalSite = Site::factory()->create();
+        $newSite = Site::factory()->create();
+        $viewer = $this->viewer('coordinator', $originalSite);
+        $client = Client::factory()->create(['site_id' => $originalSite->id, 'status' => 'active']);
+        $this->grant($viewer, 'clients.viewAny');
+        $device = $this->assignedDevice($client, ['name' => 'Client tracker custody']);
+        $assignment = $device->assignments()->firstOrFail();
+
+        $this->assertSame($originalSite->id, (int) $assignment->custody_site_id);
+        $this->assertTrue($this->access->visibleDevices($viewer)->whereKey($device->id)->exists());
+
+        $client->update(['site_id' => $newSite->id]);
+        $this->assertFalse($this->access->visibleDevices($viewer)->whereKey($device->id)->exists());
+
+        $assignment->update(['released_at' => now()]);
+        $this->assertSame($originalSite->id, (int) $assignment->fresh()->custody_site_id);
+        $this->assertTrue($this->access->canAccessHistoricalAssignment($viewer, $assignment->fresh()));
+    }
+
+    public function test_event_history_uses_the_site_custody_window_at_the_time_of_each_observation(): void
+    {
+        $firstSite = Site::factory()->create();
+        $secondSite = Site::factory()->create();
+        $firstViewer = $this->viewer('coordinator', $firstSite);
+        $secondViewer = $this->viewer('coordinator', $secondSite);
+        $device = Device::factory()->create();
+        $transferAt = now()->subHours(2)->startOfSecond();
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $firstSite->id,
+            'custody_site_id' => $firstSite->id,
+            'assigned_at' => now()->subHours(4),
+            'released_at' => $transferAt,
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $secondSite->id,
+            'custody_site_id' => $secondSite->id,
+            'assigned_at' => $transferAt,
+        ]);
+        $firstEvent = DeviceEvent::query()->create([
+            'device_id' => $device->id,
+            'event_type' => 'first_site_observation',
+            'severity' => 'info',
+            'source' => 'test',
+            'occurred_at' => now()->subHours(3),
+        ]);
+        $secondEvent = DeviceEvent::query()->create([
+            'device_id' => $device->id,
+            'event_type' => 'second_site_observation',
+            'severity' => 'info',
+            'source' => 'test',
+            'occurred_at' => now()->subHour(),
+        ]);
+
+        $firstIds = $this->access
+            ->applyTemporalEventCustodyScope(DeviceEvent::query(), $firstViewer)
+            ->pluck('id')
+            ->all();
+        $secondIds = $this->access
+            ->applyTemporalEventCustodyScope(DeviceEvent::query(), $secondViewer)
+            ->pluck('id')
+            ->all();
+
+        $this->assertSame([$firstEvent->id], $firstIds);
+        $this->assertSame([$secondEvent->id], $secondIds);
     }
 
     public function test_explicit_all_sites_access_does_not_bypass_client_staff_or_asset_privacy(): void
@@ -92,7 +239,7 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
         $this->grant($viewer, 'securityDevices.devices.view');
         $this->grant($viewer, 'securityDevices.devices.viewAllSites');
 
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $staff = User::factory()->create(['approved_at' => now()]);
         HrEmployeeProfile::factory()->create([
             'user_id' => $staff->id,
@@ -136,7 +283,7 @@ class SecurityDevicesSingleApplicationAccessTest extends TestCase
         ]);
         $visible = $this->assignedDevice($allowedRoom);
         $hidden = $this->assignedDevice($hiddenRoom);
-        $privateClient = Client::factory()->create(['site_id' => $allowedSite->id]);
+        $privateClient = Client::factory()->create(['site_id' => $allowedSite->id, 'status' => 'active']);
         $private = $this->assignedDevice($privateClient);
 
         $this->assertTrue($this->access->visibleDevices($viewer)->whereKey($visible->id)->exists());

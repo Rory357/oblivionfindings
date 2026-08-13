@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Services;
 
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
@@ -42,7 +43,7 @@ class PersonalTrackingPrivacyService
             ->with(['device', 'consent.consentType'])
             ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
             ->where('assignable_id', $client->id)
-            ->whereNull('released_at')
+            ->current()
             ->whereHas('device', fn ($query) => $query->where('domain', 'tracking'))
             ->latest('assigned_at')
             ->latest('id')
@@ -53,7 +54,7 @@ class PersonalTrackingPrivacyService
     {
         $assignment = $this->activeClientAssignment($client);
 
-        return $assignment && $this->assignmentAuthorisesClient($assignment, $client)
+        return $assignment && $this->assignmentAuthorisesResidentLocation($assignment, $client)
             ? $assignment
             : null;
     }
@@ -67,16 +68,64 @@ class PersonalTrackingPrivacyService
         DeviceAssignment $assignment,
         Client|int $client,
     ): bool {
+        return $this->assignmentAuthorisesClientForPurpose(
+            $assignment,
+            $client,
+            fn (ClientConsent $consent): bool => ConsentValidationService::isValidTrackingConsent($consent),
+        );
+    }
+
+    public function assignmentAuthorisesResidentLocation(
+        DeviceAssignment $assignment,
+        Client|int $client,
+    ): bool {
+        return $this->assignmentAuthorisesClientForPurpose(
+            $assignment,
+            $client,
+            fn (ClientConsent $consent): bool => ConsentValidationService::isValidResidentLocationConsent($consent),
+        );
+    }
+
+    private function assignmentAuthorisesClientForPurpose(
+        DeviceAssignment $assignment,
+        Client|int $client,
+        callable $consentAuthorisesPurpose,
+    ): bool {
         $clientId = $client instanceof Client ? $client->id : $client;
-        $assignment->loadMissing('consent.consentType');
+        $assignment->loadMissing(['device', 'consent.consentType']);
         $consent = $assignment->consent;
+        $device = $assignment->device;
+        $clientModel = $client instanceof Client
+            ? $client
+            : Client::query()->find($clientId, ['id', 'site_id']);
 
         return $assignment->assignable_type === DeviceAssignment::TARGET_CLIENT
             && (int) $assignment->assignable_id === (int) $clientId
+            && $assignment->assigned_at?->lessThanOrEqualTo(now())
             && $assignment->isCollectionActive()
+            && $clientModel instanceof Client
+            && is_numeric($clientModel->site_id)
+            && (int) $assignment->custody_site_id === (int) $clientModel->site_id
+            && app(DeviceCustodySiteResolver::class)->assignmentMatchesCurrentTarget($assignment)
+            && $device instanceof Device
+            && (int) $device->id === (int) $assignment->device_id
+            && $device->domain === 'tracking'
+            && ! in_array($device->status, [
+                DeviceStatus::Decommissioned,
+                DeviceStatus::Quarantined,
+                DeviceStatus::Lost,
+            ], true)
             && $consent !== null
             && (int) $consent->client_id === (int) $clientId
-            && ConsentValidationService::isValidTrackingConsent($consent);
+            && $assignment->authority_basis === 'assignment_linked_client_consent'
+            && is_string($assignment->tracking_purpose)
+            && trim($assignment->tracking_purpose) !== ''
+            && is_array($assignment->access_audience)
+            && in_array('authorised_client_care', $assignment->access_audience, true)
+            && is_numeric($assignment->retention_days)
+            && (int) $assignment->retention_days > 0
+            && $assignment->collection_started_at?->lessThanOrEqualTo(now())
+            && $consentAuthorisesPurpose($consent);
     }
 
     /**
@@ -87,11 +136,27 @@ class PersonalTrackingPrivacyService
      */
     public function stopForConsent(ClientConsent $consent, int $actorUserId): array
     {
-        $assignments = DeviceAssignment::query()
+        $assignmentQuery = fn () => DeviceAssignment::query()
             ->where('consent_id', $consent->id)
             ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
             ->whereNull('released_at')
-            ->whereHas('device', fn ($query) => $query->where('domain', 'tracking'))
+            ->whereHas('device', fn ($query) => $query->where('domain', 'tracking'));
+
+        // Every assignment mutation locks consent -> Device -> assignment.
+        // Lock affected Devices in a deterministic order before assignment rows
+        // so consent withdrawal cannot deadlock with release or transfer.
+        $deviceIds = $assignmentQuery()
+            ->distinct()
+            ->orderBy('device_id')
+            ->pluck('device_id');
+        Device::query()
+            ->whereKey($deviceIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id']);
+        $assignments = $assignmentQuery()
+            ->orderBy('device_id')
+            ->orderBy('id')
             ->lockForUpdate()
             ->get();
 

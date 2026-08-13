@@ -80,8 +80,7 @@ class LocationHardwareRetirementTest extends TestCase
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
-        $consent = $this->createFleetTrackingConsent($client);
-        $this->createActiveTrackingConsent($client, 'Asset Location Tracking (Safety)');
+        $consent = $this->createResidentTrackingConsent($client);
 
         $device = Device::factory()->tracking()->create([
             'name' => 'Client GPS',
@@ -134,7 +133,7 @@ class LocationHardwareRetirementTest extends TestCase
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
-        $consent = $this->createFleetTrackingConsent($client);
+        $consent = $this->createResidentTrackingConsent($client);
 
         $device = Device::factory()->tracking()->create([
             'name' => 'Resident Pendant',
@@ -205,9 +204,9 @@ class LocationHardwareRetirementTest extends TestCase
         $this->assertStringContainsString('@deprecated', $docComment);
     }
 
-    private function createFleetTrackingConsent(Client $client): ClientConsent
+    private function createResidentTrackingConsent(Client $client): ClientConsent
     {
-        return $this->createActiveTrackingConsent($client, 'Fleet Tracking');
+        return $this->createActiveTrackingConsent($client, 'Personal Tracker (Wandering Risk)');
     }
 
     private function createActiveTrackingConsent(Client $client, string $typeName): ClientConsent

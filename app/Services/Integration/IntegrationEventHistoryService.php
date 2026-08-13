@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Models\FleetTelemetryEvent;
 use App\Models\Integration\IntegrationEvent;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
@@ -132,7 +133,7 @@ class IntegrationEventHistoryService
         }
 
         if (! empty($filters['date_to'])) {
-            $query->where('occurred_at', '<=', $filters['date_to'].' 23:59:59');
+            $query->where('occurred_at', '<=', $this->dateToBoundary($filters['date_to']));
         }
 
         if (! empty($filters['event_types'])) {
@@ -200,7 +201,7 @@ class IntegrationEventHistoryService
         }
 
         if (! empty($filters['date_to'])) {
-            $query->where('occurred_at', '<=', $filters['date_to'].' 23:59:59');
+            $query->where('occurred_at', '<=', $this->dateToBoundary($filters['date_to']));
         }
 
         if (! empty($filters['event_types'])) {
@@ -308,6 +309,15 @@ class IntegrationEventHistoryService
         }
 
         return $location;
+    }
+
+    private function dateToBoundary(mixed $value): string
+    {
+        $raw = trim((string) $value);
+
+        return preg_match('/\d{1,2}:\d{2}/', $raw) === 1
+            ? Carbon::parse($raw)->toDateTimeString()
+            : Carbon::parse($raw)->endOfDay()->toDateTimeString();
     }
 
     private function resolvePayload(IntegrationEvent $event): array

@@ -16,6 +16,10 @@ class ConsentValidationService
         'Fleet Tracking',
     ];
 
+    private const RESIDENT_LOCATION_CONSENT_TYPE_NAMES = [
+        'Personal Tracker (Wandering Risk)',
+    ];
+
     /**
      * Check if a client has valid (active, non-expired) consent for a given consent type name.
      */
@@ -100,6 +104,33 @@ class ConsentValidationService
             && $consent->isValid()
             && $consent->withdrawn_at === null
             && $consent->superseded_by_consent_id === null;
+    }
+
+    /**
+     * Resident location is a distinct purpose from vehicle Fleet Tracking or
+     * tracking a client-associated Asset. Only the personal wandering-risk
+     * consent can authorise a Device assigned directly to a Client.
+     */
+    public static function isValidResidentLocationConsent(ClientConsent $consent): bool
+    {
+        return in_array((string) $consent->consentType?->name, self::RESIDENT_LOCATION_CONSENT_TYPE_NAMES, true)
+            && (bool) $consent->consentType?->active
+            && $consent->isValid()
+            && $consent->given_at?->lessThanOrEqualTo(now())
+            && $consent->withdrawn_at === null
+            && $consent->superseded_by_consent_id === null;
+    }
+
+    public static function latestValidResidentLocationConsentForClient(Client $client): ?ClientConsent
+    {
+        return self::validConsentQuery($client)
+            ->whereHas('consentType', fn ($query) => $query
+                ->whereIn('name', self::RESIDENT_LOCATION_CONSENT_TYPE_NAMES)
+                ->where('active', true))
+            ->where('given_at', '<=', now())
+            ->latest('given_at')
+            ->latest('id')
+            ->first();
     }
 
     /**
