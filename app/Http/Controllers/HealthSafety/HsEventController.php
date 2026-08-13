@@ -12,6 +12,7 @@ use App\Models\ControlRoomAlert;
 use App\Models\EmergencyDrill;
 use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
+use App\Models\HsClosureException;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
@@ -24,6 +25,7 @@ use App\Models\SiteInspectionRecord;
 use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Models\WorkplaceInjury;
+use App\Services\HealthSafety\HsEventClosureService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourneyPresenter;
 use App\Services\Incidents\IncidentJourneyService;
@@ -44,6 +46,7 @@ class HsEventController extends Controller
 
     public function __construct(
         private readonly HsEventService $events,
+        private readonly HsEventClosureService $closures,
         private readonly UserSiteAccessService $siteAccess,
         private readonly HsCorrectiveActionPresenter $correctiveActionPresenter,
         private readonly LinkedOperationalEvidencePresenter $linkedEvidence,
@@ -309,32 +312,91 @@ class HsEventController extends Controller
         ]);
     }
 
-    /**
-     * Close an event through the governance gate (E-Gap 1). A blocked closure
-     * (incomplete required investigation / unverified actions) requires a logged
-     * override reason; a closure summary is always required.
-     */
+    /** Close through the one canonical H&S readiness/exception aggregate. */
     public function close(Request $request, int $hsEvent)
     {
         $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
 
         $data = $request->validate([
             'closure_summary' => ['required', 'string', 'max:2000'],
-            'override_reason' => ['nullable', 'string', 'max:2000'],
+            'exception_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
         try {
-            $this->events->closeEvent(
+            $this->closures->closeEvent(
                 $hsEvent,
                 $data['closure_summary'],
                 $request->user(),
-                $data['override_reason'] ?? null,
+                isset($data['exception_id']) ? (int) $data['exception_id'] : null,
             );
         } catch (\DomainException $e) {
             return back()->with('error', $e->getMessage());
         }
 
         return back()->with('success', 'Event closed.');
+    }
+
+    public function requestClosureException(Request $request, int $hsEvent)
+    {
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
+        $data = $request->validate([
+            'category' => ['required', 'string', 'in:'.implode(',', array_keys(HsClosureException::CATEGORY_SCOPES))],
+            'reason' => ['required', 'string', 'min:20', 'max:2000'],
+            'evidence_reference' => ['required', 'string', 'min:5', 'max:500'],
+            'scope' => ['required', 'array', 'min:1', 'max:1'],
+            'scope.*' => ['required', 'string', 'in:hs_acceptance,hs_investigation,recommendation_dispositions,corrective_actions'],
+            'expires_at' => ['required', 'date', 'after:now'],
+            'review_at' => ['required', 'date', 'after:now', 'before_or_equal:expires_at'],
+        ]);
+
+        try {
+            $this->closures->requestException($hsEvent, $request->user(), $data);
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Closure exception sent for independent decision.');
+    }
+
+    public function decideClosureException(Request $request, int $hsEvent, int $exception)
+    {
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
+        $exception = $hsEvent->closureExceptions()->findOrFail($exception);
+        $data = $request->validate([
+            'decision' => ['required', 'string', 'in:approved,rejected'],
+            'reason' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+
+        try {
+            $this->closures->decideException(
+                $hsEvent,
+                $exception,
+                $request->user(),
+                $data['decision'],
+                $data['reason'],
+            );
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Closure exception decision recorded.');
+    }
+
+    public function revokeClosureException(Request $request, int $hsEvent, int $exception)
+    {
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
+        $exception = $hsEvent->closureExceptions()->findOrFail($exception);
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+
+        try {
+            $this->closures->revokeException($hsEvent, $exception, $request->user(), $data['reason']);
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Closure exception revoked.');
     }
 
     /**
@@ -397,6 +459,7 @@ class HsEventController extends Controller
                 $data['method'],
                 $data['reference'] ?? null,
                 $request->boolean('site_preserved'),
+                $request->user(),
             );
         } catch (\DomainException $e) {
             return back()->with('error', $e->getMessage());
@@ -423,6 +486,50 @@ class HsEventController extends Controller
         }
 
         return back()->with('success', 'WorkSafe acknowledgement recorded.');
+    }
+
+    public function worksafeSitePreservation(Request $request, int $hsEvent)
+    {
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
+        $data = $request->validate([
+            'required' => ['required', 'boolean'],
+            'evidence_reference' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        try {
+            $this->events->recordSitePreservationDecision(
+                $hsEvent,
+                $request->boolean('required'),
+                $data['evidence_reference'],
+                $request->user(),
+            );
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Site-preservation decision recorded.');
+    }
+
+    public function worksafeSitePreservationRelease(Request $request, int $hsEvent)
+    {
+        $hsEvent = $this->resolveAccessibleEvent($request, $hsEvent);
+        $data = $request->validate([
+            'released_at' => ['required', 'date'],
+            'evidence_reference' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        try {
+            $this->events->releaseSitePreservation(
+                $hsEvent,
+                $data['released_at'],
+                $data['evidence_reference'],
+                $request->user(),
+            );
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Site-preservation release recorded.');
     }
 
     /**
@@ -513,6 +620,8 @@ class HsEventController extends Controller
             'owner:id,name',
             'acceptedBy:id,name',
             'worksafeDecidedBy:id,name',
+            'worksafeSitePreservationDecidedBy:id,name',
+            'worksafeSitePreservationReleasedBy:id,name',
         ]);
 
         $investigations = $hsEvent->investigations()
@@ -727,6 +836,15 @@ class HsEventController extends Controller
             && $hsEvent->worksafe_status === HsEvent::WORKSAFE_PENDING;
         $canAcknowledgeWorksafe = $canManage
             && $hsEvent->worksafe_status === HsEvent::WORKSAFE_NOTIFIED;
+        $canReviewSitePreservation = $canManage
+            && $hsEvent->worksafe_notifiable === true
+            && in_array($hsEvent->worksafe_status, [HsEvent::WORKSAFE_NOTIFIED, HsEvent::WORKSAFE_ACKNOWLEDGED], true)
+            && ! in_array($hsEvent->worksafe_site_preservation_status, [
+                HsEvent::SITE_PRESERVATION_ACTIVE,
+                HsEvent::SITE_PRESERVATION_RELEASED,
+            ], true);
+        $canReleaseSitePreservation = $canManage
+            && $hsEvent->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_ACTIVE;
         $nextAction = match (true) {
             $canAccept => ['label' => 'Accept this H&S handover', 'href' => null],
             $canDecideWorksafe && $hsEvent->worksafe_notifiable === null => [
@@ -736,6 +854,18 @@ class HsEventController extends Controller
             $canNotifyWorksafe => [
                 'label' => 'Record the WorkSafe notification',
                 'href' => "/health-safety/events/{$hsEvent->id}?action=worksafe-notify",
+            ],
+            $canAcknowledgeWorksafe => [
+                'label' => 'Record the WorkSafe acknowledgement',
+                'href' => "/health-safety/events/{$hsEvent->id}?action=worksafe-acknowledge",
+            ],
+            $canReleaseSitePreservation => [
+                'label' => 'Record the Site-preservation release',
+                'href' => "/health-safety/events/{$hsEvent->id}?action=worksafe-site-release",
+            ],
+            $canReviewSitePreservation => [
+                'label' => 'Review Site-preservation obligations',
+                'href' => "/health-safety/events/{$hsEvent->id}?action=worksafe-site-preservation",
             ],
             $canManage && $hsEvent->investigation_required && ! $hsEvent->hasCompletedInvestigation() => [
                 'label' => 'Continue the H&S investigation',
@@ -747,7 +877,36 @@ class HsEventController extends Controller
             ],
             default => null,
         };
-        $closureGate = $this->events->closureGate($hsEvent);
+        $closureReadiness = $this->closures->readiness($hsEvent);
+        $closureExceptions = $hsEvent->closureExceptions()
+            ->with(['requester:id,name', 'latestDecision.decidedBy:id,name'])
+            ->orderByDesc('requested_at')
+            ->get()
+            ->map(fn (HsClosureException $exception): array => [
+                'id' => $exception->id,
+                'status' => $exception->status(),
+                'category' => $exception->category,
+                'reason' => $exception->reason,
+                'evidence_reference' => $exception->evidence_reference,
+                'scope' => $exception->scope,
+                'requester' => $exception->requester ? [
+                    'id' => $exception->requester->id,
+                    'name' => $exception->requester->name,
+                ] : null,
+                'approver' => $exception->latestDecision?->decidedBy ? [
+                    'id' => $exception->latestDecision->decidedBy->id,
+                    'name' => $exception->latestDecision->decidedBy->name,
+                ] : null,
+                'decision_reason' => $exception->latestDecision?->reason,
+                'created_at' => $exception->created_at?->toIso8601String(),
+                'requested_at' => $exception->requested_at?->toIso8601String(),
+                'decided_at' => $exception->latestDecision?->decided_at?->toIso8601String(),
+                'expires_at' => $exception->expires_at?->toIso8601String(),
+                'review_at' => $exception->review_at?->toIso8601String(),
+                'provenance_hash' => $exception->provenance_hash,
+            ])
+            ->values()
+            ->all();
 
         return [
             'id' => $hsEvent->id,
@@ -777,9 +936,24 @@ class HsEventController extends Controller
                 'acknowledged_at' => $hsEvent->worksafe_acknowledged_at?->toIso8601String(),
                 'method' => $hsEvent->worksafe_method,
                 'site_preserved' => (bool) $hsEvent->worksafe_site_preserved,
+                'site_preservation_status' => $hsEvent->worksafe_site_preservation_status,
+                'site_preservation_decided_at' => $hsEvent->worksafe_site_preservation_decided_at?->toIso8601String(),
+                'site_preservation_decided_by' => $hsEvent->worksafeSitePreservationDecidedBy ? [
+                    'id' => $hsEvent->worksafeSitePreservationDecidedBy->id,
+                    'name' => $hsEvent->worksafeSitePreservationDecidedBy->name,
+                ] : null,
+                'site_preservation_decision_reference' => $hsEvent->worksafe_site_preservation_decision_reference,
+                'site_preservation_released_at' => $hsEvent->worksafe_site_preservation_released_at?->toIso8601String(),
+                'site_preservation_released_by' => $hsEvent->worksafeSitePreservationReleasedBy ? [
+                    'id' => $hsEvent->worksafeSitePreservationReleasedBy->id,
+                    'name' => $hsEvent->worksafeSitePreservationReleasedBy->name,
+                ] : null,
+                'site_preservation_release_reference' => $hsEvent->worksafe_site_preservation_release_reference,
                 'can_decide' => $canDecideWorksafe,
                 'can_notify' => $canNotifyWorksafe,
                 'can_acknowledge' => $canAcknowledgeWorksafe,
+                'can_review_site_preservation' => $canReviewSitePreservation,
+                'can_release_site_preservation' => $canReleaseSitePreservation,
             ],
             'investigation_required' => (bool) $hsEvent->investigation_required,
             'control_room_alert' => $alert ? [
@@ -845,7 +1019,9 @@ class HsEventController extends Controller
             'corrective_actions' => $correctiveActions,
             'risk_assessments' => $riskAssessments,
             'attachments' => $handoverAttachments,
-            'close_gate' => $closureGate->toArray(),
+            'close_gate' => $closureReadiness->toJourneyGate()->toArray(),
+            'close_readiness' => $closureReadiness->toArray(),
+            'closure_exceptions' => $closureExceptions,
             'assignable_staff' => $assignableStaff,
             'action_handover' => [
                 'eligible_owners' => $assignableStaff,
@@ -853,7 +1029,9 @@ class HsEventController extends Controller
             ],
             'can' => [
                 'manage' => $canManage,
-                'override_closure' => $currentUser->canDo('healthSafety.overrideClosure'),
+                'close' => $currentUser->canDo('healthSafety.events.close'),
+                'request_closure_exception' => $currentUser->canDo('healthSafety.closureExceptions.request'),
+                'approve_closure_exception' => $currentUser->canDo('healthSafety.closureExceptions.approve'),
                 'manage_corrective_action_lifecycle' => $canManage
                     && $canAccessActionEvidence,
                 'verify_corrective_actions' => $canManage && $canAccessActionEvidence,

@@ -58,6 +58,9 @@ class HsEventWorksafeTest extends TestCase
         $this->assertEquals('phone', $event->worksafe_method);
         $this->assertEquals('WS-2026-0099', $event->worksafe_reference);
         $this->assertTrue($event->worksafe_site_preserved);
+        $this->assertSame(HsEvent::SITE_PRESERVATION_ACTIVE, $event->worksafe_site_preservation_status);
+        $this->assertNotNull($event->worksafe_site_preservation_decided_at);
+        $this->assertNotNull($event->worksafe_site_preservation_decided_by_user_id);
     }
 
     public function test_acknowledge_transitions_notified_to_acknowledged(): void
@@ -385,6 +388,95 @@ class HsEventWorksafeTest extends TestCase
         $this->assertSame(
             'The source classifier identified a serious event that meets the threshold.',
             $event->worksafe_decision_reason,
+        );
+    }
+
+    public function test_site_preservation_requires_an_explicit_evidence_backed_decision_and_release(): void
+    {
+        $actor = $this->hsOfficer();
+        $site = Site::factory()->create();
+        $notRequired = HsEvent::factory()->worksafeNotifiable($actor)->create([
+            'site_id' => $site->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+            'worksafe_notified_at' => now()->subHours(2),
+            'worksafe_acknowledged_at' => now()->subHour(),
+            'worksafe_method' => 'online',
+        ]);
+
+        $this->actingAs($actor)
+            ->post("/health-safety/events/{$notRequired->id}/worksafe/site-preservation", [
+                'required' => false,
+                'evidence_reference' => 'Owner review HSP-2026-001',
+            ])
+            ->assertSessionHas('success');
+
+        $notRequired->refresh();
+        $this->assertSame(HsEvent::SITE_PRESERVATION_NOT_REQUIRED, $notRequired->worksafe_site_preservation_status);
+        $this->assertFalse($notRequired->worksafe_site_preserved);
+        $this->assertSame($actor->id, $notRequired->worksafe_site_preservation_decided_by_user_id);
+        $this->assertSame('Owner review HSP-2026-001', $notRequired->worksafe_site_preservation_decision_reference);
+
+        $active = HsEvent::factory()->worksafeNotifiable($actor)->create([
+            'site_id' => $site->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+            'worksafe_notified_at' => now()->subHours(4),
+            'worksafe_acknowledged_at' => now()->subHours(3),
+            'worksafe_method' => 'online',
+            'worksafe_site_preserved' => true,
+            'worksafe_site_preservation_status' => HsEvent::SITE_PRESERVATION_ACTIVE,
+            'worksafe_site_preservation_decided_at' => now()->subHours(4),
+            'worksafe_site_preservation_decided_by_user_id' => $actor->id,
+            'worksafe_site_preservation_decision_reference' => 'Scene secured HSP-2026-002',
+        ]);
+
+        $this->actingAs($actor)
+            ->post("/health-safety/events/{$active->id}/worksafe/site-preservation/release", [
+                'released_at' => now()->subHour()->toIso8601String(),
+                'evidence_reference' => 'Release record HSP-2026-002-R',
+            ])
+            ->assertSessionHas('success');
+
+        $active->refresh();
+        $this->assertSame(HsEvent::SITE_PRESERVATION_RELEASED, $active->worksafe_site_preservation_status);
+        $this->assertSame($actor->id, $active->worksafe_site_preservation_released_by_user_id);
+        $this->assertSame('Release record HSP-2026-002-R', $active->worksafe_site_preservation_release_reference);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'healthSafety.event.sitePreservationDecisionRecorded',
+            'auditable_id' => $notRequired->id,
+            'user_id' => $actor->id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'healthSafety.event.sitePreservationReleased',
+            'auditable_id' => $active->id,
+            'user_id' => $actor->id,
+        ]);
+    }
+
+    public function test_active_site_preservation_cannot_be_downgraded_instead_of_released(): void
+    {
+        $actor = $this->hsOfficer();
+        $event = HsEvent::factory()->worksafeNotifiable($actor)->create([
+            'worksafe_status' => HsEvent::WORKSAFE_ACKNOWLEDGED,
+            'worksafe_notified_at' => now()->subHours(4),
+            'worksafe_acknowledged_at' => now()->subHours(3),
+            'worksafe_method' => 'online',
+            'worksafe_site_preserved' => true,
+            'worksafe_site_preservation_status' => HsEvent::SITE_PRESERVATION_ACTIVE,
+            'worksafe_site_preservation_decided_at' => now()->subHours(4),
+            'worksafe_site_preservation_decided_by_user_id' => $actor->id,
+            'worksafe_site_preservation_decision_reference' => 'Scene secured HSP-2026-003',
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('must be released with evidence');
+
+        app(HsEventService::class)->recordSitePreservationDecision(
+            $event,
+            false,
+            'Retrospective downgrade HSP-2026-003-X',
+            $actor,
         );
     }
 }

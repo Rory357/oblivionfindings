@@ -22,6 +22,8 @@ export function actionFromUrl(url: string): EventActionKey | null {
                 'worksafe-decision': 'worksafe_decision',
                 'worksafe-notify': 'worksafe_notify',
                 'worksafe-acknowledge': 'worksafe_acknowledge',
+                'worksafe-site-preservation': 'worksafe_site_preservation',
+                'worksafe-site-release': 'worksafe_site_release',
                 investigation: 'investigation',
             } as const
         )[action ?? ''] ?? null

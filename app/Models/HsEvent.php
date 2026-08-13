@@ -73,6 +73,12 @@ class HsEvent extends Model
 
     public const WORKSAFE_ACKNOWLEDGED = 'acknowledged';
 
+    public const SITE_PRESERVATION_ACTIVE = 'active';
+
+    public const SITE_PRESERVATION_RELEASED = 'released';
+
+    public const SITE_PRESERVATION_NOT_REQUIRED = 'not_required';
+
     // H&S handover acceptance states
     public const HANDOVER_NOT_READY = 'not_ready';
 
@@ -111,6 +117,13 @@ class HsEvent extends Model
         'worksafe_method',
         'worksafe_acknowledged_at',
         'worksafe_site_preserved',
+        'worksafe_site_preservation_status',
+        'worksafe_site_preservation_decided_at',
+        'worksafe_site_preservation_decided_by_user_id',
+        'worksafe_site_preservation_decision_reference',
+        'worksafe_site_preservation_released_at',
+        'worksafe_site_preservation_released_by_user_id',
+        'worksafe_site_preservation_release_reference',
         'investigation_required',
         'control_room_alert_id',
         'handover_status',
@@ -134,6 +147,8 @@ class HsEvent extends Model
         'worksafe_notified_at' => 'datetime',
         'worksafe_acknowledged_at' => 'datetime',
         'worksafe_site_preserved' => 'boolean',
+        'worksafe_site_preservation_decided_at' => 'datetime',
+        'worksafe_site_preservation_released_at' => 'datetime',
         'investigation_required' => 'boolean',
         'accepted_at' => 'datetime',
     ];
@@ -202,6 +217,16 @@ class HsEvent extends Model
         return $this->belongsTo(User::class, 'worksafe_decided_by_user_id');
     }
 
+    public function worksafeSitePreservationDecidedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'worksafe_site_preservation_decided_by_user_id');
+    }
+
+    public function worksafeSitePreservationReleasedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'worksafe_site_preservation_released_by_user_id');
+    }
+
     /**
      * Incident linked through the explicit journey FK. The polymorphic source
      * relation remains available for provenance and legacy event sources.
@@ -260,6 +285,11 @@ class HsEvent extends Model
     public function riskAssessments(): HasMany
     {
         return $this->hasMany(HsRiskAssessment::class, 'hs_event_id');
+    }
+
+    public function closureExceptions(): HasMany
+    {
+        return $this->hasMany(HsClosureException::class, 'hs_event_id');
     }
 
     /* ------------------------------------------------------------------ */

@@ -471,7 +471,10 @@ class RbacSeeder extends Seeder
             ['key' => 'hazards.manage', 'description' => 'Edit and update hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage_types', 'description' => 'Manage hazard type catalog', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.viewAllSites', 'description' => 'Application-wide H&S Site access when paired with the relevant H&S capability', 'group' => 'hazards', 'module' => 'Compliance'],
-            ['key' => 'healthSafety.overrideClosure', 'description' => 'Override blocked H&S event closure with a recorded reason', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.events.close', 'description' => 'Close an H&S event after canonical readiness checks pass', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.events.closeAny', 'description' => 'Close an H&S event owned by another H&S lead', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.closureExceptions.request', 'description' => 'Request a narrow H&S closure exception', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.closureExceptions.approve', 'description' => 'Independently decide or revoke H&S closure exceptions', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Restraints & Behaviour Support
             ['key' => 'restraints.view', 'description' => 'View the restraint register & behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
@@ -564,8 +567,20 @@ class RbacSeeder extends Seeder
         |--------------------------------------------------------------------------
         */
 
-        // Admin gets EVERYTHING
-        $admin?->permissions()->sync(Permission::pluck('id'));
+        // H&S closure authority is assigned by the explicit product policy
+        // below. A generic administrator role must not inherit it merely from
+        // the broad all-permissions baseline.
+        $restrictedHsClosureAuthority = [
+            'healthSafety.events.close',
+            'healthSafety.events.closeAny',
+            'healthSafety.closureExceptions.request',
+            'healthSafety.closureExceptions.approve',
+        ];
+        $admin?->permissions()->sync(
+            Permission::query()
+                ->whereNotIn('key', $restrictedHsClosureAuthority)
+                ->pluck('id'),
+        );
 
         // Helper function to sync permissions by key
         $syncPermissions = function ($role, $keys) {
@@ -827,6 +842,7 @@ class RbacSeeder extends Seeder
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
             'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign',
+            'healthSafety.events.close', 'healthSafety.closureExceptions.request',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.schedule',
             'vendors.view', 'credentials.view', 'reports.sites.view',
@@ -855,12 +871,28 @@ class RbacSeeder extends Seeder
         $syncPermissions($healthSafetyOfficer, [
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign', 'hazards.close',
-            'healthSafety.viewAllSites',
+            'healthSafety.viewAllSites', 'healthSafety.events.close', 'healthSafety.events.closeAny',
+            'healthSafety.closureExceptions.request',
             'incidents.create',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',
         ]);
+
+        // Explicit product policy: Compliance Lead is the independent,
+        // application-wide decision authority. Broad admin/global access alone
+        // never implies this permission.
+        if ($complianceLead) {
+            $complianceLead->permissions()->syncWithoutDetaching(
+                Permission::query()
+                    ->whereIn('key', [
+                        'hazards.view',
+                        'healthSafety.viewAllSites',
+                        'healthSafety.closureExceptions.approve',
+                    ])
+                    ->pluck('id'),
+            );
+        }
 
         // Maintenance Coordinator
         $syncPermissions($maintenanceCoordinator, [

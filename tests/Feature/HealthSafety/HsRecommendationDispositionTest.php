@@ -10,7 +10,6 @@ use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRecommendationDisposition;
-use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -353,9 +352,9 @@ class HsRecommendationDispositionTest extends TestCase
             );
     }
 
-    public function test_event_detail_exposes_each_recommendation_decision_and_closure_override_capability(): void
+    public function test_event_detail_exposes_each_recommendation_decision_and_separated_closure_authority(): void
     {
-        $actor = $this->overrideOfficer();
+        $actor = $this->hsOfficer();
         $investigation = HsInvestigation::factory()->completed()->create();
 
         $acceptedRisk = $this->service->dispositionRecommendation(
@@ -380,7 +379,9 @@ class HsRecommendationDispositionTest extends TestCase
             ->get("/health-safety/events/{$investigation->hs_event_id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->where('detail.can.override_closure', true)
+                ->where('detail.can.close', true)
+                ->where('detail.can.request_closure_exception', true)
+                ->where('detail.can.approve_closure_exception', false)
                 ->where(
                     'detail.investigations.0.recommendations.0.disposition.disposition',
                     HsRecommendationDisposition::DISPOSITION_ACCEPTED_RISK,
@@ -414,17 +415,6 @@ class HsRecommendationDispositionTest extends TestCase
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
             'secondary_site_ids' => [],
-        ]);
-
-        return $user;
-    }
-
-    private function overrideOfficer(): User
-    {
-        $user = $this->hsOfficer();
-        $permission = Permission::query()->where('key', 'healthSafety.overrideClosure')->firstOrFail();
-        $user->permissionOverrides()->syncWithoutDetaching([
-            $permission->id => ['allowed' => true],
         ]);
 
         return $user;

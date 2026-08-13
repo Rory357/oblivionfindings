@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Models\FirstAidRecord;
 use App\Models\HsEvent;
+use App\Services\AuditLogger;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
@@ -18,8 +19,8 @@ use Illuminate\Support\Facades\Log;
  * → ClientIncident → ClientIncidentObserver) ALSO raises an HsEvent. Because the idempotency key
  * is keyed on the source model, the two keys never collide, so dedup cannot save us — this
  * observer must NOT also escalate a linked record, else one real event yields two HsEvents.
- * We therefore escalate ONLY when related_incident_id is null, and RETIRE our HsEvent if the
- * record later links to an incident (the incident becomes authoritative).
+ * We therefore escalate ONLY when related_incident_id is null. If it later links to an incident,
+ * provenance is recorded but H&S alone owns the eventual canonical closure decision.
  */
 class FirstAidObserver implements ShouldHandleEventsAfterCommit
 {
@@ -109,21 +110,18 @@ class FirstAidObserver implements ShouldHandleEventsAfterCommit
         }
     }
 
-    /**
-     * The record was linked to an incident after we raised an HsEvent. Close our (now
-     * duplicate) FirstAid HsEvent so governance follows the incident only.
-     */
+    /** Record supersession provenance without bypassing canonical H&S closure. */
     private function retireHsEvent(FirstAidRecord $record): void
     {
         try {
             $key = HsEvent::buildIdempotencyKey(get_class($record), $record->getKey(), HsEvent::CATEGORY_INJURY);
             $hsEvent = HsEvent::where('idempotency_key', $key)->first();
 
-            if ($hsEvent && $hsEvent->status !== HsEvent::STATUS_CLOSED) {
-                $hsEvent->update([
-                    'status' => HsEvent::STATUS_CLOSED,
-                    'closed_at' => now(),
-                    'closure_summary' => 'Superseded by linked incident #'.$record->related_incident_id.' (escalated via the First Aid Register).',
+            if ($hsEvent) {
+                AuditLogger::log('healthSafety.event.firstAidSupersessionRecorded', $hsEvent, [
+                    'first_aid_record_id' => $record->id,
+                    'linked_incident_id' => $record->related_incident_id,
+                    'closure_required' => $hsEvent->status !== HsEvent::STATUS_CLOSED,
                 ]);
             }
         } catch (\Throwable $e) {

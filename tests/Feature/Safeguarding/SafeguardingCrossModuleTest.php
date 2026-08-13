@@ -109,7 +109,7 @@ class SafeguardingCrossModuleTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('closed', $concern->fresh()->status);
-        $this->assertSame(HsEvent::STATUS_CLOSED, $hsEvent->fresh()->status);
+        $this->assertSame(HsEvent::STATUS_OPEN, $hsEvent->fresh()->status);
 
         $alert->refresh();
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $alert->status);

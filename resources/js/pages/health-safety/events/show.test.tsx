@@ -10,6 +10,8 @@ describe('H&S event direct-action links', () => {
         ['?action=worksafe-decision', 'worksafe_decision'],
         ['?action=worksafe-notify', 'worksafe_notify'],
         ['?action=worksafe-acknowledge', 'worksafe_acknowledge'],
+        ['?action=worksafe-site-preservation', 'worksafe_site_preservation'],
+        ['?action=worksafe-site-release', 'worksafe_site_release'],
         ['?action=investigation', 'investigation'],
     ] as const)('maps %s to the matching event pane', (query, expected) => {
         expect(actionFromUrl(`/health-safety/events/17${query}`)).toBe(

@@ -2,20 +2,28 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Governance\Services\GovernanceAuditService;
+use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\SafeguardingActionPlan;
+use App\Models\SafeguardingAttachment;
 use App\Models\SafeguardingConcern;
-use App\Models\SafeguardingInvestigation;
 use App\Models\SafeguardingExternalReport;
-use App\Models\Client;
-use App\Models\User;
+use App\Models\SafeguardingInvestigation;
 use App\Models\Site;
+use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Safeguarding\SafeguardingLifecycle;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
-use Illuminate\Http\RedirectResponse;
 
 class SafeguardingConcernController extends Controller
 {
@@ -147,7 +155,7 @@ class SafeguardingConcernController extends Controller
                 ->count(),
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'subjects' => Client::query()->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
-                ->map(fn (Client $c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)])
+                ->map(fn (Client $c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)])
                 ->values(),
             'staff' => User::staff()->select('id', 'name')->orderBy('name')->get()
                 ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])->values(),
@@ -238,7 +246,7 @@ class SafeguardingConcernController extends Controller
         // back() so the raise wizard can show its success pane (preserveState) and
         // the list refreshes in place; created_concern_id powers "Open concern".
         return back()
-            ->with('success', 'Safeguarding concern raised — reference ' . $concern->reference_number . '.')
+            ->with('success', 'Safeguarding concern raised — reference '.$concern->reference_number.'.')
             ->with('created_concern_id', $concern->id);
     }
 
@@ -358,7 +366,7 @@ class SafeguardingConcernController extends Controller
             'updated_by' => auth()->id(),
         ]);
 
-        return back()->with('success', 'Status updated to ' . $lifecycle->label($validated['status']) . '.');
+        return back()->with('success', 'Status updated to '.$lifecycle->label($validated['status']).'.');
     }
 
     /**
@@ -377,10 +385,10 @@ class SafeguardingConcernController extends Controller
         }
 
         $validated = $request->validate([
-            'substantiation' => 'required|in:' . implode(',', SafeguardingLifecycle::SUBSTANTIATIONS),
+            'substantiation' => 'required|in:'.implode(',', SafeguardingLifecycle::SUBSTANTIATIONS),
             'initial_risk' => 'required|in:low,medium,high,critical',
             'lead_user_id' => 'nullable|exists:users,id',
-            'path' => 'required|in:' . implode(',', SafeguardingLifecycle::TRIAGE_PATHS),
+            'path' => 'required|in:'.implode(',', SafeguardingLifecycle::TRIAGE_PATHS),
             'notes' => 'nullable|string',
             // For the "investigate" path we may capture an investigation type up front.
             'investigation_type' => 'nullable|string',
@@ -484,7 +492,7 @@ class SafeguardingConcernController extends Controller
 
         $closureSummary = $validated['closure_summary'];
         if ($needsOverride && filled($validated['override_reason'] ?? null)) {
-            $closureSummary .= "\n\nClosed with open work. Override reason: " . trim($validated['override_reason']);
+            $closureSummary .= "\n\nClosed with open work. Override reason: ".trim($validated['override_reason']);
         }
 
         $concern->update([
@@ -539,7 +547,7 @@ class SafeguardingConcernController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Index helpers (rows, redaction, worklist, counts)                  */
+    /*  Index helpers (rows, redaction, worklist, counts) */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -561,7 +569,7 @@ class SafeguardingConcernController extends Controller
         $subject = $concern->subject;
 
         if ($subject instanceof Client) {
-            return trim($subject->first_name . ' ' . $subject->last_name) ?: null;
+            return trim($subject->first_name.' '.$subject->last_name) ?: null;
         }
         if ($subject instanceof User) {
             return $subject->name;
@@ -583,7 +591,7 @@ class SafeguardingConcernController extends Controller
             'reported_at' => $concern->reported_at?->toISOString(),
             'concern_type' => $concern->concern_type,
             'abuse_category' => $restricted ? null : $concern->abuse_category,
-            'description' => $restricted ? null : \Illuminate\Support\Str::limit((string) $concern->description, 120),
+            'description' => $restricted ? null : Str::limit((string) $concern->description, 120),
             'severity' => $concern->severity,
             'status' => $concern->status,
             'current_risk_level' => $concern->current_risk_level,
@@ -637,11 +645,11 @@ class SafeguardingConcernController extends Controller
      */
     private function recentAccessLog(SafeguardingConcern $concern): array
     {
-        if (! \Illuminate\Support\Facades\Schema::hasTable('governance_audit_log')) {
+        if (! Schema::hasTable('governance_audit_log')) {
             return [];
         }
 
-        return \Illuminate\Support\Facades\DB::table('governance_audit_log as a')
+        return DB::table('governance_audit_log as a')
             ->leftJoin('users as u', 'u.id', '=', 'a.user_id')
             ->where('a.resource_type', SafeguardingConcern::class)
             ->where('a.resource_id', $concern->getKey())
@@ -651,7 +659,7 @@ class SafeguardingConcernController extends Controller
             ->get(['u.name as by', 'a.created_at as at'])
             ->map(fn ($row) => [
                 'by' => $row->by ?? 'Unknown user',
-                'at' => $row->at ? \Illuminate\Support\Carbon::parse($row->at)->toISOString() : null,
+                'at' => $row->at ? Carbon::parse($row->at)->toISOString() : null,
             ])
             ->all();
     }
@@ -682,7 +690,7 @@ class SafeguardingConcernController extends Controller
 
     private function overdueActionsCount(): int
     {
-        return \App\Models\SafeguardingActionPlan::query()
+        return SafeguardingActionPlan::query()
             ->where('due_date', '<', now())
             ->whereNotIn('status', ['completed', 'cancelled'])
             ->whereIn('safeguarding_concern_id', $this->openConcernIds())
@@ -733,7 +741,7 @@ class SafeguardingConcernController extends Controller
                     'subject' => $restricted ? null : $this->subjectDisplayName($c),
                     'owner' => $c->assignedTo?->name,
                     'kind' => 'ack',
-                    'detail' => 'Acknowledgement awaited · ' . $r->authority_name,
+                    'detail' => 'Acknowledgement awaited · '.$r->authority_name,
                     'open_section' => 'reports',
                     'due_at' => $r->reported_at?->toISOString(),
                     'overdue' => (bool) ($r->reported_at && $r->reported_at->lt(now()->subDays(7))),
@@ -751,9 +759,9 @@ class SafeguardingConcernController extends Controller
 
     /**
      * X3 state-sync: when a concern reaches a terminal state (closed /
-     * no_action_required), close its H&S projection while preserving the linked
-     * Control Room alert as an independent operational lifecycle. Best-effort;
-     * never blocks the safeguarding action.
+     * no_action_required), preserve the H&S projection and flag the linked Control
+     * Room alert for an operational decision. H&S alone owns canonical closure.
+     * Best-effort; never blocks the safeguarding action.
      */
     private function syncTerminalState(SafeguardingConcern $concern): void
     {
@@ -763,10 +771,6 @@ class SafeguardingConcernController extends Controller
 
             if (! $hsEvent) {
                 return;
-            }
-
-            if ($hsEvent->status !== HsEvent::STATUS_CLOSED) {
-                $hsEvent->update(['status' => HsEvent::STATUS_CLOSED]);
             }
 
             $alertId = $hsEvent->control_room_alert_id;
@@ -802,7 +806,7 @@ class SafeguardingConcernController extends Controller
                 }
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Safeguarding terminal state sync failed', [
+            Log::error('Safeguarding terminal state sync failed', [
                 'concern_id' => $concern->id,
                 'error' => $e->getMessage(),
             ]);
@@ -834,7 +838,7 @@ class SafeguardingConcernController extends Controller
 
         // Need-to-know: every access to a concern detail is recorded — this is what the
         // dialog's "Viewing is logged" cue refers to. No-ops if the audit table is absent.
-        \App\Domain\Governance\Services\GovernanceAuditService::log('viewed', SafeguardingConcern::class, $concern->getKey(), ['restricted' => $restricted]);
+        GovernanceAuditService::log('viewed', SafeguardingConcern::class, $concern->getKey(), ['restricted' => $restricted]);
 
         $base = [
             'id' => $concern->id,
@@ -958,7 +962,7 @@ class SafeguardingConcernController extends Controller
                 'severity' => $al->severity,
                 'active' => (bool) $al->active,
             ])->values()->all(),
-            'attachments' => $concern->attachments->map(function (\App\Models\SafeguardingAttachment $a) use ($concern, $canSensitive) {
+            'attachments' => $concern->attachments->map(function (SafeguardingAttachment $a) use ($concern, $canSensitive) {
                 // Need-to-know: sensitive evidence is locked for viewers without viewSensitive.
                 if ($a->is_sensitive && ! $canSensitive) {
                     return ['id' => $a->id, 'locked' => true, 'is_sensitive' => true];
@@ -1010,7 +1014,7 @@ class SafeguardingConcernController extends Controller
     {
         $p = $concern->allegedPerpetrator;
         if ($p instanceof Client) {
-            return trim($p->first_name . ' ' . $p->last_name) ?: null;
+            return trim($p->first_name.' '.$p->last_name) ?: null;
         }
         if ($p instanceof User) {
             return $p->name;

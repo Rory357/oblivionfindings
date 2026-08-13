@@ -37,18 +37,29 @@ vi.mock('@inertiajs/react', async () => {
         usePage: () => ({ props: { flash: {} } }),
         useForm: <T extends Record<string, unknown>>(initial: T) => {
             const [data, setDataState] = React.useState(initial);
+            const transform = React.useRef<
+                ((current: T) => Record<string, unknown>) | null
+            >(null);
 
             return {
                 data,
                 errors: {},
                 processing: false,
+                transform: (
+                    callback: (current: T) => Record<string, unknown>,
+                ) => {
+                    transform.current = callback;
+                },
                 setData: (key: keyof T, value: T[keyof T]) =>
                     setDataState((current) => ({ ...current, [key]: value })),
                 post: (
                     url: string,
                     options: { onSuccess?: (page: { props: object }) => void },
                 ) => {
-                    inertia.post(url, data);
+                    inertia.post(
+                        url,
+                        transform.current ? transform.current(data) : data,
+                    );
                     options.onSuccess?.({ props: { flash: {} } });
                 },
                 reset: vi.fn(),
@@ -107,8 +118,20 @@ import {
     type EventDetail,
 } from './event-detail-dialog';
 
-function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
-    return {
+type EventDetailOverrides = Omit<
+    Partial<EventDetail>,
+    'worksafe' | 'close_gate' | 'close_readiness' | 'can'
+> & {
+    worksafe?: Partial<EventDetail['worksafe']>;
+    close_gate?: Partial<EventDetail['close_gate']> & {
+        requirements?: EventDetail['close_gate']['requirements'];
+    };
+    close_readiness?: Partial<EventDetail['close_readiness']>;
+    can?: Partial<EventDetail['can']>;
+};
+
+function eventDetail(overrides: EventDetailOverrides = {}): EventDetail {
+    const base: EventDetail = {
         id: 17,
         reference_number: 'HS-2026-0017',
         event_category: 'incident',
@@ -134,9 +157,18 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
             acknowledged_at: null,
             method: null,
             site_preserved: false,
+            site_preservation_status: null,
+            site_preservation_decided_at: null,
+            site_preservation_decided_by: null,
+            site_preservation_decision_reference: null,
+            site_preservation_released_at: null,
+            site_preservation_released_by: null,
+            site_preservation_release_reference: null,
             can_decide: true,
             can_notify: false,
             can_acknowledge: false,
+            can_review_site_preservation: false,
+            can_release_site_preservation: false,
         },
         investigation_required: true,
         control_room_alert: {
@@ -195,6 +227,43 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
                 },
             ],
         },
+        close_readiness: {
+            ordinary_allowed: false,
+            requirements: [
+                {
+                    key: 'hs_acceptance',
+                    complete: false,
+                    label: 'Accept the H&S handover before closing this event.',
+                    href: '/health-safety/events/17?action=accept-handover',
+                    classification: 'exceptional',
+                },
+                {
+                    key: 'hs_investigation',
+                    complete: false,
+                    label: 'Complete the required investigation before closing this event.',
+                    href: '/health-safety/events/17?action=investigation',
+                    classification: 'exceptional',
+                },
+            ],
+            hard_blockers: [],
+            exceptional_blockers: [
+                {
+                    key: 'hs_acceptance',
+                    complete: false,
+                    label: 'Accept the H&S handover before closing this event.',
+                    href: '/health-safety/events/17?action=accept-handover',
+                    classification: 'exceptional',
+                },
+                {
+                    key: 'hs_investigation',
+                    complete: false,
+                    label: 'Complete the required investigation before closing this event.',
+                    href: '/health-safety/events/17?action=investigation',
+                    classification: 'exceptional',
+                },
+            ],
+        },
+        closure_exceptions: [],
         journey_state: 'H&S acceptance pending',
         assignable_staff: [
             { id: 8, name: 'Moana Rangi' },
@@ -209,7 +278,9 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
         },
         can: {
             manage: true,
-            override_closure: false,
+            close: true,
+            request_closure_exception: true,
+            approve_closure_exception: false,
             manage_corrective_action_lifecycle: true,
             verify_corrective_actions: true,
         },
@@ -375,8 +446,58 @@ function eventDetail(overrides: Partial<EventDetail> = {}): EventDetail {
                 href: '/incidents/42',
             },
         },
+    };
+
+    const detail: EventDetail = {
+        ...base,
         ...overrides,
-    } as EventDetail;
+        worksafe: { ...base.worksafe, ...overrides.worksafe },
+        close_gate: { ...base.close_gate, ...overrides.close_gate },
+        close_readiness: {
+            ...base.close_readiness,
+            ...overrides.close_readiness,
+        },
+        can: { ...base.can, ...overrides.can },
+    };
+
+    if (overrides.close_gate && !overrides.close_readiness) {
+        const hardKeys = new Set([
+            'worksafe_decision',
+            'worksafe_notification',
+            'worksafe_acknowledgement',
+            'site_preservation',
+            'control_room_linkage',
+            'control_room_scope',
+            'control_room_alert',
+            'protective_work',
+        ]);
+        const requirements = detail.close_gate.requirements.map(
+            (requirement) => ({
+                ...requirement,
+                href: requirement.href ?? `/health-safety/events/${detail.id}`,
+                classification: hardKeys.has(requirement.key)
+                    ? ('hard' as const)
+                    : ('exceptional' as const),
+            }),
+        );
+
+        detail.close_readiness = {
+            ordinary_allowed: detail.close_gate.allowed,
+            requirements,
+            hard_blockers: requirements.filter(
+                (requirement) =>
+                    !requirement.complete &&
+                    requirement.classification === 'hard',
+            ),
+            exceptional_blockers: requirements.filter(
+                (requirement) =>
+                    !requirement.complete &&
+                    requirement.classification === 'exceptional',
+            ),
+        };
+    }
+
+    return detail;
 }
 
 function renderDialog(
@@ -497,7 +618,7 @@ describe('EventDetailDialog control-room handover', () => {
                     notes: 'Accepted for formal investigation.',
                     can_accept: false,
                 },
-            } as Partial<EventDetail>),
+            } as EventDetailOverrides),
         );
 
         expect(screen.getByText('Accepted into H&S')).toBeInTheDocument();
@@ -527,10 +648,10 @@ describe('EventDetailDialog closure governance', () => {
             '/health-safety/events/17?action=accept-handover',
         );
         expect(
-            screen.getByText(
+            screen.getAllByText(
                 'Complete the required investigation before closing this event.',
-            ),
-        ).toBeInTheDocument();
+            ).length,
+        ).toBeGreaterThan(0);
         expect(
             screen.queryByRole('textbox', { name: /Override reason/ }),
         ).not.toBeInTheDocument();
@@ -539,16 +660,55 @@ describe('EventDetailDialog closure governance', () => {
         ).toBeDisabled();
     });
 
-    it('shows the override decision only to an authorised user and posts the reason', () => {
+    it('uses a current independently approved exception id instead of free text', () => {
+        const blocker = {
+            key: 'hs_investigation',
+            complete: false,
+            label: 'Complete the required investigation before closing this event.',
+            href: '/health-safety/events/17?action=investigation',
+            classification: 'exceptional' as const,
+        };
         renderDialog(
             eventDetail({
+                close_gate: {
+                    allowed: false,
+                    requirements: [blocker],
+                },
+                close_readiness: {
+                    ordinary_allowed: false,
+                    requirements: [blocker],
+                    hard_blockers: [],
+                    exceptional_blockers: [blocker],
+                },
+                closure_exceptions: [
+                    {
+                        id: 41,
+                        status: 'approved',
+                        category: 'investigation_record',
+                        reason: 'The investigation record is awaiting external evidence.',
+                        evidence_reference: 'BOARD-2026-41',
+                        scope: ['hs_investigation'],
+                        requester: { id: 8, name: 'Moana Rangi' },
+                        approver: { id: 19, name: 'Independent Approver' },
+                        decision_reason:
+                            'Time-limited approval for this record only.',
+                        created_at: '2026-08-14T01:00:00Z',
+                        requested_at: '2026-08-14T01:00:00Z',
+                        decided_at: '2026-08-14T02:00:00Z',
+                        review_at: '2099-08-18T02:00:00Z',
+                        expires_at: '2099-08-21T02:00:00Z',
+                        provenance_hash: 'a'.repeat(64),
+                    },
+                ],
                 can: {
                     manage: true,
-                    override_closure: true,
+                    close: true,
+                    request_closure_exception: true,
+                    approve_closure_exception: false,
                     manage_corrective_action_lifecycle: true,
                     verify_corrective_actions: true,
                 },
-            } as Partial<EventDetail>),
+            } as EventDetailOverrides),
         );
 
         fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
@@ -556,17 +716,92 @@ describe('EventDetailDialog closure governance', () => {
             screen.getByRole('textbox', { name: /Closure summary/ }),
             { target: { value: 'Closed under the formal exception process.' } },
         );
-        fireEvent.change(
-            screen.getByRole('textbox', { name: /Override reason/ }),
-            { target: { value: 'Executive statutory direction.' } },
-        );
         fireEvent.click(screen.getByRole('button', { name: 'Close event' }));
 
         expect(inertia.post).toHaveBeenCalledWith(
             '/health-safety/events/17/close',
             {
                 closure_summary: 'Closed under the formal exception process.',
-                override_reason: 'Executive statutory direction.',
+                exception_id: '41',
+            },
+        );
+    });
+
+    it('gives the independent approver an exception review action without close authority', () => {
+        const blocker = {
+            key: 'hs_investigation',
+            complete: false,
+            label: 'Complete the required investigation before closing this event.',
+            href: '/health-safety/events/17?action=investigation',
+            classification: 'exceptional' as const,
+        };
+        renderDialog(
+            eventDetail({
+                close_gate: { allowed: false, requirements: [blocker] },
+                close_readiness: {
+                    ordinary_allowed: false,
+                    requirements: [blocker],
+                    hard_blockers: [],
+                    exceptional_blockers: [blocker],
+                },
+                closure_exceptions: [
+                    {
+                        id: 44,
+                        status: 'pending',
+                        category: 'investigation_record',
+                        reason: 'The external evidence has a documented delivery delay.',
+                        evidence_reference: 'BOARD-2026-44',
+                        scope: ['hs_investigation'],
+                        requester: { id: 8, name: 'Moana Rangi' },
+                        approver: null,
+                        decision_reason: null,
+                        created_at: '2026-08-14T01:00:00Z',
+                        requested_at: '2026-08-14T01:00:00Z',
+                        decided_at: null,
+                        review_at: '2099-08-18T02:00:00Z',
+                        expires_at: '2099-08-21T02:00:00Z',
+                        provenance_hash: 'b'.repeat(64),
+                    },
+                ],
+                can: {
+                    manage: false,
+                    close: false,
+                    request_closure_exception: false,
+                    approve_closure_exception: true,
+                    manage_corrective_action_lifecycle: false,
+                    verify_corrective_actions: false,
+                },
+            }),
+        );
+
+        expect(
+            screen.queryByRole('button', { name: 'Close event' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Review closure exception' }),
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Review closure exception' }),
+        ).toBeInTheDocument();
+        fireEvent.change(
+            screen.getByRole('textbox', {
+                name: /Independent decision reason/,
+            }),
+            {
+                target: {
+                    value: 'Evidence and time limit independently reviewed.',
+                },
+            },
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Approve exception' }),
+        );
+
+        expect(inertia.post).toHaveBeenCalledWith(
+            '/health-safety/events/17/closure-exceptions/44/decision',
+            {
+                reason: 'Evidence and time limit independently reviewed.',
+                decision: 'approved',
             },
         );
     });
@@ -750,7 +985,9 @@ describe('EventDetailDialog WorkSafe governance', () => {
                 handover: acceptedHandover,
                 can: {
                     manage: false,
-                    override_closure: false,
+                    close: true,
+                    request_closure_exception: false,
+                    approve_closure_exception: false,
                     manage_corrective_action_lifecycle: false,
                     verify_corrective_actions: false,
                 },
@@ -861,7 +1098,9 @@ describe('EventDetailDialog WorkSafe governance', () => {
         const viewOnly = eventDetail({
             can: {
                 manage: false,
-                override_closure: false,
+                close: true,
+                request_closure_exception: false,
+                approve_closure_exception: false,
                 manage_corrective_action_lifecycle: false,
                 verify_corrective_actions: false,
             },
@@ -973,7 +1212,7 @@ describe('EventDetailDialog recommendation outcomes', () => {
                         lessons_learned: null,
                     },
                 ],
-            } as Partial<EventDetail>),
+            } as EventDetailOverrides),
         );
 
         fireEvent.click(screen.getByRole('button', { name: /Investigation/ }));
@@ -1020,7 +1259,7 @@ describe('EventDetailDialog recommendation outcomes', () => {
                     lessons_learned: null,
                 },
             ],
-        } as Partial<EventDetail>);
+        } as EventDetailOverrides);
         renderDialog(detail);
         fireEvent.click(screen.getByRole('button', { name: /Investigation/ }));
         fireEvent.click(screen.getByRole('button', { name: 'Choose outcome' }));
@@ -1079,7 +1318,7 @@ describe('EventDetailDialog recommendation outcomes', () => {
                     lessons_learned: null,
                 },
             ],
-        } as Partial<EventDetail>);
+        } as EventDetailOverrides);
 
         renderDialog(detail);
         fireEvent.click(screen.getByRole('button', { name: /Investigation/ }));
@@ -1320,7 +1559,9 @@ describe('EventDetailDialog corrective-action provenance', () => {
             eventDetail({
                 can: {
                     manage: false,
-                    override_closure: false,
+                    close: true,
+                    request_closure_exception: false,
+                    approve_closure_exception: false,
                     manage_corrective_action_lifecycle: false,
                     verify_corrective_actions: false,
                 },
@@ -1381,7 +1622,9 @@ describe('EventDetailDialog corrective-action provenance', () => {
             eventDetail({
                 can: {
                     manage: true,
-                    override_closure: false,
+                    close: true,
+                    request_closure_exception: false,
+                    approve_closure_exception: false,
                     manage_corrective_action_lifecycle: true,
                     verify_corrective_actions: true,
                 },
@@ -1523,7 +1766,9 @@ describe('EventDetailDialog corrective-action provenance', () => {
             eventDetail({
                 can: {
                     manage: true,
-                    override_closure: false,
+                    close: true,
+                    request_closure_exception: false,
+                    approve_closure_exception: false,
                     manage_corrective_action_lifecycle: false,
                     verify_corrective_actions: false,
                 },

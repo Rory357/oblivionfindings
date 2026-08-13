@@ -64,10 +64,11 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
     // ── Events governance write actions (gated) ──
     Route::middleware('permission:hazards.manage')->group(function () {
         Route::post('/events/{hsEvent}/accept-handover', [HsEventController::class, 'acceptHandover'])->name('events.handover.accept');
-        Route::post('/events/{hsEvent}/close', [HsEventController::class, 'close'])->name('events.close');
         Route::post('/events/{hsEvent}/worksafe/decision', HsWorksafeDecisionController::class)->name('events.worksafe.decision');
         Route::post('/events/{hsEvent}/worksafe/notify', [HsEventController::class, 'worksafeNotify'])->name('events.worksafe.notify');
         Route::post('/events/{hsEvent}/worksafe/acknowledge', [HsEventController::class, 'worksafeAcknowledge'])->name('events.worksafe.acknowledge');
+        Route::post('/events/{hsEvent}/worksafe/site-preservation', [HsEventController::class, 'worksafeSitePreservation'])->name('events.worksafe.site-preservation');
+        Route::post('/events/{hsEvent}/worksafe/site-preservation/release', [HsEventController::class, 'worksafeSitePreservationRelease'])->name('events.worksafe.site-preservation.release');
 
         // Investigation workflow (exposes HsInvestigationService)
         Route::post('/events/{event}/investigations', [HsInvestigationController::class, 'store'])->name('events.investigations.store');
@@ -85,6 +86,20 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::post('/events/{event}/corrective-actions/{action}/verify', [HsCorrectiveActionController::class, 'verify'])->name('events.corrective-actions.verify');
         Route::post('/events/{event}/corrective-actions/{action}/close', [HsCorrectiveActionController::class, 'close'])->name('events.corrective-actions.close');
         Route::post('/events/{event}/corrective-actions/{action}/return', [HsCorrectiveActionController::class, 'returnForRework'])->name('events.corrective-actions.return');
+    });
+
+    Route::middleware('permission:healthSafety.events.close')->group(function () {
+        Route::post('/events/{hsEvent}/close', [HsEventController::class, 'close'])->name('events.close');
+    });
+    Route::middleware('permission:healthSafety.closureExceptions.request')->group(function () {
+        Route::post('/events/{hsEvent}/closure-exceptions', [HsEventController::class, 'requestClosureException'])
+            ->name('events.closure-exceptions.request');
+    });
+    Route::middleware('permission:healthSafety.closureExceptions.approve')->group(function () {
+        Route::post('/events/{hsEvent}/closure-exceptions/{exception}/decision', [HsEventController::class, 'decideClosureException'])
+            ->name('events.closure-exceptions.decision');
+        Route::post('/events/{hsEvent}/closure-exceptions/{exception}/revoke', [HsEventController::class, 'revokeClosureException'])
+            ->name('events.closure-exceptions.revoke');
     });
 
     // ── Risk Assessment write actions (gated) — all delegate to HsRiskAssessmentService ──

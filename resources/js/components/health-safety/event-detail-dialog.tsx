@@ -313,9 +313,50 @@ export type EventWorksafe = WorksafeState & {
     acknowledged_at: string | null;
     method: string | null;
     site_preserved: boolean;
+    site_preservation_status: 'active' | 'released' | 'not_required' | null;
+    site_preservation_decided_at: string | null;
+    site_preservation_decided_by: { id: number; name: string } | null;
+    site_preservation_decision_reference: string | null;
+    site_preservation_released_at: string | null;
+    site_preservation_released_by: { id: number; name: string } | null;
+    site_preservation_release_reference: string | null;
     can_decide: boolean;
     can_notify: boolean;
     can_acknowledge: boolean;
+    can_review_site_preservation: boolean;
+    can_release_site_preservation: boolean;
+};
+
+export type ClosureRequirement = {
+    key: string;
+    complete: boolean;
+    label: string;
+    href: string;
+    classification: 'hard' | 'exceptional';
+};
+
+export type ClosureException = {
+    id: number;
+    status:
+        | 'pending'
+        | 'approved'
+        | 'rejected'
+        | 'revoked'
+        | 'expired'
+        | 'review_due';
+    category: string;
+    reason: string;
+    evidence_reference: string;
+    scope: string[];
+    requester: { id: number; name: string } | null;
+    approver: { id: number; name: string } | null;
+    decision_reason: string | null;
+    created_at: string | null;
+    requested_at: string | null;
+    decided_at: string | null;
+    expires_at: string | null;
+    review_at: string | null;
+    provenance_hash: string;
 };
 
 export type EventDetail = {
@@ -360,12 +401,21 @@ export type EventDetail = {
         completed_at: string | null;
     }>;
     close_gate: JourneyGateData;
+    close_readiness: {
+        ordinary_allowed: boolean;
+        requirements: ClosureRequirement[];
+        hard_blockers: ClosureRequirement[];
+        exceptional_blockers: ClosureRequirement[];
+    };
+    closure_exceptions: ClosureException[];
     journey_state: string;
     assignable_staff: Array<{ id: number; name: string }>;
     action_handover: CorrectiveActionHandover;
     can: {
         manage: boolean;
-        override_closure: boolean;
+        close: boolean;
+        request_closure_exception: boolean;
+        approve_closure_exception: boolean;
         manage_corrective_action_lifecycle: boolean;
         verify_corrective_actions: boolean;
     };
@@ -387,6 +437,8 @@ export type EventActionKey =
     | 'worksafe_decision'
     | 'worksafe_notify'
     | 'worksafe_acknowledge'
+    | 'worksafe_site_preservation'
+    | 'worksafe_site_release'
     | 'investigation'
     | 'add_action';
 
@@ -571,6 +623,8 @@ type ActivePane =
     | { kind: 'worksafe_decision' }
     | { kind: 'worksafe_notify' }
     | { kind: 'worksafe_acknowledge' }
+    | { kind: 'worksafe_site_preservation' }
+    | { kind: 'worksafe_site_release' }
     | { kind: 'inv_start' }
     | { kind: 'inv_findings'; investigationId: number }
     | { kind: 'inv_complete'; investigationId: number }
@@ -591,7 +645,11 @@ function paneFromAction(
 ): ActivePane | null {
     switch (action) {
         case 'close':
-            return { kind: 'close' };
+            return detail.can.close ||
+                detail.can.request_closure_exception ||
+                detail.can.approve_closure_exception
+                ? { kind: 'close' }
+                : null;
         case 'accept_handover':
             return detail.handover.can_accept
                 ? { kind: 'accept_handover' }
@@ -607,6 +665,14 @@ function paneFromAction(
         case 'worksafe_acknowledge':
             return detail.worksafe.can_acknowledge
                 ? { kind: 'worksafe_acknowledge' }
+                : null;
+        case 'worksafe_site_preservation':
+            return detail.worksafe.can_review_site_preservation
+                ? { kind: 'worksafe_site_preservation' }
+                : null;
+        case 'worksafe_site_release':
+            return detail.worksafe.can_release_site_preservation
+                ? { kind: 'worksafe_site_release' }
                 : null;
         case 'investigation':
             return { kind: 'inv_start' };
@@ -705,6 +771,8 @@ export function EventDetailDialog({
         detail.worksafe.can_decide,
         detail.worksafe.can_notify,
         detail.worksafe.can_acknowledge,
+        detail.worksafe.can_review_site_preservation,
+        detail.worksafe.can_release_site_preservation,
         detail.handover.can_accept,
     ]);
 
@@ -806,9 +874,15 @@ export function EventDetailDialog({
     );
 
     const canAct = d.can.manage && d.status !== 'closed';
-    const blockers = d.close_gate.requirements.filter(
+    const canClose = d.can.close && d.status !== 'closed';
+    const blockers = d.close_readiness.requirements.filter(
         (requirement) => !requirement.complete,
     );
+    const canReviewClosureExceptions =
+        d.status !== 'closed' &&
+        d.can.approve_closure_exception &&
+        (d.closure_exceptions.length > 0 ||
+            d.close_readiness.exceptional_blockers.length > 0);
 
     // Options bar — suppressed while a pane owns the body + its own buttons. Write
     // actions appear only when they can run (no stubs). Investigation / corrective-
@@ -861,7 +935,28 @@ export function EventDetailDialog({
                     acknowledgement
                 </Button>
             ) : null}
-            {canAct ? (
+            {d.worksafe.can_release_site_preservation ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPane({ kind: 'worksafe_site_release' })}
+                >
+                    <ShieldCheck className="mr-1.5 h-4 w-4" /> Record Site
+                    release
+                </Button>
+            ) : d.worksafe.can_review_site_preservation ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                        setPane({ kind: 'worksafe_site_preservation' })
+                    }
+                >
+                    <ShieldAlert className="mr-1.5 h-4 w-4" /> Review Site
+                    preservation
+                </Button>
+            ) : null}
+            {canClose ? (
                 <Button
                     size="sm"
                     variant="outline"
@@ -878,6 +973,16 @@ export function EventDetailDialog({
                     }
                 >
                     <CheckCircle2 className="mr-1.5 h-4 w-4" /> Close event
+                </Button>
+            ) : null}
+            {!canClose && canReviewClosureExceptions ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPane({ kind: 'close' })}
+                >
+                    <ShieldCheck className="mr-1.5 h-4 w-4" /> Review closure
+                    exception
                 </Button>
             ) : null}
         </div>
@@ -950,29 +1055,46 @@ export function EventDetailDialog({
 /* ------------------------------------------------------------------ */
 
 function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
-    const gate = d.close_gate;
-    const blocked = !gate.allowed;
-    const form = useForm<{ closure_summary: string; override_reason: string }>({
+    const hardBlockers = d.close_readiness.hard_blockers;
+    const exceptionalBlockers = d.close_readiness.exceptional_blockers;
+    const now = Date.now();
+    const authorisingException = d.closure_exceptions.find(
+        (exception) =>
+            exception.status === 'approved' &&
+            exception.expires_at !== null &&
+            new Date(exception.expires_at).getTime() > now &&
+            exception.review_at !== null &&
+            new Date(exception.review_at).getTime() > now &&
+            exceptionalBlockers.every((blocker) =>
+                exception.scope.includes(blocker.key),
+            ),
+    );
+    const form = useForm<{ closure_summary: string; exception_id: string }>({
         closure_summary: '',
-        override_reason: '',
+        exception_id: authorisingException
+            ? String(authorisingException.id)
+            : '',
     });
-    // A rejected close comes back as a 302 + flash.error (pane stays open) —
-    // show WHY, or the click looks like it did nothing.
     const [attempted, setAttempted] = useState(false);
     const flashError = (usePage().props as { flash?: { error?: string } }).flash
         ?.error;
     const canSubmit =
+        d.can.close &&
         form.data.closure_summary.trim() !== '' &&
-        (!blocked ||
-            (d.can.override_closure &&
-                form.data.override_reason.trim() !== ''));
+        hardBlockers.length === 0 &&
+        (exceptionalBlockers.length === 0 ||
+            authorisingException !== undefined);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        if (blocked && !d.can.override_closure) return;
+        if (!canSubmit) return;
         setAttempted(true);
-        // A blocked closure comes back on a 302 as flash.error (not 422) — keep the
-        // pane open so the user can record an override reason.
+        form.transform((data) => ({
+            ...data,
+            exception_id: authorisingException
+                ? String(authorisingException.id)
+                : '',
+        }));
         form.post(`/health-safety/events/${d.id}/close`, {
             preserveScroll: true,
             onSuccess: (page) => {
@@ -985,11 +1107,15 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4">
             <StepHead
                 icon={CheckCircle2}
-                title="Close event"
-                blurb="H&S ownership, WorkSafe, investigation decisions and corrective actions must all be complete. A closure summary is always required."
+                title={d.can.close ? 'Close event' : 'Review closure exception'}
+                blurb={
+                    d.can.close
+                        ? 'The statutory and protective checks are hard gates. An independently approved, current exception can cover only the named internal-governance blocker.'
+                        : 'Review the request, evidence, scope and time limit independently. This authority does not grant ordinary closure permission.'
+                }
             />
 
             {attempted && flashError ? (
@@ -1001,61 +1127,338 @@ function CloseEventPane({ d, onDone }: { d: EventDetail; onDone: () => void }) {
                 </InfoCard>
             ) : null}
 
-            <JourneyGateList gate={gate} />
+            <JourneyGateList gate={d.close_gate} />
 
-            {blocked ? (
+            {hardBlockers.length > 0 ? (
                 <InfoCard icon={AlertTriangle} tone="crit">
-                    <p className="font-semibold">Closure is blocked</p>
+                    <p className="font-semibold">Hard safety blockers</p>
                     <p className="mt-2">
-                        {d.can.override_closure
-                            ? 'You have the separate override permission. Record the formal reason below; the actor, reason and blockers will be audited.'
-                            : 'Complete the listed work before closing. Only a separately authorised manager can override these gates.'}
+                        These WorkSafe, Site-preservation, Site-scope,
+                        active-alert or protective-work checks cannot be
+                        bypassed by an exception.
                     </p>
                 </InfoCard>
             ) : null}
 
-            <Field
-                label="Closure summary"
-                required
-                error={form.errors.closure_summary}
-            >
-                <Textarea
-                    rows={4}
-                    value={form.data.closure_summary}
-                    onChange={(e) =>
-                        form.setData('closure_summary', e.target.value)
-                    }
-                    placeholder="How was this event resolved? What did the investigation and corrective actions conclude?"
-                />
-            </Field>
-
-            {blocked && d.can.override_closure ? (
-                <Field
-                    label="Override reason"
-                    required
-                    hint="Logged"
-                    error={form.errors.override_reason}
-                >
-                    <Textarea
-                        rows={3}
-                        value={form.data.override_reason}
-                        onChange={(e) =>
-                            form.setData('override_reason', e.target.value)
-                        }
-                        placeholder="Why is this event being closed despite the open gate?"
-                    />
-                </Field>
+            {exceptionalBlockers.length > 0 ? (
+                <InfoCard icon={ShieldCheck} tone="warn">
+                    <p className="font-semibold">
+                        Exceptional internal blocker
+                    </p>
+                    <p className="mt-2">
+                        {authorisingException
+                            ? `Approved exception #${authorisingException.id} covers the current blocker until ${authorisingException.expires_at ? formatDateTime(authorisingException.expires_at) : 'its recorded expiry'}. It will be rechecked when you close.`
+                            : 'A separate requester and approver must record a current, evidence-backed exception for the exact blocker. Free text cannot authorise closure.'}
+                    </p>
+                </InfoCard>
             ) : null}
 
-            <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={onDone}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={form.processing || !canSubmit}>
-                    Close event
-                </Button>
+            {d.can.close ? (
+                <form onSubmit={submit} className="flex flex-col gap-4">
+                    <Field
+                        label="Closure summary"
+                        required
+                        error={form.errors.closure_summary}
+                    >
+                        <Textarea
+                            rows={4}
+                            value={form.data.closure_summary}
+                            onChange={(e) =>
+                                form.setData('closure_summary', e.target.value)
+                            }
+                            placeholder="How was this event resolved? What did the investigation and corrective actions conclude?"
+                        />
+                    </Field>
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onDone}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={form.processing || !canSubmit}
+                        >
+                            Close event
+                        </Button>
+                    </div>
+                </form>
+            ) : null}
+
+            {exceptionalBlockers.length > 0 ||
+            d.closure_exceptions.length > 0 ? (
+                <ClosureExceptionPanel d={d} blockers={exceptionalBlockers} />
+            ) : null}
+        </div>
+    );
+}
+
+const EXCEPTION_CATEGORY_BY_SCOPE: Record<string, string> = {
+    hs_acceptance: 'handover_record',
+    hs_investigation: 'investigation_record',
+    recommendation_dispositions: 'recommendation_decision',
+    corrective_actions: 'corrective_action_monitoring',
+};
+
+function futureDateTimeInput(days: number): string {
+    const date = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16);
+}
+
+function ClosureExceptionPanel({
+    d,
+    blockers,
+}: {
+    d: EventDetail;
+    blockers: ClosureRequirement[];
+}) {
+    const firstScope = blockers[0]?.key ?? '';
+    const request = useForm({
+        category: EXCEPTION_CATEGORY_BY_SCOPE[firstScope] ?? '',
+        reason: '',
+        evidence_reference: '',
+        scope: firstScope ? [firstScope] : ([] as string[]),
+        review_at: futureDateTimeInput(3),
+        expires_at: futureDateTimeInput(7),
+    });
+
+    const submitRequest = (e: FormEvent) => {
+        e.preventDefault();
+        request.post(`/health-safety/events/${d.id}/closure-exceptions`, {
+            preserveScroll: true,
+        });
+    };
+
+    return (
+        <section
+            aria-label="Closure exceptions"
+            className="space-y-3 rounded-xl border border-border bg-card/70 p-3"
+        >
+            <p className="text-sm font-semibold">Closure exception record</p>
+
+            {d.closure_exceptions.map((exception) => (
+                <ClosureExceptionRecord
+                    key={exception.id}
+                    d={d}
+                    exception={exception}
+                />
+            ))}
+
+            {d.can.request_closure_exception && blockers.length > 0 ? (
+                <form
+                    onSubmit={submitRequest}
+                    className="space-y-3 border-t pt-3"
+                >
+                    <Field label="Exceptional blocker" required>
+                        <SelectInput
+                            value={request.data.scope[0] ?? ''}
+                            placeholder="Choose an exceptional blocker"
+                            onChange={(scope) => {
+                                request.setData('scope', [scope]);
+                                request.setData(
+                                    'category',
+                                    EXCEPTION_CATEGORY_BY_SCOPE[scope] ?? '',
+                                );
+                            }}
+                            options={blockers.map((blocker) => ({
+                                value: blocker.key,
+                                label: blocker.label,
+                            }))}
+                        />
+                    </Field>
+                    <Field
+                        label="Narrow exception reason"
+                        required
+                        error={request.errors.reason}
+                    >
+                        <Textarea
+                            rows={3}
+                            value={request.data.reason}
+                            onChange={(e) =>
+                                request.setData('reason', e.target.value)
+                            }
+                            placeholder="Why this named internal record cannot be completed before closure"
+                        />
+                    </Field>
+                    <Field
+                        label="Evidence or reference"
+                        required
+                        error={request.errors.evidence_reference}
+                    >
+                        <Input
+                            value={request.data.evidence_reference}
+                            onChange={(e) =>
+                                request.setData(
+                                    'evidence_reference',
+                                    e.target.value,
+                                )
+                            }
+                            placeholder="Decision, document, meeting or case reference"
+                        />
+                    </Field>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Review due" required>
+                            <Input
+                                type="datetime-local"
+                                value={request.data.review_at}
+                                onChange={(e) =>
+                                    request.setData('review_at', e.target.value)
+                                }
+                            />
+                        </Field>
+                        <Field label="Expires" required>
+                            <Input
+                                type="datetime-local"
+                                value={request.data.expires_at}
+                                onChange={(e) =>
+                                    request.setData(
+                                        'expires_at',
+                                        e.target.value,
+                                    )
+                                }
+                            />
+                        </Field>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button type="submit" disabled={request.processing}>
+                            Send for independent decision
+                        </Button>
+                    </div>
+                </form>
+            ) : null}
+        </section>
+    );
+}
+
+function ClosureExceptionRecord({
+    d,
+    exception,
+}: {
+    d: EventDetail;
+    exception: ClosureException;
+}) {
+    const decision = useForm({ reason: '', decision: 'approved' });
+    const revoke = useForm({ reason: '' });
+    const decide = (value: 'approved' | 'rejected') => {
+        decision.transform((data) => ({ ...data, decision: value }));
+        decision.post(
+            `/health-safety/events/${d.id}/closure-exceptions/${exception.id}/decision`,
+            { preserveScroll: true },
+        );
+    };
+
+    return (
+        <div className="rounded-lg border border-border/70 p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold">
+                    Exception #{exception.id} · {titleCase(exception.status)}
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    {exception.status === 'approved' ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
+                    ) : (
+                        <Clock className="h-3.5 w-3.5" />
+                    )}
+                    {exception.scope.join(', ').replace(/_/g, ' ')}
+                </span>
             </div>
-        </form>
+            <p className="mt-2 text-muted-foreground">{exception.reason}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+                Requested by {exception.requester?.name ?? 'Unknown'} · evidence{' '}
+                {exception.evidence_reference}
+                {exception.approver
+                    ? ` · decided by ${exception.approver.name}`
+                    : ''}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+                Requested{' '}
+                {exception.requested_at
+                    ? formatDateTime(exception.requested_at)
+                    : 'time unavailable'}
+                {exception.review_at
+                    ? ` · review ${formatDateTime(exception.review_at)}`
+                    : ''}
+                {exception.expires_at
+                    ? ` · expires ${formatDateTime(exception.expires_at)}`
+                    : ''}
+            </p>
+            {exception.decision_reason ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                    Decision: {exception.decision_reason}
+                </p>
+            ) : null}
+            <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                Provenance {exception.provenance_hash.slice(0, 16)}
+            </p>
+
+            {d.can.approve_closure_exception &&
+            exception.status === 'pending' ? (
+                <div className="mt-3 space-y-2 border-t pt-3">
+                    <Field label="Independent decision reason" required>
+                        <Textarea
+                            rows={2}
+                            value={decision.data.reason}
+                            onChange={(e) =>
+                                decision.setData('reason', e.target.value)
+                            }
+                        />
+                    </Field>
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={decision.processing}
+                            onClick={() => decide('rejected')}
+                        >
+                            Reject
+                        </Button>
+                        <Button
+                            type="button"
+                            disabled={decision.processing}
+                            onClick={() => decide('approved')}
+                        >
+                            Approve exception
+                        </Button>
+                    </div>
+                </div>
+            ) : null}
+
+            {d.can.approve_closure_exception &&
+            exception.status === 'approved' ? (
+                <form
+                    className="mt-3 space-y-2 border-t pt-3"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        revoke.post(
+                            `/health-safety/events/${d.id}/closure-exceptions/${exception.id}/revoke`,
+                            { preserveScroll: true },
+                        );
+                    }}
+                >
+                    <Field label="Revocation reason" required>
+                        <Input
+                            value={revoke.data.reason}
+                            onChange={(e) =>
+                                revoke.setData('reason', e.target.value)
+                            }
+                        />
+                    </Field>
+                    <div className="flex justify-end">
+                        <Button
+                            type="submit"
+                            variant="outline"
+                            disabled={revoke.processing}
+                        >
+                            Revoke exception
+                        </Button>
+                    </div>
+                </form>
+            ) : null}
+        </div>
     );
 }
 
@@ -1468,6 +1871,160 @@ function WorksafeAcknowledgePane({
     );
 }
 
+function WorksafeSitePreservationPane({
+    d,
+    onDone,
+}: {
+    d: EventDetail;
+    onDone: () => void;
+}) {
+    const form = useForm({
+        required:
+            d.worksafe.site_preservation_status === 'active' ? 'active' : '',
+        evidence_reference:
+            d.worksafe.site_preservation_decision_reference ?? '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.transform((data) => ({
+            required: data.required === 'active',
+            evidence_reference: data.evidence_reference,
+        }));
+        form.post(`/health-safety/events/${d.id}/worksafe/site-preservation`, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                if (
+                    !(page.props as { flash?: { error?: string } }).flash?.error
+                )
+                    onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead
+                icon={ShieldAlert}
+                title="Review Site preservation"
+                blurb="Record the event-specific product decision and its evidence. The application does not infer whether preservation applies."
+            />
+            <Field label="Site-preservation decision" required>
+                <SelectInput
+                    value={form.data.required}
+                    placeholder="Choose a Site-preservation decision"
+                    onChange={(value) => form.setData('required', value)}
+                    options={[
+                        {
+                            value: 'active',
+                            label: 'Required — preservation remains active',
+                        },
+                        {
+                            value: 'not_required',
+                            label: 'Reviewed — not required for this event',
+                        },
+                    ]}
+                />
+            </Field>
+            <Field label="Evidence or decision reference" required>
+                <Input
+                    value={form.data.evidence_reference}
+                    onChange={(e) =>
+                        form.setData('evidence_reference', e.target.value)
+                    }
+                    placeholder="WorkSafe communication, decision or internal review reference"
+                />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        !form.data.required ||
+                        form.data.evidence_reference.trim().length < 5
+                    }
+                >
+                    Record decision
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+function WorksafeSiteReleasePane({
+    d,
+    onDone,
+}: {
+    d: EventDetail;
+    onDone: () => void;
+}) {
+    const form = useForm({
+        released_at: todayInput(),
+        evidence_reference:
+            d.worksafe.site_preservation_release_reference ?? '',
+    });
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        form.post(
+            `/health-safety/events/${d.id}/worksafe/site-preservation/release`,
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    if (
+                        !(page.props as { flash?: { error?: string } }).flash
+                            ?.error
+                    )
+                        onDone();
+                },
+            },
+        );
+    };
+
+    return (
+        <form onSubmit={submit} className="flex flex-col gap-4">
+            <StepHead
+                icon={ShieldCheck}
+                title="Record Site-preservation release"
+                blurb="Record when the active preservation work was released and the evidence that supports that decision."
+            />
+            <Field label="Released at" required>
+                <Input
+                    type="date"
+                    value={form.data.released_at}
+                    onChange={(e) =>
+                        form.setData('released_at', e.target.value)
+                    }
+                />
+            </Field>
+            <Field label="Release evidence or reference" required>
+                <Input
+                    value={form.data.evidence_reference}
+                    onChange={(e) =>
+                        form.setData('evidence_reference', e.target.value)
+                    }
+                    placeholder="Release communication, inspector or decision reference"
+                />
+            </Field>
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={onDone}>
+                    Cancel
+                </Button>
+                <Button
+                    type="submit"
+                    disabled={
+                        form.processing ||
+                        form.data.evidence_reference.trim().length < 5
+                    }
+                >
+                    Record release
+                </Button>
+            </div>
+        </form>
+    );
+}
+
 /** Routes an ActivePane to its form. Corrective-action panes land in Step 4b-ii. */
 function PaneRenderer({
     pane,
@@ -1504,6 +2061,14 @@ function PaneRenderer({
         case 'worksafe_acknowledge':
             return d.worksafe.can_acknowledge ? (
                 <WorksafeAcknowledgePane d={d} onDone={onDone} />
+            ) : null;
+        case 'worksafe_site_preservation':
+            return d.worksafe.can_review_site_preservation ? (
+                <WorksafeSitePreservationPane d={d} onDone={onDone} />
+            ) : null;
+        case 'worksafe_site_release':
+            return d.worksafe.can_release_site_preservation ? (
+                <WorksafeSiteReleasePane d={d} onDone={onDone} />
             ) : null;
         case 'inv_start':
             return <StartInvestigationPane d={d} onDone={onDone} />;
@@ -3878,11 +4443,19 @@ function WorkSafeBanner({ d }: { d: EventDetail }) {
                 <DutyChip label="Notify ASAP" done={notified} />
                 <DutyChip
                     label={
-                        d.worksafe.site_preserved
-                            ? 'Site preserved'
-                            : 'Preserve the site until released'
+                        d.worksafe.site_preservation_status === 'released'
+                            ? 'Site release recorded'
+                            : d.worksafe.site_preservation_status ===
+                                'not_required'
+                              ? 'Site preservation reviewed — not required'
+                              : d.worksafe.site_preservation_status === 'active'
+                                ? 'Site preservation active — release required'
+                                : 'Review Site preservation'
                     }
-                    done={d.worksafe.site_preserved}
+                    done={
+                        d.worksafe.site_preservation_status === 'released' ||
+                        d.worksafe.site_preservation_status === 'not_required'
+                    }
                 />
                 <DutyChip label="Keep records ≥ 5 years" />
             </span>

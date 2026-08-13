@@ -4,14 +4,11 @@ namespace App\Services\HealthSafety;
 
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Models\ClientIncident;
-use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
-use App\Models\HsInvestigation;
-use App\Models\HsRecommendationDisposition;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
-use App\Support\Journeys\JourneyGate;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,7 +27,6 @@ class HsEventService
 {
     public function __construct(
         private readonly ComprehensiveAlertBridgeService $bridge,
-        private readonly HsInvestigationService $investigations,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -301,212 +297,6 @@ class HsEventService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Governance — gated closure (E-Gap 1) */
-    /* ------------------------------------------------------------------ */
-
-    /**
-     * The unmet closure gates for an event (empty array = clean to close).
-     *
-     * An event cannot be closed while a required investigation is incomplete or
-     * any corrective action is still open/unverified — unless overridden with a
-     * logged reason.
-     *
-     * @return list<string>
-     */
-    public function closeBlockers(HsEvent $event): array
-    {
-        return $this->closureGate($event)->blockers();
-    }
-
-    public function closureGate(HsEvent $event): JourneyGate
-    {
-        $requirements = [];
-        $sourceType = ltrim((string) $event->source_type, '\\');
-        $handoverRequiresAcceptance = $sourceType === ClientIncident::class
-            || in_array($event->handover_status, [
-                HsEvent::HANDOVER_NOT_READY,
-                HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
-            ], true);
-        $acceptanceOk = ! $handoverRequiresAcceptance
-            || $event->handover_status === HsEvent::HANDOVER_ACCEPTED;
-
-        $requirements[] = [
-            'key' => 'hs_acceptance',
-            'complete' => $acceptanceOk,
-            'label' => $acceptanceOk
-                ? 'H&S handover accepted where required'
-                : 'Accept the H&S handover before closing this event.',
-            'href' => "/health-safety/events/{$event->id}?action=accept-handover",
-        ];
-
-        $worksafeOk = $event->worksafe_notifiable === false
-            ? $event->worksafe_decided_at !== null
-                && $event->worksafe_decided_by_user_id !== null
-            : ($event->worksafe_notifiable === true
-                && in_array($event->worksafe_status, [
-                    HsEvent::WORKSAFE_NOTIFIED,
-                    HsEvent::WORKSAFE_ACKNOWLEDGED,
-                ], true));
-
-        $worksafeLabel = $worksafeOk
-            ? $this->worksafeRequirementLabel($event)
-            : ($event->worksafe_notifiable === null
-                ? 'Record the WorkSafe notifiability decision before closing this event.'
-                : ($event->worksafe_notifiable === true
-                    ? 'Record the WorkSafe notification before closing this event.'
-                    : 'Complete the WorkSafe notifiability decision record before closing this event.'));
-        $requirements[] = [
-            'key' => 'worksafe_decision',
-            'complete' => $worksafeOk,
-            'label' => $worksafeLabel,
-            'href' => $this->worksafeRequirementHref($event),
-        ];
-
-        $hasActiveInvestigation = $event->investigations()
-            ->where('status', '!=', HsInvestigation::STATUS_COMPLETED)
-            ->exists();
-        $investigationOk = ! $hasActiveInvestigation
-            && (! $event->investigation_required || $event->hasCompletedInvestigation());
-        $investigationHref = $hasActiveInvestigation
-            ? "/health-safety/events/{$event->id}?section=investigation"
-            : "/health-safety/events/{$event->id}?action=investigation";
-
-        $requirements[] = [
-            'key' => 'hs_investigation',
-            'complete' => $investigationOk,
-            'label' => $investigationOk
-                ? 'Required H&S investigation complete'
-                : ($hasActiveInvestigation
-                ? 'Complete the active H&S investigation before closing this event.'
-                    : 'Complete the required H&S investigation before closing this event.'),
-            'href' => $investigationHref,
-        ];
-
-        $recommendationsOk = true;
-        $recommendationBlockers = [];
-        $completedInvestigations = $event->investigations()
-            ->where('status', HsInvestigation::STATUS_COMPLETED)
-            ->get();
-
-        foreach ($completedInvestigations as $investigation) {
-            $missing = $this->investigations->undispositionedRecommendationIndexes($investigation);
-            if ($missing === []) {
-                continue;
-            }
-
-            $recommendationsOk = false;
-            $numbers = collect($missing)
-                ->map(static fn (int $index): string => (string) ($index + 1))
-                ->implode(', ');
-            $recommendationBlockers[] = "Decide the outcome of recommendation {$numbers} on investigation {$investigation->reference_number}.";
-        }
-        $requirements[] = [
-            'key' => 'recommendation_dispositions',
-            'complete' => $recommendationsOk,
-            'label' => $recommendationsOk
-                ? 'Every investigation recommendation has a recorded outcome'
-                : implode(' ', $recommendationBlockers),
-            'href' => "/health-safety/events/{$event->id}?section=investigation",
-        ];
-
-        $unresolvedActionDisposition = HsRecommendationDisposition::query()
-            ->whereHas('investigation', fn ($query) => $query->where('hs_event_id', $event->id))
-            ->where('disposition', HsRecommendationDisposition::DISPOSITION_CORRECTIVE_ACTION)
-            ->where(function ($query): void {
-                $query
-                    ->whereNull('hs_corrective_action_id')
-                    ->orWhereHas('correctiveAction', fn ($actionQuery) => $actionQuery
-                        ->whereNotIn('status', [
-                            HsCorrectiveAction::STATUS_VERIFIED,
-                            HsCorrectiveAction::STATUS_CLOSED,
-                        ]));
-            })
-            ->exists();
-        $actionsOk = ! $event->hasOpenCorrectiveActions() && ! $unresolvedActionDisposition;
-
-        $requirements[] = [
-            'key' => 'corrective_actions',
-            'complete' => $actionsOk,
-            'label' => $actionsOk
-                ? 'All corrective actions verified or closed'
-                : 'All corrective actions must be verified or closed before this event can be closed.',
-            'href' => "/health-safety/corrective-actions?event={$event->id}",
-        ];
-
-        return JourneyGate::fromRequirements($requirements);
-    }
-
-    /**
-     * Close an event through the governance gate.
-     *
-     * Blocks unless every gate in {@see closeBlockers()} is met. Bypass requires
-     * both the dedicated override permission and a reason; the actor, reason and
-     * exact blockers are then written to the strict audit trail. A closure summary
-     * is always required.
-     *
-     * @throws \DomainException when the gate blocks and no override reason is given
-     */
-    public function closeEvent(HsEvent $event, string $summary, User $actor, ?string $overrideReason = null): HsEvent
-    {
-        $summary = trim($summary);
-        if ($summary === '') {
-            throw new \DomainException('A closure summary is required.');
-        }
-
-        return DB::transaction(function () use ($event, $summary, $actor, $overrideReason): HsEvent {
-            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
-            if ($locked->status === HsEvent::STATUS_CLOSED) {
-                throw new \DomainException('This event is already closed.');
-            }
-
-            $blockers = $this->closeBlockers($locked);
-            $normalisedOverrideReason = filled($overrideReason) ? trim((string) $overrideReason) : null;
-
-            if ($blockers !== [] && $normalisedOverrideReason === null) {
-                throw new \DomainException(implode(' ', $blockers));
-            }
-
-            if ($blockers !== [] && ! $actor->canDo('healthSafety.overrideClosure')) {
-                throw new \DomainException(
-                    'You do not have permission to override H&S closure blockers. Complete the listed work or ask an authorised manager.'
-                );
-            }
-
-            $overridden = $blockers !== [];
-            $locked->update([
-                'status' => HsEvent::STATUS_CLOSED,
-                'closed_at' => now(),
-                'closed_by' => $actor->id,
-                'closure_summary' => $summary,
-            ]);
-
-            AuditLogger::logOrFail(
-                $overridden
-                    ? 'healthSafety.event.closureOverridden'
-                    : 'healthSafety.event.closed',
-                $locked,
-                [
-                    'actor_id' => $actor->id,
-                    'closure_summary' => $summary,
-                    'override_reason' => $overridden ? $normalisedOverrideReason : null,
-                    'blockers' => $blockers,
-                ],
-            );
-
-            Log::info('HsEventService: event closed', [
-                'hs_event_id' => $locked->id,
-                'reference' => $locked->reference_number,
-                'actor' => $actor->id,
-                'overridden' => $overridden,
-                'override_reason' => $overridden ? $normalisedOverrideReason : null,
-                'blockers_at_close' => $blockers,
-            ]);
-
-            return $locked->fresh();
-        }, 3);
-    }
-
-    /* ------------------------------------------------------------------ */
     /*  Governance — WorkSafe NZ notification (E-Gap 2) */
     /* ------------------------------------------------------------------ */
 
@@ -586,6 +376,13 @@ class HsEventService
                     'worksafe_method' => null,
                     'worksafe_acknowledged_at' => null,
                     'worksafe_site_preserved' => false,
+                    'worksafe_site_preservation_status' => null,
+                    'worksafe_site_preservation_decided_at' => null,
+                    'worksafe_site_preservation_decided_by_user_id' => null,
+                    'worksafe_site_preservation_decision_reference' => null,
+                    'worksafe_site_preservation_released_at' => null,
+                    'worksafe_site_preservation_released_by_user_id' => null,
+                    'worksafe_site_preservation_release_reference' => null,
                 ];
             }
 
@@ -620,11 +417,11 @@ class HsEventService
         string $method,
         ?string $reference = null,
         bool $sitePreserved = false,
+        ?User $actor = null,
     ): HsEvent {
-        return DB::transaction(function () use ($event, $notifiedAt, $method, $reference, $sitePreserved): HsEvent {
+        return DB::transaction(function () use ($event, $notifiedAt, $method, $reference, $sitePreserved, $actor): HsEvent {
             $incident = $this->lockIncidentForWorksafeProjection($event);
             $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
-
             if ($locked->worksafe_notifiable !== true) {
                 throw new \DomainException($locked->worksafe_notifiable === null
                     ? 'Record the WorkSafe notifiability decision before recording a notification.'
@@ -635,14 +432,48 @@ class HsEventService
                 throw new \DomainException('WorkSafe has already acknowledged this notification.');
             }
 
-            $locked->update([
+            $changes = [
                 'worksafe_status' => HsEvent::WORKSAFE_NOTIFIED,
                 'worksafe_notified_at' => $notifiedAt,
                 'worksafe_method' => $method,
                 'worksafe_reference' => $reference ?: $locked->worksafe_reference,
-                'worksafe_site_preserved' => $sitePreserved,
-            ]);
+                'worksafe_site_preserved' => in_array(
+                    $locked->worksafe_site_preservation_status,
+                    [HsEvent::SITE_PRESERVATION_ACTIVE, HsEvent::SITE_PRESERVATION_RELEASED],
+                    true,
+                ) || ($sitePreserved && $locked->worksafe_site_preservation_status === null),
+            ];
+            $siteDecisionRecorded = $sitePreserved
+                && $locked->worksafe_site_preservation_status === null;
+            if ($siteDecisionRecorded) {
+                $decisionActor = $actor ?? auth()->user();
+                if (! $decisionActor) {
+                    throw new \DomainException('The Site-preservation decision requires an identified actor.');
+                }
+                $changes = [
+                    ...$changes,
+                    'worksafe_site_preservation_status' => HsEvent::SITE_PRESERVATION_ACTIVE,
+                    'worksafe_site_preservation_decided_at' => now(),
+                    'worksafe_site_preservation_decided_by_user_id' => $decisionActor->id,
+                    'worksafe_site_preservation_decision_reference' => $reference
+                        ? 'WorkSafe notification '.$reference
+                        : 'WorkSafe notification record',
+                    'worksafe_site_preservation_released_at' => null,
+                    'worksafe_site_preservation_released_by_user_id' => null,
+                    'worksafe_site_preservation_release_reference' => null,
+                ];
+            }
+            $locked->update($changes);
             $this->projectWorksafeCompatibility($locked->fresh(), $incident);
+
+            if ($siteDecisionRecorded) {
+                AuditLogger::logOrFail('healthSafety.event.sitePreservationDecisionRecorded', $locked, [
+                    'actor_id' => $decisionActor->id,
+                    'required' => true,
+                    'evidence_reference' => $changes['worksafe_site_preservation_decision_reference'],
+                    'source' => 'worksafe_notification',
+                ]);
+            }
 
             Log::info('HsEventService: WorkSafe notification recorded', [
                 'hs_event_id' => $locked->id,
@@ -665,7 +496,6 @@ class HsEventService
         return DB::transaction(function () use ($event, $acknowledgedAt): HsEvent {
             $incident = $this->lockIncidentForWorksafeProjection($event);
             $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
-
             if ($locked->worksafe_status !== HsEvent::WORKSAFE_NOTIFIED) {
                 throw new \DomainException('Record the WorkSafe notification before its acknowledgement.');
             }
@@ -685,6 +515,116 @@ class HsEventService
     }
 
     /**
+     * Record the product owner's event-specific Site-preservation applicability
+     * decision without inferring legal applicability in code.
+     */
+    public function recordSitePreservationDecision(
+        HsEvent $event,
+        bool $required,
+        string $evidenceReference,
+        User $actor,
+    ): HsEvent {
+        $evidenceReference = trim($evidenceReference);
+        if (mb_strlen($evidenceReference) < 5) {
+            throw new \DomainException('A Site-preservation evidence reference is required.');
+        }
+
+        return DB::transaction(function () use ($event, $required, $evidenceReference, $actor): HsEvent {
+            $incident = $this->lockIncidentForWorksafeProjection($event);
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+            if ($locked->worksafe_notifiable !== true
+                || ! in_array($locked->worksafe_status, [HsEvent::WORKSAFE_NOTIFIED, HsEvent::WORKSAFE_ACKNOWLEDGED], true)
+            ) {
+                throw new \DomainException('Record the applicable WorkSafe notification before reviewing Site preservation.');
+            }
+            if ($locked->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_RELEASED) {
+                throw new \DomainException('The Site-preservation release has already been recorded.');
+            }
+            if ($locked->worksafe_site_preservation_status === HsEvent::SITE_PRESERVATION_ACTIVE && ! $required) {
+                throw new \DomainException(
+                    'Active Site-preservation work must be released with evidence; it cannot be changed to not required.',
+                );
+            }
+
+            $before = [
+                'status' => $locked->worksafe_site_preservation_status,
+                'decided_at' => $locked->worksafe_site_preservation_decided_at?->toIso8601String(),
+                'decided_by_user_id' => $locked->worksafe_site_preservation_decided_by_user_id,
+                'decision_reference' => $locked->worksafe_site_preservation_decision_reference,
+            ];
+            $locked->forceFill([
+                'worksafe_site_preserved' => $required,
+                'worksafe_site_preservation_status' => $required
+                    ? HsEvent::SITE_PRESERVATION_ACTIVE
+                    : HsEvent::SITE_PRESERVATION_NOT_REQUIRED,
+                'worksafe_site_preservation_decided_at' => now(),
+                'worksafe_site_preservation_decided_by_user_id' => $actor->id,
+                'worksafe_site_preservation_decision_reference' => $evidenceReference,
+                'worksafe_site_preservation_released_at' => null,
+                'worksafe_site_preservation_released_by_user_id' => null,
+                'worksafe_site_preservation_release_reference' => null,
+            ])->save();
+            $this->projectWorksafeCompatibility($locked->fresh(), $incident);
+
+            AuditLogger::logOrFail('healthSafety.event.sitePreservationDecisionRecorded', $locked, [
+                'actor_id' => $actor->id,
+                'required' => $required,
+                'evidence_reference' => $evidenceReference,
+                'before' => $before,
+                'after' => [
+                    'status' => $locked->worksafe_site_preservation_status,
+                    'decided_at' => $locked->worksafe_site_preservation_decided_at?->toIso8601String(),
+                    'decided_by_user_id' => $locked->worksafe_site_preservation_decided_by_user_id,
+                    'decision_reference' => $locked->worksafe_site_preservation_decision_reference,
+                ],
+            ]);
+
+            return $locked->fresh();
+        }, 3);
+    }
+
+    public function releaseSitePreservation(
+        HsEvent $event,
+        \DateTimeInterface|string $releasedAt,
+        string $evidenceReference,
+        User $actor,
+    ): HsEvent {
+        $evidenceReference = trim($evidenceReference);
+        if (mb_strlen($evidenceReference) < 5) {
+            throw new \DomainException('A Site-preservation release reference is required.');
+        }
+
+        return DB::transaction(function () use ($event, $releasedAt, $evidenceReference, $actor): HsEvent {
+            $incident = $this->lockIncidentForWorksafeProjection($event);
+            $locked = HsEvent::query()->lockForUpdate()->findOrFail($event->id);
+            if ($locked->worksafe_site_preservation_status !== HsEvent::SITE_PRESERVATION_ACTIVE) {
+                throw new \DomainException('Only active Site-preservation work can be released.');
+            }
+            $release = CarbonImmutable::parse($releasedAt);
+            $started = $locked->worksafe_site_preservation_decided_at ?? $locked->worksafe_notified_at;
+            if ($started && $release->isBefore($started)) {
+                throw new \DomainException('The Site-preservation release cannot predate the recorded obligation.');
+            }
+
+            $locked->forceFill([
+                'worksafe_site_preservation_status' => HsEvent::SITE_PRESERVATION_RELEASED,
+                'worksafe_site_preservation_released_at' => $release,
+                'worksafe_site_preservation_released_by_user_id' => $actor->id,
+                'worksafe_site_preservation_release_reference' => $evidenceReference,
+            ])->save();
+            $this->projectWorksafeCompatibility($locked->fresh(), $incident);
+
+            AuditLogger::logOrFail('healthSafety.event.sitePreservationReleased', $locked, [
+                'actor_id' => $actor->id,
+                'released_at' => $release->toIso8601String(),
+                'evidence_reference' => $evidenceReference,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
+    }
+
+    /**
      * Keep legacy incident/governance rows as one-way projections of HsEvent.
      */
     private function projectWorksafeCompatibility(HsEvent $event, ?ClientIncident $incident): void
@@ -693,12 +633,18 @@ class HsEventService
             return;
         }
 
+        $releasedByName = $event->worksafe_site_preservation_released_by_user_id
+            ? $event->worksafeSitePreservationReleasedBy()->value('name')
+            : null;
+
         $incident->updateQuietly([
             'is_notifiable' => (bool) $event->worksafe_notifiable,
             'worksafe_notification_status' => $event->worksafe_status,
             'worksafe_notified_at' => $event->worksafe_notified_at,
             'worksafe_reference' => $event->worksafe_reference,
             'site_preserved' => (bool) $event->worksafe_site_preserved,
+            'site_preservation_released_at' => $event->worksafe_site_preservation_released_at,
+            'site_preservation_released_by' => $releasedByName,
         ]);
 
         NotifiableIncident::query()
@@ -717,6 +663,8 @@ class HsEventService
                     'notification_reference' => $event->worksafe_reference,
                     'notified_by' => auth()->id() ?: $legacy->notified_by,
                     'site_preserved' => (bool) $event->worksafe_site_preserved,
+                    'site_preservation_released_at' => $event->worksafe_site_preservation_released_at,
+                    'site_preservation_released_by' => $event->worksafe_site_preservation_released_by_user_id,
                     'authority_response_tracking' => $tracking ?: null,
                 ]);
             });
@@ -764,28 +712,6 @@ class HsEventService
             'reason' => null,
             'source' => null,
         ];
-    }
-
-    private function worksafeRequirementLabel(HsEvent $event): string
-    {
-        return match (true) {
-            $event->worksafe_notifiable === null => 'Record the WorkSafe notifiability decision',
-            $event->worksafe_notifiable === false => 'WorkSafe decision recorded — not notifiable',
-            $event->worksafe_status === HsEvent::WORKSAFE_PENDING => 'Record the WorkSafe notification',
-            $event->worksafe_status === HsEvent::WORKSAFE_NOTIFIED => 'WorkSafe notified — acknowledgement pending',
-            $event->worksafe_status === HsEvent::WORKSAFE_ACKNOWLEDGED => 'WorkSafe notification acknowledged',
-            default => 'Complete the WorkSafe notification record',
-        };
-    }
-
-    private function worksafeRequirementHref(HsEvent $event): string
-    {
-        $action = $event->worksafe_notifiable === true
-            && $event->worksafe_status === HsEvent::WORKSAFE_PENDING
-                ? 'worksafe-notify'
-                : 'worksafe-decision';
-
-        return "/health-safety/events/{$event->id}?action={$action}";
     }
 
     private function assertWorksafeDecisionMutable(HsEvent $event): void
