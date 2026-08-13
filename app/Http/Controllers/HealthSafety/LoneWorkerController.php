@@ -52,7 +52,7 @@ class LoneWorkerController extends Controller
     private const LIVE_STATUSES = ['active', 'overdue', 'emergency'];
 
     /** Explicit H&S-wide access; hazards.view/manage remain site-scoped. */
-    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS;
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,

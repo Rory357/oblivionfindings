@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\BehaviourSupportPlan;
 use App\Models\Client;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -14,7 +15,7 @@ class BehaviourSupportPlanFactory extends Factory
     public function definition(): array
     {
         return [
-            'client_id' => Client::factory(),
+            'client_id' => Client::factory()->for(Site::factory()),
             'title' => 'Behaviour support plan — '.fake()->lastName(),
             'triggers' => fake()->sentence(),
             'de_escalation_strategies' => fake()->sentence(),

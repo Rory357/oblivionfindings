@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\DB;
 class HsGovernanceService
 {
     /** @var list<string> */
-    private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+    private const SITE_BYPASS_PERMISSIONS = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS;
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,

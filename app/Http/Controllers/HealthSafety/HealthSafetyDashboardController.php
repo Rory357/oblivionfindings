@@ -36,7 +36,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HealthSafetyDashboardController extends Controller
 {
-    private const HS_SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+    private const HS_SITE_BYPASS_PERMISSIONS = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS;
 
     public function __construct(
         private readonly HsDashboardService $dashboardService,

@@ -23,6 +23,14 @@ class UserSiteAccessService
 {
     public const DEFAULT_MESSAGE = 'You are not authorized to access records for this site.';
 
+    /**
+     * The one explicit application-wide H&S Site bypass. H&S capability
+     * permissions (hazards.*, restraints.*, hr.wellbeing.*) never imply it.
+     *
+     * @var array<int, string>
+     */
+    public const HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
+
     /** @var array<string, bool> */
     private array $clientIncidentSiteColumnCache = [];
 
@@ -116,6 +124,26 @@ class UserSiteAccessService
         }
 
         return false;
+    }
+
+    /** @return array<int, int> */
+    public function accessibleHealthSafetySiteIds(?User $user): array
+    {
+        return $this->accessibleSiteIds($user, self::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+    }
+
+    public function canAccessAllHealthSafetySites(?User $user): bool
+    {
+        return $this->canBypass($user, self::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+    }
+
+    public function assertCanAccessHealthSafetySiteId(?User $user, ?int $siteId): void
+    {
+        $this->assertCanAccessSiteId(
+            $user,
+            $siteId,
+            self::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
     }
 
     /**
@@ -277,6 +305,81 @@ class UserSiteAccessService
             $user,
             $this->nullablePositiveId($injury->site_id),
             $bypassPermissions,
+        );
+    }
+
+    /**
+     * Canonical restraint-event Site scope. A restricted viewer must be
+     * allowed both the recorded Site and the linked Client's current Site so
+     * stale or conflicting provenance cannot disclose another Site's PHI.
+     * The named application-wide H&S permission deliberately bypasses this
+     * restriction so authorised governance roles can inspect legacy records.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function applyRestraintEventScope(
+        Builder $query,
+        ?User $user,
+        array $bypassPermissions = self::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+    ): Builder {
+        if ($this->canBypass($user, $bypassPermissions)) {
+            return $query;
+        }
+
+        return $this->applyRestraintEventSiteScopeForSiteIds(
+            $query,
+            $this->accessibleSiteIds($user, $bypassPermissions),
+        );
+    }
+
+    /**
+     * @param  array<int, int|string>  $siteIds
+     */
+    public function applyRestraintEventSiteScopeForSiteIds(Builder $query, array $siteIds): Builder
+    {
+        $siteIds = $this->normalizePositiveSiteIds($siteIds);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->whereIn($query->qualifyColumn('site_id'), $siteIds)
+            ->whereHas('client', fn (Builder $client) => $client->whereIn('site_id', $siteIds));
+    }
+
+    /**
+     * Behaviour support plans inherit their Site boundary from their Client.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     */
+    public function applyBehaviourSupportPlanScope(
+        Builder $query,
+        ?User $user,
+        array $bypassPermissions = self::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+    ): Builder {
+        if ($this->canBypass($user, $bypassPermissions)) {
+            return $query;
+        }
+
+        return $this->applyBehaviourSupportPlanSiteScopeForSiteIds(
+            $query,
+            $this->accessibleSiteIds($user, $bypassPermissions),
+        );
+    }
+
+    /**
+     * @param  array<int, int|string>  $siteIds
+     */
+    public function applyBehaviourSupportPlanSiteScopeForSiteIds(Builder $query, array $siteIds): Builder
+    {
+        $siteIds = $this->normalizePositiveSiteIds($siteIds);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas(
+            'client',
+            fn (Builder $client) => $client->whereIn('site_id', $siteIds),
         );
     }
 

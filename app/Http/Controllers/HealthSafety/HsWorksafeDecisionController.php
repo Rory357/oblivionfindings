@@ -24,7 +24,7 @@ class HsWorksafeDecisionController extends Controller
         $this->siteAccess->applyHsEventScope(
             $query,
             $request->user(),
-            ['healthSafety.viewAllSites'],
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
         );
         $event = $query->findOrFail($hsEvent);
         $data = $request->validated();

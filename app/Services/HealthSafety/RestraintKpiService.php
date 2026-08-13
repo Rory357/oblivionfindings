@@ -4,6 +4,7 @@ namespace App\Services\HealthSafety;
 
 use App\Models\BehaviourSupportPlan;
 use App\Models\RestraintEvent;
+use App\Services\UserSiteAccessService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,10 @@ use Illuminate\Support\Facades\DB;
  */
 class RestraintKpiService
 {
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /**
      * Command-centre summary — period + site scoped. Lagging signals (what happened
      * in the window) plus standing oversight signals (open items, not period-bound).
@@ -113,16 +118,24 @@ class RestraintKpiService
     {
         $query = RestraintEvent::query();
 
-        return $this->applySiteScope($query, $siteId);
+        return $siteId === null
+            ? $query
+            : $this->siteAccess->applyRestraintEventSiteScopeForSiteIds(
+                $query,
+                $this->normalizeSiteIds($siteId),
+            );
     }
 
     private function scopedPlans(int|array|null $siteId): Builder
     {
-        return BehaviourSupportPlan::query()
-            ->when($siteId !== null, fn (Builder $q) => $q->whereHas(
-                'client',
-                fn (Builder $clientQuery) => $this->applySiteScope($clientQuery, $siteId),
-            ));
+        $query = BehaviourSupportPlan::query();
+
+        return $siteId === null
+            ? $query
+            : $this->siteAccess->applyBehaviourSupportPlanSiteScopeForSiteIds(
+                $query,
+                $this->normalizeSiteIds($siteId),
+            );
     }
 
     /**
@@ -140,7 +153,7 @@ class RestraintKpiService
             return 0;
         }
 
-        $clientsWithActivePlan = BehaviourSupportPlan::query()
+        $clientsWithActivePlan = $this->scopedPlans($siteId)
             ->whereIn('client_id', $clientIdsWithEvents)
             ->where('status', 'active')
             ->distinct()
@@ -149,21 +162,14 @@ class RestraintKpiService
         return $clientIdsWithEvents->diff($clientsWithActivePlan)->count();
     }
 
-    private function applySiteScope(Builder $query, int|array|null $siteId): Builder
+    /** @return array<int, int> */
+    private function normalizeSiteIds(int|array $siteId): array
     {
-        if ($siteId === null) {
-            return $query;
-        }
-
-        $siteIds = collect(is_array($siteId) ? $siteId : [$siteId])
+        return collect(is_array($siteId) ? $siteId : [$siteId])
             ->map(fn ($id) => (int) $id)
             ->filter(fn (int $id) => $id > 0)
             ->unique()
             ->values()
             ->all();
-
-        return $siteIds === []
-            ? $query->whereRaw('1 = 0')
-            : $query->whereIn($query->qualifyColumn('site_id'), $siteIds);
     }
 }

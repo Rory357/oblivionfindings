@@ -245,7 +245,11 @@ class HsInvestigationController extends Controller
     private function resolveAccessibleEvent(Request $request, HsEvent $event): HsEvent
     {
         $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope($query, $request->user(), ['healthSafety.viewAllSites']);
+        $this->siteAccess->applyHsEventScope(
+            $query,
+            $request->user(),
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
 
         return $query->findOrFail($event->id);
     }
@@ -267,7 +271,7 @@ class HsInvestigationController extends Controller
             $query,
             $event,
             $request->user(),
-            ['healthSafety.viewAllSites'],
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
         );
         $eligibleIds = $query->get()
             ->filter(fn (User $staff): bool => $staff->canDo('hazards.manage'))

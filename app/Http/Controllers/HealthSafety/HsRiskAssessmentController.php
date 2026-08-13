@@ -427,7 +427,7 @@ class HsRiskAssessmentController extends Controller
     /** @return array<int, string> */
     private function bypassPermissions(): array
     {
-        return ['healthSafety.viewAllSites'];
+        return UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS;
     }
 
     private function applyTab(Builder $query, string $tab): void

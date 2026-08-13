@@ -193,7 +193,7 @@ class HsCorrectiveActionController extends Controller
     private function resolveAccessibleEvent(
         Request $request,
         HsEvent $event,
-        array $bypassPermissions = ['healthSafety.viewAllSites'],
+        array $bypassPermissions = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
     ): HsEvent {
         $query = HsEvent::query();
         $this->siteAccess->applyHsEventScope(
@@ -212,7 +212,7 @@ class HsCorrectiveActionController extends Controller
             $query,
             $event,
             $request->user(),
-            ['healthSafety.viewAllSites'],
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
         );
         $staff = $query->first();
 
