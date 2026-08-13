@@ -250,6 +250,62 @@ class WebhookReceiverTest extends TestCase
         $this->assertDatabaseCount('monitoring_outbox', 0);
     }
 
+    public function test_routing_failure_rolls_back_projection_and_monitoring_replay_completes_once(): void
+    {
+        $key = 'unifi-routing-recovery-1234';
+        $site = Site::factory()->create();
+        $this->createProviderConnection('unifi', $key);
+        $this->mapProviderToSite('unifi', $site);
+        $payload = $this->payload($site->id, 'evt-routing-recovery');
+        $attempt = 0;
+
+        $this->mock(AlertRoutingService::class, function (MockInterface $mock) use (&$attempt): void {
+            $mock->shouldReceive('processEvent')
+                ->twice()
+                ->withArgs(fn (IntegrationEvent $event): bool => $event->exists)
+                ->andReturnUsing(function () use (&$attempt) {
+                    if ($attempt++ === 0) {
+                        throw new \RuntimeException('injected alert routing failure');
+                    }
+
+                    return null;
+                });
+        });
+
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
+            ->assertAccepted();
+        $outbox = MonitoringOutbox::query()->sole();
+
+        try {
+            app(MonitoringEnvelopeConsumer::class)->consume(
+                'event-projector',
+                $outbox->envelope_bytes,
+                $site->id,
+            );
+            $this->fail('The injected routing failure should roll back the monitoring projection.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('injected alert routing failure', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('integration_events', 0);
+        $this->assertDatabaseCount('monitoring_inbox', 0);
+
+        app(MonitoringEnvelopeConsumer::class)->consume(
+            'event-projector',
+            $outbox->envelope_bytes,
+            $site->id,
+        );
+        app(MonitoringEnvelopeConsumer::class)->consume(
+            'event-projector',
+            $outbox->envelope_bytes,
+            $site->id,
+        );
+
+        $this->assertDatabaseCount('integration_events', 1);
+        $this->assertDatabaseCount('monitoring_inbox', 1);
+        $this->assertNotNull(\DB::table('monitoring_inbox')->value('processed_at'));
+    }
+
     private function createProviderConnection(string $provider, string $key): IntegrationProviderConnection
     {
         return IntegrationProviderConnection::create([

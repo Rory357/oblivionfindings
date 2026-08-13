@@ -145,6 +145,13 @@ class SignalProcessingService
         }
 
         return DB::transaction(function () use ($signal) {
+            $signal = Signal::query()->whereKey($signal->id)->lockForUpdate()->firstOrFail();
+            if ($signal->status !== 'pending') {
+                return $signal->status === 'processed'
+                    ? ($signal->alert ?? $signal->correlatedAlert)
+                    : null;
+            }
+
             // Check if in maintenance window
             if ($this->isInMaintenanceWindow($signal)) {
                 $signal->markSuppressed('In maintenance window');
@@ -827,7 +834,7 @@ class SignalProcessingService
     {
         // Eager-load relationships for context enrichment
         $fleetSignal->loadMissing([
-            'asset:id,name,asset_tag,registration_number,home_site_id',
+            'asset:id,name,asset_tag,registration_number,site_id,home_site_id',
             'asset.homeSite:id,name',
             'trip:id,asset_id,driver_session_id,started_at,ended_at,distance_km,start_address,end_address',
             'trip.driverSession:id,user_id',
@@ -852,8 +859,12 @@ class SignalProcessingService
         $data = [
             'signal_source_id' => $fleetSource?->id,
             'signal_type_code' => $signalTypeCode,
+            'idempotency_key' => hash(
+                'sha256',
+                'safety-signal|fleet|'.$fleetSignal->idempotency_key,
+            ),
             'asset_id' => $fleetSignal->asset_id,
-            'site_id' => $fleetSignal->asset?->home_site_id,
+            'site_id' => $fleetSignal->asset?->home_site_id ?: $fleetSignal->asset?->site_id,
             'external_ref' => 'fleet_signal_'.$fleetSignal->id,
             'severity_hint' => $fleetSignal->severity_hint ?? 'medium',
             'occurred_at' => $fleetSignal->occurred_at,
@@ -908,6 +919,10 @@ class SignalProcessingService
         $data = [
             'signal_source_id' => $source?->id,
             'signal_type_code' => $shiftSignal->signal_type,
+            'idempotency_key' => hash(
+                'sha256',
+                'safety-signal|shift|'.$shiftSignal->idempotency_key,
+            ),
             'site_id' => $shiftSignal->site_id ?: $shiftSignal->shift?->site_id ?: $shiftSignal->shift?->client?->site_id,
             'client_id' => $shiftSignal->client_id ?: $shiftSignal->shift?->client_id,
             'external_ref' => 'shift_signal_'.$shiftSignal->id,

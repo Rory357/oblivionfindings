@@ -116,7 +116,7 @@ interface MaintenanceWindowData {
 
 interface SignalOutboxRow {
     id: number;
-    status: 'failed' | 'dead_letter';
+    status: 'failed' | 'dead_letter' | 'unroutable';
     attempts: number;
     last_attempt_at: string | null;
     last_error: string | null;
@@ -205,6 +205,7 @@ const windowStatusColors: Record<string, string> = {
 const outboxStatusColors: Record<string, string> = {
     failed: 'bg-status-warning-bg text-status-warning',
     dead_letter: 'bg-status-critical-bg text-status-critical',
+    unroutable: 'bg-status-critical-bg text-status-critical',
 };
 
 function heartbeatColor(isoString: string | null): string {

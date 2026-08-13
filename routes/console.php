@@ -173,6 +173,13 @@ app(Schedule::class)
     ->everyMinute()
     ->withoutOverlapping();
 
+// Fleet, shift and device-event source rows are durable delivery intents.
+// Reconcile any missing outbox and retry transiently stranded routing work.
+app(Schedule::class)
+    ->command('safety-signals:recover --limit=100')
+    ->everyMinute()
+    ->withoutOverlapping();
+
 // Recover Control Room alert notification outbox rows that were committed
 // before a transient queue/worker failure could deliver them.
 app(Schedule::class)

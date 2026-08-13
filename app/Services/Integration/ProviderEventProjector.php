@@ -86,6 +86,11 @@ final readonly class ProviderEventProjector
                 throw new RuntimePayloadInvalid('Provider event identity was reused with different content.');
             }
 
+            // A legacy or interrupted projection may have persisted the source
+            // before routing completed. Routing is deterministic and signal
+            // ingestion is idempotent, so replay safely converges here.
+            $this->routing->processEvent($existing);
+
             return;
         }
 

@@ -4,6 +4,7 @@ namespace App\Domain\SecurityDevices\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class DeviceEvent extends Model
 {
@@ -34,6 +35,11 @@ class DeviceEvent extends Model
     public function device(): BelongsTo
     {
         return $this->belongsTo(Device::class);
+    }
+
+    public function signalOutbox(): HasOne
+    {
+        return $this->hasOne(DeviceEventSignalOutbox::class, 'device_event_id');
     }
 
     // ── Scopes ────────────────────────────────────────────────────

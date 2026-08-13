@@ -3,6 +3,7 @@
 namespace App\Services\Integration;
 
 use App\Enums\AlertSeverity;
+use App\Exceptions\SafetySignalUnroutable;
 use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\Integration\IntegrationEvent;
@@ -126,6 +127,11 @@ class IntegrationSignalNormaliser
         $signalTypeCode = $this->resolveSignalTypeCode($event);
         $severity = $this->resolveSeverity($event);
         $signalSource = $this->resolveSignalSource($event->provider);
+        if ($event->site_id === null || $signalSource === null) {
+            throw new SafetySignalUnroutable(
+                'Integration event has no canonical Site or active signal source.',
+            );
+        }
         $idempotencyKey = $this->buildIdempotencyKey($event);
 
         return [

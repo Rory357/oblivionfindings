@@ -96,14 +96,15 @@ class AlertRoutingService
             return $alert;
         } catch (\Throwable $e) {
             Log::error('AlertRoutingService: signal processing failed', SafeOperationalData::logContext([
+                'integration_event_id' => $event->id,
                 'provider' => $event->provider,
                 'error_category' => SafeOperationalData::failureCategory($e),
             ]));
 
-            // Do NOT rethrow — the IntegrationEvent is already persisted.
-            // The failure is logged for operational visibility.
-            // A future retry mechanism can re-process unlinked events.
-            return null;
+            // The monitoring consumer owns retry and dead-letter state. Let it
+            // roll back this projection boundary instead of acknowledging a
+            // persisted IntegrationEvent whose alert was never completed.
+            throw $e;
         }
     }
 

@@ -8,12 +8,18 @@ use App\Models\ShiftSignal;
 use App\Models\ShiftSignalOutbox;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ShiftSignalService
 {
     public const TYPE_NO_SHOW = 'shift_no_show';
+
     public const TYPE_LATE_START = 'shift_late_start';
+
     public const TYPE_NOT_COMPLETED = 'shift_not_completed';
+
     public const TYPE_UNCOVERED = 'shift_uncovered';
 
     public const START_ANOMALY_TYPES = [
@@ -22,37 +28,49 @@ class ShiftSignalService
     ];
 
     public const RESOLUTION_SOURCE_ATTENDANCE = 'attendance_evidence';
+
     public const RESOLUTION_SOURCE_SHIFT_COMPLETION = 'shift_completion';
+
     public const RESOLUTION_SOURCE_COVERAGE = 'coverage_restored';
 
     public function emit(array $payload): ShiftSignal
     {
         $idempotencyKey = $payload['idempotency_key'] ?? $this->buildIdempotencyKey($payload);
 
-        $signal = ShiftSignal::query()->firstOrCreate(
-            ['idempotency_key' => $idempotencyKey],
-            [
-                'shift_id' => $payload['shift_id'] ?? null,
-                'site_id' => $payload['site_id'] ?? null,
-                'client_id' => $payload['client_id'] ?? null,
-                'user_id' => $payload['user_id'] ?? null,
-                'signal_type' => $payload['signal_type'],
-                'severity_hint' => $payload['severity_hint'] ?? 'medium',
-                'occurred_at' => $payload['occurred_at'] ?? now(),
-                'payload' => $payload['payload'] ?? null,
-            ]
-        );
+        [$signal, $outboxId] = DB::transaction(function () use ($payload, $idempotencyKey): array {
+            $signal = ShiftSignal::query()->firstOrCreate(
+                ['idempotency_key' => $idempotencyKey],
+                [
+                    'shift_id' => $payload['shift_id'] ?? null,
+                    'site_id' => $payload['site_id'] ?? null,
+                    'client_id' => $payload['client_id'] ?? null,
+                    'user_id' => $payload['user_id'] ?? null,
+                    'signal_type' => $payload['signal_type'],
+                    'severity_hint' => $payload['severity_hint'] ?? 'medium',
+                    'occurred_at' => $payload['occurred_at'] ?? now(),
+                    'payload' => $payload['payload'] ?? null,
+                ]
+            );
 
-        if (! $signal->wasRecentlyCreated) {
-            return $signal;
+            $outbox = ShiftSignalOutbox::query()->firstOrCreate(
+                ['shift_signal_id' => $signal->id],
+                ['status' => 'pending'],
+            );
+
+            return [$signal, $outbox->id];
+        }, 3);
+
+        try {
+            DispatchShiftSignalOutbox::dispatch($outboxId);
+        } catch (Throwable $exception) {
+            // The source and outbox are already durable. The scheduled recovery
+            // sweep will re-dispatch this intent without duplicating the alert.
+            Log::error('Shift safety signal queue dispatch failed', [
+                'shift_signal_id' => $signal->id,
+                'outbox_id' => $outboxId,
+                'error' => $exception->getMessage(),
+            ]);
         }
-
-        $outbox = ShiftSignalOutbox::query()->create([
-            'shift_signal_id' => $signal->id,
-            'status' => 'pending',
-        ]);
-
-        DispatchShiftSignalOutbox::dispatch($outbox->id);
 
         return $signal;
     }

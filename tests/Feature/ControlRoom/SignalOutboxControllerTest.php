@@ -37,7 +37,7 @@ class SignalOutboxControllerTest extends TestCase
 
     public function test_settings_index_exposes_failed_signal_outbox_rows(): void
     {
-        $outbox = $this->createOutbox(['status' => 'dead_letter']);
+        $outbox = $this->createOutbox(['status' => 'unroutable']);
 
         $this->actingAs($this->admin)
             ->get('/control-room/settings?tab=signal-outbox')
@@ -46,7 +46,7 @@ class SignalOutboxControllerTest extends TestCase
                 ->component('control-room/settings')
                 ->has('signalOutbox', 1)
                 ->where('signalOutbox.0.id', $outbox->id)
-                ->where('signalOutbox.0.status', 'dead_letter')
+                ->where('signalOutbox.0.status', 'unroutable')
                 ->where('signalOutbox.0.can_retry', true)
                 ->where('signalOutbox.0.signal.id', $outbox->fleet_signal_id)
             );

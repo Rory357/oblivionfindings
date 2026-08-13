@@ -3,10 +3,13 @@
 namespace App\Services\Fleet;
 
 use App\Events\FleetSignalEmitted;
+use App\Jobs\DispatchFleetSignalOutbox;
 use App\Models\FleetSignal;
 use App\Models\FleetSignalOutbox;
-use App\Jobs\DispatchFleetSignalOutbox;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class FleetSignalService
 {
@@ -14,8 +17,8 @@ class FleetSignalService
     {
         $idempotencyKey = $payload['idempotency_key'] ?? $this->buildIdempotencyKey($payload);
 
-        $signal = FleetSignal::query()
-            ->firstOrCreate(
+        [$signal, $outboxId, $created] = DB::transaction(function () use ($payload, $idempotencyKey): array {
+            $signal = FleetSignal::query()->firstOrCreate(
                 ['idempotency_key' => $idempotencyKey],
                 [
                     'asset_id' => $payload['asset_id'],
@@ -31,18 +34,30 @@ class FleetSignalService
                 ]
             );
 
-        if (!$signal->wasRecentlyCreated) {
-            return $signal;
+            $created = $signal->wasRecentlyCreated;
+            $outbox = FleetSignalOutbox::query()->firstOrCreate(
+                ['fleet_signal_id' => $signal->id],
+                ['status' => 'pending'],
+            );
+
+            return [$signal, $outbox->id, $created];
+        }, 3);
+
+        try {
+            DispatchFleetSignalOutbox::dispatch($outboxId);
+        } catch (Throwable $exception) {
+            // The source and outbox are already durable. The scheduled recovery
+            // sweep will re-dispatch this intent without duplicating the alert.
+            Log::error('Fleet safety signal queue dispatch failed', [
+                'fleet_signal_id' => $signal->id,
+                'outbox_id' => $outboxId,
+                'error' => $exception->getMessage(),
+            ]);
         }
 
-        $outbox = FleetSignalOutbox::create([
-            'fleet_signal_id' => $signal->id,
-            'status' => 'pending',
-        ]);
-
-        DispatchFleetSignalOutbox::dispatch($outbox->id);
-
-        event(new FleetSignalEmitted($signal));
+        if ($created) {
+            event(new FleetSignalEmitted($signal));
+        }
 
         return $signal;
     }

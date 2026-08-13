@@ -158,7 +158,7 @@ class ControlRoomSettingsController extends Controller
 
         $signalOutbox = FleetSignalOutbox::query()
             ->with('signal:id,asset_id,device_id,signal_type,severity_hint,occurred_at')
-            ->whereIn('status', ['failed', 'dead_letter'])
+            ->whereIn('status', ['failed', 'dead_letter', 'unroutable'])
             ->latest('last_attempt_at')
             ->latest('id')
             ->limit(100)
@@ -200,7 +200,7 @@ class ControlRoomSettingsController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        abort_unless(in_array($outbox->status, ['failed', 'dead_letter'], true), 422, 'Only failed signal deliveries can be retried.');
+        abort_unless(in_array($outbox->status, ['failed', 'dead_letter', 'unroutable'], true), 422, 'Only failed signal deliveries can be retried.');
         abort_if(
             $outbox->last_attempt_at && $outbox->last_attempt_at->gt(now()->subMinutes(5)),
             429,
@@ -351,7 +351,7 @@ class ControlRoomSettingsController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:control_room_triage_queues,code,' . $queue->id,
+            'code' => 'required|string|max:50|unique:control_room_triage_queues,code,'.$queue->id,
             'tier' => 'required|integer|min:1|max:5',
             'description' => 'nullable|string|max:500',
             'handle_severities' => 'nullable|array',

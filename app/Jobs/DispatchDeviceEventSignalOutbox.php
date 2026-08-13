@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Domain\SecurityDevices\Models\DeviceEventSignalOutbox;
 use App\Exceptions\SafetySignalUnroutable;
-use App\Models\ShiftSignalOutbox;
-use App\Services\ControlRoom\SignalProcessingService;
+use App\Observers\DeviceEventObserver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -16,17 +16,18 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
-class DispatchShiftSignalOutbox implements ShouldBeUnique, ShouldQueue
+class DispatchDeviceEventSignalOutbox implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 3;
+    public int $tries = 3;
 
-    public $timeout = 30;
+    public int $timeout = 30;
 
-    public $backoff = [10, 30, 60];
+    /** @var array<int, int> */
+    public array $backoff = [10, 30, 60];
 
-    public $uniqueFor = 300;
+    public int $uniqueFor = 300;
 
     public function __construct(public int $outboxId) {}
 
@@ -35,11 +36,11 @@ class DispatchShiftSignalOutbox implements ShouldBeUnique, ShouldQueue
         return (string) $this->outboxId;
     }
 
-    public function handle(SignalProcessingService $processor): void
+    public function handle(DeviceEventObserver $observer): void
     {
         try {
-            DB::transaction(function () use ($processor): void {
-                $outbox = ShiftSignalOutbox::query()
+            DB::transaction(function () use ($observer): void {
+                $outbox = DeviceEventSignalOutbox::query()
                     ->whereKey($this->outboxId)
                     ->lockForUpdate()
                     ->first();
@@ -48,9 +49,9 @@ class DispatchShiftSignalOutbox implements ShouldBeUnique, ShouldQueue
                     return;
                 }
 
-                $signal = $outbox->signal()->first();
-                if ($signal === null) {
-                    throw new RuntimeException('Shift signal source row is unavailable.');
+                $event = $outbox->event()->first();
+                if ($event === null) {
+                    throw new RuntimeException('Device event source row is unavailable.');
                 }
 
                 $outbox->forceFill([
@@ -60,13 +61,7 @@ class DispatchShiftSignalOutbox implements ShouldBeUnique, ShouldQueue
                     'last_error' => null,
                 ])->save();
 
-                $controlSignal = $processor->ingestFromShiftSignal($signal);
-                if (! $controlSignal->site_id || ! $controlSignal->signal_source_id) {
-                    throw new SafetySignalUnroutable(
-                        'Shift safety signal has no canonical Site or active signal source.',
-                    );
-                }
-                $processor->process($controlSignal);
+                $observer->deliver($event);
 
                 $outbox->forceFill([
                     'status' => 'sent',
@@ -76,7 +71,7 @@ class DispatchShiftSignalOutbox implements ShouldBeUnique, ShouldQueue
         } catch (SafetySignalUnroutable $exception) {
             $this->recordFailure('unroutable', $exception);
 
-            Log::error('Shift safety signal is unroutable', [
+            Log::error('Device-event safety signal is unroutable', [
                 'outbox_id' => $this->outboxId,
                 'error' => mb_substr($exception->getMessage(), 0, 500),
             ]);
@@ -91,7 +86,7 @@ class DispatchShiftSignalOutbox implements ShouldBeUnique, ShouldQueue
     {
         try {
             DB::transaction(function () use ($exception): void {
-                $outbox = ShiftSignalOutbox::query()->whereKey($this->outboxId)->lockForUpdate()->first();
+                $outbox = DeviceEventSignalOutbox::query()->whereKey($this->outboxId)->lockForUpdate()->first();
                 if ($outbox === null || in_array($outbox->status, ['sent', 'unroutable'], true)) {
                     return;
                 }
@@ -100,26 +95,25 @@ class DispatchShiftSignalOutbox implements ShouldBeUnique, ShouldQueue
                     'status' => 'dead_letter',
                     'last_error' => mb_substr($exception->getMessage(), 0, 1000),
                 ])->save();
-                $signal = $outbox->signal;
 
-                Log::critical('Shift signal permanently failed delivery', [
+                Log::critical('Device-event safety signal permanently failed delivery', [
                     'outbox_id' => $this->outboxId,
-                    'signal_id' => $signal?->id,
-                    'signal_type' => $signal?->signal_type,
-                    'shift_id' => $signal?->shift_id,
-                    'site_id' => $signal?->site_id,
+                    'device_event_id' => $outbox->device_event_id,
                     'error' => mb_substr($exception->getMessage(), 0, 500),
                 ]);
             });
-        } catch (Throwable $e) {
-            Log::error('Failed to handle shift signal dead-letter: '.$e->getMessage());
+        } catch (Throwable $failure) {
+            Log::error('Failed to handle device-event safety signal dead-letter', [
+                'outbox_id' => $this->outboxId,
+                'error' => $failure->getMessage(),
+            ]);
         }
     }
 
     private function recordFailure(string $status, Throwable $exception): void
     {
         DB::transaction(function () use ($status, $exception): void {
-            $outbox = ShiftSignalOutbox::query()->whereKey($this->outboxId)->lockForUpdate()->first();
+            $outbox = DeviceEventSignalOutbox::query()->whereKey($this->outboxId)->lockForUpdate()->first();
             if ($outbox === null || $outbox->status === 'sent') {
                 return;
             }
