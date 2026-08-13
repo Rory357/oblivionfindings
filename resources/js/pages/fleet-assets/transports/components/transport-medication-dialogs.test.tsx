@@ -29,6 +29,7 @@ const medication: TransportMedicationOption = {
     frequency: 'Twice daily',
     is_prn: false,
     controlled_drug: false,
+    witness_required: false,
     dose_times: ['08:00', '20:00'],
     route: 'Oral',
     instructions: 'Take with food.',
@@ -40,6 +41,7 @@ const log: TransportMedicationLog = {
     medication_id: medication.id,
     medication_name: 'Paracetamol 500mg',
     is_controlled_drug: false,
+    witness_required: false,
     packed_by: { id: 3, name: 'Packing Worker' },
     packed_at: '2026-07-13T08:00:00+12:00',
     administered_by: null,
@@ -76,11 +78,13 @@ describe('transport medication payload contract', () => {
         expect(
             buildAdministerMedicationPayload({
                 witnessedByUserId: '18',
+                witnessCredential: ' witness-secret ',
                 notes: 'Given during transit.',
                 scan: idleScan,
             }),
         ).toEqual({
             witnessed_by_user_id: 18,
+            witness_credential: 'witness-secret',
             notes: 'Given during transit.',
             scan_code: null,
             scan_source: null,

@@ -11,6 +11,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationScanVerificationService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -36,7 +37,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
     public function test_transport_show_includes_medication_transit_context(): void
     {
         $site = Site::factory()->create();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $asset = Asset::factory()->vehicle()->forSite($site)->create();
 
         $medication = ClientMedication::query()->create([
@@ -53,9 +54,10 @@ class ResidentTransportMedicationTransitTest extends TestCase
 
         $transport = FleetResidentTransport::query()->create([
             'asset_id' => $asset->id,
+            'site_id' => $site->id,
             'driver_user_id' => $this->admin->id,
             'resident_id' => $client->id,
-            'resident_name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+            'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
             'transport_type' => 'medical',
             'departed_at' => now(),
             'passengers_count' => 1,
@@ -65,6 +67,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
         FleetMedicationTransitLog::query()->create([
             'transport_id' => $transport->id,
             'client_id' => $client->id,
+            'site_id' => $site->id,
             'medication_id' => $medication->id,
             'medication_name' => 'Paracetamol 500mg',
             'is_controlled_drug' => false,
@@ -90,14 +93,23 @@ class ResidentTransportMedicationTransitTest extends TestCase
     {
         $site = Site::factory()->create();
         $asset = Asset::factory()->vehicle()->forSite($site)->create();
-        $transportClient = Client::factory()->create();
-        $otherClient = Client::factory()->create();
+        $transportClient = Client::factory()->create(['site_id' => $site->id]);
+        $otherClient = Client::factory()->create(['site_id' => $site->id]);
+        $otherMedication = ClientMedication::query()->create([
+            'client_id' => $otherClient->id,
+            'name' => 'Other resident medication',
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'version' => 1,
+        ]);
 
         $transport = FleetResidentTransport::query()->create([
             'asset_id' => $asset->id,
+            'site_id' => $site->id,
             'driver_user_id' => $this->admin->id,
             'resident_id' => $transportClient->id,
-            'resident_name' => trim(($transportClient->first_name ?? '') . ' ' . ($transportClient->last_name ?? '')),
+            'resident_name' => trim(($transportClient->first_name ?? '').' '.($transportClient->last_name ?? '')),
             'transport_type' => 'medical',
             'departed_at' => now(),
             'passengers_count' => 1,
@@ -108,12 +120,12 @@ class ResidentTransportMedicationTransitTest extends TestCase
             ->from("/fleet-assets/transports/{$transport->id}")
             ->post("/fleet-assets/transports/{$transport->id}/pack-medication", [
                 'client_id' => $otherClient->id,
+                'medication_id' => $otherMedication->id,
                 'medication_name' => 'Manual packed item',
                 'is_controlled_drug' => false,
                 'notes' => 'Attempted wrong resident pack',
             ])
-            ->assertRedirect("/fleet-assets/transports/{$transport->id}")
-            ->assertSessionHasErrors(['client_id']);
+            ->assertNotFound();
 
         $this->assertDatabaseCount('fleet_medication_transit_logs', 0);
     }
@@ -121,15 +133,31 @@ class ResidentTransportMedicationTransitTest extends TestCase
     public function test_medication_index_can_scope_to_a_transport(): void
     {
         $site = Site::factory()->create();
-        $client = Client::factory()->create();
-        $otherClient = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $otherClient = Client::factory()->create(['site_id' => $site->id]);
         $asset = Asset::factory()->vehicle()->forSite($site)->create();
+
+        $medication = ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Scoped medication',
+            'active' => true,
+            'state' => 'active',
+            'version' => 1,
+        ]);
+        $otherMedication = ClientMedication::query()->create([
+            'client_id' => $otherClient->id,
+            'name' => 'Other transport medication',
+            'active' => true,
+            'state' => 'active',
+            'version' => 1,
+        ]);
 
         $transport = FleetResidentTransport::query()->create([
             'asset_id' => $asset->id,
+            'site_id' => $site->id,
             'driver_user_id' => $this->admin->id,
             'resident_id' => $client->id,
-            'resident_name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+            'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
             'transport_type' => 'medical',
             'departed_at' => now(),
             'passengers_count' => 1,
@@ -138,9 +166,10 @@ class ResidentTransportMedicationTransitTest extends TestCase
 
         $otherTransport = FleetResidentTransport::query()->create([
             'asset_id' => $asset->id,
+            'site_id' => $site->id,
             'driver_user_id' => $this->admin->id,
             'resident_id' => $otherClient->id,
-            'resident_name' => trim(($otherClient->first_name ?? '') . ' ' . ($otherClient->last_name ?? '')),
+            'resident_name' => trim(($otherClient->first_name ?? '').' '.($otherClient->last_name ?? '')),
             'transport_type' => 'appointment',
             'departed_at' => now()->subHour(),
             'passengers_count' => 1,
@@ -150,6 +179,9 @@ class ResidentTransportMedicationTransitTest extends TestCase
         FleetMedicationTransitLog::query()->create([
             'transport_id' => $transport->id,
             'client_id' => $client->id,
+            'site_id' => $site->id,
+            'medication_id' => $medication->id,
+            'medication_order_version' => 1,
             'medication_name' => 'Scoped medication',
             'is_controlled_drug' => false,
             'packed_by_user_id' => $this->admin->id,
@@ -159,6 +191,9 @@ class ResidentTransportMedicationTransitTest extends TestCase
         FleetMedicationTransitLog::query()->create([
             'transport_id' => $otherTransport->id,
             'client_id' => $otherClient->id,
+            'site_id' => $site->id,
+            'medication_id' => $otherMedication->id,
+            'medication_order_version' => 1,
             'medication_name' => 'Other transport medication',
             'is_controlled_drug' => false,
             'packed_by_user_id' => $this->admin->id,
@@ -183,7 +218,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
     {
         $site = Site::factory()->create();
         $asset = Asset::factory()->vehicle()->forSite($site)->create();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
 
         $medication = ClientMedication::query()->create([
             'client_id' => $client->id,
@@ -201,7 +236,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
             ->from('/fleet-assets/transports/create')
             ->post('/fleet-assets/transports', [
                 'asset_id' => $asset->id,
-                'resident_name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
                 'client_id' => $client->id,
                 'transport_type' => 'medical',
                 'pickup_location' => 'House',
@@ -231,7 +266,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
     {
         $site = Site::factory()->create();
         $asset = Asset::factory()->vehicle()->forSite($site)->create();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
 
         $medication = ClientMedication::query()->create([
             'client_id' => $client->id,
@@ -251,7 +286,7 @@ class ResidentTransportMedicationTransitTest extends TestCase
         $response = $this->actingAs($this->admin)
             ->post('/fleet-assets/transports', [
                 'asset_id' => $asset->id,
-                'resident_name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
                 'client_id' => $client->id,
                 'transport_type' => 'medical',
                 'pickup_location' => 'House',
@@ -292,12 +327,26 @@ class ResidentTransportMedicationTransitTest extends TestCase
     {
         [$transport, $client] = $this->createInProgressTransport();
 
+        $medication = ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Controlled transit medication',
+            'dosage' => '1 tablet',
+            'frequency' => 'PRN',
+            'is_prn' => true,
+            'controlled_drug' => true,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'version' => 1,
+        ]);
+
         $this->actingAs($this->admin)
             ->from("/fleet-assets/transports/{$transport->id}")
             ->post("/fleet-assets/transports/{$transport->id}/pack-medication", [
                 'client_id' => $client->id,
-                'medication_name' => 'Controlled transit medication',
-                'is_controlled_drug' => true,
+                'medication_id' => $medication->id,
+                'medication_name' => $medication->name,
+                'is_controlled_drug' => $medication->controlled_drug,
                 'witness_name' => '',
                 'notes' => 'Prepared for the appointment.',
             ])
@@ -311,9 +360,26 @@ class ResidentTransportMedicationTransitTest extends TestCase
     {
         [$transport, $client] = $this->createInProgressTransport();
 
+        $medication = ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Controlled transit medication',
+            'dosage' => '1 tablet',
+            'frequency' => 'PRN',
+            'is_prn' => true,
+            'controlled_drug' => true,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'version' => 1,
+        ]);
+        $scanCode = app(MedicationScanVerificationService::class)->internalCode($client, $medication);
+
         $log = FleetMedicationTransitLog::query()->create([
             'transport_id' => $transport->id,
             'client_id' => $client->id,
+            'site_id' => $transport->site_id,
+            'medication_id' => $medication->id,
+            'medication_order_version' => 1,
             'medication_name' => 'Controlled transit medication',
             'is_controlled_drug' => true,
             'packed_witness_name' => 'Packing Witness',
@@ -326,6 +392,10 @@ class ResidentTransportMedicationTransitTest extends TestCase
             ->post("/fleet-assets/medication-transit/{$log->id}/administer", [
                 'witnessed_by_user_id' => null,
                 'notes' => 'Dose given during transport.',
+                'scan_code' => $scanCode,
+                'scan_source' => 'manual',
+                'scan_verified' => true,
+                'scan_match_source' => 'internal_emar',
             ])
             ->assertRedirect("/fleet-assets/transports/{$transport->id}")
             ->assertSessionHasErrors(['witnessed_by_user_id']);
@@ -333,17 +403,36 @@ class ResidentTransportMedicationTransitTest extends TestCase
         $this->assertNull($log->fresh()->administered_at);
     }
 
-    public function test_pack_administer_and_return_preserve_transit_consequences(): void
+    public function test_pack_and_return_preserve_terminal_transit_consequences(): void
     {
         [$transport, $client] = $this->createInProgressTransport();
+
+        $medication = ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Transit medication',
+            'dosage' => '1 tablet',
+            'frequency' => 'PRN',
+            'is_prn' => true,
+            'controlled_drug' => false,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+            'version' => 1,
+        ]);
+        $scanCode = app(MedicationScanVerificationService::class)->internalCode($client, $medication);
 
         $this->actingAs($this->admin)
             ->post("/fleet-assets/transports/{$transport->id}/pack-medication", [
                 'client_id' => $client->id,
-                'medication_name' => 'Transit medication',
+                'medication_id' => $medication->id,
+                'medication_name' => $medication->name,
                 'is_controlled_drug' => false,
                 'witness_name' => null,
                 'notes' => 'Packed at the house.',
+                'scan_code' => $scanCode,
+                'scan_source' => 'manual',
+                'scan_verified' => true,
+                'scan_match_source' => 'internal_emar',
             ])
             ->assertSessionHasNoErrors();
 
@@ -352,26 +441,20 @@ class ResidentTransportMedicationTransitTest extends TestCase
         $this->assertSame($this->admin->id, $log->packed_by_user_id);
 
         $this->actingAs($this->admin)
-            ->post("/fleet-assets/medication-transit/{$log->id}/administer", [
-                'witnessed_by_user_id' => null,
-                'notes' => 'Given at the scheduled time.',
-            ])
-            ->assertSessionHasNoErrors();
-
-        $log->refresh();
-        $this->assertSame('administered', $log->status);
-        $this->assertNotNull($log->administered_at);
-        $this->assertSame($this->admin->id, $log->administered_by_user_id);
-
-        $this->actingAs($this->admin)
             ->post("/fleet-assets/medication-transit/{$log->id}/return", [
                 'notes' => 'Returned to house stock.',
+                'scan_code' => $scanCode,
+                'scan_source' => 'manual',
+                'scan_verified' => true,
+                'scan_match_source' => 'internal_emar',
             ])
             ->assertSessionHasNoErrors();
 
         $log->refresh();
         $this->assertSame('returned', $log->status);
         $this->assertNotNull($log->returned_to_house_at);
+        $this->assertNull($log->administered_at);
+        $this->assertSame($this->admin->id, $log->returned_by_user_id);
         $this->assertSame('Returned to house stock.', $log->notes);
     }
 
@@ -379,14 +462,15 @@ class ResidentTransportMedicationTransitTest extends TestCase
     private function createInProgressTransport(): array
     {
         $site = Site::factory()->create();
-        $client = Client::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
         $asset = Asset::factory()->vehicle()->forSite($site)->create();
 
         $transport = FleetResidentTransport::query()->create([
             'asset_id' => $asset->id,
+            'site_id' => $site->id,
             'driver_user_id' => $this->admin->id,
             'resident_id' => $client->id,
-            'resident_name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+            'resident_name' => trim(($client->first_name ?? '').' '.($client->last_name ?? '')),
             'transport_type' => 'medical',
             'departed_at' => now(),
             'passengers_count' => 1,
