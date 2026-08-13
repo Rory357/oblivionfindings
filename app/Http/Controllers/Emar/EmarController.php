@@ -42,6 +42,8 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\Emar\ShiftMedicationSnapshotService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationScopeDecision;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationOverviewService;
@@ -70,6 +72,7 @@ class EmarController extends Controller
         protected ShiftHandoverService $handoverService,
         protected MedicationScanVerificationService $scanVerificationService,
         protected MedsBoardPayloadService $boardPayload,
+        protected MedicationScopeDecisionService $medicationScope,
     ) {}
 
     // ─── Helpers ──────────────────────────────────────────
@@ -2963,8 +2966,8 @@ class EmarController extends Controller
     public function storePrescription(Request $request)
     {
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'client_medication_id' => 'nullable|exists:client_medications,id',
+            'client_id' => 'required|integer',
+            'client_medication_id' => 'nullable|integer',
             'order_type' => 'required|in:new,change,cease,verbal,telephone',
             'prescriber_name' => 'required|string|max:255',
             'prescriber_registration' => 'nullable|string|max:255',
@@ -2983,27 +2986,51 @@ class EmarController extends Controller
             'read_back_witnessed_by' => 'nullable|exists:users,id',
         ]);
 
-        $validated['received_by'] = auth()->id();
-        $validated['status'] = 'pending';
-        $validated['requires_countersign'] = in_array($validated['order_type'], ['verbal', 'telephone']);
+        $user = $request->user();
+        abort_unless($user, 403);
 
-        // prescriber_type is NOT NULL with a 'gp' schema default, but the create
-        // dialog leaves it blank — and the global ConvertEmptyStringsToNull
-        // middleware turns that '' into an explicit null, which MySQL (strict
-        // mode) rejects. Drop the blank value so the column default applies.
-        if (blank($validated['prescriber_type'] ?? null)) {
-            unset($validated['prescriber_type']);
-        }
+        return $this->medicationScope->forClient(
+            $user,
+            (int) $validated['client_id'],
+            now(),
+            function (MedicationScopeDecision $scope) use ($validated, $user) {
+                $medication = null;
+                if (! empty($validated['client_medication_id'])) {
+                    $medication = ClientMedication::query()
+                        ->whereKey($validated['client_medication_id'])
+                        ->where('client_id', $scope->client->id)
+                        ->whereNull('deleted_at')
+                        ->whereNull('superseded_by')
+                        ->lockForUpdate()
+                        ->first();
+                    abort_unless($medication, 404, 'The requested medication action is not available.');
+                }
 
-        $order = MedicationPrescriberOrder::create($validated);
+                $payload = $validated;
+                $payload['client_id'] = $scope->client->id;
+                $payload['received_by'] = $user->id;
+                $payload['status'] = 'pending';
+                $payload['requires_countersign'] = in_array($payload['order_type'], ['verbal', 'telephone']);
 
-        // A written cease order takes effect immediately; verbal/telephone
-        // cease orders apply once countersigned (see countersignPrescription).
-        if (! $order->requires_countersign) {
-            $this->applyCeaseOrder($order);
-        }
+                // Blank values are converted to null; omit this NOT NULL field
+                // so the schema's canonical default applies.
+                if (blank($payload['prescriber_type'] ?? null)) {
+                    unset($payload['prescriber_type']);
+                }
 
-        return redirect()->back();
+                $order = MedicationPrescriberOrder::create($payload);
+                if (! $order->requires_countersign) {
+                    $this->applyCeaseOrder($order, $medication);
+                }
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'created_prescriber_order',
+                    'Order '.$order->id,
+                );
+
+                return redirect()->back();
+            },
+        );
     }
 
     /**
@@ -3011,16 +3038,29 @@ class EmarController extends Controller
      * stop the medication appearing on rounds/MAR — recording the order without
      * discontinuing the ClientMedication left it administrable.
      */
-    private function applyCeaseOrder(MedicationPrescriberOrder $order): void
-    {
+    private function applyCeaseOrder(
+        MedicationPrescriberOrder $order,
+        ?ClientMedication $medication = null,
+    ): void {
         if ($order->order_type !== 'cease' || ! $order->client_medication_id) {
             return;
         }
 
-        $medication = ClientMedication::find($order->client_medication_id);
+        $medication ??= ClientMedication::query()
+            ->whereKey($order->client_medication_id)
+            ->where('client_id', $order->client_id)
+            ->whereNull('deleted_at')
+            ->lockForUpdate()
+            ->first();
         if (! $medication || $medication->state === 'ceased') {
             return;
         }
+
+        abort_unless(
+            (int) $medication->client_id === (int) $order->client_id,
+            404,
+            'The requested medication action is not available.',
+        );
 
         $medication->update([
             'state' => 'ceased',
@@ -3037,7 +3077,7 @@ class EmarController extends Controller
     {
         $validated = $request->validate([
             'status' => 'nullable|string|max:255',
-            'client_medication_id' => 'nullable|exists:client_medications,id',
+            'client_medication_id' => 'nullable|integer',
             'pharmacy_notes' => 'nullable|string',
             'pharmacy_name' => 'nullable|string|max:255',
             'batch_number' => 'nullable|string|max:255',
@@ -3048,9 +3088,43 @@ class EmarController extends Controller
             'instructions' => 'nullable|string',
         ]);
 
-        $order->update($validated);
+        $user = $request->user();
+        abort_unless($user, 403);
 
-        return redirect()->back();
+        return $this->medicationScope->forPrescription(
+            $user,
+            $order,
+            now(),
+            function (MedicationScopeDecision $scope) use ($validated) {
+                if (array_key_exists('client_medication_id', $validated)
+                    && $validated['client_medication_id'] !== null) {
+                    if ($scope->prescription->client_medication_id !== null
+                        && (int) $validated['client_medication_id'] !== (int) $scope->prescription->client_medication_id) {
+                        throw ValidationException::withMessages([
+                            'client_medication_id' => 'The requested medication action is not available.',
+                        ]);
+                    }
+
+                    $linkedMedication = ClientMedication::query()
+                        ->whereKey($validated['client_medication_id'])
+                        ->where('client_id', $scope->client->id)
+                        ->whereNull('deleted_at')
+                        ->whereNull('superseded_by')
+                        ->lockForUpdate()
+                        ->first();
+                    abort_unless($linkedMedication, 404, 'The requested medication action is not available.');
+                }
+
+                $scope->prescription->update($validated);
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'updated_prescriber_order',
+                    'Order '.$scope->prescription->id,
+                );
+
+                return redirect()->back();
+            },
+        );
     }
 
     public function countersignPrescription(Request $request, MedicationPrescriberOrder $order)
@@ -3059,24 +3133,50 @@ class EmarController extends Controller
             'countersign_method' => 'nullable|string|max:255',
         ]);
 
-        $order->update([
-            'countersigned_at' => now(),
-            'countersigned_by' => auth()->id(),
-            'countersign_method' => $validated['countersign_method'] ?? null,
-            'status' => $order->status === 'pending' ? 'confirmed' : $order->status,
-        ]);
+        $user = $request->user();
+        abort_unless($user, 403);
 
-        // A verbal/telephone cease order takes effect once countersigned.
-        $this->applyCeaseOrder($order->fresh());
+        return $this->medicationScope->forPrescription(
+            $user,
+            $order,
+            now(),
+            function (MedicationScopeDecision $scope) use ($validated, $user) {
+                $scope->prescription->update([
+                    'countersigned_at' => now(),
+                    'countersigned_by' => $user->id,
+                    'countersign_method' => $validated['countersign_method'] ?? null,
+                    'status' => $scope->prescription->status === 'pending'
+                        ? 'confirmed'
+                        : $scope->prescription->status,
+                ]);
 
-        return redirect()->back();
+                $this->applyCeaseOrder($scope->prescription, $scope->medication);
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'countersigned_prescriber_order',
+                    'Order '.$scope->prescription->id,
+                );
+
+                return redirect()->back();
+            },
+        );
     }
 
-    public function destroyPrescription(MedicationPrescriberOrder $order)
+    public function destroyPrescription(Request $request, MedicationPrescriberOrder $order)
     {
-        $order->update(['status' => 'cancelled']);
+        $user = $request->user();
+        abort_unless($user, 403);
 
-        return redirect()->back();
+        return $this->medicationScope->forPrescription($user, $order, now(), function (MedicationScopeDecision $scope) {
+            $scope->prescription->update(['status' => 'cancelled']);
+            $this->medicationScope->recordBreakGlassUse(
+                $scope,
+                'cancelled_prescriber_order',
+                'Order '.$scope->prescription->id,
+            );
+
+            return redirect()->back();
+        });
     }
 
     // ─── Covert Authorisations CRUD ─────────────────────────
@@ -4450,7 +4550,7 @@ class EmarController extends Controller
     public function storePrnEffectiveness(Request $request)
     {
         $validated = $request->validate([
-            'client_medication_administration_id' => 'required|exists:client_medication_administrations,id',
+            'client_medication_administration_id' => 'required|integer',
             'effectiveness' => 'required|in:effective,partially_effective,not_effective',
             'review_minutes_after' => 'nullable|integer|min:0',
             'observations' => 'nullable|string',
@@ -4458,17 +4558,34 @@ class EmarController extends Controller
             'escalation_action' => 'nullable|string',
         ]);
 
-        // Get administration to populate client and medication IDs
+        $user = $request->user();
+        abort_unless($user, 403);
         $administration = ClientMedicationAdministration::findOrFail($validated['client_medication_administration_id']);
 
-        $validated['client_id'] = $administration->client_id;
-        $validated['client_medication_id'] = $administration->client_medication_id;
-        $validated['reviewed_by'] = auth()->id();
-        $validated['reviewed_at'] = now();
+        return $this->medicationScope->forPrnEffectiveness(
+            $user,
+            $administration,
+            now(),
+            function (MedicationScopeDecision $scope) use ($validated, $user) {
+                MedicationPrnEffectiveness::updateOrCreate(
+                    ['client_medication_administration_id' => $scope->administration->id],
+                    [
+                        ...$validated,
+                        'client_id' => $scope->client->id,
+                        'client_medication_id' => $scope->medication->id,
+                        'reviewed_by' => $user->id,
+                        'reviewed_at' => now(),
+                    ],
+                );
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'recorded_prn_effectiveness',
+                    'Administration '.$scope->administration->id,
+                );
 
-        MedicationPrnEffectiveness::create($validated);
-
-        return redirect()->back();
+                return redirect()->back();
+            },
+        );
     }
 
     // ─── Medications CRUD ─────────────────────────────────
@@ -4476,7 +4593,7 @@ class EmarController extends Controller
     public function storeMedication(Request $request)
     {
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
+            'client_id' => 'required|integer',
             'medication_name' => 'required|string|max:255',
             'brand_name' => 'nullable|string|max:255',
             'dose' => 'required|string|max:100',
@@ -4503,28 +4620,45 @@ class EmarController extends Controller
             'pharmac_subgroup' => 'nullable|string|max:255',
         ]);
 
-        $canVerify = $this->canVerifyMedicationOrders($request->user());
+        $user = $request->user();
+        abort_unless($user, 403);
 
-        $medication = ClientMedication::create(array_merge(
-            $this->buildMedicationPayload($validated),
-            [
-                'created_by' => $request->user()?->id,
-                'start_date' => $validated['start_date'] ?? now()->toDateString(),
-                'state' => 'active',
-                'active' => true,
-                'approval_status' => $canVerify ? 'verified' : 'pending_verification',
-                'verified_by' => $canVerify ? $request->user()?->id : null,
-                'verified_at' => $canVerify ? now() : null,
-            ],
-        ));
+        return $this->medicationScope->forClient(
+            $user,
+            (int) $validated['client_id'],
+            now(),
+            function (MedicationScopeDecision $scope) use ($validated, $user) {
+                $canVerify = $this->canVerifyMedicationOrders($user);
+                $payload = $this->buildMedicationPayload($validated);
+                $payload['client_id'] = $scope->client->id;
 
-        return redirect()->back();
+                $medication = ClientMedication::create(array_merge(
+                    $payload,
+                    [
+                        'created_by' => $user->id,
+                        'start_date' => $validated['start_date'] ?? now()->toDateString(),
+                        'state' => 'active',
+                        'active' => true,
+                        'approval_status' => $canVerify ? 'verified' : 'pending_verification',
+                        'verified_by' => $canVerify ? $user->id : null,
+                        'verified_at' => $canVerify ? now() : null,
+                    ],
+                ));
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'created_medication_order',
+                    'Medication '.$medication->id,
+                );
+
+                return redirect()->back();
+            },
+        );
     }
 
     public function updateMedication(Request $request, ClientMedication $medication)
     {
         $validated = $request->validate([
-            'client_id' => 'nullable|exists:clients,id',
+            'client_id' => 'nullable|integer',
             'medication_name' => 'sometimes|string|max:255',
             'brand_name' => 'nullable|string|max:255',
             'dose' => 'sometimes|string|max:100',
@@ -4551,32 +4685,67 @@ class EmarController extends Controller
             'pharmac_subgroup' => 'nullable|string|max:255',
         ]);
 
-        $payload = $this->buildMedicationPayload($validated);
+        $user = $request->user();
+        abort_unless($user, 403);
 
-        if (! $this->canVerifyMedicationOrders($request->user())) {
-            $payload['approval_status'] = 'pending_verification';
-            $payload['verified_by'] = null;
-            $payload['verified_at'] = null;
-            $payload['rejection_reason'] = null;
-        }
+        return $this->medicationScope->forMedication(
+            $user,
+            $medication,
+            now(),
+            function (MedicationScopeDecision $scope) use ($validated, $user) {
+                if (array_key_exists('client_id', $validated)
+                    && (int) $validated['client_id'] !== (int) $scope->client->id) {
+                    throw ValidationException::withMessages([
+                        'client_id' => 'The requested medication action is not available.',
+                    ]);
+                }
 
-        $medication->update($payload);
+                $payload = $this->buildMedicationPayload($validated);
+                unset($payload['client_id']);
 
-        return redirect()->back();
+                if (! $this->canVerifyMedicationOrders($user)) {
+                    $payload['approval_status'] = 'pending_verification';
+                    $payload['verified_by'] = null;
+                    $payload['verified_at'] = null;
+                    $payload['rejection_reason'] = null;
+                }
+
+                $scope->medication->update($payload);
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'updated_medication_order',
+                    'Medication '.$scope->medication->id,
+                );
+
+                return redirect()->back();
+            },
+        );
     }
 
     public function verifyMedication(Request $request, ClientMedication $medication)
     {
         abort_unless($this->canVerifyMedicationOrders($request->user()), 403);
 
-        $medication->forceFill([
-            'approval_status' => 'verified',
-            'verified_by' => $request->user()?->id,
-            'verified_at' => now(),
-            'rejection_reason' => null,
-        ])->save();
+        return $this->medicationScope->forMedication(
+            $request->user(),
+            $medication,
+            now(),
+            function (MedicationScopeDecision $scope) use ($request) {
+                $scope->medication->forceFill([
+                    'approval_status' => 'verified',
+                    'verified_by' => $request->user()->id,
+                    'verified_at' => now(),
+                    'rejection_reason' => null,
+                ])->save();
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'verified_medication_order',
+                    'Medication '.$scope->medication->id,
+                );
 
-        return redirect()->back()->with('success', 'Medication order verified.');
+                return redirect()->back()->with('success', 'Medication order verified.');
+            },
+        );
     }
 
     public function rejectMedication(Request $request, ClientMedication $medication)
@@ -4587,14 +4756,26 @@ class EmarController extends Controller
             'rejection_reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        $medication->forceFill([
-            'approval_status' => 'rejected',
-            'verified_by' => null,
-            'verified_at' => null,
-            'rejection_reason' => $validated['rejection_reason'],
-        ])->save();
+        return $this->medicationScope->forMedication(
+            $request->user(),
+            $medication,
+            now(),
+            function (MedicationScopeDecision $scope) use ($validated) {
+                $scope->medication->forceFill([
+                    'approval_status' => 'rejected',
+                    'verified_by' => null,
+                    'verified_at' => null,
+                    'rejection_reason' => $validated['rejection_reason'],
+                ])->save();
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'rejected_medication_order',
+                    'Medication '.$scope->medication->id,
+                );
 
-        return redirect()->back()->with('success', 'Medication order rejected.');
+                return redirect()->back()->with('success', 'Medication order rejected.');
+            },
+        );
     }
 
     public function discontinueMedication(Request $request, ClientMedication $medication)
@@ -4605,16 +4786,32 @@ class EmarController extends Controller
             'reason' => 'required|string|max:500',
         ]);
 
-        $medication->update([
-            'state' => 'ceased',
-            'active' => false,
-            'end_date' => now()->toDateString(),
-            'ceased_reason' => $request->reason,
-            'ceased_at' => now(),
-            'ceased_by' => $request->user()?->id,
-        ]);
+        $user = $request->user();
+        abort_unless($user, 403);
 
-        return redirect()->back();
+        return $this->medicationScope->forMedication(
+            $user,
+            $medication,
+            now(),
+            function (MedicationScopeDecision $scope) use ($request, $user) {
+                $scope->medication->update([
+                    'state' => 'ceased',
+                    'active' => false,
+                    'end_date' => now()->toDateString(),
+                    'ceased_reason' => $request->reason,
+                    'ceased_at' => now(),
+                    'ceased_by' => $user->id,
+                ]);
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'ceased_medication_order',
+                    'Medication '.$scope->medication->id,
+                );
+
+                return redirect()->back();
+            },
+            true,
+        );
     }
 
     // ─── Controlled Drug Entry CRUD ──────────────────────

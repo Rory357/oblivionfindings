@@ -2,13 +2,19 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationRound;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
@@ -29,7 +35,7 @@ class GuidedRoundOfflineReplayTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
         Cache::flush();
 
         $this->worker = User::factory()->create([
@@ -37,6 +43,22 @@ class GuidedRoundOfflineReplayTest extends TestCase
             'approved_at' => now(),
         ]);
         $this->worker->roles()->attach(Role::query()->where('name', 'support_worker')->first());
+        $site = Site::factory()->create(['is_active' => true]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $this->worker->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today(),
+            'expiry_date' => today()->addYear(),
+        ]);
 
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'Guided Round',
@@ -46,6 +68,17 @@ class GuidedRoundOfflineReplayTest extends TestCase
 
         $this->client = Client::factory()->create([
             'service_context_id' => $serviceContext->id,
+            'site_id' => $site->id,
+        ]);
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $serviceContext->id,
+            'user_id' => $this->worker->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'status' => 'in_progress',
         ]);
 
         $this->medication = ClientMedication::query()->create([
@@ -60,10 +93,11 @@ class GuidedRoundOfflineReplayTest extends TestCase
 
         $this->round = MedicationRound::query()->create([
             'service_context_id' => $serviceContext->id,
+            'site_id' => $site->id,
             'name' => 'Morning round',
             'scheduled_time' => '08:00',
             'window_minutes' => 60,
-            'round_date' => now()->toDateString(),
+            'round_date' => Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(),
             'status' => 'in_progress',
             'assigned_to' => $this->worker->id,
             'started_by' => $this->worker->id,
@@ -74,7 +108,7 @@ class GuidedRoundOfflineReplayTest extends TestCase
 
     public function test_duplicate_round_admin_uuid_is_idempotent(): void
     {
-        $scheduledFor = now()->setTime(8, 0);
+        $scheduledFor = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->setTime(8, 0);
         $payload = [
             'status' => 'given',
             'scheduled_for' => $scheduledFor->toIso8601String(),
@@ -108,15 +142,15 @@ class GuidedRoundOfflineReplayTest extends TestCase
 
     public function test_queued_round_admin_conflicts_when_round_dose_already_exists(): void
     {
-        $scheduledFor = now()->setTime(8, 0);
+        $scheduledFor = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->setTime(8, 0);
 
         ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id,
             'client_medication_id' => $this->medication->id,
             'medication_round_id' => $this->round->id,
             'administered_by' => $this->worker->id,
-            'scheduled_for' => $scheduledFor,
-            'administered_at' => $scheduledFor,
+            'scheduled_for' => $scheduledFor->copy()->utc(),
+            'administered_at' => $scheduledFor->copy()->utc(),
             'status' => 'given',
         ]);
 

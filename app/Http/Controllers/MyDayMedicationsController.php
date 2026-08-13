@@ -6,6 +6,9 @@ use App\Enums\Medication\NotGivenReason;
 use App\Models\ClientMedication;
 use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
+use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationScopeDecision;
+use App\Services\Medication\MedicationScopeDecisionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -21,8 +24,9 @@ class MyDayMedicationsController extends Controller
 {
     public function __construct(
         protected EnhancedMarService $marService,
-    ) {
-    }
+        protected MarScheduleService $scheduleService,
+        protected MedicationScopeDecisionService $medicationScope,
+    ) {}
 
     /**
      * Mark a scheduled dose as administered (status='given').
@@ -41,7 +45,7 @@ class MyDayMedicationsController extends Controller
         abort_unless($user->canDo('medications.administer.record'), 403);
 
         $data = $request->validate([
-            'scheduled_for' => ['nullable', 'date'],
+            'scheduled_for' => ['required', 'date'],
             'dose_given' => ['nullable', 'string', 'max:255'],
             'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -49,39 +53,53 @@ class MyDayMedicationsController extends Controller
             'witness_credential' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $result = $this->marService->recordAdministration(
+        $scheduledFor = $this->scheduleService->parseWorkerDateTime($data['scheduled_for']);
+
+        return $this->medicationScope->forAdministration(
+            $user,
             $medication->client,
             $medication,
-            [
-                'status' => 'given',
-                'scheduled_for' => $data['scheduled_for'] ?? now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
-                'administered_at' => now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
-                'dose_given' => $data['dose_given'] ?? $medication->dosage,
-                'quantity_administered' => $data['quantity_administered'] ?? null,
-                'notes' => $data['notes'] ?? null,
-                'witnessed_by' => $data['witnessed_by'] ?? null,
-                'witness_credential' => $data['witness_credential'] ?? null,
-            ],
-            $user->id,
+            now(),
+            $scheduledFor,
+            null,
+            null,
+            function (MedicationScopeDecision $scope) use ($data, $user) {
+                $result = $this->marService->recordAdministration(
+                    $scope->client,
+                    $scope->medication,
+                    [
+                        'status' => 'given',
+                        'scheduled_for' => $data['scheduled_for'],
+                        'administered_at' => now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
+                        'dose_given' => $data['dose_given'] ?? $scope->medication->dosage,
+                        'quantity_administered' => $data['quantity_administered'] ?? null,
+                        'notes' => $data['notes'] ?? null,
+                        'witnessed_by' => $data['witnessed_by'] ?? null,
+                        'witness_credential' => $data['witness_credential'] ?? null,
+                        'scope_authorized' => true,
+                    ],
+                    $user->id,
+                    $scope->shiftId(),
+                );
+
+                if (! ($result['success'] ?? false)) {
+                    return back()->withInput()->withErrors([
+                        $result['error_field'] ?? 'medication' => $result['error'] ?? 'Could not record this dose.',
+                    ]);
+                }
+
+                if (empty($result['duplicate'])) {
+                    AuditLogger::log('meds.administer', $result['administration'], [
+                        'medication_id' => $scope->medication->id,
+                        'client_id' => $scope->client->id,
+                        'via' => 'my-day',
+                    ]);
+                    $this->medicationScope->recordBreakGlassUse($scope, 'recorded_dose', 'Via My Day');
+                }
+
+                return back()->with('success', empty($result['duplicate']) ? 'Dose given.' : 'Dose already recorded.');
+            },
         );
-
-        if (! ($result['success'] ?? false)) {
-            return back()->withInput()->withErrors([
-                $result['error_field'] ?? 'medication' => $result['error'] ?? 'Could not record this dose.',
-            ]);
-        }
-
-        $administration = $result['administration'];
-
-        if (empty($result['duplicate'])) {
-            AuditLogger::log('meds.administer', $administration, [
-                'medication_id' => $medication->id,
-                'client_id' => $medication->client_id,
-                'via' => 'my-day',
-            ]);
-        }
-
-        return back()->with('success', empty($result['duplicate']) ? 'Dose given.' : 'Dose already recorded.');
     }
 
     /**
@@ -98,45 +116,59 @@ class MyDayMedicationsController extends Controller
         abort_unless($user->canDo('medications.administer.record'), 403);
 
         $data = $request->validate([
-            'scheduled_for' => ['nullable', 'date'],
+            'scheduled_for' => ['required', 'date'],
             'reason_code' => ['nullable', 'string', 'max:60'],
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
         $reasonCode = $data['reason_code'] ?? NotGivenReason::Refused->value;
 
-        $result = $this->marService->recordAdministration(
+        $scheduledFor = $this->scheduleService->parseWorkerDateTime($data['scheduled_for']);
+
+        return $this->medicationScope->forAdministration(
+            $user,
             $medication->client,
             $medication,
-            [
-                'status' => 'refused',
-                'scheduled_for' => $data['scheduled_for'] ?? now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
-                'administered_at' => now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
-                'reason_code' => $reasonCode,
-                'reason' => $data['reason'] ?? NotGivenReason::tryFrom($reasonCode)?->label(),
-            ],
-            $user->id,
+            now(),
+            $scheduledFor,
+            null,
+            null,
+            function (MedicationScopeDecision $scope) use ($data, $reasonCode, $user) {
+                $result = $this->marService->recordAdministration(
+                    $scope->client,
+                    $scope->medication,
+                    [
+                        'status' => 'refused',
+                        'scheduled_for' => $data['scheduled_for'],
+                        'administered_at' => now(config('app.worker_timezone', 'Pacific/Auckland'))->toIso8601String(),
+                        'reason_code' => $reasonCode,
+                        'reason' => $data['reason'] ?? NotGivenReason::tryFrom($reasonCode)?->label(),
+                        'scope_authorized' => true,
+                    ],
+                    $user->id,
+                    $scope->shiftId(),
+                );
+
+                if (! ($result['success'] ?? false)) {
+                    return back()->withInput()->withErrors([
+                        $result['error_field'] ?? 'medication' => $result['error'] ?? 'Could not mark this dose refused.',
+                    ]);
+                }
+
+                if (empty($result['duplicate'])) {
+                    AuditLogger::log('meds.refuse', $result['administration'], [
+                        'medication_id' => $scope->medication->id,
+                        'client_id' => $scope->client->id,
+                        'reason' => $data['reason'] ?? null,
+                        'reason_code' => $reasonCode,
+                        'via' => 'my-day',
+                    ]);
+                    $this->medicationScope->recordBreakGlassUse($scope, 'recorded_refused_dose', 'Via My Day');
+                }
+
+                return back()->with('success', empty($result['duplicate']) ? 'Dose marked refused.' : 'Dose already recorded.');
+            },
         );
-
-        if (! ($result['success'] ?? false)) {
-            return back()->withInput()->withErrors([
-                $result['error_field'] ?? 'medication' => $result['error'] ?? 'Could not mark this dose refused.',
-            ]);
-        }
-
-        $administration = $result['administration'];
-
-        if (empty($result['duplicate'])) {
-            AuditLogger::log('meds.refuse', $administration, [
-                'medication_id' => $medication->id,
-                'client_id' => $medication->client_id,
-                'reason' => $data['reason'] ?? null,
-                'reason_code' => $reasonCode,
-                'via' => 'my-day',
-            ]);
-        }
-
-        return back()->with('success', empty($result['duplicate']) ? 'Dose marked refused.' : 'Dose already recorded.');
     }
 
     /**

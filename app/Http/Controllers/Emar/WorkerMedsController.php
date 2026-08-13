@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Emar;
 use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Models\BreakGlassAccessEvent;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -19,6 +18,8 @@ use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationScopeDecision;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Timeline\TimelineEmitter;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -58,6 +59,7 @@ class WorkerMedsController extends Controller
         protected EnhancedMarService $marService,
         protected MarScheduleService $scheduleService,
         protected MedsBoardPayloadService $boardPayload,
+        protected MedicationScopeDecisionService $medicationScope,
     ) {}
 
     public function today(Request $request): Response
@@ -170,7 +172,7 @@ class WorkerMedsController extends Controller
         );
 
         $data = $request->validate([
-            'client_medication_id' => ['required', 'integer', 'exists:client_medications,id'],
+            'client_medication_id' => ['required', 'integer'],
             'scheduled_for' => ['required', 'date'],
             'status' => ['required', 'in:given,refused,withheld'],
             'reason_code' => ['nullable', 'string', 'max:60', 'required_unless:status,given'],
@@ -188,80 +190,94 @@ class WorkerMedsController extends Controller
             ...$this->offlineSubmissionRules(),
         ]);
 
-        return $this->runOfflineSubmissionOnce('dose', $data, function () use ($user, $data) {
-            $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
+        $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
+        abort_unless($medication->client, 404);
+        $scheduledFor = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
+        $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
+            $data['administered_at'] ?? $data['captured_offline_at'] ?? now()->toIso8601String()
+        ));
 
-            abort_if($medication->is_prn, 422, 'As-needed medications are recorded through the PRN flow.');
-            abort_unless($medication->client, 404);
+        return $this->medicationScope->forAdministration(
+            $user,
+            $medication->client,
+            $medication,
+            $actionAt,
+            $scheduledFor,
+            null,
+            null,
+            function (MedicationScopeDecision $scope) use ($user, $data) {
+                $medication = $scope->medication;
+                $shiftId = $scope->shiftId();
 
-            $shiftId = $this->activeShiftIdFor($user, (int) $medication->client_id);
+                $notes = trim((string) ($data['notes'] ?? ''));
+                if (($data['cd_balance'] ?? null) !== null) {
+                    $balanceLine = 'CD register balance after dose: '.$data['cd_balance'];
+                    $notes = $notes === '' ? $balanceLine : $notes."\n".$balanceLine;
+                }
 
-            $notes = trim((string) ($data['notes'] ?? ''));
-            if (($data['cd_balance'] ?? null) !== null) {
-                $balanceLine = 'CD register balance after dose: '.$data['cd_balance'];
-                $notes = $notes === '' ? $balanceLine : $notes."\n".$balanceLine;
-            }
+                $result = $this->marService->recordAdministration(
+                    $scope->client,
+                    $medication,
+                    [
+                        'status' => $data['status'],
+                        'reason' => $data['reason'] ?? null,
+                        'reason_code' => $data['status'] === 'given' ? null : ($data['reason_code'] ?? null),
+                        'dose_given' => $data['status'] === 'given' ? $medication->dosage : null,
+                        'quantity_administered' => $data['quantity_administered'] ?? null,
+                        'scheduled_for' => $data['scheduled_for'],
+                        'administered_at' => $data['administered_at']
+                            ?? $data['captured_offline_at']
+                            ?? now()->toIso8601String(),
+                        'witnessed_by' => $data['witnessed_by'] ?? null,
+                        'witness_credential' => $data['witness_credential'] ?? null,
+                        'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
+                        'pulse_bpm' => $data['pulse_bpm'] ?? null,
+                        'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
+                        'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
+                        'notes' => $notes !== '' ? $notes : null,
+                        'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                        'scope_authorized' => true,
+                    ],
+                    $user->id,
+                    $shiftId,
+                );
 
-            $result = $this->marService->recordAdministration(
-                $medication->client,
-                $medication,
-                [
-                    'status' => $data['status'],
-                    'reason' => $data['reason'] ?? null,
-                    'reason_code' => $data['status'] === 'given' ? null : ($data['reason_code'] ?? null),
-                    'dose_given' => $data['status'] === 'given' ? $medication->dosage : null,
-                    'quantity_administered' => $data['quantity_administered'] ?? null,
-                    'scheduled_for' => $data['scheduled_for'],
-                    'administered_at' => $data['administered_at']
-                        ?? $data['captured_offline_at']
-                        ?? now()->toIso8601String(),
-                    'witnessed_by' => $data['witnessed_by'] ?? null,
-                    'witness_credential' => $data['witness_credential'] ?? null,
-                    'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
-                    'pulse_bpm' => $data['pulse_bpm'] ?? null,
-                    'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
-                    'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
-                    'notes' => $notes !== '' ? $notes : null,
-                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
-                ],
-                $user->id,
-                $shiftId,
-            );
+                if (! ($result['success'] ?? false)) {
+                    $field = $result['error_field'] ?? 'status';
 
-            if (! ($result['success'] ?? false)) {
-                $field = $result['error_field'] ?? 'status';
+                    return back()->withErrors([
+                        $field => $result['error'] ?? 'Could not record this dose.',
+                    ]);
+                }
 
-                return back()->withErrors([
-                    $field => $result['error'] ?? 'Could not record this dose.',
-                ]);
-            }
+                $clientName = trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? ''));
 
-            $clientName = trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? ''));
+                if ($result['duplicate'] ?? false) {
+                    return back()->with('warning', 'This dose was already recorded — no changes made.');
+                }
 
-            if ($result['duplicate'] ?? false) {
-                return back()->with('warning', 'This dose was already recorded — no changes made.');
-            }
+                $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'recorded_dose',
+                    $medication->name.' · '.$data['status'],
+                );
 
-            $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
+                // The sidebar overdue badge caches for 60s — recording a dose is
+                // the one action that should drop it immediately.
+                Cache::forget(HandleInertiaRequests::medsOverdueBadgeCacheKey(
+                    (int) $user->id,
+                    Carbon::now($this->scheduleService->workerTimezone())->toDateString(),
+                ));
 
-            // Access-scope log: record a dose given under an active break-glass grant.
-            BreakGlassAccessEvent::recordFor($user, $medication->client, 'recorded_dose', $medication->name.' · '.$data['status']);
+                $outcome = match ($data['status']) {
+                    'refused' => 'recorded as refused',
+                    'withheld' => 'recorded as withheld',
+                    default => 'recorded to the MAR',
+                };
 
-            // The sidebar overdue badge caches for 60s — recording a dose is
-            // the one action that should drop it immediately.
-            Cache::forget(HandleInertiaRequests::medsOverdueBadgeCacheKey(
-                (int) $user->id,
-                Carbon::now($this->scheduleService->workerTimezone())->toDateString(),
-            ));
-
-            $outcome = match ($data['status']) {
-                'refused' => 'recorded as refused',
-                'withheld' => 'recorded as withheld',
-                default => 'recorded to the MAR',
-            };
-
-            return back()->with('success', $medication->name.' '.$outcome.' for '.$clientName);
-        });
+                return back()->with('success', $medication->name.' '.$outcome.' for '.$clientName);
+            });
     }
 
     /**
@@ -285,7 +301,7 @@ class WorkerMedsController extends Controller
         );
 
         $data = $request->validate([
-            'client_medication_id' => ['required', 'integer', 'exists:client_medications,id'],
+            'client_medication_id' => ['required', 'integer'],
             'reason' => ['required', 'string', 'max:500'],
             'dose_given' => ['nullable', 'string', 'max:255'],
             'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
@@ -300,87 +316,73 @@ class WorkerMedsController extends Controller
             ...$this->offlineSubmissionRules(),
         ]);
 
-        $this->reconcilePrnOfflineMarker($data);
+        $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
+        abort_unless($medication->client, 404);
+        $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
+            $data['administered_at'] ?? $data['captured_offline_at'] ?? now()->toIso8601String()
+        ));
 
-        return $this->runOfflineSubmissionOnce('prn', $data, function () use ($user, $data) {
-            $medication = ClientMedication::with('client')->findOrFail($data['client_medication_id']);
+        return $this->medicationScope->forAdministration(
+            $user,
+            $medication->client,
+            $medication,
+            $actionAt,
+            null,
+            null,
+            null,
+            function (MedicationScopeDecision $scope) use ($user, $data) {
+                $medication = $scope->medication;
+                $shiftId = $scope->shiftId();
 
-            abort_unless($medication->is_prn, 422, 'This medication is not configured as an as-needed (PRN) med.');
-            abort_unless($medication->active, 422, 'This medication is not currently active.');
-            abort_unless($medication->client, 404);
+                $result = $this->marService->recordAdministration(
+                    $scope->client,
+                    $medication,
+                    [
+                        'status' => 'given',
+                        'reason' => trim($data['reason']),
+                        'dose_given' => $data['dose_given'] ?? null,
+                        'quantity_administered' => $data['quantity_administered'] ?? null,
+                        'witnessed_by' => $data['witnessed_by'] ?? null,
+                        'witness_credential' => $data['witness_credential'] ?? null,
+                        'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
+                        'pulse_bpm' => $data['pulse_bpm'] ?? null,
+                        'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
+                        'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
+                        'notes' => $data['notes'] ?? null,
+                        'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                        'administered_at' => $data['administered_at']
+                            ?? $data['captured_offline_at']
+                            ?? now()->toIso8601String(),
+                        'scope_authorized' => true,
+                    ],
+                    $user->id,
+                    $shiftId,
+                );
 
-            $shiftId = $this->activeShiftIdFor($user, (int) $medication->client_id);
+                if (! ($result['success'] ?? false)) {
+                    $field = $result['error_field'] ?? 'reason';
 
-            $result = $this->marService->recordAdministration(
-                $medication->client,
-                $medication,
-                [
-                    'status' => 'given',
-                    'reason' => trim($data['reason']),
-                    'dose_given' => $data['dose_given'] ?? null,
-                    'quantity_administered' => $data['quantity_administered'] ?? null,
-                    'witnessed_by' => $data['witnessed_by'] ?? null,
-                    'witness_credential' => $data['witness_credential'] ?? null,
-                    'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
-                    'pulse_bpm' => $data['pulse_bpm'] ?? null,
-                    'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
-                    'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
-                    'notes' => $data['notes'] ?? null,
-                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
-                    'administered_at' => $data['administered_at']
-                        ?? $data['captured_offline_at']
-                        ?? now()->toIso8601String(),
-                ],
-                $user->id,
-                $shiftId,
-            );
+                    return back()->withErrors([
+                        $field => $result['error'] ?? 'Could not record this PRN dose.',
+                    ]);
+                }
 
-            if (! ($result['success'] ?? false)) {
-                $field = $result['error_field'] ?? 'reason';
+                if ($result['duplicate'] ?? false) {
+                    return $this->onDuplicateOfflineSubmission('prn', $data);
+                }
 
-                return back()->withErrors([
-                    $field => $result['error'] ?? 'Could not record this PRN dose.',
-                ]);
-            }
+                $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'recorded_prn_dose',
+                    $medication->name,
+                );
 
-            if ($result['duplicate'] ?? false) {
-                return $this->onDuplicateOfflineSubmission('prn', $data);
-            }
-
-            $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
-
-            return back()->with(
-                'success',
-                'Saved — '.$medication->name.' recorded for '.trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? '')),
-            );
-        });
-    }
-
-    /**
-     * A cache marker is only a fast path after the matching MAR row exists.
-     * Failed PRN attempts have no administration row, so an old marker must
-     * never prevent the durable incident handler from reconciling the attempt.
-     */
-    private function reconcilePrnOfflineMarker(array $data): void
-    {
-        $requestUuid = trim((string) ($data['client_request_uuid'] ?? ''));
-        if ($requestUuid === '') {
-            return;
-        }
-
-        $cacheKey = $this->offlineSubmissionKey('prn', $requestUuid);
-        if (! Cache::has($cacheKey)) {
-            return;
-        }
-
-        $completed = ClientMedicationAdministration::withTrashed()
-            ->where('client_request_uuid', $requestUuid)
-            ->where('client_medication_id', $data['client_medication_id'])
-            ->exists();
-
-        if (! $completed) {
-            Cache::forget($cacheKey);
-        }
+                return back()->with(
+                    'success',
+                    'Saved — '.$medication->name.' recorded for '.trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? '')),
+                );
+            });
     }
 
     /**
@@ -400,7 +402,7 @@ class WorkerMedsController extends Controller
         );
 
         $data = $request->validate([
-            'client_medication_administration_id' => ['required', 'integer', 'exists:client_medication_administrations,id'],
+            'client_medication_administration_id' => ['required', 'integer'],
             'effectiveness' => ['required', 'in:effective,partially_effective,not_effective'],
             // Explicit "reviewed X minutes after the dose" chip from the eMAR
             // effectiveness wizard; when omitted we derive it from the elapsed
@@ -424,37 +426,48 @@ class WorkerMedsController extends Controller
         $administration = ClientMedicationAdministration::with(['medication:id,name,is_prn', 'prnEffectiveness'])
             ->findOrFail($data['client_medication_administration_id']);
 
-        abort_unless($administration->medication?->is_prn, 422, 'Only PRN doses take an effectiveness check.');
+        return $this->medicationScope->forPrnEffectiveness(
+            $user,
+            $administration,
+            now(),
+            function (MedicationScopeDecision $scope) use ($data, $user) {
+                $administration = $scope->administration;
+                $administration->loadMissing('prnEffectiveness');
+                $reviewMinutes = $data['review_minutes_after']
+                    ?? ($administration->administered_at
+                        ? max(0, (int) round($this->boardPayload->rawUtcInstant($administration, 'administered_at')->diffInMinutes(now('UTC'))))
+                        : null);
 
-        $reviewMinutes = $data['review_minutes_after']
-            ?? ($administration->administered_at
-                ? max(0, (int) round($this->boardPayload->rawUtcInstant($administration, 'administered_at')->diffInMinutes(now('UTC'))))
-                : null);
+                // updateOrCreate (keyed on the hasOne administration) so the eMAR
+                // "Re-record effectiveness" action revises the single register entry.
+                $existed = (bool) $administration->prnEffectiveness;
+                MedicationPrnEffectiveness::updateOrCreate(
+                    ['client_medication_administration_id' => $administration->id],
+                    [
+                        'client_id' => $scope->client->id,
+                        'client_medication_id' => $scope->medication->id,
+                        'effectiveness' => $data['effectiveness'],
+                        'review_minutes_after' => $reviewMinutes,
+                        'observations' => $data['observations'] ?? null,
+                        'escalation_needed' => (bool) ($data['escalation_needed'] ?? false),
+                        'escalation_action' => $data['escalation_action'] ?? null,
+                        'reviewed_by' => $user->id,
+                        'reviewed_at' => now(),
+                    ],
+                );
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'recorded_prn_effectiveness',
+                    'Administration '.$administration->id,
+                );
 
-        // updateOrCreate (keyed on the hasOne administration) so the eMAR
-        // "Re-record effectiveness" action revises the single register entry
-        // rather than blocking or duplicating it.
-        $existed = (bool) $administration->prnEffectiveness;
-        MedicationPrnEffectiveness::updateOrCreate(
-            ['client_medication_administration_id' => $administration->id],
-            [
-                'client_id' => $administration->client_id,
-                'client_medication_id' => $administration->client_medication_id,
-                'effectiveness' => $data['effectiveness'],
-                'review_minutes_after' => $reviewMinutes,
-                'observations' => $data['observations'] ?? null,
-                'escalation_needed' => (bool) ($data['escalation_needed'] ?? false),
-                'escalation_action' => $data['escalation_action'] ?? null,
-                'reviewed_by' => $user->id,
-                'reviewed_at' => now(),
-            ],
-        );
-
-        return back()->with(
-            'success',
-            $existed
-                ? 'Effectiveness review updated on the PRN register.'
-                : 'Follow-up recorded — effect noted on the PRN register.',
+                return back()->with(
+                    'success',
+                    $existed
+                        ? 'Effectiveness review updated on the PRN register.'
+                        : 'Follow-up recorded — effect noted on the PRN register.',
+                );
+            },
         );
     }
 
@@ -504,23 +517,11 @@ class WorkerMedsController extends Controller
         return [];
     }
 
-    /** The worker's currently clocked-in shift for this client, if any. */
-    private function activeShiftIdFor(User $user, int $clientId): ?int
-    {
-        return Shift::query()
-            ->where('user_id', $user->id)
-            ->where('client_id', $clientId)
-            ->whereNotNull('actual_starts_at')
-            ->whereNull('actual_ends_at')
-            ->latest('actual_starts_at')
-            ->value('id');
-    }
-
     /**
      * Mirror the guided-round controller's timeline emission so worker-board
      * recordings (scheduled doses and PRNs) appear in client timelines and
-     * the board's activity feed. Best-effort: the administration is already
-     * saved, so a timeline failure must never fail the request.
+     * the board's activity feed. Callers invoke this inside the same scope
+     * transaction so a timeline failure rolls the administration back.
      */
     private function emitMedicationTimelineEvent(
         ClientMedicationAdministration $administration,
@@ -528,32 +529,28 @@ class WorkerMedsController extends Controller
         User $user,
         ?int $shiftId,
     ): void {
-        try {
-            $statusLabel = ucfirst(str_replace('_', ' ', (string) $administration->status));
+        $statusLabel = ucfirst(str_replace('_', ' ', (string) $administration->status));
 
-            app(TimelineEmitter::class)->record([
-                'source_type' => ClientMedicationAdministration::class,
-                'source_id' => $administration->id,
-                'occurred_at' => $administration->administered_at ?? now(),
-                'type' => 'medication_'.$administration->status,
-                'actor_user_id' => $user->id,
-                'client_id' => $medication->client_id,
-                'shift_id' => $shiftId,
-                'site_id' => $medication->client?->site_id,
-                'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
-                'body' => null,
-                'meta' => array_filter([
-                    'medication_name' => $medication->name,
-                    'dosage' => $medication->dosage,
-                    'status' => $administration->status,
-                    'reason' => $administration->reason,
-                    'witnessed_by' => $administration->witnessed_by,
-                    'is_prn' => $medication->is_prn ? true : null,
-                ]),
-            ]);
-        } catch (\Throwable $e) {
-            report($e);
-        }
+        app(TimelineEmitter::class)->record([
+            'source_type' => ClientMedicationAdministration::class,
+            'source_id' => $administration->id,
+            'occurred_at' => $administration->administered_at ?? now(),
+            'type' => 'medication_'.$administration->status,
+            'actor_user_id' => $user->id,
+            'client_id' => $medication->client_id,
+            'shift_id' => $shiftId,
+            'site_id' => $medication->client?->site_id,
+            'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
+            'body' => null,
+            'meta' => array_filter([
+                'medication_name' => $medication->name,
+                'dosage' => $medication->dosage,
+                'status' => $administration->status,
+                'reason' => $administration->reason,
+                'witnessed_by' => $administration->witnessed_by,
+                'is_prn' => $medication->is_prn ? true : null,
+            ]),
+        ]);
     }
 
     /**

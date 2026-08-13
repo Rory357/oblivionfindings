@@ -6,12 +6,16 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
+use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -32,6 +36,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
     {
         parent::setUp();
 
+        Carbon::setTestNow(Carbon::parse('2026-07-01 08:10:00', config('app.worker_timezone', 'Pacific/Auckland')));
         $this->seed(RbacSeeder::class);
         Cache::flush();
 
@@ -67,6 +72,13 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             'created_by' => $this->operator->id,
             'updated_by' => $this->operator->id,
         ]);
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $this->operator->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today(),
+            'expiry_date' => today()->addYear(),
+        ]);
 
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'Operations MAR',
@@ -79,6 +91,19 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             'service_context_id' => $serviceContext->id,
         ]);
         $this->client->supportWorkers()->syncWithoutDetaching([$this->operator->id]);
+
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $serviceContext->id,
+            'user_id' => $this->operator->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(3),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $this->operator->id,
+            'status' => 'in_progress',
+        ]);
 
         $this->medication = ClientMedication::query()->create([
             'client_id' => $this->client->id,
@@ -97,13 +122,20 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
         $this->app->instance(NotificationService::class, $notification);
     }
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
     public function test_duplicate_client_request_uuid_returns_cached_response_without_second_write(): void
     {
         $notification = Mockery::mock(NotificationService::class);
         $notification->shouldReceive('notifyCrud')->once()->andReturnNull();
         $this->app->instance(NotificationService::class, $notification);
 
-        $scheduledFor = now()->setTime(8, 0);
+        $scheduledFor = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->setTime(8, 0);
         $payload = [
             'status' => 'given',
             'dose_given' => '500mg',
@@ -133,7 +165,12 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
             ->assertJsonPath('sync.duplicate', true);
 
         $this->assertDatabaseCount('client_medication_administrations', 1);
-        $this->assertDatabaseCount('timeline_events', 1);
+        $this->assertSame(
+            1,
+            TimelineEvent::query()
+                ->where('source_type', ClientMedicationAdministration::class)
+                ->count(),
+        );
         $this->assertDatabaseHas('client_medication_administrations', [
             'client_request_uuid' => $payload['client_request_uuid'],
         ]);
@@ -141,7 +178,7 @@ class ClientMedicalAdministrationIdempotencyTest extends TestCase
 
     public function test_offline_replay_conflicts_with_existing_scheduled_record(): void
     {
-        $scheduledFor = now()->setTime(8, 0);
+        $scheduledFor = Carbon::now(config('app.worker_timezone', 'Pacific/Auckland'))->setTime(8, 0);
 
         ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id,

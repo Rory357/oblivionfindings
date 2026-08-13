@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\MedicationPrescriberOrder;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -31,6 +33,7 @@ class PrescriptionsPageTest extends TestCase
 
         $site = Site::factory()->create(['type' => 'house', 'is_active' => true, 'brand_colour' => '#6D4C41']);
         $client = Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Ngata', 'site_id' => $site->id, 'status' => 'active']);
+        $this->assignUserToClient($user, $client);
         $med = ClientMedication::query()->create(['client_id' => $client->id, 'name' => 'Warfarin', 'dosage' => '3mg', 'frequency' => 'Once daily', 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
         MedicationPrescriberOrder::create([
             'client_id' => $client->id, 'client_medication_id' => $med->id, 'order_type' => 'new', 'status' => 'pending',
@@ -63,7 +66,7 @@ class PrescriptionsPageTest extends TestCase
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
         $this->grantPermissions($user, ['medications.view', 'medications.orders.manage', 'clients.update']);
-        $client = Client::factory()->create(['status' => 'active']);
+        $client = $this->makeScopedClient($user);
 
         $this->actingAs($user)
             ->post('/emar/prescriptions', [
@@ -92,7 +95,7 @@ class PrescriptionsPageTest extends TestCase
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
         $this->grantPermissions($user, ['medications.view', 'medications.orders.manage', 'clients.update']);
-        $client = Client::factory()->create(['status' => 'active']);
+        $client = $this->makeScopedClient($user);
         $order = MedicationPrescriberOrder::create([
             'client_id' => $client->id, 'order_type' => 'verbal', 'status' => 'pending', 'requires_countersign' => true,
             'prescriber_name' => 'Dr Lee', 'medication_name' => 'Amoxicillin', 'dose' => '500mg', 'route' => 'Oral', 'frequency' => 'TDS', 'order_date' => '2026-06-15',
@@ -113,7 +116,7 @@ class PrescriptionsPageTest extends TestCase
         $this->seed(RbacSeeder::class);
         $user = $this->makeRoleUser('admin');
         $this->grantPermissions($user, ['medications.view', 'medications.orders.manage', 'clients.update']);
-        $client = Client::factory()->create(['status' => 'active']);
+        $client = $this->makeScopedClient($user);
 
         // The create dialog posts an empty prescriber_type; ConvertEmptyStringsToNull
         // turns it into null. The column is NOT NULL with a 'gp' default, so a blank
@@ -148,6 +151,39 @@ class PrescriptionsPageTest extends TestCase
         }
 
         return $user;
+    }
+
+    protected function makeScopedClient(User $user): Client
+    {
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $client = Client::factory()->create(['status' => 'active', 'site_id' => $site->id]);
+        $this->assignUserToClient($user, $client);
+
+        return $client;
+    }
+
+    protected function assignUserToClient(User $user, Client $client): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $client->site_id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $user->id,
+            'status' => 'in_progress',
+        ]);
     }
 
     /**

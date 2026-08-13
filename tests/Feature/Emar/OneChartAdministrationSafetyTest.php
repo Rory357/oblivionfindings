@@ -2,13 +2,16 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAdminRule;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -23,6 +26,8 @@ class OneChartAdministrationSafetyTest extends TestCase
     private User $admin;
 
     private Client $client;
+
+    private Site $site;
 
     protected function setUp(): void
     {
@@ -42,14 +47,42 @@ class OneChartAdministrationSafetyTest extends TestCase
             'type' => 'residential',
             'is_active' => true,
         ]);
-        $site = Site::factory()->create([
+        $this->site = Site::factory()->create([
             'type' => 'house',
             'is_active' => true,
         ]);
 
         $this->client = Client::factory()->create([
             'service_context_id' => $serviceContext->id,
-            'site_id' => $site->id,
+            'site_id' => $this->site->id,
+        ]);
+
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $this->admin->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => today(),
+            'expiry_date' => today()->addYear(),
+        ]);
+
+        Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'user_id' => $this->admin->id,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addHours(2),
+            'actual_starts_at' => now()->subHour(),
+            'actual_ends_at' => null,
+            'started_by' => $this->admin->id,
+            'status' => 'in_progress',
         ]);
     }
 
@@ -261,7 +294,7 @@ class OneChartAdministrationSafetyTest extends TestCase
             'name' => 'Paracetamol',
             'dosage' => '500mg',
             'frequency' => 'Once daily',
-            'dose_times' => ['09:00'],
+            'dose_times' => [now(config('app.worker_timezone', 'Pacific/Auckland'))->format('H:i')],
             'controlled_drug' => false,
             'witness_required' => false,
             'active' => true,
