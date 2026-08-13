@@ -4,9 +4,16 @@ namespace App\Policies;
 
 use App\Models\SafeguardingConcern;
 use App\Models\User;
+use App\Services\UserSiteAccessService;
 
 class SafeguardingConcernPolicy
 {
+    private const SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+    ) {}
+
     /**
      * Determine if the user can view any safeguarding concerns.
      */
@@ -20,6 +27,10 @@ class SafeguardingConcernPolicy
      */
     public function view(User $user, SafeguardingConcern $concern): bool
     {
+        if (! $this->canAccessConcernSite($user, $concern)) {
+            return false;
+        }
+
         // Can view if has viewAny permission
         if ($user->canDo('safeguarding.viewAny')) {
             return true;
@@ -51,6 +62,11 @@ class SafeguardingConcernPolicy
      */
     public function update(User $user, SafeguardingConcern $concern): bool
     {
+        if (! $this->canAccessConcernSite($user, $concern)
+            || ! $this->canAccessSensitiveConcern($user, $concern)) {
+            return false;
+        }
+
         // Can update if has general update permission
         if ($user->canDo('safeguarding.update')) {
             return true;
@@ -69,7 +85,9 @@ class SafeguardingConcernPolicy
      */
     public function investigate(User $user, SafeguardingConcern $concern): bool
     {
-        return $user->canDo('safeguarding.investigate');
+        return $user->canDo('safeguarding.investigate')
+            && $this->canAccessConcernSite($user, $concern)
+            && $this->canAccessSensitiveConcern($user, $concern);
     }
 
     /**
@@ -77,7 +95,9 @@ class SafeguardingConcernPolicy
      */
     public function reportExternal(User $user, SafeguardingConcern $concern): bool
     {
-        return $user->canDo('safeguarding.report.external');
+        return $user->canDo('safeguarding.report.external')
+            && $this->canAccessConcernSite($user, $concern)
+            && $this->canAccessSensitiveConcern($user, $concern);
     }
 
     /**
@@ -86,5 +106,26 @@ class SafeguardingConcernPolicy
     public function viewSensitive(User $user): bool
     {
         return $user->canDo('safeguarding.viewSensitive');
+    }
+
+    private function canAccessConcernSite(User $user, SafeguardingConcern $concern): bool
+    {
+        $siteId = is_numeric($concern->site_id) && (int) $concern->site_id > 0
+            ? (int) $concern->site_id
+            : null;
+
+        if ($siteId === null || $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
+            return true;
+        }
+
+        return in_array($siteId, $this->siteAccess->accessibleSiteIds($user), true);
+    }
+
+    private function canAccessSensitiveConcern(User $user, SafeguardingConcern $concern): bool
+    {
+        return ! $concern->is_sensitive
+            || $user->canDo('safeguarding.viewSensitive')
+            || (int) $concern->assigned_to_user_id === (int) $user->id
+            || (int) $concern->reported_by_user_id === (int) $user->id;
     }
 }

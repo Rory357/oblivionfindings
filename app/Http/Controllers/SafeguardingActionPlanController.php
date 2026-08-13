@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingConcern;
-use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -42,7 +41,9 @@ class SafeguardingActionPlanController extends Controller
      */
     public function update(Request $request, SafeguardingConcern $concern, SafeguardingActionPlan $actionPlan): RedirectResponse
     {
-        $this->authorize('update', $concern);
+        $actualConcern = $actionPlan->concern()->firstOrFail();
+        abort_unless($actualConcern->is($concern), 404);
+        $this->authorize('update', $actualConcern);
 
         $validated = $request->validate([
             'action_description' => 'nullable|string',
@@ -63,7 +64,9 @@ class SafeguardingActionPlanController extends Controller
      */
     public function complete(Request $request, SafeguardingConcern $concern, SafeguardingActionPlan $actionPlan): RedirectResponse
     {
-        $this->authorize('update', $concern);
+        $actualConcern = $actionPlan->concern()->firstOrFail();
+        abort_unless($actualConcern->is($concern), 404);
+        $this->authorize('update', $actualConcern);
 
         $validated = $request->validate([
             'completion_notes' => 'nullable|string',

@@ -77,6 +77,17 @@ class SafeguardingConcern extends Model
     ];
 
     /**
+     * Map nested route parameter names to their canonical relationships.
+     */
+    protected function childRouteBindingRelationshipName($childType): string
+    {
+        return match ($childType) {
+            'report' => 'externalReports',
+            default => parent::childRouteBindingRelationshipName($childType),
+        };
+    }
+
+    /**
      * Boot the model.
      */
     protected static function boot()

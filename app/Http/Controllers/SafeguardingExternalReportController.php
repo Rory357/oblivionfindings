@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\SafeguardingConcern;
 use App\Models\SafeguardingExternalReport;
-use App\Models\User;
 use App\Services\Safeguarding\SafeguardingLifecycle;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,7 +54,9 @@ class SafeguardingExternalReportController extends Controller
      */
     public function update(Request $request, SafeguardingConcern $concern, SafeguardingExternalReport $report): RedirectResponse
     {
-        $this->authorize('reportExternal', $concern);
+        $actualConcern = $report->concern()->firstOrFail();
+        abort_unless($actualConcern->is($concern), 404);
+        $this->authorize('reportExternal', $actualConcern);
 
         $validated = $request->validate([
             'authority_reference' => 'nullable|string',
