@@ -29,7 +29,6 @@ use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\AssetTracker;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
 use App\Models\FleetTelemetryEvent;
@@ -51,6 +50,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\AuthoritativeConsentFixture;
 
 uses(RefreshDatabase::class);
 
@@ -127,17 +127,10 @@ function governedQueclinkTrackingFixture(string $imei = '864696060004173'): arra
         'legal_basis' => 'consent',
         'effective_from' => now()->subDay(),
     ]);
-    $consent = ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $type->id,
-        'consent_type_version_id' => $version->id,
+    $consent = AuthoritativeConsentFixture::manualSelf($client, $type, $actor, [
         'status' => 'given',
         'given_at' => now(),
-        'given_by_user_id' => $actor->id,
-        'given_method' => 'electronic',
         'expires_at' => now()->addMonth(),
-        'created_by' => $actor->id,
-        'updated_by' => $actor->id,
     ]);
     $asset = Asset::factory()->create([
         'category' => 'personal_tracker',

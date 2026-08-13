@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\ConsentValidationService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,10 +13,33 @@ class ClientConsent extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes;
 
+    public const DECISION_AUTHORITATIVE = 'authoritative';
+
+    public const DECISION_INFORMATIONAL = 'informational_acknowledgement';
+
+    public const DECISION_GOVERNANCE_REVIEW = 'governance_review_required';
+
+    public const BASIS_SELF = 'self';
+
+    public const BASIS_SUBSTITUTE = 'substitute';
+
     protected $fillable = [
         'client_id',
+        'site_id',
         'consent_type_id',
         'consent_type_version_id',
+        'source_consent_request_id',
+        'decision_state',
+        'decision_basis',
+        'decision_client_id',
+        'decision_actor_user_id',
+        'authority_scope_id',
+        'capacity_evidence_consent_id',
+        'decision_purpose',
+        'decision_contract_version',
+        'decision_evidence',
+        'gate_satisfying',
+        'governance_review_reason',
         'status',
         'given_at',
         'given_by_user_id',
@@ -61,6 +85,9 @@ class ClientConsent extends Model
         'best_interests_decision' => 'boolean',
         'best_interests_consultees' => 'array',
         'conditions' => 'array',
+        'decision_contract_version' => 'integer',
+        'decision_evidence' => 'array',
+        'gate_satisfying' => 'boolean',
     ];
 
     /**
@@ -69,6 +96,11 @@ class ClientConsent extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
     }
 
     /**
@@ -85,6 +117,31 @@ class ClientConsent extends Model
     public function consentTypeVersion(): BelongsTo
     {
         return $this->belongsTo(ConsentTypeVersion::class);
+    }
+
+    public function sourceConsentRequest(): BelongsTo
+    {
+        return $this->belongsTo(ConsentRequest::class, 'source_consent_request_id');
+    }
+
+    public function decisionClient(): BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'decision_client_id');
+    }
+
+    public function decisionActor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'decision_actor_user_id');
+    }
+
+    public function authorityScope(): BelongsTo
+    {
+        return $this->belongsTo(ConsentAuthorityScope::class);
+    }
+
+    public function capacityEvidenceConsent(): BelongsTo
+    {
+        return $this->belongsTo(ClientConsent::class, 'capacity_evidence_consent_id');
     }
 
     /**
@@ -148,7 +205,13 @@ class ClientConsent extends Model
      */
     public function scopeActive($query)
     {
-        return $query->where('status', 'given')
+        return $query->where('decision_state', self::DECISION_AUTHORITATIVE)
+            ->where('gate_satisfying', true)
+            ->where('status', 'given')
+            ->whereNotNull('given_at')
+            ->where('given_at', '<=', now())
+            ->whereNull('withdrawn_at')
+            ->whereNull('superseded_by_consent_id')
             ->where(function ($q) {
                 $q->whereNull('expires_at')
                     ->orWhere('expires_at', '>', now());
@@ -178,8 +241,7 @@ class ClientConsent extends Model
      */
     public function isValid(): bool
     {
-        return $this->status === 'given'
-            && (! $this->expires_at || $this->expires_at->isFuture());
+        return ConsentValidationService::isConsumable($this);
     }
 
     /**

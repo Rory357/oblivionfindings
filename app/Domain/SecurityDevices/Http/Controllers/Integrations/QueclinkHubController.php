@@ -4,11 +4,14 @@ namespace App\Domain\SecurityDevices\Http\Controllers\Integrations;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceConfigurationProfile;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Presenters\IntegrationSiteCredentialsPresenter;
 use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
+use App\Domain\SecurityDevices\Services\DeviceCustodySiteResolver;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\QueclinkIntegrationAccessService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -315,7 +318,7 @@ class QueclinkHubController extends Controller
                 ->with('consentType')
                 ->find($requestedConsentId);
 
-            if ($consent && ConsentValidationService::isValidTrackingConsent($consent)) {
+            if ($consent && ConsentValidationService::isValidTrackingConsent($consent, $client)) {
                 return (int) $consent->id;
             }
 
@@ -380,14 +383,14 @@ class QueclinkHubController extends Controller
     public function releaseDevice(Request $request, QueclinkDevice $queclinkDevice)
     {
         abort_unless($this->userCanManage($request->user()), 403);
-        $this->queclinkAccess->assertDeviceForRelease($request->user(), $queclinkDevice);
+        $this->assertDeviceForRelease($request->user(), $queclinkDevice);
 
         DB::transaction(function () use ($queclinkDevice, $request) {
             $lockedDevice = QueclinkDevice::query()
                 ->whereKey($queclinkDevice->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
-            $this->queclinkAccess->assertDeviceForRelease($request->user(), $lockedDevice);
+            $this->assertDeviceForRelease($request->user(), $lockedDevice);
             abort_unless($lockedDevice->isPaired(), 422);
 
             $canonicalDeviceId = $lockedDevice->device_id ? (int) $lockedDevice->device_id : null;
@@ -397,7 +400,7 @@ class QueclinkHubController extends Controller
                 ->whereKey($lockedDevice->device_id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $this->devicesAccess->assertCanReleaseActiveAssignment(
+            $this->assertCanReleaseCanonicalDevice(
                 $request->user(),
                 $canonicalDevice,
                 true,
@@ -1353,10 +1356,14 @@ class QueclinkHubController extends Controller
             ->where('device_id', $canonicalDeviceId)
             ->whereNull('released_at')
             ->latest('assigned_at')
-            ->first(['assignable_type', 'assignable_id']);
+            ->first(['assignable_type', 'assignable_id', 'custody_site_id']);
 
         if (! $assignment) {
             return null;
+        }
+
+        if (is_numeric($assignment->custody_site_id) && (int) $assignment->custody_site_id > 0) {
+            return (int) $assignment->custody_site_id;
         }
 
         return match ($assignment->assignable_type) {
@@ -1412,13 +1419,81 @@ class QueclinkHubController extends Controller
 
     private function visibleDeviceQuery(User $viewer): Builder
     {
-        return QueclinkDevice::query()->where(function (Builder $query) use ($viewer): void {
+        $query = QueclinkDevice::query()->where(function (Builder $query) use ($viewer): void {
             $query->whereIn('device_id', $this->devicesAccess->visibleDevices($viewer)->select('devices.id'))
-                ->orWhereIn('device_id', $this->devicesAccess->releasableDevices($viewer)->select('devices.id'));
+                ->orWhereIn('device_id', $this->devicesAccess->releasableDevices($viewer)->select('devices.id'))
+                ->orWhere(function (Builder $historical) use ($viewer): void {
+                    $historical->where('status', QueclinkDevice::STATUS_PAIRED)
+                        ->whereIn('device_id', $this->historicalClientReleaseDevices($viewer)->select('devices.id'));
+                });
 
             if ($this->devicesAccess->canViewUnassigned($viewer)) {
                 $query->orWhereNull('device_id');
             }
+        });
+
+        return $query->where(function (Builder $integrity) use ($viewer): void {
+            $integrity->whereNull('device_id')
+                ->orWhereNotIn('device_id', $this->historicalClientAssignedDevices()->select('devices.id'))
+                ->orWhere(function (Builder $historical) use ($viewer): void {
+                    $historical->where('status', QueclinkDevice::STATUS_PAIRED)
+                        ->whereIn('device_id', $this->historicalClientReleaseDevices($viewer)->select('devices.id'));
+                });
+        });
+    }
+
+    private function historicalClientAssignedDevices(): Builder
+    {
+        return Device::query()->whereHas('assignments', fn (Builder $assignment): Builder => $assignment
+            ->active()
+            ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+            ->whereExists(fn ($clients) => $clients
+                ->selectRaw('1')
+                ->from('clients as historical_clients')
+                ->whereColumn('historical_clients.id', 'device_assignments.assignable_id')
+                ->whereNotNull('historical_clients.deleted_at')));
+    }
+
+    private function historicalClientReleaseDevices(User $viewer): Builder
+    {
+        $siteIds = $this->devicesAccess->accessibleSiteIds($viewer);
+        $query = Device::query()->where('status', '!=', DeviceStatus::Quarantined->value);
+        if (! $this->userCanManage($viewer) || ! $viewer->canDo('clients.viewAny') || $siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas('assignments', function (Builder $assignment) use ($siteIds): void {
+            $assignment->active()
+                ->where('assigned_at', '<=', now())
+                ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+                ->whereIn('custody_site_id', $siteIds)
+                ->whereExists(fn ($clients) => $clients
+                    ->selectRaw('1')
+                    ->from('clients as historical_clients')
+                    ->whereColumn('historical_clients.id', 'device_assignments.assignable_id')
+                    ->whereColumn('historical_clients.site_id', 'device_assignments.custody_site_id')
+                    ->whereNotNull('historical_clients.deleted_at'))
+                ->whereExists(fn ($links) => $links
+                    ->selectRaw('1')
+                    ->from('device_asset_links as historical_links')
+                    ->join('assets as historical_assets', 'historical_assets.id', '=', 'historical_links.asset_id')
+                    ->whereColumn('historical_links.device_id', 'device_assignments.device_id')
+                    ->whereNull('historical_links.unlinked_at')
+                    ->whereColumn('historical_assets.client_id', 'device_assignments.assignable_id')
+                    ->whereColumn('historical_assets.site_id', 'device_assignments.custody_site_id'))
+                ->whereNotExists(fn ($links) => $links
+                    ->selectRaw('1')
+                    ->from('device_asset_links as conflicting_links')
+                    ->leftJoin('assets as conflicting_assets', 'conflicting_assets.id', '=', 'conflicting_links.asset_id')
+                    ->whereColumn('conflicting_links.device_id', 'device_assignments.device_id')
+                    ->whereNull('conflicting_links.unlinked_at')
+                    ->where(function ($mismatch): void {
+                        $mismatch->whereNull('conflicting_assets.id')
+                            ->orWhereNull('conflicting_assets.client_id')
+                            ->orWhereColumn('conflicting_assets.client_id', '!=', 'device_assignments.assignable_id')
+                            ->orWhereNull('conflicting_assets.site_id')
+                            ->orWhereColumn('conflicting_assets.site_id', '!=', 'device_assignments.custody_site_id');
+                    }));
         });
     }
 
@@ -1426,6 +1501,97 @@ class QueclinkHubController extends Controller
     {
         return QueclinkRawFrame::query()
             ->whereIn('queclink_device_id', $this->visibleDeviceQuery($viewer)->select('queclink_devices.id'));
+    }
+
+    private function assertDeviceForRelease(User $user, QueclinkDevice $providerDevice): void
+    {
+        abort_unless(
+            $this->userCanManage($user)
+                && $providerDevice->isPaired()
+                && is_numeric($providerDevice->device_id),
+            404,
+        );
+
+        $canonicalDevice = Device::query()->find((int) $providerDevice->device_id);
+        abort_unless($canonicalDevice instanceof Device, 404);
+        $this->assertCanReleaseCanonicalDevice($user, $canonicalDevice);
+    }
+
+    private function assertCanReleaseCanonicalDevice(User $user, Device $device, bool $lockForUpdate = false): void
+    {
+        $isNormallyReleasable = $this->devicesAccess->releasableDevices($user)
+            ->whereKey($device->getKey())
+            ->exists();
+        $query = $device->assignments()->active();
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $assignments = $query->get();
+        if ($assignments->isEmpty()) {
+            abort_unless($isNormallyReleasable, 404);
+
+            return;
+        }
+
+        foreach ($assignments as $assignment) {
+            if ($isNormallyReleasable && $this->devicesAccess->canAccessCurrentAssignment($user, $assignment)) {
+                continue;
+            }
+
+            abort_unless(
+                $device->status !== DeviceStatus::Quarantined
+                    && $this->canReleaseFromRetainedProvenance($user, $assignment),
+                404,
+            );
+        }
+    }
+
+    private function canReleaseFromRetainedProvenance(User $user, DeviceAssignment $assignment): bool
+    {
+        if ($assignment->released_at !== null
+            || ! $assignment->assigned_at?->lessThanOrEqualTo(now())
+            || ! is_numeric($assignment->custody_site_id)
+            || ! in_array((int) $assignment->custody_site_id, $this->devicesAccess->accessibleSiteIds($user), true)) {
+            return false;
+        }
+
+        $targetType = (string) $assignment->assignable_type;
+        $targetId = (int) $assignment->assignable_id;
+        $custodySiteId = (int) $assignment->custody_site_id;
+        $currentSiteId = app(DeviceCustodySiteResolver::class)->tryResolve($targetType, $targetId);
+        if ($currentSiteId !== null && $currentSiteId !== $custodySiteId) {
+            return false;
+        }
+
+        if ($targetType === DeviceAssignment::TARGET_CLIENT) {
+            return $this->historicalClientReleaseDevices($user)
+                ->whereKey((int) $assignment->device_id)
+                ->exists();
+        }
+
+        $targetColumn = $targetType === DeviceAssignment::TARGET_STAFF
+            ? 'primary_driver_user_id'
+            : null;
+        if ($targetColumn === null
+            || ! $user->canDo('staff.viewAny')
+            || ! $user->canDo('hazards.view')) {
+            return false;
+        }
+
+        $matchingLinks = DeviceAssetLink::query()
+            ->active()
+            ->forDevice((int) $assignment->device_id)
+            ->whereHas('asset', fn (Builder $asset): Builder => $asset
+                ->where('site_id', $custodySiteId)
+                ->where($targetColumn, $targetId))
+            ->count();
+
+        return $matchingLinks > 0
+            && $matchingLinks === DeviceAssetLink::query()
+                ->active()
+                ->forDevice((int) $assignment->device_id)
+                ->count();
     }
 
     /** @return array<string, mixed> */

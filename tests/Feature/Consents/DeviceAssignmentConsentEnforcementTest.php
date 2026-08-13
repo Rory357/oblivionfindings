@@ -12,6 +12,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 /**
@@ -100,6 +101,28 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
         $this->assertDatabaseCount('device_assignments', 0);
     }
 
+    public function test_client_tracker_assignment_with_informational_acknowledgement_is_rejected(): void
+    {
+        $consent = $this->givenConsentFor($this->client);
+        $consent->update([
+            'decision_state' => ClientConsent::DECISION_INFORMATIONAL,
+            'decision_basis' => 'informational_only',
+            'gate_satisfying' => false,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post("/security-devices/devices/{$this->tracker->id}/assign", [
+                'assignable_type' => 'client',
+                'assignable_id' => $this->client->id,
+                'assignment_type' => 'permanent',
+                'consent_id' => $consent->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('assignable_type');
+
+        $this->assertDatabaseCount('device_assignments', 0);
+    }
+
     public function test_client_tracker_assignment_with_wrong_client_consent_is_rejected(): void
     {
         $otherClient = Client::factory()->create();
@@ -159,12 +182,8 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
             'purpose' => 'Client personal safety tracking',
         ]);
 
-        return ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
-            'status' => 'given',
+        return AuthoritativeConsentFixture::manualSelf($client, $consentType, $this->admin, [
             'given_at' => now()->subDay(),
-            'given_method' => 'electronic',
             'expires_at' => $expiresAt,
         ]);
     }

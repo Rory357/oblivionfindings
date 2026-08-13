@@ -13,6 +13,7 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function grantClientLocationConsentRole(User $user, string $roleName, array $permissionKeys): void
 {
@@ -125,17 +126,10 @@ function recordClientLocationTrackingConsent(
     User $actor,
     array $overrides = [],
 ): ClientConsent {
-    return ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => clientLocationTrackingConsentType()->id,
-        'status' => 'given',
+    $type = clientLocationTrackingConsentType();
+
+    return AuthoritativeConsentFixture::manualSelf($client, $type, $actor, [
         'given_at' => now()->subHour(),
-        'expires_at' => now()->addMonth(),
-        'given_by_user_id' => $actor->id,
-        'given_by_relationship' => $actor->role === 'client' ? 'self' : 'staff',
-        'given_method' => 'written',
-        'created_by' => $actor->id,
-        'updated_by' => $actor->id,
         ...$overrides,
     ]);
 }
@@ -158,7 +152,8 @@ function assignClientLocationConsentTracker(
         'assigned_at' => now(),
         'assigned_by_user_id' => $consent?->given_by_user_id,
         'consent_id' => $consent?->id,
-        'tracking_purpose' => 'Client personal safety location tracking',
+        'tracking_purpose' => $consent?->decision_purpose
+            ?? clientLocationTrackingConsentType()->purpose,
         'authority_basis' => 'assignment_linked_client_consent',
         'access_audience' => ['authorised_client_care', 'control_room', 'health_and_safety'],
         'retention_days' => 90,
@@ -339,16 +334,14 @@ it('preserves staff profile and history location access with active tracking con
         'securityDevices.devices.view',
     ]);
 
+    // Consent authorises the tracking purpose; it never grants a viewer
+    // access to a resident outside their canonical Site scope.
     $this->actingAs($otherSiteViewer)
         ->get(route('operations.clients.show', $client, false))
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('location.tracker.id', $device->id)
-            ->where('location.tracker.detail_url', null)
-            ->where('location.tracker.detail_access.state', 'restricted')
-            ->where('location.tracker.tracking_workspace_url', null)
-            ->where('location.tracker.tracking_workspace_access.state', 'restricted'));
+        ->assertForbidden();
 
+    $this->getJson(route('operations.clients.location.history', $client, false))
+        ->assertForbidden();
     $this->get("/security-devices/devices/{$device->id}")->assertNotFound();
 
     $deviceViewer = makeClientLocationConsentStaff($client->site, 'location_device_viewer', [

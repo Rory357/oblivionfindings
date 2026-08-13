@@ -31,6 +31,7 @@ class ConsentRequestController extends Controller
         Gate::authorize('viewAny', ConsentRequest::class);
 
         $requests = ConsentRequest::forClient($client->id)
+            ->where('site_id', $client->site_id)
             ->with(['consentType:id,name,category', 'requestedBy:id,name', 'recipient:id,name'])
             ->orderByDesc('created_at')
             ->get()
@@ -130,6 +131,7 @@ class ConsentRequestController extends Controller
     {
         Gate::authorize('view', $client);
         abort_unless($consentRequest->client_id === $client->id, 404);
+        abort_unless((int) $consentRequest->site_id === (int) $client->site_id, 404);
         Gate::authorize('view', $consentRequest);
 
         $consentRequest->load([
@@ -150,6 +152,7 @@ class ConsentRequestController extends Controller
     {
         Gate::authorize('view', $client);
         abort_unless($consentRequest->client_id === $client->id, 404);
+        abort_unless((int) $consentRequest->site_id === (int) $client->site_id, 404);
         Gate::authorize('cancel', $consentRequest);
 
         $data = $request->validate([

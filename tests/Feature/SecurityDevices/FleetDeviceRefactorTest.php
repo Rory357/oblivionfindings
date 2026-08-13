@@ -14,7 +14,6 @@ use App\Models\AssetTracker;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
-use App\Models\ConsentTypeVersion;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -22,6 +21,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class FleetDeviceRefactorTest extends TestCase
@@ -677,30 +677,12 @@ class FleetDeviceRefactorTest extends TestCase
             ]
         );
 
-        $version = ConsentTypeVersion::firstOrCreate(
-            [
-                'consent_type_id' => $consentType->id,
-                'version' => 1,
-            ],
-            [
-                'description' => 'Fleet tracking v1',
-                'purpose' => 'Enable fleet vehicle GPS tracking.',
-                'legal_basis' => 'consent',
-                'effective_from' => now()->subDay(),
-            ]
+        return AuthoritativeConsentFixture::manualSelf(
+            $client,
+            $consentType,
+            $this->admin,
+            $overrides,
         );
-
-        return ClientConsent::create(array_merge([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
-            'consent_type_version_id' => $version->id,
-            'status' => 'given',
-            'given_at' => now(),
-            'given_by_user_id' => $this->admin->id,
-            'given_method' => 'electronic',
-            'created_by' => $this->admin->id,
-            'updated_by' => $this->admin->id,
-        ], $overrides));
     }
 
     /** @param array<int, string> $permissions */

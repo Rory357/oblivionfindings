@@ -9,7 +9,6 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\QueclinkIntegrationAccessService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
-use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\AppSetting;
 use App\Models\Asset;
 use App\Models\AssetTracker;
@@ -42,6 +41,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class QueclinkHubControllerTest extends TestCase
@@ -820,18 +820,21 @@ class QueclinkHubControllerTest extends TestCase
         $supported = Client::factory()->create([
             'organization_id' => null,
             'site_id' => $site->id,
+            'status' => 'active',
             'first_name' => 'Supported Legacy',
             'last_name' => 'Client',
         ]);
         $ambiguous = Client::factory()->create([
             'organization_id' => null,
             'site_id' => null,
+            'status' => 'active',
             'first_name' => 'Ambiguous Legacy',
             'last_name' => 'Client',
         ]);
         $foreign = Client::factory()->create([
             'organization_id' => null,
             'site_id' => $foreignSite->id,
+            'status' => 'active',
             'first_name' => 'Foreign Legacy',
             'last_name' => 'Client',
         ]);
@@ -1175,7 +1178,7 @@ class QueclinkHubControllerTest extends TestCase
     public function test_claim_as_client_links_existing_valid_tracking_consent_when_not_supplied()
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
-        $client = Client::create(['organization_id' => 1, 'site_id' => $site->id, 'first_name' => 'Amelia', 'last_name' => 'Wilson']);
+        $client = Client::create(['organization_id' => 1, 'site_id' => $site->id, 'status' => 'active', 'first_name' => 'Amelia', 'last_name' => 'Wilson']);
         $consentType = ConsentType::create([
             'name' => 'Personal Tracker (Wandering Risk)',
             'category' => 'safety',
@@ -1193,10 +1196,7 @@ class QueclinkHubControllerTest extends TestCase
             'legal_basis' => 'Consent',
             'effective_from' => now()->subDay(),
         ]);
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
-            'consent_type_version_id' => $consentVersion->id,
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, $this->admin, [
             'status' => 'given',
             'given_at' => now()->subDay(),
             'expires_at' => now()->addDays(30),
@@ -1342,8 +1342,8 @@ class QueclinkHubControllerTest extends TestCase
     public function test_claim_consent_is_scoped_after_client_authorization_and_never_becomes_an_existence_oracle(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
-        $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id]);
-        $otherClient = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id]);
+        $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'status' => 'active']);
+        $otherClient = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'status' => 'active']);
         $foreignConsent = $this->trackingConsent($otherClient);
         $messages = [];
 
@@ -1372,7 +1372,7 @@ class QueclinkHubControllerTest extends TestCase
     public function test_claim_rejects_non_tracking_consent_and_any_consent_for_non_client_targets(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
-        $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id]);
+        $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'status' => 'active']);
         $type = ConsentType::factory()->create(['name' => 'Photography permission', 'active' => true]);
         $version = ConsentTypeVersion::create([
             'consent_type_id' => $type->id,
@@ -1431,8 +1431,8 @@ class QueclinkHubControllerTest extends TestCase
         $inactiveStaff = User::factory()->create(['organization_id' => 1, 'approved_at' => null, 'name' => 'Inactive Site Worker']);
         HrEmployeeProfile::factory()->create(['tenant_id' => 1, 'user_id' => $inactiveStaff->id, 'primary_site_id' => $site->id]);
 
-        $clientWithoutSite = Client::factory()->create(['organization_id' => 1, 'site_id' => null, 'first_name' => 'No Site']);
-        $legacyClient = Client::factory()->create(['organization_id' => null, 'site_id' => $site->id, 'first_name' => 'Valid Legacy']);
+        $clientWithoutSite = Client::factory()->create(['organization_id' => 1, 'site_id' => null, 'status' => 'active', 'first_name' => 'No Site']);
+        $legacyClient = Client::factory()->create(['organization_id' => null, 'site_id' => $site->id, 'status' => 'active', 'first_name' => 'Valid Legacy']);
 
         $this->actingAs($this->admin)
             ->get('/security-devices/integrations/queclink?target_type=staff&target_search=Worker')
@@ -1516,7 +1516,7 @@ class QueclinkHubControllerTest extends TestCase
     public function test_two_devices_cannot_claim_the_same_client_personal_asset(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
-        $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id]);
+        $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'status' => 'active']);
         $consent = $this->trackingConsent($client);
         $devices = collect([187, 188])->map(fn (int $suffix) => QueclinkDevice::create([
             'tenant_id' => 1,
@@ -1744,7 +1744,7 @@ class QueclinkHubControllerTest extends TestCase
     public function test_release_uses_historical_provenance_for_a_soft_deleted_client(): void
     {
         $site = Site::factory()->create(['tenant_id' => 1]);
-        $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id]);
+        $client = Client::factory()->create(['organization_id' => 1, 'site_id' => $site->id, 'status' => 'active']);
         $consent = $this->trackingConsent($client);
         $device = QueclinkDevice::create([
             'tenant_id' => 1,
@@ -1773,6 +1773,73 @@ class QueclinkHubControllerTest extends TestCase
             'queclink_device_id' => $device->id,
             'event_type' => 'release',
         ]);
+    }
+
+    public function test_soft_deleted_client_release_visibility_rejects_foreign_mismatched_unlinked_quarantined_and_non_paired_provenance(): void
+    {
+        $localSite = Site::factory()->create(['tenant_id' => 1]);
+        $foreignSite = Site::factory()->create(['tenant_id' => 1]);
+        $viewer = $this->siteRestrictedViewer($localSite);
+
+        foreach (['foreign', 'wrong_person', 'wrong_site', 'unlinked', 'quarantined', 'non_paired'] as $index => $state) {
+            $site = $state === 'foreign' ? $foreignSite : $localSite;
+            $client = Client::factory()->create([
+                'organization_id' => 1,
+                'site_id' => $site->id,
+                'status' => 'active',
+            ]);
+            $consent = $this->trackingConsent($client);
+            $providerDevice = QueclinkDevice::create([
+                'tenant_id' => 1,
+                'imei' => '86469606050419'.$index,
+                'status' => QueclinkDevice::STATUS_PENDING,
+            ]);
+            $this->actingAs($this->admin)->post("/security-devices/integrations/queclink/devices/{$providerDevice->id}/claim", [
+                'pairing_type' => 'client',
+                'target_id' => $client->id,
+                'consent_id' => $consent->id,
+            ])->assertRedirect();
+
+            $canonical = Device::query()->findOrFail($providerDevice->fresh()->device_id);
+            $assignment = $canonical->assignments()->active()->sole();
+            if ($state === 'wrong_person') {
+                $otherClient = Client::factory()->create([
+                    'organization_id' => 1,
+                    'site_id' => $localSite->id,
+                    'status' => 'active',
+                ]);
+                $canonical->activeAssetLinks()->sole()->asset()->update(['client_id' => $otherClient->id]);
+            } elseif ($state === 'wrong_site') {
+                $canonical->activeAssetLinks()->sole()->asset()->update(['site_id' => $foreignSite->id]);
+            } elseif ($state === 'unlinked') {
+                $canonical->activeAssetLinks()->update(['unlinked_at' => now()]);
+            } elseif ($state === 'quarantined') {
+                $canonical->update(['status' => 'quarantined']);
+            } elseif ($state === 'non_paired') {
+                QueclinkDevice::query()->whereKey($providerDevice->id)->update([
+                    'status' => QueclinkDevice::STATUS_PENDING,
+                ]);
+            }
+            $client->delete();
+
+            $this->actingAs($viewer)
+                ->get('/security-devices/integrations/queclink?device_search='.substr($providerDevice->imei, -6))
+                ->assertInertia(fn ($page) => $page
+                    ->has('devices.paired', 0)
+                    ->has('devices.pending', 0)
+                    ->has('devices.rejected', 0)
+                    ->where('devices.total', 0));
+            $this->actingAs($viewer)
+                ->post("/security-devices/integrations/queclink/devices/{$providerDevice->id}/release")
+                ->assertNotFound();
+
+            $this->assertNull($assignment->fresh()->released_at);
+            $this->assertSame(
+                $state === 'non_paired' ? QueclinkDevice::STATUS_PENDING : QueclinkDevice::STATUS_PAIRED,
+                $providerDevice->fresh()->status,
+            );
+            $this->assertSame($canonical->id, $providerDevice->fresh()->device_id);
+        }
     }
 
     public function test_release_rolls_back_for_a_foreign_historical_assignment_while_claim_stays_live_only(): void
@@ -2454,16 +2521,12 @@ class QueclinkHubControllerTest extends TestCase
 
     private function partialTargetRequest(string $targetType)
     {
-        $version = app(HandleInertiaRequests::class)->version(request());
-
         return $this->actingAs($this->admin)->get(
             "/security-devices/integrations/queclink?target_type={$targetType}&target_search=Worker",
-            [
-                'X-Inertia' => 'true',
-                'X-Inertia-Version' => $version,
-                'X-Inertia-Partial-Component' => 'security-devices/integrations/queclink-hub',
-                'X-Inertia-Partial-Data' => 'targets',
-            ],
+            $this->inertiaPartialHeaders(
+                'security-devices/integrations/queclink-hub',
+                'targets',
+            ),
         );
     }
 
@@ -2487,10 +2550,7 @@ class QueclinkHubControllerTest extends TestCase
             'effective_from' => now()->subDay(),
         ]);
 
-        return ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $type->id,
-            'consent_type_version_id' => $version->id,
+        return AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin, [
             'status' => 'given',
             'given_at' => now()->subDay(),
             'expires_at' => now()->addDays(30),

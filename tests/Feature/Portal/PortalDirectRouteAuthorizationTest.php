@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ClientDocument;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
@@ -16,6 +15,7 @@ use App\Models\TimelineEventComment;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function makePortalDirectRouteUser(Client $client, array $permissions): User
 {
@@ -63,17 +63,10 @@ function grantPortalDirectRouteFamilyDisclosure(Client $client, User $actor): vo
         'name' => 'Information Sharing with Whānau / Family',
         'category' => 'communication',
     ]);
-    ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $type->id,
+    AuthoritativeConsentFixture::manualSelf($client, $type, $actor, [
         'status' => 'given',
         'given_at' => now()->subMinute(),
         'expires_at' => now()->addMonth(),
-        'given_by_user_id' => $actor->id,
-        'given_by_relationship' => 'next_of_kin',
-        'given_method' => 'portal',
-        'created_by' => $actor->id,
-        'updated_by' => $actor->id,
     ]);
     FamilyPortalSetting::query()->create([
         'organization_id' => $client->organization_id,

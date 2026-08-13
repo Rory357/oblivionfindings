@@ -26,6 +26,7 @@ use App\Services\Fleet\FleetDeviceRuntimeService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class PersonalTrackingConsentWithdrawalTest extends TestCase
@@ -364,17 +365,7 @@ class PersonalTrackingConsentWithdrawalTest extends TestCase
 
     private function givenConsent(Client $client, ConsentType $type, User $actor): ClientConsent
     {
-        return ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => $type->id,
-            'status' => 'given',
-            'given_at' => now(),
-            'given_by_user_id' => $actor->id,
-            'given_method' => 'electronic',
-            'expires_at' => now()->addMonth(),
-            'created_by' => $actor->id,
-            'updated_by' => $actor->id,
-        ]);
+        return AuthoritativeConsentFixture::manualSelf($client, $type, $actor);
     }
 
     private function telemetryEvent(

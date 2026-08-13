@@ -6,7 +6,6 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device as CanonicalDevice;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoom\Signal;
@@ -17,6 +16,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class ControlRoomDeviceVisibilityTest extends TestCase
@@ -282,15 +282,9 @@ class ControlRoomDeviceVisibilityTest extends TestCase
             'name' => 'Fleet Tracking',
             'active' => true,
         ]);
-        $consent = ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, $this->operator, [
             'status' => 'given',
             'given_at' => now()->subDay(),
-            'given_by_user_id' => $this->operator->id,
-            'given_method' => 'electronic',
-            'created_by' => $this->operator->id,
-            'updated_by' => $this->operator->id,
         ]);
         $canonical = CanonicalDevice::factory()->tracking()->create();
         $collectionStartedAt = now()->subHour();

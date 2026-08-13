@@ -10,6 +10,7 @@ use App\Models\ClientConsent;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Services\AuditLogger;
 use App\Services\ConsentValidationService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class PersonalTrackingPrivacyService
@@ -59,6 +60,30 @@ class PersonalTrackingPrivacyService
             : null;
     }
 
+    /** @return Collection<int, DeviceAssignment> */
+    public function authorisedClientAssignments(Client $client): Collection
+    {
+        return DeviceAssignment::query()
+            ->with([
+                'device',
+                'consent.consentType',
+                'consent.consentTypeVersion',
+                'consent.sourceConsentRequest',
+                'consent.authorityScope.nextOfKin',
+                'consent.authorityScope.capacityEvidenceConsent',
+            ])
+            ->where('assignable_type', DeviceAssignment::TARGET_CLIENT)
+            ->where('assignable_id', $client->id)
+            ->current()
+            ->whereHas('device', fn ($query) => $query->where('domain', 'tracking'))
+            ->orderBy('device_id')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (DeviceAssignment $assignment): bool => $this
+                ->assignmentAuthorisesResidentLocation($assignment, $client))
+            ->values();
+    }
+
     public function activeConsentForClientAssignment(Client $client): ?ClientConsent
     {
         return $this->authorisedClientAssignment($client)?->consent;
@@ -71,7 +96,7 @@ class PersonalTrackingPrivacyService
         return $this->assignmentAuthorisesClientForPurpose(
             $assignment,
             $client,
-            fn (ClientConsent $consent): bool => ConsentValidationService::isValidTrackingConsent($consent),
+            fn (ClientConsent $consent): bool => ConsentValidationService::isValidTrackingConsent($consent, $client),
         );
     }
 
@@ -82,7 +107,7 @@ class PersonalTrackingPrivacyService
         return $this->assignmentAuthorisesClientForPurpose(
             $assignment,
             $client,
-            fn (ClientConsent $consent): bool => ConsentValidationService::isValidResidentLocationConsent($consent),
+            fn (ClientConsent $consent): bool => ConsentValidationService::isValidResidentLocationConsent($consent, $client),
         );
     }
 
@@ -92,12 +117,23 @@ class PersonalTrackingPrivacyService
         callable $consentAuthorisesPurpose,
     ): bool {
         $clientId = $client instanceof Client ? $client->id : $client;
-        $assignment->loadMissing(['device', 'consent.consentType']);
+        $assignment = DeviceAssignment::query()
+            ->with([
+                'device',
+                'consent.consentType',
+                'consent.consentTypeVersion',
+                'consent.sourceConsentRequest',
+                'consent.authorityScope.nextOfKin',
+                'consent.authorityScope.capacityEvidenceConsent',
+            ])
+            ->find($assignment->id);
+        if (! $assignment) {
+            return false;
+        }
+
         $consent = $assignment->consent;
         $device = $assignment->device;
-        $clientModel = $client instanceof Client
-            ? $client
-            : Client::query()->find($clientId, ['id', 'site_id']);
+        $clientModel = Client::query()->find($clientId, ['id', 'site_id']);
 
         return $assignment->assignable_type === DeviceAssignment::TARGET_CLIENT
             && (int) $assignment->assignable_id === (int) $clientId
@@ -120,6 +156,10 @@ class PersonalTrackingPrivacyService
             && $assignment->authority_basis === 'assignment_linked_client_consent'
             && is_string($assignment->tracking_purpose)
             && trim($assignment->tracking_purpose) !== ''
+            && hash_equals(
+                str((string) $consent->decision_purpose)->squish()->lower()->toString(),
+                str($assignment->tracking_purpose)->squish()->lower()->toString(),
+            )
             && is_array($assignment->access_audience)
             && in_array('authorised_client_care', $assignment->access_audience, true)
             && is_numeric($assignment->retention_days)
@@ -198,7 +238,7 @@ class PersonalTrackingPrivacyService
         $consent->loadMissing('consentType');
         if ($assignment->assignable_type !== DeviceAssignment::TARGET_CLIENT
             || (int) $assignment->assignable_id !== (int) $consent->client_id
-            || ! ConsentValidationService::isValidTrackingConsent($consent)) {
+            || ! ConsentValidationService::isValidTrackingConsent($consent, $consent->client_id)) {
             throw new \InvalidArgumentException(
                 'Tracking collection can only resume with an active location consent linked to this client assignment.',
             );

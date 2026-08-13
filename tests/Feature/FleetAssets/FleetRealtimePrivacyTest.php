@@ -23,6 +23,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class FleetRealtimePrivacyTest extends TestCase
@@ -222,13 +223,9 @@ class FleetRealtimePrivacyTest extends TestCase
             ],
         );
 
-        return ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => $type->id,
-            'consent_type_version_id' => $version->id,
+        return AuthoritativeConsentFixture::manualSelf($client, $type, User::factory()->create(), [
             'status' => 'given',
             'given_at' => now(),
-            'given_method' => 'electronic',
             'expires_at' => now()->addMonth(),
         ]);
     }

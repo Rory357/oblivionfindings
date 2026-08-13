@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
@@ -32,6 +33,7 @@ class TrackingWorkspacePresenter
         private readonly SecurityDevicesAccessService $access,
         private readonly UserSiteAccessService $siteAccess,
         private readonly IntegrationEventHistoryService $eventHistory,
+        private readonly PersonalTrackingPrivacyService $trackingPrivacy,
     ) {}
 
     public function present(User $viewer, Builder $trackingScope, array $activeTab, array $filters = []): array
@@ -459,9 +461,8 @@ class TrackingWorkspacePresenter
             $assignmentConsent = null;
         }
         $activeConsent = $assignment
-            ? ($assignment->isCollectionActive()
-                && $assignmentConsent
-                && ConsentValidationService::isValidTrackingConsent($assignmentConsent)
+            ? ($assignmentConsent
+                && $this->trackingPrivacy->assignmentAuthorisesClient($assignment, $client)
                     ? $assignmentConsent
                     : null)
             : ConsentValidationService::latestValidTrackingConsentForClient($client);

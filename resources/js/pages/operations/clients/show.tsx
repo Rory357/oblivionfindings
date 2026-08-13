@@ -5158,13 +5158,13 @@ export default function ClientShow({
                 {tab === 'consents' &&
                     (() => {
                         const activeCount = consents.filter(
-                            (c: any) => c.status === 'given' && !c.is_expired,
+                            (c: any) => c.is_consumable,
                         ).length;
                         const expiredCount = consents.filter(
                             (c: any) => c.is_expired,
                         ).length;
                         const expiringCount = consents.filter(
-                            (c: any) => c.is_expiring_soon,
+                            (c: any) => c.is_consumable && c.is_expiring_soon,
                         ).length;
 
                         const STATUS_COLORS: Record<string, string> = {
@@ -5173,6 +5173,10 @@ export default function ClientShow({
                                 'bg-status-critical-bg text-status-critical',
                             withdrawn: 'bg-muted text-muted-foreground',
                             expired: 'bg-status-warning-bg text-status-warning',
+                            governance_review_required:
+                                'bg-status-warning-bg text-status-warning',
+                            informational_acknowledgement:
+                                'bg-status-info-bg text-status-info',
                         };
 
                         return (
@@ -5262,9 +5266,14 @@ export default function ClientShow({
                                             <div className="space-y-2">
                                                 {consents.map((c: any) => {
                                                     const displayStatus =
-                                                        c.is_expired
-                                                            ? 'expired'
-                                                            : c.status;
+                                                        c.decision_state ===
+                                                            'governance_review_required' ||
+                                                        c.decision_state ===
+                                                            'informational_acknowledgement'
+                                                            ? c.decision_state
+                                                            : c.is_expired
+                                                              ? 'expired'
+                                                              : c.status;
                                                     return (
                                                         <div
                                                             key={c.id}
@@ -5280,9 +5289,10 @@ export default function ClientShow({
                                                                     <span
                                                                         className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_COLORS[displayStatus] ?? 'bg-muted text-muted-foreground'}`}
                                                                     >
-                                                                        {
-                                                                            displayStatus
-                                                                        }
+                                                                        {displayStatus.replace(
+                                                                            /_/g,
+                                                                            ' ',
+                                                                        )}
                                                                     </span>
                                                                     {c.capacity_assessed && (
                                                                         <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">

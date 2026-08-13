@@ -6,7 +6,6 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\FamilyPortalSetting;
 use App\Models\NextOfKin;
@@ -17,6 +16,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class PortalSurfaceTest extends TestCase
@@ -42,17 +42,10 @@ class PortalSurfaceTest extends TestCase
             'name' => 'Information Sharing with Whānau / Family',
             'category' => 'communication',
         ]);
-        ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => $familyConsentType->id,
+        AuthoritativeConsentFixture::manualSelf($client, $familyConsentType, $portalUser, [
             'status' => 'given',
             'given_at' => now(),
             'expires_at' => now()->addMonth(),
-            'given_by_user_id' => $portalUser->id,
-            'given_by_relationship' => 'next_of_kin',
-            'given_method' => 'portal',
-            'created_by' => $portalUser->id,
-            'updated_by' => $portalUser->id,
         ]);
         FamilyPortalSetting::query()->create([
             'client_id' => $client->id,
@@ -117,17 +110,10 @@ class PortalSurfaceTest extends TestCase
         ]);
         $givenAt = now()->subHour()->startOfSecond();
 
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => $consentType->id,
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $consentType, $portalUser, [
             'status' => 'given',
             'given_at' => $givenAt,
             'expires_at' => now()->addDay(),
-            'given_by_user_id' => $portalUser->id,
-            'given_by_relationship' => 'next_of_kin',
-            'given_method' => 'portal',
-            'created_by' => $portalUser->id,
-            'updated_by' => $portalUser->id,
         ]);
         $device = Device::factory()->tracking()->create();
         DeviceAssignment::query()->create([

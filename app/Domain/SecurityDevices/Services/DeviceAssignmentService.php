@@ -304,7 +304,7 @@ class DeviceAssignmentService
 
         if (! $consent
             || (int) $consent->client_id !== $assignableId
-            || ! ConsentValidationService::isValidTrackingConsent($consent)) {
+            || ! ConsentValidationService::isValidTrackingConsent($consent, $assignableId)) {
             throw new \InvalidArgumentException(
                 'Client tracker assignments require an active, assignment-linked location-tracking consent.'
             );

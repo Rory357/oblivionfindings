@@ -244,6 +244,7 @@ class ActionsAggregator
 
         return ConsentRequest::query()
             ->where('client_id', $client->id)
+            ->where('site_id', $client->site_id)
             ->where('status', ConsentRequest::STATUS_PENDING)
             ->orderBy('expires_at')
             ->limit(11)

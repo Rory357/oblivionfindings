@@ -14,7 +14,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ClientConsent;
-use App\Models\ConsentType;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ConsentValidationService;
@@ -518,78 +517,84 @@ class DeviceController extends Controller
             return back()->withErrors(['consent' => 'An active canonical Client assignment is required before consent can be recorded.']);
         }
 
-        $consentType = ConsentType::query()
-            ->where('name', 'Fleet Tracking')
-            ->first();
-
-        if (! $consentType) {
-            $consentType = ConsentType::create([
-                'name' => 'Fleet Tracking',
-                'category' => 'operational',
-                'description' => 'Consent for vehicle location tracking.',
-                'purpose' => 'Enable fleet vehicle GPS tracking.',
-                'legal_basis' => 'consent',
-                'is_mandatory' => false,
-                'requires_capacity_assessment' => false,
-                'allows_withdrawal' => true,
-                'renewal_required' => false,
-                'active' => true,
+        $consent = $context['client_consent'];
+        if (! $consent
+            || ! ConsentValidationService::isValidTrackingConsent($consent, $client)) {
+            return back()->withErrors([
+                'consent' => 'No authoritative tracking consent is available. Record Client self-consent or complete a verified representative consent request first.',
             ]);
         }
 
-        $currentVersion = $consentType->currentVersion()->first();
-
-        DB::transaction(function () use (
-            $request,
-            $client,
-            $consentType,
-            $currentVersion,
-            $context,
-            $assignment,
-            $tracker,
-            $asset,
-            $device,
-        ): void {
-            $consent = ClientConsent::create([
-                'client_id' => $client->id,
-                'consent_type_id' => $consentType->id,
-                'consent_type_version_id' => $currentVersion?->id,
-                'status' => 'given',
-                'given_at' => now(),
-                'given_by_user_id' => $request->user()->id,
-                'given_method' => 'electronic',
-                'given_notes' => $request->input('notes'),
-                'created_by' => $request->user()->id,
-                'updated_by' => $request->user()->id,
-            ]);
-
-            collect([$context['assignment_consent']])->filter()->unique('id')->sortBy('id')->each(
-                function (ClientConsent $oldConsent) use ($consent, $request): void {
-                    $lockedConsent = ClientConsent::query()
-                        ->lockForUpdate()
-                        ->findOrFail($oldConsent->id);
-                    $lockedConsent->update(['superseded_by_consent_id' => $consent->id]);
-                    $this->trackingPrivacy->stopForConsent($lockedConsent, $request->user()->id);
-                },
-            );
-
-            $this->trackingPrivacy->resumeClientAssignment(
-                $assignment,
+        try {
+            DB::transaction(function () use (
+                $request,
+                $client,
                 $consent,
-                $request->user()->id,
-            );
+                $context,
+                $assignment,
+                $tracker,
+                $asset,
+                $device,
+            ): void {
+                $consentIds = collect([
+                    $consent->id,
+                    $context['assignment_consent']?->id,
+                ])->filter()->unique()->sort()->values();
+                $lockedConsents = ClientConsent::query()
+                    ->with([
+                        'consentType',
+                        'consentTypeVersion',
+                        'sourceConsentRequest',
+                        'authorityScope.nextOfKin',
+                        'authorityScope.capacityEvidenceConsent',
+                    ])
+                    ->whereKey($consentIds->all())
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id');
+                $authoritativeConsent = $lockedConsents->get($consent->id);
+                if (! $authoritativeConsent) {
+                    throw new \InvalidArgumentException(
+                        'The authoritative tracking consent is no longer available.',
+                    );
+                }
+                if (! ConsentValidationService::isValidTrackingConsent($authoritativeConsent, $client)) {
+                    throw new \InvalidArgumentException(
+                        'The authoritative tracking consent is no longer current.',
+                    );
+                }
 
-            AuditLogger::logOrFail('assets.device_assignment.consent.granted', $asset ?? $device, [
-                'actor_id' => $request->user()->id,
-                'device_id' => $device->id,
-                'legacy_tracker_id' => $tracker?->id,
-                'assignment_id' => $assignment?->id,
-                'client_id' => $client->id,
-                'consent_id' => $consent->id,
-            ]);
-        });
+                $lockedConsents
+                    ->filter(fn (ClientConsent $oldConsent): bool => (int) $oldConsent->id
+                        !== (int) $authoritativeConsent->id)
+                    ->unique('id')->sortBy('id')->each(
+                        function (ClientConsent $oldConsent) use ($authoritativeConsent, $request): void {
+                            $oldConsent->update(['superseded_by_consent_id' => $authoritativeConsent->id]);
+                            $this->trackingPrivacy->stopForConsent($oldConsent, $request->user()->id);
+                        },
+                    );
 
-        return back()->with('success', 'Location tracking consent granted.');
+                $this->trackingPrivacy->resumeClientAssignment(
+                    $assignment,
+                    $authoritativeConsent,
+                    $request->user()->id,
+                );
+
+                AuditLogger::logOrFail('assets.device_assignment.consent.granted', $asset ?? $device, [
+                    'actor_id' => $request->user()->id,
+                    'device_id' => $device->id,
+                    'legacy_tracker_id' => $tracker?->id,
+                    'assignment_id' => $assignment?->id,
+                    'client_id' => $client->id,
+                    'consent_id' => $authoritativeConsent->id,
+                ]);
+            });
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withErrors(['consent' => $exception->getMessage()]);
+        }
+
+        return back()->with('success', 'Authoritative location tracking consent linked.');
     }
 
     public function revokeConsent(Request $request, Device $device)
@@ -607,7 +612,7 @@ class DeviceController extends Controller
         $asset = $context['asset'];
         $consents = collect([$context['assignment_consent']])
             ->filter(fn (?ClientConsent $consent): bool => $consent !== null
-            && ConsentValidationService::isValidTrackingConsent($consent))
+            && ConsentValidationService::isValidTrackingConsent($consent, $consent->client_id))
             ->unique('id')
             ->sortBy('id')
             ->values();
@@ -630,7 +635,7 @@ class DeviceController extends Controller
                     ->lockForUpdate()
                     ->findOrFail($consent->id);
 
-                if (! ConsentValidationService::isValidTrackingConsent($lockedConsent)) {
+                if (! ConsentValidationService::isValidTrackingConsent($lockedConsent, $lockedConsent->client_id)) {
                     continue;
                 }
 

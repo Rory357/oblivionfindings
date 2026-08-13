@@ -17,6 +17,7 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class CanonicalIntegrationEventHistoryTest extends TestCase
@@ -69,18 +70,16 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
             'purpose' => 'Client personal safety tracking',
             'active' => true,
         ]);
-        $this->trackingConsent = ClientConsent::query()->create([
-            'client_id' => $this->client->id,
-            'consent_type_id' => $trackingConsentType->id,
-            'status' => 'given',
-            'given_at' => now(),
-            'expires_at' => now()->addMonth(),
-            'given_by_user_id' => $this->portalUser->id,
-            'given_by_relationship' => 'next_of_kin',
-            'given_method' => 'portal',
-            'created_by' => $this->admin->id,
-            'updated_by' => $this->admin->id,
-        ]);
+        $this->trackingConsent = AuthoritativeConsentFixture::manualSelf(
+            $this->client,
+            $trackingConsentType,
+            $this->admin,
+            [
+                'status' => 'given',
+                'given_at' => now(),
+                'expires_at' => now()->addMonth(),
+            ],
+        );
     }
 
     public function test_client_location_history_reads_canonical_integration_event_identity(): void

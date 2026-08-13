@@ -15,6 +15,7 @@ class ConsentRequestPolicy
     public function view(User $user, ConsentRequest $request): bool
     {
         return $user->canDo('consents.viewAny')
+            && $this->matchesCanonicalSite($request)
             && $user->can('view', $request->client);
     }
 
@@ -26,6 +27,7 @@ class ConsentRequestPolicy
     public function cancel(User $user, ConsentRequest $request): bool
     {
         return $user->canDo('consents.request')
+            && $this->matchesCanonicalSite($request)
             && $user->can('view', $request->client);
     }
 
@@ -35,6 +37,15 @@ class ConsentRequestPolicy
             return false;
         }
 
-        return $user->canAccessClientPortal($request->client);
+        return $this->matchesCanonicalSite($request)
+            && ConsentRequest::recipientRoleMatchesRelationship($user, $request->recipient_relationship)
+            && $user->canAccessClientPortal($request->client);
+    }
+
+    private function matchesCanonicalSite(ConsentRequest $request): bool
+    {
+        return is_numeric($request->site_id)
+            && is_numeric($request->client?->site_id)
+            && (int) $request->site_id === (int) $request->client->site_id;
     }
 }

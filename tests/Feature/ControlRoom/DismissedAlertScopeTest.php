@@ -26,6 +26,7 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class DismissedAlertScopeTest extends TestCase
@@ -858,13 +859,9 @@ class DismissedAlertScopeTest extends TestCase
             ],
         );
 
-        return ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => $type->id,
-            'consent_type_version_id' => $version->id,
+        return AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin, [
             'status' => 'given',
             'given_at' => now(),
-            'given_method' => 'electronic',
         ]);
     }
 

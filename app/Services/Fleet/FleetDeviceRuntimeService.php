@@ -5,6 +5,7 @@ namespace App\Services\Fleet;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Models\Asset;
 use App\Models\AssetTelemetrySnapshot;
 use App\Models\AssetTracker;
@@ -20,6 +21,10 @@ use UnexpectedValueException;
 
 class FleetDeviceRuntimeService
 {
+    public function __construct(
+        private readonly PersonalTrackingPrivacyService $trackingPrivacy,
+    ) {}
+
     public function recentSnapshotsForDevice(
         Device $device,
         int $limit = 20,
@@ -174,8 +179,9 @@ class FleetDeviceRuntimeService
             ? ConsentValidationService::latestValidTrackingConsentForClient($client)
             : null;
         $usableConsent = match (true) {
-            $assignment !== null => $assignment->isCollectionActive()
-                ? $this->usableTrackingConsent($assignmentConsent, $client)
+            $assignment !== null => $client
+                && $this->trackingPrivacy->assignmentAuthorisesClient($assignment, $client)
+                ? $assignmentConsent
                 : null,
             $tracker?->consent_id !== null => $this->usableTrackingConsent($trackerConsent, $client),
             default => $this->usableTrackingConsent($clientConsent, $client),
@@ -203,7 +209,7 @@ class FleetDeviceRuntimeService
             return 'revoked';
         }
 
-        if ($consent->isValid()) {
+        if (ConsentValidationService::isValidTrackingConsent($consent, $consent->client_id)) {
             return 'consented';
         }
 
@@ -285,7 +291,7 @@ class FleetDeviceRuntimeService
             return null;
         }
 
-        return ConsentValidationService::isValidTrackingConsent($consent)
+        return ConsentValidationService::isValidTrackingConsent($consent, $client)
             ? $consent
             : null;
     }

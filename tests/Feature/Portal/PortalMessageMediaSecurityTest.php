@@ -2,7 +2,6 @@
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ClientPhoto;
 use App\Models\ConsentType;
 use App\Models\NextOfKin;
@@ -20,6 +19,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function makePortalMessageMediaUser(Client $client): User
 {
@@ -67,17 +67,10 @@ function grantPortalMessageMediaFamilyDisclosure(Client $client, User $user): vo
         'name' => 'Information Sharing with Whānau / Family',
         'category' => 'communication',
     ]);
-    ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $type->id,
+    AuthoritativeConsentFixture::manualSelf($client, $type, $user, [
         'status' => 'given',
         'given_at' => now()->subMinute(),
         'expires_at' => now()->addMonth(),
-        'given_by_user_id' => $user->id,
-        'given_by_relationship' => 'next_of_kin',
-        'given_method' => 'portal',
-        'created_by' => $user->id,
-        'updated_by' => $user->id,
     ]);
 }
 

@@ -15,6 +15,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class DeviceCustodyAuthorizationTest extends TestCase
@@ -188,16 +189,10 @@ class DeviceCustodyAuthorizationTest extends TestCase
             'active' => true,
         ]);
 
-        return ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => $type->id,
+        return AuthoritativeConsentFixture::manualSelf($client, $type, $actor, [
             'status' => 'given',
             'given_at' => now()->subDay(),
             'expires_at' => now()->addMonth(),
-            'given_by_user_id' => $actor->id,
-            'given_method' => 'electronic',
-            'created_by' => $actor->id,
-            'updated_by' => $actor->id,
         ]);
     }
 

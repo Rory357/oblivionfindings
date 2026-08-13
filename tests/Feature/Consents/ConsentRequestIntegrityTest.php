@@ -3,8 +3,10 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientConsent;
+use App\Models\ConsentAuthorityScope;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
+use App\Models\ConsentTypeVersion;
 use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\Role;
@@ -13,6 +15,9 @@ use App\Models\User;
 use App\Notifications\Operations\ConsentRequestReminderNotification;
 use App\Notifications\Operations\ConsentRequestRespondedNotification;
 use App\Services\ConsentRequestService;
+use App\Services\Consents\ConsentAuthorityScopeService;
+use App\Services\ConsentValidationService;
+use App\Services\Portal\PortalClientSectionAccess;
 use Carbon\Carbon;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +25,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function grantConsentIntegrityPermissions(User $user, array $permissionKeys): void
 {
@@ -86,12 +92,27 @@ function makeConsentIntegrityContext(): array
     $client = Client::factory()->create(['site_id' => $site->id]);
     $client->portalUsers()->attach($recipient->id, ['relation' => 'next_of_kin']);
 
+    $consentType = ConsentType::factory()->create([
+        'active' => true,
+        'purpose' => 'Authorise the documented support intervention.',
+    ]);
+    $consentTypeVersion = ConsentTypeVersion::query()->create([
+        'consent_type_id' => $consentType->id,
+        'version' => $consentType->version,
+        'description' => $consentType->description,
+        'purpose' => $consentType->purpose,
+        'legal_basis' => $consentType->legal_basis,
+        'effective_from' => now()->subDay(),
+        'created_by' => $staff->id,
+    ]);
+
     return [
         'staff' => $staff,
         'recipient' => $recipient,
         'client' => $client,
         'site' => $site,
-        'consentType' => ConsentType::factory()->create(['active' => true]),
+        'consentType' => $consentType,
+        'consentTypeVersion' => $consentTypeVersion,
     ];
 }
 
@@ -117,7 +138,9 @@ function makeConsentIntegrityRequest(array $context, array $overrides = []): Con
 {
     return ConsentRequest::factory()->create([
         'client_id' => $context['client']->id,
+        'site_id' => $context['site']->id,
         'consent_type_id' => $context['consentType']->id,
+        'consent_type_version_id' => $context['consentTypeVersion']->id,
         'requested_by_user_id' => $context['staff']->id,
         'recipient_user_id' => $context['recipient']->id,
         'recipient_relationship' => ConsentRequest::RELATION_NEXT_OF_KIN,
@@ -138,13 +161,24 @@ function consentIntegrityHttpRequest(User $user): HttpRequest
     return $request;
 }
 
+function makeConsentIntegritySelfContext(): array
+{
+    $context = makeConsentIntegrityContext();
+    assignConsentIntegrityPortalRole($context['recipient'], 'client');
+    $context['client']->update(['user_id' => $context['recipient']->id]);
+    $context['client']->portalUsers()->detach($context['recipient']->id);
+    $context['client']->portalUsers()->attach($context['recipient']->id, ['relation' => 'self']);
+
+    return $context;
+}
+
 /** @param array{staff: User, recipient: User, client: Client, site: Site, consentType: ConsentType} $context */
 function makeVerifiedConsentAuthority(
     array $context,
     string $authorityType = ConsentRequest::RELATION_WELFARE_GUARDIAN,
     ?Carbon $expiresAt = null,
 ): NextOfKin {
-    return NextOfKin::query()->create([
+    $authority = NextOfKin::query()->create([
         'user_id' => $context['recipient']->id,
         'client_id' => $context['client']->id,
         'relationship' => 'guardian',
@@ -153,6 +187,59 @@ function makeVerifiedConsentAuthority(
         'legal_authority_verified_by_user_id' => $context['staff']->id,
         'legal_authority_expires_at' => $expiresAt ?? now()->addYear(),
     ]);
+
+    $capacity = ClientConsent::query()->create([
+        'client_id' => $context['client']->id,
+        'site_id' => $context['site']->id,
+        'consent_type_id' => $context['consentType']->id,
+        'consent_type_version_id' => $context['consentTypeVersion']->id,
+        'status' => 'given',
+        'given_at' => now()->subDay(),
+        'given_by_user_id' => $context['staff']->id,
+        'given_method' => 'written',
+        'capacity_assessed' => true,
+        'capacity_outcome' => 'lacks_capacity',
+        'capacity_assessor_id' => $context['staff']->id,
+        'capacity_assessed_at' => now()->subDay(),
+        'capacity_notes' => 'Capacity evidence retained for the scoped decision.',
+        'expires_at' => $expiresAt ?? now()->addYear(),
+        'created_by' => $context['staff']->id,
+    ]);
+    ConsentAuthorityScope::query()->create([
+        'next_of_kin_id' => $authority->id,
+        'client_id' => $context['client']->id,
+        'site_id' => $context['site']->id,
+        'representative_user_id' => $context['recipient']->id,
+        'consent_type_id' => $context['consentType']->id,
+        'authority_type' => $authorityType,
+        'purpose' => consentIntegrityPayload($context)['purpose'],
+        'version' => 1,
+        'valid_from' => now()->subDay(),
+        'expires_at' => $expiresAt ?? now()->addYear(),
+        'verified_at' => now()->subDay(),
+        'verified_by_user_id' => $context['staff']->id,
+        'capacity_evidence_consent_id' => $capacity->id,
+        'evidence_reference' => 'governance-test-record',
+        'evidence_snapshot' => [
+            'authority' => [
+                'next_of_kin_id' => $authority->id,
+                'legal_authority_type' => $authority->legal_authority_type,
+                'verified_at' => $authority->legal_authority_verified_at?->toISOString(),
+                'verified_by_user_id' => $authority->legal_authority_verified_by_user_id,
+                'expires_at' => $authority->legal_authority_expires_at?->toISOString(),
+            ],
+            'capacity' => [
+                'client_consent_id' => $capacity->id,
+                'outcome' => $capacity->capacity_outcome,
+                'assessor_user_id' => $capacity->capacity_assessor_id,
+                'assessed_at' => $capacity->capacity_assessed_at?->toISOString(),
+            ],
+            'governance_decision' => 'explicit_test_fixture_only',
+            'legal_or_clinical_determination' => 'not_made_by_consent_workflow',
+        ],
+    ]);
+
+    return $authority;
 }
 
 beforeEach(function () {
@@ -210,11 +297,15 @@ it('binds verified substitute authority and materialises capacity fields from th
 
     expect($consentRequest->authority_next_of_kin_id)->toBe($authority->id)
         ->and($consentRequest->authorityToConsent())->toBe('substitute')
+        ->and($consentRequest->authority_scope_id)->not->toBeNull()
+        ->and($consentRequest->capacity_evidence_consent_id)->not->toBeNull()
         ->and($consent->capacity_assessed)->toBeTrue()
         ->and($consent->capacity_outcome)->toBe('lacks_capacity')
-        ->and($consent->best_interests_decision)->toBeTrue()
-        ->and($consent->best_interests_decision_maker_id)->toBe($context['recipient']->id)
-        ->and($consent->conditions['authority_next_of_kin_id'] ?? null)->toBe($authority->id);
+        ->and($consent->best_interests_decision)->toBeFalse()
+        ->and($consent->best_interests_decision_maker_id)->toBeNull()
+        ->and($consent->conditions['authority_next_of_kin_id'] ?? null)->toBe($authority->id)
+        ->and($consent->decision_state)->toBe(ClientConsent::DECISION_AUTHORITATIVE)
+        ->and($consent->gate_satisfying)->toBeTrue();
 });
 
 it('rejects verified authority when its explicit type does not match the request', function () {
@@ -258,7 +349,7 @@ it('revalidates substitute authority expiry inside the locked approval decision'
         ->assertStatus(409);
 
     expect($consentRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
-        ->and(ClientConsent::query()->exists())->toBeFalse();
+        ->and(ClientConsent::query()->whereNotNull('source_consent_request_id')->exists())->toBeFalse();
 });
 
 it('preserves ordinary next-of-kin approval without fabricating incapacity', function () {
@@ -282,12 +373,95 @@ it('preserves ordinary next-of-kin approval without fabricating incapacity', fun
         )
         ->assertRedirect();
 
-    $consent = ClientConsent::query()->sole();
     expect($consentRequest->fresh()->authorityToConsent())->toBe('informational_only')
-        ->and($consent->capacity_assessed)->toBeFalse()
-        ->and($consent->capacity_outcome)->toBeNull()
-        ->and($consent->best_interests_decision)->toBeFalse()
-        ->and($consent->best_interests_decision_maker_id)->toBeNull();
+        ->and($consentRequest->fresh()->decision_kind)->toBe(ConsentRequest::DECISION_INFORMATIONAL)
+        ->and($consentRequest->fresh()->resulting_consent_id)->toBeNull()
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('keeps canonical next-of-kin provisioning separate from portal membership and decision authority', function () {
+    $context = makeConsentIntegrityContext();
+    $portalRole = Role::query()->firstOrCreate(
+        ['name' => 'next_of_kin'],
+        ['label' => 'Next of Kin / Guardian (Portal)', 'level' => 15, 'type' => 'system'],
+    );
+    $provisionedRecipient = User::factory()->create([
+        'role' => 'next_of_kin',
+        'approved_at' => now(),
+    ]);
+    $provisionedRecipient->roles()->sync([$portalRole->id]);
+    $relationship = NextOfKin::query()->create([
+        'user_id' => $provisionedRecipient->id,
+        'client_id' => $context['client']->id,
+        'relationship' => 'guardian',
+    ]);
+    $payload = consentIntegrityPayload($context, [
+        'recipient_user_id' => $provisionedRecipient->id,
+    ]);
+    unset($payload['expires_in_days']);
+    $payload['client_id'] = $context['client']->id;
+    $service = app(ConsentRequestService::class);
+
+    $rejectedWithoutMembership = false;
+    try {
+        $service->create($payload, $context['staff'], '14');
+    } catch (ValidationException) {
+        $rejectedWithoutMembership = true;
+    }
+
+    expect($rejectedWithoutMembership)->toBeTrue()
+        ->and(ConsentRequest::query()->exists())->toBeFalse();
+
+    $context['client']->portalUsers()->attach($provisionedRecipient->id, [
+        'relation' => ConsentRequest::RELATION_NEXT_OF_KIN,
+    ]);
+    $clientRole = Role::query()->firstOrCreate(
+        ['name' => 'client'],
+        ['label' => 'Client Portal', 'level' => 10, 'type' => 'system'],
+    );
+    $provisionedRecipient->roles()->sync([$clientRole->id]);
+    $rejectedWithWrongRole = false;
+    try {
+        $service->create($payload, $context['staff'], '14');
+    } catch (ValidationException) {
+        $rejectedWithWrongRole = true;
+    }
+
+    expect($rejectedWithWrongRole)->toBeTrue()
+        ->and(ConsentRequest::query()->exists())->toBeFalse();
+
+    $provisionedRecipient->roles()->sync([$portalRole->id]);
+    $consentRequest = $service->create($payload, $context['staff'], '14');
+    $provisionedRecipient->roles()->sync([$clientRole->id]);
+    $rejectedAfterRoleDrift = false;
+    try {
+        $service->approve(
+            $consentRequest,
+            $provisionedRecipient,
+            consentIntegrityHttpRequest($provisionedRecipient),
+        );
+    } catch (ConflictHttpException) {
+        $rejectedAfterRoleDrift = true;
+    }
+
+    expect($rejectedAfterRoleDrift)->toBeTrue()
+        ->and($consentRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+
+    $provisionedRecipient->roles()->sync([$portalRole->id]);
+    $result = $service->approve(
+        $consentRequest,
+        $provisionedRecipient,
+        consentIntegrityHttpRequest($provisionedRecipient),
+    );
+    $consentRequest->refresh();
+
+    expect($result)->toBeNull()
+        ->and($consentRequest->decision_kind)->toBe(ConsentRequest::DECISION_INFORMATIONAL)
+        ->and($consentRequest->authority_next_of_kin_id)->toBeNull()
+        ->and($consentRequest->authority_scope_id)->toBeNull()
+        ->and($relationship->legal_authority_type)->toBeNull()
+        ->and(ClientConsent::query()->exists())->toBeFalse();
 });
 
 it('preserves client self-consent without substitute-capacity fields', function () {
@@ -320,7 +494,13 @@ it('preserves client self-consent without substitute-capacity fields', function 
     $consent = ClientConsent::query()->sole();
     expect($consentRequest->fresh()->authorityToConsent())->toBe('self')
         ->and($consent->capacity_assessed)->toBeFalse()
-        ->and($consent->best_interests_decision)->toBeFalse();
+        ->and($consent->best_interests_decision)->toBeFalse()
+        ->and(ConsentValidationService::isConsumable(
+            $consent,
+            $context['client'],
+            $context['consentType']->id,
+            $context['consentTypeVersion']->purpose,
+        ))->toBeTrue();
 });
 
 it('rejects a self label when the recipient is only linked as next of kin', function () {
@@ -340,8 +520,10 @@ it('rejects a self label when the recipient is only linked as next of kin', func
 });
 
 it('makes two stale identical approvals one committed decision and one consent', function () {
-    $context = makeConsentIntegrityContext();
-    $consentRequest = makeConsentIntegrityRequest($context);
+    $context = makeConsentIntegritySelfContext();
+    $consentRequest = makeConsentIntegrityRequest($context, [
+        'recipient_relationship' => ConsentRequest::RELATION_SELF,
+    ]);
     $firstCopy = ConsentRequest::query()->findOrFail($consentRequest->id);
     $staleCopy = ConsentRequest::query()->findOrFail($consentRequest->id);
     $service = app(ConsentRequestService::class);
@@ -485,8 +667,10 @@ it('does not let stale expiry overwrite a cancellation committed after selection
 });
 
 it('prevents a stale decline from overriding a committed approval', function () {
-    $context = makeConsentIntegrityContext();
-    $consentRequest = makeConsentIntegrityRequest($context);
+    $context = makeConsentIntegritySelfContext();
+    $consentRequest = makeConsentIntegrityRequest($context, [
+        'recipient_relationship' => ConsentRequest::RELATION_SELF,
+    ]);
     $approveCopy = ConsentRequest::query()->findOrFail($consentRequest->id);
     $declineCopy = ConsentRequest::query()->findOrFail($consentRequest->id);
     $service = app(ConsentRequestService::class);
@@ -595,15 +779,14 @@ it('rejects a conflicting cancellation after another cancellation committed', fu
 
 it('makes repeated identical withdrawal idempotent without a second write', function () {
     $context = makeConsentIntegrityContext();
-    $consent = ClientConsent::query()->create([
-        'client_id' => $context['client']->id,
-        'consent_type_id' => $context['consentType']->id,
-        'status' => 'given',
-        'given_at' => now(),
-        'given_method' => 'written',
-        'given_by_user_id' => $context['recipient']->id,
-        'created_by' => $context['staff']->id,
-    ]);
+    $consent = AuthoritativeConsentFixture::manualSelf(
+        $context['client'],
+        $context['consentType'],
+        $context['staff'],
+        [
+            'given_at' => now(),
+        ],
+    );
     $reason = 'Client withdrew after reviewing the implications.';
 
     $this->travelTo(Carbon::parse('2026-07-10 11:00:00'));
@@ -824,4 +1007,206 @@ it('round trips verified authority columns when no authority data is populated',
         ->and(Schema::hasColumn('next_of_kins', 'legal_authority_verified_at'))->toBeTrue()
         ->and(Schema::hasColumn('next_of_kins', 'legal_authority_verified_by_user_id'))->toBeTrue()
         ->and(Schema::hasColumn('next_of_kins', 'legal_authority_expires_at'))->toBeTrue();
+});
+
+/** @return array{context: array, request: ConsentRequest, consent: ClientConsent, scope: ConsentAuthorityScope} */
+function makeConsumableSubstituteDecision(): array
+{
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    $payload = consentIntegrityPayload($context, [
+        'client_id' => $context['client']->id,
+        'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+    ]);
+    unset($payload['expires_in_days']);
+
+    $request = app(ConsentRequestService::class)->create($payload, $context['staff'], '14');
+    $consent = app(ConsentRequestService::class)->approve(
+        $request,
+        $context['recipient'],
+        consentIntegrityHttpRequest($context['recipient']),
+        'Approved under the scoped governance evidence.',
+    );
+
+    expect($consent)->toBeInstanceOf(ClientConsent::class);
+
+    return [
+        'context' => $context,
+        'request' => $request->fresh(),
+        'consent' => $consent->fresh(),
+        'scope' => ConsentAuthorityScope::query()->findOrFail($request->authority_scope_id),
+    ];
+}
+
+it('consumes one fully bound substitute decision through the canonical authority contract', function () {
+    ['context' => $context, 'consent' => $consent] = makeConsumableSubstituteDecision();
+
+    expect(ConsentValidationService::consumabilityDecision(
+        $consent,
+        $context['client'],
+        $context['consentType']->id,
+        $context['consentTypeVersion']->purpose,
+    )->allowed)->toBeTrue();
+});
+
+it('fails the authority type and downstream matrix closed', function (string $case) {
+    ['context' => $context, 'consent' => $consent, 'scope' => $scope] = makeConsumableSubstituteDecision();
+
+    match ($case) {
+        'expired authority' => $scope->update(['expires_at' => now()->subMinute()]),
+        'revoked authority' => $scope->update([
+            'revoked_at' => now(),
+            'revoked_by_user_id' => $context['staff']->id,
+            'revocation_reason' => 'Governance evidence withdrawn.',
+        ]),
+        'wrong purpose' => $scope->update(['purpose' => 'A different scoped purpose.']),
+        'wrong type' => $consent->update([
+            'consent_type_id' => ConsentType::factory()->create()->id,
+        ]),
+        'wrong person' => $consent->update([
+            'decision_actor_user_id' => User::factory()->create()->id,
+        ]),
+        'wrong site' => $consent->update([
+            'site_id' => Site::factory()->create()->id,
+        ]),
+        'stale authority version' => $scope->update(['version' => 2]),
+        'authority record reverified' => $scope->nextOfKin()->update([
+            'legal_authority_verified_at' => now()->subHour(),
+        ]),
+        'expired capacity evidence' => $scope->capacityEvidenceConsent()->update([
+            'expires_at' => now()->subMinute(),
+        ]),
+        'informational capacity evidence' => $scope->capacityEvidenceConsent()->update([
+            'decision_state' => ClientConsent::DECISION_INFORMATIONAL,
+        ]),
+    };
+
+    $decision = ConsentValidationService::consumabilityDecision(
+        $consent->fresh(),
+        $context['client']->fresh(),
+        $context['consentType']->id,
+        $context['consentTypeVersion']->purpose,
+    );
+
+    expect($decision->allowed)->toBeFalse();
+})->with([
+    'expired authority',
+    'revoked authority',
+    'wrong purpose',
+    'wrong type',
+    'wrong person',
+    'wrong site',
+    'stale authority version',
+    'authority record reverified',
+    'expired capacity evidence',
+    'informational capacity evidence',
+]);
+
+it('revokes scoped authority once and disables every derived authoritative decision', function () {
+    ['context' => $context, 'consent' => $consent, 'scope' => $scope] = makeConsumableSubstituteDecision();
+    $service = app(ConsentAuthorityScopeService::class);
+    $reason = 'Governance evidence was withdrawn.';
+
+    $service->revoke($scope, $context['staff'], $reason);
+    $firstUpdatedAt = $scope->fresh()->updated_at->copy();
+    $service->revoke($scope, $context['staff'], $reason);
+
+    expect($scope->fresh()->updated_at->equalTo($firstUpdatedAt))->toBeTrue()
+        ->and($scope->fresh()->revoked_by_user_id)->toBe($context['staff']->id)
+        ->and($scope->fresh()->revocation_reason)->toBe($reason)
+        ->and($consent->fresh()->status)->toBe('revoked')
+        ->and($consent->fresh()->gate_satisfying)->toBeFalse()
+        ->and(ConsentValidationService::isConsumable($consent->fresh(), $context['client']))->toBeFalse();
+});
+
+it('rolls approval back when scoped capacity evidence becomes stale under the lock', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    $payload = consentIntegrityPayload($context, [
+        'client_id' => $context['client']->id,
+        'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+    ]);
+    unset($payload['expires_in_days']);
+    $request = app(ConsentRequestService::class)->create($payload, $context['staff'], '14');
+    $request->capacityEvidenceConsent()->update(['expires_at' => now()->subMinute()]);
+
+    expect(fn () => app(ConsentRequestService::class)->approve(
+        $request,
+        $context['recipient'],
+        consentIntegrityHttpRequest($context['recipient']),
+    ))->toThrow(ConflictHttpException::class);
+
+    expect($request->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and(ClientConsent::query()->where('source_consent_request_id', $request->id)->exists())->toBeFalse();
+});
+
+it('denies an informational consent-shaped legacy row to portal disclosure', function () {
+    $context = makeConsentIntegrityContext();
+    $familyType = ConsentType::factory()->create([
+        'name' => 'Information Sharing with Whānau / Family',
+        'category' => 'communication',
+        'purpose' => 'Share agreed care information with family.',
+        'requires_capacity_assessment' => false,
+    ]);
+    $version = ConsentTypeVersion::query()->create([
+        'consent_type_id' => $familyType->id,
+        'version' => $familyType->version,
+        'description' => $familyType->description,
+        'purpose' => $familyType->purpose,
+        'legal_basis' => $familyType->legal_basis,
+        'effective_from' => now()->subDay(),
+    ]);
+    ClientConsent::query()->create([
+        'client_id' => $context['client']->id,
+        'site_id' => $context['site']->id,
+        'consent_type_id' => $familyType->id,
+        'consent_type_version_id' => $version->id,
+        'decision_state' => ClientConsent::DECISION_INFORMATIONAL,
+        'decision_basis' => 'informational_only',
+        'decision_client_id' => $context['client']->id,
+        'decision_actor_user_id' => $context['recipient']->id,
+        'decision_purpose' => $version->purpose,
+        'decision_contract_version' => ConsentRequest::DECISION_CONTRACT_VERSION,
+        'gate_satisfying' => false,
+        'status' => 'given',
+        'given_at' => now(),
+        'given_by_user_id' => $context['recipient']->id,
+        'given_method' => 'electronic',
+    ]);
+
+    expect(app(PortalClientSectionAccess::class)
+        ->hasActiveFamilyInformationConsent($context['client']))->toBeFalse();
+});
+
+it('routes every authoritative consent consumer through the canonical decision contract', function () {
+    $directConsumers = [
+        'app/Models/ClientConsent.php',
+        'app/Services/Portal/PortalClientSectionAccess.php',
+        'app/Domain/SecurityDevices/Models/DeviceAssignment.php',
+        'app/Domain/SecurityDevices/Services/DeviceAssignmentService.php',
+        'app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php',
+        'app/Domain/SecurityDevices/Http/Controllers/DeviceAssignmentController.php',
+        'app/Domain/SecurityDevices/Http/Controllers/Integrations/QueclinkHubController.php',
+        'app/Http/Controllers/FleetAssets/DeviceController.php',
+        'app/Http/Controllers/FleetAssets/ResidentTrackingController.php',
+        'app/Services/Fleet/FleetDeviceRuntimeService.php',
+        'app/Services/Clients/ClientPersonalAssetTrackerService.php',
+        'app/Http/Controllers/ClientPersonalAssetController.php',
+    ];
+    $delegatingConsumers = [
+        'app/Domain/SecurityDevices/Presenters/TrackingWorkspacePresenter.php',
+        'app/Services/ControlRoom/ControlRoomDeviceVisibilityService.php',
+    ];
+
+    foreach ($directConsumers as $path) {
+        expect(file_get_contents(base_path($path)))
+            ->toContain('ConsentValidationService');
+    }
+    foreach ($delegatingConsumers as $path) {
+        expect(file_get_contents(base_path($path)))
+            ->toContain('PersonalTrackingPrivacyService');
+    }
+
+    expect(file_get_contents(base_path('app/Http/Controllers/FleetAssets/DeviceController.php')))
+        ->not->toContain('ClientConsent::create');
 });

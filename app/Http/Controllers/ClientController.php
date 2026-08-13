@@ -1363,6 +1363,7 @@ class ClientController extends Controller
             ] : null,
             'consents' => $sectionAccess['consents']
                 ? ClientConsent::where('client_id', $client->id)
+                    ->where('site_id', $client->site_id)
                     ->with('consentType:id,name,category')
                     ->orderByDesc('created_at')
                     ->get()
@@ -1371,6 +1372,9 @@ class ClientController extends Controller
                         'consent_type' => $c->consentType?->name ?? 'Unknown',
                         'consent_type_category' => $c->consentType?->category,
                         'status' => $c->status,
+                        'decision_state' => $c->decision_state,
+                        'governance_review_reason' => $c->governance_review_reason,
+                        'is_consumable' => $c->isValid(),
                         'given_at' => $c->given_at?->toISOString(),
                         'given_method' => $c->given_method,
                         'expires_at' => $c->expires_at?->toISOString(),
@@ -1394,6 +1398,7 @@ class ClientController extends Controller
                 : [],
             'consent_request_list' => $sectionAccess['consents']
                 ? ConsentRequest::where('client_id', $client->id)
+                    ->where('site_id', $client->site_id)
                     ->with(['consentType:id,name', 'recipient:id,name'])
                     ->orderByDesc('created_at')
                     ->limit(50)

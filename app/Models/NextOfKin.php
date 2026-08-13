@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class NextOfKin extends Model
@@ -63,6 +64,11 @@ class NextOfKin extends Model
     public function legalAuthorityVerifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'legal_authority_verified_by_user_id');
+    }
+
+    public function consentAuthorityScopes(): HasMany
+    {
+        return $this->hasMany(ConsentAuthorityScope::class);
     }
 
     public function hasVerifiedLegalAuthority(string $authorityType): bool

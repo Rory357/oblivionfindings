@@ -17,6 +17,7 @@ use App\Models\TimelineEvent;
 use App\Models\User;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function grantPortalSectionDisclosureRole(
     User $user,
@@ -95,17 +96,8 @@ function recordPortalSectionFamilyConsent(Client $client, User $actor, array $ov
         'category' => 'communication',
     ]);
 
-    return ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $type->id,
-        'status' => 'given',
+    return AuthoritativeConsentFixture::manualSelf($client, $type, $actor, [
         'given_at' => now()->subHour(),
-        'expires_at' => now()->addMonth(),
-        'given_by_user_id' => $actor->id,
-        'given_by_relationship' => 'next_of_kin',
-        'given_method' => 'portal',
-        'created_by' => $actor->id,
-        'updated_by' => $actor->id,
         ...$overrides,
     ]);
 }
@@ -266,7 +258,9 @@ it('fails closed across portal readers for a NOK without active family informati
 });
 
 it('combines active consent portal settings and NOK flags for positive family disclosure', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create([
+        'site_id' => Site::factory()->create()->id,
+    ]);
     $nok = makePortalSectionDisclosureIdentity($client, flags: [
         'can_view_medical' => true,
         'can_view_medications' => true,
@@ -339,7 +333,9 @@ it('combines active consent portal settings and NOK flags for positive family di
 });
 
 it('keeps each disabled family portal setting effective even with active consent and permissive NOK flags', function () {
-    $client = Client::factory()->create();
+    $client = Client::factory()->create([
+        'site_id' => Site::factory()->create()->id,
+    ]);
     $nok = makePortalSectionDisclosureIdentity($client, flags: [
         'can_view_medical' => true,
         'can_view_medications' => true,

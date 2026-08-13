@@ -3,7 +3,6 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\CarePlan;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ClientOnboardingWorkflow;
 use App\Models\ConsentType;
 use App\Models\FamilyNote;
@@ -16,6 +15,7 @@ use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\TimelineEventComment;
 use App\Models\User;
+use Tests\Support\AuthoritativeConsentFixture;
 
 function grantClientProfileDailyWorkspacePermissions(User $user, array $permissionKeys): void
 {
@@ -311,17 +311,10 @@ it('does not delete a portal family note through another clients route', functio
         'name' => 'Information Sharing with Whānau / Family',
         'category' => 'communication',
     ]);
-    ClientConsent::query()->create([
-        'client_id' => $client->id,
-        'consent_type_id' => $familyConsentType->id,
+    AuthoritativeConsentFixture::manualSelf($client, $familyConsentType, $familyMember, [
         'status' => 'given',
         'given_at' => now(),
         'expires_at' => now()->addMonth(),
-        'given_by_user_id' => $familyMember->id,
-        'given_by_relationship' => 'next_of_kin',
-        'given_method' => 'portal',
-        'created_by' => $familyMember->id,
-        'updated_by' => $familyMember->id,
     ]);
     FamilyPortalSetting::query()->create([
         'client_id' => $client->id,
