@@ -8,6 +8,7 @@ use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\User;
 use App\Services\CoverageReservationService;
+use App\Services\Eligibility\AssignmentEligibilityGateway;
 use App\Services\Eligibility\EligibilityResult;
 use App\Services\ShiftReplacementService;
 use App\Services\ShiftStaffEligibilityService;
@@ -445,108 +446,120 @@ class JobBoardController extends Controller
         $auth = $request->user();
         abort_unless($this->canApprovePositions($auth), 403);
 
-        $position = ShiftOpenPosition::query()
+        $positionRecord = ShiftOpenPosition::query()
             ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
-            ->with(['shift', 'replacementRequest'])
             ->where('status', 'claimed')
-            ->findOrFail($position);
+            ->whereKey($position)
+            ->first(['id', 'shift_id']);
+        abort_unless($positionRecord, 404);
+        $positionId = (int) $positionRecord->id;
+        $shiftId = (int) $positionRecord->shift_id;
 
-        if (! $position->shift || ! $position->claimed_by) {
-            return redirect()->back()->withErrors([
-                'position' => 'This claimed position is missing shift or claimant information.',
-            ]);
-        }
+        $decision = DB::transaction(function () use ($positionId, $shiftId, $auth) {
+            // Keep the shared mutation lock order: Shift, position, assignee.
+            $shift = Shift::query()
+                ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $auth, ['reports.viewAny']))
+                ->lockForUpdate()
+                ->findOrFail($shiftId);
 
-        $assignee = User::staff()->find($position->claimed_by);
-        if (! $assignee) {
-            return redirect()->back()->withErrors([
-                'position' => 'The claimed worker is no longer available for assignment.',
-            ]);
-        }
-
-        $shiftSiteId = $this->siteAccess->shiftSiteId($position->shift);
-        $eligibleAssignee = User::query()->whereKey($assignee->id);
-        if (! $shiftSiteId || ! $this->siteAccess
-            ->applyFleetRecipientEligibility($eligibleAssignee, $shiftSiteId)
-            ->exists()) {
-            return redirect()->back()->withErrors([
-                'position' => 'The claimed worker is no longer eligible to work at this Shift Site.',
-            ]);
-        }
-
-        try {
-            $eligibility = app(ShiftStaffEligibilityService::class)->evaluate($position->shift, $assignee);
-            if ($eligibility->hasBlocks()) {
-                return redirect()->back()->withErrors([
-                    'position' => $eligibility->blocking_reasons[0] ?? 'Cannot approve this claim for the selected worker.',
-                ])->with('compliance_warnings', $eligibility->toArray()['compliance_warnings'] ?? []);
+            $position = ShiftOpenPosition::query()
+                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
+                ->with('replacementRequest')
+                ->lockForUpdate()
+                ->findOrFail($positionId);
+            if ($position->status !== 'claimed' || (int) $position->shift_id !== $shiftId) {
+                throw ValidationException::withMessages([
+                    'position' => 'This claim is no longer active.',
+                ]);
             }
 
-            if ($eligibility->hasWarnings()) {
-                session()->flash('compliance_warnings', $eligibility->warnings);
+            $position->setRelation('shift', $shift);
+
+            if (! $position->claimed_by) {
+                throw ValidationException::withMessages([
+                    'position' => 'This claimed position is missing shift or claimant information.',
+                ]);
             }
-        } catch (\Throwable $e) {
-            Log::warning('Eligibility check failed during job board approval', ['error' => $e->getMessage()]);
-        }
 
-        if (in_array($position->shift->status, ['completed', 'cancelled'], true)) {
-            return redirect()->back()->withErrors([
-                'position' => 'This shift can no longer be assigned from the job board.',
+            $assignee = User::staff()->lockForUpdate()->find($position->claimed_by);
+            if (! $assignee) {
+                throw ValidationException::withMessages([
+                    'position' => 'The claimed worker is no longer available for assignment.',
+                ]);
+            }
+
+            $shiftSiteId = $this->siteAccess->shiftSiteId($shift);
+            $eligibleAssignee = User::query()->whereKey($assignee->id);
+            if (! $shiftSiteId || ! $this->siteAccess
+                ->applyFleetRecipientEligibility($eligibleAssignee, $shiftSiteId)
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'position' => 'The claimed worker is no longer eligible to work at this Shift Site.',
+                ]);
+            }
+
+            $decision = app(AssignmentEligibilityGateway::class)->decide($shift, $assignee);
+            if ($decision->result?->hasBlocks()) {
+                session()->flash(
+                    'compliance_warnings',
+                    $decision->result->toArray()['compliance_warnings'] ?? [],
+                );
+            }
+            $decision->assertMayAssign(
+                'position',
+                'Cannot approve this claim for the selected worker.',
+            );
+
+            if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+                throw ValidationException::withMessages([
+                    'position' => 'This shift can no longer be assigned from the job board.',
+                ]);
+            }
+
+            $reservation = CoverageReservation::query()
+                ->where('shift_open_position_id', $position->id)
+                ->where('status', CoverageReservationService::STATUS_ACTIVE)
+                ->latest('id')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $reservation) {
+                $reservation = app(CoverageReservationService::class)
+                    ->reserveForAssignment($shift, $auth, 'job_board_approve');
+            }
+
+            $position->update([
+                'approved_by' => $auth->id,
+                'approved_at' => now(),
+                'status' => 'filled',
             ]);
+
+            $shift->update([
+                'user_id' => $position->claimed_by,
+                'status' => $shift->status === 'draft' ? 'scheduled' : $shift->status,
+            ]);
+
+            ShiftOpenPosition::query()
+                ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
+                ->where('shift_id', $position->shift_id)
+                ->where('id', '!=', $position->id)
+                ->whereIn('status', ['open', 'claimed'])
+                ->update(['status' => 'cancelled']);
+
+            app(CoverageReservationService::class)->fulfill($reservation, $shift, $position);
+
+            app(ShiftReplacementService::class)->approveFromOpenPosition(
+                $position->fresh(['replacementRequest', 'shift.client', 'claimer']),
+                $auth,
+                $decision,
+            );
+
+            return $decision;
+        });
+
+        if ($decision->isWarning()) {
+            session()->flash('compliance_warnings', $decision->result?->warnings ?? []);
         }
-
-        $reservation = CoverageReservation::query()
-            ->where('shift_open_position_id', $position->id)
-            ->where('status', CoverageReservationService::STATUS_ACTIVE)
-            ->latest('id')
-            ->first();
-
-        if (! $reservation) {
-            $reservation = app(CoverageReservationService::class)->reserveForAssignment($position->shift, $auth, 'job_board_approve');
-        }
-
-        try {
-            DB::transaction(function () use ($position, $auth, $reservation) {
-                $position = ShiftOpenPosition::query()
-                    ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionScope($query, $auth, ['reports.viewAny']))
-                    ->with('shift')
-                    ->lockForUpdate()
-                    ->findOrFail($position->id);
-                if ($position->status !== 'claimed') {
-                    throw ValidationException::withMessages([
-                        'position' => 'This claim is no longer active.',
-                    ]);
-                }
-
-                $position->update([
-                    'approved_by' => $auth->id,
-                    'approved_at' => now(),
-                    'status' => 'filled',
-                ]);
-
-                $position->shift->update([
-                    'user_id' => $position->claimed_by,
-                    'status' => $position->shift->status === 'draft' ? 'scheduled' : $position->shift->status,
-                ]);
-
-                ShiftOpenPosition::query()
-                    ->tap(fn ($query) => $this->siteAccess->applyShiftOpenPositionIntegrityScope($query))
-                    ->where('shift_id', $position->shift_id)
-                    ->where('id', '!=', $position->id)
-                    ->whereIn('status', ['open', 'claimed'])
-                    ->update(['status' => 'cancelled']);
-
-                app(CoverageReservationService::class)->fulfill($reservation, $position->shift, $position);
-            });
-        } catch (\Throwable $e) {
-            app(CoverageReservationService::class)->release($reservation);
-            throw $e;
-        }
-
-        app(ShiftReplacementService::class)->approveFromOpenPosition(
-            $position->fresh(['replacementRequest', 'shift.client', 'claimer']),
-            $auth,
-        );
 
         return redirect()->back()->with('success', 'Claim approved and shift assigned.');
     }

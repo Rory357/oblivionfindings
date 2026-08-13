@@ -6,6 +6,8 @@ use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\ShiftReplacementRequest;
 use App\Models\User;
+use App\Services\Eligibility\AssignmentEligibilityDecision;
+use App\Services\Eligibility\AssignmentEligibilityGateway;
 use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +25,7 @@ class ShiftReplacementService
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly ShiftStaffEligibilityService $eligibility,
+        private readonly AssignmentEligibilityGateway $assignmentEligibility,
     ) {}
 
     public function request(Shift $shift, User $actor, array $data): ShiftReplacementRequest
@@ -286,8 +289,11 @@ class ShiftReplacementService
         ]);
     }
 
-    public function approveFromOpenPosition(ShiftOpenPosition $position, User $actor): void
-    {
+    public function approveFromOpenPosition(
+        ShiftOpenPosition $position,
+        User $actor,
+        ?AssignmentEligibilityDecision $eligibilityDecision = null,
+    ): void {
         $this->siteAccess->assertCanAccessShiftOpenPosition($actor, $position, ['reports.viewAny']);
         if (! ($actor->canDo('job_board.approve') || $actor->canDo('shifts.manageAny'))) {
             throw ValidationException::withMessages([
@@ -311,12 +317,15 @@ class ShiftReplacementService
         }
 
         $this->assertStaffEligibleForShiftSite($replacement->shift, $replacementUser);
-        $eligibility = $this->eligibility->evaluate($replacement->shift, $replacementUser);
-        if ($eligibility->hasBlocks()) {
-            throw ValidationException::withMessages([
-                'replacement' => $eligibility->blocking_reasons[0] ?? 'The claimed staff member is no longer eligible for this Shift.',
-            ]);
-        }
+        $eligibilityDecision = $this->currentAssignmentDecision(
+            $replacement->shift,
+            $replacementUser,
+            $eligibilityDecision,
+        );
+        $eligibilityDecision->assertMayAssign(
+            'replacement',
+            'The claimed staff member is no longer eligible for this Shift.',
+        );
 
         if (
             $replacement->status === self::APPROVED
@@ -363,8 +372,12 @@ class ShiftReplacementService
         ]);
     }
 
-    public function resolveFromManualAssignment(Shift $shift, int $assignedUserId, User $actor): void
-    {
+    public function resolveFromManualAssignment(
+        Shift $shift,
+        int $assignedUserId,
+        User $actor,
+        ?AssignmentEligibilityDecision $eligibilityDecision = null,
+    ): void {
         $this->siteAccess->assertCanAccessShift($actor, $shift, ['reports.viewAny']);
         $replacement = $this->activeForShift($shift);
         if (! $replacement) {
@@ -382,12 +395,15 @@ class ShiftReplacementService
         }
 
         $this->assertStaffEligibleForShiftSite($shift, $replacementUser);
-        $eligibility = $this->eligibility->evaluate($shift, $replacementUser);
-        if ($eligibility->hasBlocks()) {
-            throw ValidationException::withMessages([
-                'replacement' => $eligibility->blocking_reasons[0] ?? 'The assigned staff member is not eligible for this Shift.',
-            ]);
-        }
+        $eligibilityDecision = $this->currentAssignmentDecision(
+            $shift,
+            $replacementUser,
+            $eligibilityDecision,
+        );
+        $eligibilityDecision->assertMayAssign(
+            'replacement',
+            'The assigned staff member is not eligible for this Shift.',
+        );
 
         if (
             $replacement->status === self::APPROVED
@@ -434,6 +450,18 @@ class ShiftReplacementService
             ->active()
             ->latest('requested_at')
             ->first();
+    }
+
+    private function currentAssignmentDecision(
+        Shift $shift,
+        User $user,
+        ?AssignmentEligibilityDecision $decision,
+    ): AssignmentEligibilityDecision {
+        if ($decision?->matches($shift, $user)) {
+            return $decision;
+        }
+
+        return $this->assignmentEligibility->decide($shift, $user);
     }
 
     protected function cancelOtherPositionsForShift(int $shiftId, ?int $exceptPositionId = null): void

@@ -3,17 +3,21 @@
 namespace Tests\Feature\Operations;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Client;
+use App\Models\CoverageReservation;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\ShiftReplacementRequest;
+use App\Models\ShiftSignalOutbox;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use App\Services\Eligibility\AssignmentEligibilityDecision;
 use App\Services\Eligibility\EligibilityResult;
 use App\Services\ShiftReplacementService;
 use App\Services\ShiftStaffEligibilityService;
@@ -566,6 +570,125 @@ class JobBoardControllerTest extends TestCase
         ]);
     }
 
+    public function test_approve_exception_is_safe_503_with_zero_side_effects_then_retry_and_replay_are_serialized(): void
+    {
+        Notification::fake();
+        $position = $this->positionForShift($this->shiftForSite(), [
+            'status' => 'claimed',
+            'claimed_by' => $this->worker->id,
+            'claimed_at' => now(),
+        ]);
+        $baseline = [
+            'audit' => AuditLog::query()->count(),
+            'timeline' => TimelineEvent::query()->count(),
+            'reservations' => CoverageReservation::query()->count(),
+            'outbox' => ShiftSignalOutbox::query()->count(),
+        ];
+        $attempt = 0;
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt): void {
+            $mock->shouldReceive('evaluate')->twice()->andReturnUsing(function () use (&$attempt) {
+                if (++$attempt === 1) {
+                    throw new \RuntimeException('private eligibility provider detail');
+                }
+
+                return $this->eligibleResult();
+            });
+        });
+
+        $this->actingAs($this->manager)
+            ->postJson(route('operations.job_board.approve', $position))
+            ->assertStatus(503)
+            ->assertJsonPath('errors.position.0', AssignmentEligibilityDecision::UNAVAILABLE_MESSAGE)
+            ->assertJsonMissing(['private eligibility provider detail']);
+
+        $this->assertDatabaseHas('shift_open_positions', [
+            'id' => $position->id,
+            'status' => 'claimed',
+            'approved_by' => null,
+        ]);
+        $this->assertDatabaseHas('shifts', [
+            'id' => $position->shift_id,
+            'user_id' => $this->currentStaff->id,
+        ]);
+        $this->assertDatabaseHas('shift_replacement_requests', [
+            'id' => $position->replacement_request_id,
+            'status' => ShiftReplacementService::CLAIMED,
+        ]);
+        $this->assertSame($baseline['audit'], AuditLog::query()->count());
+        $this->assertSame($baseline['timeline'], TimelineEvent::query()->count());
+        $this->assertSame($baseline['reservations'], CoverageReservation::query()->count());
+        $this->assertSame($baseline['outbox'], ShiftSignalOutbox::query()->count());
+        Notification::assertNothingSent();
+
+        $this->actingAs($this->manager)
+            ->post(route('operations.job_board.approve', $position))
+            ->assertSessionHas('success');
+
+        $this->actingAs($this->manager)
+            ->postJson(route('operations.job_board.approve', $position))
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('shift_open_positions', [
+            'id' => $position->id,
+            'status' => 'filled',
+            'approved_by' => $this->manager->id,
+        ]);
+        $this->assertDatabaseHas('shifts', [
+            'id' => $position->shift_id,
+            'user_id' => $this->worker->id,
+        ]);
+        $this->assertSame(1, TimelineEvent::query()
+            ->where('source_type', ShiftReplacementRequest::class)
+            ->where('source_id', $position->replacement_request_id)
+            ->where('type', 'shift_replacement_approved')
+            ->count());
+        Notification::assertSentToTimes($this->worker, AppEventNotification::class, 1);
+    }
+
+    public function test_approve_hard_block_is_422_and_warning_state_remains_advisory(): void
+    {
+        $blockedPosition = $this->positionForShift($this->shiftForSite(), [
+            'status' => 'claimed',
+            'claimed_by' => $this->worker->id,
+            'claimed_at' => now(),
+        ]);
+        $this->blockEligibility('Current credential is missing.');
+
+        $this->actingAs($this->manager)
+            ->postJson(route('operations.job_board.approve', $blockedPosition))
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.position.0', 'Current credential is missing.');
+
+        $this->assertDatabaseHas('shift_open_positions', [
+            'id' => $blockedPosition->id,
+            'status' => 'claimed',
+        ]);
+        $this->assertDatabaseHas('shifts', [
+            'id' => $blockedPosition->shift_id,
+            'user_id' => $this->currentStaff->id,
+        ]);
+
+        $warningPosition = $this->positionForShift($this->shiftForSite(), [
+            'status' => 'claimed',
+            'claimed_by' => $this->worker->id,
+            'claimed_at' => now(),
+        ]);
+        $warning = 'Medication competency expires within the warning window.';
+        $this->warnEligibility($warning);
+        Notification::fake();
+
+        $this->actingAs($this->manager)
+            ->post(route('operations.job_board.approve', $warningPosition))
+            ->assertSessionHas('success')
+            ->assertSessionHas('compliance_warnings', [$warning]);
+
+        $this->assertDatabaseHas('shift_open_positions', [
+            'id' => $warningPosition->id,
+            'status' => 'filled',
+        ]);
+        $this->assertDatabaseCount('shift_eligibility_overrides', 0);
+    }
+
     public function test_approve_refuses_when_claimant_no_longer_has_shift_site_eligibility(): void
     {
         $position = $this->positionForShift($this->shiftForSite(), [
@@ -936,6 +1059,28 @@ class JobBoardControllerTest extends TestCase
             $mock->shouldReceive('evaluate')->andReturn($blocked);
             $mock->shouldReceive('evaluateMany')->andReturnUsing(
                 fn ($shifts, $users) => $this->eligibilityMatrix($shifts, $users, $blocked)
+            );
+        });
+    }
+
+    private function warnEligibility(string $warning): void
+    {
+        $result = new EligibilityResult(
+            is_allowed: true,
+            blocking_reasons: [],
+            warnings: [$warning],
+            checked_rules: [],
+            overrideable_warnings: [[
+                'rule' => 'medication_competency',
+                'message' => $warning,
+                'overrideable' => true,
+            ]],
+        );
+
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($result) {
+            $mock->shouldReceive('evaluate')->andReturn($result);
+            $mock->shouldReceive('evaluateMany')->andReturnUsing(
+                fn ($shifts, $users) => $this->eligibilityMatrix($shifts, $users, $result)
             );
         });
     }

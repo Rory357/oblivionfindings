@@ -12,6 +12,7 @@ use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\CoverageReservationService;
+use App\Services\Eligibility\AssignmentEligibilityDecision;
 use App\Services\ShiftCancellationService;
 use App\Services\ShiftHandoverService;
 use App\Services\ShiftReplacementService;
@@ -452,8 +453,14 @@ class ShiftLifecycleService
     /**
      * @param  array<string, mixed>|null  $overrideData
      */
-    public function assign(Shift $shift, User $actor, User $assignee, ?array $overrideData = null, mixed $reservation = null): Shift
-    {
+    public function assign(
+        Shift $shift,
+        User $actor,
+        User $assignee,
+        ?array $overrideData = null,
+        mixed $reservation = null,
+        ?AssignmentEligibilityDecision $eligibilityDecision = null,
+    ): Shift {
         $originalUserId = $shift->user_id;
 
         $assigned = DB::transaction(function () use ($shift, $assignee, $overrideData, $reservation) {
@@ -494,7 +501,12 @@ class ShiftLifecycleService
         }
 
         if ($originalUserId && (int) $originalUserId !== (int) $assignee->id) {
-            $this->replacementService->resolveFromManualAssignment($assigned, (int) $assignee->id, $actor);
+            $this->replacementService->resolveFromManualAssignment(
+                $assigned,
+                (int) $assignee->id,
+                $actor,
+                $eligibilityDecision,
+            );
         }
 
         return $assigned->fresh() ?? $assigned;

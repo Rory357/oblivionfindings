@@ -10,6 +10,17 @@ class ShiftEligibilityOverride extends Model
 {
     use AuditableChanges;
 
+    protected static function booted(): void
+    {
+        static::updating(function (): never {
+            throw new \LogicException('Shift eligibility override evidence is immutable.');
+        });
+
+        static::deleting(function (): never {
+            throw new \LogicException('Shift eligibility override evidence is immutable.');
+        });
+    }
+
     protected $fillable = [
         'shift_id',
         'user_id',
