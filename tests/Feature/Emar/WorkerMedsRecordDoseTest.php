@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
@@ -14,6 +15,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
 use App\Services\Incidents\IncidentJourneyService;
@@ -40,6 +42,8 @@ class WorkerMedsRecordDoseTest extends TestCase
 
     protected ServiceContext $serviceContext;
 
+    protected Site $site;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -50,6 +54,15 @@ class WorkerMedsRecordDoseTest extends TestCase
 
         $this->worker = $this->makeRoleUser('support_worker');
         $this->grantPermissions($this->worker, ['medications.administer.record']);
+        $this->site = Site::factory()->create(['is_active' => true]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->worker->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         MedicationCompetencyAssessment::query()->create([
             'user_id' => $this->worker->id,
             'assessment_type' => 'annual',
@@ -68,11 +81,13 @@ class WorkerMedsRecordDoseTest extends TestCase
             'first_name' => 'Aroha',
             'last_name' => 'Ngata',
             'service_context_id' => $this->serviceContext->id,
+            'site_id' => $this->site->id,
             'status' => 'active',
         ]);
 
         Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
             'user_id' => $this->worker->id,
             'starts_at' => now()->subHour(),
@@ -207,7 +222,7 @@ class WorkerMedsRecordDoseTest extends TestCase
         ]);
     }
 
-    public function test_offline_refusal_replay_repairs_a_failed_post_commit_incident_hook_without_duplicates(): void
+    public function test_offline_refusal_rolls_back_a_failed_incident_hook_then_replays_without_duplicates(): void
     {
         $medication = $this->scheduledMedication(['09:30'], [
             'high_risk' => true,
@@ -266,7 +281,7 @@ class WorkerMedsRecordDoseTest extends TestCase
 
         $this->assertInstanceOf(\RuntimeException::class, $firstException);
         $this->assertSame('Forced worker refusal hook failure', $firstException->getMessage());
-        $this->assertDatabaseCount('client_medication_administrations', 1);
+        $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertDatabaseCount('client_incidents', 0);
         $this->assertDatabaseCount('control_room_signals', 0);
         $this->assertDatabaseCount('control_room_alerts', 0);
@@ -275,7 +290,7 @@ class WorkerMedsRecordDoseTest extends TestCase
             ->from('/meds/today')
             ->post('/meds/today/record', $payload)
             ->assertRedirect('/meds/today')
-            ->assertSessionHas('warning');
+            ->assertSessionHas('success');
         Cache::forget("offline:idempotency:dose:{$requestUuid}");
         $this->actingAs($this->worker)
             ->from('/meds/today')

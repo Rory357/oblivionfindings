@@ -102,6 +102,33 @@ class MedicationControllerTest extends TestCase
 
         // Assign support worker to client
         $this->client->supportWorkers()->attach($this->supportWorker->id);
+
+        // Medication writes require current server-authoritative work scope.
+        // Give each role a current client assignment so the existing controller
+        // regression cases continue to exercise their intended permission and
+        // validation boundary rather than failing earlier on assignment.
+        foreach ([
+            $this->admin,
+            $this->providerManager,
+            $this->coordinator,
+            $this->supportWorker,
+            $this->financeUser,
+            $this->hrUser,
+            $this->auditor,
+        ] as $staff) {
+            Shift::factory()->create([
+                'client_id' => $this->client->id,
+                'site_id' => $this->site->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => $staff->id,
+                'starts_at' => now()->subHour(),
+                'ends_at' => now()->addHours(7),
+                'actual_starts_at' => now()->subHour(),
+                'actual_ends_at' => null,
+                'started_by' => $staff->id,
+                'status' => 'in_progress',
+            ]);
+        }
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -2275,12 +2302,11 @@ class MedicationControllerTest extends TestCase
         $med = $this->createMedication();
 
         $otherContext = ServiceContext::factory()->create(['name' => 'Home Support']);
-        $shift = Shift::factory()->create([
-            'site_id' => $this->site->id,
-            'client_id' => $this->client->id,
-            'user_id' => $this->supportWorker->id,
-            'service_context_id' => $otherContext->id,
-        ]);
+        $shift = Shift::query()
+            ->where('client_id', $this->client->id)
+            ->where('user_id', $this->supportWorker->id)
+            ->firstOrFail();
+        $shift->forceFill(['service_context_id' => $otherContext->id])->save();
 
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [

@@ -10,9 +10,10 @@ use App\Models\MedicationRound;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationScopeDecision;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Frontline guided medication round flow.
@@ -30,6 +31,7 @@ class GuidedRoundController extends Controller
         protected GuidedRoundService $guidedRoundService,
         protected EnhancedMarService $marService,
         protected MarScheduleService $scheduleService,
+        protected MedicationScopeDecisionService $medicationScope,
     ) {}
 
     /**
@@ -40,15 +42,15 @@ class GuidedRoundController extends Controller
         $user = $request->user();
         abort_unless($this->canWork($user), 403);
 
-        // The guided walk-through is now a modal on /emar/rounds (and surfaced
-        // on /meds/today). Redirect deep links there with the round pre-opened
-        // — the rounds() controller builds the items/progress payload and
-        // auto-starts a pending round for a competent viewer.
-        $dateStr = $round->round_date instanceof \DateTimeInterface
-            ? $round->round_date->format('Y-m-d')
-            : (string) $round->round_date;
+        return $this->medicationScope->forRound($user, $round, now(), function (MedicationScopeDecision $scope) {
+            // The guided walk-through is now a modal on /emar/rounds (and surfaced
+            // on /meds/today). Redirect deep links there with the round pre-opened.
+            $dateStr = $scope->round->round_date instanceof \DateTimeInterface
+                ? $scope->round->round_date->format('Y-m-d')
+                : (string) $scope->round->round_date;
 
-        return redirect()->route('emar.rounds', ['date' => $dateStr, 'guided' => $round->id]);
+            return redirect()->route('emar.rounds', ['date' => $dateStr, 'guided' => $scope->round->id]);
+        });
     }
 
     /**
@@ -64,7 +66,6 @@ class GuidedRoundController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canWork($user), 403);
-        abort_unless($medication->active, 422, 'This medication is not currently active.');
 
         $data = $request->validate([
             'status' => ['required', 'in:given,refused,held'],
@@ -83,14 +84,6 @@ class GuidedRoundController extends Controller
             'origin_device_id' => ['nullable', 'string', 'max:255'],
             'queued_offline' => ['nullable', 'boolean'],
         ]);
-
-        if ($cached = $this->getCachedMedicationSyncResponse('round_admin', $data)) {
-            if ($request->expectsJson()) {
-                return response()->json($cached);
-            }
-
-            return back()->with('status', 'Dose already recorded for this round.');
-        }
 
         // Worker vocabulary: "held" → backend "withheld".
         $backendStatus = $data['status'] === 'held' ? 'withheld' : $data['status'];
@@ -115,152 +108,183 @@ class GuidedRoundController extends Controller
         }
 
         $scheduled = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
+        $actionAt = $this->scheduleService->parseWorkerDateTime((string) (
+            $data['captured_offline_at'] ?? now()->toIso8601String()
+        ));
 
-        return DB::transaction(function () use ($request, $round, $medication, $data, $backendStatus, $scheduled, $user) {
-            // Guard against double administration for the same dose in the
-            // same round (covers a worker tapping twice, or resuming after a
-            // partial network error).
-            $existing = $medication->administrations()
-                ->where('medication_round_id', $round->id)
-                ->whereBetween('scheduled_for', $this->scheduleService->utcSlotWindow($scheduled))
-                ->first();
+        return $this->medicationScope->forAdministration(
+            $user,
+            $medication->client,
+            $medication,
+            $actionAt,
+            $scheduled,
+            null,
+            $round,
+            function (MedicationScopeDecision $scope) use ($request, $data, $backendStatus, $scheduled, $actionAt, $user) {
+                $round = $scope->round;
+                $medication = $scope->medication;
 
-            if ($existing) {
-                if (($data['queued_offline'] ?? false) && $request->expectsJson()) {
-                    return response()->json(
-                        $this->buildMedicationConflictPayload(
-                            $data,
-                            'Medication state changed before this offline round item could sync. Supervisor review is required.',
-                        ),
-                        409,
-                    );
-                }
+                // Guard against double administration for the same dose in the
+                // same round (covers a worker tapping twice, or resuming after a
+                // partial network error).
+                $existing = $medication->administrations()
+                    ->where('medication_round_id', $round->id)
+                    ->whereBetween('scheduled_for', $this->scheduleService->utcSlotWindow($scheduled))
+                    ->first();
 
-                if ($request->expectsJson()) {
-                    return response()->json(
-                        $this->withMedicationSync(
-                            [
-                                'success' => true,
-                                'administration' => [
-                                    'id' => $existing->id,
-                                    'status' => $existing->status,
-                                    'administered_at' => $existing->administered_at?->toIso8601String(),
-                                    'round_id' => $round->id,
+                if ($existing) {
+                    if (($data['queued_offline'] ?? false) && $request->expectsJson()) {
+                        return response()->json(
+                            $this->buildMedicationConflictPayload(
+                                $data,
+                                'Medication state changed before this offline round item could sync. Supervisor review is required.',
+                            ),
+                            409,
+                        );
+                    }
+
+                    if ($request->expectsJson()) {
+                        return response()->json(
+                            $this->withMedicationSync(
+                                [
+                                    'success' => true,
+                                    'administration' => [
+                                        'id' => $existing->id,
+                                        'status' => $existing->status,
+                                        'administered_at' => $existing->administered_at?->toIso8601String(),
+                                        'round_id' => $round->id,
+                                    ],
                                 ],
-                            ],
-                            $data,
-                            'duplicate',
-                            true,
-                            'Dose already recorded for this round.',
-                        ),
-                    );
+                                $data,
+                                'duplicate',
+                                true,
+                                'Dose already recorded for this round.',
+                            ),
+                        );
+                    }
+
+                    return back()->with('status', 'Dose already recorded for this round.');
                 }
 
-                return back()->with('status', 'Dose already recorded for this round.');
-            }
+                $result = $this->marService->recordAdministration(
+                    $scope->client,
+                    $medication,
+                    [
+                        'status' => $backendStatus,
+                        'reason' => $data['reason'] ?? null,
+                        'reason_code' => $data['reason_code'] ?? null,
+                        'scheduled_for' => $scheduled->toIso8601String(),
+                        'administered_at' => $actionAt->toIso8601String(),
+                        'witnessed_by' => $data['witnessed_by'] ?? null,
+                        'witness_credential' => $data['witness_credential'] ?? null,
+                        'quantity_administered' => $data['quantity_administered'] ?? null,
+                        'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
+                        'pulse_bpm' => $data['pulse_bpm'] ?? null,
+                        'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
+                        'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
+                        'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                        'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                        'origin_device_id' => $data['origin_device_id'] ?? null,
+                        'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                        'scope_authorized' => true,
+                        'medication_round_id' => $round->id,
+                        // The round's own window_minutes is the authoritative
+                        // schedule for a guided round; skip the narrower MAR
+                        // time-window check here so workers aren't blocked by it
+                        // while walking through a round that's still inside its
+                        // own legitimate window.
+                        'override_window' => true,
+                    ],
+                    $user->id,
+                    $scope->shiftId(),
+                );
 
-            $result = $this->marService->recordAdministration(
-                $medication->client,
-                $medication,
-                [
-                    'status' => $backendStatus,
-                    'reason' => $data['reason'] ?? null,
-                    'reason_code' => $data['reason_code'] ?? null,
-                    'scheduled_for' => $scheduled->toIso8601String(),
-                    'administered_at' => now()->toIso8601String(),
-                    'witnessed_by' => $data['witnessed_by'] ?? null,
-                    'witness_credential' => $data['witness_credential'] ?? null,
-                    'quantity_administered' => $data['quantity_administered'] ?? null,
-                    'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
-                    'pulse_bpm' => $data['pulse_bpm'] ?? null,
-                    'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
-                    'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
-                    // The round's own window_minutes is the authoritative
-                    // schedule for a guided round; skip the narrower MAR
-                    // time-window check here so workers aren't blocked by it
-                    // while walking through a round that's still inside its
-                    // own legitimate window.
-                    'override_window' => true,
-                ],
-                $user->id,
-                null,
-            );
+                if (! ($result['success'] ?? false)) {
+                    if ($request->expectsJson()) {
+                        return response()->json(
+                            $this->withMedicationSync(
+                                $result,
+                                $data,
+                                'rejected',
+                                false,
+                                $result['error'] ?? 'Could not record this dose.',
+                            ),
+                            422,
+                        );
+                    }
 
-            if (! ($result['success'] ?? false)) {
-                if ($request->expectsJson()) {
-                    return response()->json(
-                        $this->withMedicationSync(
-                            $result,
-                            $data,
-                            'rejected',
-                            false,
-                            $result['error'] ?? 'Could not record this dose.',
-                        ),
-                        422,
-                    );
+                    return back()->withErrors([
+                        'status' => $result['error'] ?? 'Could not record this dose.',
+                    ]);
                 }
 
-                return back()->withErrors([
-                    'status' => $result['error'] ?? 'Could not record this dose.',
+                // Link the administration to the round so progress stays honest
+                // and the round counters can be updated off a single query.
+                $admin = $result['administration'];
+                abort_unless(
+                    $admin->medication_round_id === null || (int) $admin->medication_round_id === (int) $round->id,
+                    409,
+                    'Medication state changed before this round item could be recorded.',
+                );
+                $admin->medication_round_id = $round->id;
+                $admin->shift_id = $scope->shiftId();
+                $admin->save();
+
+                $statusLabel = ucfirst(str_replace('_', ' ', $backendStatus));
+                app(TimelineEmitter::class)->record([
+                    'source_type' => ClientMedicationAdministration::class,
+                    'source_id' => $admin->id,
+                    'occurred_at' => $admin->administered_at ?? now(),
+                    'type' => 'medication_'.$backendStatus,
+                    'actor_user_id' => $user->id,
+                    'client_id' => $medication->client_id,
+                    'shift_id' => $scope->shiftId(),
+                    'site_id' => $medication->client?->site_id,
+                    'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
+                    'body' => null,
+                    'meta' => array_filter([
+                        'medication_name' => $medication->name,
+                        'dosage' => $medication->dosage,
+                        'status' => $backendStatus,
+                        'reason' => $data['reason'] ?? null,
+                        'witnessed_by' => $data['witnessed_by'] ?? null,
+                        'medication_round_id' => $round->id,
+                        'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                        'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                        'origin_device_id' => $data['origin_device_id'] ?? null,
+                        'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                    ]),
+                    'visibility' => 'internal',
+                    'is_pinned' => false,
+                    'created_by' => $user->id,
                 ]);
-            }
 
-            // Link the administration to the round so progress stays honest
-            // and the round counters can be updated off a single query.
-            $admin = $result['administration'];
-            $admin->medication_round_id = $round->id;
-            $admin->save();
+                $round->updateCounts();
+                $this->medicationScope->recordBreakGlassUse(
+                    $scope,
+                    'recorded_round_dose',
+                    'Administration '.$admin->id,
+                );
 
-            $statusLabel = ucfirst(str_replace('_', ' ', $backendStatus));
-            app(TimelineEmitter::class)->record([
-                'source_type' => ClientMedicationAdministration::class,
-                'source_id' => $admin->id,
-                'occurred_at' => $admin->administered_at ?? now(),
-                'type' => 'medication_'.$backendStatus,
-                'actor_user_id' => $user->id,
-                'client_id' => $medication->client_id,
-                'shift_id' => null,
-                'site_id' => $medication->client?->site_id,
-                'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
-                'body' => null,
-                'meta' => array_filter([
-                    'medication_name' => $medication->name,
-                    'dosage' => $medication->dosage,
-                    'status' => $backendStatus,
-                    'reason' => $data['reason'] ?? null,
-                    'witnessed_by' => $data['witnessed_by'] ?? null,
-                    'medication_round_id' => $round->id,
-                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
-                    'captured_offline_at' => $data['captured_offline_at'] ?? null,
-                    'origin_device_id' => $data['origin_device_id'] ?? null,
-                    'queued_offline' => (bool) ($data['queued_offline'] ?? false),
-                ]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $user->id,
-            ]);
+                $payload = $this->withMedicationSync([
+                    'success' => true,
+                    'administration' => [
+                        'id' => $admin->id,
+                        'status' => $admin->status,
+                        'administered_at' => $admin->administered_at?->toIso8601String(),
+                        'round_id' => $round->id,
+                    ],
+                    'safety_check' => $result['safety_check'] ?? null,
+                ], $data, $this->medicationProcessedStatus($data));
 
-            $round->updateCounts();
+                $this->rememberMedicationSyncResponse('round_admin', $data, $payload);
 
-            $payload = $this->withMedicationSync([
-                'success' => true,
-                'administration' => [
-                    'id' => $admin->id,
-                    'status' => $admin->status,
-                    'administered_at' => $admin->administered_at?->toIso8601String(),
-                    'round_id' => $round->id,
-                ],
-                'safety_check' => $result['safety_check'] ?? null,
-            ], $data, $this->medicationProcessedStatus($data));
+                if ($request->expectsJson()) {
+                    return response()->json($payload);
+                }
 
-            $this->rememberMedicationSyncResponse('round_admin', $data, $payload);
-
-            if ($request->expectsJson()) {
-                return response()->json($payload);
-            }
-
-            return back();
-        });
+                return back();
+            });
     }
 
     /**
@@ -272,17 +296,26 @@ class GuidedRoundController extends Controller
         $user = $request->user();
         abort_unless($this->canWork($user), 403);
 
-        if ($round->status !== 'completed') {
-            $round->forceFill([
-                'status' => 'completed',
-                'completed_by' => $user->id,
-                'completed_at' => now(),
-            ])->save();
-        }
+        return $this->medicationScope->forRound(
+            $user,
+            $round,
+            now(),
+            function (MedicationScopeDecision $scope) use ($user) {
+                if ($scope->round->status !== 'completed') {
+                    $scope->round->forceFill([
+                        'status' => 'completed',
+                        'completed_by' => $user->id,
+                        'completed_at' => now(),
+                    ])->save();
+                    $this->medicationScope->recordBreakGlassUse($scope, 'completed_medication_round');
+                }
 
-        $round->updateCounts();
+                $scope->round->updateCounts();
 
-        return redirect()->route('meds.round.show', $round);
+                return redirect()->route('meds.round.show', $scope->round);
+            },
+            ['in_progress', 'completed'],
+        );
     }
 
     private function canWork($user): bool

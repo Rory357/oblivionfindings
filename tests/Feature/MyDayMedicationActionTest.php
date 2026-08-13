@@ -5,6 +5,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Shift;
 use App\Models\Site;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Services\EnhancedMarService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     Cache::flush();
@@ -68,11 +70,6 @@ it('stores scheduled doses in UTC while resolving the local slot on My Day and M
         'dose_times' => ['09:00'],
     ]);
 
-    Shift::factory()->assignedToday($worker)->published()->create([
-        'client_id' => $medication->client_id,
-        'site_id' => $medication->client->site_id,
-    ]);
-
     $scheduledLocal = Carbon::parse('2026-05-21 09:00:00', 'Pacific/Auckland');
 
     $this->actingAs($worker)
@@ -85,7 +82,7 @@ it('stores scheduled doses in UTC while resolving the local slot on My Day and M
         ->where('client_medication_id', $medication->id)
         ->firstOrFail();
 
-    expect(\Illuminate\Support\Facades\DB::table('client_medication_administrations')->where('id', $administration->id)->value('scheduled_for'))
+    expect(DB::table('client_medication_administrations')->where('id', $administration->id)->value('scheduled_for'))
         ->toBe($scheduledLocal->copy()->utc()->format('Y-m-d H:i:s'));
 
     $this->actingAs($worker)
@@ -221,6 +218,15 @@ it('rejects workers without medications.administer.record permission', function 
     assignMedicationWorkerToSite($worker, $site);
     $client = Client::factory()->create(['site_id' => $site->id]);
     $client->supportWorkers()->attach($worker->id);
+    Shift::factory()->published()->create([
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'user_id' => $worker->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(2),
+        'actual_starts_at' => now()->subHour(),
+        'status' => 'in_progress',
+    ]);
     $medication = ClientMedication::factory()->create(['client_id' => $client->id]);
 
     $this->actingAs($worker)
@@ -254,6 +260,13 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
         $overrides[$permission->id] = ['allowed' => true];
     }
     $worker->permissionOverrides()->syncWithoutDetaching($overrides);
+    MedicationCompetencyAssessment::query()->create([
+        'user_id' => $worker->id,
+        'assessment_type' => 'annual',
+        'status' => 'passed',
+        'assessment_date' => today(),
+        'expiry_date' => today()->addYear(),
+    ]);
 
     $client = Client::factory()->create(['site_id' => $site->id]);
     $client->supportWorkers()->attach($worker->id);
@@ -262,12 +275,25 @@ function makeWorkerAndMedication(array $medicationOverrides = []): array
         'client_id' => $client->id,
         'name' => 'Donepezil',
         'dosage' => '5 mg',
+        'dose_times' => ['10:00'],
         'active' => true,
         'state' => 'active',
         'approval_status' => 'verified',
         'start_date' => Carbon::parse('2026-05-01', 'Pacific/Auckland')->toDateString(),
         'end_date' => null,
     ], $medicationOverrides));
+
+    Shift::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $site->id,
+        'user_id' => $worker->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(2),
+        'actual_starts_at' => now()->subHour(),
+        'actual_ends_at' => null,
+        'started_by' => $worker->id,
+        'status' => 'in_progress',
+    ]);
 
     return [$worker, $medication];
 }

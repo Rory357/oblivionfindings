@@ -583,14 +583,11 @@ class EnhancedMarService
             }
         }
 
-        if ($shiftId !== null && ! Shift::query()
-            ->whereKey($shiftId)
-            ->where('client_id', $client->id)
-            ->exists()) {
+        if ((int) $medication->client_id !== (int) $client->id) {
             return [
                 'success' => false,
-                'error' => 'The selected shift does not belong to this client.',
-                'error_field' => 'shift_id',
+                'error' => 'The requested medication action is not available.',
+                'error_field' => 'client_medication_id',
             ];
         }
 
@@ -656,14 +653,15 @@ class EnhancedMarService
                 if ($shiftId !== null) {
                     $shift = Shift::query()
                         ->whereKey($shiftId)
-                        ->where('client_id', $client->id)
+                        ->where('user_id', $userId)
+                        ->where('site_id', $client->site_id)
                         ->lockForUpdate()
                         ->first();
 
                     if (! $shift) {
                         return [
                             'success' => false,
-                            'error' => 'The selected shift does not belong to this client.',
+                            'error' => 'The selected shift is not available for this medication action.',
                             'error_field' => 'shift_id',
                         ];
                     }
@@ -671,6 +669,14 @@ class EnhancedMarService
 
                 // Re-fetch medication with lock to prevent race conditions
                 $medication = ClientMedication::lockForUpdate()->findOrFail($medication->id);
+
+                if ((int) $medication->client_id !== (int) $client->id) {
+                    return [
+                        'success' => false,
+                        'error' => 'The requested medication action is not available.',
+                        'error_field' => 'client_medication_id',
+                    ];
+                }
 
                 if (! $medication->isAdministrable()) {
                     return [
@@ -818,6 +824,7 @@ class EnhancedMarService
                 $admin->early_minutes = $windowCheck['early_minutes'] ?? null;
                 $admin->outcome = $data['outcome'] ?? null;
                 $admin->site = $data['site'] ?? null;
+                $admin->medication_round_id = $data['medication_round_id'] ?? null;
 
                 if ($shift) {
                     $admin->service_context_id = $shift->service_context_id;
@@ -932,10 +939,11 @@ class EnhancedMarService
                 $clientRequestUuid,
             );
 
-        // Incident integration runs only after the MAR transaction commits so a
-        // rolled-back dose never raises an incident. Exact durable UUID replays
-        // deliberately rerun these source-idempotent hooks to repair a prior
-        // post-commit delivery failure; generic scheduled-slot duplicates do not.
+        // Incident integration runs after the inner MAR persistence transaction
+        // succeeds. Controller write paths wrap this in the authoritative scope
+        // transaction, keeping the administration and required incident effects
+        // atomic. Exact durable UUID replays rerun the source-idempotent hooks;
+        // generic scheduled-slot duplicates do not.
         if ($isNewAdministration || $isExactDurableReplay) {
             $reporterId = $isExactDurableReplay
                 ? ((int) $administration->administered_by ?: $userId)
@@ -1142,8 +1150,7 @@ class EnhancedMarService
         array $data,
         int $userId,
         bool $lockForUpdate = false,
-    ): ?array
-    {
+    ): ?array {
         if (($data['status'] ?? null) !== 'given') {
             return null;
         }

@@ -15,16 +15,20 @@ use App\Models\ClientMedicationStock;
 use App\Models\ServiceContext;
 use App\Models\User;
 use App\Services\EnhancedMarService;
+use App\Services\MarScheduleService;
+use App\Services\Medication\MedicationScopeDecision;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\NotificationService;
 use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class ClientMedicalController extends Controller
 {
@@ -170,46 +174,61 @@ class ClientMedicalController extends Controller
         }
 
         try {
-            $m = new ClientMedication;
-            $m->client_id = $client->id;
-            $m->created_by = $user->id;
-            $m->fill($this->buildMedicationPayload($data));
-            $m->save();
+            return app(MedicationScopeDecisionService::class)->forClient(
+                $user,
+                (int) $client->id,
+                now(),
+                function (MedicationScopeDecision $scope) use ($request, $data, $user) {
+                    $client = $scope->client;
+                    $medication = new ClientMedication;
+                    $medication->client_id = $client->id;
+                    $medication->created_by = $user->id;
+                    $medication->fill($this->buildMedicationPayload($data));
+                    $medication->save();
 
-            app(TimelineEmitter::class)->record([
-                'source_type' => ClientMedication::class,
-                'source_id' => $m->id,
-                'occurred_at' => now(),
-                'type' => 'medication_prescribed',
-                'actor_user_id' => $user->id,
-                'client_id' => $client->id,
-                'site_id' => $client->site_id,
-                'subject' => 'Medication added: '.$m->name.($m->dosage ? ' '.$m->dosage : ''),
-                'body' => $m->instructions,
-                'meta' => array_filter([
-                    'medication_name' => $m->name,
-                    'dosage' => $m->dosage,
-                    'frequency' => $m->frequency,
-                    'route' => $m->route,
-                    'is_prn' => $m->is_prn,
-                    'controlled_drug' => $m->controlled_drug,
-                    'high_risk' => $m->high_risk,
-                ]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $user->id,
-            ]);
+                    app(TimelineEmitter::class)->record([
+                        'source_type' => ClientMedication::class,
+                        'source_id' => $medication->id,
+                        'occurred_at' => now(),
+                        'type' => 'medication_prescribed',
+                        'actor_user_id' => $user->id,
+                        'client_id' => $client->id,
+                        'site_id' => $client->site_id,
+                        'subject' => 'Medication added: '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
+                        'body' => $medication->instructions,
+                        'meta' => array_filter([
+                            'medication_name' => $medication->name,
+                            'dosage' => $medication->dosage,
+                            'frequency' => $medication->frequency,
+                            'route' => $medication->route,
+                            'is_prn' => $medication->is_prn,
+                            'controlled_drug' => $medication->controlled_drug,
+                            'high_risk' => $medication->high_risk,
+                        ]),
+                        'visibility' => 'internal',
+                        'is_pinned' => false,
+                        'created_by' => $user->id,
+                    ]);
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication', $m, $client, [
-                'title' => 'Medication added: '.$m->name,
-                'url' => url("/clients/{$client->id}/medical"),
-            ]);
+                    app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication', $medication, $client, [
+                        'title' => 'Medication added: '.$medication->name,
+                        'url' => url("/clients/{$client->id}/medical"),
+                    ]);
+                    app(MedicationScopeDecisionService::class)->recordBreakGlassUse(
+                        $scope,
+                        'created_medication_order',
+                        'Medication '.$medication->id,
+                    );
 
-            return back()->with('success', 'Medication added successfully.');
+                    return back()->with('success', 'Medication added successfully.');
+                },
+            );
+        } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
-            return back()->withInput()->with('error', 'Failed to add medication: '.$e->getMessage());
+            return back()->withInput()->with('error', 'Failed to add medication. No changes were saved.');
         }
     }
 
@@ -218,7 +237,6 @@ class ClientMedicalController extends Controller
         $this->authorize('viewMedications', $client);
         $user = $request->user();
         abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.orders.manage') ?? false), 403);
-        abort_unless($medication->client_id === $client->id, 404);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -257,19 +275,46 @@ class ClientMedicalController extends Controller
         }
 
         try {
-            $medication->fill($this->buildMedicationPayload($data));
-            $medication->save();
+            return app(MedicationScopeDecisionService::class)->forMedication(
+                $user,
+                $medication,
+                now(),
+                function (MedicationScopeDecision $scope) use ($request, $client, $data) {
+                    abort_unless(
+                        (int) $scope->client->id === (int) $client->id,
+                        404,
+                        'The requested medication action is not available.',
+                    );
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medication', $medication, $client, [
-                'title' => 'Medication updated: '.$medication->name,
-                'url' => url("/clients/{$client->id}/medical"),
-            ]);
+                    $scope->medication->fill($this->buildMedicationPayload($data));
+                    $scope->medication->save();
 
-            return back()->with('success', 'Medication updated successfully.');
+                    app(NotificationService::class)->notifyCrud(
+                        $request->user(),
+                        'updated',
+                        'medication',
+                        $scope->medication,
+                        $scope->client,
+                        [
+                            'title' => 'Medication updated: '.$scope->medication->name,
+                            'url' => url("/clients/{$scope->client->id}/medical"),
+                        ],
+                    );
+                    app(MedicationScopeDecisionService::class)->recordBreakGlassUse(
+                        $scope,
+                        'updated_medication_order',
+                        'Medication '.$scope->medication->id,
+                    );
+
+                    return back()->with('success', 'Medication updated successfully.');
+                },
+            );
+        } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
-            return back()->withInput()->with('error', 'Failed to update medication: '.$e->getMessage());
+            return back()->withInput()->with('error', 'Failed to update medication. No changes were saved.');
         }
     }
 
@@ -429,12 +474,7 @@ class ClientMedicalController extends Controller
             'quantity_administered' => ['nullable', 'numeric', 'min:0.01', 'max:10000'],
             'scheduled_for' => ['nullable', 'date'],
             'administered_at' => ['nullable', 'date'],
-            'shift_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('shifts', 'id')
-                    ->where(fn ($query) => $query->where('client_id', $client->id)),
-            ],
+            'shift_id' => ['nullable', 'integer'],
             'witnessed_by' => ['nullable', 'integer'],
             'witness_credential' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
@@ -448,214 +488,248 @@ class ClientMedicalController extends Controller
             'queued_offline' => ['nullable', 'boolean'],
         ]);
 
-        if ($cached = $this->getCachedMedicationSyncResponse('administration', $data)) {
-            if ($request->expectsJson()) {
-                return response()->json($cached);
-            }
-
-            return back()->with('success', 'Already saved — no changes needed.');
-        }
-
-        // Require a structured code whenever the outcome is not "given".
-        if (($data['status'] ?? 'given') !== 'given' && empty($data['reason_code'])) {
-            return back()->withInput()->withErrors([
-                'reason_code' => 'Please choose why the medication was not given.',
-            ]);
-        }
-
-        // For PRN (as-needed) medication, require an indication/reason even when "given".
-        if ($medication->is_prn && (($data['status'] ?? 'given') === 'given') && empty($data['reason'])) {
-            return back()->withInput()->with('error', 'Please provide the PRN indication (reason) for as-needed medication.');
-        }
-
-        // Step 8: time window logic. If a scheduled dose is administered outside the safe window,
-        // require a reason even for "given".
-        if (($data['status'] ?? 'given') === 'given' && ! empty($data['scheduled_for'])) {
-            try {
-                $scheduled = Carbon::parse($data['scheduled_for']);
-                $adminAt = ! empty($data['administered_at']) ? Carbon::parse($data['administered_at']) : now();
-
-                $lateAfterMinutes = 30;
-                $earlyBeforeMinutes = 60;
-                $diff = $scheduled->diffInMinutes($adminAt, false); // adminAt - scheduled
-
-                if (($diff < -$earlyBeforeMinutes || $diff > $lateAfterMinutes) && empty($data['reason'])) {
-                    return back()->withInput()->with('error', 'Please provide a reason when administering outside the scheduled time window.');
-                }
-            } catch (\Throwable $e) {
-                // ignore parse errors
-            }
-        }
-
-        // Controlled drugs: require permission + witness when recording a "given" administration.
-        if ($medication->controlled_drug && (($data['status'] ?? 'given') === 'given')) {
-            abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
-            if (empty($data['witnessed_by'])) {
-                return back()->withInput()->with('error', 'A witness is required when administering a controlled drug.');
-            }
-            if ((int) $data['witnessed_by'] === (int) $user->id) {
-                return back()->withInput()->with('error', 'The witness must be a different user.');
-            }
-
-            $witness = User::query()->find($data['witnessed_by']);
-            if (! $witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || ! $witness->canDo('medications.controlled.witness')) {
-                return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
-            }
-        }
-
-        $medication->loadMissing('stock');
+        $schedule = app(MarScheduleService::class);
+        $scheduledFor = filled($data['scheduled_for'] ?? null)
+            ? $schedule->parseWorkerDateTime((string) $data['scheduled_for'])
+            : null;
+        $actionAt = $schedule->parseWorkerDateTime((string) (
+            $data['administered_at'] ?? $data['captured_offline_at'] ?? now()->toIso8601String()
+        ));
 
         try {
-            if (($data['queued_offline'] ?? false) && ! $medication->is_prn && ! empty($data['scheduled_for'])) {
-                $isDurableReplay = filled($data['client_request_uuid'] ?? null)
-                    && ClientMedicationAdministration::withTrashed()
-                        ->where('client_id', $client->id)
-                        ->where('client_medication_id', $medication->id)
-                        ->where('client_request_uuid', $data['client_request_uuid'])
-                        ->exists();
-
-                if (! $isDurableReplay) {
-                    $scheduledFor = Carbon::parse($data['scheduled_for']);
-                    $conflictingAdministration = ClientMedicationAdministration::query()
-                        ->where('client_id', $client->id)
-                        ->where('client_medication_id', $medication->id)
-                        ->whereBetween('scheduled_for', [
-                            $scheduledFor->copy()->subMinute(),
-                            $scheduledFor->copy()->addMinute(),
-                        ])
-                        ->latest('id')
-                        ->first();
-
-                    if ($conflictingAdministration) {
-                        $payload = $this->buildMedicationConflictPayload(
-                            $data,
-                            'Medication state changed before this offline administration could sync. Supervisor review is required.',
-                        );
-
-                        if ($request->expectsJson()) {
-                            return response()->json($payload, 409);
-                        }
-
-                        return back()->withInput()->with('error', $payload['error']);
-                    }
-                }
-            }
-
-            $result = app(EnhancedMarService::class)->recordAdministration(
+            return app(MedicationScopeDecisionService::class)->forAdministration(
+                $user,
                 $client,
                 $medication,
-                $data,
-                $user->id,
-                $data['shift_id'] ?? null
-            );
+                $actionAt,
+                $scheduledFor,
+                isset($data['shift_id']) ? (int) $data['shift_id'] : null,
+                null,
+                function (MedicationScopeDecision $scope) use ($request, $data, $user) {
+                    $client = $scope->client;
+                    $medication = $scope->medication;
+                    $data['shift_id'] = $scope->shiftId();
+                    $data['scope_authorized'] = true;
 
-            if (! ($result['success'] ?? false)) {
-                // PRN over-limit incidents are raised inside EnhancedMarService
-                // (shared across all recording surfaces), so no handling here.
-                if ($request->expectsJson()) {
-                    return response()->json(
-                        $this->withMedicationSync(
-                            $result,
-                            $data,
-                            'rejected',
-                            false,
-                            $result['error'] ?? null,
-                        ),
-                        422,
+                    // Require a structured code whenever the outcome is not "given".
+                    if (($data['status'] ?? 'given') !== 'given' && empty($data['reason_code'])) {
+                        return back()->withInput()->withErrors([
+                            'reason_code' => 'Please choose why the medication was not given.',
+                        ]);
+                    }
+
+                    // For PRN (as-needed) medication, require an indication/reason even when "given".
+                    if ($medication->is_prn && (($data['status'] ?? 'given') === 'given') && empty($data['reason'])) {
+                        return back()->withInput()->with('error', 'Please provide the PRN indication (reason) for as-needed medication.');
+                    }
+
+                    // Step 8: time window logic. If a scheduled dose is administered outside the safe window,
+                    // require a reason even for "given".
+                    if (($data['status'] ?? 'given') === 'given' && ! empty($data['scheduled_for'])) {
+                        try {
+                            $scheduled = Carbon::parse($data['scheduled_for']);
+                            $adminAt = ! empty($data['administered_at']) ? Carbon::parse($data['administered_at']) : now();
+
+                            $lateAfterMinutes = 30;
+                            $earlyBeforeMinutes = 60;
+                            $diff = $scheduled->diffInMinutes($adminAt, false); // adminAt - scheduled
+
+                            if (($diff < -$earlyBeforeMinutes || $diff > $lateAfterMinutes) && empty($data['reason'])) {
+                                return back()->withInput()->with('error', 'Please provide a reason when administering outside the scheduled time window.');
+                            }
+                        } catch (\Throwable $e) {
+                            // ignore parse errors
+                        }
+                    }
+
+                    // Controlled drugs: require permission + witness when recording a "given" administration.
+                    if ($medication->controlled_drug && (($data['status'] ?? 'given') === 'given')) {
+                        abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
+                        if (empty($data['witnessed_by'])) {
+                            return back()->withInput()->with('error', 'A witness is required when administering a controlled drug.');
+                        }
+                        if ((int) $data['witnessed_by'] === (int) $user->id) {
+                            return back()->withInput()->with('error', 'The witness must be a different user.');
+                        }
+
+                        $witness = User::query()->find($data['witnessed_by']);
+                        if (! $witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || ! $witness->canDo('medications.controlled.witness')) {
+                            return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
+                        }
+                    }
+
+                    $medication->loadMissing('stock');
+
+                    if (($data['queued_offline'] ?? false) && ! $medication->is_prn && ! empty($data['scheduled_for'])) {
+                        $isDurableReplay = filled($data['client_request_uuid'] ?? null)
+                            && ClientMedicationAdministration::withTrashed()
+                                ->where('client_id', $client->id)
+                                ->where('client_medication_id', $medication->id)
+                                ->where('client_request_uuid', $data['client_request_uuid'])
+                                ->exists();
+
+                        if (! $isDurableReplay) {
+                            $scheduledFor = Carbon::parse($data['scheduled_for']);
+                            $conflictingAdministration = ClientMedicationAdministration::query()
+                                ->where('client_id', $client->id)
+                                ->where('client_medication_id', $medication->id)
+                                ->whereBetween('scheduled_for', [
+                                    $scheduledFor->copy()->subMinute(),
+                                    $scheduledFor->copy()->addMinute(),
+                                ])
+                                ->latest('id')
+                                ->first();
+
+                            if ($conflictingAdministration) {
+                                $payload = $this->buildMedicationConflictPayload(
+                                    $data,
+                                    'Medication state changed before this offline administration could sync. Supervisor review is required.',
+                                );
+
+                                if ($request->expectsJson()) {
+                                    return response()->json($payload, 409);
+                                }
+
+                                return back()->withInput()->with('error', $payload['error']);
+                            }
+                        }
+                    }
+
+                    $result = app(EnhancedMarService::class)->recordAdministration(
+                        $client,
+                        $medication,
+                        $data,
+                        $user->id,
+                        $data['shift_id'] ?? null
                     );
-                }
 
-                return back()->withInput()->with('error', $result['error'] ?? 'Failed to record administration.');
-            }
+                    if (! ($result['success'] ?? false)) {
+                        // PRN over-limit incidents are raised inside EnhancedMarService
+                        // (shared across all recording surfaces), so no handling here.
+                        if ($request->expectsJson()) {
+                            return response()->json(
+                                $this->withMedicationSync(
+                                    $result,
+                                    $data,
+                                    'rejected',
+                                    false,
+                                    $result['error'] ?? null,
+                                ),
+                                422,
+                            );
+                        }
 
-            /** @var ClientMedicationAdministration $a */
-            $a = $result['administration'];
+                        return back()->withInput()->with('error', $result['error'] ?? 'Failed to record administration.');
+                    }
 
-            if ($result['duplicate'] ?? false) {
-                $payload = $this->withMedicationSync([
-                    'success' => true,
-                    'administration' => [
-                        'id' => $a->id,
-                        'status' => $a->status,
-                        'administered_at' => $a->administered_at?->toIso8601String(),
-                    ],
-                    'safety_check' => $result['safety_check'] ?? null,
-                ], $data, 'duplicate', true, 'This medication request was already processed.');
+                    /** @var ClientMedicationAdministration $a */
+                    $a = $result['administration'];
 
-                $this->rememberMedicationSyncResponse('administration', $data, $payload);
+                    if ($result['duplicate'] ?? false) {
+                        $payload = $this->withMedicationSync([
+                            'success' => true,
+                            'administration' => [
+                                'id' => $a->id,
+                                'status' => $a->status,
+                                'administered_at' => $a->administered_at?->toIso8601String(),
+                            ],
+                            'safety_check' => $result['safety_check'] ?? null,
+                        ], $data, 'duplicate', true, 'This medication request was already processed.');
 
-                if ($request->expectsJson()) {
-                    return response()->json($payload);
-                }
+                        $this->rememberMedicationSyncResponse('administration', $data, $payload);
 
-                return back()->with('success', 'Already saved — no changes needed.');
-            }
+                        if ($request->expectsJson()) {
+                            return response()->json($payload);
+                        }
 
-            $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
-            app(TimelineEmitter::class)->record([
-                'source_type' => ClientMedicationAdministration::class,
-                'source_id' => $a->id,
-                'occurred_at' => $a->administered_at ?? now(),
-                'type' => 'medication_'.$data['status'],
-                'actor_user_id' => $user->id,
-                'client_id' => $client->id,
-                'shift_id' => $data['shift_id'] ?? null,
-                'site_id' => $client->site_id,
-                'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
-                'body' => $data['notes'] ?? null,
-                'meta' => array_filter([
-                    'medication_name' => $medication->name,
-                    'dosage' => $medication->dosage,
-                    'dose_given' => $data['dose_given'] ?? null,
-                    'status' => $data['status'],
-                    'reason' => $data['reason'] ?? null,
-                    'reason_code' => $data['reason_code'] ?? null,
-                    'witnessed_by' => $data['witnessed_by'] ?? null,
-                    'witness_method' => $a->witness_method,
-                    'pulse_bpm' => $data['pulse_bpm'] ?? null,
-                    'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
-                    'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
-                    'client_request_uuid' => $data['client_request_uuid'] ?? null,
-                    'captured_offline_at' => $data['captured_offline_at'] ?? null,
-                    'origin_device_id' => $data['origin_device_id'] ?? null,
-                    'queued_offline' => (bool) ($data['queued_offline'] ?? false),
-                ]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $user->id,
-            ]);
+                        return back()->with('success', 'Already saved — no changes needed.');
+                    }
 
-            // Missed/refused/late incident creation now lives in
-            // EnhancedMarService::recordAdministration so every recording
-            // surface raises the same incidents.
-            app(MedicationAlertService::class)->generateClientAlerts($client);
+                    $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
+                    app(TimelineEmitter::class)->record([
+                        'source_type' => ClientMedicationAdministration::class,
+                        'source_id' => $a->id,
+                        'occurred_at' => $a->administered_at ?? now(),
+                        'type' => 'medication_'.$data['status'],
+                        'actor_user_id' => $user->id,
+                        'client_id' => $client->id,
+                        'shift_id' => $data['shift_id'] ?? null,
+                        'site_id' => $client->site_id,
+                        'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
+                        'body' => $data['notes'] ?? null,
+                        'meta' => array_filter([
+                            'medication_name' => $medication->name,
+                            'dosage' => $medication->dosage,
+                            'dose_given' => $data['dose_given'] ?? null,
+                            'status' => $data['status'],
+                            'reason' => $data['reason'] ?? null,
+                            'reason_code' => $data['reason_code'] ?? null,
+                            'witnessed_by' => $data['witnessed_by'] ?? null,
+                            'witness_method' => $a->witness_method,
+                            'pulse_bpm' => $data['pulse_bpm'] ?? null,
+                            'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
+                            'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
+                            'client_request_uuid' => $data['client_request_uuid'] ?? null,
+                            'captured_offline_at' => $data['captured_offline_at'] ?? null,
+                            'origin_device_id' => $data['origin_device_id'] ?? null,
+                            'queued_offline' => (bool) ($data['queued_offline'] ?? false),
+                        ]),
+                        'visibility' => 'internal',
+                        'is_pinned' => false,
+                        'created_by' => $user->id,
+                    ]);
 
-            app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication administration', $a, $client, [
-                'title' => 'Medication administration recorded',
-                'url' => url("/clients/{$client->id}/medical"),
-            ]);
+                    // Missed/refused/late incident creation now lives in
+                    // EnhancedMarService::recordAdministration so every recording
+                    // surface raises the same incidents.
+                    app(MedicationAlertService::class)->generateClientAlerts($client);
 
-            $payload = $this->withMedicationSync([
-                'success' => true,
-                'administration' => [
-                    'id' => $a->id,
-                    'status' => $a->status,
-                    'administered_at' => $a->administered_at?->toIso8601String(),
-                ],
-                'safety_check' => $result['safety_check'] ?? null,
-            ], $data, $this->medicationProcessedStatus($data));
+                    app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication administration', $a, $client, [
+                        'title' => 'Medication administration recorded',
+                        'url' => url("/clients/{$client->id}/medical"),
+                    ]);
+                    app(MedicationScopeDecisionService::class)->recordBreakGlassUse(
+                        $scope,
+                        'recorded_dose',
+                        'Administration '.$a->id,
+                    );
 
-            $this->rememberMedicationSyncResponse('administration', $data, $payload);
+                    $payload = $this->withMedicationSync([
+                        'success' => true,
+                        'administration' => [
+                            'id' => $a->id,
+                            'status' => $a->status,
+                            'administered_at' => $a->administered_at?->toIso8601String(),
+                        ],
+                        'safety_check' => $result['safety_check'] ?? null,
+                    ], $data, $this->medicationProcessedStatus($data));
 
-            if ($request->expectsJson()) {
-                return response()->json($payload);
-            }
+                    $this->rememberMedicationSyncResponse('administration', $data, $payload);
 
-            return back()->with('success', 'Medication administration recorded.');
+                    if ($request->expectsJson()) {
+                        return response()->json($payload);
+                    }
+
+                    return back()->with('success', 'Medication administration recorded.');
+                },
+            );
         } catch (\Throwable $e) {
+            if ($e instanceof ValidationException
+                || $e instanceof AuthorizationException
+                || $e instanceof HttpExceptionInterface) {
+                throw $e;
+            }
+
             report($e);
 
-            return back()->withInput()->with('error', 'Failed to record administration: '.$e->getMessage());
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to record administration. No changes were saved.',
+                ], 500);
+            }
+
+            return back()->withInput()->with('error', 'Failed to record administration. No changes were saved.');
         }
     }
 
@@ -700,20 +774,45 @@ class ClientMedicalController extends Controller
         $this->authorize('viewMedications', $client);
         $user = $request->user();
         abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.orders.manage') ?? false), 403);
-        abort_unless($medication->client_id === $client->id, 404);
-
         try {
-            $medication->delete();
-            app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'medication', $medication, $client, [
-                'title' => 'Medication removed: '.($medication->name ?? 'Medication'),
-                'url' => url("/clients/{$client->id}/medical"),
-            ]);
+            return app(MedicationScopeDecisionService::class)->forMedication(
+                $user,
+                $medication,
+                now(),
+                function (MedicationScopeDecision $scope) use ($request, $client) {
+                    abort_unless(
+                        (int) $scope->client->id === (int) $client->id,
+                        404,
+                        'The requested medication action is not available.',
+                    );
 
-            return back()->with('success', 'Medication removed successfully.');
+                    $scope->medication->delete();
+                    app(NotificationService::class)->notifyCrud(
+                        $request->user(),
+                        'deleted',
+                        'medication',
+                        $scope->medication,
+                        $scope->client,
+                        [
+                            'title' => 'Medication removed: '.($scope->medication->name ?? 'Medication'),
+                            'url' => url("/clients/{$scope->client->id}/medical"),
+                        ],
+                    );
+                    app(MedicationScopeDecisionService::class)->recordBreakGlassUse(
+                        $scope,
+                        'deleted_medication_order',
+                        'Medication '.$scope->medication->id,
+                    );
+
+                    return back()->with('success', 'Medication removed successfully.');
+                },
+            );
+        } catch (AuthorizationException|ValidationException|HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Throwable $e) {
             report($e);
 
-            return back()->with('error', 'Failed to remove medication: '.$e->getMessage());
+            return back()->with('error', 'Failed to remove medication. No changes were saved.');
         }
     }
 
