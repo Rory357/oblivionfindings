@@ -4,17 +4,13 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
-use App\Models\Client;
-use App\Models\MealRecipe;
 use App\Models\Site;
 use App\Models\SiteMealPlanEntry;
 use App\Models\SiteMealWeekTemplate;
-use App\Services\Catering\DietaryConflictChecker;
+use App\Services\Catering\SiteMealPlanAggregate;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\ValidationException;
 
 class SiteMealWeekTemplateController extends Controller
@@ -22,7 +18,7 @@ class SiteMealWeekTemplateController extends Controller
     use RespondsToInertiaOrJson;
 
     public function __construct(
-        private readonly DietaryConflictChecker $conflictChecker,
+        private readonly SiteMealPlanAggregate $aggregate,
     ) {}
 
     public function index(Site $site)
@@ -34,7 +30,9 @@ class SiteMealWeekTemplateController extends Controller
                 ->where('site_id', $site->id)
                 ->orWhere('is_starter', true))
             ->orderBy('name')
-            ->get()
+            ->get();
+        $templates = $this->aggregate
+            ->visibleTemplates($site, $templates)
             ->map(fn (SiteMealWeekTemplate $t) => [
                 'id' => $t->id,
                 'name' => $t->name,
@@ -50,16 +48,19 @@ class SiteMealWeekTemplateController extends Controller
     {
         $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
-        $data = $this->validateInput($request, $site);
+        $data = $this->validateInput($request);
 
-        SiteMealWeekTemplate::create([
-            'site_id' => $site->id,
-            'name' => $data['name'],
-            'description' => $data['description'] ?? null,
-            'meals' => $data['meals'] ?? [],
-            'is_starter' => false,
-            'created_by' => auth()->id(),
-        ]);
+        DB::transaction(function () use ($data, $request, $site): void {
+            $meals = $this->resolveTemplateMeals($site, $data['meals'] ?? [], $request, true);
+            SiteMealWeekTemplate::create([
+                'site_id' => $site->id,
+                'name' => $data['name'],
+                'description' => $data['description'] ?? null,
+                'meals' => $meals,
+                'is_starter' => false,
+                'created_by' => auth()->id(),
+            ]);
+        }, 3);
 
         return $this->inertiaOrJson($request, 'Template saved');
     }
@@ -69,13 +70,22 @@ class SiteMealWeekTemplateController extends Controller
         $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless(! $template->is_starter && $template->site_id === $site->id, 404);
-        $data = $this->validateInput($request, $site);
+        $data = $this->validateInput($request);
 
-        $template->update([
-            'name' => $data['name'],
-            'description' => $data['description'] ?? null,
-            'meals' => $data['meals'] ?? [],
-        ]);
+        DB::transaction(function () use ($data, $request, $site, $template): void {
+            $locked = SiteMealWeekTemplate::query()
+                ->whereKey($template->id)
+                ->where('is_starter', false)
+                ->where('site_id', $site->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $meals = $this->resolveTemplateMeals($site, $data['meals'] ?? [], $request, true);
+            $locked->update([
+                'name' => $data['name'],
+                'description' => $data['description'] ?? null,
+                'meals' => $meals,
+            ]);
+        }, 3);
 
         return $this->inertiaOrJson($request, 'Template updated');
     }
@@ -95,7 +105,6 @@ class SiteMealWeekTemplateController extends Controller
         $this->authorize('view', $site);
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($template->is_starter || $template->site_id === $site->id, 404);
-        $this->assertTemplateRecipesVisibleToSite($template, $site);
 
         $data = $request->validate([
             'week' => 'required|date',
@@ -104,36 +113,58 @@ class SiteMealWeekTemplateController extends Controller
 
         $start = CarbonImmutable::parse($data['week'])->startOfWeek();
 
-        $residentIds = $site->type === 'house'
-            ? Client::query()->where('site_id', $site->id)->pluck('id')->all()
-            : [];
+        $applied = DB::transaction(function () use ($data, $request, $site, $start, $template): int {
+            $lockedTemplate = SiteMealWeekTemplate::query()
+                ->whereKey($template->id)
+                ->where(fn ($query) => $query
+                    ->where('is_starter', true)
+                    ->orWhere('site_id', $site->id))
+                ->lockForUpdate()
+                ->firstOrFail();
+            $residentIds = $site->type === 'house'
+                ? $this->aggregate->residentQuery($site, $request->user())->pluck('id')->all()
+                : [];
+            $candidates = collect();
+            foreach (($lockedTemplate->meals ?? []) as $meal) {
+                $day = (int) ($meal['day'] ?? 0);
+                if ($day < 0 || $day > 6 || empty($meal['recipe_id'])) {
+                    continue;
+                }
+                $planDate = $start->addDays($day)->toDateString();
+                try {
+                    $resolved = $this->aggregate->resolve(
+                        $site,
+                        (int) $meal['recipe_id'],
+                        $residentIds,
+                        $planDate,
+                        $request->user(),
+                        true,
+                    );
+                } catch (ValidationException) {
+                    throw ValidationException::withMessages([
+                        'template' => ['This template contains a recipe that is not available at this Site.'],
+                    ]);
+                }
+                if ($resolved['report']['has_hard_blocks']) {
+                    throw ValidationException::withMessages([
+                        'template' => ['This template contains a meal blocked by current clinical restrictions. No meals were applied.'],
+                    ]);
+                }
 
-        $candidates = collect();
-        foreach (($template->meals ?? []) as $meal) {
-            $day = (int) ($meal['day'] ?? 0);
-            if ($day < 0 || $day > 6 || empty($meal['recipe_id'])) {
-                continue;
-            }
-            $planDate = $start->addDays($day)->toDateString();
-            $recipe = MealRecipe::query()
-                ->with(['tags', 'ingredients.product.tags'])
-                ->findOrFail($meal['recipe_id']);
-            $report = $this->conflictChecker->checkRecipeAgainstClients($recipe, $residentIds, $planDate);
-            if ($report['has_hard_blocks']) {
-                throw ValidationException::withMessages([
-                    'template' => ['This template contains a meal blocked by current clinical restrictions. No meals were applied.'],
+                $candidates->push([
+                    'plan_date' => $planDate,
+                    'meal_slot' => $meal['slot'] ?? 'lunch',
+                    'recipe_id' => $resolved['recipe']?->id,
+                    'servings' => (int) ($meal['servings'] ?? 1),
+                    'resident_ids' => $resolved['resident_ids'],
                 ]);
             }
 
-            $candidates->push([
-                'plan_date' => $planDate,
-                'meal_slot' => $meal['slot'] ?? 'lunch',
-                'recipe_id' => $meal['recipe_id'],
-                'servings' => (int) ($meal['servings'] ?? 1),
-            ]);
-        }
-
-        $applied = DB::transaction(function () use ($data, $site, $start, $residentIds, $candidates): int {
+            SiteMealPlanEntry::query()
+                ->where('site_id', $site->id)
+                ->whereBetween('plan_date', [$start->toDateString(), $start->addDays(6)->toDateString()])
+                ->lockForUpdate()
+                ->get();
             if (! empty($data['replace'])) {
                 SiteMealPlanEntry::query()
                     ->where('site_id', $site->id)
@@ -149,7 +180,7 @@ class SiteMealWeekTemplateController extends Controller
                     'source_type' => 'recipe',
                     'recipe_id' => $candidate['recipe_id'],
                     'servings' => $candidate['servings'],
-                    'client_ids' => $residentIds,
+                    'client_ids' => $candidate['resident_ids'],
                     'created_by' => auth()->id(),
                 ]);
             }
@@ -160,7 +191,7 @@ class SiteMealWeekTemplateController extends Controller
         return $this->inertiaOrJson($request, "Applied “{$template->name}” · {$applied} meal".($applied === 1 ? '' : 's'));
     }
 
-    private function validateInput(Request $request, Site $site): array
+    private function validateInput(Request $request): array
     {
         return $request->validate([
             'name' => 'required|string|max:120',
@@ -168,51 +199,35 @@ class SiteMealWeekTemplateController extends Controller
             'meals' => 'nullable|array',
             'meals.*.day' => 'required|integer|min:0|max:6',
             'meals.*.slot' => 'required|in:'.implode(',', SiteMealPlanEntry::MEAL_SLOTS),
-            'meals.*.recipe_id' => [
-                'required',
-                'integer',
-                $this->visibleRecipeRule($site),
-            ],
+            'meals.*.recipe_id' => ['required', 'integer'],
             'meals.*.servings' => 'nullable|integer|min:1|max:500',
         ]);
     }
 
-    private function assertTemplateRecipesVisibleToSite(SiteMealWeekTemplate $template, Site $site): void
+    /**
+     * @param  array<int, array<string, mixed>>  $meals
+     * @return array<int, array<string, mixed>>
+     */
+    private function resolveTemplateMeals(Site $site, array $meals, Request $request, bool $lockForUpdate): array
     {
-        $recipeIds = collect($template->meals ?? [])
-            ->pluck('recipe_id')
-            ->filter()
-            ->map(fn ($recipeId) => (int) $recipeId)
-            ->unique()
-            ->values();
-
-        if ($recipeIds->isEmpty()) {
-            return;
+        foreach ($meals as $index => $meal) {
+            try {
+                $resolved = $this->aggregate->resolve(
+                    $site,
+                    (int) $meal['recipe_id'],
+                    [],
+                    null,
+                    $request->user(),
+                    $lockForUpdate,
+                );
+            } catch (ValidationException) {
+                throw ValidationException::withMessages([
+                    "meals.{$index}.recipe_id" => ['The selected recipe is not available for this Site.'],
+                ]);
+            }
+            $meals[$index]['recipe_id'] = $resolved['recipe']?->id;
         }
 
-        $visibleCount = MealRecipe::query()
-            ->active()
-            ->visibleToSite($site->id)
-            ->whereIn('id', $recipeIds)
-            ->count();
-
-        if ($visibleCount !== $recipeIds->count()) {
-            throw ValidationException::withMessages([
-                'template' => ['This template contains a recipe that is not available at this Site.'],
-            ]);
-        }
-    }
-
-    private function visibleRecipeRule(Site $site): Exists
-    {
-        return Rule::exists('meal_recipes', 'id')
-            ->where(fn ($query) => $query
-                ->where('is_active', true)
-                ->whereNull('deleted_at')
-                ->where(fn ($scope) => $scope
-                    ->where('scope', 'shared')
-                    ->orWhere(fn ($local) => $local
-                        ->where('scope', 'house')
-                        ->where('site_id', $site->id))));
+        return array_values($meals);
     }
 }

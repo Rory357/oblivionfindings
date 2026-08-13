@@ -70,8 +70,8 @@ function mealPlannerEntry(Site $site, string $date, string $name): SiteMealPlanE
 }
 
 test('meal planning lists relationships and copy actions honour canonical Site access', function (): void {
-    $visibleClient = Client::factory()->create(['site_id' => $this->visibleMealSite->id]);
-    $hiddenClient = Client::factory()->create(['site_id' => $this->hiddenMealSite->id]);
+    $visibleClient = Client::factory()->create(['site_id' => $this->visibleMealSite->id, 'status' => 'active']);
+    $hiddenClient = Client::factory()->create(['site_id' => $this->hiddenMealSite->id, 'status' => 'active']);
     $sharedRecipe = MealRecipe::query()->create([
         'name' => 'Shared meal recipe',
         'scope' => 'shared',
@@ -273,8 +273,8 @@ test('inventory and week templates preserve Site ownership and global starter re
         ->getJson("/sites/{$this->visibleMealSite->id}/meal-templates")
         ->assertOk();
     expect(collect($templates->json('templates'))->pluck('id'))
-        ->toContain($visibleTemplate->id, $starter->id, $invalidStarter->id)
-        ->not->toContain($hiddenTemplate->id);
+        ->toContain($visibleTemplate->id, $starter->id)
+        ->not->toContain($hiddenTemplate->id, $invalidStarter->id);
 
     $this->actingAs($this->mealViewer)
         ->postJson("/sites/{$this->visibleMealSite->id}/meal-templates/{$hiddenTemplate->id}/apply", [

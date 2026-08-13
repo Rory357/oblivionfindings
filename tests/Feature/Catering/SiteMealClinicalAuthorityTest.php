@@ -39,8 +39,8 @@ beforeEach(function (): void {
         'type' => 'house',
         'is_active' => true,
     ]);
-    $this->clientA = Client::factory()->create(['site_id' => $this->siteA->id]);
-    $this->clientB = Client::factory()->create(['site_id' => $this->siteB->id]);
+    $this->clientA = Client::factory()->create(['site_id' => $this->siteA->id, 'status' => 'active']);
+    $this->clientB = Client::factory()->create(['site_id' => $this->siteB->id, 'status' => 'active']);
     $this->planner = mealClinicalUserAtSite($this->siteA);
     $this->author = mealClinicalUserAtSite($this->siteA, ['clinical.mealRestrictions.author']);
     $this->approver = mealClinicalUserAtSite($this->siteA, ['clinical.mealRestrictions.approve']);
@@ -299,8 +299,8 @@ test('pending amendment concurrency is rejected against the same authorised vers
 
 test('effective future expired and stale restrictions fail closed on the meal date', function (): void {
     $futureClient = $this->clientA;
-    $expiredClient = Client::factory()->create(['site_id' => $this->siteA->id]);
-    $staleClient = Client::factory()->create(['site_id' => $this->siteA->id]);
+    $expiredClient = Client::factory()->create(['site_id' => $this->siteA->id, 'status' => 'active']);
+    $staleClient = Client::factory()->create(['site_id' => $this->siteA->id, 'status' => 'active']);
     mealClinicalAuthorisedRestriction($futureClient, $this->author, $this->approver, [
         'effective_from' => today()->addDay()->toDateString(),
         'review_due_at' => today()->addMonths(6)->toDateString(),

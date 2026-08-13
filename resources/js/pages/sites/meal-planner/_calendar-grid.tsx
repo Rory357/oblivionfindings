@@ -2412,6 +2412,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
             servings: entry.servings,
             notes: entry.notes,
             client_ids: entry.client_ids ?? [],
+            expected_version: entry.version,
             allergen_override_reason:
                 entry.allergen_override_reason ?? undefined,
         };
