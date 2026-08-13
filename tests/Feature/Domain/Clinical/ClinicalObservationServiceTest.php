@@ -13,8 +13,12 @@ use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class ClinicalObservationServiceTest extends TestCase
@@ -215,21 +219,289 @@ class ClinicalObservationServiceTest extends TestCase
         $this->assertEquals('completed', $schedule->status);
         $this->assertEquals($this->recorder->id, $schedule->completed_by);
         $this->assertEquals($observation->id, $schedule->clinical_observation_id);
-    }
-
-    public function test_does_not_complete_already_completed_schedule(): void
-    {
-        $schedule = ClinicalProtocolSchedule::factory()->completed()->create();
-        $originalCompletedBy = $schedule->completed_by;
-
-        $this->service->record($this->client, $this->recorder, [
-            'observation_type' => ObservationType::Weight,
-            'data' => ['weight_kg' => 70],
+        $this->assertDatabaseHas('clinical_observations', [
+            'id' => $observation->id,
+            'client_id' => $this->client->id,
+            'observation_type' => ObservationType::Weight->value,
             'protocol_schedule_id' => $schedule->id,
         ]);
+        $this->assertSame(1, TimelineEvent::query()
+            ->where('type', ClinicalObservationService::TIMELINE_TYPE_OBSERVATION)
+            ->where('source_id', $observation->id)
+            ->count());
+    }
+
+    public function test_rejects_already_completed_schedule_without_partial_writes(): void
+    {
+        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $this->client->id,
+        ]);
+        $schedule = ClinicalProtocolSchedule::factory()->completed()->create([
+            'clinical_protocol_id' => $protocol->id,
+        ]);
+        $original = $schedule->only([
+            'status',
+            'completed_by',
+            'completed_at',
+            'clinical_observation_id',
+        ]);
+
+        $this->assertScheduleRejected($this->client, ObservationType::Weight, $schedule);
 
         $schedule->refresh();
-        $this->assertEquals($originalCompletedBy, $schedule->completed_by);
+        $this->assertSame($original['status'], $schedule->status);
+        $this->assertSame($original['completed_by'], $schedule->completed_by);
+        $this->assertTrue($schedule->completed_at->equalTo($original['completed_at']));
+        $this->assertSame($original['clinical_observation_id'], $schedule->clinical_observation_id);
+        $this->assertDatabaseCount('clinical_observations', 0);
+        $this->assertDatabaseCount('timeline_events', 0);
+    }
+
+    public function test_rejects_cross_resident_and_cross_type_schedules_without_partial_writes(): void
+    {
+        $otherClient = Client::factory()->create();
+        $otherResidentProtocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $otherClient->id,
+        ]);
+        $otherResidentSchedule = ClinicalProtocolSchedule::factory()->create([
+            'clinical_protocol_id' => $otherResidentProtocol->id,
+        ]);
+
+        $this->assertScheduleRejected($this->client, ObservationType::Weight, $otherResidentSchedule);
+
+        $wrongTypeProtocol = ClinicalProtocol::factory()->everyShiftVitals()->create([
+            'client_id' => $this->client->id,
+            'frequency' => 'daily',
+        ]);
+        $wrongTypeSchedule = ClinicalProtocolSchedule::factory()->create([
+            'clinical_protocol_id' => $wrongTypeProtocol->id,
+        ]);
+
+        $this->assertScheduleRejected($this->client, ObservationType::Weight, $wrongTypeSchedule);
+
+        $this->assertDatabaseCount('clinical_observations', 0);
+        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertSame('pending', $otherResidentSchedule->fresh()->status);
+        $this->assertSame('pending', $wrongTypeSchedule->fresh()->status);
+    }
+
+    public function test_rejects_inactive_expired_and_wrong_frequency_protocol_schedules(): void
+    {
+        $protocols = [
+            ClinicalProtocol::factory()->dailyWeight()->inactive()->create([
+                'client_id' => $this->client->id,
+            ]),
+            ClinicalProtocol::factory()->dailyWeight()->expired()->create([
+                'client_id' => $this->client->id,
+            ]),
+            ClinicalProtocol::factory()->everyShiftVitals()->create([
+                'client_id' => $this->client->id,
+                'observation_type' => ObservationType::Weight,
+            ]),
+        ];
+
+        foreach ($protocols as $protocol) {
+            $schedule = ClinicalProtocolSchedule::factory()->create([
+                'clinical_protocol_id' => $protocol->id,
+            ]);
+
+            $this->assertScheduleRejected($this->client, ObservationType::Weight, $schedule);
+            $this->assertSame('pending', $schedule->fresh()->status);
+        }
+
+        $this->assertDatabaseCount('clinical_observations', 0);
+        $this->assertDatabaseCount('timeline_events', 0);
+    }
+
+    public function test_rejects_missed_and_skipped_stale_schedules(): void
+    {
+        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $this->client->id,
+        ]);
+
+        foreach (['missed', 'skipped'] as $status) {
+            $schedule = ClinicalProtocolSchedule::factory()->create([
+                'clinical_protocol_id' => $protocol->id,
+                'status' => $status,
+                'skip_reason' => $status === 'skipped' ? 'Resident unavailable' : null,
+            ]);
+
+            $this->assertScheduleRejected($this->client, ObservationType::Weight, $schedule);
+            $this->assertSame($status, $schedule->fresh()->status);
+        }
+
+        $this->assertDatabaseCount('clinical_observations', 0);
+        $this->assertDatabaseCount('timeline_events', 0);
+    }
+
+    public function test_rolls_back_observation_timeline_schedule_and_audit_when_a_later_effect_fails(): void
+    {
+        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $this->client->id,
+        ]);
+        $schedule = ClinicalProtocolSchedule::factory()->create([
+            'clinical_protocol_id' => $protocol->id,
+        ]);
+        $auditCountBefore = DB::table('audit_logs')->count();
+
+        Event::listen(ObservationRecorded::class, static function (): never {
+            throw new RuntimeException('Forced post-completion failure.');
+        });
+
+        try {
+            $this->service->record($this->client, $this->recorder, [
+                'observation_type' => ObservationType::Weight,
+                'data' => ['weight_kg' => 70],
+                'protocol_schedule_id' => $schedule->id,
+            ]);
+            self::fail('The forced post-completion failure was not raised.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Forced post-completion failure.', $exception->getMessage());
+        }
+
+        $schedule->refresh();
+        $this->assertSame('pending', $schedule->status);
+        $this->assertNull($schedule->completed_by);
+        $this->assertNull($schedule->completed_at);
+        $this->assertNull($schedule->clinical_observation_id);
+        $this->assertDatabaseCount('clinical_observations', 0);
+        $this->assertDatabaseCount('timeline_events', 0);
+        $this->assertSame($auditCountBefore, DB::table('audit_logs')->count());
+    }
+
+    public function test_concurrent_schedule_completion_records_one_observation_and_one_final_effect(): void
+    {
+        $connection = DB::connection();
+        $this->assertSame('mysql', $connection->getDriverName());
+
+        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $this->client->id,
+            'created_by' => $this->recorder->id,
+        ]);
+        $schedule = ClinicalProtocolSchedule::factory()->create([
+            'clinical_protocol_id' => $protocol->id,
+            'due_at' => now(),
+        ]);
+        $database = $connection->getDatabaseName();
+        $token = Str::uuid()->toString();
+        $releasePath = sys_get_temp_dir().DIRECTORY_SEPARATOR."clinical-schedule-release-{$token}";
+        $readyPaths = [
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."clinical-schedule-ready-a-{$token}",
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."clinical-schedule-ready-b-{$token}",
+        ];
+        $attemptPaths = [
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."clinical-schedule-attempt-a-{$token}",
+            sys_get_temp_dir().DIRECTORY_SEPARATOR."clinical-schedule-attempt-b-{$token}",
+        ];
+        $processes = [];
+        $clientId = $this->client->id;
+        $recorderId = $this->recorder->id;
+        $protocolId = $protocol->id;
+        $scheduleId = $schedule->id;
+
+        // RefreshDatabase's transaction must be committed so independent MySQL
+        // workers can see the fixtures. A replacement transaction is opened in
+        // finally for the framework teardown callback.
+        $connection->commit();
+
+        try {
+            $connection->beginTransaction();
+            ClinicalProtocol::query()->whereKey($protocolId)->lockForUpdate()->firstOrFail();
+
+            foreach ([0, 1] as $index) {
+                $processes[] = $this->startScheduleCompletionWorker(
+                    $clientId,
+                    $recorderId,
+                    $scheduleId,
+                    $readyPaths[$index],
+                    $attemptPaths[$index],
+                    $releasePath,
+                    $database,
+                );
+            }
+
+            $this->waitForFiles($readyPaths, 'Both schedule workers did not connect.');
+            touch($releasePath);
+            $this->waitForFiles($attemptPaths, 'Both schedule workers did not reach the command.');
+            usleep(250_000);
+
+            foreach ($processes as $process) {
+                $this->assertTrue(
+                    $process->isRunning(),
+                    trim($process->getErrorOutput()) ?: 'A worker exited before the protocol lock was released.',
+                );
+            }
+
+            $connection->commit();
+
+            $results = [];
+            foreach ($processes as $process) {
+                $process->wait();
+                $this->assertTrue(
+                    $process->isSuccessful(),
+                    trim($process->getErrorOutput()) ?: 'A schedule concurrency worker failed.',
+                );
+                $results[] = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            }
+
+            $statuses = collect($results)->pluck('status')->sort()->values()->all();
+            $this->assertSame(['recorded', 'rejected'], $statuses);
+
+            $observations = ClinicalObservation::query()
+                ->where('protocol_schedule_id', $scheduleId)
+                ->get();
+            $this->assertCount(1, $observations);
+            $observation = $observations->sole();
+
+            $schedule->refresh();
+            $this->assertSame('completed', $schedule->status);
+            $this->assertSame($recorderId, $schedule->completed_by);
+            $this->assertSame($observation->id, $schedule->clinical_observation_id);
+            $this->assertNotNull($schedule->completed_at);
+            $this->assertSame(1, TimelineEvent::query()
+                ->where('type', ClinicalObservationService::TIMELINE_TYPE_OBSERVATION)
+                ->where('source_id', $observation->id)
+                ->count());
+            $this->assertSame(1, DB::table('audit_logs')
+                ->where('action', 'clinicalprotocolschedule.update')
+                ->where('auditable_id', $scheduleId)
+                ->count());
+        } finally {
+            while ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+
+            foreach ($processes as $process) {
+                if ($process->isRunning()) {
+                    $process->stop(1);
+                }
+            }
+
+            foreach ([...$readyPaths, ...$attemptPaths, $releasePath] as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+
+            try {
+                DB::table('audit_logs')
+                    ->where('client_id', $clientId)
+                    ->orWhere('user_id', $recorderId)
+                    ->orWhere(function ($query) use ($scheduleId) {
+                        $query->where('auditable_type', ClinicalProtocolSchedule::class)
+                            ->where('auditable_id', $scheduleId);
+                    })
+                    ->delete();
+                DB::table('timeline_events')->where('client_id', $clientId)->delete();
+                DB::table('clinical_protocol_schedules')->where('id', $scheduleId)->delete();
+                DB::table('clinical_observations')->where('client_id', $clientId)->delete();
+                DB::table('clinical_protocols')->where('id', $protocolId)->delete();
+                DB::table('clients')->where('id', $clientId)->delete();
+                DB::table('users')->where('id', $recorderId)->delete();
+            } finally {
+                $connection->beginTransaction();
+            }
+        }
     }
 
     // ── Domain event ─────────────────────────────────────────────────────
@@ -329,5 +601,107 @@ class ClinicalObservationServiceTest extends TestCase
         );
 
         $this->assertCount(2, $results);
+    }
+
+    private function assertScheduleRejected(
+        Client $client,
+        ObservationType $type,
+        ClinicalProtocolSchedule $schedule,
+    ): void {
+        try {
+            $this->service->record($client, $this->recorder, [
+                'observation_type' => $type,
+                'data' => ['weight_kg' => 70],
+                'protocol_schedule_id' => $schedule->id,
+            ]);
+            self::fail('The invalid protocol schedule was accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('protocol_schedule_id', $exception->errors());
+        }
+    }
+
+    private function startScheduleCompletionWorker(
+        int $clientId,
+        int $recorderId,
+        int $scheduleId,
+        string $readyPath,
+        string $attemptPath,
+        string $releasePath,
+        string $database,
+    ): Process {
+        $worker = <<<'PHP'
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$client = App\Models\Client::query()->findOrFail((int) $argv[2]);
+$recorder = App\Models\User::query()->findOrFail((int) $argv[3]);
+$scheduleId = (int) $argv[4];
+file_put_contents($argv[5], (string) Illuminate\Support\Facades\DB::selectOne('SELECT CONNECTION_ID() AS id')->id);
+$deadline = microtime(true) + 15;
+while (! is_file($argv[7])) {
+    if (microtime(true) >= $deadline) {
+        throw new RuntimeException('Timed out waiting for the schedule concurrency release barrier.');
+    }
+    usleep(10_000);
+}
+file_put_contents($argv[6], 'attempting');
+try {
+    $observation = $app->make(App\Domain\Clinical\Services\ClinicalObservationService::class)->record(
+        $client,
+        $recorder,
+        [
+            'observation_type' => App\Domain\Clinical\Enums\ObservationType::Weight,
+            'data' => ['weight_kg' => 70],
+            'protocol_schedule_id' => $scheduleId,
+        ],
+    );
+    $result = ['status' => 'recorded', 'observation_id' => $observation->id];
+} catch (Illuminate\Validation\ValidationException $exception) {
+    $result = ['status' => 'rejected', 'errors' => array_keys($exception->errors())];
+}
+echo json_encode($result, JSON_THROW_ON_ERROR);
+PHP;
+
+        $process = new Process(
+            [
+                PHP_BINARY,
+                '-r',
+                $worker,
+                base_path(),
+                (string) $clientId,
+                (string) $recorderId,
+                (string) $scheduleId,
+                $readyPath,
+                $attemptPath,
+                $releasePath,
+            ],
+            base_path(),
+            [
+                'APP_ENV' => 'testing',
+                'DB_CONNECTION' => 'mysql',
+                'DB_DATABASE' => $database,
+                'QUEUE_CONNECTION' => 'sync',
+            ],
+        );
+        $process->setTimeout(30);
+        $process->start();
+
+        return $process;
+    }
+
+    /** @param list<string> $paths */
+    private function waitForFiles(array $paths, string $message): void
+    {
+        $deadline = microtime(true) + 15;
+
+        do {
+            if (collect($paths)->every(fn (string $path): bool => is_file($path))) {
+                return;
+            }
+
+            usleep(10_000);
+        } while (microtime(true) < $deadline);
+
+        throw new RuntimeException($message);
     }
 }

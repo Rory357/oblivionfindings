@@ -4,8 +4,10 @@ namespace App\Domain\Clinical\Services;
 
 use App\Domain\Clinical\Enums\Acvpu;
 use App\Domain\Clinical\Enums\ObservationType;
+use App\Domain\Clinical\Enums\ProtocolFrequency;
 use App\Domain\Clinical\Events\ObservationRecorded;
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Clinical\Models\ClinicalProtocol;
 use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
 use App\Models\Client;
 use App\Models\Shift;
@@ -13,12 +15,15 @@ use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Support\WorkerClock;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class ClinicalObservationService
 {
     public const TIMELINE_TYPE_OBSERVATION = 'clinical_observation';
+
+    private const PROTOCOL_SCHEDULE_UNAVAILABLE = 'This protocol schedule is no longer available. Refresh the due observations and try again.';
 
     public function __construct(
         protected News2Scorer $news2Scorer,
@@ -54,48 +59,54 @@ class ClinicalObservationService
             ? $this->news2Scorer->score($input['data'])
             : null;
 
-        $observation = ClinicalObservation::create([
-            'client_id' => $client->id,
-            'shift_id' => $shift?->id,
-            'site_id' => $shift?->site_id ?? $client->site_id,
-            'recorded_by' => $recorder->id,
-            'observation_type' => $type,
-            'recorded_at' => WorkerClock::toUtc($input['recorded_at'] ?? null) ?? now(),
-            'data' => $input['data'],
-            'news2_score' => $news2?->score,
-            'news2_band' => $news2?->band,
-            'notes' => $input['notes'] ?? null,
-            'is_flagged' => $isFlagged = (bool) ($input['is_flagged'] ?? false),
-            'flagged_reason' => $isFlagged ? ($input['flagged_reason'] ?? null) : null,
-            'flagged_by' => $isFlagged ? $recorder->id : null,
-            'protocol_schedule_id' => $input['protocol_schedule_id'] ?? null,
-        ]);
-
-        $this->createTimelineEvent($observation, $recorder);
-
-        if (! empty($input['protocol_schedule_id'])) {
-            $this->completeProtocolSchedule(
-                $input['protocol_schedule_id'],
-                $recorder->id,
-                $observation->id,
+        return DB::transaction(function () use ($client, $recorder, $input, $shift, $type, $news2): ClinicalObservation {
+            $schedule = $this->resolvePendingProtocolSchedule(
+                $client,
+                $type,
+                $input['protocol_schedule_id'] ?? null,
+                array_key_exists('protocol_schedule_id', $input),
+                $shift,
             );
-        }
 
-        // Deterioration escalation — Medium/High NEWS2 raises a clinical signal.
-        if ($news2 && $news2->band->isOnWatch()) {
-            $this->signalService->emitForDeterioration($observation, $news2);
-        }
+            $observation = ClinicalObservation::create([
+                'client_id' => $client->id,
+                'shift_id' => $shift?->id,
+                'site_id' => $shift?->site_id ?? $client->site_id,
+                'recorded_by' => $recorder->id,
+                'observation_type' => $type,
+                'recorded_at' => WorkerClock::toUtc($input['recorded_at'] ?? null) ?? now(),
+                'data' => $input['data'],
+                'news2_score' => $news2?->score,
+                'news2_band' => $news2?->band,
+                'notes' => $input['notes'] ?? null,
+                'is_flagged' => $isFlagged = (bool) ($input['is_flagged'] ?? false),
+                'flagged_reason' => $isFlagged ? ($input['flagged_reason'] ?? null) : null,
+                'flagged_by' => $isFlagged ? $recorder->id : null,
+                'protocol_schedule_id' => $schedule?->id,
+            ]);
 
-        ObservationRecorded::dispatch($observation);
+            $this->createTimelineEvent($observation, $recorder);
 
-        Log::info('ClinicalObservationService: observation recorded', [
-            'observation_id' => $observation->id,
-            'type' => $type->value,
-            'client_id' => $client->id,
-            'shift_id' => $shift?->id,
-        ]);
+            if ($schedule) {
+                $this->completeProtocolSchedule($schedule, $recorder->id, $observation->id);
+            }
 
-        return $observation;
+            // Deterioration escalation — Medium/High NEWS2 raises a clinical signal.
+            if ($news2 && $news2->band->isOnWatch()) {
+                $this->signalService->emitForDeterioration($observation, $news2);
+            }
+
+            ObservationRecorded::dispatch($observation);
+
+            Log::info('ClinicalObservationService: observation recorded', [
+                'observation_id' => $observation->id,
+                'type' => $type->value,
+                'client_id' => $client->id,
+                'shift_id' => $shift?->id,
+            ]);
+
+            return $observation;
+        }, 3);
     }
 
     /**
@@ -576,12 +587,97 @@ class ClinicalObservationService
 
     // ── Protocol schedule completion ─────────────────────────────────────
 
-    protected function completeProtocolSchedule(int $scheduleId, int $userId, int $observationId): void
-    {
-        $schedule = ClinicalProtocolSchedule::find($scheduleId);
-
-        if ($schedule && $schedule->isPending()) {
-            $schedule->markCompleted($userId, $observationId);
+    protected function resolvePendingProtocolSchedule(
+        Client $client,
+        ObservationType $type,
+        mixed $scheduleId,
+        bool $scheduleWasSupplied,
+        ?Shift $shift,
+    ): ?ClinicalProtocolSchedule {
+        if (! $scheduleWasSupplied || $scheduleId === null) {
+            return null;
         }
+
+        if (! is_int($scheduleId) && ! (is_string($scheduleId) && ctype_digit($scheduleId))) {
+            $this->rejectProtocolSchedule();
+        }
+
+        $scheduleId = (int) $scheduleId;
+        if ($scheduleId < 1) {
+            $this->rejectProtocolSchedule();
+        }
+
+        // Lock the owner first, then resolve the schedule from that owner. This
+        // fixed lock order serializes protocol deactivation and schedule
+        // completion without ever trusting the schedule id as a free-standing
+        // record identifier.
+        $protocol = ClinicalProtocol::query()
+            ->forClient($client->id)
+            ->ofType($type)
+            ->where('frequency', '!=', ProtocolFrequency::EveryShift->value)
+            ->whereHas('schedules', fn ($query) => $query->whereKey($scheduleId))
+            ->lockForUpdate()
+            ->first();
+
+        if (
+            ! $protocol
+            || (int) $protocol->client_id !== (int) $client->id
+            || $protocol->observation_type !== $type
+            || $protocol->frequency === ProtocolFrequency::EveryShift
+            || ! $protocol->isCurrentlyApplicable()
+        ) {
+            $this->rejectProtocolSchedule();
+        }
+
+        $schedule = $protocol->schedules()
+            ->whereKey($scheduleId)
+            ->lockForUpdate()
+            ->first();
+
+        if (
+            ! $schedule
+            || ! $schedule->isPending()
+            || $schedule->completed_by !== null
+            || $schedule->completed_at !== null
+            || $schedule->clinical_observation_id !== null
+            || $schedule->skip_reason !== null
+        ) {
+            $this->rejectProtocolSchedule();
+        }
+
+        if ($shift && ! $this->scheduleBelongsToShiftWindow($schedule, $shift)) {
+            $this->rejectProtocolSchedule();
+        }
+
+        return $schedule;
+    }
+
+    protected function scheduleBelongsToShiftWindow(ClinicalProtocolSchedule $schedule, Shift $shift): bool
+    {
+        if (! $shift->starts_at || ! $shift->ends_at) {
+            return false;
+        }
+
+        if ($schedule->due_at->lt($shift->starts_at) || $schedule->due_at->gt($shift->ends_at)) {
+            return false;
+        }
+
+        return ! $schedule->shift_task_id
+            || $schedule->shiftTask()->where('shift_id', $shift->id)->exists();
+    }
+
+    protected function rejectProtocolSchedule(): never
+    {
+        throw ValidationException::withMessages([
+            'protocol_schedule_id' => self::PROTOCOL_SCHEDULE_UNAVAILABLE,
+        ]);
+    }
+
+    protected function completeProtocolSchedule(
+        ClinicalProtocolSchedule $schedule,
+        int $userId,
+        int $observationId,
+    ): void {
+        $schedule->markCompleted($userId, $observationId);
     }
 }

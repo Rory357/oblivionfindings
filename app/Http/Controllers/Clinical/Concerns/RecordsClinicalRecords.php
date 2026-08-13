@@ -40,7 +40,10 @@ trait RecordsClinicalRecords
             'data' => ['present', 'array'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'recorded_at' => ['nullable', 'date'],
-            'protocol_schedule_id' => ['nullable', 'integer', 'exists:clinical_protocol_schedules,id'],
+            // The canonical observation command resolves this opaque id through
+            // its owning protocol and performs the authoritative client/type/
+            // pending checks under row locks.
+            'protocol_schedule_id' => ['nullable', 'integer'],
             // Flag-on-entry → pushes the record to the RN sign-off queue.
             'is_flagged' => ['nullable', 'boolean'],
             'flagged_reason' => ['nullable', 'string', 'max:500'],

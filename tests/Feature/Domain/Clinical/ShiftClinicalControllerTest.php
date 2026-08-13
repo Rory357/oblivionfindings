@@ -251,6 +251,66 @@ class ShiftClinicalControllerTest extends TestCase
         $this->assertNotNull($schedule->clinical_observation_id);
     }
 
+    public function test_shift_observation_surface_rejects_cross_type_schedule_atomically(): void
+    {
+        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $this->client->id,
+            'created_by' => $this->staffUser->id,
+        ]);
+        $schedule = ClinicalProtocolSchedule::factory()->create([
+            'clinical_protocol_id' => $protocol->id,
+            'due_at' => now()->addHour(),
+        ]);
+
+        $this->actingAs($this->staffUser)
+            ->postJson("/shifts/{$this->shift->id}/clinical/observations", [
+                'observation_type' => 'bowel',
+                'data' => ['bristol_type' => 4],
+                'protocol_schedule_id' => $schedule->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('protocol_schedule_id');
+
+        $schedule->refresh();
+        $this->assertSame('pending', $schedule->status);
+        $this->assertNull($schedule->completed_by);
+        $this->assertNull($schedule->completed_at);
+        $this->assertNull($schedule->clinical_observation_id);
+        $this->assertDatabaseCount('clinical_observations', 0);
+        $this->assertDatabaseMissing('timeline_events', [
+            'type' => 'clinical_observation',
+            'client_id' => $this->client->id,
+        ]);
+    }
+
+    public function test_shift_observation_surface_rejects_schedule_outside_shift_window(): void
+    {
+        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $this->client->id,
+            'created_by' => $this->staffUser->id,
+        ]);
+        $schedule = ClinicalProtocolSchedule::factory()->create([
+            'clinical_protocol_id' => $protocol->id,
+            'due_at' => $this->shift->ends_at->copy()->addMinute(),
+        ]);
+
+        $this->actingAs($this->staffUser)
+            ->postJson("/shifts/{$this->shift->id}/clinical/observations", [
+                'observation_type' => 'weight',
+                'data' => ['weight_kg' => 71.0],
+                'protocol_schedule_id' => $schedule->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('protocol_schedule_id');
+
+        $this->assertSame('pending', $schedule->fresh()->status);
+        $this->assertDatabaseCount('clinical_observations', 0);
+        $this->assertDatabaseMissing('timeline_events', [
+            'type' => 'clinical_observation',
+            'client_id' => $this->client->id,
+        ]);
+    }
+
     public function test_shift_observation_rejects_out_of_range_bowel_chart_with_field_error(): void
     {
         $response = $this->actingAs($this->staffUser)
