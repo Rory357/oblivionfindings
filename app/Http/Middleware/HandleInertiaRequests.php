@@ -81,20 +81,7 @@ class HandleInertiaRequests extends Middleware
             // least one module feed; badge = my open + overdue items. One
             // cache entry per user — the aggregator fans out across ~17
             // modules, and users with no feeds never pay for the badge.
-            $can['tasks'] = Cache::remember(
-                "tasks.nav.{$user->id}",
-                now()->addMinutes(5),
-                function () use ($user) {
-                    $this->preparePermissionLookup($user);
-                    $taskAggregator = app(TaskAggregator::class);
-                    $view = $taskAggregator->sourcesFor($user) !== [];
-
-                    return [
-                        'view' => $view,
-                        'badge' => $view ? $taskAggregator->badgeCountFor($user) : 0,
-                    ];
-                },
-            );
+            $can['tasks'] = $this->taskNavigation($user);
         }
 
         // Pull all app-settings we need for chrome (labels / theme / branding)
@@ -335,6 +322,43 @@ class HandleInertiaRequests extends Middleware
                     : ['unread_count' => 0, 'items' => []],
             ] : null),
         ];
+    }
+
+    /**
+     * Keep task-provider faults out of the global Inertia failure path. A
+     * degraded projection is reported by TaskAggregator, exposed to clients,
+     * and deliberately not cached so the next request can recover promptly.
+     *
+     * @return array{view: bool, badge: int, badgeDegraded: bool}
+     */
+    private function taskNavigation(User $user): array
+    {
+        $cacheKey = "tasks.nav.{$user->id}";
+        $cached = Cache::get($cacheKey);
+
+        if (is_array($cached)
+            && array_key_exists('view', $cached)
+            && array_key_exists('badge', $cached)) {
+            return [
+                'view' => (bool) $cached['view'],
+                'badge' => (int) $cached['badge'],
+                'badgeDegraded' => (bool) ($cached['badgeDegraded'] ?? false),
+            ];
+        }
+
+        $this->preparePermissionLookup($user);
+        $projection = app(TaskAggregator::class)->navigationBadgeFor($user);
+        $navigation = [
+            'view' => $projection['view'],
+            'badge' => $projection['view'] ? $projection['badge'] : 0,
+            'badgeDegraded' => $projection['degraded'],
+        ];
+
+        if (! $projection['degraded']) {
+            Cache::put($cacheKey, $navigation, now()->addMinutes(5));
+        }
+
+        return $navigation;
     }
 
     /**
