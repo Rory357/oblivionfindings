@@ -81,6 +81,7 @@ it('hydrates the in-progress review as the complete working care plan', function
     $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, [
         'clients.viewAny',
+        'sites.viewAll',
         'care_plans.viewAny',
     ]);
     $client = makeCarePlanReviewIntegrityClient();
@@ -272,10 +273,15 @@ it('requires a fresh review-version sign-off before review completion', function
 
     $this->actingAs($manager)
         ->post("/operations/care-plans/{$review->id}/sign-offs", [
+            'attestation_state' => 'witnessed',
             'party_role' => 'client',
             'party_name' => 'Fresh review signatory',
+            'signer_client_id' => $client->id,
             'agreed_on' => today()->toDateString(),
             'method' => 'in_person',
+            'witness_declaration' => '1',
+            'evidence_type' => 'witness_statement',
+            'evidence_reference' => 'review-meeting-minutes-2026-07',
         ])
         ->assertRedirect();
 
@@ -289,7 +295,7 @@ it('requires a fresh review-version sign-off before review completion', function
         ->and($review->fresh()->status)->toBe('active');
 });
 
-it('retracts the canonical timeline projection when a sign-off is removed', function () {
+it('preserves canonical timeline evidence when an attestation is revoked', function () {
     $manager = User::factory()->create();
     grantCarePlanReviewIntegrityPermissions($manager, ['care_plans.update']);
     $client = makeCarePlanReviewIntegrityClient();
@@ -297,10 +303,15 @@ it('retracts the canonical timeline projection when a sign-off is removed', func
 
     $this->actingAs($manager)
         ->post("/operations/care-plans/{$plan->id}/sign-offs", [
+            'attestation_state' => 'witnessed',
             'party_role' => 'client',
             'party_name' => 'Aroha Client',
+            'signer_client_id' => $client->id,
             'agreed_on' => today()->toDateString(),
             'method' => 'in_person',
+            'witness_declaration' => '1',
+            'evidence_type' => 'witness_statement',
+            'evidence_reference' => 'signed-review-sheet-42',
         ])
         ->assertRedirect();
 
@@ -314,11 +325,17 @@ it('retracts the canonical timeline projection when a sign-off is removed', func
         ->delete("/operations/care-plans/{$plan->id}/sign-offs/{$signOff->id}")
         ->assertRedirect();
 
-    expect(CarePlanSignOff::query()->find($signOff->id))->toBeNull()
+    expect(CarePlanSignOff::query()->find($signOff->id)?->revoked_at)->not->toBeNull()
         ->and(TimelineEvent::query()
             ->where('source_type', CarePlanSignOff::class)
             ->where('source_id', $signOff->id)
-            ->exists())->toBeFalse();
+            ->where('type', 'care_plan_signed_off')
+            ->exists())->toBeTrue()
+        ->and(TimelineEvent::query()
+            ->where('source_type', CarePlanSignOff::class)
+            ->where('source_id', $signOff->id)
+            ->where('type', 'care_plan_attestation_revoked')
+            ->exists())->toBeTrue();
 });
 
 it('uses the dedicated delete capability for current care plans', function () {

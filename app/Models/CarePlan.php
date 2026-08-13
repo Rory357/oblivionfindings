@@ -12,6 +12,17 @@ class CarePlan extends Model
 {
     use AuditableChanges, HasFactory, SoftDeletes, WritesLegacyOrganizationStorageContext;
 
+    public const DEFAULT_ATTESTATION_POLICY = [
+        'version' => 1,
+        'requirement' => 'eligible_attestation',
+        'satisfying_states' => [
+            'direct_authenticated',
+            'witnessed',
+            'authorised_representative',
+        ],
+        'governance_review_required' => true,
+    ];
+
     protected $fillable = [
         'client_id',
         'title',
@@ -24,6 +35,7 @@ class CarePlan extends Model
         'reviewed_by',
         'created_by',
         'content',
+        'attestation_policy',
         'version',
         'parent_id',
     ];
@@ -34,7 +46,15 @@ class CarePlan extends Model
         'next_review_at' => 'date',
         'reviewed_at' => 'datetime',
         'content' => 'array',
+        'attestation_policy' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (CarePlan $carePlan): void {
+            $carePlan->attestation_policy ??= self::DEFAULT_ATTESTATION_POLICY;
+        });
+    }
 
     public function client()
     {

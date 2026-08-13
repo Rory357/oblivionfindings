@@ -9,6 +9,7 @@ use App\Http\Controllers\ClientRagController;
 use App\Http\Controllers\ClientVisitRequestController;
 use App\Http\Controllers\FamilyNoteController;
 use App\Http\Controllers\NotificationInboxController;
+use App\Http\Controllers\Portal\CarePlanAttestationController;
 use App\Http\Controllers\Portal\ConsentRequestPortalController;
 use App\Http\Controllers\Portal\FamilyDashboardController;
 use App\Http\Controllers\Portal\PortalCalendarController;
@@ -79,6 +80,9 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.consent-requests.approve');
     Route::post('/portal/clients/{client}/consent-requests/{consentRequest}/decline', [ConsentRequestPortalController::class, 'decline'])
         ->name('portal.clients.consent-requests.decline');
+
+    Route::post('/portal/clients/{client}/care-plans/{carePlan}/attestations', [CarePlanAttestationController::class, 'store'])
+        ->name('portal.clients.care-plans.attestations.store');
 
     // Portal Calendar
     Route::get('/portal/clients/{client}/calendar', [PortalCalendarController::class, 'index'])

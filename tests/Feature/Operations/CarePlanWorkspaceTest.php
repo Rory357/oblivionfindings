@@ -225,7 +225,7 @@ it('binds care plan funding agreements to the plan client', function () {
         ->toBe($ownAgreement->id);
 });
 
-it('records and removes a sign-off', function () {
+it('records proxy information and preserves it when revoked', function () {
     $user = User::factory()->create();
     grantCpPerms($user, ['care_plans.update']);
     $client = makeCpClient($user);
@@ -242,12 +242,14 @@ it('records and removes a sign-off', function () {
     $signOff = CarePlanSignOff::query()->where('care_plan_id', $plan->id)->firstOrFail();
     expect($signOff->party_role)->toBe('whanau')
         ->and($signOff->party_name)->toBe('Hana Wineera')
-        ->and($signOff->recorded_by)->toBe($user->id);
+        ->and($signOff->recorded_by)->toBe($user->id)
+        ->and($signOff->attestation_state)->toBe('recorded_proxy')
+        ->and($signOff->gate_satisfying)->toBeFalse();
 
     $this->actingAs($user)
         ->delete("/operations/care-plans/{$plan->id}/sign-offs/{$signOff->id}")
         ->assertRedirect();
-    expect(CarePlanSignOff::query()->find($signOff->id))->toBeNull();
+    expect(CarePlanSignOff::query()->find($signOff->id)?->revoked_at)->not->toBeNull();
 });
 
 it('records repeated care plan sign-offs with each canonical sign-off as the timeline source', function () {
@@ -274,7 +276,7 @@ it('records repeated care plan sign-offs with each canonical sign-off as the tim
         ->orderBy('id')
         ->get();
     $events = TimelineEvent::query()
-        ->where('type', 'care_plan_signed_off')
+        ->where('type', 'care_plan_attestation_evidence_recorded')
         ->where('source_type', CarePlanSignOff::class)
         ->orderBy('source_id')
         ->get();

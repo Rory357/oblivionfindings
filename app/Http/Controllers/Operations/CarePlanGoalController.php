@@ -6,11 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\CarePlan;
 use App\Models\CarePlanGoal;
 use App\Models\ClientNote;
+use App\Services\Operations\CarePlanAttestationService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class CarePlanGoalController extends Controller
 {
+    public function __construct(
+        private readonly CarePlanAttestationService $attestations,
+    ) {}
+
     public function store(Request $request, $carePlan)
     {
         $auth = $request->user();
@@ -56,13 +61,14 @@ class CarePlanGoalController extends Controller
             ]);
         }
         $this->recalcProgress($goal);
+        $this->attestations->supersedeChangedVersion($carePlan);
 
         return redirect()->back()->with('success', 'Goal added.');
     }
 
     public function update(Request $request, $carePlan, $goal)
     {
-        [, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
+        [$carePlan, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
 
         $data = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:255'],
@@ -75,15 +81,17 @@ class CarePlanGoalController extends Controller
         ]);
 
         $goal->update($data);
+        $this->attestations->supersedeChangedVersion($carePlan);
 
         return redirect()->back()->with('success', 'Goal updated.');
     }
 
     public function destroy(Request $request, $carePlan, $goal)
     {
-        [, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
+        [$carePlan, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
 
         $goal->delete();
+        $this->attestations->supersedeChangedVersion($carePlan);
 
         return redirect()->back()->with('success', 'Goal removed.');
     }
@@ -144,7 +152,7 @@ class CarePlanGoalController extends Controller
 
     public function updateProgress(Request $request, $carePlan, $goal)
     {
-        [, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
+        [$carePlan, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
 
         $data = $request->validate([
             'progress_percentage' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -176,7 +184,7 @@ class CarePlanGoalController extends Controller
 
     public function storeStep(Request $request, $carePlan, $goal)
     {
-        [, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
+        [$carePlan, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -190,13 +198,14 @@ class CarePlanGoalController extends Controller
             'created_by' => $request->user()->id,
         ]);
         $this->recalcProgress($goal);
+        $this->attestations->supersedeChangedVersion($carePlan);
 
         return redirect()->back()->with('success', 'Sub-goal added.');
     }
 
     public function updateStep(Request $request, $carePlan, $goal, $step)
     {
-        [, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
+        [$carePlan, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
         $step = $goal->steps()->findOrFail($step);
 
         $data = $request->validate([
@@ -213,17 +222,19 @@ class CarePlanGoalController extends Controller
 
         $step->update($data);
         $this->recalcProgress($goal);
+        $this->attestations->supersedeChangedVersion($carePlan);
 
         return redirect()->back()->with('success', 'Sub-goal updated.');
     }
 
     public function destroyStep(Request $request, $carePlan, $goal, $step)
     {
-        [, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
+        [$carePlan, $goal] = $this->authorizeGoal($request, $carePlan, $goal);
         $step = $goal->steps()->findOrFail($step);
 
         $step->delete();
         $this->recalcProgress($goal);
+        $this->attestations->supersedeChangedVersion($carePlan);
 
         return redirect()->back()->with('success', 'Sub-goal removed.');
     }

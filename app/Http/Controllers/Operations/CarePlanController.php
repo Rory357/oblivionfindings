@@ -12,6 +12,7 @@ use App\Models\ClientOnboardingStep;
 use App\Models\ClientOnboardingWorkflow;
 use App\Models\ServiceAgreement;
 use App\Models\User;
+use App\Services\Operations\CarePlanAttestationService;
 use App\Services\Timeline\TimelineEmitter;
 use App\Services\UserSiteAccessService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -28,6 +29,7 @@ class CarePlanController extends Controller
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
+        private readonly CarePlanAttestationService $attestations,
     ) {}
 
     public function index(Request $request)
@@ -376,6 +378,7 @@ class CarePlanController extends Controller
         }
 
         $carePlan->update($data);
+        $this->attestations->supersedeChangedVersion($carePlan);
 
         return redirect("/operations/clients/{$carePlan->client_id}?tab=care_plans")
             ->with('success', 'Care plan updated.');
@@ -494,53 +497,11 @@ class CarePlanController extends Controller
             'review_notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        DB::transaction(function () use ($auth, $carePlan, $data): void {
-            $locked = CarePlan::query()
-                ->where('client_id', $carePlan->client_id)
-                ->lockForUpdate()
-                ->findOrFail($carePlan->id);
-            if ($locked->status !== 'review') {
-                throw ValidationException::withMessages([
-                    'status' => 'Only an in-progress review can be completed.',
-                ]);
-            }
-            if ($locked->goals()->count() === 0 && ! $this->hasStructuredDomains($locked->content ?? [])) {
-                throw ValidationException::withMessages([
-                    'goals' => 'Cannot activate a care plan without at least one goal or support domain. Please add goals or domains before completing the review.',
-                ]);
-            }
-            if (! $locked->signOffs()->exists()) {
-                throw ValidationException::withMessages([
-                    'sign_offs' => 'Record at least one new sign-off on this review before completing it.',
-                ]);
-            }
-
-            $rootId = $locked->parent_id ?? $locked->id;
-
-            CarePlan::query()
-                ->where('client_id', $locked->client_id)
-                ->where('id', '!=', $locked->id)
-                ->where(function ($query) use ($rootId) {
-                    $query->whereKey($rootId)->orWhere('parent_id', $rootId);
-                })
-                ->where('status', 'active')
-                ->update(['status' => 'archived']);
-
-            $content = $locked->content ?? [];
-            if (filled($data['review_notes'] ?? null)) {
-                data_set($content, 'review_context.review_notes', $data['review_notes']);
-            }
-            data_set($content, 'review_context.completed_at', now()->toISOString());
-            data_set($content, 'review_context.completed_by', $auth->id);
-
-            $locked->update([
-                'status' => 'active',
-                'reviewed_at' => now(),
-                'reviewed_by' => $auth->id,
-                'next_review_at' => $locked->next_review_at ?? now()->addMonths(3),
-                'content' => $content,
-            ]);
-        });
+        $this->attestations->completeReview(
+            $carePlan,
+            $auth,
+            $data['review_notes'] ?? null,
+        );
 
         return redirect("/operations/clients/{$carePlan->client_id}?tab=care_plans")
             ->with('success', 'Review completed. Plan is now active.');
@@ -572,46 +533,9 @@ class CarePlanController extends Controller
 
         $this->ensureMutableCarePlan($carePlan);
 
-        $data = $request->validate([
-            'party_role' => ['required', Rule::in(CarePlanSignOff::PARTY_ROLES)],
-            'party_name' => ['required', 'string', 'max:160'],
-            'relationship' => ['nullable', 'string', 'max:120'],
-            'agreed_on' => ['required', 'date'],
-            'method' => ['nullable', Rule::in(CarePlanSignOff::METHODS)],
-            'acknowledgement' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $data = $request->validate($this->attestations->validationRules());
 
-        DB::transaction(function () use ($auth, $carePlan, $data): void {
-            $signOff = $carePlan->signOffs()->create([
-                'party_role' => $data['party_role'],
-                'party_name' => $data['party_name'],
-                'relationship' => $data['relationship'] ?? null,
-                'agreed_on' => $data['agreed_on'],
-                'method' => $data['method'] ?? null,
-                'acknowledgement' => $data['acknowledgement'] ?? null,
-                'recorded_by' => $auth->id,
-            ]);
-
-            app(TimelineEmitter::class)->record([
-                'source_type' => CarePlanSignOff::class,
-                'source_id' => $signOff->id,
-                'occurred_at' => now(),
-                'type' => 'care_plan_signed_off',
-                'actor_user_id' => $auth->id,
-                'client_id' => $carePlan->client_id,
-                'site_id' => $carePlan->client?->site_id,
-                'subject' => 'Care plan agreed by '.$signOff->party_name,
-                'body' => null,
-                'meta' => array_filter([
-                    'care_plan_id' => $carePlan->id,
-                    'party_role' => $signOff->party_role,
-                    'method' => $signOff->method,
-                ]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $auth->id,
-            ]);
-        });
+        $this->attestations->record($carePlan, $auth, $data);
 
         return back()->with('success', 'Sign-off recorded.');
     }
@@ -626,13 +550,13 @@ class CarePlanController extends Controller
 
         $this->ensureMutableCarePlan($carePlan);
 
-        DB::transaction(function () use ($carePlan, $signOff): void {
-            $signOff = $carePlan->signOffs()->findOrFail($signOff);
-            app(TimelineEmitter::class)->retract($signOff);
-            $signOff->delete();
-        });
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
 
-        return back()->with('success', 'Sign-off removed.');
+        $this->attestations->revoke($carePlan, (int) $signOff, $auth, $data['reason'] ?? null);
+
+        return back()->with('success', 'Sign-off revoked.');
     }
 
     public function exportPdf(Request $request, $carePlan)
