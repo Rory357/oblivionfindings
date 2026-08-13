@@ -816,7 +816,8 @@ app(Schedule::class)
 app(Schedule::class)
     ->job(new EnforceDataRetentionJob)
     ->timezone('Pacific/Auckland')
-    ->dailyAt('03:00');
+    ->dailyAt('03:00')
+    ->withoutOverlapping();
 
 // Finance audit export retention: daily at 03:00, alongside privacy retention.
 app(Schedule::class)

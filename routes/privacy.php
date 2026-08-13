@@ -17,7 +17,6 @@ use Illuminate\Support\Facades\Route;
  * Handles privacy requests, retention policies, breach notifications,
  * and Privacy Act 2020 compliance workflows.
  */
-
 Route::middleware(['auth'])->group(function () {
     // Privacy document / evidence attachments (polymorphic across all privacy
     // domains). Per-type view/write permissions are enforced inside the
@@ -71,6 +70,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.retention.update');
         Route::get('/privacy/retention/review', [DataRetentionPolicyController::class, 'review'])
             ->name('privacy.retention.review');
+        Route::post('/privacy/retention/{policy}/preview', [DataRetentionPolicyController::class, 'preview'])
+            ->name('privacy.retention.preview');
+        Route::post('/privacy/retention/{policy}/approve', [DataRetentionPolicyController::class, 'approve'])
+            ->name('privacy.retention.approve');
     });
 
     // Data Deletion Logs

@@ -274,11 +274,11 @@ const ACTIONS: Record<PrivacyActionKind, ActionConfig> = {
         ],
     },
     execute: {
-        title: 'Execute deletion',
-        blurb: 'Run this retention policy now. Matching records are soft-deleted and their personal fields permanently anonymised. This cannot be undone.',
+        title: 'Execute approved retention',
+        blurb: 'Run the independently approved preview now. The same legal holds, exemptions and native record-owner contract used by scheduled execution are applied again before every outcome.',
         icon: Trash2,
         tone: 'critical',
-        confirm: 'Execute deletion',
+        confirm: 'Execute approved retention',
         method: 'post',
         path: () => '/privacy/deletion/execute',
         extraInitial: (id) => ({ policy_id: id }),
@@ -286,7 +286,7 @@ const ACTIONS: Record<PrivacyActionKind, ActionConfig> = {
             {
                 type: 'checkbox',
                 name: 'confirm',
-                label: 'I understand this permanently anonymises matching records and cannot be undone.',
+                label: 'I understand approved outcomes may permanently anonymise matching records and cannot be undone.',
                 required: true,
             },
         ],

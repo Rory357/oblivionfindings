@@ -68,7 +68,7 @@ const HEADERS: Record<
         icon: Lock,
         title: 'Retention policies',
         subtitle: 'Data lifecycle rules',
-        cols: ['Policy', 'Retention', 'Status', 'Next review'],
+        cols: ['Policy', 'Retention', 'Approval', 'Next review'],
     },
     dpia: {
         icon: ShieldCheck,
@@ -245,8 +245,14 @@ function renderRow(tab: string, r: WorklistRow): ReactNode {
                         clamp
                     />
                     <Pill
-                        tone={r.active ? 'success' : 'neutral'}
-                        label={r.active ? 'Active' : 'Inactive'}
+                        tone={
+                            r.execution_state === 'approved'
+                                ? 'success'
+                                : r.execution_state === 'previewed'
+                                  ? 'warning'
+                                  : 'neutral'
+                        }
+                        label={titleCase(r.execution_state ?? 'draft')}
                     />
                     <Td>
                         {r.next_review_at ? (

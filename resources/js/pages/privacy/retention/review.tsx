@@ -1,16 +1,27 @@
 import { PageHero, PageLayout } from '@/components/page';
+import { PrivacyActionModal } from '@/components/privacy/privacy-action-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { ClipboardCheck, Clock, Database } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    Check,
+    ClipboardCheck,
+    Clock,
+    Database,
+    Eye,
+    Trash2,
+} from 'lucide-react';
+import { useState } from 'react';
 
 type Props = {
     policies: any[];
 };
 
 export default function ReviewRetention({ policies }: Props) {
+    const [executePolicyId, setExecutePolicyId] = useState<number | null>(null);
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -67,12 +78,76 @@ export default function ReviewRetention({ policies }: Props) {
                                             {policy.retention_period_years} year
                                             retention
                                         </Badge>
+                                        <Badge variant="outline">
+                                            {policy.execution_state ===
+                                            'approved'
+                                                ? 'Approved'
+                                                : policy.execution_state ===
+                                                    'previewed'
+                                                  ? 'Awaiting independent approval'
+                                                  : 'Draft'}
+                                        </Badge>
                                     </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Data review functionality will be
-                                        implemented here. This will show records
-                                        approaching their retention period.
-                                    </p>
+                                    {policy.preview_snapshot && (
+                                        <p className="text-sm text-muted-foreground">
+                                            {
+                                                policy.preview_snapshot
+                                                    .eligible_count
+                                            }{' '}
+                                            eligible outcome(s) ·{' '}
+                                            {
+                                                policy.preview_snapshot
+                                                    .exempt_count
+                                            }{' '}
+                                            protected by legal hold or
+                                            active-case exemption
+                                        </p>
+                                    )}
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                router.post(
+                                                    `/privacy/retention/${policy.id}/preview`,
+                                                    {},
+                                                )
+                                            }
+                                        >
+                                            <Eye className="mr-2 h-4 w-4" />
+                                            Create preview
+                                        </Button>
+                                        {policy.execution_state ===
+                                            'previewed' && (
+                                            <Button
+                                                size="sm"
+                                                onClick={() =>
+                                                    router.post(
+                                                        `/privacy/retention/${policy.id}/approve`,
+                                                        {},
+                                                    )
+                                                }
+                                            >
+                                                <Check className="mr-2 h-4 w-4" />
+                                                Approve preview
+                                            </Button>
+                                        )}
+                                        {policy.execution_state ===
+                                            'approved' && (
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setExecutePolicyId(
+                                                        policy.id,
+                                                    )
+                                                }
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Execute approved retention
+                                            </Button>
+                                        )}
+                                    </div>
                                 </CardContent>
                             </Card>
                         ))
@@ -82,6 +157,14 @@ export default function ReviewRetention({ policies }: Props) {
                         </div>
                     )}
                 </div>
+                {executePolicyId !== null && (
+                    <PrivacyActionModal
+                        kind="execute"
+                        recordId={executePolicyId}
+                        open
+                        onClose={() => setExecutePolicyId(null)}
+                    />
+                )}
             </PageLayout>
         </AppLayout>
     );

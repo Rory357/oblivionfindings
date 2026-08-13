@@ -68,7 +68,7 @@ class PrivacyDashboardController extends Controller
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Hero                                                            */
+    /*  Hero */
     /* ---------------------------------------------------------------- */
 
     /** @return array<string, mixed> */
@@ -118,7 +118,7 @@ class PrivacyDashboardController extends Controller
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Worklist (per active tab)                                       */
+    /*  Worklist (per active tab) */
     /* ---------------------------------------------------------------- */
 
     private function worklist(string $tab, Request $request, ?Carbon $periodStart): LengthAwarePaginator
@@ -230,6 +230,8 @@ class PrivacyDashboardController extends Controller
                 'retention_period_years' => $p->retention_period_years,
                 'legal_basis' => $p->legal_basis,
                 'active' => (bool) $p->active,
+                'execution_state' => $p->execution_state ?? 'draft',
+                'preview_eligible_count' => (int) data_get($p->preview_snapshot, 'eligible_count', 0),
                 'next_review_at' => optional($p->next_review_at)->toDateString(),
                 'review_due' => $p->next_review_at !== null && $p->next_review_at->lte(now()),
             ]);
@@ -283,7 +285,7 @@ class PrivacyDashboardController extends Controller
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Detail (detail-as-modal — only when ?<kind>=<id> present)       */
+    /*  Detail (detail-as-modal — only when ?<kind>=<id> present) */
     /* ---------------------------------------------------------------- */
 
     /** @return array<string, mixed>|null */
@@ -495,7 +497,7 @@ class PrivacyDashboardController extends Controller
     }
 
     /* ---------------------------------------------------------------- */
-    /*  Helpers                                                         */
+    /*  Helpers */
     /* ---------------------------------------------------------------- */
 
     private function periodStart(string $period): ?Carbon
