@@ -122,9 +122,17 @@ class CustomFieldController extends Controller
     public function employeeFields(Request $request, HrEmployeeProfile $profile)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
+        abort_unless(
+            $user
+                && $user->canDo('hr.employees.viewAny')
+                && $user->canDo('hr.employees.viewRestricted'),
+            403,
+        );
         $profile = $this->siteAccess
-            ->applyHistoricalStaffProfileScope(HrEmployeeProfile::withTrashed(), $user)
+            ->applyHistoricalHrEmployeeProfileScope(
+                HrEmployeeProfile::withTrashed(),
+                $user,
+            )
             ->findOrFail($profile->getKey());
 
         $definitions = HrCustomFieldDefinition::query()
@@ -153,7 +161,10 @@ class CustomFieldController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
         $profile = $this->siteAccess
-            ->applyCurrentStaffProfileScope(HrEmployeeProfile::query(), $user)
+            ->applyCurrentHrEmployeeProfileScope(
+                HrEmployeeProfile::query(),
+                $user,
+            )
             ->findOrFail($profile->getKey());
 
         $validated = $request->validate([

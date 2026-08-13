@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -23,6 +24,12 @@ beforeEach(function () {
     ]);
     $this->viewer->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
+    ]);
+    $allSites = Permission::query()
+        ->where('key', 'hr.employees.viewAllSites')
+        ->firstOrFail();
+    $this->viewer->permissionOverrides()->syncWithoutDetaching([
+        $allSites->id => ['allowed' => false],
     ]);
     peopleReadProfile($this->viewer, $this->allowedSite, [
         'employee_number' => 'EMP-VIEWER',

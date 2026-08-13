@@ -275,7 +275,10 @@ class HrDocumentController extends Controller
     private function policySummary(User $viewer): array
     {
         $visibleStaffIds = $this->siteAccess
-            ->applyStaffScope(User::query()->select('users.id'), $viewer)
+            ->applyHrEmployeeStaffScope(
+                User::query()->select('users.id'),
+                $viewer,
+            )
             ->pluck('id');
         $activeEmployees = $visibleStaffIds->count();
 
@@ -1202,7 +1205,10 @@ class HrDocumentController extends Controller
             ->unique()
             ->values()
             ->all();
-        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds($viewer);
+        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
+            $viewer,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
         $allowedSiteIds = array_values(array_intersect($profileSiteIds, $accessibleSiteIds));
 
         $offer = HrOffer::query()
