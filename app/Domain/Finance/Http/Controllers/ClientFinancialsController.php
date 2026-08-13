@@ -4,9 +4,9 @@ namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Services\ClientFinancialSummaryService;
 use App\Domain\Finance\Services\ClientLedgerService;
+use App\Domain\Finance\Services\FinancialInsightsScopeResolver;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
-use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -16,16 +16,15 @@ class ClientFinancialsController extends Controller
     public function __construct(
         private readonly ClientFinancialSummaryService $summaryService,
         private readonly ClientLedgerService $ledgerService,
-        private readonly UserSiteAccessService $siteAccess,
+        private readonly FinancialInsightsScopeResolver $scopeResolver,
     ) {}
 
-    public function show(Request $request, Client $client)
+    public function show(Request $request, string $client)
     {
-        $this->siteAccess->assertCanAccessClientId(
-            $request->user(),
-            (int) $client->id,
-            ['reports.viewAny'],
-        );
+        abort_unless(ctype_digit($client) && (int) $client > 0, 404);
+        $scope = $this->scopeResolver->resolveClient($request->user(), (int) $client);
+        abort_if($scope->isDenied(), 404);
+        $client = Client::query()->findOrFail($scope->targetClientId());
 
         $to = $request->filled('to') ? Carbon::parse($request->query('to')) : Carbon::now();
         $from = $request->filled('from') ? Carbon::parse($request->query('from')) : $to->copy()->subMonth()->startOfMonth();

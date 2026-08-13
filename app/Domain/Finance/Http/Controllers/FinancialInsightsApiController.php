@@ -4,11 +4,11 @@ namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Services\ClientFinancialSummaryService;
 use App\Domain\Finance\Services\ClientLedgerService;
+use App\Domain\Finance\Services\FinancialInsightsScopeResolver;
 use App\Domain\Finance\Services\FinancialInsightsService;
 use App\Domain\Finance\Services\FinancialKPIService;
 use App\Domain\Finance\Services\SiteFinancialDashboardService;
 use App\Http\Controllers\Controller;
-use App\Services\UserSiteAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -27,7 +27,7 @@ class FinancialInsightsApiController extends Controller
         private readonly ClientLedgerService $ledgerService,
         private readonly FinancialKPIService $kpiService,
         private readonly FinancialInsightsService $insightsService,
-        private readonly UserSiteAccessService $siteAccess,
+        private readonly FinancialInsightsScopeResolver $scopeResolver,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -41,9 +41,11 @@ class FinancialInsightsApiController extends Controller
      */
     public function siteFinancialSummary(Request $request, int $site): JsonResponse
     {
+        $scope = $this->scopeResolver->resolveSite($request->user(), $site);
+        abort_if($scope->isDenied(), 404);
         [$from, $to] = $this->parsePeriod($request);
 
-        $data = $this->siteDashboardService->getDashboard($site, $from, $to);
+        $data = $this->siteDashboardService->getDashboard($scope->targetSiteId(), $from, $to);
 
         return response()->json($data);
     }
@@ -55,10 +57,11 @@ class FinancialInsightsApiController extends Controller
      */
     public function sitesOverview(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
         [$from, $to] = $this->parsePeriod($request);
 
-        $data = $this->siteDashboardService->getSiteSummaries($tenantId, $from, $to);
+        $data = $this->siteDashboardService->getSiteSummaries($scope->siteIds, $from, $to);
 
         return response()->json($data);
     }
@@ -74,14 +77,11 @@ class FinancialInsightsApiController extends Controller
      */
     public function clientFinancialSummary(Request $request, int $client): JsonResponse
     {
-        $this->siteAccess->assertCanAccessClientId(
-            $request->user(),
-            $client,
-            ['reports.viewAny'],
-        );
+        $scope = $this->scopeResolver->resolveClient($request->user(), $client);
+        abort_if($scope->isDenied(), 404);
         [$from, $to] = $this->parsePeriod($request);
 
-        $data = $this->clientSummaryService->getSummary($client, $from, $to);
+        $data = $this->clientSummaryService->getSummary($scope->targetClientId(), $from, $to);
 
         return response()->json($data);
     }
@@ -93,15 +93,17 @@ class FinancialInsightsApiController extends Controller
      */
     public function clientLedger(Request $request, int $client): JsonResponse
     {
-        $this->siteAccess->assertCanAccessClientId(
-            $request->user(),
-            $client,
-            ['reports.viewAny'],
-        );
+        $scope = $this->scopeResolver->resolveClient($request->user(), $client);
+        abort_if($scope->isDenied(), 404);
         [$from, $to] = $this->parsePeriod($request);
         $withBalance = $request->boolean('balance', false);
 
-        $data = $this->ledgerService->getLedger($client, $from, $to, withRunningBalance: $withBalance);
+        $data = $this->ledgerService->getLedger(
+            $scope->targetClientId(),
+            $from,
+            $to,
+            withRunningBalance: $withBalance,
+        );
 
         return response()->json($data);
     }
@@ -117,10 +119,11 @@ class FinancialInsightsApiController extends Controller
      */
     public function kpis(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
         [$from, $to] = $this->parsePeriod($request);
 
-        $data = $this->kpiService->getAll($tenantId, $from, $to);
+        $data = $this->kpiService->getAll($scope->siteIds, $scope->clientIds, $from, $to);
 
         return response()->json($data);
     }
@@ -132,10 +135,11 @@ class FinancialInsightsApiController extends Controller
      */
     public function siteKpis(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
         [$from, $to] = $this->parsePeriod($request);
 
-        $data = $this->kpiService->siteKPIs($tenantId, $from, $to);
+        $data = $this->kpiService->siteKPIs($scope->siteIds, $from, $to);
 
         return response()->json($data);
     }
@@ -147,10 +151,11 @@ class FinancialInsightsApiController extends Controller
      */
     public function clientKpis(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
         [$from, $to] = $this->parsePeriod($request);
 
-        $data = $this->kpiService->clientKPIs($tenantId, $from, $to);
+        $data = $this->kpiService->clientKPIs($scope->clientIds, $from, $to);
 
         return response()->json($data);
     }
@@ -166,9 +171,10 @@ class FinancialInsightsApiController extends Controller
      */
     public function insights(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
 
-        $data = $this->insightsService->generate($tenantId);
+        $data = $this->insightsService->generate($scope->siteIds, $scope->clientIds);
 
         return response()->json([
             'insights' => $data,

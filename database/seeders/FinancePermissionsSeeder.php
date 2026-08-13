@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Role;
 use App\Models\Permission;
+use App\Models\Role;
+use Illuminate\Database\Seeder;
 
 class FinancePermissionsSeeder extends Seeder
 {
@@ -12,12 +12,13 @@ class FinancePermissionsSeeder extends Seeder
     {
         /*
         |--------------------------------------------------------------------------
-        | 1. Create all 17 finance permissions
+        | 1. Create all finance permissions
         |--------------------------------------------------------------------------
         */
         $permissionDefinitions = [
             // Dashboard
             ['key' => 'finance.dashboard', 'description' => 'View the finance dashboard'],
+            ['key' => 'finance.insights.viewAllSites', 'description' => 'View Financial Insights across all active Sites'],
 
             // General Ledger
             ['key' => 'finance.ledger.view', 'description' => 'View chart of accounts, journals, and ledger entries'],
@@ -76,6 +77,7 @@ class FinancePermissionsSeeder extends Seeder
         */
         $viewOnlyKeys = [
             'finance.dashboard',
+            'finance.insights.viewAllSites',
             'finance.ledger.view',
             'finance.ap.view',
             'finance.ar.view',

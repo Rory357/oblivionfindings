@@ -2,9 +2,10 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Models\SiteBudgetLine;
 use App\Domain\Finance\Services\BudgetVarianceService;
 use App\Domain\Finance\Services\FinancialForecastService;
-use App\Domain\Finance\Models\SiteBudgetLine;
+use App\Domain\Finance\Services\FinancialInsightsScopeResolver;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,10 +21,11 @@ class BudgetForecastApiController extends Controller
     public function __construct(
         private readonly BudgetVarianceService $varianceService,
         private readonly FinancialForecastService $forecastService,
+        private readonly FinancialInsightsScopeResolver $scopeResolver,
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Budget Endpoints                                                   */
+    /*  Budget Endpoints */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -33,10 +35,11 @@ class BudgetForecastApiController extends Controller
      */
     public function budgetOverview(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
         [$fromPeriod, $toPeriod] = $this->parsePeriodRange($request);
 
-        $data = $this->varianceService->organisationVariance($tenantId, $fromPeriod, $toPeriod);
+        $data = $this->varianceService->organisationVariance($scope->siteIds, $fromPeriod, $toPeriod);
 
         return response()->json($data);
     }
@@ -48,9 +51,12 @@ class BudgetForecastApiController extends Controller
      */
     public function siteBudget(Request $request, int $site): JsonResponse
     {
+        $scope = $this->scopeResolver->resolveSite($request->user(), $site);
+        abort_if($scope->isDenied(), 404);
         [$fromPeriod, $toPeriod] = $this->parsePeriodRange($request);
 
-        $lines = SiteBudgetLine::forSite($site)
+        $siteId = $scope->targetSiteId();
+        $lines = SiteBudgetLine::forSite($siteId)
             ->forPeriodRange($fromPeriod, $toPeriod)
             ->orderBy('period')
             ->orderBy('category')
@@ -66,7 +72,7 @@ class BudgetForecastApiController extends Controller
             ]);
 
         return response()->json([
-            'site_id' => $site,
+            'site_id' => $siteId,
             'period_from' => $fromPeriod,
             'period_to' => $toPeriod,
             'lines' => $lines,
@@ -75,7 +81,7 @@ class BudgetForecastApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Variance Endpoints                                                 */
+    /*  Variance Endpoints */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -85,10 +91,11 @@ class BudgetForecastApiController extends Controller
      */
     public function organisationVariance(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
         [$fromPeriod, $toPeriod] = $this->parsePeriodRange($request);
 
-        $data = $this->varianceService->organisationVariance($tenantId, $fromPeriod, $toPeriod);
+        $data = $this->varianceService->organisationVariance($scope->siteIds, $fromPeriod, $toPeriod);
 
         return response()->json($data);
     }
@@ -100,9 +107,11 @@ class BudgetForecastApiController extends Controller
      */
     public function siteVariance(Request $request, int $site): JsonResponse
     {
+        $scope = $this->scopeResolver->resolveSite($request->user(), $site);
+        abort_if($scope->isDenied(), 404);
         [$fromPeriod, $toPeriod] = $this->parsePeriodRange($request);
 
-        $data = $this->varianceService->siteVariance($site, $fromPeriod, $toPeriod);
+        $data = $this->varianceService->siteVariance($scope->targetSiteId(), $fromPeriod, $toPeriod);
 
         return response()->json($data);
     }
@@ -114,12 +123,15 @@ class BudgetForecastApiController extends Controller
      */
     public function siteVarianceTrend(Request $request, int $site): JsonResponse
     {
+        $scope = $this->scopeResolver->resolveSite($request->user(), $site);
+        abort_if($scope->isDenied(), 404);
         [$fromPeriod, $toPeriod] = $this->parsePeriodRange($request);
 
-        $data = $this->varianceService->monthlyTrend($site, $fromPeriod, $toPeriod);
+        $siteId = $scope->targetSiteId();
+        $data = $this->varianceService->monthlyTrend($siteId, $fromPeriod, $toPeriod);
 
         return response()->json([
-            'site_id' => $site,
+            'site_id' => $siteId,
             'period_from' => $fromPeriod,
             'period_to' => $toPeriod,
             'months' => $data,
@@ -127,7 +139,7 @@ class BudgetForecastApiController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Forecast Endpoints                                                 */
+    /*  Forecast Endpoints */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -137,11 +149,12 @@ class BudgetForecastApiController extends Controller
      */
     public function organisationForecast(Request $request): JsonResponse
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
         $months = min((int) $request->query('months', 6), 12);
         $growth = min((float) $request->query('growth', 0), 0.5);
 
-        $data = $this->forecastService->organisationForecast($tenantId, $months, $growth);
+        $data = $this->forecastService->organisationForecast($scope->siteIds, $months, $growth);
 
         return response()->json($data);
     }
@@ -153,16 +166,22 @@ class BudgetForecastApiController extends Controller
      */
     public function siteForecast(Request $request, int $site): JsonResponse
     {
+        $scope = $this->scopeResolver->resolveSite($request->user(), $site);
+        abort_if($scope->isDenied(), 404);
         $months = min((int) $request->query('months', 6), 12);
         $growth = min((float) $request->query('growth', 0), 0.5);
 
-        $data = $this->forecastService->siteForecast($site, $months, growthFactor: $growth);
+        $data = $this->forecastService->siteForecast(
+            $scope->targetSiteId(),
+            $months,
+            growthFactor: $growth,
+        );
 
         return response()->json($data);
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Helpers                                                            */
+    /*  Helpers */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -180,7 +199,7 @@ class BudgetForecastApiController extends Controller
 
         $fromPeriod = $request->filled('from')
             ? $request->query('from')
-            : Carbon::parse($toPeriod . '-01')->format('Y-m'); // Same month if not specified
+            : Carbon::parse($toPeriod.'-01')->format('Y-m'); // Same month if not specified
 
         return [$fromPeriod, $toPeriod];
     }

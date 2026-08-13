@@ -6,6 +6,7 @@ use App\Domain\Finance\Models\FinCostAllocation;
 use App\Domain\Finance\Models\SiteBudgetLine;
 use App\Models\Site;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -112,13 +113,15 @@ class BudgetVarianceService
     /**
      * Variance across all sites for a period (organisation level).
      */
-    public function organisationVariance(?int $tenantId, string $fromPeriod, string $toPeriod): array
+    public function organisationVariance(?array $siteIds, string $fromPeriod, string $toPeriod): array
     {
-        $query = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $query->forTenant($tenantId);
-        }
-        $sites = $query->get();
+        $sites = Site::query()
+            ->when($siteIds !== null, fn ($query) => $query->whereIn('id', $siteIds))
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('type', ['house', 'facility'])
+            ->get();
 
         $siteResults = [];
         $orgTotalPlanned = '0';
@@ -166,8 +169,8 @@ class BudgetVarianceService
     public function monthlyTrend(int $siteId, string $fromPeriod, string $toPeriod): array
     {
         $months = [];
-        $current = Carbon::parse($fromPeriod . '-01');
-        $end = Carbon::parse($toPeriod . '-01');
+        $current = Carbon::parse($fromPeriod.'-01');
+        $end = Carbon::parse($toPeriod.'-01');
 
         while ($current->lte($end)) {
             $period = $current->format('Y-m');
@@ -181,7 +184,7 @@ class BudgetVarianceService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Private                                                            */
+    /*  Private */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -189,12 +192,12 @@ class BudgetVarianceService
      *
      * Maps event_types to budget categories using SiteBudgetLine::CATEGORY_EVENT_TYPES.
      *
-     * @return \Illuminate\Support\Collection<string, string> category → total amount
+     * @return Collection<string, string> category → total amount
      */
-    private function getActualsByCategory(int $siteId, string $fromPeriod, string $toPeriod): \Illuminate\Support\Collection
+    private function getActualsByCategory(int $siteId, string $fromPeriod, string $toPeriod): Collection
     {
-        $from = Carbon::parse($fromPeriod . '-01')->startOfMonth();
-        $to = Carbon::parse($toPeriod . '-01')->endOfMonth();
+        $from = Carbon::parse($fromPeriod.'-01')->startOfMonth();
+        $to = Carbon::parse($toPeriod.'-01')->endOfMonth();
 
         $rawActuals = FinCostAllocation::forSite($siteId)
             ->forPeriod($from, $to)

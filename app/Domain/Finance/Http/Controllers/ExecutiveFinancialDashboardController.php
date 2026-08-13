@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Services\FinancialInsightsScopeResolver;
 use App\Domain\Finance\Services\FinancialInsightsService;
 use App\Domain\Finance\Services\FinancialKPIService;
 use App\Domain\Finance\Services\SiteFinancialDashboardService;
@@ -16,17 +17,19 @@ class ExecutiveFinancialDashboardController extends Controller
         private readonly FinancialKPIService $kpiService,
         private readonly FinancialInsightsService $insightsService,
         private readonly SiteFinancialDashboardService $siteDashboardService,
+        private readonly FinancialInsightsScopeResolver $scopeResolver,
     ) {}
 
     public function index(Request $request)
     {
-        $tenantId = $request->user()->organization_id ?? null;
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
         $to = $request->filled('to') ? Carbon::parse($request->query('to')) : Carbon::now();
         $from = $request->filled('from') ? Carbon::parse($request->query('from')) : $to->copy()->subMonth()->startOfMonth();
 
-        $kpis = $this->kpiService->getAll($tenantId, $from, $to);
-        $insights = $this->insightsService->generate($tenantId);
-        $siteSummaries = $this->siteDashboardService->getSiteSummaries($tenantId, $from, $to);
+        $kpis = $this->kpiService->getAll($scope->siteIds, $scope->clientIds, $from, $to);
+        $insights = $this->insightsService->generate($scope->siteIds, $scope->clientIds);
+        $siteSummaries = $this->siteDashboardService->getSiteSummaries($scope->siteIds, $from, $to);
 
         return Inertia::render('finance/executive-dashboard/Index', [
             'kpis' => $kpis,

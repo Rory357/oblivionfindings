@@ -3,10 +3,10 @@
 namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Services\BudgetVarianceService;
+use App\Domain\Finance\Services\FinancialInsightsScopeResolver;
 use App\Domain\Finance\Services\SiteCostService;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
-use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -16,7 +16,7 @@ class SitesFinancialOverviewController extends Controller
     public function __construct(
         private readonly SiteCostService $siteCostService,
         private readonly BudgetVarianceService $varianceService,
-        private readonly UserSiteAccessService $siteAccess,
+        private readonly FinancialInsightsScopeResolver $scopeResolver,
     ) {}
 
     public function index(Request $request)
@@ -37,15 +37,14 @@ class SitesFinancialOverviewController extends Controller
             [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
         }
 
-        $user = $request->user();
-        $sites = $this->siteAccess->applySiteScope(
-            Site::query()
-                ->active()
-                ->notArchived()
-                ->whereIn('type', ['house', 'residential', 'facility']),
-            $user,
-            ['reports.viewAny'],
-        )
+        $scope = $this->scopeResolver->resolveAggregate($request->user());
+        abort_if($scope->isDenied(), 403);
+        $sites = Site::query()
+            ->whereIn('id', $scope->siteIds)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('type', ['house', 'residential', 'facility'])
             ->orderBy('name')
             ->get(['id', 'name', 'type', 'region']);
 

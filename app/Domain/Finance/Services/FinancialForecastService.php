@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 class FinancialForecastService
 {
     private const DEFAULT_LOOKBACK_MONTHS = 3;
+
     private const DEFAULT_FORECAST_MONTHS = 6;
 
     public function __construct(
@@ -126,15 +127,17 @@ class FinancialForecastService
      * Organisation-level forecast: all sites combined.
      */
     public function organisationForecast(
-        ?int $tenantId,
+        array $siteIds,
         int $forecastMonths = self::DEFAULT_FORECAST_MONTHS,
         float $growthFactor = 0.0,
     ): array {
-        $query = Site::query()->active()->whereIn('type', ['house', 'facility']);
-        if ($tenantId) {
-            $query->forTenant($tenantId);
-        }
-        $sites = $query->get();
+        $sites = Site::query()
+            ->whereIn('id', $siteIds)
+            ->active()
+            ->notArchived()
+            ->whereNull('archived_at')
+            ->whereIn('type', ['house', 'facility'])
+            ->get();
 
         $siteForecasts = [];
         $orgMonthlyTotals = [];
@@ -170,7 +173,7 @@ class FinancialForecastService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Private: History + Averages                                        */
+    /*  Private: History + Averages */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -239,7 +242,7 @@ class FinancialForecastService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Private: Forecast Logic                                            */
+    /*  Private: Forecast Logic */
     /* ------------------------------------------------------------------ */
 
     /**

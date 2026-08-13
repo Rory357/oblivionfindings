@@ -97,11 +97,13 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // Site Financial Dashboard
     Route::get('/sites/{site}/financial-dashboard', [SiteFinancialDashboardController::class, 'show'])
         ->name('sites.financial-dashboard')
+        ->whereNumber('site')
         ->middleware('permission:finance.dashboard');
 
     // Client Financials
     Route::get('/clients/{client}/financials', [ClientFinancialsController::class, 'show'])
         ->name('clients.financials')
+        ->whereNumber('client')
         ->middleware('permission:finance.dashboard');
 
     // ── CSV list exports (C3d) ───────────────────────────────────────────
@@ -757,13 +759,16 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::get('/sites/overview', [FinancialInsightsApiController::class, 'sitesOverview'])
             ->name('sites.overview');
         Route::get('/sites/{site}/financial-summary', [FinancialInsightsApiController::class, 'siteFinancialSummary'])
-            ->name('sites.financial-summary');
+            ->name('sites.financial-summary')
+            ->whereNumber('site');
 
         // Client financial data
         Route::get('/clients/{client}/financial-summary', [FinancialInsightsApiController::class, 'clientFinancialSummary'])
-            ->name('clients.financial-summary');
+            ->name('clients.financial-summary')
+            ->whereNumber('client');
         Route::get('/clients/{client}/ledger', [FinancialInsightsApiController::class, 'clientLedger'])
-            ->name('clients.ledger');
+            ->name('clients.ledger')
+            ->whereNumber('client');
 
         // KPIs
         Route::get('/kpis', [FinancialInsightsApiController::class, 'kpis'])->name('kpis');
@@ -775,15 +780,23 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
 
         // Budgets
         Route::get('/budgets', [BudgetForecastApiController::class, 'budgetOverview'])->name('budgets');
-        Route::get('/sites/{site}/budget', [BudgetForecastApiController::class, 'siteBudget'])->name('sites.budget');
+        Route::get('/sites/{site}/budget', [BudgetForecastApiController::class, 'siteBudget'])
+            ->name('sites.budget')
+            ->whereNumber('site');
 
         // Variance
         Route::get('/variance', [BudgetForecastApiController::class, 'organisationVariance'])->name('variance');
-        Route::get('/sites/{site}/variance', [BudgetForecastApiController::class, 'siteVariance'])->name('sites.variance');
-        Route::get('/sites/{site}/variance/trend', [BudgetForecastApiController::class, 'siteVarianceTrend'])->name('sites.variance.trend');
+        Route::get('/sites/{site}/variance', [BudgetForecastApiController::class, 'siteVariance'])
+            ->name('sites.variance')
+            ->whereNumber('site');
+        Route::get('/sites/{site}/variance/trend', [BudgetForecastApiController::class, 'siteVarianceTrend'])
+            ->name('sites.variance.trend')
+            ->whereNumber('site');
 
         // Forecast
         Route::get('/forecast', [BudgetForecastApiController::class, 'organisationForecast'])->name('forecast');
-        Route::get('/sites/{site}/forecast', [BudgetForecastApiController::class, 'siteForecast'])->name('sites.forecast');
+        Route::get('/sites/{site}/forecast', [BudgetForecastApiController::class, 'siteForecast'])
+            ->name('sites.forecast')
+            ->whereNumber('site');
     });
 });
