@@ -5,8 +5,12 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device as CanonicalDevice;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoom\Signal;
+use App\Models\ControlRoomAlert;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
@@ -70,6 +74,20 @@ class ControlRoomDeviceVisibilityTest extends TestCase
             'status' => 'offline',
             'battery_level' => 10,
         ]);
+        $hiddenCanonical = CanonicalDevice::factory()->security()->create();
+        DeviceAssignment::query()->create([
+            'device_id' => $hiddenCanonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $this->hiddenSite->id,
+            'assigned_at' => now()->subHour(),
+        ]);
+        $forgedProjection = ControlRoomDevice::query()->create([
+            'name' => 'Forged visible projection',
+            'type' => ControlRoomDevice::TYPE_SENSOR,
+            'site_id' => $this->visibleSite->id,
+            'canonical_device_id' => $hiddenCanonical->id,
+            'status' => 'online',
+        ]);
 
         $this->actingAs($this->operator)
             ->get('/control-room/devices')
@@ -91,7 +109,10 @@ class ControlRoomDeviceVisibilityTest extends TestCase
 
         $this->actingAs($this->operator)
             ->get("/control-room/devices/{$hidden->id}")
-            ->assertForbidden();
+            ->assertNotFound();
+        $this->actingAs($this->operator)
+            ->get("/control-room/devices/{$forgedProjection->id}")
+            ->assertNotFound();
     }
 
     public function test_linked_projection_uses_canonical_identity_and_never_exposes_raw_config_or_payload(): void
@@ -248,5 +269,107 @@ class ControlRoomDeviceVisibilityTest extends TestCase
                     json_encode($props, JSON_THROW_ON_ERROR),
                 );
             });
+    }
+
+    public function test_personal_tracker_projection_requires_exact_resident_location_consent(): void
+    {
+        $this->grant($this->operator, ['assets.telemetry.view', 'clients.viewAny']);
+        $client = Client::factory()->create([
+            'site_id' => $this->visibleSite->id,
+            'status' => 'active',
+        ]);
+        $consentType = ConsentType::factory()->create([
+            'name' => 'Fleet Tracking',
+            'active' => true,
+        ]);
+        $consent = ClientConsent::query()->create([
+            'client_id' => $client->id,
+            'consent_type_id' => $consentType->id,
+            'status' => 'given',
+            'given_at' => now()->subDay(),
+            'given_by_user_id' => $this->operator->id,
+            'given_method' => 'electronic',
+            'created_by' => $this->operator->id,
+            'updated_by' => $this->operator->id,
+        ]);
+        $canonical = CanonicalDevice::factory()->tracking()->create();
+        $collectionStartedAt = now()->subHour();
+        DeviceAssignment::query()->create([
+            'device_id' => $canonical->id,
+            'assignable_type' => DeviceAssignment::TARGET_CLIENT,
+            'assignable_id' => $client->id,
+            'assigned_at' => $collectionStartedAt,
+            'consent_id' => $consent->id,
+        ]);
+        $projection = ControlRoomDevice::query()->create([
+            'name' => 'Resident location projection',
+            'type' => ControlRoomDevice::TYPE_PERSONAL_TRACKER,
+            'site_id' => $this->visibleSite->id,
+            'client_id' => $client->id,
+            'canonical_device_id' => $canonical->id,
+            'status' => 'online',
+            'latitude' => -36.84,
+            'longitude' => 174.76,
+            'location_description' => 'Private resident location',
+        ]);
+        foreach ([now()->subHours(2), now()] as $occurredAt) {
+            Signal::query()->create([
+                'device_id' => $projection->id,
+                'site_id' => $this->visibleSite->id,
+                'signal_type_code' => 'resident.position',
+                'severity_hint' => 'info',
+                'occurred_at' => $occurredAt,
+                'status' => 'processed',
+                'payload' => [],
+                'normalized_data' => ['title' => 'Resident position'],
+            ]);
+            ControlRoomAlert::factory()->open()->create([
+                'device_id' => $projection->id,
+                'site_id' => $this->visibleSite->id,
+                'client_id' => $client->id,
+                'source' => 'resident_tracker',
+                'alert_type' => 'wandering',
+                'triggered_at' => $occurredAt,
+            ]);
+        }
+
+        $this->actingAs($this->operator)
+            ->get('/control-room/devices')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('devices.data', 0)
+                ->where('stats.signal_sources', 0));
+        $this->actingAs($this->operator)
+            ->get("/control-room/devices/{$projection->id}")
+            ->assertNotFound();
+
+        $consentType->update(['name' => 'Personal Tracker (Wandering Risk)']);
+
+        $this->actingAs($this->operator)
+            ->get('/control-room/devices')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('devices.data', 1)
+                ->where('devices.data.0.location_description', 'Private resident location'));
+        $this->actingAs($this->operator)
+            ->get("/control-room/devices/{$projection->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('device.latitude', -36.84)
+                ->where('device.longitude', 174.76)
+                ->has('signals', 1)
+                ->has('alerts', 1));
+    }
+
+    /** @param list<string> $keys */
+    private function grant(User $user, array $keys): void
+    {
+        $permissions = Permission::query()->whereIn('key', $keys)->get();
+        $this->assertCount(count($keys), $permissions);
+        $user->permissionOverrides()->syncWithoutDetaching(
+            $permissions->mapWithKeys(fn (Permission $permission): array => [
+                $permission->id => ['allowed' => true],
+            ]),
+        );
     }
 }

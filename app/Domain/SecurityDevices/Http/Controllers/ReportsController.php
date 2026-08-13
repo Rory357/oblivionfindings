@@ -41,11 +41,14 @@ class ReportsController extends Controller
         abort_unless($user && $user->canDo('securityDevices.reports.view'), 403);
 
         $visibleDeviceIds = $this->access->visibleDevices($user)->select('devices.id');
+        $visibleEvents = $this->access->applyTemporalEventCustodyScope(
+            DeviceEvent::query(),
+            $user,
+        );
 
         $stats = [
             'devices' => (clone $visibleDeviceIds)->count(),
-            'events_90d' => DeviceEvent::query()
-                ->whereIn('device_id', clone $visibleDeviceIds)
+            'events_90d' => $visibleEvents
                 ->where('occurred_at', '>=', now()->subDays(self::EVENTS_WINDOW_DAYS))
                 ->count(),
             'maintenance' => DeviceMaintenanceRecord::query()
@@ -124,10 +127,6 @@ class ReportsController extends Controller
             'event_type' => ['nullable', 'string', 'max:100'],
             'source' => ['nullable', 'string', 'max:100'],
         ]);
-        $visibleDeviceIds = $this->access->visibleDevices($user)
-            ->when($filters['domain'] ?? null, fn ($query, string $domain) => $query->where('domain', $domain))
-            ->when($filters['device_id'] ?? null, fn ($query, int $deviceId) => $query->whereKey($deviceId))
-            ->select('devices.id');
         $since = now()->subDays(self::EVENTS_WINDOW_DAYS);
         $filename = 'security-devices-events-'.self::EVENTS_WINDOW_DAYS.'d-'.now()->format('Y-m-d').'.csv';
 
@@ -142,8 +141,10 @@ class ReportsController extends Controller
             'processed_at',
         ];
 
-        $query = DeviceEvent::query()
-            ->whereIn('device_id', $visibleDeviceIds)
+        $query = $this->access->applyTemporalEventCustodyScope(DeviceEvent::query(), $user)
+            ->when($filters['domain'] ?? null, fn ($query, string $domain) => $query
+                ->whereHas('device', fn ($device) => $device->where('domain', $domain)))
+            ->when($filters['device_id'] ?? null, fn ($query, int $deviceId) => $query->where('device_id', $deviceId))
             ->where('occurred_at', '>=', $since)
             ->when($filters['severity'] ?? null, fn ($query, string $severity) => $query->where('severity', $severity))
             ->when($filters['event_type'] ?? null, fn ($query, string $eventType) => $query->where('event_type', $eventType))

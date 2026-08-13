@@ -258,8 +258,8 @@ class DeviceMutationAccessBoundaryTest extends TestCase
             Permission::query()->where('key', 'fleet.viewAny')->value('id') => ['allowed' => true],
         ]);
         $client = Client::factory()->create([
-
             'site_id' => $this->allowedSite->id,
+            'status' => 'active',
         ]);
         $staff = User::factory()->create();
         HrEmployeeProfile::factory()->create([
@@ -307,8 +307,8 @@ class DeviceMutationAccessBoundaryTest extends TestCase
     {
         $unrelatedSite = Site::factory()->create([]);
         $mismatchedClient = Client::factory()->create([
-
             'site_id' => $unrelatedSite->id,
+            'status' => 'active',
         ]);
         $vehicle = Asset::factory()->create([
             'category' => 'Vehicle',
@@ -349,8 +349,8 @@ class DeviceMutationAccessBoundaryTest extends TestCase
 
     public function test_vehicle_assignment_requires_canonical_site_or_client_site_evidence(): void
     {
-        $siteLessClient = Client::factory()->create(['site_id' => null]);
-        $siteClient = Client::factory()->create(['site_id' => $this->allowedSite->id]);
+        $siteLessClient = Client::factory()->create(['site_id' => null, 'status' => 'active']);
+        $siteClient = Client::factory()->create(['site_id' => $this->allowedSite->id, 'status' => 'active']);
         $vehicles = [
             Asset::factory()->create([
                 'category' => 'Vehicle', 'site_id' => null, 'home_site_id' => null, 'client_id' => $siteLessClient->id,

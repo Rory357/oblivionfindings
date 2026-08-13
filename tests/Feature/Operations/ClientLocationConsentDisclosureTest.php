@@ -102,7 +102,7 @@ function makeClientLocationConsentStaff(
 function clientLocationTrackingConsentType(): ConsentType
 {
     return ConsentType::query()->firstOrCreate(
-        ['name' => 'Asset Location Tracking (Safety)'],
+        ['name' => 'Personal Tracker (Wandering Risk)'],
         [
             'category' => 'safety',
             'description' => 'Consent to location monitoring of a personal tracker for safety.',

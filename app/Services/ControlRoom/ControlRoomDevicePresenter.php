@@ -12,7 +12,7 @@ use BackedEnum;
  */
 class ControlRoomDevicePresenter
 {
-    public function list(Device $projection): array
+    public function list(Device $projection, bool $includeLocation = true): array
     {
         $canonical = $this->canonical($projection);
 
@@ -27,7 +27,7 @@ class ControlRoomDevicePresenter
             'reported_battery_level' => $projection->battery_level,
             'last_signal_at' => $projection->last_signal_at?->toISOString(),
             'signal_activity' => $this->signalActivity($projection),
-            'location_description' => $projection->location_description,
+            'location_description' => $includeLocation ? $projection->location_description : null,
             'site_id' => $projection->site_id,
             'site_name' => $projection->site_name,
             'signal_source_name' => $projection->signalSource?->name,
@@ -44,7 +44,7 @@ class ControlRoomDevicePresenter
         ];
     }
 
-    public function detail(Device $projection): array
+    public function detail(Device $projection, bool $includeLocation = true): array
     {
         $canonical = $this->canonical($projection);
 
@@ -59,9 +59,9 @@ class ControlRoomDevicePresenter
             'reported_battery_level' => $projection->battery_level,
             'last_signal_at' => $projection->last_signal_at?->toISOString(),
             'signal_activity' => $this->signalActivity($projection),
-            'latitude' => $projection->latitude ? (float) $projection->latitude : null,
-            'longitude' => $projection->longitude ? (float) $projection->longitude : null,
-            'location_description' => $projection->location_description,
+            'latitude' => $includeLocation && $projection->latitude ? (float) $projection->latitude : null,
+            'longitude' => $includeLocation && $projection->longitude ? (float) $projection->longitude : null,
+            'location_description' => $includeLocation ? $projection->location_description : null,
             'identity_source' => $canonical ? 'canonical' : 'signal_projection',
             'canonical' => $canonical ? [
                 'id' => $canonical->id,

@@ -42,6 +42,7 @@ class DeviceAssignmentConsentEnforcementTest extends TestCase
         $this->client = Client::factory()->create([
             'organization_id' => 1,
             'site_id' => $site->id,
+            'status' => 'active',
         ]);
         $this->tracker = Device::factory()->tracking()->create();
     }

@@ -120,7 +120,7 @@ function makeClientLocationAssetStaff(
 function grantClientLocationAssetTrackingConsent(Client $client, User $actor): ClientConsent
 {
     $consentType = ConsentType::query()->firstOrCreate(
-        ['name' => 'Asset Location Tracking (Safety)'],
+        ['name' => 'Personal Tracker (Wandering Risk)'],
         [
             'category' => 'safety',
             'description' => 'Consent to location monitoring of a personal tracker for safety.',
@@ -283,6 +283,7 @@ it('separates telemetry visibility from tracker command management', function ()
         'assets.viewAny',
         'assets.telemetry.view',
         'assets.trackers.manage',
+        'securityDevices.devices.viewUnassigned',
     ]);
 
     $this->actingAs($manager)
@@ -354,6 +355,7 @@ it('uses the canonical client site and device assignment for tracking and picker
         'assets.viewAny',
         'assets.telemetry.view',
         'assets.trackers.manage',
+        'securityDevices.devices.viewUnassigned',
     ]);
 
     $client = Client::factory()->create([
@@ -473,6 +475,7 @@ it('enforces the canonical client site on asset writes and persists eligible lin
         'clients.viewAny',
         'clients.update',
         'assets.trackers.manage',
+        'securityDevices.devices.viewUnassigned',
     ]);
 
     $localRoom = makeClientLocationAssetRoom($localSite, 'Local Room');
@@ -616,6 +619,7 @@ it('replaces a personal asset tracker through canonical assignment history and c
         'clients.viewAny',
         'clients.update',
         'assets.trackers.manage',
+        'securityDevices.devices.viewUnassigned',
     ]);
     $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
     $consent = grantClientLocationAssetTrackingConsent($client, $user);

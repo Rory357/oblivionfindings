@@ -50,9 +50,10 @@ class TrackingWorkspaceCanonicalHistoryTest extends TestCase
         $client = Client::factory()->create([
             'site_id' => $site->id,
             'preferred_name' => 'Synthetic Client',
+            'status' => 'active',
         ]);
         $consentType = ConsentType::factory()->create([
-            'name' => 'Canonical location history consent',
+            'name' => 'Personal Tracker (Wandering Risk)',
             'purpose' => 'Client personal safety tracking',
             'active' => true,
         ]);

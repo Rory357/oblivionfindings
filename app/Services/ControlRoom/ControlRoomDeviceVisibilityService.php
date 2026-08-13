@@ -2,6 +2,8 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\Client;
@@ -21,18 +23,14 @@ use Illuminate\Database\Eloquent\Relations\Relation;
  */
 class ControlRoomDeviceVisibilityService
 {
-    /** @var list<string> */
-    private const SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
-
     public function __construct(
-        private readonly UserSiteAccessService $siteAccess,
         private readonly SecurityDevicesAccessService $deviceAccess,
     ) {}
 
     /** @return list<int> */
     public function accessibleSiteIds(User $user): array
     {
-        return $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
+        return $this->deviceAccess->accessibleSiteIds($user);
     }
 
     public function canViewCanonicalDevices(User $user): bool
@@ -69,17 +67,12 @@ class ControlRoomDeviceVisibilityService
             return $query->whereRaw('1 = 0');
         }
 
-        $clientIds = Client::query()->select('id')->whereIn('site_id', $siteIds);
-        $assetIds = Asset::query()
-            ->select('id')
-            ->where(function (Builder $assets) use ($siteIds): void {
-                $assets->whereIn('site_id', $siteIds)
-                    ->orWhereIn('home_site_id', $siteIds);
-            });
-        $canBypass = $this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS);
-        $visibleCanonicalIds = $this->canViewCanonicalDevices($user)
-            ? $this->deviceAccess->visibleDevices($user)->select('devices.id')
-            : null;
+        $clientIds = $this->deviceAccess->authorizedClientIds($user);
+        $assetIds = $this->deviceAccess->authorizedAssetIds($user);
+        $canBypass = $this->deviceAccess->canViewQuarantined($user);
+        // Canonical custody always constrains the projection, even when the
+        // actor cannot see canonical identity fields in the response.
+        $visibleCanonicalIds = $this->deviceAccess->visibleDevices($user)->select('devices.id');
 
         $query->where(function (Builder $visibility) use (
             $siteIds,
@@ -91,22 +84,20 @@ class ControlRoomDeviceVisibilityService
             $visibility->whereIn('control_room_devices.site_id', $siteIds)
                 ->orWhere(function (Builder $clientFallback) use ($clientIds): void {
                     $clientFallback->whereNull('control_room_devices.site_id')
-                        ->whereIn('control_room_devices.client_id', clone $clientIds);
+                        ->whereIn('control_room_devices.client_id', $clientIds);
                 })
                 ->orWhere(function (Builder $assetFallback) use ($assetIds): void {
                     $assetFallback->whereNull('control_room_devices.site_id')
                         ->whereNull('control_room_devices.client_id')
-                        ->whereIn('control_room_devices.asset_id', clone $assetIds);
+                        ->whereIn('control_room_devices.asset_id', $assetIds);
                 });
 
-            if ($visibleCanonicalIds !== null) {
-                $visibility->orWhere(function (Builder $canonicalFallback) use ($visibleCanonicalIds): void {
-                    $canonicalFallback->whereNull('control_room_devices.site_id')
-                        ->whereNull('control_room_devices.client_id')
-                        ->whereNull('control_room_devices.asset_id')
-                        ->whereIn('control_room_devices.canonical_device_id', clone $visibleCanonicalIds);
-                });
-            }
+            $visibility->orWhere(function (Builder $canonicalFallback) use ($visibleCanonicalIds): void {
+                $canonicalFallback->whereNull('control_room_devices.site_id')
+                    ->whereNull('control_room_devices.client_id')
+                    ->whereNull('control_room_devices.asset_id')
+                    ->whereIn('control_room_devices.canonical_device_id', clone $visibleCanonicalIds);
+            });
 
             if ($canBypass) {
                 $visibility->orWhere(function (Builder $unassigned): void {
@@ -122,18 +113,112 @@ class ControlRoomDeviceVisibilityService
         // explicitly inaccessible Client, Asset, or canonical Device link.
         $query->where(function (Builder $clients) use ($clientIds): void {
             $clients->whereNull('control_room_devices.client_id')
-                ->orWhereIn('control_room_devices.client_id', clone $clientIds);
+                ->orWhere(function (Builder $authoritative) use ($clientIds): void {
+                    $authoritative->whereIn('control_room_devices.client_id', $clientIds)
+                        ->whereExists(fn ($client) => $client
+                            ->selectRaw('1')
+                            ->from('clients')
+                            ->whereColumn('clients.id', 'control_room_devices.client_id')
+                            ->where('clients.status', 'active')
+                            ->whereNull('clients.deleted_at')
+                            ->where(function ($site): void {
+                                $site->whereNull('control_room_devices.site_id')
+                                    ->orWhereColumn('clients.site_id', 'control_room_devices.site_id');
+                            }));
+                });
         });
         $query->where(function (Builder $assets) use ($assetIds): void {
             $assets->whereNull('control_room_devices.asset_id')
-                ->orWhereIn('control_room_devices.asset_id', clone $assetIds);
+                ->orWhere(function (Builder $authoritative) use ($assetIds): void {
+                    $authoritative->whereIn('control_room_devices.asset_id', $assetIds)
+                        ->whereExists(fn ($asset) => $asset
+                            ->selectRaw('1')
+                            ->from('assets')
+                            ->whereColumn('assets.id', 'control_room_devices.asset_id')
+                            ->where('assets.status', 'active')
+                            ->where(function ($site): void {
+                                $site->whereNull('control_room_devices.site_id')
+                                    ->orWhereColumn('assets.site_id', 'control_room_devices.site_id')
+                                    ->orWhere(function ($home): void {
+                                        $home->whereNull('assets.site_id')
+                                            ->whereColumn('assets.home_site_id', 'control_room_devices.site_id');
+                                    });
+                            }));
+                });
         });
-        if ($visibleCanonicalIds !== null) {
-            $query->where(function (Builder $canonical) use ($visibleCanonicalIds): void {
-                $canonical->whereNull('control_room_devices.canonical_device_id')
-                    ->orWhereIn('control_room_devices.canonical_device_id', clone $visibleCanonicalIds);
-            });
-        }
+        $query->where(function (Builder $canonical) use ($visibleCanonicalIds): void {
+            $canonical->whereNull('control_room_devices.canonical_device_id')
+                ->orWhereIn('control_room_devices.canonical_device_id', clone $visibleCanonicalIds);
+        });
+        $query->where(function (Builder $siteBinding): void {
+            $siteBinding->whereNull('control_room_devices.canonical_device_id')
+                ->orWhereNull('control_room_devices.site_id')
+                ->orWhereExists(fn ($assignment) => $assignment
+                    ->selectRaw('1')
+                    ->from('device_assignments')
+                    ->whereColumn('device_assignments.device_id', 'control_room_devices.canonical_device_id')
+                    ->whereColumn('device_assignments.custody_site_id', 'control_room_devices.site_id')
+                    ->where('device_assignments.assigned_at', '<=', now())
+                    ->whereNull('device_assignments.released_at'))
+                ->orWhereExists(fn ($assetLink) => $assetLink
+                    ->selectRaw('1')
+                    ->from('device_asset_links')
+                    ->join('assets', 'assets.id', '=', 'device_asset_links.asset_id')
+                    ->whereColumn('device_asset_links.device_id', 'control_room_devices.canonical_device_id')
+                    ->whereColumn('device_asset_links.asset_id', 'control_room_devices.asset_id')
+                    ->whereNull('device_asset_links.unlinked_at')
+                    ->where('assets.status', 'active')
+                    ->where(function ($site): void {
+                        $site->whereColumn('assets.site_id', 'control_room_devices.site_id')
+                            ->orWhere(function ($home): void {
+                                $home->whereNull('assets.site_id')
+                                    ->whereColumn('assets.home_site_id', 'control_room_devices.site_id');
+                            });
+                    }));
+        });
+        $query->where(function (Builder $clientBinding): void {
+            $clientBinding->whereNull('control_room_devices.canonical_device_id')
+                ->orWhereNull('control_room_devices.client_id')
+                ->orWhereExists(fn ($assignment) => $assignment
+                    ->selectRaw('1')
+                    ->from('device_assignments')
+                    ->whereColumn('device_assignments.device_id', 'control_room_devices.canonical_device_id')
+                    ->whereColumn('device_assignments.assignable_id', 'control_room_devices.client_id')
+                    ->where('device_assignments.assignable_type', 'client')
+                    ->where('device_assignments.assigned_at', '<=', now())
+                    ->whereNull('device_assignments.released_at'))
+                ->orWhereExists(fn ($assetLink) => $assetLink
+                    ->selectRaw('1')
+                    ->from('device_asset_links')
+                    ->join('assets', 'assets.id', '=', 'device_asset_links.asset_id')
+                    ->whereColumn('device_asset_links.device_id', 'control_room_devices.canonical_device_id')
+                    ->whereColumn('device_asset_links.asset_id', 'control_room_devices.asset_id')
+                    ->whereColumn('assets.client_id', 'control_room_devices.client_id')
+                    ->whereNull('device_asset_links.unlinked_at')
+                    ->where('assets.status', 'active'));
+        });
+        $query->where(function (Builder $assetBinding): void {
+            $assetBinding->whereNull('control_room_devices.canonical_device_id')
+                ->orWhereNull('control_room_devices.asset_id')
+                ->orWhere(function (Builder $linked): void {
+                    $linked->whereExists(fn ($assignment) => $assignment
+                        ->selectRaw('1')
+                        ->from('device_assignments')
+                        ->whereColumn('device_assignments.device_id', 'control_room_devices.canonical_device_id')
+                        ->whereColumn('device_assignments.assignable_id', 'control_room_devices.asset_id')
+                        ->where('device_assignments.assignable_type', 'vehicle')
+                        ->where('device_assignments.assigned_at', '<=', now())
+                        ->whereNull('device_assignments.released_at'))
+                        ->orWhereExists(fn ($assetLink) => $assetLink
+                            ->selectRaw('1')
+                            ->from('device_asset_links')
+                            ->whereColumn('device_asset_links.device_id', 'control_room_devices.canonical_device_id')
+                            ->whereColumn('device_asset_links.asset_id', 'control_room_devices.asset_id')
+                            ->whereNull('device_asset_links.unlinked_at'));
+                });
+        });
+
+        $this->applyPersonalTrackingAuthorityScope($query, $user, $clientIds);
 
         return $query;
     }
@@ -143,7 +228,7 @@ class ControlRoomDeviceVisibilityService
         $query = Device::query()->whereKey($device->getKey());
         $this->applyScope($query, $user);
 
-        abort_unless($query->exists(), 403, UserSiteAccessService::DEFAULT_MESSAGE);
+        abort_unless($query->exists(), 404);
     }
 
     public function assertCanFilterSite(User $user, int $siteId): void
@@ -173,10 +258,7 @@ class ControlRoomDeviceVisibilityService
             return null;
         }
 
-        return Client::query()
-            ->whereKey($clientId)
-            ->whereIn('site_id', $this->accessibleSiteIds($user))
-            ->first(['id', 'first_name', 'last_name']);
+        return $this->deviceAccess->assignableClient($user, $clientId);
     }
 
     public function visibleAsset(User $user, ?int $assetId): ?Asset
@@ -185,14 +267,115 @@ class ControlRoomDeviceVisibilityService
             return null;
         }
 
-        $siteIds = $this->accessibleSiteIds($user);
+        return $this->deviceAccess->assignableAsset($user, $assetId);
+    }
 
-        return Asset::query()
-            ->whereKey($assetId)
-            ->where(function (Builder $assets) use ($siteIds): void {
-                $assets->whereIn('site_id', $siteIds)
-                    ->orWhereIn('home_site_id', $siteIds);
-            })
-            ->first(['id', 'name', 'asset_tag']);
+    public function canViewPersonalLocation(User $user, Device $projection): bool
+    {
+        $canonical = $projection->canonicalDevice;
+        $isPersonalTracker = $projection->type === Device::TYPE_PERSONAL_TRACKER
+            || ($canonical && $canonical->domain === 'tracking' && $projection->client_id !== null);
+        if (! $isPersonalTracker) {
+            return true;
+        }
+
+        if (! $user->canDo('assets.telemetry.view')) {
+            return false;
+        }
+
+        if (! $canonical || ! $projection->client_id) {
+            return false;
+        }
+
+        $client = $this->deviceAccess->assignableClient($user, (int) $projection->client_id);
+        if (! $client) {
+            return false;
+        }
+
+        $assignment = app(PersonalTrackingPrivacyService::class)
+            ->authorisedClientAssignment($client);
+
+        return $assignment
+            && (int) $assignment->device_id === (int) $canonical->id
+            && $this->deviceAccess->canAccessCurrentAssignment($user, $assignment);
+    }
+
+    /** @param list<int> $authorisedClientIds */
+    private function applyPersonalTrackingAuthorityScope(
+        Builder $query,
+        User $user,
+        array $authorisedClientIds,
+    ): void {
+        $query->where(function (Builder $privacy) use ($user, $authorisedClientIds): void {
+            $privacy->where(function (Builder $ordinary): void {
+                $ordinary->where('control_room_devices.type', '!=', Device::TYPE_PERSONAL_TRACKER)
+                    ->where(function (Builder $notCanonicalPersonal): void {
+                        $notCanonicalPersonal->whereNull('control_room_devices.client_id')
+                            ->orWhereNull('control_room_devices.canonical_device_id')
+                            ->orWhereNotExists(fn ($canonical) => $canonical
+                                ->selectRaw('1')
+                                ->from('devices')
+                                ->whereColumn('devices.id', 'control_room_devices.canonical_device_id')
+                                ->where('devices.domain', 'tracking')
+                                ->whereNull('devices.deleted_at'));
+                    });
+            });
+
+            if (! $user->canDo('assets.telemetry.view') || $authorisedClientIds === []) {
+                return;
+            }
+
+            $privacy->orWhere(function (Builder $personal) use ($authorisedClientIds): void {
+                $personal->whereNotNull('control_room_devices.client_id')
+                    ->whereNotNull('control_room_devices.canonical_device_id')
+                    ->whereIn('control_room_devices.client_id', $authorisedClientIds)
+                    ->where(function (Builder $classification): void {
+                        $classification->where('control_room_devices.type', Device::TYPE_PERSONAL_TRACKER)
+                            ->orWhereExists(fn ($canonical) => $canonical
+                                ->selectRaw('1')
+                                ->from('devices')
+                                ->whereColumn('devices.id', 'control_room_devices.canonical_device_id')
+                                ->where('devices.domain', 'tracking')
+                                ->whereNull('devices.deleted_at'));
+                    })
+                    ->whereExists(function ($authority): void {
+                        $authority->selectRaw('1')
+                            ->from('device_assignments')
+                            ->join('devices as custody_devices', 'custody_devices.id', '=', 'device_assignments.device_id')
+                            ->join('clients', 'clients.id', '=', 'device_assignments.assignable_id')
+                            ->join('client_consents', 'client_consents.id', '=', 'device_assignments.consent_id')
+                            ->join('consent_types', 'consent_types.id', '=', 'client_consents.consent_type_id')
+                            ->whereColumn('device_assignments.device_id', 'control_room_devices.canonical_device_id')
+                            ->whereColumn('device_assignments.assignable_id', 'control_room_devices.client_id')
+                            ->whereColumn('device_assignments.custody_site_id', 'clients.site_id')
+                            ->where('device_assignments.assignable_type', DeviceAssignment::TARGET_CLIENT)
+                            ->where('device_assignments.assigned_at', '<=', now())
+                            ->whereNull('device_assignments.released_at')
+                            ->whereNull('device_assignments.collection_stopped_at')
+                            ->where('device_assignments.authority_basis', 'assignment_linked_client_consent')
+                            ->whereNotNull('device_assignments.tracking_purpose')
+                            ->whereJsonContains('device_assignments.access_audience', 'authorised_client_care')
+                            ->where('device_assignments.collection_started_at', '<=', now())
+                            ->where('device_assignments.retention_days', '>', 0)
+                            ->where('custody_devices.domain', 'tracking')
+                            ->whereNotIn('custody_devices.status', ['decommissioned', 'quarantined', 'lost'])
+                            ->whereNull('custody_devices.deleted_at')
+                            ->where('clients.status', 'active')
+                            ->whereNull('clients.deleted_at')
+                            ->where('client_consents.status', 'given')
+                            ->whereNull('client_consents.withdrawn_at')
+                            ->whereNull('client_consents.superseded_by_consent_id')
+                            ->whereNull('client_consents.deleted_at')
+                            ->where('client_consents.given_at', '<=', now())
+                            ->where(function ($expiry): void {
+                                $expiry->whereNull('client_consents.expires_at')
+                                    ->orWhere('client_consents.expires_at', '>', now());
+                            })
+                            ->where('consent_types.name', 'Personal Tracker (Wandering Risk)')
+                            ->where('consent_types.active', true)
+                            ->whereNull('consent_types.deleted_at');
+                    });
+            });
+        });
     }
 }

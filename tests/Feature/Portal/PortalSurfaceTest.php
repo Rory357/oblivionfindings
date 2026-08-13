@@ -113,7 +113,7 @@ class PortalSurfaceTest extends TestCase
         $client = $this->makePortalClient();
         $portalUser = $this->makePortalUser($client);
         $consentType = ConsentType::factory()->create([
-            'name' => 'Asset Location Tracking (Safety)',
+            'name' => 'Personal Tracker (Wandering Risk)',
         ]);
         $givenAt = now()->subHour()->startOfSecond();
 
@@ -152,6 +152,7 @@ class PortalSurfaceTest extends TestCase
     {
         return Client::factory()->create([
             'site_id' => Site::factory()->create()->id,
+            'status' => 'active',
         ]);
     }
 

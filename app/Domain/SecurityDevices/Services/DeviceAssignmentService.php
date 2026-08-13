@@ -3,17 +3,22 @@
 namespace App\Domain\SecurityDevices\Services;
 
 use App\Domain\SecurityDevices\Enums\AssignmentType;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\ClientConsent;
 use App\Services\ConsentValidationService;
 use App\Services\Sites\SiteTypePlanPinStatusService;
+use Closure;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use UnexpectedValueException;
 
 class DeviceAssignmentService
 {
     public function __construct(
         private readonly ?PersonalTrackingPrivacyService $trackingPrivacy = null,
+        private readonly ?DeviceCustodySiteResolver $custodySites = null,
     ) {}
 
     /**
@@ -31,21 +36,52 @@ class DeviceAssignmentService
         ?int $consentId = null,
         ?string $notes = null,
         ?\DateTimeInterface $assignedAt = null,
+        bool $replaceExisting = true,
+        ?Closure $authorizeLockedDevice = null,
+        ?Closure $validateLockedConsent = null,
     ): DeviceAssignment {
         $this->validateTarget($assignableType);
 
         return DB::transaction(function () use (
             $device, $assignableType, $assignableId, $assignedByUserId,
             $assignmentType, $expectedReturnAt, $consentId, $notes, $assignedAt,
+            $replaceExisting, $authorizeLockedDevice, $validateLockedConsent,
         ) {
+            // Consent withdrawal locks ClientConsent before the Device. Keep
+            // assignment on the same order so an assign/withdraw race cannot
+            // deadlock or authorise from a stale consent snapshot.
+            $lockedConsent = $assignableType === DeviceAssignment::TARGET_CLIENT && $consentId
+                ? ClientConsent::query()->with('consentType')->lockForUpdate()->find($consentId)
+                : null;
             $lockedDevice = $this->lockDevice($device);
-            $this->validateConsent($lockedDevice, $assignableType, $assignableId, $consentId);
+            if ($lockedDevice->status === DeviceStatus::Quarantined) {
+                throw new \InvalidArgumentException('A quarantined device cannot be assigned.');
+            }
+
+            try {
+                $custodySiteId = ($this->custodySites ?? app(DeviceCustodySiteResolver::class))
+                    ->resolve($assignableType, $assignableId, true);
+            } catch (UnexpectedValueException) {
+                throw new \InvalidArgumentException('The assignment target has no authoritative current Site.');
+            }
+
+            $this->validateConsent($lockedDevice, $assignableType, $assignableId, $lockedConsent);
+            if ($validateLockedConsent) {
+                $validateLockedConsent($lockedConsent);
+            }
+            if ($authorizeLockedDevice) {
+                $authorizeLockedDevice($lockedDevice);
+            }
+            if (! $replaceExisting && $this->unreleasedAssignments($lockedDevice)->isNotEmpty()) {
+                throw new \InvalidArgumentException('This device is already assigned.');
+            }
             $this->releaseActiveAssignments($lockedDevice, $assignedByUserId, 'assignment_replaced');
 
             return DeviceAssignment::create([
                 'device_id' => $lockedDevice->id,
                 'assignable_type' => $assignableType,
                 'assignable_id' => $assignableId,
+                'custody_site_id' => $custodySiteId,
                 'assignment_type' => $assignmentType,
                 'assigned_at' => $assignedAt ?? now(),
                 'expected_return_at' => $expectedReturnAt,
@@ -59,10 +95,16 @@ class DeviceAssignmentService
     /**
      * Release the active assignment for a device (return to pool).
      */
-    public function release(Device $device, int $releasedByUserId): ?DeviceAssignment
-    {
-        return DB::transaction(function () use ($device, $releasedByUserId): ?DeviceAssignment {
+    public function release(
+        Device $device,
+        int $releasedByUserId,
+        ?Closure $authorizeLockedDevice = null,
+    ): ?DeviceAssignment {
+        return DB::transaction(function () use ($device, $releasedByUserId, $authorizeLockedDevice): ?DeviceAssignment {
             $lockedDevice = $this->lockDevice($device);
+            if ($authorizeLockedDevice) {
+                $authorizeLockedDevice($lockedDevice);
+            }
 
             return $this->releaseActiveAssignments(
                 $lockedDevice,
@@ -146,10 +188,13 @@ class DeviceAssignmentService
         ?int $consentId = null,
         ?string $notes = null,
         ?\DateTimeInterface $assignedAt = null,
+        ?Closure $authorizeLockedDevice = null,
+        ?Closure $validateLockedConsent = null,
     ): DeviceAssignment {
         return $this->assign(
             $device, $assignableType, $assignableId, $userId,
             $assignmentType, $expectedReturnAt, $consentId, $notes, $assignedAt,
+            true, $authorizeLockedDevice, $validateLockedConsent,
         );
     }
 
@@ -206,6 +251,16 @@ class DeviceAssignmentService
         return $activeAssignments->first()->fresh();
     }
 
+    /** @return Collection<int, DeviceAssignment> */
+    private function unreleasedAssignments(Device $device)
+    {
+        return DeviceAssignment::query()
+            ->where('device_id', $device->id)
+            ->whereNull('released_at')
+            ->lockForUpdate()
+            ->get();
+    }
+
     private function notesWithLifecycleReason(?string $notes, string $reason): string
     {
         $stamp = "Lifecycle reason: {$reason}.";
@@ -241,15 +296,11 @@ class DeviceAssignmentService
         Device $device,
         string $assignableType,
         int $assignableId,
-        ?int $consentId,
+        ?ClientConsent $consent,
     ): void {
         if ($assignableType !== DeviceAssignment::TARGET_CLIENT || $device->domain !== 'tracking') {
             return;
         }
-
-        $consent = $consentId
-            ? ClientConsent::query()->with('consentType')->find($consentId)
-            : null;
 
         if (! $consent
             || (int) $consent->client_id !== $assignableId

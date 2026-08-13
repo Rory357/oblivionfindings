@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Enums\LinkType;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
@@ -41,6 +42,7 @@ class PersonalTrackingConsentWithdrawalTest extends TestCase
         $admin->roles()->attach(Role::query()->where('name', 'admin')->value('id'));
         $client = Client::factory()->create([
             'site_id' => $site->id,
+            'status' => 'active',
         ]);
         $consentType = ConsentType::factory()->create([
             'name' => 'Personal Tracker (Wandering Risk)',
@@ -317,6 +319,12 @@ class PersonalTrackingConsentWithdrawalTest extends TestCase
         // revoked immediately when that assignment ends; it never borrows a
         // Client consent.
         $worker = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+        ]);
         $staffTracker = Device::factory()->tracking()->create([
             'latitude' => -41.2865,
             'longitude' => 174.7762,

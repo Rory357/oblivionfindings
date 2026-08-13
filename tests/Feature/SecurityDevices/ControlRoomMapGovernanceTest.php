@@ -204,7 +204,7 @@ class ControlRoomMapGovernanceTest extends TestCase
             });
     }
 
-    public function test_report_bypass_uses_the_single_application_site_boundary(): void
+    public function test_report_permission_does_not_bypass_the_single_application_site_boundary(): void
     {
         $homeSite = Site::factory()->create([
             'name' => 'Home Site',
@@ -225,18 +225,12 @@ class ControlRoomMapGovernanceTest extends TestCase
                     ->pluck('id')
                     ->sort()
                     ->values()
-                    ->all() === collect([$homeSite->id, $otherApplicationSite->id])
-                    ->sort()
-                    ->values()
-                    ->all())
+                    ->all() === [$homeSite->id])
             );
 
         $this->actingAs($operator)
             ->get("/control-room/map?site_id={$otherApplicationSite->id}")
-            ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->where('filters.site_id', (string) $otherApplicationSite->id)
-            );
+            ->assertForbidden();
     }
 
     /** @param list<string> $permissionKeys */

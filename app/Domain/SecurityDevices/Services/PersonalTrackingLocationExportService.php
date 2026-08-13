@@ -38,6 +38,16 @@ class PersonalTrackingLocationExportService
         $dateFrom = Carbon::parse($data['date_from'])->startOfDay();
         $dateTo = Carbon::parse($data['date_to'])->endOfDay();
         $maximumScopeDays = min(31, $retentionDays);
+        $collectionStart = $assignment->collection_started_at ?? $assignment->assigned_at;
+
+        if (! $collectionStart) {
+            throw ValidationException::withMessages([
+                'date_from' => 'This resident assignment has no authoritative collection start.',
+            ]);
+        }
+        if ($dateFrom->lt($collectionStart)) {
+            $dateFrom = $collectionStart->copy();
+        }
 
         if ($dateFrom->isBefore(now()->subDays($retentionDays)->startOfDay())) {
             throw ValidationException::withMessages([
@@ -65,7 +75,14 @@ class PersonalTrackingLocationExportService
 
         // Re-check after the read so a consent withdrawn during export
         // preparation cannot produce a response from stale in-memory data.
-        abort_unless($this->privacy->authorisedClientAssignment($client), 403);
+        $currentAssignment = $this->privacy->authorisedClientAssignment($client);
+        abort_unless(
+            $currentAssignment
+                && (int) $currentAssignment->id === (int) $assignment->id
+                && (int) $currentAssignment->device_id === (int) $assignment->device_id
+                && (int) $currentAssignment->consent_id === (int) $assignment->consent_id,
+            403,
+        );
 
         AuditLogger::logOrFail('tracking.location_export.authorised', $client, [
             'actor_id' => $user->id,

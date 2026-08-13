@@ -11,7 +11,6 @@ use App\Models\ClientConsent;
 use App\Services\ConsentValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\DB;
 
 class DeviceAssignmentController extends Controller
 {
@@ -35,7 +34,7 @@ class DeviceAssignmentController extends Controller
             'assignable_id' => ['required', 'integer', 'min:1'],
             'assignment_type' => ['nullable', 'string', 'in:permanent,temporary,loan,shared'],
             'expected_return_at' => ['nullable', 'date', 'after:today'],
-            'consent_id' => ['nullable', 'integer', 'exists:client_consents,id'],
+            'consent_id' => ['nullable', 'integer', 'min:1'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
         $this->access->assertCanAssignTarget(
@@ -53,19 +52,26 @@ class DeviceAssignmentController extends Controller
                 isset($validated['consent_id']) ? (int) $validated['consent_id'] : null,
             );
 
-            DB::transaction(function () use ($device, $user, $validated): void {
-                $this->access->assertCanManageActiveAssignment($user, $device, true);
-                $this->service->assign(
-                    device: $device,
-                    assignableType: $validated['assignable_type'],
-                    assignableId: $validated['assignable_id'],
-                    assignedByUserId: $user->id,
-                    assignmentType: AssignmentType::tryFrom($validated['assignment_type'] ?? 'permanent') ?? AssignmentType::Permanent,
-                    expectedReturnAt: isset($validated['expected_return_at']) ? new \DateTime($validated['expected_return_at']) : null,
-                    consentId: $validated['consent_id'] ?? null,
-                    notes: $validated['notes'] ?? null,
-                );
-            });
+            $this->service->assign(
+                device: $device,
+                assignableType: $validated['assignable_type'],
+                assignableId: $validated['assignable_id'],
+                assignedByUserId: $user->id,
+                assignmentType: AssignmentType::tryFrom($validated['assignment_type'] ?? 'permanent') ?? AssignmentType::Permanent,
+                expectedReturnAt: isset($validated['expected_return_at']) ? new \DateTime($validated['expected_return_at']) : null,
+                consentId: $validated['consent_id'] ?? null,
+                notes: $validated['notes'] ?? null,
+                authorizeLockedDevice: function (Device $lockedDevice) use ($user, $validated): void {
+                    $this->access->assertCanViewDevice($user, $lockedDevice);
+                    $this->access->assertCanManageActiveAssignment($user, $lockedDevice, true);
+                    $this->access->assertCanAssignTarget(
+                        $user,
+                        $lockedDevice,
+                        $validated['assignable_type'],
+                        (int) $validated['assignable_id'],
+                    );
+                },
+            );
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['assignable_type' => $e->getMessage()]);
         }
@@ -128,11 +134,14 @@ class DeviceAssignmentController extends Controller
         $this->access->assertCanViewDevice($user, $device);
         $this->access->assertCanManageActiveAssignment($user, $device);
 
-        $released = DB::transaction(function () use ($device, $user) {
-            $this->access->assertCanManageActiveAssignment($user, $device, true);
-
-            return $this->service->release($device, $user->id);
-        });
+        $released = $this->service->release(
+            $device,
+            $user->id,
+            function (Device $lockedDevice) use ($user): void {
+                $this->access->assertCanViewDevice($user, $lockedDevice);
+                $this->access->assertCanManageActiveAssignment($user, $lockedDevice, true);
+            },
+        );
 
         if (! $released) {
             return back()->with('info', 'Device has no active assignment to release.');

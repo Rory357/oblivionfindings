@@ -28,9 +28,6 @@ class ControlRoomMapController extends Controller
 
     private const MAP_STATUSES = ['online', 'offline', 'unknown'];
 
-    /** @var list<string> */
-    private const SITE_BYPASS_PERMISSIONS = ['reports.viewAny'];
-
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly ControlRoomDeviceVisibilityService $projectionVisibility,
@@ -43,10 +40,7 @@ class ControlRoomMapController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
-        $accessibleSiteIds = $this->siteAccess->accessibleSiteIds(
-            $user,
-            self::SITE_BYPASS_PERMISSIONS,
-        );
+        $accessibleSiteIds = $this->deviceAccess->accessibleSiteIds($user);
         $selectedSiteId = $this->selectedSiteId($request);
         if ($selectedSiteId !== null) {
             abort_unless(
@@ -328,10 +322,14 @@ class ControlRoomMapController extends Controller
     private function scopedAlerts(User $user, ?int $selectedSiteId): Builder
     {
         $query = ControlRoomAlert::query();
-        $this->siteAccess->applyAlertScope($query, $user, self::SITE_BYPASS_PERMISSIONS);
-        if ($selectedSiteId !== null) {
-            $this->siteAccess->applyAlertSiteScopeForSiteIds($query, [$selectedSiteId]);
+        $siteIds = $selectedSiteId !== null
+            ? [$selectedSiteId]
+            : $this->deviceAccess->accessibleSiteIds($user);
+        if ($siteIds === []) {
+            return $query->whereRaw('1 = 0');
         }
+
+        $this->siteAccess->applyAlertSiteScopeForSiteIds($query, $siteIds);
 
         return $query;
     }

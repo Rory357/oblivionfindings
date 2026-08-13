@@ -59,8 +59,8 @@ class ResidentTrackingRefactorTest extends TestCase
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
-        $this->clientAConsentId = $this->createFleetTrackingConsent($this->clientA)->id;
-        $this->clientBConsentId = $this->createFleetTrackingConsent($this->clientB)->id;
+        $this->clientAConsentId = $this->createResidentTrackingConsent($this->clientA)->id;
+        $this->clientBConsentId = $this->createResidentTrackingConsent($this->clientB)->id;
     }
 
     // ── Index: reads from canonical devices ────────────────────────
@@ -194,14 +194,14 @@ class ResidentTrackingRefactorTest extends TestCase
         ]);
     }
 
-    private function createFleetTrackingConsent(Client $client, array $overrides = []): ClientConsent
+    private function createResidentTrackingConsent(Client $client, array $overrides = []): ClientConsent
     {
         $type = ConsentType::firstOrCreate(
-            ['name' => 'Fleet Tracking'],
+            ['name' => 'Personal Tracker (Wandering Risk)'],
             [
-                'category' => 'operational',
-                'description' => 'Vehicle / tracker GPS consent',
-                'purpose' => 'Tracker location collection',
+                'category' => 'safety',
+                'description' => 'Resident personal location tracking consent',
+                'purpose' => 'Resident wandering-risk location collection',
                 'legal_basis' => 'consent',
                 'is_mandatory' => false,
                 'requires_capacity_assessment' => false,
@@ -214,8 +214,8 @@ class ResidentTrackingRefactorTest extends TestCase
         $version = ConsentTypeVersion::firstOrCreate(
             ['consent_type_id' => $type->id, 'version' => 1],
             [
-                'description' => 'Fleet tracking v1',
-                'purpose' => 'Tracker location collection',
+                'description' => 'Resident tracking v1',
+                'purpose' => 'Resident wandering-risk location collection',
                 'legal_basis' => 'consent',
                 'effective_from' => now()->subDay(),
             ],
@@ -243,7 +243,7 @@ class ResidentTrackingRefactorTest extends TestCase
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
-            'assigned_at' => now(),
+            'assigned_at' => now()->subHour(),
             'consent_id' => $this->clientAConsentId,
         ]);
 
@@ -322,7 +322,7 @@ class ResidentTrackingRefactorTest extends TestCase
             'device_id' => $device->id,
             'assignable_type' => 'client',
             'assignable_id' => $this->clientA->id,
-            'assigned_at' => now(),
+            'assigned_at' => now()->subHour(),
             'consent_id' => $this->clientAConsentId,
         ]);
         FleetTelemetryEvent::create([

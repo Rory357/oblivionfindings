@@ -65,7 +65,8 @@ class ClientDeviceRefactorTest extends TestCase
         $this->clientB = Client::factory()->create(['site_id' => $this->site->id]);
 
         $trackingConsentType = ConsentType::factory()->create([
-            'name' => 'Asset Location Tracking (Safety)',
+            'name' => 'Personal Tracker (Wandering Risk)',
+            'active' => true,
         ]);
         $this->trackingConsent = ClientConsent::query()->create([
             'client_id' => $this->clientA->id,
