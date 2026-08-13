@@ -78,8 +78,8 @@ test('shift tasks expose the rostered staff assignee while enforcing canonical S
         'sort_order' => 1,
     ]);
 
-    $tasks = app(ShiftTaskProvider::class)->tasks($viewer);
-    $directHiddenLookup = app(ShiftTaskProvider::class)->tasks($viewer, [
+    $tasks = app(ShiftTaskProvider::class)->authorizedTasks($viewer);
+    $directHiddenLookup = app(ShiftTaskProvider::class)->authorizedTasks($viewer, [
         'id' => $hiddenTask->id,
     ]);
 
@@ -119,7 +119,7 @@ it('renders the rostered worker without loading an undefined shift relationship'
         'is_completed' => false,
     ]);
 
-    $items = (new ShiftTaskProvider)->tasks($worker);
+    $items = (new ShiftTaskProvider)->authorizedTasks($worker);
 
     expect($items)->toHaveCount(1)
         ->and($items[0]->id)->toBe('shift_task-'.$task->id)

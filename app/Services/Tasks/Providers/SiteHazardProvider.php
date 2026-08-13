@@ -7,11 +7,14 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
+use App\Services\UserSiteAccessService;
 use Illuminate\Validation\ValidationException;
 
-class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
+class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -79,7 +82,7 @@ class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, TaskP
         return $user->canDo('hazards.view');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = SiteHazard::query()
             ->with(['site:id,name', 'assignedTo:id,name'])
@@ -92,33 +95,42 @@ class SiteHazardProvider implements AssignableTaskProvider, HasModelClass, TaskP
             $query->whereIn('status', ['open', 'in_progress']);
         }
 
-        return $query->get()->map(function (SiteHazard $hazard) {
-            return new TaskItem(
-                id: 'hazard-'.$hazard->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $hazard->reference_number,
-                title: $hazard->custom_hazard_type
-                    ?: ucfirst(str_replace('_', ' ', (string) $hazard->hazard_type)).' hazard',
-                status: (string) $hazard->status,
-                bucket: match ($hazard->status) {
-                    'open' => TaskItem::BUCKET_OPEN,
-                    'in_progress' => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_DONE,
-                },
-                severity: TaskItem::normaliseSeverity($hazard->risk_rating),
-                assignee: $hazard->assignedTo
-                    ? ['id' => $hazard->assignedTo->id, 'name' => $hazard->assignedTo->name]
-                    : null,
-                site: $hazard->site
-                    ? ['id' => $hazard->site->id, 'name' => $hazard->site->name]
-                    : null,
-                dueAt: optional($hazard->due_date)->toIso8601String(),
-                createdAt: optional($hazard->created_at)->toIso8601String(),
-                link: "/hazards/{$hazard->id}",
-                type: 'Hazard',
-                description: $hazard->description ? str($hazard->description)->limit(140)->toString() : null,
-            );
-        })->all();
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped->whereIn(
+                'site_id',
+                app(UserSiteAccessService::class)->accessibleSiteIds($actor, ['sites.viewAll']),
+            ),
+            function (SiteHazard $hazard) {
+                return new TaskItem(
+                    id: 'hazard-'.$hazard->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $hazard->reference_number,
+                    title: $hazard->custom_hazard_type
+                        ?: ucfirst(str_replace('_', ' ', (string) $hazard->hazard_type)).' hazard',
+                    status: (string) $hazard->status,
+                    bucket: match ($hazard->status) {
+                        'open' => TaskItem::BUCKET_OPEN,
+                        'in_progress' => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_DONE,
+                    },
+                    severity: TaskItem::normaliseSeverity($hazard->risk_rating),
+                    assignee: $hazard->assignedTo
+                        ? ['id' => $hazard->assignedTo->id, 'name' => $hazard->assignedTo->name]
+                        : null,
+                    site: $hazard->site
+                        ? ['id' => $hazard->site->id, 'name' => $hazard->site->name]
+                        : null,
+                    dueAt: optional($hazard->due_date)->toIso8601String(),
+                    createdAt: optional($hazard->created_at)->toIso8601String(),
+                    link: "/hazards/{$hazard->id}",
+                    type: 'Hazard',
+                    description: $hazard->description ? str($hazard->description)->limit(140)->toString() : null,
+                );
+            },
+        );
     }
 }

@@ -10,6 +10,7 @@ use App\Models\RespiteDailyNote;
 use App\Models\RespiteEvidencePack;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
+use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -53,6 +54,38 @@ class RespiteStayScope
                     ->where(function (Builder $locations) use ($siteIds): void {
                         $locations->whereNull('location_id')->orWhereIn('location_id', $siteIds);
                     });
+            });
+    }
+
+    /**
+     * Canonical booking row scope for task feeds and other non-HTTP consumers.
+     * It preserves the same Client assignment and booking-location boundary as
+     * applyAccessibleStayScope().
+     */
+    public function applyAccessibleBookingScope(Builder $query, ?User $user): Builder
+    {
+        $siteIds = $this->siteAccess->accessibleSiteIds($user, self::CLIENT_SITE_BYPASS_PERMISSIONS);
+
+        if (! $user || $siteIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->whereHas('client', function (Builder $clients) use ($siteIds, $user): void {
+                $clients->whereIn('site_id', $siteIds);
+
+                if (! $user->canDo('clients.viewAny')) {
+                    if (! $user->canDo('clients.viewAssigned')) {
+                        $clients->whereRaw('1 = 0');
+
+                        return;
+                    }
+
+                    $clients->whereHas('supportWorkers', fn (Builder $workers) => $workers->whereKey($user->id));
+                }
+            })
+            ->where(function (Builder $locations) use ($siteIds): void {
+                $locations->whereNull('location_id')->orWhereIn('location_id', $siteIds);
             });
     }
 

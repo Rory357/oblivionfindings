@@ -5,13 +5,15 @@ namespace App\Services\Tasks\Providers;
 use App\Models\HsEvent;
 use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 
-class HsEventProvider implements HasModelClass, TaskProvider
+class HsEventProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
 
@@ -35,7 +37,7 @@ class HsEventProvider implements HasModelClass, TaskProvider
         return $user->canDo('hazards.view');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $includeSearchContext = TaskSearch::hasQuery($filters);
         $with = [
@@ -70,11 +72,6 @@ class HsEventProvider implements HasModelClass, TaskProvider
 
         $query = HsEvent::query()
             ->with($with)
-            ->tap(fn ($q) => app(UserSiteAccessService::class)->applyHsEventScope(
-                $q,
-                $user,
-                self::SITE_BYPASS_PERMISSIONS,
-            ))
             ->when(
                 $includeSearchContext,
                 fn ($q) => $q->whereHas(
@@ -90,51 +87,61 @@ class HsEventProvider implements HasModelClass, TaskProvider
             $query->where('status', '!=', HsEvent::STATUS_CLOSED);
         }
 
-        return $query->get()->map(function (HsEvent $event) use ($includeSearchContext) {
-            $journey = IncidentJourneyTaskContext::make(
-                $event->clientIncident,
-                $event->controlRoomAlert,
-                $event,
-                $includeSearchContext,
-            );
-            $client = $journey['person'] ?? ($event->client ? [
-                'id' => $event->client->id,
-                'name' => trim($event->client->first_name.' '.$event->client->last_name),
-            ] : null);
-            $site = $journey['site'] ?? ($event->site ? [
-                'id' => $event->site->id,
-                'name' => $event->site->name,
-            ] : null);
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => app(UserSiteAccessService::class)->applyHsEventScope(
+                $scoped,
+                $actor,
+                self::SITE_BYPASS_PERMISSIONS,
+            ),
+            function (HsEvent $event) use ($includeSearchContext) {
+                $journey = IncidentJourneyTaskContext::make(
+                    $event->clientIncident,
+                    $event->controlRoomAlert,
+                    $event,
+                    $includeSearchContext,
+                );
+                $client = $journey['person'] ?? ($event->client ? [
+                    'id' => $event->client->id,
+                    'name' => trim($event->client->first_name.' '.$event->client->last_name),
+                ] : null);
+                $site = $journey['site'] ?? ($event->site ? [
+                    'id' => $event->site->id,
+                    'name' => $event->site->name,
+                ] : null);
 
-            return new TaskItem(
-                id: 'hs_event-'.$event->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $event->reference_number,
-                title: ucfirst(str_replace('_', ' ', (string) $event->event_category)).' event',
-                status: (string) $event->status,
-                bucket: match ($event->status) {
-                    HsEvent::STATUS_CLOSED => TaskItem::BUCKET_DONE,
-                    HsEvent::STATUS_INVESTIGATING,
-                    HsEvent::STATUS_CORRECTIVE_ACTION,
-                    HsEvent::STATUS_MONITORING => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_OPEN,
-                },
-                severity: TaskItem::normaliseSeverity($event->severity),
-                assignee: $event->owner ? ['id' => $event->owner->id, 'name' => $event->owner->name] : null,
-                client: $client,
-                site: $site,
-                dueAt: null,
-                createdAt: optional($event->created_at)->toIso8601String(),
-                link: "/health-safety/events/{$event->id}",
-                type: 'H&S event',
-                description: null,
-                journey: $journey,
-                sourceContext: str_replace('_', ' ', (string) $event->event_category),
-                actionLabel: $event->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE
-                    ? 'Accept H&S handover'
-                    : 'Continue H&S governance',
-            );
-        })->all();
+                return new TaskItem(
+                    id: 'hs_event-'.$event->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $event->reference_number,
+                    title: ucfirst(str_replace('_', ' ', (string) $event->event_category)).' event',
+                    status: (string) $event->status,
+                    bucket: match ($event->status) {
+                        HsEvent::STATUS_CLOSED => TaskItem::BUCKET_DONE,
+                        HsEvent::STATUS_INVESTIGATING,
+                        HsEvent::STATUS_CORRECTIVE_ACTION,
+                        HsEvent::STATUS_MONITORING => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN,
+                    },
+                    severity: TaskItem::normaliseSeverity($event->severity),
+                    assignee: $event->owner ? ['id' => $event->owner->id, 'name' => $event->owner->name] : null,
+                    client: $client,
+                    site: $site,
+                    dueAt: null,
+                    createdAt: optional($event->created_at)->toIso8601String(),
+                    link: "/health-safety/events/{$event->id}",
+                    type: 'H&S event',
+                    description: null,
+                    journey: $journey,
+                    sourceContext: str_replace('_', ' ', (string) $event->event_category),
+                    actionLabel: $event->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE
+                        ? 'Accept H&S handover'
+                        : 'Continue H&S governance',
+                );
+            },
+        );
     }
 }

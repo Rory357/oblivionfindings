@@ -2,6 +2,8 @@
 
 namespace App\Services\Tasks\Contracts;
 
+use App\Models\User;
+
 /**
  * A composite provider may emit records from more than one underlying model.
  *
@@ -20,5 +22,5 @@ interface ProvidesTaskSourceAliases
      * state such as open/done filters. This must remain stable for the
      * lifetime of the underlying records.
      */
-    public function legacySourceAliasForId(int $id): ?string;
+    public function legacySourceAliasForId(User $user, int $id): ?string;
 }

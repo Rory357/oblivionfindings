@@ -346,8 +346,9 @@ it('splits a non-sensitive safeguarding concern into a pending action plan', fun
 it('blocks a split from a user who lacks the child-create permission', function () {
     // Can VIEW incidents (so the source is visible and passes canView), but has
     // NOT been granted incidents.followups.manage → createChild rejects.
-    $user = makeWatcherUser(['incidents.viewAny']);
-    $incident = ClientIncident::factory()->create(['status' => 'submitted']);
+    $site = Site::factory()->create();
+    $user = makeWatcherUser(['incidents.viewAny'], $site);
+    $incident = makeWatcherIncident($site);
 
     $this->actingAs($user)
         ->post("/tasks/incident/{$incident->id}/split", [

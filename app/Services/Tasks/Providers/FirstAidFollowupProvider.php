@@ -5,10 +5,13 @@ namespace App\Services\Tasks\Providers;
 use App\Models\FirstAidFollowup;
 use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
+use App\Services\UserSiteAccessService;
 
-class FirstAidFollowupProvider implements HasModelClass, TaskProvider
+class FirstAidFollowupProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -31,7 +34,7 @@ class FirstAidFollowupProvider implements HasModelClass, TaskProvider
         return $user->canDo('hazards.view');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = FirstAidFollowup::query()
             ->with([
@@ -48,34 +51,46 @@ class FirstAidFollowupProvider implements HasModelClass, TaskProvider
             $query->whereNull('completed_at');
         }
 
-        return $query->get()->map(function (FirstAidFollowup $followup) {
-            $record = $followup->record;
-            $client = $record?->client;
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped->whereHas(
+                'record',
+                fn ($records) => $records->whereIn(
+                    'site_id',
+                    app(UserSiteAccessService::class)->accessibleHealthSafetySiteIds($actor),
+                ),
+            ),
+            function (FirstAidFollowup $followup) {
+                $record = $followup->record;
+                $client = $record?->client;
 
-            return new TaskItem(
-                id: 'first_aid_followup-'.$followup->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $record?->reference_number,
-                title: 'First aid follow-up',
-                status: $followup->completed_at ? 'completed' : 'open',
-                bucket: $followup->completed_at ? TaskItem::BUCKET_DONE : TaskItem::BUCKET_OPEN,
-                severity: 'medium',
-                assignee: $followup->assignedTo
-                    ? ['id' => $followup->assignedTo->id, 'name' => (string) $followup->assignedTo->name]
-                    : null,
-                client: $client
-                    ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]
-                    : null,
-                site: $record?->site
-                    ? ['id' => $record->site->id, 'name' => (string) $record->site->name]
-                    : null,
-                dueAt: optional($followup->due_at)->toIso8601String(),
-                createdAt: optional($followup->created_at)->toIso8601String(),
-                link: "/health-safety/first-aid/{$followup->first_aid_record_id}",
-                type: 'First aid follow-up',
-                description: $followup->notes ? str($followup->notes)->limit(140)->toString() : null,
-            );
-        })->all();
+                return new TaskItem(
+                    id: 'first_aid_followup-'.$followup->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $record?->reference_number,
+                    title: 'First aid follow-up',
+                    status: $followup->completed_at ? 'completed' : 'open',
+                    bucket: $followup->completed_at ? TaskItem::BUCKET_DONE : TaskItem::BUCKET_OPEN,
+                    severity: 'medium',
+                    assignee: $followup->assignedTo
+                        ? ['id' => $followup->assignedTo->id, 'name' => (string) $followup->assignedTo->name]
+                        : null,
+                    client: $client
+                        ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]
+                        : null,
+                    site: $record?->site
+                        ? ['id' => $record->site->id, 'name' => (string) $record->site->name]
+                        : null,
+                    dueAt: optional($followup->due_at)->toIso8601String(),
+                    createdAt: optional($followup->created_at)->toIso8601String(),
+                    link: "/health-safety/first-aid/{$followup->first_aid_record_id}",
+                    type: 'First aid follow-up',
+                    description: $followup->notes ? str($followup->notes)->limit(140)->toString() : null,
+                );
+            },
+        );
     }
 }

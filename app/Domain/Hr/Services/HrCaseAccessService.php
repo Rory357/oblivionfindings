@@ -23,6 +23,7 @@ class HrCaseAccessService
         $historicalSubjects = $this->siteAccess->applyHistoricalStaffSiteScope(
             User::query()->select('users.id'),
             $viewer,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
         );
 
         $query->whereIn($query->qualifyColumn('user_id'), $historicalSubjects);

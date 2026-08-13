@@ -5,13 +5,16 @@ namespace App\Services\Tasks\Providers;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingConcern;
 use App\Models\User;
+use App\Policies\SafeguardingConcernPolicy;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 use Illuminate\Validation\ValidationException;
 
-class SafeguardingActionPlanProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
+class SafeguardingActionPlanProvider implements AssignableTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -38,7 +41,11 @@ class SafeguardingActionPlanProvider implements AssignableTaskProvider, HasModel
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
-        $plan = SafeguardingActionPlan::query()->with('concern')->find($id);
+        $plan = SafeguardingActionPlan::query()
+            ->with('concern')
+            ->whereHas('concern', fn ($concerns) => app(SafeguardingConcernPolicy::class)
+                ->applyVisibleScope($concerns, $actor))
+            ->find($id);
         $concern = $plan?->concern;
 
         if (! $plan || ! $concern) {
@@ -92,7 +99,7 @@ class SafeguardingActionPlanProvider implements AssignableTaskProvider, HasModel
         return $user->canDo('safeguarding.viewAny');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = SafeguardingActionPlan::query()
             ->with(['concern:id,reference_number,is_sensitive', 'assignedTo:id,name'])
@@ -104,41 +111,51 @@ class SafeguardingActionPlanProvider implements AssignableTaskProvider, HasModel
             $query->whereIn('status', ['pending', 'in_progress']);
         }
 
-        return $query->get()->map(function (SafeguardingActionPlan $plan) {
-            $concern = $plan->concern;
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped->whereHas(
+                'concern',
+                fn ($concerns) => app(SafeguardingConcernPolicy::class)
+                    ->applyVisibleScope($concerns, $actor),
+            ),
+            function (SafeguardingActionPlan $plan) {
+                $concern = $plan->concern;
 
-            // Need-to-know: never surface free-text from a sensitive concern.
-            $sensitive = (bool) ($concern?->is_sensitive);
+                // Need-to-know: never surface free-text from a sensitive concern.
+                $sensitive = (bool) ($concern?->is_sensitive);
 
-            return new TaskItem(
-                id: 'safeguarding_action-'.$plan->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $concern?->reference_number,
-                title: $sensitive
-                    ? 'Safeguarding action'
-                    : str((string) $plan->action_description)->limit(140)->toString(),
-                status: (string) $plan->status,
-                bucket: match ($plan->status) {
-                    'completed', 'cancelled' => TaskItem::BUCKET_DONE,
-                    'pending' => TaskItem::BUCKET_OPEN,
-                    default => TaskItem::BUCKET_IN_PROGRESS,
-                },
-                // Priority is an integer column: 1 = high, 2 = medium, 3+ = low.
-                severity: match ((int) $plan->priority) {
-                    1 => 'high',
-                    2 => 'medium',
-                    default => 'low',
-                },
-                assignee: $plan->assignedTo
-                    ? ['id' => $plan->assignedTo->id, 'name' => $plan->assignedTo->name]
-                    : null,
-                dueAt: optional($plan->due_date)->toIso8601String(),
-                createdAt: optional($plan->created_at)->toIso8601String(),
-                link: "/safeguarding?concern={$plan->safeguarding_concern_id}",
-                type: 'Action plan',
-                description: null,
-            );
-        })->all();
+                return new TaskItem(
+                    id: 'safeguarding_action-'.$plan->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $concern?->reference_number,
+                    title: $sensitive
+                        ? 'Safeguarding action'
+                        : str((string) $plan->action_description)->limit(140)->toString(),
+                    status: (string) $plan->status,
+                    bucket: match ($plan->status) {
+                        'completed', 'cancelled' => TaskItem::BUCKET_DONE,
+                        'pending' => TaskItem::BUCKET_OPEN,
+                        default => TaskItem::BUCKET_IN_PROGRESS,
+                    },
+                    // Priority is an integer column: 1 = high, 2 = medium, 3+ = low.
+                    severity: match ((int) $plan->priority) {
+                        1 => 'high',
+                        2 => 'medium',
+                        default => 'low',
+                    },
+                    assignee: $plan->assignedTo
+                        ? ['id' => $plan->assignedTo->id, 'name' => $plan->assignedTo->name]
+                        : null,
+                    dueAt: optional($plan->due_date)->toIso8601String(),
+                    createdAt: optional($plan->created_at)->toIso8601String(),
+                    link: "/safeguarding?concern={$plan->safeguarding_concern_id}",
+                    type: 'Action plan',
+                    description: null,
+                );
+            },
+        );
     }
 }

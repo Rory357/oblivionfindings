@@ -6,10 +6,12 @@ use App\Models\ClientIncident;
 use App\Models\IncidentFollowup;
 use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\SplittableTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +26,7 @@ use Illuminate\Validation\ValidationException;
  * IS splittable: a queue row can be forked into an IncidentFollowup, mirroring
  * IncidentFollowupController::store() exactly (permission, columns, scoping).
  */
-class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, TaskProvider
+class ClientIncidentProvider implements HasModelClass, SiteScopedTaskProvider, SplittableTaskProvider, TaskProvider
 {
     private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites', 'reports.viewAny'];
 
@@ -49,7 +51,7 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
         return $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $includeSearchContext = TaskSearch::hasQuery($filters);
         $with = [
@@ -82,17 +84,6 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
 
         $query = ClientIncident::query()
             ->with($with)
-            ->tap(fn ($q) => app(UserSiteAccessService::class)->applyClientIncidentScope(
-                $q,
-                $user,
-                self::SITE_BYPASS_PERMISSIONS,
-            ))
-            // viewAssigned-only staff see just their assigned clients' incidents,
-            // exactly as IncidentController::index scopes the register.
-            ->when(
-                ! $user->canDo('incidents.viewAny') && $user->canDo('incidents.viewAssigned'),
-                fn ($q) => $q->whereHas('client.supportWorkers', fn ($qq) => $qq->whereKey($user->id)),
-            )
             ->when(
                 $includeSearchContext,
                 fn ($q) => TaskSearch::applyIncidentJourneyPredicate($q, $filters),
@@ -105,41 +96,63 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
             $query->whereNotIn('status', ['closed']);
         }
 
-        return $query->get()->map(function (ClientIncident $incident) use ($includeSearchContext) {
-            $journey = IncidentJourneyTaskContext::make(
-                $incident,
-                includeSearchContext: $includeSearchContext,
-            );
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            function ($scoped, User $actor) {
+                app(UserSiteAccessService::class)->applyClientIncidentScope(
+                    $scoped,
+                    $actor,
+                    self::SITE_BYPASS_PERMISSIONS,
+                );
 
-            return new TaskItem(
-                id: 'incident-'.$incident->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $incident->reference_number,
-                title: $incident->title
-                    ?: ucfirst(str_replace('_', ' ', (string) $incident->type)).' incident',
-                status: (string) $incident->status,
-                bucket: match ($incident->status) {
-                    'closed' => TaskItem::BUCKET_DONE,
-                    'submitted', 'reviewed' => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_OPEN,
-                },
-                severity: TaskItem::normaliseSeverity($incident->severity),
-                assignee: $incident->investigator
-                    ? ['id' => $incident->investigator->id, 'name' => $incident->investigator->name]
-                    : null,
-                client: $journey['person'] ?? null,
-                site: $journey['site'] ?? null,
-                dueAt: null,
-                createdAt: optional($incident->created_at)->toIso8601String(),
-                link: "/incidents?incident={$incident->id}",
-                type: 'Incident',
-                description: $incident->description ? str($incident->description)->limit(140)->toString() : null,
-                journey: $journey,
-                sourceContext: str_replace('_', ' ', (string) ($incident->source ?: 'incident report')),
-                actionLabel: 'Review incident',
-            );
-        })->all();
+                // viewAssigned-only staff see just their assigned clients'
+                // incidents, exactly as IncidentController::index does.
+                return $scoped->when(
+                    ! $actor->canDo('incidents.viewAny') && $actor->canDo('incidents.viewAssigned'),
+                    fn ($query) => $query->whereHas(
+                        'client.supportWorkers',
+                        fn ($clients) => $clients->whereKey($actor->id),
+                    ),
+                );
+            },
+            function (ClientIncident $incident) use ($includeSearchContext) {
+                $journey = IncidentJourneyTaskContext::make(
+                    $incident,
+                    includeSearchContext: $includeSearchContext,
+                );
+
+                return new TaskItem(
+                    id: 'incident-'.$incident->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $incident->reference_number,
+                    title: $incident->title
+                        ?: ucfirst(str_replace('_', ' ', (string) $incident->type)).' incident',
+                    status: (string) $incident->status,
+                    bucket: match ($incident->status) {
+                        'closed' => TaskItem::BUCKET_DONE,
+                        'submitted', 'reviewed' => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN,
+                    },
+                    severity: TaskItem::normaliseSeverity($incident->severity),
+                    assignee: $incident->investigator
+                        ? ['id' => $incident->investigator->id, 'name' => $incident->investigator->name]
+                        : null,
+                    client: $journey['person'] ?? null,
+                    site: $journey['site'] ?? null,
+                    dueAt: null,
+                    createdAt: optional($incident->created_at)->toIso8601String(),
+                    link: "/incidents?incident={$incident->id}",
+                    type: 'Incident',
+                    description: $incident->description ? str($incident->description)->limit(140)->toString() : null,
+                    journey: $journey,
+                    sourceContext: str_replace('_', ' ', (string) ($incident->source ?: 'incident report')),
+                    actionLabel: 'Review incident',
+                );
+            },
+        );
     }
 
     public function childLabel(): string
@@ -166,7 +179,7 @@ class ClientIncidentProvider implements HasModelClass, SplittableTaskProvider, T
         $notes = $description !== '' ? $title."\n\n".$description : $title;
 
         $childLink = DB::transaction(function () use ($actor, $id, $data, $notes): string {
-            // Re-fetch with the SAME viewAssigned client scoping tasks() applies,
+            // Re-fetch with the SAME viewAssigned client scoping authorizedTasks() applies,
             // so an incident outside the actor's assigned clients reads as absent.
             // Lock the parent before checking lifecycle state or inserting work so
             // this writer serialises with incident closure.

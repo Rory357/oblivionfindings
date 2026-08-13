@@ -8,15 +8,17 @@ use App\Services\AuditLogger;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
-class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
+class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     private const TRANSACTION_ATTEMPTS = 3;
 
@@ -147,7 +149,7 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
         return app(ControlRoomAlertAccessService::class)->canList($user);
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $includeSearchContext = TaskSearch::hasQuery($filters);
         $with = [
@@ -183,7 +185,6 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
         $access = app(ControlRoomAlertAccessService::class);
         $query = ControlRoomAlert::query()
             ->with($with)
-            ->tap(fn ($q) => $access->applyVisibleScope($q, $user))
             ->when(
                 $includeSearchContext,
                 fn ($q) => $q->whereHas(
@@ -199,84 +200,90 @@ class ControlRoomAlertProvider implements AssignableTaskProvider, HasModelClass,
             $query->actionable();
         }
 
-        return $query->get()->map(function (ControlRoomAlert $alert) use (
-            $access,
-            $filters,
-            $includeSearchContext,
+        return app(TaskProviderAuthorization::class)->siteScoped(
             $user,
-        ) {
-            $journey = IncidentJourneyTaskContext::make(
-                $alert->clientIncident,
-                $alert,
-                includeSearchContext: $includeSearchContext,
-            );
-            $destination = $access->destinationForScopedAlert(
-                $alert,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $access->applyVisibleScope($scoped, $actor),
+            function (ControlRoomAlert $alert) use (
+                $access,
+                $filters,
+                $includeSearchContext,
                 $user,
-                $filters['return_to'] ?? null,
-            );
-            $client = $journey['person'] ?? ($alert->client ? [
-                'id' => $alert->client->id,
-                'name' => trim($alert->client->first_name.' '.$alert->client->last_name),
-            ] : null);
-            $site = $journey['site'] ?? ($alert->site ? [
-                'id' => $alert->site->id,
-                'name' => (string) $alert->site->name,
-            ] : null);
+            ) {
+                $journey = IncidentJourneyTaskContext::make(
+                    $alert->clientIncident,
+                    $alert,
+                    includeSearchContext: $includeSearchContext,
+                );
+                $destination = $access->destinationForScopedAlert(
+                    $alert,
+                    $user,
+                    $filters['return_to'] ?? null,
+                );
+                $client = $journey['person'] ?? ($alert->client ? [
+                    'id' => $alert->client->id,
+                    'name' => trim($alert->client->first_name.' '.$alert->client->last_name),
+                ] : null);
+                $site = $journey['site'] ?? ($alert->site ? [
+                    'id' => $alert->site->id,
+                    'name' => (string) $alert->site->name,
+                ] : null);
 
-            $title = ucfirst(str_replace('_', ' ', (string) $alert->alert_type));
+                $title = ucfirst(str_replace('_', ' ', (string) $alert->alert_type));
 
-            if ($alert->category) {
-                $title .= ' — '.str_replace('_', ' ', (string) $alert->category);
-            }
+                if ($alert->category) {
+                    $title .= ' — '.str_replace('_', ' ', (string) $alert->category);
+                }
 
-            return new TaskItem(
-                id: 'alert-'.$alert->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $alert->reference_number,
-                title: $title,
-                status: (string) $alert->status,
-                bucket: match ($alert->status) {
-                    'resolved', 'closed', 'dismissed' => TaskItem::BUCKET_DONE,
-                    'ack', 'triaging', 'confirmed' => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_OPEN,
-                },
-                severity: TaskItem::normaliseSeverity($alert->severity),
-                assignee: $alert->assignedTo
-                    ? ['id' => $alert->assignedTo->id, 'name' => (string) $alert->assignedTo->name]
-                    : null,
-                client: $client,
-                site: $site,
-                dueAt: optional($alert->due_at)->toIso8601String(),
-                createdAt: optional($alert->created_at)->toIso8601String(),
-                link: $destination['href'],
-                type: 'Alert',
-                description: $alert->notes ? str($alert->notes)->limit(140)->toString() : null,
-                journey: $journey,
-                sourceContext: str_replace('_', ' ', (string) ($alert->source ?: $alert->alert_type)),
-                actionLabel: $destination['label'],
-                displayState: match ($alert->status) {
-                    ControlRoomAlert::STATUS_OPEN => 'Awaiting response',
-                    ControlRoomAlert::STATUS_ACK => 'Acknowledged',
-                    ControlRoomAlert::STATUS_TRIAGING => 'Triage in progress',
-                    ControlRoomAlert::STATUS_CONFIRMED => 'Response confirmed',
-                    ControlRoomAlert::STATUS_RESOLVED => 'Resolved',
-                    ControlRoomAlert::STATUS_CLOSED => 'Closed',
-                    ControlRoomAlert::STATUS_DISMISSED => 'Dismissed',
-                    default => ucfirst(str_replace('_', ' ', (string) $alert->status)),
-                },
-                searchTerms: $includeSearchContext
-                    ? array_values(array_filter([
-                        $alert->assignedTo?->name,
-                        ...$alert->tasks
-                            ->flatMap(fn ($task) => [$task->title, $task->description])
-                            ->filter()
-                            ->all(),
-                    ]))
-                    : [],
-                actionHelp: $destination['help'],
-            );
-        })->all();
+                return new TaskItem(
+                    id: 'alert-'.$alert->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $alert->reference_number,
+                    title: $title,
+                    status: (string) $alert->status,
+                    bucket: match ($alert->status) {
+                        'resolved', 'closed', 'dismissed' => TaskItem::BUCKET_DONE,
+                        'ack', 'triaging', 'confirmed' => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN,
+                    },
+                    severity: TaskItem::normaliseSeverity($alert->severity),
+                    assignee: $alert->assignedTo
+                        ? ['id' => $alert->assignedTo->id, 'name' => (string) $alert->assignedTo->name]
+                        : null,
+                    client: $client,
+                    site: $site,
+                    dueAt: optional($alert->due_at)->toIso8601String(),
+                    createdAt: optional($alert->created_at)->toIso8601String(),
+                    link: $destination['href'],
+                    type: 'Alert',
+                    description: $alert->notes ? str($alert->notes)->limit(140)->toString() : null,
+                    journey: $journey,
+                    sourceContext: str_replace('_', ' ', (string) ($alert->source ?: $alert->alert_type)),
+                    actionLabel: $destination['label'],
+                    displayState: match ($alert->status) {
+                        ControlRoomAlert::STATUS_OPEN => 'Awaiting response',
+                        ControlRoomAlert::STATUS_ACK => 'Acknowledged',
+                        ControlRoomAlert::STATUS_TRIAGING => 'Triage in progress',
+                        ControlRoomAlert::STATUS_CONFIRMED => 'Response confirmed',
+                        ControlRoomAlert::STATUS_RESOLVED => 'Resolved',
+                        ControlRoomAlert::STATUS_CLOSED => 'Closed',
+                        ControlRoomAlert::STATUS_DISMISSED => 'Dismissed',
+                        default => ucfirst(str_replace('_', ' ', (string) $alert->status)),
+                    },
+                    searchTerms: $includeSearchContext
+                        ? array_values(array_filter([
+                            $alert->assignedTo?->name,
+                            ...$alert->tasks
+                                ->flatMap(fn ($task) => [$task->title, $task->description])
+                                ->filter()
+                                ->all(),
+                        ]))
+                        : [],
+                    actionHelp: $destination['help'],
+                );
+            },
+        );
     }
 }

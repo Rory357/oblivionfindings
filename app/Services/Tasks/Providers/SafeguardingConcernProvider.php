@@ -6,14 +6,17 @@ use App\Models\Client;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingConcern;
 use App\Models\User;
+use App\Policies\SafeguardingConcernPolicy;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\SplittableTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 use Illuminate\Validation\ValidationException;
 
-class SafeguardingConcernProvider implements AssignableTaskProvider, HasModelClass, SplittableTaskProvider, TaskProvider
+class SafeguardingConcernProvider implements AssignableTaskProvider, HasModelClass, SiteScopedTaskProvider, SplittableTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -40,7 +43,9 @@ class SafeguardingConcernProvider implements AssignableTaskProvider, HasModelCla
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
-        $concern = SafeguardingConcern::query()->find($id);
+        $concern = app(SafeguardingConcernPolicy::class)
+            ->applyVisibleScope(SafeguardingConcern::query(), $actor)
+            ->find($id);
 
         if (! $concern) {
             throw ValidationException::withMessages([
@@ -89,7 +94,7 @@ class SafeguardingConcernProvider implements AssignableTaskProvider, HasModelCla
         return $user->canDo('safeguarding.viewAny');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = SafeguardingConcern::query()
             ->with(['assignedTo:id,name', 'site:id,name'])
@@ -103,48 +108,55 @@ class SafeguardingConcernProvider implements AssignableTaskProvider, HasModelCla
 
         $canSensitive = $user->can('viewSensitive', SafeguardingConcern::class);
 
-        return $query->get()->map(function (SafeguardingConcern $concern) use ($user, $canSensitive) {
-            // Need-to-know parity with SafeguardingConcernController::isConcernRestricted():
-            // a sensitive concern is restricted unless the viewer has viewSensitive
-            // or is the assignee/reporter. Restricted rows expose no free-text,
-            // no subject, and no site (a site name narrows the subject pool).
-            $restricted = $concern->is_sensitive
-                && ! $canSensitive
-                && $concern->assigned_to_user_id !== $user->id
-                && $concern->reported_by_user_id !== $user->id;
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => app(SafeguardingConcernPolicy::class)
+                ->applyVisibleScope($scoped, $actor),
+            function (SafeguardingConcern $concern) use ($user, $canSensitive) {
+                // Need-to-know parity with SafeguardingConcernController::isConcernRestricted():
+                // a sensitive concern is restricted unless the viewer has viewSensitive
+                // or is the assignee/reporter. Restricted rows expose no free-text,
+                // no subject, and no site (a site name narrows the subject pool).
+                $restricted = $concern->is_sensitive
+                    && ! $canSensitive
+                    && $concern->assigned_to_user_id !== $user->id
+                    && $concern->reported_by_user_id !== $user->id;
 
-            return new TaskItem(
-                id: 'safeguarding-'.$concern->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $concern->reference_number,
-                title: ucfirst(str_replace('_', ' ', (string) $concern->concern_type)).' concern',
-                status: (string) $concern->status,
-                bucket: match (true) {
-                    in_array($concern->status, SafeguardingConcern::TERMINAL_STATUSES, true) => TaskItem::BUCKET_DONE,
-                    $concern->status === 'reported' => TaskItem::BUCKET_OPEN,
-                    default => TaskItem::BUCKET_IN_PROGRESS,
-                },
-                severity: TaskItem::normaliseSeverity($concern->severity),
-                assignee: $concern->assignedTo
-                    ? ['id' => $concern->assignedTo->id, 'name' => $concern->assignedTo->name]
-                    : null,
-                client: (! $restricted && $concern->subject_type === Client::class && $concern->subject_id)
-                    ? ['id' => (int) $concern->subject_id, 'name' => (string) $concern->subject_name]
-                    : null,
-                site: (! $restricted && $concern->site)
-                    ? ['id' => $concern->site->id, 'name' => $concern->site->name]
-                    : null,
-                dueAt: null,
-                createdAt: optional($concern->created_at)->toIso8601String(),
-                link: "/safeguarding?concern={$concern->id}",
-                type: 'Concern',
-                description: (! $restricted && $concern->description)
-                    ? str($concern->description)->limit(140)->toString()
-                    : null,
-                restricted: $restricted,
-            );
-        })->all();
+                return new TaskItem(
+                    id: 'safeguarding-'.$concern->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $concern->reference_number,
+                    title: ucfirst(str_replace('_', ' ', (string) $concern->concern_type)).' concern',
+                    status: (string) $concern->status,
+                    bucket: match (true) {
+                        in_array($concern->status, SafeguardingConcern::TERMINAL_STATUSES, true) => TaskItem::BUCKET_DONE,
+                        $concern->status === 'reported' => TaskItem::BUCKET_OPEN,
+                        default => TaskItem::BUCKET_IN_PROGRESS,
+                    },
+                    severity: TaskItem::normaliseSeverity($concern->severity),
+                    assignee: $concern->assignedTo
+                        ? ['id' => $concern->assignedTo->id, 'name' => $concern->assignedTo->name]
+                        : null,
+                    client: (! $restricted && $concern->subject_type === Client::class && $concern->subject_id)
+                        ? ['id' => (int) $concern->subject_id, 'name' => (string) $concern->subject_name]
+                        : null,
+                    site: (! $restricted && $concern->site)
+                        ? ['id' => $concern->site->id, 'name' => $concern->site->name]
+                        : null,
+                    dueAt: null,
+                    createdAt: optional($concern->created_at)->toIso8601String(),
+                    link: "/safeguarding?concern={$concern->id}",
+                    type: 'Concern',
+                    description: (! $restricted && $concern->description)
+                        ? str($concern->description)->limit(140)->toString()
+                        : null,
+                    restricted: $restricted,
+                );
+            },
+        );
     }
 
     public function childLabel(): string
@@ -163,7 +175,9 @@ class SafeguardingConcernProvider implements AssignableTaskProvider, HasModelCla
             ]);
         }
 
-        $concern = SafeguardingConcern::query()->find($id);
+        $concern = app(SafeguardingConcernPolicy::class)
+            ->applyVisibleScope(SafeguardingConcern::query(), $actor)
+            ->find($id);
 
         if (! $concern) {
             throw ValidationException::withMessages([

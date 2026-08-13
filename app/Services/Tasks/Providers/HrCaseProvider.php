@@ -7,8 +7,10 @@ use App\Domain\Hr\Services\HrCaseAccessService;
 use App\Models\User;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\UserSiteAccessService;
 use Illuminate\Validation\ValidationException;
 
@@ -18,7 +20,7 @@ use Illuminate\Validation\ValidationException;
  * eligibility remains current staff at an approved Site, and task text never
  * exposes the case title or narrative.
  */
-class HrCaseProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
+class HrCaseProvider implements AssignableTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -43,7 +45,7 @@ class HrCaseProvider implements AssignableTaskProvider, HasModelClass, TaskProvi
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
-        // Re-fetch with the same confidentiality scoping used by tasks()
+        // Re-fetch with the same confidentiality scoping used by authorizedTasks()
         // applies, so an out-of-scope case reads as "not found".
         $case = app(HrCaseAccessService::class)
             ->applyVisibleCaseScope(HrCase::query(), $actor)
@@ -72,10 +74,9 @@ class HrCaseProvider implements AssignableTaskProvider, HasModelClass, TaskProvi
         return $user->canDo('hr.cases.view');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
-        $query = app(HrCaseAccessService::class)
-            ->applyVisibleCaseScope(HrCase::query(), $user)
+        $query = HrCase::query()
             ->with('assignedTo:id,name')
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('opened_at')
@@ -85,35 +86,46 @@ class HrCaseProvider implements AssignableTaskProvider, HasModelClass, TaskProvi
             $query->whereNotIn('status', ['resolved', 'closed']);
         }
 
-        return $query->get()->map(function (HrCase $case) {
-            return new TaskItem(
-                id: 'hr_case-'.$case->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $case->case_number,
-                title: ucfirst(str_replace('_', ' ', (string) $case->case_type)).' case',
-                status: (string) $case->status,
-                bucket: match ($case->status) {
-                    'resolved', 'closed' => TaskItem::BUCKET_DONE,
-                    'under_investigation', 'awaiting_response' => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_OPEN,
-                },
-                severity: TaskItem::normaliseSeverity($case->severity),
-                assignee: $case->assignedTo
-                    ? ['id' => $case->assignedTo->id, 'name' => (string) $case->assignedTo->name]
-                    : null,
-                dueAt: null,
-                createdAt: optional($case->created_at)->toIso8601String(),
-                link: "/hr/cases/{$case->id}",
-                type: 'HR case',
-            );
-        })->all();
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => app(HrCaseAccessService::class)
+                ->applyVisibleCaseScope($scoped, $actor),
+            function (HrCase $case) {
+                return new TaskItem(
+                    id: 'hr_case-'.$case->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $case->case_number,
+                    title: ucfirst(str_replace('_', ' ', (string) $case->case_type)).' case',
+                    status: (string) $case->status,
+                    bucket: match ($case->status) {
+                        'resolved', 'closed' => TaskItem::BUCKET_DONE,
+                        'under_investigation', 'awaiting_response' => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN,
+                    },
+                    severity: TaskItem::normaliseSeverity($case->severity),
+                    assignee: $case->assignedTo
+                        ? ['id' => $case->assignedTo->id, 'name' => (string) $case->assignedTo->name]
+                        : null,
+                    dueAt: null,
+                    createdAt: optional($case->created_at)->toIso8601String(),
+                    link: "/hr/cases/{$case->id}",
+                    type: 'HR case',
+                );
+            },
+        );
     }
 
     protected function visibleStaffUserIds(User $viewer)
     {
         $staff = User::query()->select('users.id');
 
-        return app(UserSiteAccessService::class)->applyStaffScope($staff, $viewer);
+        return app(UserSiteAccessService::class)->applyStaffScope(
+            $staff,
+            $viewer,
+            UserSiteAccessService::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS,
+        );
     }
 }

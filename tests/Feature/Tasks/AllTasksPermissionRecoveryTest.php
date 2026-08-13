@@ -90,7 +90,7 @@ it('maps Control Room task destinations to the same manage view and no-access de
             'help' => 'This response is owned by Current Control Room Owner. Contact a Control Room manager if you need access.',
         ]);
 
-    $item = collect((new ControlRoomAlertProvider)->tasks($noDestination, [
+    $item = collect((new ControlRoomAlertProvider)->authorizedTasks($noDestination, [
         'return_to' => $returnTo,
     ]))->firstWhere('id', 'alert-'.$alert->id);
 
@@ -257,7 +257,7 @@ it('keeps the provider row action aligned with the shared access decision', func
     ]);
     $returnTo = '/tasks?q='.$alert->reference_number.'&sources=alert';
 
-    $item = collect((new ControlRoomAlertProvider)->tasks($viewer, [
+    $item = collect((new ControlRoomAlertProvider)->authorizedTasks($viewer, [
         'return_to' => $returnTo,
     ]))->firstWhere('id', 'alert-'.$alert->id);
 

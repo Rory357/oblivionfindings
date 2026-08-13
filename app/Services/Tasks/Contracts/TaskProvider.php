@@ -12,9 +12,10 @@ use App\Services\Tasks\TaskItem;
  * Providers return OPEN (non-terminal) work items by default; when
  * `$filters['include_done']` is true they may also include recently
  * closed items. Cross-cutting filtering (severity, assignee, search,
- * source toggles) happens centrally in {@see TaskAggregator} —
- * a provider only applies module-specific visibility rules (e.g. HR case
- * confidentiality) that the aggregator cannot know about.
+ * source toggles) happens centrally in {@see TaskAggregator}. Every provider
+ * must apply its owning module's canonical row scope before loading or
+ * projecting records. A module permission only enables the source; it never
+ * grants implicit cross-Site row access.
  */
 interface TaskProvider
 {
@@ -37,5 +38,5 @@ interface TaskProvider
      * }  $filters
      * @return TaskItem[]
      */
-    public function tasks(User $user, array $filters = []): array;
+    public function authorizedTasks(User $user, array $filters = []): array;
 }

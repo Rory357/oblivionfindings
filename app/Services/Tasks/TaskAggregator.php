@@ -151,20 +151,20 @@ class TaskAggregator
         $itemIds = ["{$source}-{$id}"];
         if ($provider->sourceKey() === $source
             && $provider instanceof ProvidesTaskSourceAliases) {
-            $legacyAlias = $this->legacySourceAliasFor($provider, $id);
+            $legacyAlias = $this->legacySourceAliasFor($provider, $user, $id);
             $itemIds = $legacyAlias ? ["{$legacyAlias}-{$id}"] : $itemIds;
         }
         $exactFilters = [
             ...$filters,
             'id' => $id,
         ];
-        $item = collect($provider->tasks($user, $exactFilters))
+        $item = collect($provider->authorizedTasks($user, $exactFilters))
             ->first(fn (TaskItem $candidate) => in_array($candidate->id, $itemIds, true));
         if ($item) {
             return $item;
         }
 
-        return collect($provider->tasks($user, [
+        return collect($provider->authorizedTasks($user, [
             ...$exactFilters,
             'include_done' => true,
         ]))->first(fn (TaskItem $candidate) => in_array($candidate->id, $itemIds, true));
@@ -238,7 +238,7 @@ class TaskAggregator
         return $provider instanceof ProvidesTaskSourceAliases
             && $provider->sourceKey() !== $source
             && $rows->contains($provider->sourceKey())
-            && $this->legacySourceAliasFor($provider, $id) === $source;
+            && $this->legacySourceAliasFor($provider, $user, $id) === $source;
     }
 
     /**
@@ -274,10 +274,6 @@ class TaskAggregator
             ->where('item_id', $id)
             ->get();
         $provider = $this->providerFor($source);
-        $legacyOwnerAlias = $provider instanceof ProvidesTaskSourceAliases
-            ? $this->legacySourceAliasFor($provider, $id)
-            : null;
-
         foreach ($watchers as $watcher) {
             if (! $watcher->user) {
                 $staleRows[] = (int) $watcher->id;
@@ -291,6 +287,11 @@ class TaskAggregator
                 && $watcher->source === $provider->sourceKey();
 
             if ($isLegacyCompositeRow) {
+                $legacyOwnerAlias = $this->legacySourceAliasFor(
+                    $provider,
+                    $watcher->user,
+                    $id,
+                );
                 // A legacy row owned by another subtype is ignored, never
                 // pruned. Ownership comes from record existence, so it cannot
                 // switch when a record completes or leaves a due-date window.
@@ -365,7 +366,7 @@ class TaskAggregator
                 }
 
                 $view = true;
-                foreach ($provider->tasks($user) as $item) {
+                foreach ($provider->authorizedTasks($user) as $item) {
                     // Match itemsFor(): retries or legacy aliases cannot
                     // inflate the shared count for one canonical record.
                     $items[$item->id] ??= $item;
@@ -416,7 +417,7 @@ class TaskAggregator
                 continue;
             }
 
-            foreach ($provider->tasks($user, $filters) as $item) {
+            foreach ($provider->authorizedTasks($user, $filters) as $item) {
                 // A provider retry or legacy duplicate must not create two
                 // tickets for the same canonical source record.
                 $items[$item->id] ??= $item;
@@ -522,15 +523,12 @@ class TaskAggregator
             'myOverdue' => count(array_filter($mine, fn (TaskItem $i) => $i->isOverdue())),
             'watching' => count(array_filter(
                 $open,
-                fn (TaskItem $i) => $this->isWatched($i, $watched),
+                fn (TaskItem $i) => $this->isWatched($i, $user, $watched),
             )),
         ];
     }
 
-    /**
-     * Sidebar badge: my open + overdue item count. Uncached — the caller
-     * (HandleInertiaRequests) caches view+badge together per user.
-     */
+    /** Sidebar badge: my open + overdue item count, resolved per request. */
     public function badgeCountFor(User $user): int
     {
         return $this->countBadgeItems($this->itemsFor($user, []), $user);
@@ -621,7 +619,7 @@ class TaskAggregator
 
         // following=true: only items the user is watching (task_watchers).
         if (! empty($filters['following'])) {
-            if (! $this->isWatched($item, $this->watchedKeysFor($user))) {
+            if (! $this->isWatched($item, $user, $this->watchedKeysFor($user))) {
                 return false;
             }
         }
@@ -632,7 +630,7 @@ class TaskAggregator
     /**
      * @param  array<string, true>  $watched
      */
-    private function isWatched(TaskItem $item, array $watched): bool
+    private function isWatched(TaskItem $item, User $user, array $watched): bool
     {
         $id = $item->numericId();
         $identityKey = $item->identitySource().'|'.$id;
@@ -651,17 +649,18 @@ class TaskAggregator
         // subtype identities. Record existence fixes one historical owner;
         // open/done presentation changes can never remap it.
         return $provider instanceof ProvidesTaskSourceAliases
-            && $this->legacySourceAliasFor($provider, $id) === $item->identitySource();
+            && $this->legacySourceAliasFor($provider, $user, $id) === $item->identitySource();
     }
 
     private function legacySourceAliasFor(
         ProvidesTaskSourceAliases $provider,
+        User $user,
         int $id,
     ): ?string {
-        $memoKey = $provider::class.'|'.$id;
+        $memoKey = $provider::class.'|'.$user->id.'|'.$id;
 
         if (! array_key_exists($memoKey, $this->legacySourceAliasMemo)) {
-            $this->legacySourceAliasMemo[$memoKey] = $provider->legacySourceAliasForId($id);
+            $this->legacySourceAliasMemo[$memoKey] = $provider->legacySourceAliasForId($user, $id);
         }
 
         return $this->legacySourceAliasMemo[$memoKey];

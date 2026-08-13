@@ -5,10 +5,13 @@ namespace App\Services\Tasks\Providers;
 use App\Models\SiteChecklistRun;
 use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
+use App\Services\UserSiteAccessService;
 
-class SiteChecklistRunProvider implements HasModelClass, TaskProvider
+class SiteChecklistRunProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -31,7 +34,7 @@ class SiteChecklistRunProvider implements HasModelClass, TaskProvider
         return $user->canDo('checklists.view');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = SiteChecklistRun::query()
             ->with(['site:id,name', 'template:id,name', 'assignedTo:id,name'])
@@ -44,33 +47,42 @@ class SiteChecklistRunProvider implements HasModelClass, TaskProvider
             $query->whereIn('status', ['scheduled', 'in_progress', 'overdue']);
         }
 
-        return $query->get()->map(function (SiteChecklistRun $run) {
-            return new TaskItem(
-                id: 'checklist_run-'.$run->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: null,
-                title: $run->template?->name ?: 'Checklist run',
-                status: (string) $run->status,
-                bucket: match ($run->status) {
-                    'completed', 'skipped' => TaskItem::BUCKET_DONE,
-                    'in_progress' => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_OPEN, // scheduled | overdue
-                },
-                severity: 'low',
-                assignee: $run->assignedTo
-                    ? ['id' => $run->assignedTo->id, 'name' => (string) $run->assignedTo->name]
-                    : null,
-                site: $run->site
-                    ? ['id' => $run->site->id, 'name' => (string) $run->site->name]
-                    : null,
-                dueAt: optional($run->scheduled_date)->toIso8601String(),
-                createdAt: optional($run->created_at)->toIso8601String(),
-                // Same target sites.checklists.showRun redirects to.
-                link: "/sites/{$run->site_id}/checklists?run={$run->id}",
-                type: 'Checklist run',
-                description: $run->overall_notes ? str($run->overall_notes)->limit(140)->toString() : null,
-            );
-        })->all();
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped->whereIn(
+                'site_id',
+                app(UserSiteAccessService::class)->accessibleSiteIds($actor, ['sites.viewAll']),
+            ),
+            function (SiteChecklistRun $run) {
+                return new TaskItem(
+                    id: 'checklist_run-'.$run->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: null,
+                    title: $run->template?->name ?: 'Checklist run',
+                    status: (string) $run->status,
+                    bucket: match ($run->status) {
+                        'completed', 'skipped' => TaskItem::BUCKET_DONE,
+                        'in_progress' => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN, // scheduled | overdue
+                    },
+                    severity: 'low',
+                    assignee: $run->assignedTo
+                        ? ['id' => $run->assignedTo->id, 'name' => (string) $run->assignedTo->name]
+                        : null,
+                    site: $run->site
+                        ? ['id' => $run->site->id, 'name' => (string) $run->site->name]
+                        : null,
+                    dueAt: optional($run->scheduled_date)->toIso8601String(),
+                    createdAt: optional($run->created_at)->toIso8601String(),
+                    // Same target sites.checklists.showRun redirects to.
+                    link: "/sites/{$run->site_id}/checklists?run={$run->id}",
+                    type: 'Checklist run',
+                    description: $run->overall_notes ? str($run->overall_notes)->limit(140)->toString() : null,
+                );
+            },
+        );
     }
 }

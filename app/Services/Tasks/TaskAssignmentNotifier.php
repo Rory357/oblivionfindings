@@ -24,8 +24,7 @@ class TaskAssignmentNotifier
             return; // Unassignment and self-assignment need no ping.
         }
 
-        $item = collect($provider->tasks($actor, ['include_done' => true]))
-            ->first(fn (TaskItem $i) => $i->id === $provider->sourceKey()."-{$id}");
+        $item = $aggregator->findItemFor($actor, $provider->sourceKey(), $id);
 
         $label = $item?->ref ?? ($item?->title ?? 'a task');
 

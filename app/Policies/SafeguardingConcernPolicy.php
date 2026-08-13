@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\SafeguardingConcern;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 
 class SafeguardingConcernPolicy
 {
@@ -106,6 +107,27 @@ class SafeguardingConcernPolicy
     public function viewSensitive(User $user): bool
     {
         return $user->canDo('safeguarding.viewSensitive');
+    }
+
+    /**
+     * Canonical SQL counterpart to view(): Site-less organisation records and
+     * the explicit reports permission remain global; every Site-owned concern
+     * is constrained before it is loaded.
+     */
+    public function applyVisibleScope(Builder $query, User $user): Builder
+    {
+        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
+            return $query;
+        }
+
+        $siteIds = $this->siteAccess->accessibleSiteIds($user);
+
+        return $query->where(function (Builder $sites) use ($siteIds): void {
+            $sites->whereNull('site_id');
+            if ($siteIds !== []) {
+                $sites->orWhereIn('site_id', $siteIds);
+            }
+        });
     }
 
     private function canAccessConcernSite(User $user, SafeguardingConcern $concern): bool

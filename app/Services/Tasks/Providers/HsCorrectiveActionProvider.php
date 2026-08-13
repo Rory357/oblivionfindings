@@ -6,14 +6,16 @@ use App\Models\HsCorrectiveAction;
 use App\Models\User;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\IncidentJourneyTaskContext;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
 use Illuminate\Validation\ValidationException;
 
-class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
+class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     private const SITE_BYPASS_PERMISSIONS = ['healthSafety.viewAllSites'];
 
@@ -96,7 +98,7 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
         return $user->canDo('hazards.view');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $includeSearchContext = TaskSearch::hasQuery($filters);
         $with = [
@@ -134,11 +136,6 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
 
         $query = HsCorrectiveAction::query()
             ->with($with)
-            ->whereHas('hsEvent', fn ($q) => app(UserSiteAccessService::class)->applyHsEventScope(
-                $q,
-                $user,
-                self::SITE_BYPASS_PERMISSIONS,
-            ))
             ->when(
                 $includeSearchContext,
                 fn ($q) => $q->whereHas(
@@ -154,79 +151,92 @@ class HsCorrectiveActionProvider implements AssignableTaskProvider, HasModelClas
             $query->where('status', '!=', HsCorrectiveAction::STATUS_CLOSED);
         }
 
-        return $query->get()->map(function (HsCorrectiveAction $action) use ($includeSearchContext) {
-            $event = $action->hsEvent;
-            $journey = IncidentJourneyTaskContext::make(
-                $event?->clientIncident,
-                $event?->controlRoomAlert,
-                $event,
-                $includeSearchContext,
-            );
-            $client = $journey['person'] ?? ($event?->client ? [
-                'id' => $event->client->id,
-                'name' => trim($event->client->first_name.' '.$event->client->last_name),
-            ] : null);
-            $site = $journey['site'] ?? ($event?->site ? [
-                'id' => $event->site->id,
-                'name' => $event->site->name,
-            ] : null);
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped->whereHas(
+                'hsEvent',
+                fn ($events) => app(UserSiteAccessService::class)->applyHsEventScope(
+                    $events,
+                    $actor,
+                    self::SITE_BYPASS_PERMISSIONS,
+                ),
+            ),
+            function (HsCorrectiveAction $action) use ($includeSearchContext) {
+                $event = $action->hsEvent;
+                $journey = IncidentJourneyTaskContext::make(
+                    $event?->clientIncident,
+                    $event?->controlRoomAlert,
+                    $event,
+                    $includeSearchContext,
+                );
+                $client = $journey['person'] ?? ($event?->client ? [
+                    'id' => $event->client->id,
+                    'name' => trim($event->client->first_name.' '.$event->client->last_name),
+                ] : null);
+                $site = $journey['site'] ?? ($event?->site ? [
+                    'id' => $event->site->id,
+                    'name' => $event->site->name,
+                ] : null);
 
-            return new TaskItem(
-                id: 'corrective_action-'.$action->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $action->reference_number,
-                title: $action->title ?: 'Corrective action',
-                status: (string) $action->status,
-                bucket: match ($action->status) {
-                    HsCorrectiveAction::STATUS_CLOSED => TaskItem::BUCKET_DONE,
-                    HsCorrectiveAction::STATUS_IN_PROGRESS,
-                    HsCorrectiveAction::STATUS_COMPLETED,
-                    HsCorrectiveAction::STATUS_VERIFIED => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_OPEN,
-                },
-                severity: TaskItem::normaliseSeverity($action->priority),
-                assignee: $action->assignedTo
-                    ? ['id' => $action->assignedTo->id, 'name' => $action->assignedTo->name]
-                    : null,
-                client: $client,
-                site: $site,
-                dueAt: optional($action->due_date)->toIso8601String(),
-                createdAt: optional($action->created_at)->toIso8601String(),
-                link: "/health-safety/corrective-actions?event={$action->hs_event_id}",
-                type: 'Corrective action',
-                description: $action->description ? str($action->description)->limit(140)->toString() : null,
-                journey: $journey,
-                sourceContext: 'Health & Safety',
-                actionLabel: match ($action->status) {
-                    HsCorrectiveAction::STATUS_OPEN => 'Start corrective action',
-                    HsCorrectiveAction::STATUS_IN_PROGRESS => 'Complete corrective action',
-                    HsCorrectiveAction::STATUS_COMPLETED => 'Verify corrective action',
-                    HsCorrectiveAction::STATUS_VERIFIED => 'Close corrective action',
-                    default => 'Review corrective action',
-                },
-                displayState: match ($action->status) {
-                    HsCorrectiveAction::STATUS_OPEN => 'Not started',
-                    HsCorrectiveAction::STATUS_IN_PROGRESS => 'In progress',
-                    HsCorrectiveAction::STATUS_COMPLETED => 'Awaiting independent verification',
-                    HsCorrectiveAction::STATUS_VERIFIED => 'Verified — ready to close',
-                    HsCorrectiveAction::STATUS_CLOSED => 'Closed',
-                    default => ucfirst(str_replace('_', ' ', (string) $action->status)),
-                },
-                searchTerms: $includeSearchContext
-                    ? array_values(array_filter([
-                        $action->assignedTo?->name,
-                        $action->sourceControlRoomTask?->title,
-                        $action->sourceControlRoomTask?->description,
-                        $action->hsInvestigation?->reference_number,
-                    ]))
-                    : [],
-                actionHelp: match ($action->status) {
-                    HsCorrectiveAction::STATUS_COMPLETED => 'A different H&S manager must review the retained evidence.',
-                    HsCorrectiveAction::STATUS_VERIFIED => 'The evidence is verified; close the action to finish the responsibility.',
-                    default => null,
-                },
-            );
-        })->all();
+                return new TaskItem(
+                    id: 'corrective_action-'.$action->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $action->reference_number,
+                    title: $action->title ?: 'Corrective action',
+                    status: (string) $action->status,
+                    bucket: match ($action->status) {
+                        HsCorrectiveAction::STATUS_CLOSED => TaskItem::BUCKET_DONE,
+                        HsCorrectiveAction::STATUS_IN_PROGRESS,
+                        HsCorrectiveAction::STATUS_COMPLETED,
+                        HsCorrectiveAction::STATUS_VERIFIED => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN,
+                    },
+                    severity: TaskItem::normaliseSeverity($action->priority),
+                    assignee: $action->assignedTo
+                        ? ['id' => $action->assignedTo->id, 'name' => $action->assignedTo->name]
+                        : null,
+                    client: $client,
+                    site: $site,
+                    dueAt: optional($action->due_date)->toIso8601String(),
+                    createdAt: optional($action->created_at)->toIso8601String(),
+                    link: "/health-safety/corrective-actions?event={$action->hs_event_id}",
+                    type: 'Corrective action',
+                    description: $action->description ? str($action->description)->limit(140)->toString() : null,
+                    journey: $journey,
+                    sourceContext: 'Health & Safety',
+                    actionLabel: match ($action->status) {
+                        HsCorrectiveAction::STATUS_OPEN => 'Start corrective action',
+                        HsCorrectiveAction::STATUS_IN_PROGRESS => 'Complete corrective action',
+                        HsCorrectiveAction::STATUS_COMPLETED => 'Verify corrective action',
+                        HsCorrectiveAction::STATUS_VERIFIED => 'Close corrective action',
+                        default => 'Review corrective action',
+                    },
+                    displayState: match ($action->status) {
+                        HsCorrectiveAction::STATUS_OPEN => 'Not started',
+                        HsCorrectiveAction::STATUS_IN_PROGRESS => 'In progress',
+                        HsCorrectiveAction::STATUS_COMPLETED => 'Awaiting independent verification',
+                        HsCorrectiveAction::STATUS_VERIFIED => 'Verified — ready to close',
+                        HsCorrectiveAction::STATUS_CLOSED => 'Closed',
+                        default => ucfirst(str_replace('_', ' ', (string) $action->status)),
+                    },
+                    searchTerms: $includeSearchContext
+                        ? array_values(array_filter([
+                            $action->assignedTo?->name,
+                            $action->sourceControlRoomTask?->title,
+                            $action->sourceControlRoomTask?->description,
+                            $action->hsInvestigation?->reference_number,
+                        ]))
+                        : [],
+                    actionHelp: match ($action->status) {
+                        HsCorrectiveAction::STATUS_COMPLETED => 'A different H&S manager must review the retained evidence.',
+                        HsCorrectiveAction::STATUS_VERIFIED => 'The evidence is verified; close the action to finish the responsibility.',
+                        default => null,
+                    },
+                );
+            },
+        );
     }
 }

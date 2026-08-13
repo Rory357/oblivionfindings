@@ -40,7 +40,7 @@ function navigationTestProvider(
             return true;
         }
 
-        public function tasks(User $user, array $filters = []): array
+        public function authorizedTasks(User $user, array $filters = []): array
         {
             $this->calls++;
 

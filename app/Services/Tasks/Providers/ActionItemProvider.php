@@ -5,12 +5,14 @@ namespace App\Services\Tasks\Providers;
 use App\Domain\Governance\Models\ActionItem;
 use App\Models\User;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
+use App\Services\Tasks\Contracts\ExplicitlyGlobalTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 use Illuminate\Validation\ValidationException;
 
-class ActionItemProvider implements AssignableTaskProvider, HasModelClass, TaskProvider
+class ActionItemProvider implements AssignableTaskProvider, ExplicitlyGlobalTaskProvider, HasModelClass, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -66,7 +68,12 @@ class ActionItemProvider implements AssignableTaskProvider, HasModelClass, TaskP
         return $user->canDo('governance.actions.view');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function globalViewPermissions(): array
+    {
+        return ['governance.actions.view'];
+    }
+
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = ActionItem::query()
             ->with('assignedTo:id,name')
@@ -78,28 +85,33 @@ class ActionItemProvider implements AssignableTaskProvider, HasModelClass, TaskP
             $query->whereIn('status', ['open', 'in_progress', 'blocked']);
         }
 
-        return $query->get()->map(function (ActionItem $action) {
-            return new TaskItem(
-                id: 'action_item-'.$action->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $action->action_reference,
-                title: str((string) $action->description)->limit(140)->toString(),
-                status: (string) $action->status,
-                bucket: match ($action->status) {
-                    'complete' => TaskItem::BUCKET_DONE,
-                    'in_progress', 'blocked' => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_OPEN,
-                },
-                severity: TaskItem::normaliseSeverity($action->priority),
-                assignee: $action->assignedTo
-                    ? ['id' => $action->assignedTo->id, 'name' => (string) $action->assignedTo->name]
-                    : null,
-                dueAt: optional($action->due_date)->toIso8601String(),
-                createdAt: optional($action->created_at)->toIso8601String(),
-                link: '/governance/actions',
-                type: 'Action item',
-            );
-        })->all();
+        return app(TaskProviderAuthorization::class)->explicitlyGlobal(
+            $user,
+            $this->globalViewPermissions(),
+            $query,
+            function (ActionItem $action) {
+                return new TaskItem(
+                    id: 'action_item-'.$action->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $action->action_reference,
+                    title: str((string) $action->description)->limit(140)->toString(),
+                    status: (string) $action->status,
+                    bucket: match ($action->status) {
+                        'complete' => TaskItem::BUCKET_DONE,
+                        'in_progress', 'blocked' => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN,
+                    },
+                    severity: TaskItem::normaliseSeverity($action->priority),
+                    assignee: $action->assignedTo
+                        ? ['id' => $action->assignedTo->id, 'name' => (string) $action->assignedTo->name]
+                        : null,
+                    dueAt: optional($action->due_date)->toIso8601String(),
+                    createdAt: optional($action->created_at)->toIso8601String(),
+                    link: '/governance/actions',
+                    type: 'Action item',
+                );
+            },
+        );
     }
 }

@@ -2,12 +2,15 @@
 
 namespace App\Services\Tasks\Providers;
 
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\FleetServiceSchedule;
 use App\Models\FleetWorkOrder;
 use App\Models\User;
 use App\Services\Tasks\Contracts\ProvidesTaskSourceAliases;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 
 /**
  * Fleet maintenance backlog: work orders that are due (or about to be) and
@@ -17,7 +20,7 @@ use App\Services\Tasks\TaskItem;
  * (routes/fleet-assets.php: permission:fleet.viewAny|assets.viewAny) — the
  * same gate FleetIncidentProvider uses.
  */
-class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, TaskProvider
+class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, SiteScopedTaskProvider, TaskProvider
 {
     /** How far ahead a due date counts as actionable. */
     private const HORIZON_DAYS = 7;
@@ -40,15 +43,17 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, TaskProvide
         ];
     }
 
-    public function legacySourceAliasForId(int $id): ?string
+    public function legacySourceAliasForId(User $user, int $id): ?string
     {
+        $assetIds = app(SecurityDevicesAccessService::class)->authorizedAssetIds($user);
+
         // Historical provider order was work orders first, then schedules.
         // Resolve by record existence, never by due horizon or lifecycle state.
-        if (FleetWorkOrder::query()->whereKey($id)->exists()) {
+        if (FleetWorkOrder::query()->whereKey($id)->whereIn('asset_id', $assetIds)->exists()) {
             return 'fleet_work_order';
         }
 
-        if (FleetServiceSchedule::query()->whereKey($id)->exists()) {
+        if (FleetServiceSchedule::query()->whereKey($id)->whereIn('asset_id', $assetIds)->exists()) {
             return 'fleet_service_schedule';
         }
 
@@ -60,11 +65,11 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, TaskProvide
         return $user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         return array_merge(
-            $this->workOrders($filters),
-            $this->serviceSchedules($filters),
+            $this->workOrders($user, $filters),
+            $this->serviceSchedules($user, $filters),
         );
     }
 
@@ -73,7 +78,7 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, TaskProvide
      *
      * @return TaskItem[]
      */
-    private function workOrders(array $filters): array
+    private function workOrders(User $user, array $filters): array
     {
         $query = FleetWorkOrder::query()
             ->with(['asset:id,name', 'assignedTo:id,name'])
@@ -87,41 +92,50 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, TaskProvide
             $query->whereNotIn('status', ['completed', 'cancelled']);
         }
 
-        return $query->get()->map(function (FleetWorkOrder $order) {
-            $title = $order->title ?: 'Work order';
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped->whereIn(
+                'asset_id',
+                app(SecurityDevicesAccessService::class)->authorizedAssetIds($actor),
+            ),
+            function (FleetWorkOrder $order) {
+                $title = $order->title ?: 'Work order';
 
-            if ($order->asset) {
-                $title .= ' — '.$order->asset->name;
-            }
+                if ($order->asset) {
+                    $title .= ' — '.$order->asset->name;
+                }
 
-            return new TaskItem(
-                id: 'fleet_work_order-'.$order->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: $order->reference_number,
-                title: $title,
-                status: (string) $order->status,
-                bucket: match ($order->status) {
-                    'completed', 'cancelled' => TaskItem::BUCKET_DONE,
-                    'in_progress' => TaskItem::BUCKET_IN_PROGRESS,
-                    default => TaskItem::BUCKET_OPEN, // open / on_hold
-                },
-                severity: match ($order->priority) {
-                    'urgent' => 'critical',
-                    'high' => 'high',
-                    'medium' => 'medium',
-                    default => 'low',
-                },
-                assignee: $order->assignedTo
-                    ? ['id' => $order->assignedTo->id, 'name' => (string) $order->assignedTo->name]
-                    : null,
-                dueAt: optional($order->due_at)->toIso8601String(),
-                createdAt: optional($order->created_at)->toIso8601String(),
-                link: "/fleet-assets/maintenance/work-orders/{$order->id}",
-                type: 'Work order',
-                description: $order->description ? str($order->description)->limit(140)->toString() : null,
-            );
-        })->all();
+                return new TaskItem(
+                    id: 'fleet_work_order-'.$order->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: $order->reference_number,
+                    title: $title,
+                    status: (string) $order->status,
+                    bucket: match ($order->status) {
+                        'completed', 'cancelled' => TaskItem::BUCKET_DONE,
+                        'in_progress' => TaskItem::BUCKET_IN_PROGRESS,
+                        default => TaskItem::BUCKET_OPEN, // open / on_hold
+                    },
+                    severity: match ($order->priority) {
+                        'urgent' => 'critical',
+                        'high' => 'high',
+                        'medium' => 'medium',
+                        default => 'low',
+                    },
+                    assignee: $order->assignedTo
+                        ? ['id' => $order->assignedTo->id, 'name' => (string) $order->assignedTo->name]
+                        : null,
+                    dueAt: optional($order->due_at)->toIso8601String(),
+                    createdAt: optional($order->created_at)->toIso8601String(),
+                    link: "/fleet-assets/maintenance/work-orders/{$order->id}",
+                    type: 'Work order',
+                    description: $order->description ? str($order->description)->limit(140)->toString() : null,
+                );
+            },
+        );
     }
 
     /**
@@ -131,18 +145,26 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, TaskProvide
      *
      * @return TaskItem[]
      */
-    private function serviceSchedules(array $filters): array
+    private function serviceSchedules(User $user, array $filters): array
     {
-        return FleetServiceSchedule::query()
+        $query = FleetServiceSchedule::query()
             ->where('is_active', true)
             ->whereNotNull('next_due_at')
             ->where('next_due_at', '<=', now()->addDays(self::HORIZON_DAYS))
             ->with('asset:id,name')
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderBy('next_due_at')
-            ->limit(300)
-            ->get()
-            ->map(function (FleetServiceSchedule $schedule) {
+            ->limit(300);
+
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped->whereIn(
+                'asset_id',
+                app(SecurityDevicesAccessService::class)->authorizedAssetIds($actor),
+            ),
+            function (FleetServiceSchedule $schedule) {
                 $title = 'Service due';
 
                 if ($schedule->asset) {
@@ -169,6 +191,7 @@ class FleetMaintenanceProvider implements ProvidesTaskSourceAliases, TaskProvide
                     link: '/fleet-assets/maintenance/schedules',
                     type: 'Service schedule',
                 );
-            })->all();
+            },
+        );
     }
 }

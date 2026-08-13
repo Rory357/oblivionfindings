@@ -325,40 +325,22 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Keep task-provider faults out of the global Inertia failure path. A
-     * degraded projection is reported by TaskAggregator, exposed to clients,
-     * and deliberately not cached so the next request can recover promptly.
+     * Keep task-provider faults out of the global Inertia failure path. This
+     * projection is deliberately request-time: Site reassignment, revocation
+     * and permission changes must immediately remove foreign derived counts.
      *
      * @return array{view: bool, badge: int, badgeDegraded: bool}
      */
     private function taskNavigation(User $user): array
     {
-        $cacheKey = "tasks.nav.{$user->id}";
-        $cached = Cache::get($cacheKey);
-
-        if (is_array($cached)
-            && array_key_exists('view', $cached)
-            && array_key_exists('badge', $cached)) {
-            return [
-                'view' => (bool) $cached['view'],
-                'badge' => (int) $cached['badge'],
-                'badgeDegraded' => (bool) ($cached['badgeDegraded'] ?? false),
-            ];
-        }
-
         $this->preparePermissionLookup($user);
         $projection = app(TaskAggregator::class)->navigationBadgeFor($user);
-        $navigation = [
+
+        return [
             'view' => $projection['view'],
             'badge' => $projection['view'] ? $projection['badge'] : 0,
             'badgeDegraded' => $projection['degraded'],
         ];
-
-        if (! $projection['degraded']) {
-            Cache::put($cacheKey, $navigation, now()->addMinutes(5));
-        }
-
-        return $navigation;
     }
 
     /**

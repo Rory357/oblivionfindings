@@ -2,13 +2,17 @@
 
 namespace App\Services\Tasks\Providers;
 
+use App\Models\RespiteBooking;
 use App\Models\RespiteTask;
 use App\Models\User;
+use App\Services\Respite\RespiteStayScope;
 use App\Services\Tasks\Contracts\HasModelClass;
+use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
+use App\Services\Tasks\TaskProviderAuthorization;
 
-class RespiteTaskProvider implements HasModelClass, TaskProvider
+class RespiteTaskProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
     public function sourceKey(): string
     {
@@ -31,7 +35,7 @@ class RespiteTaskProvider implements HasModelClass, TaskProvider
         return $user->canDo('respite.tasks.view');
     }
 
-    public function tasks(User $user, array $filters = []): array
+    public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = RespiteTask::query()
             ->with('assignedTo:id,name')
@@ -48,35 +52,48 @@ class RespiteTaskProvider implements HasModelClass, TaskProvider
             ]);
         }
 
-        return $query->get()->map(function (RespiteTask $task) {
-            return new TaskItem(
-                id: 'respite_task-'.$task->id,
-                source: $this->sourceKey(),
-                sourceLabel: $this->label(),
-                ref: null,
-                title: (string) ($task->title ?: 'Respite task'),
-                status: (string) $task->status,
-                bucket: match ($task->status) {
-                    RespiteTask::STATUS_COMPLETED,
-                    RespiteTask::STATUS_APPROVED,
-                    RespiteTask::STATUS_SKIPPED => TaskItem::BUCKET_DONE,
-                    RespiteTask::STATUS_IN_PROGRESS,
-                    RespiteTask::STATUS_AWAITING_APPROVAL,
-                    RespiteTask::STATUS_BLOCKED => TaskItem::BUCKET_IN_PROGRESS,
-                    // pending | rejected (rejected needs rework)
-                    default => TaskItem::BUCKET_OPEN,
-                },
-                // Priority is the string vocabulary low/medium/high/critical.
-                severity: TaskItem::normaliseSeverity($task->priority),
-                assignee: $task->assignedTo
-                    ? ['id' => $task->assignedTo->id, 'name' => (string) $task->assignedTo->name]
-                    : null,
-                dueAt: optional($task->due_at)->toIso8601String(),
-                createdAt: optional($task->created_at)->toIso8601String(),
-                link: "/respite/tasks/{$task->id}",
-                type: 'Respite task',
-                description: $task->description ? str($task->description)->limit(140)->toString() : null,
-            );
-        })->all();
+        return app(TaskProviderAuthorization::class)->siteScoped(
+            $user,
+            $this->canView($user),
+            $query,
+            fn ($scoped, User $actor) => $scoped
+                ->where('subject_type', RespiteBooking::class)
+                ->whereHasMorph(
+                    'subject',
+                    [RespiteBooking::class],
+                    fn ($bookings) => app(RespiteStayScope::class)
+                        ->applyAccessibleBookingScope($bookings, $actor),
+                ),
+            function (RespiteTask $task) {
+                return new TaskItem(
+                    id: 'respite_task-'.$task->id,
+                    source: $this->sourceKey(),
+                    sourceLabel: $this->label(),
+                    ref: null,
+                    title: (string) ($task->title ?: 'Respite task'),
+                    status: (string) $task->status,
+                    bucket: match ($task->status) {
+                        RespiteTask::STATUS_COMPLETED,
+                        RespiteTask::STATUS_APPROVED,
+                        RespiteTask::STATUS_SKIPPED => TaskItem::BUCKET_DONE,
+                        RespiteTask::STATUS_IN_PROGRESS,
+                        RespiteTask::STATUS_AWAITING_APPROVAL,
+                        RespiteTask::STATUS_BLOCKED => TaskItem::BUCKET_IN_PROGRESS,
+                        // pending | rejected (rejected needs rework)
+                        default => TaskItem::BUCKET_OPEN,
+                    },
+                    // Priority is the string vocabulary low/medium/high/critical.
+                    severity: TaskItem::normaliseSeverity($task->priority),
+                    assignee: $task->assignedTo
+                        ? ['id' => $task->assignedTo->id, 'name' => (string) $task->assignedTo->name]
+                        : null,
+                    dueAt: optional($task->due_at)->toIso8601String(),
+                    createdAt: optional($task->created_at)->toIso8601String(),
+                    link: "/respite/tasks/{$task->id}",
+                    type: 'Respite task',
+                    description: $task->description ? str($task->description)->limit(140)->toString() : null,
+                );
+            },
+        );
     }
 }

@@ -48,7 +48,7 @@ test('HR case tasks include only cases whose subjects are at approved Sites', fu
         'title' => 'Hidden Site case',
     ]);
 
-    $items = app(HrCaseProvider::class)->tasks($this->manager);
+    $items = app(HrCaseProvider::class)->authorizedTasks($this->manager);
 
     expect(collect($items)->pluck('id')->all())
         ->toContain("hr_case-{$allowed->id}")
@@ -133,7 +133,7 @@ test('HR case tasks retain allowed Site history while concealing hidden Site his
         'status' => 'open',
     ]);
 
-    $items = app(HrCaseProvider::class)->tasks($this->manager);
+    $items = app(HrCaseProvider::class)->authorizedTasks($this->manager);
     expect(collect($items)->pluck('id')->all())
         ->toContain("hr_case-{$allowed->id}")
         ->not->toContain("hr_case-{$hidden->id}");

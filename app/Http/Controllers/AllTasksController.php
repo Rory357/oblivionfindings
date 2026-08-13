@@ -14,6 +14,7 @@ use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskAssignmentNotifier;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskSearch;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -227,6 +228,7 @@ class AllTasksController extends Controller
         $provider = $aggregator->providerFor($source);
 
         abort_unless($provider !== null && $provider->canView($user), 404);
+        abort_unless($aggregator->findItemFor($user, $source, $id) !== null, 404);
         abort_unless($provider instanceof AssignableTaskProvider, 400, 'This record type cannot be assigned from the queue.');
 
         if (! $provider->canAssign($user)) {
@@ -280,11 +282,16 @@ class AllTasksController extends Controller
         ]);
 
         if (! $validated['watching']) {
-            TaskWatcher::query()
+            $ownWatcher = TaskWatcher::query()
                 ->whereIn('source', $aggregator->watcherSourceKeysFor($source))
                 ->where('item_id', $id)
-                ->where('user_id', $user->id)
-                ->delete();
+                ->where('user_id', $user->id);
+
+            // Revoked users may remove their own stale follower row without
+            // resolving the now-hidden source record. A guessed foreign ID
+            // with no caller-owned row retains the same generic 404 shape.
+            abort_unless($ownWatcher->exists(), 404);
+            $ownWatcher->delete();
 
             Cache::forget("tasks.nav.{$user->id}");
 
@@ -333,6 +340,7 @@ class AllTasksController extends Controller
 
         $provider = $aggregator->providerFor($source);
         abort_unless($provider !== null && $provider->canView($user), 404);
+        abort_unless($aggregator->findItemFor($user, $source, $id) !== null, 404);
         abort_unless($provider instanceof SplittableTaskProvider, 400, 'This record type cannot be split into a child task.');
 
         try {
@@ -349,8 +357,7 @@ class AllTasksController extends Controller
         // FYI the new child's assignee (never the actor). Personal ping only —
         // the false trio stops NotificationService fanning it to every manager.
         if ($assigneeId !== null && $assigneeId !== $user->id) {
-            $parent = collect($provider->tasks($user, ['include_done' => true]))
-                ->first(fn (TaskItem $i) => $i->id === "{$source}-{$id}");
+            $parent = $aggregator->findItemFor($user, $source, $id);
 
             app(NotificationService::class)->notifyCrud(
                 actor: $user,
@@ -388,6 +395,11 @@ class AllTasksController extends Controller
 
         $users = User::query()
             ->staff()
+            ->tap(fn ($users) => app(UserSiteAccessService::class)->applyStaffScope(
+                $users,
+                $request->user(),
+                ['reports.viewAny'],
+            ))
             ->when($q !== '', fn ($query) => $query->where('name', 'like', '%'.$q.'%'))
             ->orderBy('name')
             ->limit(20)
@@ -428,7 +440,7 @@ class AllTasksController extends Controller
     {
         $validated = $request->validate([
             'view' => ['nullable', 'array'],
-            // All 22 module keys as one CSV run past 250 chars — cap generously.
+            // All provider keys as one CSV run past 250 chars — cap generously.
             'view.*' => ['nullable', 'string', 'max:500'],
         ]);
 

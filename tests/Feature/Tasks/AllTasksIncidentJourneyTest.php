@@ -232,7 +232,7 @@ it('keeps private journey search relations out of the normal capped incident fee
         $queries[] = strtolower($query->sql);
     });
 
-    $items = (new ClientIncidentProvider)->tasks($user);
+    $items = (new ClientIncidentProvider)->authorizedTasks($user);
 
     expect($items)->not->toBeEmpty()
         ->and(collect($queries)->contains(fn (string $sql) => str_contains($sql, 'incident_followups')))->toBeFalse()
