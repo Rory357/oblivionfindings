@@ -4,7 +4,7 @@ namespace App\Http\Controllers\ControlRoom\Concerns;
 
 use App\Models\ControlRoomAlert;
 use App\Models\User;
-use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\ControlRoom\ControlRoomAlertNestedResourceResolver;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -25,10 +25,12 @@ trait AuthorizesControlRoomAlertAccess
 
     protected function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
     {
-        app(ControlRoomAlertAccessService::class)->assertCanView(
-            $alert,
-            $user,
-        );
+        $this->nestedAlertResources()->alert($user, $alert);
+    }
+
+    protected function nestedAlertResources(): ControlRoomAlertNestedResourceResolver
+    {
+        return app(ControlRoomAlertNestedResourceResolver::class);
     }
 
     protected function accessibleStaffQuery(User $user): Builder

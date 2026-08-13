@@ -88,11 +88,11 @@ class ControlRoomEvidenceController extends Controller
      *
      * Handles three cases: file upload, text note, or CCTV bookmark.
      */
-    public function storeItem(Request $request, EvidencePack $pack)
+    public function storeItem(Request $request, ControlRoomAlert $alert, int $pack)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessAlert($user, $pack->alert);
+        $pack = $this->nestedAlertResources()->evidencePack($user, $alert, $pack);
 
         if ($pack->status !== 'collecting') {
             return back()->withErrors(['pack' => 'Cannot add items to a completed or exported pack.']);
@@ -115,13 +115,16 @@ class ControlRoomEvidenceController extends Controller
     /**
      * Remove an evidence item.
      */
-    public function destroyItem(Request $request, EvidenceItem $item)
-    {
+    public function destroyItem(
+        Request $request,
+        ControlRoomAlert $alert,
+        int $pack,
+        int $item,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-
+        $item = $this->nestedAlertResources()->evidenceItem($user, $alert, $pack, $item);
         $pack = $item->evidencePack;
-        $this->assertCanAccessAlert($user, $pack->alert);
 
         if ($pack->status !== 'collecting') {
             return back()->withErrors(['pack' => 'Cannot remove items from a completed or exported pack.']);
@@ -152,12 +155,16 @@ class ControlRoomEvidenceController extends Controller
      * Uploads are validated to a safe allowlist at store time; serving as an
      * attachment (never inline) keeps any document from executing in-browser.
      */
-    public function downloadItem(Request $request, EvidenceItem $item)
-    {
+    public function downloadItem(
+        Request $request,
+        ControlRoomAlert $alert,
+        int $pack,
+        int $item,
+    ) {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+        $item = $this->nestedAlertResources()->evidenceItem($user, $alert, $pack, $item);
         $pack = $item->evidencePack;
-        $this->assertCanAccessAlert($user, $pack->alert);
 
         abort_unless($item->storage_path && Storage::disk('local')->exists($item->storage_path), 404);
 
@@ -177,11 +184,11 @@ class ControlRoomEvidenceController extends Controller
     /**
      * Mark an evidence pack as complete.
      */
-    public function completePack(Request $request, EvidencePack $pack)
+    public function completePack(Request $request, ControlRoomAlert $alert, int $pack)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessAlert($user, $pack->alert);
+        $pack = $this->nestedAlertResources()->evidencePack($user, $alert, $pack);
 
         if ($pack->status !== 'collecting') {
             return back()->withErrors(['pack' => 'Only packs with status "collecting" can be completed.']);
@@ -199,11 +206,11 @@ class ControlRoomEvidenceController extends Controller
     /**
      * Export an evidence pack as a ZIP download.
      */
-    public function export(Request $request, EvidencePack $pack)
+    public function export(Request $request, ControlRoomAlert $alert, int $pack)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessAlert($user, $pack->alert);
+        $pack = $this->nestedAlertResources()->evidencePack($user, $alert, $pack);
 
         if ($pack->status !== 'complete') {
             return back()->withErrors(['pack' => 'Only completed packs can be exported.']);

@@ -22,6 +22,7 @@ use App\Services\ControlRoom\AlertWorklistQuery;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\ControlRoom\ControlRoomAlertNestedResourceResolver;
 use App\Services\ControlRoom\ControlRoomAlertProvenanceService;
 use App\Services\ControlRoom\ControlRoomHandoverScopeService;
 use App\Services\ControlRoom\SensorIncidentBridgeService;
@@ -1263,10 +1264,7 @@ class ControlRoomAlertController extends Controller
 
     protected function assertCanAccessAlert(User $user, ControlRoomAlert $alert): void
     {
-        app(ControlRoomAlertAccessService::class)->assertCanView(
-            $alert,
-            $user,
-        );
+        app(ControlRoomAlertNestedResourceResolver::class)->alert($user, $alert);
     }
 
     protected function freshAssignmentActor(User $actor): User

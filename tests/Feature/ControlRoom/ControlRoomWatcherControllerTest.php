@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ControlRoomWatcherControllerTest extends TestCase
@@ -66,7 +67,7 @@ class ControlRoomWatcherControllerTest extends TestCase
 
     public function test_index_returns_watchers(): void
     {
-        AlertWatcher::create([
+        $watcher = AlertWatcher::create([
             'alert_id' => $this->alert->id,
             'user_id' => $this->other->id,
             'added_by_user_id' => $this->admin->id,
@@ -95,7 +96,7 @@ class ControlRoomWatcherControllerTest extends TestCase
 
     public function test_store_rejects_duplicate_watcher(): void
     {
-        AlertWatcher::create([
+        $watcher = AlertWatcher::create([
             'alert_id' => $this->alert->id,
             'user_id' => $this->other->id,
             'added_by_user_id' => $this->admin->id,
@@ -137,7 +138,7 @@ class ControlRoomWatcherControllerTest extends TestCase
 
     public function test_destroy_removes_watcher(): void
     {
-        AlertWatcher::create([
+        $watcher = AlertWatcher::create([
             'alert_id' => $this->alert->id,
             'user_id' => $this->other->id,
             'added_by_user_id' => $this->admin->id,
@@ -147,7 +148,7 @@ class ControlRoomWatcherControllerTest extends TestCase
         $this->alert->update(['watchers_count' => 1]);
 
         $this->actingAs($this->admin)
-            ->delete("/control-room/alerts/{$this->alert->id}/watchers/{$this->other->id}")
+            ->delete("/control-room/alerts/{$this->alert->id}/watchers/{$watcher->id}")
             ->assertOk();
 
         $this->assertDatabaseMissing('control_room_alert_watchers', [
@@ -163,9 +164,29 @@ class ControlRoomWatcherControllerTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_destroy_replay_does_not_decrement_or_audit_twice(): void
+    {
+        $watcher = AlertWatcher::create([
+            'alert_id' => $this->alert->id,
+            'user_id' => $this->other->id,
+            'added_by_user_id' => $this->admin->id,
+        ]);
+        $this->alert->update(['watchers_count' => 1]);
+
+        $url = "/control-room/alerts/{$this->alert->id}/watchers/{$watcher->id}";
+        $this->actingAs($this->admin)->delete($url)->assertOk();
+        $this->actingAs($this->admin)->delete($url)->assertNotFound();
+
+        $this->assertSame(0, $this->alert->fresh()->watchers_count);
+        $this->assertSame(1, DB::table('audit_logs')
+            ->where('action', 'controlRoom.watcher.removed')
+            ->where('auditable_id', $this->alert->id)
+            ->count());
+    }
+
     public function test_destroy_redirects_back_for_inertia_requests(): void
     {
-        AlertWatcher::create([
+        $watcher = AlertWatcher::create([
             'alert_id' => $this->alert->id,
             'user_id' => $this->other->id,
             'added_by_user_id' => $this->admin->id,
@@ -177,7 +198,7 @@ class ControlRoomWatcherControllerTest extends TestCase
         // the Inertia visit).
         $this->actingAs($this->admin)
             ->withHeader('X-Inertia', 'true')
-            ->delete("/control-room/alerts/{$this->alert->id}/watchers/{$this->other->id}")
+            ->delete("/control-room/alerts/{$this->alert->id}/watchers/{$watcher->id}")
             ->assertRedirect();
 
         $this->assertDatabaseMissing('control_room_alert_watchers', [

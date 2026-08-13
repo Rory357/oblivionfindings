@@ -1117,7 +1117,7 @@ class ControlRoomAlertControllerTest extends TestCase
         $alert->update(['playbook_run_id' => $run->id]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$alert->id}/playbook/advance")
+            ->post("/control-room/alerts/{$alert->id}/playbook-runs/{$run->id}/advance")
             ->assertRedirect()
             ->assertSessionDoesntHaveErrors();
 
@@ -1147,7 +1147,7 @@ class ControlRoomAlertControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/control-room/evidence/{$pack->id}/items", [
+            ->post("/control-room/alerts/{$alert->id}/evidence/{$pack->id}/items", [
                 'file' => UploadedFile::fake()->create('evidence.pdf', 12, 'application/pdf'),
             ])
             ->assertRedirect()

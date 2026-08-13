@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ControlRoomPlaybookControllerTest extends TestCase
@@ -244,6 +245,57 @@ class ControlRoomPlaybookControllerTest extends TestCase
         ]);
     }
 
+    public function test_start_and_advance_replays_do_not_duplicate_runs_steps_or_audits(): void
+    {
+        $playbook = Playbook::create([
+            'code' => 'pb-replay',
+            'name' => 'Replay safe',
+            'category' => 'safety',
+            'is_active' => true,
+        ]);
+        PlaybookStep::create([
+            'playbook_id' => $playbook->id,
+            'order' => 0,
+            'title' => 'Only step',
+            'type' => 'task',
+        ]);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'site_id' => $this->site->id,
+        ]);
+        $startUrl = "/control-room/alerts/{$alert->id}/playbook/start";
+
+        $this->actingAs($this->admin)
+            ->post($startUrl, ['playbook_id' => $playbook->id])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+        $this->actingAs($this->admin)
+            ->post($startUrl, ['playbook_id' => $playbook->id])
+            ->assertSessionHasErrors('playbook');
+
+        $run = PlaybookRun::query()->where('alert_id', $alert->id)->sole();
+        $this->assertSame(1, $run->steps()->count());
+        $this->assertSame(1, DB::table('audit_logs')
+            ->where('action', 'controlRoom.playbook.startRun')
+            ->where('auditable_id', $alert->id)
+            ->count());
+
+        $advanceUrl = "/control-room/alerts/{$alert->id}/playbook-runs/{$run->id}/advance";
+        $this->actingAs($this->admin)
+            ->post($advanceUrl)
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+        $this->actingAs($this->admin)
+            ->post($advanceUrl)
+            ->assertSessionHasErrors('playbook');
+
+        $this->assertSame(PlaybookRun::STATUS_COMPLETED, $run->fresh()->status);
+        $this->assertSame(1, $run->fresh()->completed_steps);
+        $this->assertSame(1, DB::table('audit_logs')
+            ->where('action', 'controlRoom.playbook.runCompleted')
+            ->where('auditable_id', $alert->id)
+            ->count());
+    }
+
     public function test_started_run_steps_carry_their_template_titles(): void
     {
         // Regression: run steps were rendered as an empty "Step " because the
@@ -320,19 +372,19 @@ class ControlRoomPlaybookControllerTest extends TestCase
 
         // Complete step 1 → counts.
         $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$alert->id}/playbook/advance", [])
+            ->post("/control-room/alerts/{$alert->id}/playbook-runs/{$run->id}/advance", [])
             ->assertRedirect();
         $this->assertSame(1, $run->fresh()->completed_steps);
 
         // Skip step 2 → does not count.
         $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$alert->id}/playbook/skip", [])
+            ->post("/control-room/alerts/{$alert->id}/playbook-runs/{$run->id}/skip", [])
             ->assertRedirect();
         $this->assertSame(1, $run->fresh()->completed_steps);
 
         // Complete step 3 → counts, run finishes at 2 completed of 3 total.
         $this->actingAs($this->admin)
-            ->post("/control-room/alerts/{$alert->id}/playbook/advance", [])
+            ->post("/control-room/alerts/{$alert->id}/playbook-runs/{$run->id}/advance", [])
             ->assertRedirect();
         $run->refresh();
         $this->assertSame(2, $run->completed_steps);

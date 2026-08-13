@@ -79,7 +79,7 @@ echo json_encode([
         ->value('id'),
 ], JSON_THROW_ON_ERROR);
 `).id;
-        await postLaravel(page, `/control-room/evidence/${packId}/items`, {
+        await postLaravel(page, `/control-room/alerts/${alertId}/evidence/${packId}/items`, {
             item_type: 'note',
             content:
                 'Photograph logged: loose rail, wet-floor marker, and isolation tape.',

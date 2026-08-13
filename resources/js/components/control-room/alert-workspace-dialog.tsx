@@ -978,8 +978,8 @@ export function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
             },
         );
     };
-    const removeWatcher = (userId: number) => {
-        router.delete(`/control-room/alerts/${a.id}/watchers/${userId}`, {
+    const removeWatcher = (watcherId: number) => {
+        router.delete(`/control-room/alerts/${a.id}/watchers/${watcherId}`, {
             preserveScroll: true,
             preserveState: true,
         });
@@ -1017,7 +1017,7 @@ export function WatchToggle({ d }: { d: AlertWorkspaceDetail }) {
                                 <Button
                                     unstyled
                                     type="button"
-                                    onClick={() => removeWatcher(w.user_id)}
+                                    onClick={() => removeWatcher(w.id)}
                                     className="text-muted-foreground/60 hover:text-status-critical"
                                     aria-label={`Remove ${w.user_name}`}
                                 >
@@ -2848,14 +2848,16 @@ function PlaybookSection({
     const run = d.playbook_run;
     const alertId = d.alert.id;
     const advance = () =>
+        run &&
         router.post(
-            `/control-room/alerts/${alertId}/playbook/advance`,
+            `/control-room/alerts/${alertId}/playbook-runs/${run.id}/advance`,
             {},
             { preserveScroll: true },
         );
     const skip = () =>
+        run &&
         router.post(
-            `/control-room/alerts/${alertId}/playbook/skip`,
+            `/control-room/alerts/${alertId}/playbook-runs/${run.id}/skip`,
             {},
             { preserveScroll: true },
         );
@@ -3014,6 +3016,7 @@ function EvidenceSection({ d }: { d: AlertWorkspaceDetail }) {
                 d.evidence_packs.map((pack) => (
                     <EvidencePackCard
                         key={pack.id}
+                        alertId={d.alert.id}
                         pack={pack}
                         canManage={canManage}
                     />
@@ -3093,9 +3096,11 @@ const EVIDENCE_TYPE_LABELS: Record<string, string> = {
 };
 
 function EvidencePackCard({
+    alertId,
     pack,
     canManage,
 }: {
+    alertId: number;
     pack: AlertWorkspaceDetail['evidence_packs'][number];
     canManage: boolean;
 }) {
@@ -3106,7 +3111,7 @@ function EvidencePackCard({
 
     const uploadFile = (file: File) => {
         router.post(
-            `/control-room/evidence/${pack.id}/items`,
+            `/control-room/alerts/${alertId}/evidence/${pack.id}/items`,
             { item_type: 'file', file },
             {
                 preserveScroll: true,
@@ -3117,7 +3122,7 @@ function EvidencePackCard({
     };
 
     const removeItem = (itemId: number) => {
-        router.delete(`/control-room/evidence/items/${itemId}`, {
+        router.delete(`/control-room/alerts/${alertId}/evidence/${pack.id}/items/${itemId}`, {
             preserveScroll: true,
         });
     };
@@ -3137,7 +3142,7 @@ function EvidencePackCard({
                 <div className="flex shrink-0 items-center gap-1.5">
                     {pack.status === 'complete' ? (
                         <a
-                            href={`/control-room/evidence/${pack.id}/export`}
+                            href={`/control-room/alerts/${alertId}/evidence/${pack.id}/export`}
                             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-muted"
                         >
                             <Download className="h-3.5 w-3.5" /> Export ZIP
@@ -3157,6 +3162,7 @@ function EvidencePackCard({
 
             {completing ? (
                 <CompletePackReview
+                    alertId={alertId}
                     pack={pack}
                     onCancel={() => setCompleting(false)}
                 />
@@ -3262,11 +3268,13 @@ function EvidencePackCard({
                                 </div>
                             ) : adding === 'note' ? (
                                 <EvidenceNoteForm
+                                    alertId={alertId}
                                     packId={pack.id}
                                     onDone={() => setAdding(null)}
                                 />
                             ) : (
                                 <EvidenceCctvForm
+                                    alertId={alertId}
                                     packId={pack.id}
                                     onDone={() => setAdding(null)}
                                 />
@@ -3280,15 +3288,17 @@ function EvidencePackCard({
 }
 
 function CompletePackReview({
+    alertId,
     pack,
     onCancel,
 }: {
+    alertId: number;
     pack: AlertWorkspaceDetail['evidence_packs'][number];
     onCancel: () => void;
 }) {
     const form = useForm({});
     const submit = () => {
-        form.post(`/control-room/evidence/${pack.id}/complete`, {
+        form.post(`/control-room/alerts/${alertId}/evidence/${pack.id}/complete`, {
             preserveScroll: true,
             onSuccess: onPaneSuccess(onCancel),
         });
@@ -3330,9 +3340,11 @@ function CompletePackReview({
 }
 
 function EvidenceNoteForm({
+    alertId,
     packId,
     onDone,
 }: {
+    alertId: number;
     packId: number;
     onDone: () => void;
 }) {
@@ -3342,7 +3354,7 @@ function EvidenceNoteForm({
     });
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        form.post(`/control-room/evidence/${packId}/items`, {
+        form.post(`/control-room/alerts/${alertId}/evidence/${packId}/items`, {
             preserveScroll: true,
             onSuccess: () => {
                 form.reset();
@@ -3382,9 +3394,11 @@ function EvidenceNoteForm({
 }
 
 function EvidenceCctvForm({
+    alertId,
     packId,
     onDone,
 }: {
+    alertId: number;
     packId: number;
     onDone: () => void;
 }) {
@@ -3395,7 +3409,7 @@ function EvidenceCctvForm({
     }>({ item_type: 'cctv_bookmark', camera_id: '', timestamp: '' });
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        form.post(`/control-room/evidence/${packId}/items`, {
+        form.post(`/control-room/alerts/${alertId}/evidence/${packId}/items`, {
             preserveScroll: true,
             onSuccess: () => {
                 form.reset();
@@ -3652,7 +3666,7 @@ function TaskRow({
                             icon={Check}
                             onConfirm={() =>
                                 router.post(
-                                    `/control-room/tasks/${t.id}/status`,
+                                    `/control-room/alerts/${d.alert.id}/tasks/${t.id}/status`,
                                     { status: 'completed' },
                                     { preserveScroll: true },
                                 )
@@ -3663,7 +3677,7 @@ function TaskRow({
                             icon={Trash2}
                             destructive
                             onConfirm={() =>
-                                router.delete(`/control-room/tasks/${t.id}`, {
+                                router.delete(`/control-room/alerts/${d.alert.id}/tasks/${t.id}`, {
                                     preserveScroll: true,
                                 })
                             }
@@ -3703,7 +3717,7 @@ function TaskRow({
                                     icon={Check}
                                     onConfirm={() =>
                                         router.post(
-                                            `/control-room/tasks/${st.id}/status`,
+                                            `/control-room/alerts/${d.alert.id}/tasks/${st.id}/status`,
                                             { status: 'completed' },
                                             { preserveScroll: true },
                                         )
@@ -3769,7 +3783,7 @@ function EditTaskForm({
                 : null,
             due_at: data.due_at || null,
         }));
-        form.put(`/control-room/tasks/${t.id}`, {
+        form.put(`/control-room/alerts/${d.alert.id}/tasks/${t.id}`, {
             preserveScroll: true,
             onSuccess: onDone,
         });
@@ -4153,7 +4167,7 @@ function TimeTracking({ d }: { d: AlertWorkspaceDetail }) {
                             icon={Timer}
                             onConfirm={() =>
                                 router.post(
-                                    `/control-room/time-entries/${myRunning.id}/stop`,
+                                    `/control-room/alerts/${alertId}/time-entries/${myRunning.id}/stop`,
                                     {},
                                     { preserveScroll: true },
                                 )
@@ -4229,7 +4243,7 @@ function TimeTracking({ d }: { d: AlertWorkspaceDetail }) {
                                     destructive
                                     onConfirm={() =>
                                         router.delete(
-                                            `/control-room/time-entries/${t.id}`,
+                                            `/control-room/alerts/${alertId}/time-entries/${t.id}`,
                                             { preserveScroll: true },
                                         )
                                     }
@@ -4445,12 +4459,17 @@ function DiscussionThread({
     const [replying, setReplying] = useState(false);
     return (
         <div className="rounded-lg border border-border p-2.5">
-            <DiscussionEntry entry={thread} canManage={d.can.manage} />
+            <DiscussionEntry
+                alertId={d.alert.id}
+                entry={thread}
+                canManage={d.can.manage}
+            />
             {thread.replies.length ? (
                 <div className="mt-2 flex flex-col gap-1.5 border-l-2 border-border pl-3">
                     {thread.replies.map((r) => (
                         <DiscussionEntry
                             key={r.id}
+                            alertId={d.alert.id}
                             entry={r}
                             canManage={d.can.manage}
                         />
@@ -4483,9 +4502,11 @@ function DiscussionThread({
 
 /** One comment or reply — the author can edit it in place; author or a manager can delete. */
 function DiscussionEntry({
+    alertId,
     entry,
     canManage,
 }: {
+    alertId: number;
     entry: {
         id: number;
         content: string;
@@ -4506,7 +4527,7 @@ function DiscussionEntry({
     const save = (e: FormEvent) => {
         e.preventDefault();
         if (!form.data.content.trim()) return;
-        form.put(`/control-room/discussions/${entry.id}`, {
+        form.put(`/control-room/alerts/${alertId}/discussions/${entry.id}`, {
             preserveScroll: true,
             onSuccess: () => setEditing(false),
         });
@@ -4574,7 +4595,7 @@ function DiscussionEntry({
                         destructive
                         onConfirm={() =>
                             router.delete(
-                                `/control-room/discussions/${entry.id}`,
+                                `/control-room/alerts/${alertId}/discussions/${entry.id}`,
                                 { preserveScroll: true },
                             )
                         }

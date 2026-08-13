@@ -10,7 +10,9 @@ use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ControlRoomTimeEntryController extends Controller
 {
@@ -103,11 +105,12 @@ class ControlRoomTimeEntryController extends Controller
     /**
      * Stop a running timer.
      */
-    public function stop(Request $request, TimeEntry $entry)
+    public function stop(Request $request, ControlRoomAlert $alert, int $entry)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessAlert($user, $entry->alert);
+        $entryId = $entry;
+        $entry = $this->nestedAlertResources()->timeEntry($user, $alert, $entryId);
 
         if (! $entry->isRunning()) {
             if ($request->header('X-Inertia')) {
@@ -121,23 +124,31 @@ class ControlRoomTimeEntryController extends Controller
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $endedAt = now();
-        $durationMinutes = (int) round($entry->started_at->diffInMinutes($endedAt));
+        $entry = DB::transaction(function () use ($alert, $data, $entryId, $user): TimeEntry {
+            $locked = $this->nestedAlertResources()->timeEntry($user, $alert, $entryId, true);
+            if (! $locked->isRunning()) {
+                throw ValidationException::withMessages([
+                    'alert' => 'This time entry is not running.',
+                ]);
+            }
 
-        $entry->update([
-            'ended_at' => $endedAt,
-            'duration_minutes' => max($durationMinutes, 1),
-            'description' => $data['description'] ?? $entry->description,
-        ]);
+            $endedAt = now();
+            $durationMinutes = (int) round($locked->started_at->diffInMinutes($endedAt));
+            $locked->update([
+                'ended_at' => $endedAt,
+                'duration_minutes' => max($durationMinutes, 1),
+                'description' => $data['description'] ?? $locked->description,
+            ]);
 
-        // Update alert aggregate
-        $this->updateAlertTimeSpent($entry->alert_id);
+            $this->updateAlertTimeSpent($alert->id);
+            AuditLogger::log('controlRoom.timeEntry.stopped', $alert, [
+                'alert_id' => $alert->id,
+                'entry_id' => $locked->id,
+                'duration_minutes' => $locked->duration_minutes,
+            ]);
 
-        AuditLogger::log('controlRoom.timeEntry.stopped', $entry->alert, [
-            'alert_id' => $entry->alert_id,
-            'entry_id' => $entry->id,
-            'duration_minutes' => $entry->duration_minutes,
-        ]);
+            return $locked;
+        }, 3);
 
         if ($request->header('X-Inertia')) {
             return $this->inertiaOrJson($request, "Timer stopped — {$entry->duration_minutes} min logged.");
@@ -209,25 +220,23 @@ class ControlRoomTimeEntryController extends Controller
     /**
      * Delete a time entry.
      */
-    public function destroy(Request $request, TimeEntry $entry)
+    public function destroy(Request $request, ControlRoomAlert $alert, int $entry)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
-        $this->assertCanAccessAlert($user, $entry->alert);
+        $entryId = $entry;
+        $this->nestedAlertResources()->timeEntry($user, $alert, $entryId);
 
-        $alertId = $entry->alert_id;
-        $alert = $entry->alert;
-        $entryId = $entry->id;
+        DB::transaction(function () use ($alert, $entryId, $user): void {
+            $locked = $this->nestedAlertResources()->timeEntry($user, $alert, $entryId, true);
+            $locked->delete();
+            $this->updateAlertTimeSpent($alert->id);
 
-        $entry->delete();
-
-        // Update alert aggregate
-        $this->updateAlertTimeSpent($alertId);
-
-        AuditLogger::log('controlRoom.timeEntry.deleted', $alert, [
-            'alert_id' => $alertId,
-            'entry_id' => $entryId,
-        ]);
+            AuditLogger::log('controlRoom.timeEntry.deleted', $alert, [
+                'alert_id' => $alert->id,
+                'entry_id' => $entryId,
+            ]);
+        }, 3);
 
         if ($request->header('X-Inertia')) {
             return $this->inertiaOrJson($request, 'Time entry deleted.');
