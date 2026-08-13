@@ -65,7 +65,9 @@ class ShiftClinicalController extends Controller
             'data' => ['present', 'array'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'recorded_at' => ['nullable', 'date'],
-            'protocol_schedule_id' => ['nullable', 'integer', 'exists:clinical_protocol_schedules,id'],
+            // Ownership and pending-state validation belongs to the canonical
+            // observation command, where it is performed atomically under lock.
+            'protocol_schedule_id' => ['nullable', 'integer'],
         ]);
 
         $type = ObservationType::from($validated['observation_type']);

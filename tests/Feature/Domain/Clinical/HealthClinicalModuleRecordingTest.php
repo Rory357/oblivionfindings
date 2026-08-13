@@ -5,6 +5,8 @@ namespace Tests\Feature\Domain\Clinical;
 use App\Domain\Clinical\Models\ClinicalAttachment;
 use App\Domain\Clinical\Models\ClinicalEvent;
 use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Clinical\Models\ClinicalProtocol;
+use App\Domain\Clinical\Models\ClinicalProtocolSchedule;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\Role;
@@ -91,6 +93,42 @@ class HealthClinicalModuleRecordingTest extends TestCase
             'client_id' => $this->client->id,
             'actor_user_id' => $user->id,
         ]);
+    }
+
+    public function test_module_observation_surface_rejects_another_residents_schedule_atomically(): void
+    {
+        $user = $this->createUserWithRole('coordinator');
+        $otherClient = Client::factory()->create([
+            'site_id' => $this->site->id,
+            'status' => 'active',
+        ]);
+        $protocol = ClinicalProtocol::factory()->dailyWeight()->create([
+            'client_id' => $otherClient->id,
+            'created_by' => $user->id,
+        ]);
+        $schedule = ClinicalProtocolSchedule::factory()->create([
+            'clinical_protocol_id' => $protocol->id,
+            'due_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->from('/health-clinical')
+            ->post('/health-clinical/observations', [
+                'client_id' => $this->client->id,
+                'observation_type' => 'weight',
+                'data' => ['weight_kg' => 78.4],
+                'protocol_schedule_id' => $schedule->id,
+            ])
+            ->assertRedirect('/health-clinical')
+            ->assertSessionHasErrors('protocol_schedule_id');
+
+        $schedule->refresh();
+        $this->assertSame('pending', $schedule->status);
+        $this->assertNull($schedule->completed_by);
+        $this->assertNull($schedule->completed_at);
+        $this->assertNull($schedule->clinical_observation_id);
+        $this->assertDatabaseCount('clinical_observations', 0);
+        $this->assertDatabaseCount('timeline_events', 0);
     }
 
     public function test_module_event_store_persists_witnesses(): void
