@@ -483,6 +483,113 @@ class UnifiSettingsRefactorTest extends TestCase
         ]);
     }
 
+    public function test_failed_sync_is_visible_preserves_last_success_and_requires_health_recovery_before_safe_retry(): void
+    {
+        $site = Site::factory()->create([]);
+        $siteConfig = IntegrationSiteConfig::create([
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'mapped_external_site_id' => 'local-site',
+            'is_active' => true,
+        ]);
+        $lastSyncedAt = now()->subDay()->startOfSecond();
+        $connection = IntegrationProviderConnection::create([
+            'provider' => 'unifi',
+            'secret_encrypted' => 'test-secret',
+            'status' => IntegrationProviderConnection::STATUS_CONNECTED,
+            'last_synced_at' => $lastSyncedAt,
+        ]);
+        $existingDevice = Device::factory()->itInfrastructure()->create([
+            'provider' => 'unifi',
+            'name' => 'Existing device',
+        ]);
+
+        $deviceAdapter = \Mockery::mock(DeviceSyncCapability::class);
+        $deviceAdapter->shouldReceive('syncDevices')
+            ->twice()
+            ->andReturn(
+                new SyncResult(error: 'RAW-TLS-FAILURE token=test-secret'),
+                new SyncResult(processed: 1, updated: 1),
+            );
+        $healthAdapter = \Mockery::mock(ConnectionHealthCapability::class);
+        $healthAdapter->shouldReceive('testConnection')->once()->andReturnTrue();
+        $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
+        $registry->shouldReceive('hasCapability')
+            ->twice()
+            ->with('unifi', DeviceSyncCapability::class)
+            ->andReturnTrue();
+        $registry->shouldReceive('capability')
+            ->twice()
+            ->with('unifi', DeviceSyncCapability::class)
+            ->andReturn($deviceAdapter);
+        $registry->shouldReceive('hasCapability')
+            ->once()
+            ->with('unifi', ConnectionHealthCapability::class)
+            ->andReturnTrue();
+        $registry->shouldReceive('capability')
+            ->once()
+            ->with('unifi', ConnectionHealthCapability::class)
+            ->andReturn($healthAdapter);
+        $this->instance(IntegrationAdapterRegistry::class, $registry);
+
+        $failed = $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/sync-devices', ['site_config_id' => $siteConfig->id])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+
+        $failedConnection = $connection->fresh();
+        $this->assertSame(IntegrationProviderConnection::STATUS_ERROR, $failedConnection->status);
+        $this->assertSame($lastSyncedAt->toDateTimeString(), $failedConnection->last_synced_at?->toDateTimeString());
+        $this->assertSame('Provider operation failed. Review the bounded diagnostic state and retry.', $failedConnection->last_error);
+        $this->assertSame('Existing device', $existingDevice->fresh()->name);
+        $this->assertSame(1, Device::query()->where('provider', 'unifi')->count());
+        $this->assertSame(IntegrationSyncLog::STATUS_FAILED, IntegrationSyncLog::query()->sole()->status);
+        $this->assertStringNotContainsString('RAW-TLS-FAILURE', json_encode([
+            'session' => $failed->getSession()->all(),
+            'connection' => $failedConnection->toArray(),
+            'sync' => IntegrationSyncLog::query()->sole()->toArray(),
+        ], JSON_THROW_ON_ERROR));
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/integrations/unifi')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('providerConnection.status', IntegrationProviderConnection::STATUS_ERROR)
+                ->where('syncLogs.0.status', IntegrationSyncLog::STATUS_FAILED)
+                ->where('syncLogs.0.failure_category', 'provider_failure'));
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/sync-devices', ['site_config_id' => $siteConfig->id])
+            ->assertRedirect()
+            ->assertSessionHas('error');
+        $this->assertDatabaseCount('integration_sync_logs', 1);
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/test')
+            ->assertRedirect()
+            ->assertSessionHas('success');
+        $this->assertSame(IntegrationProviderConnection::STATUS_CONNECTED, $connection->fresh()->status);
+
+        $this->actingAs($this->admin)
+            ->post('/security-devices/integrations/unifi/sync-devices', ['site_config_id' => $siteConfig->id])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $recovered = $connection->fresh();
+        $this->assertSame(IntegrationProviderConnection::STATUS_CONNECTED, $recovered->status);
+        $this->assertNull($recovered->last_error);
+        $this->assertTrue($recovered->last_synced_at?->isAfter($lastSyncedAt));
+        $this->assertDatabaseCount('integration_sync_logs', 2);
+        $this->assertDatabaseHas('integration_sync_logs', [
+            'provider' => 'unifi',
+            'site_id' => $site->id,
+            'status' => IntegrationSyncLog::STATUS_SUCCESS,
+            'items_processed' => 1,
+            'items_updated' => 1,
+        ]);
+        $this->assertSame(1, Device::query()->where('provider', 'unifi')->count());
+    }
+
     public function test_inactive_unifi_site_config_is_indistinguishable_from_missing_and_never_syncs(): void
     {
         config()->set('app.debug', false);

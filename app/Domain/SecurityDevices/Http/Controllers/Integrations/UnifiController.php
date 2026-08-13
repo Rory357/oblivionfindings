@@ -759,10 +759,15 @@ class UnifiController extends Controller
                 $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
             }
 
-            $connection->update([
-                'last_synced_at' => now(),
+            $connectionState = [
                 'last_error' => $result->isSuccess() ? null : SafeOperationalData::failureSummary(),
-            ]);
+            ];
+            if ($result->isSuccess() || $result->isPartial()) {
+                $connectionState['last_synced_at'] = now();
+            } else {
+                $connectionState['status'] = IntegrationProviderConnection::STATUS_ERROR;
+            }
+            $connection->update($connectionState);
 
             if (! $result->isSuccess() && ! $result->isPartial()) {
                 return redirect()->back()->with('error', 'UniFi device sync failed. Review the bounded diagnostic state and retry.');
@@ -774,6 +779,11 @@ class UnifiController extends Controller
             );
         } catch (\Throwable $e) {
             $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, SafeOperationalData::failureSummary());
+
+            $connection->update([
+                'status' => IntegrationProviderConnection::STATUS_ERROR,
+                'last_error' => SafeOperationalData::failureSummary(),
+            ]);
 
             return redirect()->back()->with('error', 'Failed to sync UniFi devices. Review the bounded diagnostic state and retry.');
         }

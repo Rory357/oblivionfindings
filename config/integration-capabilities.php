@@ -15,4 +15,9 @@ return [
     'milesight' => [
         'allowed_hosts' => $milesightAllowedHosts,
     ],
+    'unifi' => [
+        // Empty uses the operating system trust store. A configured path must
+        // resolve to a readable, valid PEM CA bundle or requests fail closed.
+        'ca_bundle' => env('UNIFI_CA_BUNDLE'),
+    ],
 ];

@@ -33,12 +33,12 @@ use App\Services\Integration\IntegrationSecretManager;
 use App\Services\Integration\IntegrationSecretMaterialService;
 use App\Services\Integration\SyncResult;
 use App\Services\Integration\UnifiOperationalBridgeService;
+use App\Services\Integration\UnifiTransportSecurity;
 use App\Support\SafeOperationalData;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, EventCollectionCapability, IntegrationAdapterInterface, InventoryDiscoveryCapability, ObservationCollectionCapability, SnapshotCollectionCapability, TopologyCollectionCapability, WebhookVerificationCapability
@@ -81,6 +81,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
         private readonly UnifiOperationalBridgeService $runtime,
         private readonly CanonicalDeviceSiteResolver $siteResolver,
         private readonly IntegrationSecretMaterialService $secrets,
+        private readonly UnifiTransportSecurity $transport,
     ) {}
 
     /**
@@ -2509,9 +2510,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
     /** @param array<string, string> $headers */
     private function providerRequest(array $headers = []): PendingRequest
     {
-        $request = Http::withoutRedirecting();
-
-        return $headers === [] ? $request : $request->withHeaders($headers);
+        return $this->transport->request($headers);
     }
 
     private function accessRetryAfter(mixed $value): int

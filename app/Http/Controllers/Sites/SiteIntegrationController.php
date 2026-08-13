@@ -348,12 +348,17 @@ class SiteIntegrationController extends Controller
                 );
             }
 
-            $providerConnection->update([
-                'last_synced_at' => now(),
+            $connectionState = [
                 'last_error' => $result->isSuccess() || $result->isPartial()
                     ? null
                     : SafeOperationalData::failureSummary(),
-            ]);
+            ];
+            if ($result->isSuccess() || $result->isPartial()) {
+                $connectionState['last_synced_at'] = now();
+            } else {
+                $connectionState['status'] = IntegrationProviderConnection::STATUS_ERROR;
+            }
+            $providerConnection->update($connectionState);
 
             if (! $result->isSuccess() && ! $result->isPartial()) {
                 return redirect()->back()->with('error', 'Device sync failed. Review the bounded diagnostic state and retry.');

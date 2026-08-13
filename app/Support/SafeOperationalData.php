@@ -15,6 +15,7 @@ use App\Models\SiteHouseRoom;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\Integration\IntegrationDiscoveryException;
+use App\Services\Integration\UnifiTransportConfigurationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
@@ -175,6 +176,7 @@ final class SafeOperationalData
     {
         return match (true) {
             $exception instanceof IntegrationDiscoveryException => $exception->failureCategory(),
+            $exception instanceof UnifiTransportConfigurationException => 'transport_security_failure',
             $exception instanceof ConnectionException => 'connection_failure',
             $exception instanceof ValidationException => 'validation_failure',
             default => 'provider_failure',
