@@ -221,6 +221,7 @@ class SiteChecklistRunExecutionService
             $this->assertMutable($run);
 
             $this->persistResponses($run, $responses);
+            $this->assertRequiredResponsesComplete($run);
             $run->calculateCompletion();
             $this->raiseFollowUpsForFailures($run, (int) $canonicalActor->id);
 
@@ -352,6 +353,34 @@ class SiteChecklistRunExecutionService
                     'is_failed' => (bool) ($response['is_failed'] ?? false),
                 ],
             );
+        }
+    }
+
+    private function assertRequiredResponsesComplete(SiteChecklistRun $run): void
+    {
+        $requiredItemIds = SiteChecklistTemplateItem::query()
+            ->where('template_id', $run->template_id)
+            ->where('is_required', true)
+            ->sharedLock()
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id);
+
+        if ($requiredItemIds->isEmpty()) {
+            return;
+        }
+
+        $answeredItemIds = $run->responses()
+            ->whereIn('template_item_id', $requiredItemIds->all())
+            ->lockForUpdate()
+            ->get(['template_item_id', 'response_value'])
+            ->filter(fn ($response): bool => trim((string) $response->response_value) !== '')
+            ->pluck('template_item_id')
+            ->map(fn ($id): int => (int) $id);
+
+        if ($requiredItemIds->diff($answeredItemIds)->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'responses' => 'Complete all required checklist items before signing.',
+            ]);
         }
     }
 

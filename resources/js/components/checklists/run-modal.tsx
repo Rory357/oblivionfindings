@@ -51,13 +51,10 @@ export function RunModal({
     const page = usePage();
     const runDetail =
         (page.props as { runDetail?: RunDetail | null }).runDetail ?? null;
-    const userName =
-        (page.props as { auth?: { user?: { name?: string } } })?.auth?.user
-            ?.name ?? '';
 
     const ready = runDetail && runDetail.id === runId;
     const [resp, setResp] = useState<RespState>({});
-    const [signature, setSignature] = useState(userName);
+    const [signature, setSignature] = useState('');
     const [show, setShow] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
@@ -305,21 +302,19 @@ export function RunModal({
                                 </div>
                             ) : (
                                 <div className="flex flex-col gap-3">
-                                    {runDetail!.template.flags?.sign ? (
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-medium text-muted-foreground">
-                                                Sign-off
-                                            </span>
-                                            <input
-                                                value={signature}
-                                                onChange={(e) =>
-                                                    setSignature(e.target.value)
-                                                }
-                                                placeholder="Your name"
-                                                className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
-                                            />
-                                        </div>
-                                    ) : null}
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-medium text-muted-foreground">
+                                            Sign-off
+                                        </span>
+                                        <input
+                                            value={signature}
+                                            onChange={(e) =>
+                                                setSignature(e.target.value)
+                                            }
+                                            placeholder="Your name"
+                                            className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring/30"
+                                        />
+                                    </div>
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="text-xs text-muted-foreground">
                                             {failed.length > 0 ? (

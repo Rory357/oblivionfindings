@@ -144,6 +144,90 @@ class ChecklistRunOwnershipTest extends TestCase
         );
     }
 
+    public function test_forged_partial_completion_cannot_sign_without_every_required_response(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $owner = $this->siteUser('support_worker', $site);
+        [$run, $requiredItem] = $this->makeChecklistRun($site, runAssignee: $owner);
+        $optionalItem = $run->template->items()->create([
+            'question' => 'Optional context',
+            'response_type' => 'text',
+            'is_required' => false,
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($owner)
+            ->post("/checklists/runs/{$run->id}/complete", [
+                'responses' => $this->payload($optionalItem, 'Only the optional item'),
+                'signature_name' => 'Forged Partial Attestation',
+            ])
+            ->assertSessionHasErrors([
+                'responses' => 'Complete all required checklist items before signing.',
+            ]);
+
+        $blocked = $run->fresh();
+        $this->assertSame('in_progress', $blocked->status);
+        $this->assertNull($blocked->signature_name);
+        $this->assertNull($blocked->signature_payload_hash);
+        $this->assertDatabaseMissing('site_checklist_responses', ['run_id' => $run->id]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'checklist.completed',
+            'auditable_id' => $run->id,
+        ]);
+
+        $this->actingAs($owner)
+            ->post("/checklists/runs/{$run->id}/complete", [
+                'responses' => [
+                    ...$this->payload($requiredItem, 'yes'),
+                    ...$this->payload($optionalItem, 'Optional context'),
+                ],
+                'signature_name' => 'Complete Attestation',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Checklist completed.');
+
+        $this->assertTrue($run->fresh()->hasVerifiableSignatureProvenance());
+    }
+
+    public function test_both_signature_configurations_require_an_explicit_typed_attestation(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $owner = $this->siteUser('support_worker', $site);
+
+        foreach ([false, true] as $requiresSignature) {
+            [$run, $item] = $this->makeChecklistRun(
+                $site,
+                runAssignee: $owner,
+                requiresSignature: $requiresSignature,
+            );
+
+            $this->actingAs($owner)
+                ->post("/checklists/runs/{$run->id}/complete", [
+                    'responses' => $this->payload($item, 'yes'),
+                ])
+                ->assertSessionHasErrors('signature_name');
+
+            $unsigned = $run->fresh();
+            $this->assertSame('in_progress', $unsigned->status);
+            $this->assertNull($unsigned->signature_name);
+
+            $attestation = $requiresSignature
+                ? 'Required Signature Attestation'
+                : 'Standard Completion Attestation';
+            $this->actingAs($owner)
+                ->post("/checklists/runs/{$run->id}/complete", [
+                    'responses' => $this->payload($item, 'yes'),
+                    'signature_name' => $attestation,
+                ])
+                ->assertRedirect()
+                ->assertSessionHas('success', 'Checklist completed.');
+
+            $completed = $run->fresh();
+            $this->assertSame($attestation, $completed->signature_name);
+            $this->assertTrue($completed->hasVerifiableSignatureProvenance());
+        }
+    }
+
     public function test_wrong_site_direct_ids_are_concealed_without_side_effects(): void
     {
         $visibleSite = Site::factory()->create(['type' => 'house']);
@@ -177,6 +261,51 @@ class ChecklistRunOwnershipTest extends TestCase
             'action' => 'checklist.completed',
             'auditable_id' => $run->id,
         ]);
+    }
+
+    public function test_site_authorized_worker_can_follow_the_run_redirect(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $worker = $this->siteUser('support_worker', $site);
+        [$run] = $this->makeChecklistRun($site, runAssignee: $worker);
+
+        $this->actingAs($worker)
+            ->get("/checklists/runs/{$run->id}")
+            ->assertRedirect("/sites/{$site->id}/checklists?run={$run->id}");
+    }
+
+    public function test_wrong_site_and_nonexistent_run_redirect_ids_share_the_missing_contract(): void
+    {
+        $visibleSite = Site::factory()->create(['type' => 'house']);
+        $hiddenSite = Site::factory()->create(['type' => 'house']);
+        $worker = $this->siteUser('support_worker', $visibleSite);
+        $hiddenOwner = $this->siteUser('support_worker', $hiddenSite);
+        [$hiddenRun] = $this->makeChecklistRun($hiddenSite, runAssignee: $hiddenOwner);
+        $missingRunId = (int) SiteChecklistRun::query()->max('id') + 10_000;
+
+        $wrongSite = $this->actingAs($worker)
+            ->get("/checklists/runs/{$hiddenRun->id}");
+        $nonexistent = $this->actingAs($worker)
+            ->get("/checklists/runs/{$missingRunId}");
+
+        $wrongSite->assertNotFound()->assertHeaderMissing('Location');
+        $nonexistent->assertNotFound()->assertHeaderMissing('Location');
+        $this->assertSame($nonexistent->getContent(), $wrongSite->getContent());
+    }
+
+    public function test_explicit_global_role_can_follow_a_run_redirect_without_site_assignment(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $owner = $this->siteUser('support_worker', $site);
+        $admin = $this->roleUser('admin');
+        [$run] = $this->makeChecklistRun($site, runAssignee: $owner);
+
+        $this->assertTrue($admin->canDo('sites.viewAll'));
+        $this->assertFalse($admin->hrEmployeeProfile()->exists());
+
+        $this->actingAs($admin)
+            ->get("/checklists/runs/{$run->id}")
+            ->assertRedirect("/sites/{$site->id}/checklists?run={$run->id}");
     }
 
     public function test_explicit_global_manager_override_is_retained_with_reason(): void
@@ -703,6 +832,7 @@ class ChecklistRunOwnershipTest extends TestCase
         ?User $runAssignee = null,
         ?User $assignmentAssignee = null,
         bool $createsHazard = false,
+        bool $requiresSignature = false,
     ): array {
         $template = SiteChecklistTemplate::create([
             'key' => 'ownership_'.Str::uuid(),
@@ -710,6 +840,7 @@ class ChecklistRunOwnershipTest extends TestCase
             'applicable_to_type' => 'house',
             'frequency' => 'daily',
             'is_active' => true,
+            'settings' => ['requires_signature' => $requiresSignature],
         ]);
         $item = $template->items()->create([
             'question' => 'Is the check complete?',

@@ -30,6 +30,8 @@ use App\Http\Controllers\Sites\SiteVendorController;
 use App\Http\Controllers\Sites\SiteZoneController;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
+use App\Services\Sites\SiteChecklistRunExecutionService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -497,7 +499,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:hazards.manage');
 
     // Checklist run routes
-    Route::get('/checklists/runs/{run}', fn (SiteChecklistRun $run) => redirect("/sites/{$run->site_id}/checklists?run={$run->id}"))
+    Route::get('/checklists/runs/{run}', function (
+        Request $request,
+        SiteChecklistRun $run,
+        SiteChecklistRunExecutionService $runExecution,
+    ) {
+        $runExecution->assertVisible($run, $request->user());
+
+        return redirect("/sites/{$run->site_id}/checklists?run={$run->id}");
+    })
         ->name('sites.checklists.showRun')
         ->middleware('permission:checklists.view');
     Route::post('/checklists/runs/{run}/complete', [SiteChecklistController::class, 'completeRun'])
