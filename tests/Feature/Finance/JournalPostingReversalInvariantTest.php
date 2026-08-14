@@ -3,6 +3,8 @@
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Models\FinTaxRate;
+use App\Domain\Finance\Services\GstReturnService;
 use App\Domain\Finance\Services\JournalPostingService;
 use App\Models\Permission;
 use App\Models\Role;
@@ -183,6 +185,65 @@ it('enforces the one-reversal source key in MySQL independently of service code'
     ]))->toThrow(QueryException::class)
         ->and($source->fresh()->reversed_by_journal_id)->toBe($reversal->id)
         ->and(FinJournal::query()->where('reversal_of_journal_id', $source->id)->count())->toBe(1);
+});
+
+it('reverses the signed tax effect so a GST return nets the source and reversal to zero', function (): void {
+    $taxRate = FinTaxRate::create([
+        'organization_id' => 1,
+        'name' => 'GST 15%',
+        'code' => 'GST15-REVERSAL',
+        'rate' => '0.1500',
+        'type' => 'gst',
+        'is_default' => false,
+        'is_active' => true,
+        'created_by' => $this->actor->id,
+    ]);
+    $source = $this->service->createAndPost(1, [
+        'journal_date' => now()->toDateString(),
+        'type' => 'standard',
+        'reference' => 'GST-REVERSAL-SOURCE',
+        'description' => 'Tax-rated source journal',
+        'actor_id' => $this->actor->id,
+        'lines' => [
+            [
+                'account_id' => $this->cash->id,
+                'description' => 'Tax-rated cash side',
+                'debit' => '100.00',
+                'credit' => '0.00',
+                'site_id' => $this->site->id,
+            ],
+            [
+                'account_id' => $this->revenue->id,
+                'description' => 'Tax-rated revenue side',
+                'debit' => '0.00',
+                'credit' => '100.00',
+                'site_id' => $this->site->id,
+                'tax_rate_id' => $taxRate->id,
+                'tax_amount' => '15.00',
+            ],
+        ],
+    ]);
+
+    $reversal = $this->service->reverse($source, 'Tax-rated correction')->load('lines');
+    $replay = $this->service->reverse($source->fresh(), 'Retry after tax-rated correction');
+    $sourceTaxLine = $source->load('lines')->lines->firstWhere('tax_rate_id', $taxRate->id);
+    $reversalTaxLine = $reversal->lines->firstWhere('tax_rate_id', $taxRate->id);
+    $gstReturn = app(GstReturnService::class)->prepareReturn(1, [
+        'period_start' => $this->period->start_date->toDateString(),
+        'period_end' => $this->period->end_date->toDateString(),
+        'filing_frequency' => 'two_monthly',
+        'basis' => 'invoice',
+    ]);
+
+    expect($replay->id)->toBe($reversal->id)
+        ->and((string) $sourceTaxLine->tax_amount)->toBe('15.00')
+        ->and((string) $reversalTaxLine->tax_amount)->toBe('-15.00')
+        ->and((string) $gstReturn->total_sales)->toBe('0.00')
+        ->and((string) $gstReturn->total_gst_collected)->toBe('0.00')
+        ->and((string) $gstReturn->gst_payable)->toBe('0.00')
+        ->and($gstReturn->lines)->toHaveCount(2)
+        ->and($gstReturn->lines->pluck('gst_amount')->map(fn ($amount): string => (string) $amount)->sort()->values()->all())
+        ->toBe(['-15.00', '15.00']);
 });
 
 it('denies an unprivileged direct id while the explicit global finance role can reverse and replay a Site-dimensioned journal', function (): void {

@@ -201,7 +201,7 @@ class JournalPostingService
                     'client_fund_id' => $line->client_fund_id,
                     'site_id' => $line->site_id,
                     'tax_rate_id' => $line->tax_rate_id,
-                    'tax_amount' => $line->tax_amount,
+                    'tax_amount' => bcsub('0', (string) $line->tax_amount, 2),
                 ])->all(),
             ];
 
@@ -384,7 +384,9 @@ class JournalPostingService
             'client_fund_id' => $line->client_fund_id === null ? null : (int) $line->client_fund_id,
             'site_id' => $line->site_id === null ? null : (int) $line->site_id,
             'tax_rate_id' => $line->tax_rate_id === null ? null : (int) $line->tax_rate_id,
-            'tax_amount' => (string) $line->tax_amount,
+            'tax_amount' => $invert
+                ? bcsub('0', (string) $line->tax_amount, 2)
+                : (string) $line->tax_amount,
         ], JSON_THROW_ON_ERROR);
     }
 }
