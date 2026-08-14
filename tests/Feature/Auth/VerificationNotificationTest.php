@@ -31,3 +31,21 @@ test('does not send verification notification if email is verified', function ()
 
     Notification::assertNothingSent();
 });
+
+test('verification notification resend is throttled', function () {
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create();
+
+    foreach (range(1, 6) as $_) {
+        $this->actingAs($user)
+            ->post(route('verification.send'))
+            ->assertRedirect(route('home'));
+    }
+
+    $this->actingAs($user)
+        ->post(route('verification.send'))
+        ->assertTooManyRequests();
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, 6);
+});

@@ -32,6 +32,28 @@ test('password can be updated', function () {
     expect(Hash::check('new-password', $user->refresh()->password))->toBeTrue();
 });
 
+test('authenticated password change does not bypass email verification', function () {
+    $user = User::factory()->unverified()->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->from(route('user-password.edit'))
+        ->put(route('user-password.update'), [
+            'current_password' => 'password',
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('user-password.edit'));
+
+    $user->refresh();
+
+    expect(Hash::check('new-password', $user->password))->toBeTrue()
+        ->and($user->hasVerifiedEmail())->toBeFalse();
+});
+
 test('correct password must be provided to update password', function () {
     $user = User::factory()->create();
 

@@ -14,6 +14,7 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -21,7 +22,7 @@ use Illuminate\Support\Facades\Storage;
 use Lab404\Impersonate\Models\Impersonate;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Impersonate, Notifiable, TwoFactorAuthenticatable, WritesLegacyOrganizationStorageContext;
@@ -109,18 +110,6 @@ class User extends Authenticatable
             'job_board_alerts_enabled' => 'boolean',
             'tasks_default_view' => 'array',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        static::updating(function (self $user): void {
-            if (
-                $user->isDirty('password')
-                && ! $user->email_verified_at
-            ) {
-                $user->email_verified_at = now();
-            }
-        });
     }
 
     public function isApproved(): bool

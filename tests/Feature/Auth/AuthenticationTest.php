@@ -22,6 +22,31 @@ test('users can authenticate using the login screen', function () {
     $response->assertRedirect(route('dashboard', absolute: false));
 });
 
+test('approved unverified users can authenticate and are challenged at verified routes', function () {
+    $user = User::factory()->unverified()->withoutTwoFactor()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticatedAs($user);
+    $response->assertRedirect(route('dashboard', absolute: false));
+
+    $this->get(route('dashboard'))
+        ->assertRedirect(route('verification.notice'));
+});
+
+test('unverified portal users retain the explicit auth only portal flow', function () {
+    $user = User::factory()->unverified()->create([
+        'role' => 'next_of_kin',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('portal.index'))
+        ->assertOk();
+});
+
 test('users with two factor enabled are redirected to two factor challenge', function () {
     if (! Features::canManageTwoFactorAuthentication()) {
         $this->markTestSkipped('Two-factor authentication is not enabled.');

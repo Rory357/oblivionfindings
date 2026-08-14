@@ -36,10 +36,10 @@ test('reset password screen can be rendered', function () {
     });
 });
 
-test('password can be reset with valid token', function () {
+test('password can be reset with valid token and proves mailbox control', function () {
     Notification::fake();
 
-    $user = User::factory()->create();
+    $user = User::factory()->unverified()->create();
 
     $this->post(route('password.email'), ['email' => $user->email]);
 
@@ -54,6 +54,8 @@ test('password can be reset with valid token', function () {
         $response
             ->assertSessionHasNoErrors()
             ->assertRedirect(route('login'));
+
+        expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
 
         return true;
     });

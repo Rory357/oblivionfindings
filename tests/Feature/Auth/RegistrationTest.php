@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Notification;
 
 test('registration screen can be rendered', function () {
     $response = $this->get(route('register'));
@@ -9,6 +11,8 @@ test('registration screen can be rendered', function () {
 });
 
 test('new users can register', function () {
+    Notification::fake();
+
     $response = $this->post(route('register.store'), [
         'name' => 'Test User',
         'email' => 'test@example.com',
@@ -21,9 +25,9 @@ test('new users can register', function () {
         ->assertRedirect(route('login', absolute: false))
         ->assertSessionHas('status', 'Account created. An administrator must approve your access before you can log in.');
 
-    $this->assertDatabaseHas('users', [
-        'email' => 'test@example.com',
-        'approved_at' => null,
-    ]);
-    $this->assertTrue(User::where('email', 'test@example.com')->exists());
+    $user = User::where('email', 'test@example.com')->firstOrFail();
+
+    expect($user->approved_at)->toBeNull()
+        ->and($user->email_verified_at)->toBeNull();
+    Notification::assertSentTo($user, VerifyEmail::class);
 });
