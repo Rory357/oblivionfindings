@@ -946,12 +946,12 @@ export default function EmarHome(props: Props) {
                 </div>
 
                 {/* ── Main grid: Action centre + right rail ── */}
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
                     {/* LEFT — Action centre */}
-                    <Card className="rounded-[18px]">
+                    <Card className="min-w-0 rounded-[18px]">
                         <CardHeader className="gap-3">
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-center gap-2.5">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex min-w-0 items-center gap-2.5">
                                     <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
                                         <Zap className="h-5 w-5" />
                                     </span>
@@ -965,7 +965,7 @@ export default function EmarHome(props: Props) {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex shrink-0 items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -1112,7 +1112,7 @@ export default function EmarHome(props: Props) {
                     </Card>
 
                     {/* RIGHT rail */}
-                    <div className="flex flex-col gap-4">
+                    <div className="flex min-w-0 flex-col gap-4">
                         {/* Administration compliance */}
                         <Card className="rounded-[18px]">
                             <CardHeader className="flex-row items-center justify-between pb-2">
@@ -1143,6 +1143,10 @@ export default function EmarHome(props: Props) {
                                     <ResponsiveContainer
                                         width="100%"
                                         height="100%"
+                                        initialDimension={{
+                                            width: 1,
+                                            height: 140,
+                                        }}
                                     >
                                         <AreaChart
                                             data={complianceTrend}
@@ -1317,13 +1321,13 @@ export default function EmarHome(props: Props) {
                 </div>
 
                 {/* ── Client board ── */}
-                <Card className="rounded-[18px]">
-                    <CardHeader className="flex-row items-center justify-between pb-3">
-                        <div className="flex items-center gap-2.5">
-                            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary">
+                <Card className="min-w-0 rounded-[18px]">
+                    <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 pb-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                                 <Users className="h-5 w-5" />
                             </span>
-                            <div>
+                            <div className="min-w-0">
                                 <CardTitle className="text-base">
                                     Client board — today
                                 </CardTitle>
@@ -1332,7 +1336,7 @@ export default function EmarHome(props: Props) {
                                 </p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             <Button
                                 size="sm"
                                 onClick={() => setModal('add-medication')}
@@ -1342,25 +1346,25 @@ export default function EmarHome(props: Props) {
                             </Button>
                             <Link
                                 href="/emar/mar"
-                                className="text-xs font-medium text-primary hover:underline"
+                                className="text-xs font-medium whitespace-nowrap text-primary hover:underline"
                             >
                                 All clients →
                             </Link>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="min-w-0">
                         {filteredBoard.length === 0 ? (
                             <p className="py-8 text-center text-sm text-muted-foreground">
                                 No clients match this view.
                             </p>
                         ) : (
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 {filteredBoard.map((c) => (
                                     <Link
                                         key={c.id}
                                         href={`/emar/mar?client_id=${c.id}`}
                                         className={cn(
-                                            'flex flex-col gap-2 rounded-xl border p-3 transition-colors hover:bg-muted/40',
+                                            'flex min-w-0 flex-col gap-2 rounded-xl border p-3 transition-colors hover:bg-muted/40',
                                             c.status === 'attention'
                                                 ? 'border-status-critical/30 bg-status-critical-bg/40'
                                                 : c.status === 'complete'
@@ -1552,9 +1556,9 @@ export default function EmarHome(props: Props) {
 
                         {/* Reviews due */}
                         <Card className="rounded-[18px]">
-                            <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
+                            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 pb-2">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
                                         <CalendarCheck className="h-4 w-4" />
                                     </span>
                                     <CardTitle className="text-sm">
@@ -1564,7 +1568,7 @@ export default function EmarHome(props: Props) {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-7 px-2.5 text-xs"
+                                    className="h-7 shrink-0 px-2.5 text-xs"
                                     onClick={() =>
                                         setModal('medication-review')
                                     }
@@ -1622,9 +1626,9 @@ export default function EmarHome(props: Props) {
                 <div className="grid gap-3.5 lg:grid-cols-3">
                     {/* Stock & pharmacy */}
                     <Card className="rounded-[18px]">
-                        <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
-                            <div className="flex items-center gap-2">
-                                <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
+                        <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 pb-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
                                     <Package className="h-4 w-4" />
                                 </span>
                                 <CardTitle className="text-sm">
@@ -1634,7 +1638,7 @@ export default function EmarHome(props: Props) {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-7 px-2.5 text-xs"
+                                className="h-7 shrink-0 px-2.5 text-xs"
                                 onClick={() => openModal('stock-movement')}
                             >
                                 Record stock
