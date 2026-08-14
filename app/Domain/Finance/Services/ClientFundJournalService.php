@@ -176,37 +176,18 @@ class ClientFundJournalService
         }
 
         $originalJournal = FinJournal::query()->lockForUpdate()->findOrFail($original->journal->id);
-        if ($originalJournal->reversed_by_journal_id !== null) {
-            $existing = FinJournal::query()->findOrFail($originalJournal->reversed_by_journal_id);
-            $reversal->forceFill(['journal_id' => $existing->id])->save();
-
-            return $existing;
-        }
-
-        $journal = $this->journalPostingService->createAndPost(self::APPLICATION_STORAGE_CONTEXT_ID, [
-            'journal_date' => ($reversal->transaction_date ?? now())->toDateString(),
-            'type' => 'adjustment',
-            'reference' => $reversal->reference ?: 'REV-'.$originalJournal->journal_number,
-            'source_type' => 'client_fund_transaction_reversal',
-            'source_id' => $reversal->id,
-            'description' => "Reversal of {$originalJournal->journal_number}: {$reversal->reversal_reason}",
-            'actor_id' => $reversal->approved_by,
-            'lines' => $original->journal->lines->map(fn ($line): array => [
-                'account_id' => $line->account_id,
-                'description' => $line->description,
-                'debit' => $line->credit,
-                'credit' => $line->debit,
-                'cost_centre_id' => $line->cost_centre_id,
-                'funding_stream_id' => $line->funding_stream_id,
-                'client_id' => $line->client_id,
-                'client_fund_id' => $line->client_fund_id,
-                'site_id' => $line->site_id,
-                'tax_rate_id' => $line->tax_rate_id,
-                'tax_amount' => $line->tax_amount,
-            ])->all(),
-        ]);
-
-        $originalJournal->forceFill(['reversed_by_journal_id' => $journal->id])->save();
+        $journal = $this->journalPostingService->reverse(
+            $originalJournal,
+            $reversal->reversal_reason,
+            [
+                'journal_date' => ($reversal->transaction_date ?? now())->toDateString(),
+                'reference' => $reversal->reference ?: 'REV-'.$originalJournal->journal_number,
+                'description' => "Reversal of {$originalJournal->journal_number}: {$reversal->reversal_reason}",
+                'source_type' => 'client_fund_transaction_reversal',
+                'source_id' => $reversal->id,
+                'actor_id' => $reversal->approved_by,
+            ],
+        );
 
         return $journal;
     }

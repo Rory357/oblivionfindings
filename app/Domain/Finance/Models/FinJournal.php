@@ -4,10 +4,12 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinJournalFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class FinJournal extends Model
@@ -16,7 +18,7 @@ class FinJournal extends Model
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinJournalFactory::new();
+        return FinJournalFactory::new();
     }
 
     protected $table = 'fin_journals';
@@ -35,6 +37,7 @@ class FinJournal extends Model
         'posted_at',
         'posted_by',
         'reversed_by_journal_id',
+        'reversal_of_journal_id',
         'total_amount',
         'xero_journal_id',
         'myob_journal_id',
@@ -75,6 +78,16 @@ class FinJournal extends Model
     public function reversedByJournal(): BelongsTo
     {
         return $this->belongsTo(self::class, 'reversed_by_journal_id');
+    }
+
+    public function reversalOfJournal(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reversal_of_journal_id');
+    }
+
+    public function reversingJournal(): HasOne
+    {
+        return $this->hasOne(self::class, 'reversal_of_journal_id');
     }
 
     public function currency(): BelongsTo
