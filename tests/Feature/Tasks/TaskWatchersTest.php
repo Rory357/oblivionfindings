@@ -10,6 +10,8 @@ use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Models\TaskWatcher;
 use App\Models\User;
+use App\Services\Tasks\TaskAggregator;
+use App\Services\Tasks\TaskAssignmentNotifier;
 use Database\Seeders\RbacSeeder;
 
 beforeEach(function () {
@@ -162,6 +164,110 @@ it('rejects watching an incident outside the viewer site scope', function () {
         ->where('item_id', $incident->id)
         ->where('user_id', $user->id)
         ->exists())->toBeFalse();
+});
+
+it('keeps repeated watch requests idempotent', function () {
+    $site = Site::factory()->create();
+    $user = makeWatcherUser(['incidents.viewAny'], $site);
+    $incident = makeWatcherIncident($site);
+
+    $this->actingAs($user)
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
+        ->assertRedirect();
+    $this->actingAs($user)
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
+        ->assertRedirect();
+
+    expect(TaskWatcher::query()
+        ->where('source', 'incident')
+        ->where('item_id', $incident->id)
+        ->where('user_id', $user->id)
+        ->count())->toBe(1);
+});
+
+it('rechecks a watcher after client reassignment even when access was resolved earlier', function () {
+    $site = Site::factory()->create();
+    $actor = makeWatcherUser(['incidents.viewAny'], $site);
+    $assignee = makeWatcherUser(['incidents.viewAny'], $site);
+    $watcher = makeWatcherUser(['incidents.viewAssigned'], $site);
+    $incident = makeWatcherIncident($site, [
+        'title' => 'Client reassignment must revoke watcher delivery',
+    ]);
+    $incident->client->supportWorkers()->attach($watcher->id);
+    TaskWatcher::query()->create([
+        'source' => 'incident',
+        'item_id' => $incident->id,
+        'user_id' => $watcher->id,
+    ]);
+
+    $aggregator = app(TaskAggregator::class);
+    expect($aggregator->visibleWatcherIdsFor('incident', $incident->id))
+        ->toBe([$watcher->id]);
+
+    // Reassignment happens after an earlier detail/read pass resolved access.
+    $incident->client->supportWorkers()->detach($watcher->id);
+
+    $provider = $aggregator->providerFor('incident');
+    expect($provider)->not->toBeNull();
+    TaskAssignmentNotifier::notify(
+        $actor,
+        $provider,
+        $incident->id,
+        $assignee->id,
+        $aggregator,
+    );
+
+    expect($assignee->fresh()->notifications()->count())->toBe(1)
+        ->and($watcher->fresh()->notifications()->count())->toBe(0)
+        ->and(TaskWatcher::query()
+            ->where('source', 'incident')
+            ->where('item_id', $incident->id)
+            ->where('user_id', $watcher->id)
+            ->exists())->toBeFalse();
+});
+
+it('allows an explicit all-site permission to watch then removes delivery after it is revoked', function () {
+    $localSite = Site::factory()->create();
+    $foreignSite = Site::factory()->create();
+    $watcher = makeWatcherUser(['incidents.viewAny', 'reports.viewAny'], $localSite);
+    $actor = makeWatcherUser(['incidents.viewAny'], $foreignSite);
+    $assignee = makeWatcherUser(['incidents.viewAny'], $foreignSite);
+    $incident = makeWatcherIncident($foreignSite, [
+        'title' => 'Explicit global access lifecycle',
+    ]);
+
+    $this->actingAs($watcher)
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
+        ->assertRedirect()
+        ->assertSessionHas('success', 'Following this task.');
+    $this->assertDatabaseHas('task_watchers', [
+        'source' => 'incident',
+        'item_id' => $incident->id,
+        'user_id' => $watcher->id,
+    ]);
+
+    $globalPermission = Permission::query()->where('key', 'reports.viewAny')->firstOrFail();
+    $watcher->permissionOverrides()->syncWithoutDetaching([
+        $globalPermission->id => ['allowed' => false],
+    ]);
+
+    $aggregator = app(TaskAggregator::class);
+    $provider = $aggregator->providerFor('incident');
+    expect($provider)->not->toBeNull();
+    TaskAssignmentNotifier::notify(
+        $actor,
+        $provider,
+        $incident->id,
+        $assignee->id,
+        $aggregator,
+    );
+
+    expect($watcher->fresh()->notifications()->count())->toBe(0)
+        ->and(TaskWatcher::query()
+            ->where('source', 'incident')
+            ->where('item_id', $incident->id)
+            ->where('user_id', $watcher->id)
+            ->exists())->toBeFalse();
 });
 
 it('allows a user to stop following after module read permission is revoked', function () {

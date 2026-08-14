@@ -8,6 +8,7 @@ use App\Models\Permission;
 use App\Models\Site;
 use App\Models\TaskWatcher;
 use App\Models\User;
+use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 
@@ -144,4 +145,62 @@ it('prunes an out-of-scope watcher before overdue task notifications are sent', 
             ->where('item_id', $alert->id)
             ->where('user_id', $staleWatcher->id)
             ->exists())->toBeFalse();
+});
+
+it('claims watcher delivery before send and rolls the claim back for a safe retry on failure', function () {
+    $site = Site::factory()->create();
+    $watcher = makeEscalationUser([
+        'controlRoom.viewAny',
+        'controlRoom.alerts.view',
+    ], $site);
+    $alert = ControlRoomAlert::factory()->triaging()->create([
+        'site_id' => $site->id,
+        'assigned_to_user_id' => null,
+        'due_at' => now()->subDay(),
+    ]);
+    TaskWatcher::query()->create([
+        'source' => 'alert',
+        'item_id' => $alert->id,
+        'user_id' => $watcher->id,
+    ]);
+
+    $failingNotifications = Mockery::mock(NotificationService::class);
+    $failingNotifications->shouldReceive('notifyCrud')
+        ->once()
+        ->andReturnUsing(function (...$arguments) use ($alert, $watcher): void {
+            expect(DB::table('task_escalations')
+                ->where('source', 'alert')
+                ->where('item_id', $alert->id)
+                ->where('level', 3)
+                ->where('assignee_id', $watcher->id)
+                ->exists())->toBeTrue();
+
+            throw new RuntimeException('Injected watcher delivery failure.');
+        });
+    app()->instance(NotificationService::class, $failingNotifications);
+
+    $this->artisan('tasks:escalate')->assertExitCode(0);
+
+    expect(DB::table('task_escalations')
+        ->where('source', 'alert')
+        ->where('item_id', $alert->id)
+        ->where('level', 3)
+        ->where('assignee_id', $watcher->id)
+        ->exists())->toBeFalse()
+        ->and($watcher->fresh()->notifications()->count())->toBe(0);
+
+    app()->forgetInstance(NotificationService::class);
+
+    $this->artisan('tasks:escalate')->assertExitCode(0);
+    expect(DB::table('task_escalations')
+        ->where('source', 'alert')
+        ->where('item_id', $alert->id)
+        ->where('level', 3)
+        ->where('assignee_id', $watcher->id)
+        ->count())->toBe(1)
+        ->and($watcher->fresh()->notifications()->count())->toBe(1);
+
+    // A replay sees the committed unique claim and cannot duplicate delivery.
+    $this->artisan('tasks:escalate')->assertExitCode(0);
+    expect($watcher->fresh()->notifications()->count())->toBe(1);
 });

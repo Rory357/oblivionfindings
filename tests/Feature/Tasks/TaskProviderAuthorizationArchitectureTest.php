@@ -4,6 +4,8 @@ use App\Console\Commands\EscalateOverdueTasks;
 use App\Http\Controllers\AllTasksController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Notifications\AppEventNotification;
+use App\Services\NotificationService;
 use App\Services\Tasks\Contracts\ExplicitlyGlobalTaskProvider;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
@@ -147,8 +149,12 @@ it('inventories every all tasks route and aggregate consumer', function () {
         ],
         MyTasksController::class => ['itemsFor(', "['assigned' => 'me']"],
         HandleInertiaRequests::class => ['navigationBadgeFor('],
-        EscalateOverdueTasks::class => ['itemsFor('],
-        TaskAssignmentNotifier::class => ['findItemFor(', 'authorizedWatcherIdsFor('],
+        EscalateOverdueTasks::class => [
+            'itemsFor(', 'candidateWatcherIdsForDelivery(', 'authorizedWatcherItemForDelivery(',
+        ],
+        TaskAssignmentNotifier::class => [
+            'findItemFor(', 'candidateWatcherIdsForDelivery(', 'authorizedWatcherItemForDelivery(',
+        ],
     ];
 
     foreach ($consumers as $class => $requiredFragments) {
@@ -160,4 +166,28 @@ it('inventories every all tasks route and aggregate consumer', function () {
             expect($source)->toContain($fragment);
         }
     }
+});
+
+it('keeps atomic overdue delivery on the synchronous database notification channel', function () {
+    $notification = new ReflectionClass(AppEventNotification::class);
+    $notificationPath = $notification->getFileName();
+    $notificationSource = $notificationPath === false ? '' : file_get_contents($notificationPath);
+
+    $routing = new ReflectionClass(NotificationService::class);
+    $routingPath = $routing->getFileName();
+    $routingSource = $routingPath === false ? '' : file_get_contents($routingPath);
+
+    $command = new ReflectionClass(EscalateOverdueTasks::class);
+    $commandPath = $command->getFileName();
+    $commandSource = $commandPath === false ? '' : file_get_contents($commandPath);
+
+    expect($notificationSource)
+        ->toContain("return ['database'];")
+        ->not->toContain('ShouldQueue')
+        ->and($routingSource)
+        ->toContain('new AppEventNotification($payload)')
+        ->toContain('$u->notify($notification)')
+        ->and($commandSource)
+        ->toContain("DB::transaction(function () use (")
+        ->toContain("DB::table('task_escalations')->insertOrIgnore(");
 });

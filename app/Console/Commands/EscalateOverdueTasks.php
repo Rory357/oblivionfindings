@@ -90,16 +90,25 @@ class EscalateOverdueTasks extends Command
                         // this is idempotent regardless of which user's pass
                         // surfaced the item.
                         $assigneeId = (int) ($item->assignee['id'] ?? 0);
-                        $watcherIds = $aggregator->authorizedWatcherIdsFor(
+                        $watcherIds = $aggregator->candidateWatcherIdsForDelivery(
                             $item->identitySource(),
                             $item->numericId(),
                             $assigneeId > 0 ? [$assigneeId] : [],
                         );
 
                         foreach ($watcherIds as $watcherId) {
-                            $watchersPinged += $this->escalate($notifications, $seen, $item, 3, [
+                            $watcherItem = $aggregator->authorizedWatcherItemForDelivery(
+                                $item->identitySource(),
+                                $item->numericId(),
+                                $watcherId,
+                            );
+                            if ($watcherItem === null) {
+                                continue;
+                            }
+
+                            $watchersPinged += $this->escalate($notifications, $seen, $watcherItem, 3, [
                                 'event_key' => 'tasks.overdue_assignee',
-                                'title' => 'Watching: '.trim(($item->ref ? $item->ref.' ' : '').$item->title).' is overdue',
+                                'title' => 'Watching: '.trim(($watcherItem->ref ? $watcherItem->ref.' ' : '').$watcherItem->title).' is overdue',
                                 'body' => 'A work item you are following is overdue.',
                                 'target_user_ids' => [(int) $watcherId],
                                 'include_managers' => false,
@@ -156,32 +165,56 @@ class EscalateOverdueTasks extends Command
         }
 
         try {
-            $notifications->notifyCrud(null, 'overdue', 'task', null, null, array_merge([
-                'title' => 'Overdue: '.trim(($item->ref ? $item->ref.' ' : '').$item->title),
-                'url' => $item->link ? url($item->link) : url('/tasks'),
-                'severity' => $item->severity,
-                'include_assigned_workers' => false,
-                'include_entity_user' => false,
-                'context' => array_filter([
-                    'Module' => $item->sourceLabel,
-                    'Ticket' => $item->ref,
-                    'Severity' => $item->severity,
-                    'Due' => $item->dueAt ? Carbon::parse($item->dueAt)->format('Y-m-d H:i') : null,
-                    'Assigned to' => $item->assignee['name'] ?? null,
-                ]),
-            ], $extra));
+            $sent = DB::transaction(function () use (
+                $notifications,
+                $source,
+                $itemId,
+                $level,
+                $assigneeKey,
+                $item,
+                $extra,
+            ): bool {
+                $claimed = DB::table('task_escalations')->insertOrIgnore([
+                    'source' => $source,
+                    'item_id' => $itemId,
+                    'level' => $level,
+                    'assignee_id' => $assigneeKey,
+                    'notified_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-            // Insert only after a successful notify; insertOrIgnore guards the
-            // unique key against a concurrent run.
-            DB::table('task_escalations')->insertOrIgnore([
-                'source' => $source,
-                'item_id' => $itemId,
-                'level' => $level,
-                'assignee_id' => $assigneeKey,
-                'notified_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+                if ($claimed !== 1) {
+                    return false;
+                }
+
+                // AppEventNotification currently delivers through the database
+                // channel, so the notification row and unique delivery claim
+                // commit or roll back together. Claim-first prevents two
+                // overlapping command runs from both notifying the same user.
+                $notifications->notifyCrud(null, 'overdue', 'task', null, null, array_merge([
+                    'title' => 'Overdue: '.trim(($item->ref ? $item->ref.' ' : '').$item->title),
+                    'url' => $item->link ? url($item->link) : url('/tasks'),
+                    'severity' => $item->severity,
+                    'include_assigned_workers' => false,
+                    'include_entity_user' => false,
+                    'context' => array_filter([
+                        'Module' => $item->sourceLabel,
+                        'Ticket' => $item->ref,
+                        'Severity' => $item->severity,
+                        'Due' => $item->dueAt ? Carbon::parse($item->dueAt)->format('Y-m-d H:i') : null,
+                        'Assigned to' => $item->assignee['name'] ?? null,
+                    ]),
+                ], $extra));
+
+                return true;
+            }, 3);
+
+            if (! $sent) {
+                $seen[$key] = true;
+
+                return false;
+            }
 
             $seen[$key] = true;
 

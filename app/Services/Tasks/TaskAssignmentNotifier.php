@@ -51,15 +51,28 @@ class TaskAssignmentNotifier
         );
 
         // FYI the item's watchers of the reassignment — everyone "Following"
-        // except the actor and the new assignee (who got the ping above). One
-        // fan-out call for the whole watcher set.
-        $watcherIds = $aggregator->authorizedWatcherIdsFor(
+        // except the actor and the new assignee (who got the ping above).
+        // Re-authorize and re-project immediately before EACH delivery: Site,
+        // assignment, permission, and privacy visibility may have changed
+        // since the durable follower row was created.
+        $watcherIds = $aggregator->candidateWatcherIdsForDelivery(
             $provider->sourceKey(),
             $id,
             array_filter([$actor->id, $assigneeId]),
         );
 
-        if ($watcherIds !== []) {
+        foreach ($watcherIds as $watcherId) {
+            $watcherItem = $aggregator->authorizedWatcherItemForDelivery(
+                $provider->sourceKey(),
+                $id,
+                $watcherId,
+            );
+            if ($watcherItem === null) {
+                continue;
+            }
+
+            $watcherLabel = $watcherItem->ref ?? ($watcherItem->title ?: 'A task');
+
             $notifications->notifyCrud(
                 actor: $actor,
                 action: 'assigned',
@@ -67,10 +80,10 @@ class TaskAssignmentNotifier
                 entity: null,
                 extra: [
                     'event_key' => 'tasks.assigned',
-                    'title' => "{$label} was reassigned",
-                    'body' => $item?->title,
-                    'url' => $item?->link ?? '/tasks',
-                    'target_user_ids' => $watcherIds,
+                    'title' => "{$watcherLabel} was reassigned",
+                    'body' => $watcherItem->title,
+                    'url' => $watcherItem->link,
+                    'target_user_ids' => [$watcherId],
                     'include_managers' => false,
                     'include_assigned_workers' => false,
                     'include_entity_user' => false,

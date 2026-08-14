@@ -37,19 +37,6 @@ class TaskAggregator
     private array $watchedMemo = [];
 
     /**
-     * @var array<string, array{
-     *   authorized: array<int, int>,
-     *   stale_rows: array<int, int>,
-     *   stale_users: array<int, int>,
-     *   pruned: bool
-     * }>
-     */
-    private array $watcherAccessMemo = [];
-
-    /** @var array<string, string|null> */
-    private array $legacySourceAliasMemo = [];
-
-    /**
      * @param  TaskProvider[]|null  $providers  Defaults to the full registry.
      */
     public function __construct(?array $providers = null)
@@ -187,20 +174,8 @@ class TaskAggregator
         int $id,
         array $excludeUserIds = [],
     ): array {
-        $memoKey = $this->resolveWatcherAccess($source, $id);
-        $access = &$this->watcherAccessMemo[$memoKey];
-
-        if (! $access['pruned'] && $access['stale_rows'] !== []) {
-            TaskWatcher::query()
-                ->whereIn('id', $access['stale_rows'])
-                ->delete();
-
-            foreach ($access['stale_users'] as $userId) {
-                unset($this->watchedMemo[$userId]);
-            }
-
-            $access['pruned'] = true;
-        }
+        $access = $this->resolveWatcherAccess($source, $id);
+        $this->pruneStaleWatchers($access);
 
         return array_values(array_diff(
             $access['authorized'],
@@ -216,9 +191,52 @@ class TaskAggregator
      */
     public function visibleWatcherIdsFor(string $source, int $id): array
     {
-        $memoKey = $this->resolveWatcherAccess($source, $id);
+        return $this->resolveWatcherAccess($source, $id)['authorized'];
+    }
 
-        return $this->watcherAccessMemo[$memoKey]['authorized'];
+    /**
+     * Raw candidate ids for a delivery pass. Callers MUST resolve every id
+     * through authorizedWatcherItemForDelivery() immediately before sending;
+     * a follower row is durable, but permission, Site, assignment, and privacy
+     * visibility can all change after that row was created.
+     *
+     * @param  array<int, int>  $excludeUserIds
+     * @return array<int, int>
+     */
+    public function candidateWatcherIdsForDelivery(
+        string $source,
+        int $id,
+        array $excludeUserIds = [],
+    ): array {
+        return TaskWatcher::query()
+            ->whereIn('source', $this->watcherSourceKeysFor($source))
+            ->where('item_id', $id)
+            ->when(
+                $excludeUserIds !== [],
+                fn ($query) => $query->whereNotIn('user_id', array_map('intval', $excludeUserIds)),
+            )
+            ->distinct()
+            ->pluck('user_id')
+            ->map(fn ($userId) => (int) $userId)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Re-authorize one follower at the delivery boundary and return the item
+     * projected for that recipient. Returning the recipient's projection (not
+     * the actor/command projection) prevents restricted metadata from leaking
+     * through notification title, context, or link fields.
+     */
+    public function authorizedWatcherItemForDelivery(
+        string $source,
+        int $id,
+        int $userId,
+    ): ?TaskItem {
+        $access = $this->resolveWatcherAccess($source, $id, $userId);
+        $this->pruneStaleWatchers($access);
+
+        return $access['items'][$userId] ?? null;
     }
 
     public function isUserWatching(User $user, string $source, int $id): bool
@@ -258,20 +276,25 @@ class TaskAggregator
         return [$source, $provider->sourceKey()];
     }
 
-    private function resolveWatcherAccess(string $source, int $id): string
+    /**
+     * @return array{
+     *   authorized: array<int, int>,
+     *   items: array<int, TaskItem>,
+     *   stale_rows: array<int, int>,
+     *   stale_users: array<int, int>
+     * }
+     */
+    private function resolveWatcherAccess(string $source, int $id, ?int $onlyUserId = null): array
     {
-        $memoKey = "{$source}|{$id}";
-        if (array_key_exists($memoKey, $this->watcherAccessMemo)) {
-            return $memoKey;
-        }
-
         $authorized = [];
+        $items = [];
         $staleRows = [];
         $staleUsers = [];
         $watchers = TaskWatcher::query()
             ->with('user')
             ->whereIn('source', $this->watcherSourceKeysFor($source))
             ->where('item_id', $id)
+            ->when($onlyUserId !== null, fn ($query) => $query->where('user_id', $onlyUserId))
             ->get();
         $provider = $this->providerFor($source);
         foreach ($watchers as $watcher) {
@@ -298,14 +321,12 @@ class TaskAggregator
                 if ($legacyOwnerAlias !== $source) {
                     continue;
                 }
+            }
 
-                if ($this->canWatchItemFor($watcher->user, $source, $id)) {
-                    $authorized[(int) $watcher->user_id] = (int) $watcher->user_id;
-
-                    continue;
-                }
-            } elseif ($this->canWatchItemFor($watcher->user, $source, $id)) {
+            $item = $this->findItemFor($watcher->user, $source, $id);
+            if ($item?->link !== null) {
                 $authorized[(int) $watcher->user_id] = (int) $watcher->user_id;
+                $items[(int) $watcher->user_id] = $item;
 
                 continue;
             }
@@ -314,14 +335,30 @@ class TaskAggregator
             $staleUsers[] = (int) $watcher->user_id;
         }
 
-        $this->watcherAccessMemo[$memoKey] = [
+        return [
             'authorized' => array_values($authorized),
+            'items' => $items,
             'stale_rows' => array_values(array_unique($staleRows)),
             'stale_users' => array_values(array_unique($staleUsers)),
-            'pruned' => false,
         ];
+    }
 
-        return $memoKey;
+    /**
+     * @param  array{stale_rows: array<int, int>, stale_users: array<int, int>}  $access
+     */
+    private function pruneStaleWatchers(array $access): void
+    {
+        if ($access['stale_rows'] === []) {
+            return;
+        }
+
+        TaskWatcher::query()
+            ->whereIn('id', $access['stale_rows'])
+            ->delete();
+
+        foreach ($access['stale_users'] as $userId) {
+            unset($this->watchedMemo[$userId]);
+        }
     }
 
     /**
@@ -657,12 +694,6 @@ class TaskAggregator
         User $user,
         int $id,
     ): ?string {
-        $memoKey = $provider::class.'|'.$user->id.'|'.$id;
-
-        if (! array_key_exists($memoKey, $this->legacySourceAliasMemo)) {
-            $this->legacySourceAliasMemo[$memoKey] = $provider->legacySourceAliasForId($user, $id);
-        }
-
-        return $this->legacySourceAliasMemo[$memoKey];
+        return $provider->legacySourceAliasForId($user, $id);
     }
 }
