@@ -160,9 +160,10 @@ class ChecklistRunActionsTest extends TestCase
 
     public function test_support_worker_can_save_and_complete_a_site_run(): void
     {
-        [$run, $hazardItem] = $this->makeRunWithFlaggedItems();
+        [$run, $hazardItem, $damageItem] = $this->makeRunWithFlaggedItems();
         $payload = [
             ['template_item_id' => $hazardItem->id, 'response_value' => 'yes', 'is_failed' => false],
+            ['template_item_id' => $damageItem->id, 'response_value' => 'pass', 'is_failed' => false],
         ];
 
         $this->actingAs($this->supportWorker)
@@ -227,9 +228,10 @@ class ChecklistRunActionsTest extends TestCase
 
     public function test_follow_ups_are_idempotent_across_save_then_complete(): void
     {
-        [$run, $hazardItem] = $this->makeRunWithFlaggedItems();
+        [$run, $hazardItem, $damageItem] = $this->makeRunWithFlaggedItems();
         $payload = [
             ['template_item_id' => $hazardItem->id, 'response_value' => 'no', 'is_failed' => true, 'create_hazard' => true],
+            ['template_item_id' => $damageItem->id, 'response_value' => 'pass', 'is_failed' => false],
         ];
 
         // Saving raises the hazard; completing again must not duplicate it.
