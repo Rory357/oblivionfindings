@@ -45,6 +45,15 @@ class RespiteShiftSync
             return;
         }
 
+        if ($booking->status === 'no_show') {
+            $shift->update([
+                'status' => 'cancelled',
+                'notes' => $this->appendNote($shift->notes, 'Respite booking recorded as no show.'),
+            ]);
+
+            return;
+        }
+
         $shift->update([
             'client_id' => $booking->client_id,
             'starts_at' => $booking->start_at,

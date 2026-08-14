@@ -6,10 +6,13 @@ use App\Models\BehaviourSupportPlan;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\RespiteBooking;
+use App\Models\RespiteBookingRequest;
 use App\Models\RespiteDailyNote;
 use App\Models\RespiteEvidencePack;
+use App\Models\RespiteReferral;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
+use App\Models\ServiceAgreement;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,7 +22,7 @@ use Illuminate\Validation\ValidationException;
 
 class RespiteStayScope
 {
-    private const CLIENT_SITE_BYPASS_PERMISSIONS = ['clients.viewAny'];
+    private const CLIENT_SITE_BYPASS_PERMISSIONS = ['clinical.accessAllSites', 'sites.viewAll'];
 
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
@@ -89,8 +92,12 @@ class RespiteStayScope
             });
     }
 
-    public function resolveAuthorizedStay(Request $request, int $stayId, bool $lock = false): RespiteStay
-    {
+    public function resolveAuthorizedStay(
+        Request $request,
+        int $stayId,
+        bool $lock = false,
+        bool $conceal = false,
+    ): RespiteStay {
         $stayQuery = RespiteStay::query();
         if ($lock) {
             $stayQuery->lockForUpdate();
@@ -117,19 +124,123 @@ class RespiteStayScope
 
         $user = $request->user();
         abort_unless($user, 403);
-        Gate::forUser($user)->authorize('view', $client);
+        if ($conceal) {
+            abort_unless(Gate::forUser($user)->allows('view', $client), 404);
+        } else {
+            Gate::forUser($user)->authorize('view', $client);
+        }
 
         $siteId = $booking->location_id ?: $client->site_id;
-        $this->siteAccess->assertCanAccessSiteId(
-            $user,
-            $siteId ? (int) $siteId : null,
-            self::CLIENT_SITE_BYPASS_PERMISSIONS,
-        );
+        if ($conceal) {
+            $siteIds = $this->siteAccess->accessibleSiteIds($user, self::CLIENT_SITE_BYPASS_PERMISSIONS);
+            abort_unless($siteId && in_array((int) $siteId, $siteIds, true), 404);
+        } else {
+            $this->siteAccess->assertCanAccessSiteId(
+                $user,
+                $siteId ? (int) $siteId : null,
+                self::CLIENT_SITE_BYPASS_PERMISSIONS,
+            );
+        }
 
         $stay->setRelation('booking', $booking);
         $stay->setRelation('client', $client);
 
         return $stay;
+    }
+
+    public function resolveAuthorizedBookingRequest(
+        Request $request,
+        int $requestId,
+        bool $lock = false,
+    ): RespiteBookingRequest {
+        $requestQuery = RespiteBookingRequest::query();
+        $clientQuery = Client::query();
+        if ($lock) {
+            $requestQuery->lockForUpdate();
+            $clientQuery->lockForUpdate();
+        }
+
+        $bookingRequest = $requestQuery->findOrFail($requestId);
+        $client = $clientQuery->find($bookingRequest->client_id);
+        abort_unless($client, 404);
+
+        if ($bookingRequest->referral_id) {
+            $referralQuery = RespiteReferral::query();
+            if ($lock) {
+                $referralQuery->lockForUpdate();
+            }
+            abort_unless($referralQuery
+                ->whereKey($bookingRequest->referral_id)
+                ->where('client_id', $client->id)
+                ->first(['id']), 404);
+        }
+
+        if ($bookingRequest->service_agreement_id) {
+            $agreementQuery = ServiceAgreement::query();
+            if ($lock) {
+                $agreementQuery->lockForUpdate();
+            }
+            abort_unless($agreementQuery
+                ->whereKey($bookingRequest->service_agreement_id)
+                ->where('client_id', $client->id)
+                ->first(['id']), 404);
+        }
+
+        $this->assertDirectObjectAccess($request, $client, (int) $client->site_id);
+        $bookingRequest->setRelation('client', $client);
+
+        return $bookingRequest;
+    }
+
+    public function resolveAuthorizedBooking(
+        Request $request,
+        int $bookingId,
+        bool $lock = false,
+    ): RespiteBooking {
+        $bookingQuery = RespiteBooking::query();
+        $clientQuery = Client::query();
+        if ($lock) {
+            $bookingQuery->lockForUpdate();
+            $clientQuery->lockForUpdate();
+        }
+
+        $booking = $bookingQuery->findOrFail($bookingId);
+        $client = $clientQuery->find($booking->client_id);
+        abort_unless($client, 404);
+
+        if ($booking->booking_request_id) {
+            $sourceQuery = RespiteBookingRequest::query();
+            abort_unless($sourceQuery
+                ->whereKey($booking->booking_request_id)
+                ->where('client_id', $client->id)
+                ->first(['id']), 404);
+        }
+
+        if ($booking->service_agreement_id) {
+            $agreementQuery = ServiceAgreement::query();
+            abort_unless($agreementQuery
+                ->whereKey($booking->service_agreement_id)
+                ->where('client_id', $client->id)
+                ->first(['id']), 404);
+        }
+
+        $this->assertDirectObjectAccess($request, $client, (int) $client->site_id);
+        if ($booking->location_id) {
+            $this->assertDirectObjectAccess($request, $client, (int) $booking->location_id);
+        }
+
+        $booking->setRelation('client', $client);
+
+        return $booking;
+    }
+
+    public function assertAuthorizedSiteId(Request $request, int $siteId): void
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $siteIds = $this->siteAccess->accessibleSiteIds($user, self::CLIENT_SITE_BYPASS_PERMISSIONS);
+        abort_unless($siteId > 0 && in_array($siteId, $siteIds, true), 404);
     }
 
     public function lockCanonicalStay(int $stayId): RespiteStay
@@ -481,5 +592,14 @@ class RespiteStayScope
             ->where(function (Builder $plans): void {
                 $plans->whereNull('review_date')->orWhereDate('review_date', '>=', today());
             });
+    }
+
+    private function assertDirectObjectAccess(Request $request, Client $client, int $siteId): void
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        abort_unless(Gate::forUser($user)->allows('view', $client), 404);
+
+        $this->assertAuthorizedSiteId($request, $siteId);
     }
 }

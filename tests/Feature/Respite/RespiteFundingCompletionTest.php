@@ -43,7 +43,7 @@ test('booking request inherits referral funding and links an active service agre
         'referrer_name' => 'NASC Coordinator',
         'referral_reason' => 'Planned respite block',
         'urgency' => 'planned',
-        'status' => 'accepted',
+        'status' => 'received',
         'received_at' => now(),
         'funding_source' => 'whaikaha',
         'funding_reference' => 'WK-44213',

@@ -9,14 +9,15 @@ use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\DataBreachLog;
 use App\Models\MedicationAllergy;
-use App\Models\RespiteBooking;
 use App\Models\RespiteComplaint;
 use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
+use App\Models\ServiceAgreement;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\References\ReferenceNumberGenerator;
 use App\Services\Respite\RespiteShiftSync;
+use App\Services\Respite\RespiteStateTransitionService;
 use App\Services\Respite\RespiteStayScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,7 @@ class RespiteStayController extends Controller
 {
     public function __construct(
         private readonly RespiteStayScope $stayScope,
+        private readonly RespiteStateTransitionService $states,
     ) {}
 
     public function index(Request $request): Response
@@ -49,24 +51,33 @@ class RespiteStayController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'booking_id' => 'required|exists:respite_bookings,id',
-            'client_id' => 'required|exists:clients,id',
+            'booking_id' => 'required|integer',
+            'client_id' => 'required|integer',
         ]);
 
-        $booking = RespiteBooking::with('client')->findOrFail($validated['booking_id']);
-        $this->authorize('view', $booking->client);
+        $stay = DB::transaction(function () use ($request, $validated): RespiteStay {
+            $existingStay = RespiteStay::query()
+                ->where('booking_id', (int) $validated['booking_id'])
+                ->lockForUpdate()
+                ->first();
+            $booking = $this->stayScope->resolveAuthorizedBooking($request, (int) $validated['booking_id'], true);
+            $existingStay ??= RespiteStay::query()
+                ->where('booking_id', $booking->id)
+                ->first();
+            $this->states->assertStayAdmission($booking->status, $existingStay !== null);
+            if ((int) $booking->client_id !== (int) $validated['client_id']) {
+                throw ValidationException::withMessages([
+                    'client_id' => 'The stay client must match the respite booking client.',
+                ]);
+            }
 
-        if ((int) $booking->client_id !== (int) $validated['client_id']) {
-            throw ValidationException::withMessages([
-                'client_id' => 'The stay client must match the respite booking client.',
+            return RespiteStay::create([
+                ...$validated,
+                'status' => 'admitted',
+                'created_by' => auth()->id(),
+                'actual_start' => now(),
             ]);
-        }
-
-        $validated['status'] = 'admitted';
-        $validated['created_by'] = auth()->id();
-        $validated['actual_start'] = now();
-
-        $stay = RespiteStay::create($validated);
+        }, 3);
 
         event(new RespiteEvent('respite.stay.created', [
             'id' => $stay->id,
@@ -104,26 +115,37 @@ class RespiteStayController extends Controller
 
     public function checkIn(RespiteStay $stay): RedirectResponse
     {
-        $validated = request()->validate([
+        $request = request();
+        $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, false, true);
+
+        $validated = $request->validate([
             'med_rec_override_reason' => 'nullable|string|max:500',
             'anaphylaxis_acknowledged' => 'nullable|boolean',
             'epipen_location' => 'nullable|string|max:500',
             'anaphylaxis_escalation_note' => 'nullable|string|max:1000',
         ]);
 
-        $stay->loadMissing('client');
-        $this->authorize('view', $stay->client);
+        $stay = DB::transaction(function () use ($request, $stay, $validated): RespiteStay {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true, true);
+            $booking = $stay->booking;
+            $this->states->assertStayCheckIn($stay->status, $booking->status);
 
-        $this->guardAnaphylaxisAcknowledgement($stay, $validated);
-        $this->guardAdmissionMedicationReconciliation($stay, $validated['med_rec_override_reason'] ?? null);
+            $this->guardAnaphylaxisAcknowledgement($stay, $validated);
+            $this->guardAdmissionMedicationReconciliation($stay, $validated['med_rec_override_reason'] ?? null);
 
-        $stay->update([
-            'status' => 'active',
-            'actual_start' => $stay->actual_start ?? now(),
-            'updated_by' => auth()->id(),
-        ]);
+            $stay->update([
+                'status' => 'active',
+                'actual_start' => $stay->actual_start ?? now(),
+                'updated_by' => auth()->id(),
+            ]);
+            $booking->update([
+                'status' => 'in_progress',
+                'updated_by' => auth()->id(),
+            ]);
+            app(RespiteShiftSync::class)->checkInStay($stay, $stay->actual_start, auth()->id());
 
-        app(RespiteShiftSync::class)->checkInStay($stay, $stay->actual_start, auth()->id());
+            return $stay;
+        }, 3);
 
         event(new RespiteEvent('respite.stay.checked_in', [
             'id' => $stay->id,
@@ -136,29 +158,44 @@ class RespiteStayController extends Controller
 
     public function extend(Request $request, RespiteStay $stay): RedirectResponse
     {
-        $stay->loadMissing('client', 'booking');
-        $this->authorize('view', $stay->client);
+        $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, false, true);
 
         $validated = $request->validate([
             'new_end' => 'required|date',
         ]);
 
-        $newEnd = Carbon::parse($validated['new_end']);
-        $actualStart = $stay->actual_start ?: $stay->booking?->start_at;
+        $stay = DB::transaction(function () use ($request, $stay, $validated): RespiteStay {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true, true);
+            $booking = $stay->booking;
+            $this->states->assertStayExtension($stay->status, $booking->status);
 
-        if ($actualStart && $newEnd->lte($actualStart)) {
-            throw ValidationException::withMessages([
-                'new_end' => 'The new end must be after the stay start.',
+            $newEnd = Carbon::parse($validated['new_end']);
+            $currentEnd = collect([$stay->actual_end, $booking->end_at])
+                ->filter()
+                ->map(fn ($end) => Carbon::parse($end))
+                ->sortByDesc(fn (Carbon $end) => $end->getTimestamp())
+                ->first();
+            if (! $currentEnd || $newEnd->lte($currentEnd)) {
+                throw ValidationException::withMessages([
+                    'new_end' => 'The new end must be after the current respite stay end.',
+                ]);
+            }
+
+            $stay->update([
+                'status' => 'extended',
+                'actual_end' => $newEnd,
+                'updated_by' => auth()->id(),
             ]);
-        }
+            if ($booking->status === 'confirmed') {
+                $booking->update([
+                    'status' => 'in_progress',
+                    'updated_by' => auth()->id(),
+                ]);
+            }
+            app(RespiteShiftSync::class)->extendStay($stay, $newEnd);
 
-        $stay->update([
-            'status' => 'extended',
-            'actual_end' => $newEnd,
-            'updated_by' => auth()->id(),
-        ]);
-
-        app(RespiteShiftSync::class)->extendStay($stay, $newEnd);
+            return $stay;
+        }, 3);
 
         event(new RespiteEvent('respite.stay.extended', [
             'id' => $stay->id,
@@ -171,8 +208,7 @@ class RespiteStayController extends Controller
 
     public function recordBedHold(Request $request, RespiteStay $stay): RedirectResponse
     {
-        $stay->loadMissing('client');
-        $this->authorize('view', $stay->client);
+        $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, false, true);
 
         $validated = $request->validate([
             'bed_hold_status' => 'required|in:held,released,cancelled',
@@ -181,24 +217,31 @@ class RespiteStayController extends Controller
             'absence_record' => 'nullable|array',
         ]);
 
-        $absenceRecords = $stay->absence_records ?? [];
-        if (! empty($validated['absence_record'])) {
-            $absenceRecords[] = [
-                ...$validated['absence_record'],
+        $stay = DB::transaction(function () use ($request, $stay, $validated): RespiteStay {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true, true);
+            $this->states->assertStayOperational($stay->status, 'record a bed hold');
+
+            $absenceRecords = $stay->absence_records ?? [];
+            if (! empty($validated['absence_record'])) {
+                $absenceRecords[] = [
+                    ...$validated['absence_record'],
+                    'bed_hold_status' => $validated['bed_hold_status'],
+                    'bed_hold_reason' => $validated['bed_hold_reason'] ?? null,
+                    'recorded_by' => auth()->id(),
+                    'recorded_at' => now()->toIso8601String(),
+                ];
+            }
+
+            $stay->update([
                 'bed_hold_status' => $validated['bed_hold_status'],
                 'bed_hold_reason' => $validated['bed_hold_reason'] ?? null,
-                'recorded_by' => auth()->id(),
-                'recorded_at' => now()->toIso8601String(),
-            ];
-        }
+                'bed_hold_until' => $validated['bed_hold_until'] ?? null,
+                'absence_records' => $absenceRecords,
+                'updated_by' => auth()->id(),
+            ]);
 
-        $stay->update([
-            'bed_hold_status' => $validated['bed_hold_status'],
-            'bed_hold_reason' => $validated['bed_hold_reason'] ?? null,
-            'bed_hold_until' => $validated['bed_hold_until'] ?? null,
-            'absence_records' => $absenceRecords,
-            'updated_by' => auth()->id(),
-        ]);
+            return $stay;
+        }, 3);
 
         event(new RespiteEvent('respite.stay.bed_hold_recorded', [
             'id' => $stay->id,
@@ -211,9 +254,7 @@ class RespiteStayController extends Controller
 
     public function discharge(Request $request, RespiteStay $stay): RedirectResponse
     {
-        $stay->loadMissing('client');
-        $this->authorize('view', $stay->client);
-        $alreadyDischarged = $stay->status === 'discharged' && $stay->actual_end !== null;
+        $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, false, true);
 
         $validated = $request->validate([
             'discharge_summary' => 'required|string',
@@ -227,23 +268,31 @@ class RespiteStayController extends Controller
             'discharge_medication_reconciliation.whanau_briefing_acknowledged' => 'nullable|boolean',
         ]);
 
-        $this->guardDischargeMedicationReconciliation($stay, $validated['discharge_medication_reconciliation'] ?? null);
-        $this->guardDischargeCompliance($stay);
+        $stay = DB::transaction(function () use ($request, $stay, $validated): RespiteStay {
+            $stay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true, true);
+            $booking = $stay->booking;
+            $this->states->assertStayDischarge($stay->status, $booking->status);
 
-        $stay->update([
-            'status' => 'discharged',
-            'actual_end' => now(),
-            'discharge_summary' => $validated['discharge_summary'],
-            'discharge_reason' => $validated['discharge_reason'] ?? 'planned',
-            'discharge_medication_reconciliation' => $validated['discharge_medication_reconciliation'] ?? $stay->discharge_medication_reconciliation,
-            'updated_by' => auth()->id(),
-        ]);
+            $this->guardDischargeMedicationReconciliation($stay, $validated['discharge_medication_reconciliation'] ?? null);
+            $this->guardDischargeCompliance($stay);
 
-        app(RespiteShiftSync::class)->dischargeStay($stay, $validated['discharge_summary'], $stay->actual_end, auth()->id());
+            $stay->update([
+                'status' => 'discharged',
+                'actual_end' => now(),
+                'discharge_summary' => $validated['discharge_summary'],
+                'discharge_reason' => $validated['discharge_reason'] ?? 'planned',
+                'discharge_medication_reconciliation' => $validated['discharge_medication_reconciliation'] ?? $stay->discharge_medication_reconciliation,
+                'updated_by' => auth()->id(),
+            ]);
+            $booking->update([
+                'status' => 'completed',
+                'updated_by' => auth()->id(),
+            ]);
+            app(RespiteShiftSync::class)->dischargeStay($stay, $validated['discharge_summary'], $stay->actual_end, auth()->id());
+            $this->postFundingConsumption($stay);
 
-        if (! $alreadyDischarged) {
-            $this->postFundingConsumption($stay->fresh('booking.serviceAgreement'));
-        }
+            return $stay;
+        }, 3);
 
         event(new RespiteEvent('respite.stay.discharged', [
             'id' => $stay->id,
@@ -508,7 +557,9 @@ class RespiteStayController extends Controller
     private function postFundingConsumption(?RespiteStay $stay): void
     {
         $booking = $stay?->booking;
-        $agreement = $booking?->serviceAgreement;
+        $agreement = $booking?->service_agreement_id
+            ? ServiceAgreement::query()->lockForUpdate()->find($booking->service_agreement_id)
+            : null;
 
         if (! $booking || ! $agreement) {
             return;

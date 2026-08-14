@@ -246,7 +246,7 @@ class RespiteReadinessTest extends TestCase
         $this->assertSame('in_progress', $shift->status);
         $this->assertNotNull($shift->actual_starts_at);
 
-        $newEnd = Carbon::parse('2026-05-02 18:00:00');
+        $newEnd = Carbon::parse('2026-05-05 18:00:00');
 
         $this->actingAs($this->admin)
             ->post(route('respite.stays.extend', $stay), [
