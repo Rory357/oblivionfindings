@@ -208,27 +208,29 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
         Route::post('/alerts/{alert}/dismiss', [EmarController::class, 'dismissAlert'])->name('emar.alerts.dismiss');
 
-        // Controlled Drug Entries
+        // PRN Effectiveness
+        Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
+
+    }); // end medications.orders.manage middleware group
+
+    Route::middleware('permission:medications.controlled.record')->group(function () {
         Route::post('/controlled/entries', [EmarController::class, 'storeCDEntry'])->name('emar.controlled.entries.store');
         Route::post('/controlled/balance-check', [EmarController::class, 'storeBalanceCheck'])->name('emar.controlled.balance_check.store');
         Route::post('/controlled/discrepancies/{discrepancy}/resolve', [EmarController::class, 'resolveDiscrepancy'])->name('emar.controlled.discrepancies.resolve');
 
-        // Destructions — the register is immutable; erroneous records are voided, not deleted (MoD Regs 1977)
+        // The destruction register is immutable; erroneous records are voided, not deleted.
         Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
         Route::post('/destructions/{destruction}/void', [EmarController::class, 'voidDestruction'])->name('emar.destructions.void');
+    });
 
-        // Pharmacy Orders + Stock
+    Route::middleware('permission:medications.stock.update')->group(function () {
         Route::post('/stock/pharmacy-orders', [EmarController::class, 'storePharmacyOrder'])->name('emar.pharmacy_orders.store');
         Route::put('/stock/pharmacy-orders/{order}', [EmarController::class, 'updatePharmacyOrder'])->name('emar.pharmacy_orders.update');
         Route::post('/stock/pharmacy-orders/{order}/advance', [EmarController::class, 'advancePharmacyOrder'])->name('emar.pharmacy_orders.advance');
         Route::patch('/stock/{stock}', [EmarController::class, 'updateStockItem'])->name('emar.stock.update');
         Route::post('/stock/receive', [EmarController::class, 'receiveStock'])->name('emar.stock.receive');
         Route::post('/stock/adjust', [EmarController::class, 'adjustStock'])->name('emar.stock.adjust');
-
-        // PRN Effectiveness
-        Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
-
-    }); // end medications.orders.manage middleware group
+    });
 
     Route::middleware('permission:medications.orders.verify|medications.orders.manage|clients.update')->group(function () {
         Route::post('/medications/{medication}/verify', [EmarController::class, 'verifyMedication'])->name('emar.medications.verify');

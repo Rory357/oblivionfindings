@@ -386,6 +386,11 @@ class MedicationSignalService
         int $incidentId,
         ?ControlRoomAlert $alert = null,
     ): void {
+        // SignalProcessingService locks and updates a freshly loaded instance.
+        // Re-read that durable lifecycle state before proving that the returned
+        // alert is the signal's canonical direct or correlated alert.
+        $signal->refresh();
+
         if ($alert !== null
             && (int) ($signal->alert_id ?? $signal->correlated_alert_id) !== (int) $alert->id
         ) {
