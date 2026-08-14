@@ -1081,6 +1081,7 @@ function ShiftChecklistRow({
     canRun: boolean;
     onOpen: (runId: number) => void;
 }) {
+    const canExecute = canRun && run.can_run;
     const status = run.is_overdue
         ? { label: 'Overdue', tone: 'critical' as const }
         : run.status === 'in_progress'
@@ -1108,7 +1109,7 @@ function ShiftChecklistRow({
             </div>
             <Button type="button" size="sm" onClick={() => onOpen(run.id)}>
                 <CheckCircle2 className="h-4 w-4" />
-                {!canRun
+                {!canExecute
                     ? 'View'
                     : run.status === 'in_progress'
                       ? 'Continue'

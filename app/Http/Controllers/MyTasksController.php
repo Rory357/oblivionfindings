@@ -36,6 +36,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -139,7 +140,7 @@ class MyTasksController extends Controller
             : null;
         $activeShiftSiteId = $activeShift?->site_id ? (int) $activeShift->site_id : null;
         $workerToday = $workerNow->toDateString();
-        $shiftChecklists = $this->buildShiftChecklists($activeShiftSiteId, $workerToday);
+        $shiftChecklists = $this->buildShiftChecklists($user, $activeShiftSiteId, $workerToday);
 
         return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
@@ -176,7 +177,11 @@ class MyTasksController extends Controller
             'active_shift' => $activeShiftCard,
             'shiftChecklists' => $shiftChecklists,
             'checklistConfig' => $this->buildChecklistConfig($user, $workerToday),
-            'runDetail' => RunDetailPresenter::for($request->integer('run'), $activeShiftSiteId),
+            'runDetail' => RunDetailPresenter::for(
+                $request->integer('run'),
+                $activeShiftSiteId,
+                $request->user(),
+            ),
             'next_shift_briefing' => $nextShiftBriefing,
             'previous_shift' => $previousShift,
             'handover' => $handover,
@@ -193,7 +198,7 @@ class MyTasksController extends Controller
         ]);
     }
 
-    private function buildShiftChecklists(?int $siteId, string $today): array
+    private function buildShiftChecklists(User $user, ?int $siteId, string $today): array
     {
         if (! $siteId) {
             return [];
@@ -203,13 +208,18 @@ class MyTasksController extends Controller
             ->where('site_id', $siteId)
             ->whereIn('status', ['scheduled', 'in_progress'])
             ->whereDate('scheduled_date', '<=', $today)
-            ->with(['template:id,name,frequency,category'])
+            ->with([
+                'site:id,name,type',
+                'assignment:id,site_id,template_id,assigned_to_user_id',
+                'template:id,name,frequency,category',
+            ])
             ->orderBy('scheduled_date')
             ->limit(50)
             ->get()
             ->map(fn (SiteChecklistRun $run) => [
                 'id' => $run->id,
                 'status' => $run->status,
+                'can_run' => Gate::forUser($user)->allows('execute', $run),
                 'scheduled_date' => $run->scheduled_date?->toDateString(),
                 'is_overdue' => $run->scheduled_date
                     ? $run->scheduled_date->toDateString() < $today

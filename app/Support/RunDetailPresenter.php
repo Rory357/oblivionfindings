@@ -3,10 +3,12 @@
 namespace App\Support;
 
 use App\Models\SiteChecklistRun;
+use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 
 class RunDetailPresenter
 {
-    public static function for(?int $runId, ?int $siteId = null): ?array
+    public static function for(?int $runId, ?int $siteId = null, ?User $user = null): ?array
     {
         if (! $runId || $runId <= 0) {
             return null;
@@ -19,10 +21,14 @@ class RunDetailPresenter
                 'template:id,name,frequency,category,settings',
                 'template.items',
                 'responses',
+                'assignment:id,site_id,template_id,assigned_to_user_id',
             ])
             ->find($runId);
 
-        if (! $run || ! $run->site || ! $run->template) {
+        if (! $run
+            || ! $run->site
+            || ! $run->template
+            || ($user && Gate::forUser($user)->denies('view', $run))) {
             return null;
         }
 
@@ -38,6 +44,9 @@ class RunDetailPresenter
         return [
             'id' => $run->id,
             'status' => $run->status,
+            'can_run' => $user !== null
+                && in_array($run->status, ['scheduled', 'in_progress', 'overdue'], true)
+                && Gate::forUser($user)->allows('execute', $run),
             'scheduled_date' => $run->scheduled_date?->toDateString(),
             'completion_percentage' => (float) $run->completion_percentage,
             'overall_notes' => $run->overall_notes,

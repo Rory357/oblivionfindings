@@ -188,6 +188,7 @@ it('exposes active shift site checklists and clears them after completion', func
             ->where('active_shift.site.id', $site->id)
             ->has('shiftChecklists', 1)
             ->where('shiftChecklists.0.id', $run->id)
+            ->where('shiftChecklists.0.can_run', true)
             ->where('shiftChecklists.0.template.name', 'Shift Daily Checks')
             ->where('shiftChecklists.0.is_overdue', false)
             ->where('checklistConfig.can.view', true)

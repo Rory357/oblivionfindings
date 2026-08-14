@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Builds the shared payload that powers BOTH the org-wide Checklists dashboard
@@ -38,6 +39,10 @@ class ChecklistsDashboardData
         $siteId = $site?->id;
         $today = now()->toDateString();
         $user = $this->request->user();
+        $canRun = (bool) $user?->canDo('checklists.run');
+        $canSchedule = (bool) $user?->canDo('checklists.schedule');
+        $canExecuteRun = static fn (SiteChecklistRun $run): bool => $user !== null
+            && Gate::forUser($user)->allows('execute', $run);
 
         // ---- Templates (catalog is global in both modes) + a flags/meta map --
         $templateRows = SiteChecklistTemplate::query()
@@ -107,6 +112,7 @@ class ChecklistsDashboardData
             ->map(fn ($run) => [
                 'id' => $run->id,
                 'status' => $run->status,
+                'can_run' => $canExecuteRun($run),
                 'scheduled_date' => $run->scheduled_date?->toDateString(),
                 'started_at' => $run->started_at?->toDateTimeString(),
                 'pct' => (int) round((float) $run->completion_percentage),
@@ -129,6 +135,7 @@ class ChecklistsDashboardData
             ->map(fn ($run) => [
                 'id' => $run->id,
                 'status' => 'completed',
+                'can_run' => false,
                 'completed_at' => $run->completed_at?->toDateTimeString(),
                 'scheduled_date' => $run->completed_at?->toDateString(),
                 'pct' => (int) round((float) $run->completion_percentage),
@@ -151,6 +158,7 @@ class ChecklistsDashboardData
             ->map(fn ($run) => [
                 'id' => $run->id,
                 'status' => 'skipped',
+                'can_run' => false,
                 'scheduled_date' => $run->scheduled_date?->toDateString(),
                 'started_at' => $run->started_at?->toDateTimeString(),
                 'pct' => (int) round((float) $run->completion_percentage),
@@ -256,13 +264,14 @@ class ChecklistsDashboardData
             'runDetail' => RunDetailPresenter::for(
                 $this->request->integer('run'),
                 $site?->id,
+                $user,
             ),
             'templateDetail' => $this->templateDetail(),
             'can' => [
                 'view' => (bool) $user?->canDo('checklists.view'),
                 'manageTemplates' => (bool) $user?->canDo('checklists.manage_templates'),
-                'schedule' => (bool) $user?->canDo('checklists.schedule'),
-                'run' => (bool) $user?->canDo('checklists.run'),
+                'schedule' => $canSchedule,
+                'run' => $canRun,
             ],
         ];
     }

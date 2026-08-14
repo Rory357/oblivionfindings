@@ -90,7 +90,10 @@ export function RunModal({
     }, []);
 
     const items = useMemo(() => runDetail?.items ?? [], [runDetail?.items]);
-    const readOnly = runDetail?.status === 'completed' || !cfg.can.run;
+    const readOnly =
+        runDetail?.status === 'completed' ||
+        !cfg.can.run ||
+        runDetail?.can_run !== true;
 
     const answered = items.filter((it) =>
         isAnswered(resp[it.id]?.value),

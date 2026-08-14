@@ -249,7 +249,7 @@ describe('My Day audit wiring', () => {
         expect(screen.getByText(/4\s+of\s+6\s+done/)).toBeVisible();
     });
 
-    it('shows due checklists read-only when the worker can view but not run them', () => {
+    it('shows a due checklist read-only when this worker cannot run it', () => {
         mocks.props = {
             ...baseProps(),
             active_shift: {
@@ -267,6 +267,7 @@ describe('My Day audit wiring', () => {
                 {
                     id: 77,
                     status: 'scheduled',
+                    can_run: false,
                     scheduled_date: '2026-06-08',
                     is_overdue: false,
                     pct: 25,
@@ -280,7 +281,7 @@ describe('My Day audit wiring', () => {
             ],
             checklistConfig: {
                 ...baseProps().checklistConfig,
-                can: { view: true, run: false },
+                can: { view: true, run: true },
             },
         };
 

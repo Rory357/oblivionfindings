@@ -39,7 +39,7 @@ export function RunListRow({ run }: { run: ChecklistRun }) {
     const cat = run.template?.category ?? null;
     const tone = cat ? categoryMap[cat]?.tone : undefined;
     const flags = run.template?.flags;
-    const action = actionFor(run, can.run);
+    const action = actionFor(run, can.run && run.can_run);
     const ActionIcon = action.Icon;
 
     return (
@@ -131,7 +131,7 @@ export function WorklistCard({ run }: { run: ChecklistRun }) {
     const StatusIcon = meta.Icon;
     const started = run.status === 'in_progress';
     const flags = run.template?.flags;
-    const action = actionFor(run, can.run);
+    const action = actionFor(run, can.run && run.can_run);
     const ActionIcon = action.Icon;
 
     return (

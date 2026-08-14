@@ -28,6 +28,13 @@ class SiteChecklistRun extends Model
         'items_passed',
         'items_failed',
         'overall_notes',
+        'signature_name',
+        'signature_signed_at',
+        'signature_ip_address',
+        'signature_user_agent',
+        'completion_authority',
+        'completion_authority_reason',
+        'signature_payload_hash',
         'photos',
     ];
 
@@ -35,6 +42,7 @@ class SiteChecklistRun extends Model
         'scheduled_date' => 'date',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'signature_signed_at' => 'datetime',
         'completion_percentage' => 'decimal:2',
         'items_passed' => 'integer',
         'items_failed' => 'integer',
@@ -74,6 +82,94 @@ class SiteChecklistRun extends Model
     public function damages(): HasMany
     {
         return $this->hasMany(SiteDamage::class, 'checklist_run_id');
+    }
+
+    public function effectiveAssigneeUserId(): ?int
+    {
+        if ($this->assigned_to_user_id !== null) {
+            return (int) $this->assigned_to_user_id;
+        }
+
+        $this->loadMissing('assignment');
+
+        return $this->assignment?->assigned_to_user_id !== null
+            ? (int) $this->assignment->assigned_to_user_id
+            : null;
+    }
+
+    public function hasCanonicalExecutionProvenance(): bool
+    {
+        $this->loadMissing(['site', 'assignment']);
+
+        return $this->site !== null
+            && $this->assignment !== null
+            && (int) $this->assignment->site_id === (int) $this->site_id
+            && (int) $this->assignment->template_id === (int) $this->template_id;
+    }
+
+    public function isExecutableBy(User $user): bool
+    {
+        $assigneeId = $this->effectiveAssigneeUserId();
+
+        return $assigneeId === null
+            || $assigneeId === (int) $user->id
+            || $user->canDo('checklists.schedule');
+    }
+
+    public function computedSignaturePayloadHash(): string
+    {
+        $this->loadMissing('responses');
+
+        $payload = [
+            'version' => 1,
+            'run_id' => (int) $this->id,
+            'assignment_id' => (int) $this->assignment_id,
+            'site_id' => (int) $this->site_id,
+            'template_id' => (int) $this->template_id,
+            'assigned_to_user_id' => $this->assigned_to_user_id !== null
+                ? (int) $this->assigned_to_user_id
+                : null,
+            'scheduled_date' => $this->scheduled_date?->toDateString(),
+            'status' => $this->status,
+            'completed_by_user_id' => $this->completed_by_user_id !== null
+                ? (int) $this->completed_by_user_id
+                : null,
+            'completed_at' => $this->completed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'overall_notes' => $this->overall_notes,
+            'signature_name' => $this->signature_name,
+            'signature_signed_at' => $this->signature_signed_at?->copy()->utc()->format('Y-m-d\TH:i:s\Z'),
+            'signature_ip_address' => $this->signature_ip_address,
+            'signature_user_agent' => $this->signature_user_agent,
+            'completion_authority' => $this->completion_authority,
+            'completion_authority_reason' => $this->completion_authority_reason,
+            'responses' => $this->responses
+                ->sortBy('template_item_id')
+                ->values()
+                ->map(fn (SiteChecklistResponse $response): array => [
+                    'template_item_id' => (int) $response->template_item_id,
+                    'response_value' => $response->response_value,
+                    'notes' => $response->notes,
+                    'photo_path' => $response->photo_path,
+                    'is_failed' => (bool) $response->is_failed,
+                ])
+                ->all(),
+        ];
+
+        return hash('sha256', json_encode(
+            $payload,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+        ));
+    }
+
+    public function hasVerifiableSignatureProvenance(): bool
+    {
+        return $this->status === 'completed'
+            && filled($this->signature_name)
+            && $this->signature_signed_at !== null
+            && filled($this->completion_authority)
+            && is_string($this->signature_payload_hash)
+            && strlen($this->signature_payload_hash) === 64
+            && hash_equals($this->signature_payload_hash, $this->computedSignaturePayloadHash());
     }
 
     // Scopes

@@ -6,17 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
-use App\Models\SiteChecklistTemplateItem;
-use App\Models\SiteDamage;
-use App\Models\SiteHazard;
+use App\Services\Sites\SiteChecklistRunExecutionService;
 use App\Support\ChecklistsDashboardData;
 use App\Support\SiteRecommendedChecklists;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class SiteChecklistController extends Controller
 {
+    public function __construct(
+        private readonly SiteChecklistRunExecutionService $runExecution,
+    ) {}
+
     public function index(Request $request, Site $site)
     {
         $this->authorize('view', $site);
@@ -38,11 +38,11 @@ class SiteChecklistController extends Controller
     public function saveResponse(Request $request, SiteChecklistRun $run)
     {
         $this->extendChecklistExecutionWindow();
-        $this->authorize('view', $run->site);
+        $this->runExecution->assertVisible($run, $request->user());
 
         $validated = $request->validate([
             'responses' => 'required|array|min:1',
-            'responses.*.template_item_id' => 'required|integer',
+            'responses.*.template_item_id' => 'required|integer|distinct',
             'responses.*.response_value' => 'nullable|string',
             'responses.*.notes' => 'nullable|string',
             'responses.*.photo_path' => 'nullable|string',
@@ -53,16 +53,11 @@ class SiteChecklistController extends Controller
             'signature_name' => 'nullable|string',
         ]);
 
-        $this->persistResponses($run, $validated['responses']);
-
-        // Answering a scheduled run marks it in progress (also covers the run
-        // modal's save path, which never calls startRun explicitly).
-        if ($run->status === 'scheduled') {
-            $run->update(['status' => 'in_progress', 'started_at' => $run->started_at ?? now()]);
-        }
-
-        $run->calculateCompletion();
-        $this->raiseFollowUpsForFailures($run, $request->user()->id);
+        $this->runExecution->saveResponses(
+            $run,
+            $request->user(),
+            $validated['responses'],
+        );
 
         return redirect()->back();
     }
@@ -70,17 +65,11 @@ class SiteChecklistController extends Controller
     public function completeRun(Request $request, SiteChecklistRun $run)
     {
         $this->extendChecklistExecutionWindow();
-        $this->authorize('view', $run->site);
-
-        // If already completed, short-circuit so duplicate submits (page reloads,
-        // double-clicks, retries after a previous timeout) don't redo all the work.
-        if ($run->status === 'completed') {
-            return redirect()->back()->with('success', 'Checklist already completed.');
-        }
+        $this->runExecution->assertVisible($run, $request->user());
 
         $validated = $request->validate([
             'responses' => 'required|array|min:1',
-            'responses.*.template_item_id' => 'required|integer',
+            'responses.*.template_item_id' => 'required|integer|distinct',
             'responses.*.response_value' => 'nullable|string',
             'responses.*.notes' => 'nullable|string',
             'responses.*.photo_path' => 'nullable|string',
@@ -88,23 +77,23 @@ class SiteChecklistController extends Controller
             'responses.*.create_hazard' => 'boolean',
             'responses.*.create_damage' => 'boolean',
             'overall_notes' => 'nullable|string',
-            'signature_name' => 'required|string',
+            'signature_name' => 'required|string|max:255',
         ]);
 
-        DB::transaction(function () use ($run, $validated, $request) {
-            $this->persistResponses($run, $validated['responses']);
-            $run->calculateCompletion();
-            $this->raiseFollowUpsForFailures($run, $request->user()->id);
+        $result = $this->runExecution->complete(
+            $run,
+            $request->user(),
+            $validated['responses'],
+            $validated['signature_name'],
+            $validated['overall_notes'] ?? null,
+            $request->ip(),
+            $request->userAgent(),
+        );
 
-            $run->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-                'completed_by_user_id' => $request->user()->id,
-                'overall_notes' => $validated['overall_notes'] ?? null,
-            ]);
-        }, 3);
-
-        return redirect()->back()->with('success', 'Checklist completed.');
+        return redirect()->back()->with(
+            'success',
+            $result['replayed'] ? 'Checklist already completed.' : 'Checklist completed.',
+        );
     }
 
     /**
@@ -112,13 +101,17 @@ class SiteChecklistController extends Controller
      */
     public function rescheduleRun(Request $request, SiteChecklistRun $run)
     {
-        $this->authorize('update', $run->site);
+        $this->runExecution->assertVisible($run, $request->user());
 
         $validated = $request->validate([
             'scheduled_date' => ['required', 'date'],
         ]);
 
-        $run->update(['scheduled_date' => $validated['scheduled_date']]);
+        $this->runExecution->reschedule(
+            $run,
+            $request->user(),
+            $validated['scheduled_date'],
+        );
 
         return redirect()->back()->with('success', 'Checklist run rescheduled.');
     }
@@ -129,13 +122,18 @@ class SiteChecklistController extends Controller
      */
     public function reassignRun(Request $request, SiteChecklistRun $run)
     {
-        $this->authorize('update', $run->site);
+        $this->runExecution->assertVisible($run, $request->user());
 
         $validated = $request->validate([
             'assigned_to_user_id' => ['nullable', 'exists:users,id'],
         ]);
-
-        $run->update(['assigned_to_user_id' => $validated['assigned_to_user_id'] ?? null]);
+        $this->runExecution->reassign(
+            $run,
+            $request->user(),
+            isset($validated['assigned_to_user_id'])
+                ? (int) $validated['assigned_to_user_id']
+                : null,
+        );
 
         return redirect()->back()->with('success', 'Checklist run reassigned.');
     }
@@ -145,13 +143,11 @@ class SiteChecklistController extends Controller
      */
     public function skipRun(Request $request, SiteChecklistRun $run)
     {
-        $this->authorize('update', $run->site);
-
-        if ($run->status === 'completed') {
+        $this->runExecution->assertVisible($run, $request->user());
+        $skipped = $this->runExecution->skip($run, $request->user());
+        if ($skipped->status === 'completed') {
             return redirect()->back()->with('error', 'A completed run cannot be skipped.');
         }
-
-        $run->update(['status' => 'skipped']);
 
         return redirect()->back()->with('success', 'Checklist run skipped.');
     }
@@ -161,11 +157,8 @@ class SiteChecklistController extends Controller
      */
     public function restoreRun(Request $request, SiteChecklistRun $run)
     {
-        $this->authorize('update', $run->site);
-
-        if ($run->status === 'skipped') {
-            $run->update(['status' => 'scheduled']);
-        }
+        $this->runExecution->assertVisible($run, $request->user());
+        $this->runExecution->restore($run, $request->user());
 
         return redirect()->back()->with('success', 'Checklist run restored.');
     }
@@ -179,103 +172,6 @@ class SiteChecklistController extends Controller
         }
 
         @set_time_limit(120);
-    }
-
-    /**
-     * Persist responses keyed by (run_id, template_item_id).
-     * Model writes supply the inert compatibility value without exposing it here.
-     * Filters out any template_item_ids that don't belong to this run's template.
-     */
-    private function persistResponses(SiteChecklistRun $run, array $responses): void
-    {
-        if (empty($responses)) {
-            return;
-        }
-
-        $validItemIds = SiteChecklistTemplateItem::where('template_id', $run->template_id)
-            ->pluck('id')
-            ->all();
-        $validIdSet = array_flip($validItemIds);
-
-        foreach ($responses as $r) {
-            $itemId = (int) ($r['template_item_id'] ?? 0);
-            if (! isset($validIdSet[$itemId])) {
-                continue;
-            }
-
-            $run->responses()->updateOrCreate(
-                ['template_item_id' => $itemId],
-                [
-                    'response_value' => $r['response_value'] ?? null,
-                    'notes' => $r['notes'] ?? null,
-                    'photo_path' => $r['photo_path'] ?? null,
-                    'is_failed' => (bool) ($r['is_failed'] ?? false),
-                ],
-            );
-        }
-    }
-
-    /**
-     * Spawn the follow-up records a failed run item is flagged to raise: a
-     * SiteHazard (failure_creates_hazard) and/or a SiteDamage report
-     * (failure_creates_damage, folded in from the retired house-checklists).
-     * Idempotent — the response's created_hazard_id / created_damage_id stop a
-     * re-save (or save-then-complete) from duplicating either record.
-     */
-    private function raiseFollowUpsForFailures(SiteChecklistRun $run, int $userId): void
-    {
-        $responses = $run->responses()
-            ->where('is_failed', true)
-            ->where(fn ($q) => $q->whereNull('created_hazard_id')->orWhereNull('created_damage_id'))
-            ->with('templateItem')
-            ->get();
-
-        foreach ($responses as $response) {
-            $item = $response->templateItem;
-            if (! $item) {
-                continue;
-            }
-
-            if ($item->failure_creates_hazard && ! $response->created_hazard_id) {
-                $hazard = SiteHazard::create([
-                    'site_id' => $run->site_id,
-                    'hazard_type' => 'safety',
-                    'severity' => 'medium',
-                    'likelihood' => 'possible',
-                    'description' => $this->followUpDescription('Checklist check failed', $item->question, $response->notes),
-                    'reported_by_user_id' => $userId,
-                    'status' => 'open',
-                    'linked_checklist_run_id' => $run->id,
-                ]);
-                $response->created_hazard_id = $hazard->id;
-            }
-
-            if ($item->failure_creates_damage && ! $response->created_damage_id) {
-                $damage = $run->site->damages()->create([
-                    'reported_by' => $userId,
-                    'title' => 'Checklist issue: '.Str::limit($item->question, 200),
-                    'description' => $response->notes ?: $item->question,
-                    'severity' => 'minor',
-                    'status' => 'reported',
-                    'damage_date' => now()->toDateString(),
-                    'discovered_date' => now()->toDateString(),
-                    'insurance_status' => 'not_applicable',
-                    'checklist_run_id' => $run->id,
-                ]);
-                $response->created_damage_id = $damage->id;
-            }
-
-            if ($response->isDirty()) {
-                $response->save();
-            }
-        }
-    }
-
-    private function followUpDescription(string $prefix, string $question, ?string $notes): string
-    {
-        $text = "{$prefix}: {$question}";
-
-        return $notes ? "{$text} — {$notes}" : $text;
     }
 
     public function assignChecklist(Request $request, Site $site)

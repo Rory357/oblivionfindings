@@ -89,12 +89,11 @@ class ChecklistRunActionsTest extends TestCase
     public function test_admin_can_reassign_a_run_and_clear_it(): void
     {
         $run = $this->makeRun();
-        $assignee = User::factory()->create(['approved_at' => now()]);
 
         $this->actingAs($this->admin)
-            ->patch("/checklists/runs/{$run->id}/assign", ['assigned_to_user_id' => $assignee->id])
+            ->patch("/checklists/runs/{$run->id}/assign", ['assigned_to_user_id' => $this->supportWorker->id])
             ->assertRedirect();
-        $this->assertSame($assignee->id, $run->fresh()->assigned_to_user_id);
+        $this->assertSame($this->supportWorker->id, $run->fresh()->assigned_to_user_id);
 
         $this->actingAs($this->admin)
             ->patch("/checklists/runs/{$run->id}/assign", ['assigned_to_user_id' => null])

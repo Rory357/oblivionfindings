@@ -67,6 +67,7 @@ export interface ChecklistTemplate {
 export interface ChecklistRun {
     id: number;
     status: 'scheduled' | 'in_progress' | 'completed' | 'overdue' | 'skipped';
+    can_run: boolean;
     scheduled_date: string | null;
     started_at?: string | null;
     completed_at?: string | null;
@@ -153,6 +154,7 @@ export interface RunResponse {
 export interface RunDetail {
     id: number;
     status: ChecklistRun['status'];
+    can_run: boolean;
     scheduled_date: string | null;
     completion_percentage: number;
     overall_notes: string | null;

@@ -402,6 +402,7 @@ export interface MyDayPreShiftBriefing {
 export interface ShiftChecklistRun {
     id: number;
     status: 'scheduled' | 'in_progress';
+    can_run: boolean;
     scheduled_date: string | null;
     is_overdue: boolean;
     pct: number;
