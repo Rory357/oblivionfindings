@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Domain\Privacy\Services\DataSubjectRequestLifecycleService;
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
 use App\Models\DataBreachLog;
 use App\Models\DataRetentionPolicy;
 use App\Models\DataSubjectRequest;
+use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -16,6 +18,10 @@ use Inertia\Response;
 
 class DataSettingsController extends Controller
 {
+    public function __construct(
+        private readonly DataSubjectRequestLifecycleService $dsrLifecycle,
+    ) {}
+
     private const PRIVACY_SETTINGS_KEY = 'settings.data.privacy';
 
     private const COMPLIANCE_SETTINGS_KEY = 'settings.data.compliance';
@@ -92,17 +98,29 @@ class DataSettingsController extends Controller
     {
         $this->authorizeManage($request);
 
-        return Inertia::render('settings/data', [
-            'retention_values' => $this->loadRetentionValues(),
-            'privacy_settings' => $this->loadObjectSetting(self::PRIVACY_SETTINGS_KEY, self::PRIVACY_DEFAULTS),
-            'compliance_settings' => $this->loadObjectSetting(self::COMPLIANCE_SETTINGS_KEY, self::COMPLIANCE_DEFAULTS),
-            'dsar_requests' => DataSubjectRequest::query()
+        $canViewRequests = (bool) $request->user()?->canDo('privacy.viewRequests');
+        $canProcessRequests = (bool) $request->user()?->canDo('privacy.processRequests');
+        $dsarRequests = [];
+
+        if ($canViewRequests) {
+            $dsarRequests = DataSubjectRequest::query()
                 ->with('assignedTo:id,name')
                 ->orderByDesc('received_at')
                 ->limit(5)
                 ->get()
                 ->map(fn (DataSubjectRequest $request) => $this->mapDsarRequest($request))
-                ->all(),
+                ->all();
+        }
+
+        return Inertia::render('settings/data', [
+            'retention_values' => $this->loadRetentionValues(),
+            'privacy_settings' => $this->loadObjectSetting(self::PRIVACY_SETTINGS_KEY, self::PRIVACY_DEFAULTS),
+            'compliance_settings' => $this->loadObjectSetting(self::COMPLIANCE_SETTINGS_KEY, self::COMPLIANCE_DEFAULTS),
+            'privacy_capabilities' => [
+                'view_requests' => $canViewRequests,
+                'process_requests' => $canProcessRequests,
+            ],
+            'dsar_requests' => $dsarRequests,
             'breaches' => DataBreachLog::query()
                 ->orderByDesc('discovered_at')
                 ->limit(5)
@@ -197,6 +215,7 @@ class DataSettingsController extends Controller
     public function storeRequest(Request $request): JsonResponse
     {
         $this->authorizeManage($request);
+        $this->authorizeProcessRequests($request);
 
         $validated = $request->validate([
             'request_type' => ['required', 'in:access,correction,rectification,erasure,restriction,portability,objection'],
@@ -224,20 +243,20 @@ class DataSettingsController extends Controller
             $details = trim($details.PHP_EOL.PHP_EOL.implode(PHP_EOL, $contextLines));
         }
 
-        $dsar = DataSubjectRequest::create([
-            'request_type' => $requestType,
-            'subject_name' => $validated['requester_name'],
-            'subject_email' => $validated['requester_email'],
-            'request_details' => $details !== '' ? $details : 'Created from the Settings > Data & Privacy screen.',
-            'identity_verified' => $validated['identity_verified'] ? 'verified' : 'pending',
-            'identity_verified_at' => $validated['identity_verified'] ? now() : null,
-            'verified_by_user_id' => $validated['identity_verified'] ? $request->user()?->id : null,
-            'verification_method' => $validated['identity_verified'] ? 'Verified from settings intake' : null,
-            'status' => $validated['identity_verified'] ? 'in_progress' : 'identity_verification',
-            'received_at' => now(),
-            'due_date' => $this->addWorkingDays(20)->toDateString(),
-            'created_by' => $request->user()?->id,
-        ]);
+        $dsar = $this->dsrLifecycle->intake(
+            $request->user(),
+            [
+                'request_type' => $requestType,
+                'subject_name' => $validated['requester_name'],
+                'subject_email' => $validated['requester_email'],
+                'request_details' => $details !== '' ? $details : 'Created from the Settings > Data & Privacy screen.',
+                'received_at' => now(),
+                'due_date' => $this->addWorkingDays(20)->toDateString(),
+            ],
+            'settings.data_privacy',
+            null,
+            $validated['identity_verified'] ? 'Verified from settings intake' : null,
+        );
 
         $dsar->load('assignedTo:id,name');
 
@@ -267,7 +286,7 @@ class DataSettingsController extends Controller
             || in_array($validated['severity'], ['high', 'critical'], true);
 
         $breach = DataBreachLog::create([
-            'breach_reference' => app(\App\Services\References\ReferenceNumberGenerator::class)->next('BR'),
+            'breach_reference' => app(ReferenceNumberGenerator::class)->next('BR'),
             'breach_type' => $validated['breach_type'],
             'severity' => $validated['severity'],
             'discovered_at' => Carbon::parse($validated['discovery_date']),
@@ -347,6 +366,11 @@ class DataSettingsController extends Controller
     private function authorizeManage(Request $request): void
     {
         abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+    }
+
+    private function authorizeProcessRequests(Request $request): void
+    {
+        abort_unless($request->user()?->canDo('privacy.processRequests'), 403);
     }
 
     /**

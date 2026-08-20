@@ -2,6 +2,7 @@
 
 namespace App\Services\Tasks\Providers;
 
+use App\Domain\Privacy\Services\DataSubjectRequestLifecycleService;
 use App\Models\DataSubjectRequest;
 use App\Models\User;
 use App\Services\Tasks\Contracts\AssignableTaskProvider;
@@ -10,6 +11,7 @@ use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\ValidationException;
 
 class DataSubjectRequestProvider implements AssignableTaskProvider, ExplicitlyGlobalTaskProvider, HasModelClass, TaskProvider
@@ -38,6 +40,10 @@ class DataSubjectRequestProvider implements AssignableTaskProvider, ExplicitlyGl
 
     public function assign(User $actor, int $id, ?int $assigneeId): void
     {
+        if (! $this->canAssign($actor)) {
+            throw new AuthorizationException('This user cannot assign privacy requests.');
+        }
+
         $dsRequest = DataSubjectRequest::query()->find($id);
 
         if (! $dsRequest) {
@@ -46,18 +52,7 @@ class DataSubjectRequestProvider implements AssignableTaskProvider, ExplicitlyGl
             ]);
         }
 
-        $data = [
-            'assigned_to_user_id' => $assigneeId,
-            'updated_by' => $actor->id,
-        ];
-
-        // DataSubjectRequestController::update() stamps assigned_at only on
-        // first assignment — keep the original allocation time on reassigns.
-        if ($assigneeId !== null && ! $dsRequest->assigned_at) {
-            $data['assigned_at'] = now();
-        }
-
-        $dsRequest->update($data);
+        app(DataSubjectRequestLifecycleService::class)->assign($dsRequest, $actor, $assigneeId);
     }
 
     public function canView(User $user): bool
