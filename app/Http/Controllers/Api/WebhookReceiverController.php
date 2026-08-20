@@ -3,29 +3,32 @@
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Monitoring\Enums\RuntimeMessageType;
-use App\Domain\Monitoring\Models\MonitoringOutbox;
 use App\Domain\Monitoring\Services\MonitoringOutboxPublisher;
 use App\Http\Controllers\Controller;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationProviderConnection;
-use App\Models\Integration\IntegrationSiteConfig;
 use App\Services\Integration\Contracts\WebhookVerificationCapability;
 use App\Services\Integration\Data\ProviderWebhookRequest;
+use App\Services\Integration\Data\VerifiedProviderEvent;
 use App\Services\Integration\Exceptions\CapabilityUnavailable;
+use App\Services\Integration\Exceptions\WebhookBindingUnavailable;
 use App\Services\Integration\Exceptions\WebhookRejected;
 use App\Services\Integration\IntegrationAdapterRegistry;
+use App\Services\Integration\ProviderWebhookBindingGuard;
 use App\Support\SafeOperationalData;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use UnexpectedValueException;
 
 class WebhookReceiverController extends Controller
 {
     public function __construct(
         private readonly ?IntegrationAdapterRegistry $adapters = null,
         private readonly ?MonitoringOutboxPublisher $outbox = null,
+        private readonly ?ProviderWebhookBindingGuard $bindings = null,
     ) {}
 
     /**
@@ -43,6 +46,7 @@ class WebhookReceiverController extends Controller
 
         $registry = $this->adapters ?? app(IntegrationAdapterRegistry::class);
         $publisher = $this->outbox ?? app(MonitoringOutboxPublisher::class);
+        $bindings = $this->bindings ?? app(ProviderWebhookBindingGuard::class);
 
         try {
             $capability = $registry->capability($provider, WebhookVerificationCapability::class);
@@ -86,22 +90,7 @@ class WebhookReceiverController extends Controller
                 receivedAt: CarbonImmutable::now('UTC'),
             ));
 
-            $siteIds = collect($verified->events)
-                ->map(fn ($event): int => $event->siteId)
-                ->unique()
-                ->values();
-            $mappedSiteCount = IntegrationSiteConfig::query()
-                ->forProvider($provider)
-                ->active()
-                ->whereIn('site_id', $siteIds)
-                ->whereHas('site')
-                ->distinct()
-                ->count('site_id');
-            if ($mappedSiteCount !== $siteIds->count()) {
-                return response()->json(['error' => 'Webhook Site is not mapped'], 422);
-            }
-
-            $result = DB::transaction(function () use ($provider, $providerConnection, $publisher, $verified): array {
+            $result = DB::transaction(function () use ($bindings, $provider, $providerConnection, $publisher, $verified): array {
                 $activeConnection = IntegrationProviderConnection::query()
                     ->whereKey($providerConnection->id)
                     ->forProvider($provider)
@@ -113,38 +102,39 @@ class WebhookReceiverController extends Controller
                         'connection_disabled' => true,
                         'message_ids' => [],
                         'duplicates' => 0,
-                        'existing_event_id' => null,
                     ];
                 }
 
                 $messageIds = [];
                 $duplicates = 0;
-                $existingEventId = null;
 
                 foreach ($verified->events as $event) {
+                    $bindings->assertActive(
+                        provider: $provider,
+                        providerConnectionId: (int) $activeConnection->id,
+                        siteId: $event->siteId,
+                        binding: $event->binding,
+                    );
+
                     $existing = IntegrationEvent::query()
                         ->where('provider', $provider)
                         ->where('source_event_id', $event->sourceEventId)
+                        ->lockForUpdate()
                         ->first();
                     if ($existing !== null) {
+                        if (! $this->existingEventMatches($existing, $event)) {
+                            throw new WebhookRejected('source_identity_conflict', 404);
+                        }
                         $duplicates++;
-                        $existingEventId ??= $existing->id;
 
                         continue;
                     }
 
-                    $source = "provider:{$provider}:site:{$event->siteId}:events";
+                    // Webhook identity is application-wide for a provider. Keeping
+                    // Site out of the source prevents the same provider identity
+                    // from splitting into concurrent per-Site outbox streams.
+                    $source = "provider:{$provider}:webhooks";
                     $idempotencyKey = 'event:'.hash('sha256', $provider.':'.$event->sourceEventId);
-                    $alreadyStaged = MonitoringOutbox::query()
-                        ->where('source', $source)
-                        ->where('idempotency_key', $idempotencyKey)
-                        ->exists();
-                    if ($alreadyStaged) {
-                        $duplicates++;
-
-                        continue;
-                    }
-
                     $outbox = $publisher->stage(
                         type: RuntimeMessageType::Event,
                         stream: (string) config('monitoring.queues.events', 'monitoring-events'),
@@ -161,16 +151,20 @@ class WebhookReceiverController extends Controller
                             'event_type' => $event->eventType,
                             'normalized_payload' => $event->normalizedPayload,
                             'body_hash' => $event->bodyHash,
+                            'webhook_binding' => $event->binding->runtimePayload((int) $activeConnection->id),
                         ],
                     );
-                    $messageIds[] = $outbox->message_id;
+                    if ($outbox->wasRecentlyCreated) {
+                        $messageIds[] = $outbox->message_id;
+                    } else {
+                        $duplicates++;
+                    }
                 }
 
                 return [
                     'connection_disabled' => false,
                     'message_ids' => $messageIds,
                     'duplicates' => $duplicates,
-                    'existing_event_id' => $existingEventId,
                 ];
             });
 
@@ -187,8 +181,6 @@ class WebhookReceiverController extends Controller
             ];
             if ($result['message_ids'] !== []) {
                 $response['message_id'] = $result['message_ids'][0];
-            } elseif ($result['existing_event_id'] !== null) {
-                $response['event_id'] = $result['existing_event_id'];
             }
 
             return response()->json(
@@ -203,7 +195,18 @@ class WebhookReceiverController extends Controller
                 'reason_code' => $exception->reason,
             ]);
 
-            return response()->json(['error' => 'Webhook rejected'], $exception->httpStatus);
+            return response()->json([
+                'error' => $exception->httpStatus === 404
+                    ? 'Webhook endpoint not found'
+                    : 'Webhook rejected',
+            ], $exception->httpStatus);
+        } catch (WebhookBindingUnavailable|UnexpectedValueException) {
+            Log::notice('Provider webhook binding rejected.', [
+                'provider' => $provider,
+                'reason_code' => 'binding_or_identity_conflict',
+            ]);
+
+            return response()->json(['error' => 'Webhook endpoint not found'], 404);
         } catch (\InvalidArgumentException) {
             return response()->json(['error' => 'Webhook rejected'], 422);
         } catch (\Throwable $e) {
@@ -214,6 +217,19 @@ class WebhookReceiverController extends Controller
 
             return response()->json(['error' => 'Webhook intake failed'], 500);
         }
+    }
+
+    private function existingEventMatches(IntegrationEvent $existing, VerifiedProviderEvent $event): bool
+    {
+        $evidence = [...$event->normalizedPayload, 'evidence_hash' => $event->bodyHash];
+
+        return (int) $existing->site_id === $event->siteId
+            && ($existing->canonical_device_id === null ? null : (int) $existing->canonical_device_id)
+                === $event->binding->canonicalDeviceId
+            && $existing->source_app === $event->sourceApp
+            && $existing->severity === $event->severity
+            && $existing->event_type === $event->eventType
+            && ($existing->normalized_payload ?? []) === $evidence;
     }
 
     /**

@@ -2,8 +2,13 @@
 
 namespace Tests\Feature\Integrations;
 
+use App\Domain\Monitoring\Data\RuntimeEnvelope;
+use App\Domain\Monitoring\Enums\RuntimeMessageType;
 use App\Domain\Monitoring\Models\MonitoringOutbox;
 use App\Domain\Monitoring\Services\MonitoringEnvelopeConsumer;
+use App\Domain\Monitoring\Services\RuntimeEnvelopeCodec;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Http\Controllers\Api\WebhookReceiverController;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationProviderConnection;
@@ -11,11 +16,14 @@ use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Site;
 use App\Services\Integration\AlertRoutingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Mockery\MockInterface;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class WebhookReceiverTest extends TestCase
@@ -114,6 +122,9 @@ class WebhookReceiverTest extends TestCase
 
         $this->assertDatabaseHas('integration_events', [
             'site_id' => $site->id,
+            'canonical_device_id' => Device::query()
+                ->where('external_ref->provider_entity_id', 'unifi-device-'.$site->id)
+                ->value('id'),
             'provider' => 'unifi',
             'source_event_id' => 'evt-1001',
             'event_type' => 'doorbell.ring',
@@ -143,7 +154,7 @@ class WebhookReceiverTest extends TestCase
         $this->assertDatabaseCount('integration_events', 1);
     }
 
-    public function test_same_provider_source_event_id_is_an_application_wide_duplicate_across_canonical_sites(): void
+    public function test_same_provider_source_event_id_cannot_be_rebound_to_another_canonical_site(): void
     {
         $providerKey = 'application-provider-key-1234';
         $firstSite = Site::factory()->create();
@@ -161,8 +172,9 @@ class WebhookReceiverTest extends TestCase
 
         $secondPayload = $this->payload(siteId: $secondSite->id, eventId: 'evt-shared');
         $this->postJson('/webhooks/unifi', $secondPayload, $this->signedHeaders($secondPayload, $providerKey, 'nonce-for-second-shared-event'))
-            ->assertOk()
-            ->assertJson(['status' => 'duplicate']);
+            ->assertNotFound()
+            ->assertJson(['error' => 'Webhook endpoint not found'])
+            ->assertJsonMissing(['event_id' => IntegrationEvent::query()->sole()->id]);
 
         $this->assertDatabaseHas('integration_events', [
             'site_id' => $firstSite->id,
@@ -182,7 +194,8 @@ class WebhookReceiverTest extends TestCase
 
         $payload = $this->payload(siteId: $unmappedSite->id);
         $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
-            ->assertUnprocessable();
+            ->assertNotFound()
+            ->assertJson(['error' => 'Webhook endpoint not found']);
 
         $this->assertDatabaseCount('integration_events', 0);
     }
@@ -197,7 +210,8 @@ class WebhookReceiverTest extends TestCase
 
         $payload = $this->payload(siteId: $site->id);
         $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
-            ->assertUnprocessable();
+            ->assertNotFound()
+            ->assertJson(['error' => 'Webhook endpoint not found']);
 
         $this->assertDatabaseCount('monitoring_outbox', 0);
         $this->assertDatabaseCount('integration_events', 0);
@@ -206,15 +220,13 @@ class WebhookReceiverTest extends TestCase
     public function test_invalid_provider_timestamp_is_not_written_to_logs(): void
     {
         Log::spy();
-        $controller = new class extends WebhookReceiverController
-        {
-            public function parseProviderTimestamp(mixed $value): ?Carbon
-            {
-                return $this->parseTimestamp($value);
-            }
-        };
+        $controller = new WebhookReceiverController;
+        $parseProviderTimestamp = new \ReflectionMethod($controller, 'parseTimestamp');
 
-        $this->assertNotNull($controller->parseProviderTimestamp('RAW-PROVIDER-TIMESTAMP-SECRET'));
+        $this->assertNotNull($parseProviderTimestamp->invoke(
+            $controller,
+            'RAW-PROVIDER-TIMESTAMP-SECRET',
+        ));
 
         Log::shouldHaveReceived('warning')
             ->withArgs(function (string $message, array $context): bool {
@@ -241,6 +253,271 @@ class WebhookReceiverTest extends TestCase
 
         $this->assertDatabaseCount('monitoring_outbox', 1);
         $this->assertDatabaseCount('integration_events', 0);
+    }
+
+    public function test_freshly_signed_stale_provider_event_is_rejected_before_staging(): void
+    {
+        $key = 'unifi-stale-event-secret-1234';
+        $site = Site::factory()->create();
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $this->mapProviderToSite('unifi', $site);
+        $payload = $this->payload(siteId: $site->id, eventId: 'evt-stale-provider-time');
+        $payload['time'] = now()->subDays(2)->getTimestampMs();
+
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
+            ->assertUnauthorized()
+            ->assertJson(['error' => 'Webhook rejected']);
+
+        $this->assertDatabaseCount('monitoring_outbox', 0);
+        $this->assertDatabaseCount('integration_events', 0);
+    }
+
+    public function test_authenticated_webhook_cannot_forge_a_device_from_another_site(): void
+    {
+        $key = 'unifi-device-scope-secret-1234';
+        $targetSite = Site::factory()->create();
+        $foreignSite = Site::factory()->create();
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $this->mapProviderToSite('unifi', $targetSite);
+        $this->mapProviderToSite('unifi', $foreignSite);
+        $this->mockRouting(times: 0);
+
+        $payload = $this->payload(
+            siteId: $targetSite->id,
+            eventId: 'evt-forged-device',
+            deviceSiteId: $foreignSite->id,
+        );
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
+            ->assertNotFound()
+            ->assertJson(['error' => 'Webhook endpoint not found']);
+
+        $this->assertDatabaseCount('monitoring_outbox', 0);
+        $this->assertDatabaseCount('integration_events', 0);
+    }
+
+    public function test_no_id_whitespace_and_key_order_replay_uses_one_deterministic_provider_source_identity(): void
+    {
+        $key = 'unifi-fallback-identity-secret-1234';
+        $site = Site::factory()->create();
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $this->mapProviderToSite('unifi', $site);
+        $this->mockRouting(times: 1);
+        $payload = $this->payload(siteId: $site->id);
+        unset($payload['_id']);
+        $firstBody = json_encode($payload, JSON_THROW_ON_ERROR);
+        $secondBody = json_encode([
+            'device_id' => $payload['device_id'],
+            'subsystem' => $payload['subsystem'],
+            'msg' => $payload['msg'],
+            'key' => $payload['key'],
+            'severity' => $payload['severity'],
+            'time' => $payload['time'],
+            'site_id' => $payload['site_id'],
+        ], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT);
+
+        $this->postRawJson(
+            '/webhooks/unifi',
+            $firstBody,
+            $this->signedBodyHeaders($firstBody, $key, 'nonce-for-fallback-event-one'),
+        )
+            ->assertAccepted()
+            ->assertJson(['status' => 'accepted', 'accepted' => 1]);
+        $this->postRawJson(
+            '/webhooks/unifi',
+            $secondBody,
+            $this->signedBodyHeaders($secondBody, $key, 'nonce-for-fallback-event-two'),
+        )
+            ->assertOk()
+            ->assertJson(['status' => 'duplicate', 'accepted' => 0, 'duplicates' => 1]);
+
+        $outbox = MonitoringOutbox::query()->sole();
+        $this->assertSame('provider:unifi:webhooks', $outbox->source);
+        $this->consumeStagedEvent($site->id);
+
+        $event = IntegrationEvent::query()->sole();
+        $this->assertStringStartsWith('oblivion-fallback-v1:', $event->source_event_id);
+        $this->assertDatabaseCount('integration_events', 1);
+    }
+
+    public function test_source_identity_reuse_with_changed_authoritative_content_is_concealed_and_denied(): void
+    {
+        $key = 'unifi-conflicting-identity-secret-1234';
+        $site = Site::factory()->create();
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $this->mapProviderToSite('unifi', $site);
+        $this->mockRouting(times: 1);
+        $payload = $this->payload(siteId: $site->id, eventId: 'evt-conflicting-content');
+
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key, 'nonce-for-original-content'))
+            ->assertAccepted();
+        $this->consumeStagedEvent($site->id);
+
+        $payload['msg'] = 'A different event body reusing the same provider identity';
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key, 'nonce-for-conflicting-content'))
+            ->assertNotFound()
+            ->assertExactJson(['error' => 'Webhook endpoint not found']);
+
+        $this->assertDatabaseCount('monitoring_outbox', 1);
+        $this->assertDatabaseCount('integration_events', 1);
+    }
+
+    public function test_mapping_revoked_after_acceptance_is_quarantined_before_projection(): void
+    {
+        $key = 'unifi-revoked-binding-secret-1234';
+        $site = Site::factory()->create();
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $siteConfig = $this->mapProviderToSite('unifi', $site);
+        $this->mockRouting(times: 0);
+        $payload = $this->payload(siteId: $site->id, eventId: 'evt-binding-revoked');
+
+        $this->postJson('/webhooks/unifi', $payload, $this->signedHeaders($payload, $key))
+            ->assertAccepted();
+        $siteConfig->update(['is_active' => false]);
+
+        $this->consumeStagedEvent($site->id);
+
+        $this->assertDatabaseCount('integration_events', 0);
+        $this->assertDatabaseHas('monitoring_dead_letters', [
+            'consumer' => 'event-projector',
+            'source' => 'provider:unifi:webhooks',
+            'reason_code' => 'site_scope_violation',
+            'site_id' => $site->id,
+        ]);
+    }
+
+    public function test_signed_legacy_webhook_event_without_a_binding_is_quarantined_as_invalid_payload(): void
+    {
+        $key = 'unifi-legacy-unbound-secret-1234';
+        $site = Site::factory()->create();
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $this->mapProviderToSite('unifi', $site);
+        $this->mockRouting(times: 0);
+        $idempotencyKey = 'event:'.hash('sha256', 'unifi:legacy-unbound-event');
+        $envelope = RuntimeEnvelope::new(
+            type: RuntimeMessageType::Event,
+            source: "provider:unifi:site:{$site->id}:events",
+            sequence: 1,
+            idempotencyKey: $idempotencyKey,
+            payload: [
+                'event_family' => 'provider_event',
+                'site_id' => $site->id,
+                'provider' => 'unifi',
+                'source_app' => 'unifi',
+                'source_event_id' => 'legacy-unbound-event',
+                'occurred_at' => now()->utc()->toIso8601String(),
+                'severity' => 'warn',
+                'event_type' => 'doorbell.ring',
+                'normalized_payload' => ['summary' => 'Legacy unbound webhook event'],
+                'body_hash' => hash('sha256', 'legacy-unbound-webhook-body'),
+            ],
+        );
+
+        app(MonitoringEnvelopeConsumer::class)->consume(
+            'event-projector',
+            app(RuntimeEnvelopeCodec::class)->encode($envelope),
+            $site->id,
+        );
+
+        $this->assertDatabaseCount('integration_events', 0);
+        $this->assertDatabaseHas('monitoring_dead_letters', [
+            'consumer' => 'event-projector',
+            'source' => "provider:unifi:site:{$site->id}:events",
+            'idempotency_key' => $idempotencyKey,
+            'reason_code' => 'payload_invalid',
+            'site_id' => $site->id,
+        ]);
+    }
+
+    public function test_concurrent_no_id_replay_stages_and_projects_one_effect_on_mysql(): void
+    {
+        $connection = DB::connection();
+        $this->assertSame('mysql', $connection->getDriverName());
+        $key = 'unifi-concurrent-fallback-secret-1234';
+        $site = Site::factory()->create();
+        $this->createProviderConnection(provider: 'unifi', key: $key);
+        $this->mapProviderToSite('unifi', $site);
+        $payload = $this->payload(siteId: $site->id);
+        unset($payload['_id']);
+        $database = $connection->getDatabaseName();
+        $token = (string) Str::uuid();
+        $releasePath = sys_get_temp_dir().DIRECTORY_SEPARATOR."webhook-release-{$token}";
+        $readyPaths = [];
+        $processes = [];
+
+        $connection->commit();
+
+        try {
+            foreach (['first', 'second'] as $index => $suffix) {
+                $readyPaths[$index] = sys_get_temp_dir().DIRECTORY_SEPARATOR."webhook-ready-{$index}-{$token}";
+                $processes[] = $this->startConcurrentWebhookWorker(
+                    database: $database,
+                    payload: $payload,
+                    headers: $this->signedHeaders($payload, $key, "nonce-for-concurrent-{$suffix}"),
+                    readyPath: $readyPaths[$index],
+                    releasePath: $releasePath,
+                );
+            }
+
+            $this->waitForWebhookWorkerFiles($readyPaths, 'Concurrent webhook workers did not become ready.');
+            touch($releasePath);
+
+            $responses = [];
+            foreach ($processes as $process) {
+                $process->wait();
+                if (! $process->isSuccessful()) {
+                    throw new \RuntimeException(
+                        trim($process->getErrorOutput()) ?: 'A concurrent webhook worker failed.',
+                    );
+                }
+                $responses[] = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+            }
+
+            $statuses = array_column($responses, 'status');
+            sort($statuses);
+            $this->assertSame([200, 202], $statuses);
+            $this->assertEqualsCanonicalizing(
+                ['accepted', 'duplicate'],
+                array_map(static fn (array $response): string => $response['body']['status'], $responses),
+            );
+            $this->assertDatabaseCount('monitoring_outbox', 1);
+
+            $this->mockRouting(times: 1);
+            $this->consumeStagedEvent($site->id);
+            $this->assertDatabaseCount('integration_events', 1);
+            $this->assertDatabaseCount('monitoring_inbox', 1);
+        } finally {
+            foreach ($processes as $process) {
+                if ($process->isRunning()) {
+                    $process->stop(1);
+                }
+            }
+            foreach ([...$readyPaths, $releasePath] as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+            while ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+            foreach ([
+                'monitoring_dead_letters',
+                'monitoring_inbox',
+                'monitoring_consumer_checkpoints',
+                'integration_events',
+                'monitoring_outbox',
+                'device_assignments',
+                'devices',
+                'integration_site_configs',
+                'integration_tenant_secrets',
+                'audit_logs',
+                'cache_locks',
+                'cache',
+                'sites',
+            ] as $table) {
+                DB::table($table)->delete();
+            }
+            $connection->beginTransaction();
+        }
     }
 
     public function test_provider_without_verified_webhook_capability_is_hidden(): void
@@ -318,13 +595,27 @@ class WebhookReceiverTest extends TestCase
 
     private function mapProviderToSite(string $provider, Site $site): IntegrationSiteConfig
     {
-        return IntegrationSiteConfig::create([
+        $siteConfig = IntegrationSiteConfig::create([
             'site_id' => $site->id,
             'provider' => $provider,
             'mapped_external_site_id' => 'unifi-site-'.$site->id,
             'status' => IntegrationSiteConfig::STATUS_HYBRID,
             'is_active' => true,
         ]);
+        $device = Device::factory()->forProvider($provider)->create([
+            'external_ref' => [
+                'provider' => $provider,
+                'provider_entity_id' => 'unifi-device-'.$site->id,
+            ],
+        ]);
+        DeviceAssignment::query()->create([
+            'device_id' => $device->id,
+            'assignable_type' => DeviceAssignment::TARGET_SITE,
+            'assignable_id' => $site->id,
+            'assigned_at' => now(),
+        ]);
+
+        return $siteConfig;
     }
 
     private function mockRouting(int $times): void
@@ -344,8 +635,19 @@ class WebhookReceiverTest extends TestCase
         string $nonce = 'nonce-for-webhook-event-1001',
         ?int $timestamp = null,
     ): array {
-        $timestamp ??= now()->timestamp;
         $body = json_encode($payload, JSON_THROW_ON_ERROR);
+
+        return $this->signedBodyHeaders($body, $key, $nonce, $timestamp);
+    }
+
+    /** @return array<string, string> */
+    private function signedBodyHeaders(
+        string $body,
+        string $key,
+        string $nonce,
+        ?int $timestamp = null,
+    ): array {
+        $timestamp ??= now()->timestamp;
 
         return [
             'X-Integration-Key' => $key,
@@ -353,6 +655,20 @@ class WebhookReceiverTest extends TestCase
             'X-Webhook-Nonce' => $nonce,
             'X-Webhook-Signature' => 'sha256='.hash_hmac('sha256', $timestamp.'.'.$nonce.'.'.$body, $key),
         ];
+    }
+
+    /** @param array<string, string> $headers */
+    private function postRawJson(string $uri, string $body, array $headers): TestResponse
+    {
+        $server = [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+        ];
+        foreach ($headers as $name => $value) {
+            $server['HTTP_'.strtoupper(str_replace('-', '_', $name))] = $value;
+        }
+
+        return $this->call('POST', $uri, server: $server, content: $body);
     }
 
     private function consumeStagedEvent(int $siteId): void
@@ -366,19 +682,118 @@ class WebhookReceiverTest extends TestCase
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, string>  $headers
+     */
+    private function startConcurrentWebhookWorker(
+        string $database,
+        array $payload,
+        array $headers,
+        string $readyPath,
+        string $releasePath,
+    ): Process {
+        $worker = <<<'PHP'
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$payload = json_decode(base64_decode($argv[2]), true, flags: JSON_THROW_ON_ERROR);
+$headers = json_decode(base64_decode($argv[3]), true, flags: JSON_THROW_ON_ERROR);
+config()->set('cache.stores.webhook-concurrency', [
+    'driver' => 'database',
+    'connection' => null,
+    'table' => 'cache',
+    'lock_connection' => null,
+    'lock_table' => 'cache_locks',
+]);
+config()->set('integration-capabilities.webhook.replay_store', 'webhook-concurrency');
+config()->set('integration-capabilities.webhook.allow_local_replay_store_for_tests', true);
+config()->set('monitoring.delivery.sequence_lock_store', 'webhook-concurrency');
+config()->set('monitoring.delivery.allow_local_sequence_lock_for_tests', true);
+config()->set('monitoring.signing', [
+    'active_key_id' => 'webhook-test-key',
+    'keys' => [
+        'webhook-test-key' => base64_encode(str_repeat("\x42", SODIUM_CRYPTO_AUTH_KEYBYTES)),
+    ],
+]);
+Illuminate\Support\Facades\Queue::fake();
+file_put_contents($argv[4], 'ready');
+$deadline = microtime(true) + 15;
+while (! is_file($argv[5])) {
+    if (microtime(true) >= $deadline) {
+        throw new RuntimeException('Timed out waiting for the webhook release barrier.');
+    }
+    usleep(10_000);
+}
+$server = ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'];
+foreach ($headers as $name => $value) {
+    $server['HTTP_'.strtoupper(str_replace('-', '_', $name))] = $value;
+}
+$request = Illuminate\Http\Request::create(
+    '/webhooks/unifi',
+    'POST',
+    [],
+    [],
+    [],
+    $server,
+    json_encode($payload, JSON_THROW_ON_ERROR),
+);
+$response = $app->make(Illuminate\Contracts\Http\Kernel::class)->handle($request);
+echo json_encode([
+    'status' => $response->getStatusCode(),
+    'body' => json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR),
+], JSON_THROW_ON_ERROR);
+PHP;
+
+        $process = new Process([
+            PHP_BINARY,
+            '-r',
+            $worker,
+            base_path(),
+            base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)),
+            base64_encode(json_encode($headers, JSON_THROW_ON_ERROR)),
+            $readyPath,
+            $releasePath,
+        ], base_path(), [
+            'APP_ENV' => 'testing',
+            'DB_DATABASE' => $database,
+        ]);
+        $process->setTimeout(30);
+        $process->start();
+
+        return $process;
+    }
+
+    /** @param list<string> $paths */
+    private function waitForWebhookWorkerFiles(array $paths, string $message): void
+    {
+        $deadline = microtime(true) + 15;
+        while (collect($paths)->contains(fn (string $path): bool => ! is_file($path))) {
+            if (microtime(true) >= $deadline) {
+                throw new \RuntimeException($message);
+            }
+            usleep(10_000);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function payload(?int $siteId = null, string $eventId = 'evt-1001'): array
-    {
+    private function payload(
+        ?int $siteId = null,
+        string $eventId = 'evt-1001',
+        ?int $deviceSiteId = null,
+    ): array {
+        $siteId ??= Site::factory()->create()->id;
+
         return [
             '_id' => $eventId,
-            'site_id' => 'unifi-site-'.($siteId ?? Site::factory()->create()->id),
+            'site_id' => 'unifi-site-'.$siteId,
             'time' => now()->getTimestampMs(),
             'severity' => 'warning',
             'key' => 'doorbell.ring',
             'msg' => 'Front entry doorbell rang',
             'subsystem' => 'protect',
-            'mac' => 'aa:bb:cc:dd:ee:ff',
+            'device_id' => 'unifi-device-'.($deviceSiteId ?? $siteId),
         ];
     }
 }

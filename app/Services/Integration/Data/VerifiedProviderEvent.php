@@ -18,6 +18,7 @@ final readonly class VerifiedProviderEvent implements JsonSerializable
         public string $eventType,
         public array $normalizedPayload,
         public string $bodyHash,
+        public VerifiedWebhookBinding $binding,
     ) {
         if ($siteId < 1 || $sourceApp === '' || strlen($sourceApp) > 64
             || $sourceEventId === '' || strlen($sourceEventId) > 255
@@ -40,6 +41,7 @@ final readonly class VerifiedProviderEvent implements JsonSerializable
             'event_type' => $this->eventType,
             'normalized_payload' => $this->normalizedPayload,
             'body_hash' => $this->bodyHash,
+            'binding' => $this->binding->jsonSerialize(),
         ];
     }
 }

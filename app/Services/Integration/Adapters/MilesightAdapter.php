@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\Monitoring\Services\RuntimeEnvelopeCodec;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
@@ -18,6 +19,7 @@ use App\Services\Integration\Data\ProviderObservationPage;
 use App\Services\Integration\Data\ProviderWebhookRequest;
 use App\Services\Integration\Data\VerifiedProviderEvent;
 use App\Services\Integration\Data\VerifiedProviderEventBatch;
+use App\Services\Integration\Data\VerifiedWebhookBinding;
 use App\Services\Integration\Exceptions\ProviderRateLimited;
 use App\Services\Integration\Exceptions\WebhookRejected;
 use App\Services\Integration\IntegrationAdapterInterface;
@@ -58,6 +60,7 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
     public function __construct(
         private readonly MilesightOperationalBridgeService $bridge,
         private readonly CanonicalDeviceSiteResolver $siteResolver,
+        private readonly RuntimeEnvelopeCodec $codec,
         private readonly IntegrationSecretMaterialService $secrets,
     ) {}
 
@@ -178,8 +181,7 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
         $reportedType = is_array($data)
             ? strtoupper((string) $this->boundedWebhookText($data['type'] ?? null, 32))
             : '';
-        if ($sourceEventId === null || ! is_array($data) || ! is_array($profile)
-            || $providerDeviceId === null
+        if (! is_array($data) || ! is_array($profile) || $providerDeviceId === null
             || ! in_array($reportedType, ['ONLINE', 'OFFLINE', 'PROPERTY', 'EVENT', 'SERVICE'], true)) {
             throw new WebhookRejected('payload', 422);
         }
@@ -190,18 +192,18 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
             ->limit(2)
             ->get();
         if ($devices->count() !== 1) {
-            throw new WebhookRejected('site_identity', 422);
+            throw new WebhookRejected('site_identity', 404);
         }
         $device = $devices->sole();
         try {
             $siteId = $this->siteResolver->resolve((int) $device->id);
         } catch (\Throwable) {
-            throw new WebhookRejected('site_identity', 422);
+            throw new WebhookRejected('site_identity', 404);
         }
 
         $externalRef = is_array($device->external_ref) ? $device->external_ref : [];
         $applicationId = $this->boundedWebhookText($externalRef['application_id'] ?? null, 255);
-        if ($applicationId === null || ! IntegrationSiteConfig::query()
+        $siteConfigs = $applicationId === null ? collect() : IntegrationSiteConfig::query()
             ->forProvider(self::PROVIDER_SLUG)
             ->active()
             ->where('site_id', $siteId)
@@ -210,9 +212,12 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
                 ->where('is_active', true)
                 ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
                 ->whereNull('archived_at'))
-            ->exists()) {
-            throw new WebhookRejected('site_identity', 422);
+            ->limit(2)
+            ->get();
+        if ($siteConfigs->count() !== 1) {
+            throw new WebhookRejected('site_identity', 404);
         }
+        $siteConfig = $siteConfigs->sole();
 
         $reportedValues = $this->safeReportedValues($data['payload'] ?? []);
         $tslId = $this->boundedWebhookText($data['tslID'] ?? $data['tslId'] ?? null, 100);
@@ -223,8 +228,13 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
         );
 
         try {
-            $eventHash = hash('sha256', json_encode($item, JSON_THROW_ON_ERROR));
-        } catch (\JsonException) {
+            $eventHash = hash('sha256', $this->codec->canonicalPayloadBytes($item));
+        } catch (\UnexpectedValueException) {
+            throw new WebhookRejected('payload', 422);
+        }
+        if ($sourceEventId === null) {
+            $sourceEventId = 'oblivion-fallback-v1:'.hash('sha256', self::PROVIDER_SLUG.'|'.$eventHash);
+        } elseif (str_starts_with($sourceEventId, 'oblivion-fallback-v1:')) {
             throw new WebhookRejected('payload', 422);
         }
 
@@ -246,6 +256,12 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
                 'reported_values' => $reportedValues === [] ? null : $reportedValues,
             ], static fn (mixed $value): bool => $value !== null),
             bodyHash: $eventHash,
+            binding: new VerifiedWebhookBinding(
+                siteConfigId: (int) $siteConfig->id,
+                externalSiteId: $applicationId,
+                canonicalDeviceId: (int) $device->id,
+                providerEntityId: $providerDeviceId,
+            ),
         );
     }
 
@@ -328,7 +344,11 @@ class MilesightAdapter implements ConnectionHealthCapability, DeviceSyncCapabili
         } catch (\Throwable) {
             throw new WebhookRejected('payload', 422);
         }
-        if ($occurredAt->lt($receivedAt->subDays(90)) || $occurredAt->gt($receivedAt->addMinutes(5))) {
+        if ($occurredAt->lt($receivedAt->subSeconds(
+            (int) config('integration-capabilities.webhook.maximum_event_age_seconds', 86400),
+        )) || $occurredAt->gt($receivedAt->addSeconds(
+            (int) config('integration-capabilities.webhook.maximum_skew_seconds', 300),
+        ))) {
             throw new WebhookRejected('payload', 422);
         }
 

@@ -6,6 +6,8 @@ use App\Domain\Monitoring\Exceptions\RuntimePayloadInvalid;
 use App\Domain\Monitoring\Exceptions\RuntimeSiteScopeViolation;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationSiteConfig;
+use App\Services\Integration\Data\VerifiedWebhookBinding;
+use App\Services\Integration\Exceptions\WebhookBindingUnavailable;
 use Carbon\CarbonImmutable;
 
 final readonly class ProviderEventProjector
@@ -21,13 +23,20 @@ final readonly class ProviderEventProjector
         'event_type',
         'normalized_payload',
         'body_hash',
+        'webhook_binding',
     ];
 
-    public function __construct(private AlertRoutingService $routing) {}
+    public function __construct(
+        private AlertRoutingService $routing,
+        private ProviderWebhookBindingGuard $bindings,
+    ) {}
 
     /** @param array<string|int, mixed> $payload */
-    public function project(array $payload, ?int $trustedSiteId): void
-    {
+    public function project(
+        array $payload,
+        ?int $trustedSiteId,
+        bool $requireWebhookBinding = false,
+    ): void {
         if (array_diff(array_keys($payload), self::ALLOWED_KEYS) !== []) {
             throw new RuntimePayloadInvalid('Provider event payload is invalid.');
         }
@@ -41,6 +50,7 @@ final readonly class ProviderEventProjector
         $eventType = $payload['event_type'] ?? null;
         $normalized = $payload['normalized_payload'] ?? null;
         $bodyHash = $payload['body_hash'] ?? null;
+        $webhookBinding = $payload['webhook_binding'] ?? null;
 
         if (! is_int($siteId) || $siteId < 1
             || ! is_string($provider) || preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $provider) !== 1
@@ -58,11 +68,37 @@ final readonly class ProviderEventProjector
             throw new RuntimeSiteScopeViolation('Provider event Site does not match trusted routing context.');
         }
 
-        if (! IntegrationSiteConfig::query()
+        if ($requireWebhookBinding && ! is_array($webhookBinding)) {
+            throw new RuntimePayloadInvalid('Provider webhook binding is invalid.');
+        }
+
+        $canonicalDeviceId = null;
+        if ($webhookBinding !== null) {
+            if (! is_array($webhookBinding)) {
+                throw new RuntimePayloadInvalid('Provider webhook binding is invalid.');
+            }
+            try {
+                [$providerConnectionId, $binding] = VerifiedWebhookBinding::fromRuntimePayload($webhookBinding);
+            } catch (\InvalidArgumentException $exception) {
+                throw new RuntimePayloadInvalid('Provider webhook binding is invalid.', previous: $exception);
+            }
+            try {
+                $this->bindings->assertActive($provider, $providerConnectionId, $siteId, $binding);
+            } catch (WebhookBindingUnavailable $exception) {
+                throw new RuntimeSiteScopeViolation(
+                    'Provider webhook binding no longer matches its canonical target.',
+                    previous: $exception,
+                );
+            }
+            $canonicalDeviceId = $binding->canonicalDeviceId;
+        } elseif (! IntegrationSiteConfig::query()
             ->forProvider($provider)
             ->active()
             ->where('site_id', $siteId)
-            ->whereHas('site')
+            ->whereHas('site', fn ($site) => $site
+                ->where('is_active', true)
+                ->where(fn ($operational) => $operational->whereNull('archived')->orWhere('archived', false))
+                ->whereNull('archived_at'))
             ->exists()) {
             throw new RuntimeSiteScopeViolation('Provider event Site is not actively mapped.');
         }
@@ -81,6 +117,9 @@ final readonly class ProviderEventProjector
 
         if ($existing !== null) {
             if ((int) $existing->site_id !== $siteId
+                || ($existing->canonical_device_id === null ? null : (int) $existing->canonical_device_id) !== $canonicalDeviceId
+                || $existing->source_app !== $sourceApp
+                || $existing->severity !== $severity
                 || $existing->event_type !== $eventType
                 || ($existing->normalized_payload ?? []) !== $evidence) {
                 throw new RuntimePayloadInvalid('Provider event identity was reused with different content.');
@@ -96,6 +135,7 @@ final readonly class ProviderEventProjector
 
         $event = IntegrationEvent::query()->create([
             'site_id' => $siteId,
+            'canonical_device_id' => $canonicalDeviceId,
             'provider' => $provider,
             'source_app' => $sourceApp,
             'source_event_id' => $sourceEventId,
