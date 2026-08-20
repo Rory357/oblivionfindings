@@ -627,6 +627,7 @@ class HsEventController extends Controller
         $investigations = $hsEvent->investigations()
             ->with([
                 'leadInvestigator:id,name',
+                'submittedBy:id,name',
                 'reviewedBy:id,name',
                 'approvedBy:id,name',
                 'recommendationDispositions.correctiveAction:id,reference_number,status',
@@ -654,6 +655,7 @@ class HsEventController extends Controller
                 'findings_summary' => $inv->findings_summary,
                 'recommendations' => $this->presentInvestigationRecommendations($inv),
                 'lessons_learned' => $inv->lessons_learned,
+                'submitted_by_name' => $inv->submittedBy?->name,
                 'reviewed_by_name' => $inv->reviewedBy?->name,
                 'approved_by_name' => $inv->approvedBy?->name,
             ]);

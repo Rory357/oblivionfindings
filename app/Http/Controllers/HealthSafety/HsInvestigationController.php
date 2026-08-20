@@ -99,7 +99,7 @@ class HsInvestigationController extends Controller
         $this->ensureBelongs($event, $investigation);
 
         try {
-            $this->service->submitForReview($investigation);
+            $this->service->submitForReview($investigation, $request->user());
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -116,7 +116,7 @@ class HsInvestigationController extends Controller
         $data = $request->validate(['review_notes' => ['required', 'string', 'max:2000']]);
 
         try {
-            $this->service->returnForRework($investigation, $data['review_notes']);
+            $this->service->returnForRework($investigation, $data['review_notes'], $request->user());
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -124,34 +124,29 @@ class HsInvestigationController extends Controller
         return back()->with('success', 'Investigation returned for rework.');
     }
 
-    /** Complete (under_review → completed); auto-advances the event to corrective_action. */
+    /** Record review, then approve and complete, as two authenticated actors. */
     public function complete(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
         $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
-
-        $data = $request->validate(['approved_by_id' => ['nullable', 'integer']]);
-        if (isset($data['approved_by_id'])) {
-            $this->assertStaffAreAssignable(
-                $request,
-                $event,
-                [(int) $data['approved_by_id']],
-                'approved_by_id',
-            );
-        }
+        $isReviewDecision = $investigation->status === HsInvestigation::STATUS_UNDER_REVIEW;
 
         try {
-            $this->service->complete($investigation, [
-                'reviewed_by_id' => $request->user()->id,
-                'reviewed_at' => now(),
-                'approved_by_id' => $data['approved_by_id'] ?? $request->user()->id,
-                'approved_at' => now(),
-            ]);
+            if ($isReviewDecision) {
+                $this->service->review($investigation, $request->user());
+            } else {
+                $this->service->complete($investigation, $request->user());
+            }
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', 'Investigation completed.');
+        return back()->with(
+            'success',
+            $isReviewDecision
+                ? 'Investigation reviewed and ready for approval.'
+                : 'Investigation completed.',
+        );
     }
 
     /** Record or revise the explicit outcome of one completed recommendation. */

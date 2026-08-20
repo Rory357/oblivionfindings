@@ -257,10 +257,13 @@ class HsInvestigationTest extends TestCase
     public function test_can_submit_for_review(): void
     {
         $investigation = HsInvestigation::factory()->withFindings()->create();
+        $submitter = $this->globalAssuranceActor();
+        $this->actingAs($submitter);
 
-        $result = $this->service->submitForReview($investigation);
+        $result = $this->service->submitForReview($investigation, $submitter);
 
         $this->assertEquals(HsInvestigation::STATUS_UNDER_REVIEW, $result->status);
+        $this->assertSame($submitter->id, $result->submitted_by_id);
     }
 
     public function test_can_return_for_rework(): void
@@ -268,8 +271,14 @@ class HsInvestigationTest extends TestCase
         $investigation = HsInvestigation::factory()->withFindings()->create([
             'status' => HsInvestigation::STATUS_UNDER_REVIEW,
         ]);
+        $reviewer = $this->globalAssuranceActor();
+        $this->actingAs($reviewer);
 
-        $result = $this->service->returnForRework($investigation, 'Needs more detail on root causes.');
+        $result = $this->service->returnForRework(
+            $investigation,
+            'Needs more detail on root causes.',
+            $reviewer,
+        );
 
         $this->assertEquals(HsInvestigation::STATUS_IN_PROGRESS, $result->status);
         $this->assertEquals('Needs more detail on root causes.', $result->review_notes);
@@ -277,18 +286,25 @@ class HsInvestigationTest extends TestCase
 
     public function test_can_complete_investigation(): void
     {
+        $submitter = $this->globalAssuranceActor();
+        $reviewer = $this->globalAssuranceActor();
+        $approver = $this->globalAssuranceActor();
         $investigation = HsInvestigation::factory()->withFindings()->create([
-            'status' => HsInvestigation::STATUS_UNDER_REVIEW,
-        ]);
-        $reviewer = User::factory()->create();
-
-        $result = $this->service->complete($investigation, [
+            'status' => HsInvestigation::STATUS_REVIEWED,
+            'submitted_by_id' => $submitter->id,
+            'submitted_at' => now()->subHour(),
             'reviewed_by_id' => $reviewer->id,
+            'reviewed_at' => now()->subMinute(),
         ]);
+        $this->actingAs($approver);
+
+        $result = $this->service->complete($investigation, $approver);
 
         $this->assertEquals(HsInvestigation::STATUS_COMPLETED, $result->status);
         $this->assertNotNull($result->completed_at);
         $this->assertNotNull($result->approved_at);
+        $this->assertSame($reviewer->id, $result->reviewed_by_id);
+        $this->assertSame($approver->id, $result->approved_by_id);
 
         // HsEvent should now be 'corrective_action'
         $event = $investigation->hsEvent->fresh();
@@ -297,18 +313,26 @@ class HsInvestigationTest extends TestCase
 
     public function test_cannot_complete_without_recommendations(): void
     {
+        $submitter = $this->globalAssuranceActor();
+        $reviewer = $this->globalAssuranceActor();
+        $approver = $this->globalAssuranceActor();
         $investigation = HsInvestigation::factory()->create([
-            'status' => HsInvestigation::STATUS_UNDER_REVIEW,
+            'status' => HsInvestigation::STATUS_REVIEWED,
             'lead_investigator_id' => User::factory(),
             'started_at' => now(),
             'findings_summary' => 'Some findings.',
             'recommendations' => null,
+            'submitted_by_id' => $submitter->id,
+            'submitted_at' => now()->subHour(),
+            'reviewed_by_id' => $reviewer->id,
+            'reviewed_at' => now()->subMinute(),
         ]);
+        $this->actingAs($approver);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('recommendations');
 
-        $this->service->complete($investigation, []);
+        $this->service->complete($investigation, $approver);
     }
 
     // ──────────────────────────────────────────────────────
@@ -335,9 +359,11 @@ class HsInvestigationTest extends TestCase
             'status' => HsInvestigation::STATUS_DRAFT,
         ]);
 
+        $submitter = $this->globalAssuranceActor();
+        $this->actingAs($submitter);
         $this->expectException(\InvalidArgumentException::class);
 
-        $this->service->submitForReview($investigation);
+        $this->service->submitForReview($investigation, $submitter);
     }
 
     // ──────────────────────────────────────────────────────
@@ -464,5 +490,30 @@ class HsInvestigationTest extends TestCase
 
         $this->assertNotEquals($ref1, $ref2);
         $this->assertStringStartsWith('INV-'.now()->year.'-', $ref2);
+    }
+
+    private function globalAssuranceActor(): User
+    {
+        $actor = User::factory()->create(['approved_at' => now()]);
+        $site = Site::factory()->create();
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $actor->id,
+            'primary_site_id' => $site->id,
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+
+        foreach (['hazards.manage', 'healthSafety.viewAllSites'] as $key) {
+            $permission = Permission::firstOrCreate(
+                ['key' => $key],
+                ['description' => $key, 'group' => 'health_safety', 'module' => 'health_safety'],
+            );
+            $actor->permissionOverrides()->syncWithoutDetaching([
+                $permission->id => ['allowed' => true],
+            ]);
+        }
+
+        return $actor;
     }
 }

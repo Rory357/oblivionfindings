@@ -8,6 +8,7 @@ use App\Models\HsInvestigation;
 use App\Models\HsRecommendationDisposition;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +23,7 @@ class HsInvestigationService
 {
     public function __construct(
         private readonly HsCorrectiveActionService $correctiveActions,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -180,20 +182,75 @@ class HsInvestigationService
     /**
      * Submit for review — move from findings_recorded to under_review.
      */
-    public function submitForReview(HsInvestigation $investigation): HsInvestigation
+    public function submitForReview(HsInvestigation $investigation, User $submitter): HsInvestigation
     {
-        $this->assertTransition($investigation, HsInvestigation::STATUS_UNDER_REVIEW);
+        return DB::transaction(function () use ($investigation, $submitter): HsInvestigation {
+            [, $locked] = $this->lockInvestigationAggregate($investigation);
+            $submitter = $this->authorisedAssuranceActor($locked->hsEvent, $submitter);
+            $this->assertTransition($locked, HsInvestigation::STATUS_UNDER_REVIEW);
+            if ($locked->submitted_by_id !== null && (int) $locked->submitted_by_id !== (int) $submitter->id) {
+                throw new \InvalidArgumentException(
+                    'Investigation re-submission must be performed by the original submitter so its provenance cannot be overwritten.'
+                );
+            }
 
-        $investigation->update([
-            'status' => HsInvestigation::STATUS_UNDER_REVIEW,
-            'updated_by' => auth()->id(),
-        ]);
+            $submittedAt = $locked->submitted_at ?? now();
+            $locked->update([
+                'status' => HsInvestigation::STATUS_UNDER_REVIEW,
+                'submitted_by_id' => $locked->submitted_by_id ?? $submitter->id,
+                'submitted_at' => $submittedAt,
+                'updated_by' => $submitter->id,
+            ]);
+            AuditLogger::logOrFail('healthSafety.investigation.submittedForReview', $locked, [
+                'actor_id' => $submitter->id,
+                'hs_event_id' => $locked->hs_event_id,
+                'submitted_at' => $submittedAt->toIso8601String(),
+            ]);
+            Log::info('HsInvestigationService: submitted for review', [
+                'investigation_id' => $locked->id,
+                'submitted_by' => $submitter->id,
+            ]);
 
-        Log::info('HsInvestigationService: submitted for review', [
-            'investigation_id' => $investigation->id,
-        ]);
+            return $locked;
+        }, 3);
+    }
 
-        return $investigation;
+    public function review(HsInvestigation $investigation, User $reviewer): HsInvestigation
+    {
+        return DB::transaction(function () use ($investigation, $reviewer): HsInvestigation {
+            [, $locked] = $this->lockInvestigationAggregate($investigation);
+            $reviewer = $this->authorisedAssuranceActor($locked->hsEvent, $reviewer);
+            $this->assertTransition($locked, HsInvestigation::STATUS_REVIEWED);
+            if ($locked->submitted_by_id === null || $locked->submitted_at === null) {
+                throw new \InvalidArgumentException(
+                    'Investigation review requires durable submitter provenance.'
+                );
+            }
+            $this->assertIndependentAssuranceActor($locked, $reviewer, 'review');
+
+            if (! $locked->hasRecommendations()) {
+                throw new \InvalidArgumentException('Cannot review investigation without recommendations.');
+            }
+
+            $reviewedAt = now();
+            $locked->update([
+                'status' => HsInvestigation::STATUS_REVIEWED,
+                'reviewed_by_id' => $reviewer->id,
+                'reviewed_at' => $reviewedAt,
+                'updated_by' => $reviewer->id,
+            ]);
+            AuditLogger::logOrFail('healthSafety.investigation.reviewed', $locked, [
+                'actor_id' => $reviewer->id,
+                'hs_event_id' => $locked->hs_event_id,
+                'reviewed_at' => $reviewedAt->toIso8601String(),
+            ]);
+            Log::info('HsInvestigationService: investigation reviewed', [
+                'investigation_id' => $locked->id,
+                'reviewed_by' => $reviewer->id,
+            ]);
+
+            return $locked;
+        }, 3);
     }
 
     /**
@@ -201,68 +258,104 @@ class HsInvestigationService
      *
      * Used when the reviewer identifies issues requiring rework.
      */
-    public function returnForRework(HsInvestigation $investigation, string $reviewNotes): HsInvestigation
-    {
-        $this->assertTransition($investigation, HsInvestigation::STATUS_IN_PROGRESS);
+    public function returnForRework(
+        HsInvestigation $investigation,
+        string $reviewNotes,
+        User $reviewer,
+    ): HsInvestigation {
+        return DB::transaction(function () use ($investigation, $reviewNotes, $reviewer): HsInvestigation {
+            [, $locked] = $this->lockInvestigationAggregate($investigation);
+            $reviewer = $this->authorisedAssuranceActor($locked->hsEvent, $reviewer);
 
-        $investigation->update([
-            'status' => HsInvestigation::STATUS_IN_PROGRESS,
-            'review_notes' => $reviewNotes,
-            'updated_by' => auth()->id(),
-        ]);
+            $this->assertTransition($locked, HsInvestigation::STATUS_IN_PROGRESS);
+            $this->assertIndependentAssuranceActor($locked, $reviewer, 'review');
 
-        Log::info('HsInvestigationService: returned for rework', [
-            'investigation_id' => $investigation->id,
-        ]);
+            $locked->update([
+                'status' => HsInvestigation::STATUS_IN_PROGRESS,
+                'review_notes' => $reviewNotes,
+                'updated_by' => $reviewer->id,
+            ]);
 
-        $this->syncSourceIncidentStatus($investigation, 'in_progress');
+            AuditLogger::logOrFail('healthSafety.investigation.returnedForRework', $locked, [
+                'actor_id' => $reviewer->id,
+                'hs_event_id' => $locked->hs_event_id,
+                'review_notes_recorded' => true,
+            ]);
 
-        return $investigation;
+            Log::info('HsInvestigationService: returned for rework', [
+                'investigation_id' => $locked->id,
+                'reviewed_by' => $reviewer->id,
+            ]);
+
+            $this->syncSourceIncidentStatus($locked, 'in_progress');
+
+            return $locked;
+        }, 3);
     }
 
     /**
-     * Complete the investigation — move from under_review to completed.
+     * Complete the investigation — move from reviewed to completed.
      *
-     * Requires reviewer and approver details.
+     * The authenticated approver must be distinct from the durable submitter
+     * and reviewer. Caller-supplied identity metadata is never accepted.
      * Recommendations must exist before completion.
      * Does NOT close the parent HsEvent — that happens when
      * corrective actions are verified (PR3).
      */
-    public function complete(HsInvestigation $investigation, array $approval): HsInvestigation
+    public function complete(HsInvestigation $investigation, User $approver): HsInvestigation
     {
-        $this->assertTransition($investigation, HsInvestigation::STATUS_COMPLETED);
+        return DB::transaction(function () use ($investigation, $approver): HsInvestigation {
+            [, $locked] = $this->lockInvestigationAggregate($investigation);
+            $approver = $this->authorisedAssuranceActor($locked->hsEvent, $approver);
 
-        if (! $investigation->hasRecommendations()) {
-            throw new \InvalidArgumentException(
-                'Cannot complete investigation without recommendations.'
-            );
-        }
+            $this->assertTransition($locked, HsInvestigation::STATUS_COMPLETED);
+            if ($locked->submitted_by_id === null
+                || $locked->submitted_at === null
+                || $locked->reviewed_by_id === null
+                || $locked->reviewed_at === null) {
+                throw new \InvalidArgumentException(
+                    'Investigation approval requires durable submitter and reviewer provenance.'
+                );
+            }
+            $this->assertIndependentAssuranceActor($locked, $approver, 'approval');
 
-        return DB::transaction(function () use ($investigation, $approval) {
-            $investigation->update([
+            if (! $locked->hasRecommendations()) {
+                throw new \InvalidArgumentException(
+                    'Cannot complete investigation without recommendations.'
+                );
+            }
+
+            $approvedAt = now();
+            $locked->update([
                 'status' => HsInvestigation::STATUS_COMPLETED,
-                'completed_at' => now(),
-                'reviewed_by_id' => $approval['reviewed_by_id'] ?? $investigation->reviewed_by_id,
-                'reviewed_at' => $approval['reviewed_at'] ?? now(),
-                'approved_by_id' => $approval['approved_by_id'] ?? auth()->id(),
-                'approved_at' => now(),
-                'updated_by' => auth()->id(),
+                'completed_at' => $approvedAt,
+                'approved_by_id' => $approver->id,
+                'approved_at' => $approvedAt,
+                'updated_by' => $approver->id,
             ]);
 
             // Move HsEvent to corrective_action status.
             // PR3 will manage this status further when corrective actions are tracked.
-            $this->syncEventStatus($investigation, HsEvent::STATUS_CORRECTIVE_ACTION);
+            $this->syncEventStatus($locked, HsEvent::STATUS_CORRECTIVE_ACTION);
 
-            Log::info('HsInvestigationService: investigation completed', [
-                'investigation_id' => $investigation->id,
-                'approved_by' => $approval['approved_by_id'] ?? auth()->id(),
-                'recommendation_count' => count($investigation->recommendations ?? []),
+            AuditLogger::logOrFail('healthSafety.investigation.approved', $locked, [
+                'actor_id' => $approver->id,
+                'hs_event_id' => $locked->hs_event_id,
+                'reviewed_by_id' => $locked->reviewed_by_id,
+                'reviewed_at' => $locked->reviewed_at?->toIso8601String(),
+                'approved_at' => $approvedAt->toIso8601String(),
             ]);
 
-            $this->syncSourceIncidentStatus($investigation, 'completed');
+            Log::info('HsInvestigationService: investigation completed', [
+                'investigation_id' => $locked->id,
+                'approved_by' => $approver->id,
+                'recommendation_count' => count($locked->recommendations ?? []),
+            ]);
 
-            return $investigation;
-        });
+            $this->syncSourceIncidentStatus($locked, 'completed');
+
+            return $locked;
+        }, 3);
     }
 
     /* ------------------------------------------------------------------ */
@@ -453,6 +546,87 @@ class HsInvestigationService
         if (! $investigation->canTransitionTo($targetStatus)) {
             throw new \InvalidArgumentException(
                 "Cannot transition investigation from '{$investigation->status}' to '{$targetStatus}'."
+            );
+        }
+    }
+
+    /**
+     * Lock the canonical parent before its investigation so approval and rework
+     * serialize on one aggregate and re-check current lifecycle state.
+     *
+     * @return array{HsEvent, HsInvestigation}
+     */
+    private function lockInvestigationAggregate(HsInvestigation $investigation): array
+    {
+        $canonicalParentId = HsInvestigation::query()
+            ->whereKey($investigation->id)
+            ->value('hs_event_id');
+        abort_unless($canonicalParentId, 404);
+
+        $event = HsEvent::query()
+            ->lockForUpdate()
+            ->findOrFail((int) $canonicalParentId);
+        $locked = HsInvestigation::query()
+            ->whereKey($investigation->id)
+            ->where('hs_event_id', $event->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+        $locked->setRelation('hsEvent', $event);
+
+        return [$event, $locked];
+    }
+
+    private function authorisedAssuranceActor(HsEvent $event, User $actor): User
+    {
+        $authenticatedActorId = auth()->id();
+        abort_unless(
+            $authenticatedActorId !== null && (int) $authenticatedActorId === (int) $actor->id,
+            403,
+        );
+
+        $actorQuery = User::query()->whereKey($actor->id);
+        $this->siteAccess->applyStaffScope(
+            $actorQuery,
+            $actor,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+        $actor = $actorQuery->lockForUpdate()->first();
+        abort_unless($actor && $actor->canDo('hazards.manage'), 403);
+
+        $eventQuery = HsEvent::query()->whereKey($event->id);
+        $this->siteAccess->applyHsEventScope(
+            $eventQuery,
+            $actor,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
+        );
+        abort_unless($eventQuery->exists(), 403);
+
+        return $actor;
+    }
+
+    private function assertIndependentAssuranceActor(
+        HsInvestigation $investigation,
+        User $actor,
+        string $decision,
+    ): void {
+        $investigatorIds = collect([
+            $investigation->lead_investigator_id,
+            $investigation->submitted_by_id,
+            ...($investigation->team_member_ids ?? []),
+        ])
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique();
+
+        if ($investigatorIds->contains((int) $actor->id)) {
+            throw new \InvalidArgumentException(
+                "Investigation {$decision} must be performed by approved H&S staff who did not investigate or submit this work."
+            );
+        }
+
+        if ($decision === 'approval' && (int) $investigation->reviewed_by_id === (int) $actor->id) {
+            throw new \InvalidArgumentException(
+                'Investigation approval must be performed by approved H&S staff other than the recorded reviewer.'
             );
         }
     }

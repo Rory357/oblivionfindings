@@ -37,6 +37,8 @@ class HsInvestigation extends Model
 
     public const STATUS_UNDER_REVIEW = 'under_review';
 
+    public const STATUS_REVIEWED = 'reviewed';
+
     public const STATUS_COMPLETED = 'completed';
 
     /**
@@ -48,7 +50,8 @@ class HsInvestigation extends Model
         self::STATUS_IN_PROGRESS => 1,
         self::STATUS_FINDINGS_RECORDED => 2,
         self::STATUS_UNDER_REVIEW => 3,
-        self::STATUS_COMPLETED => 4,
+        self::STATUS_REVIEWED => 4,
+        self::STATUS_COMPLETED => 5,
     ];
 
     /**
@@ -59,7 +62,8 @@ class HsInvestigation extends Model
         self::STATUS_DRAFT => [self::STATUS_IN_PROGRESS],
         self::STATUS_IN_PROGRESS => [self::STATUS_FINDINGS_RECORDED],
         self::STATUS_FINDINGS_RECORDED => [self::STATUS_UNDER_REVIEW],
-        self::STATUS_UNDER_REVIEW => [self::STATUS_COMPLETED, self::STATUS_IN_PROGRESS],
+        self::STATUS_UNDER_REVIEW => [self::STATUS_REVIEWED, self::STATUS_IN_PROGRESS],
+        self::STATUS_REVIEWED => [self::STATUS_COMPLETED],
         self::STATUS_COMPLETED => [],
     ];
 
@@ -126,6 +130,8 @@ class HsInvestigation extends Model
         'findings_summary',
         'recommendations',
         'lessons_learned',
+        'submitted_by_id',
+        'submitted_at',
         'reviewed_by_id',
         'reviewed_at',
         'review_notes',
@@ -144,6 +150,7 @@ class HsInvestigation extends Model
         'started_at' => 'datetime',
         'target_completion_date' => 'date',
         'completed_at' => 'datetime',
+        'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
         'approved_at' => 'datetime',
     ];
@@ -165,6 +172,11 @@ class HsInvestigation extends Model
     public function reviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by_id');
+    }
+
+    public function submittedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'submitted_by_id');
     }
 
     public function approvedBy(): BelongsTo

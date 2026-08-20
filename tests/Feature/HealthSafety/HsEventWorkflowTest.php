@@ -83,6 +83,8 @@ class HsEventWorkflowTest extends TestCase
     {
         $site = $this->activeSite('Kauri House');
         $officer = $this->hsOfficer($site);
+        $reviewer = $this->hsOfficer($site);
+        $approver = $this->hsOfficer($site);
         $lead = $officer;
         $event = HsEvent::factory()->high()->create([
             'site_id' => $site->id,
@@ -114,7 +116,11 @@ class HsEventWorkflowTest extends TestCase
             ->assertSessionHas('success');
         $this->assertEquals(HsInvestigation::STATUS_UNDER_REVIEW, $inv->fresh()->status);
 
-        $this->actingAs($officer)->from('/health-safety/events')
+        $this->actingAs($reviewer)->from('/health-safety/events')
+            ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/complete")
+            ->assertSessionHas('success');
+        $this->assertEquals(HsInvestigation::STATUS_REVIEWED, $inv->fresh()->status);
+        $this->actingAs($approver)->from('/health-safety/events')
             ->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/complete")
             ->assertSessionHas('success');
         $this->assertEquals(HsInvestigation::STATUS_COMPLETED, $inv->fresh()->status);
@@ -223,6 +229,8 @@ class HsEventWorkflowTest extends TestCase
     {
         $site = $this->activeSite('Nikau House');
         $officer = $this->hsOfficer($site);
+        $reviewer = $this->hsOfficer($site);
+        $approver = $this->hsOfficer($site);
         $lead = $officer;
         $event = HsEvent::factory()->high()->create([
             'site_id' => $site->id,
@@ -240,7 +248,8 @@ class HsEventWorkflowTest extends TestCase
                 'recommendations' => [['description' => 'Install a grab rail', 'priority' => 'high']],
             ]);
         $this->actingAs($officer)->from('/health-safety/events')->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/submit");
-        $this->actingAs($officer)->from('/health-safety/events')->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/complete");
+        $this->actingAs($reviewer)->from('/health-safety/events')->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/complete");
+        $this->actingAs($approver)->from('/health-safety/events')->post("/health-safety/events/{$event->id}/investigations/{$inv->id}/complete");
 
         // Seed an action from recommendation 0.
         $payload = [

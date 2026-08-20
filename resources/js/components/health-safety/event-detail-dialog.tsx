@@ -130,6 +130,7 @@ export type EventInvestigation = {
     findings_summary: string | null;
     recommendations: JsonRec[] | null;
     lessons_learned: string | null;
+    submitted_by_name?: string | null;
     reviewed_by_name?: string | null;
     approved_by_name?: string | null;
 };
@@ -534,6 +535,7 @@ const INV_ORDER = [
     'in_progress',
     'findings_recorded',
     'under_review',
+    'reviewed',
     'completed',
 ] as const;
 const INV_STAGE: Record<string, string> = {
@@ -541,6 +543,7 @@ const INV_STAGE: Record<string, string> = {
     in_progress: 'In progress',
     findings_recorded: 'Findings recorded',
     under_review: 'Under review',
+    reviewed: 'Reviewed',
     completed: 'Completed',
 };
 
@@ -2518,7 +2521,8 @@ function CompleteInvestigationPane({
     inv: EventInvestigation;
     onDone: () => void;
 }) {
-    const form = useForm<{ approved_by_id: string }>({ approved_by_id: '' });
+    const form = useForm({});
+    const isReviewDecision = inv.status === 'under_review';
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
@@ -2541,31 +2545,30 @@ function CompleteInvestigationPane({
         <form onSubmit={submit} className="flex flex-col gap-4">
             <StepHead
                 icon={CheckCircle2}
-                title="Complete investigation"
-                blurb="Approve the investigation. Each recommendation must then receive an explicit outcome; only recommendations needing remediation become corrective actions."
+                title={
+                    isReviewDecision
+                        ? 'Review investigation'
+                        : 'Approve and complete investigation'
+                }
+                blurb={
+                    isReviewDecision
+                        ? 'Accept the investigation review. A different approved H&S staff member must then provide final approval.'
+                        : 'Approve the reviewed investigation. Each recommendation must then receive an explicit outcome; only recommendations needing remediation become corrective actions.'
+                }
             />
             <InfoCard icon={CheckCircle2} tone="info">
-                Completing requires recorded recommendations. You sign off as
-                the approver unless you nominate someone else.
+                {isReviewDecision
+                    ? 'Review records your authenticated decision. You must be different from the investigation submitter and team.'
+                    : 'Approval records your authenticated decision. You must be different from the investigation submitter, team and recorded reviewer.'}
             </InfoCard>
-            <Field
-                label="Approver"
-                hint="Defaults to you"
-                error={form.errors.approved_by_id}
-            >
-                <StaffSelect
-                    value={form.data.approved_by_id}
-                    onChange={(v) => form.setData('approved_by_id', v)}
-                    staff={d.assignable_staff}
-                    placeholder="You"
-                />
-            </Field>
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={onDone}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
-                    Complete investigation
+                    {isReviewDecision
+                        ? 'Record review'
+                        : 'Approve and complete'}
                 </Button>
             </div>
         </form>
@@ -2645,7 +2648,12 @@ function InvestigationControls({
 }) {
     const base = `/health-safety/events/${d.id}/investigations/${inv.id}`;
     if (
-        !['in_progress', 'findings_recorded', 'under_review'].includes(
+        ![
+            'in_progress',
+            'findings_recorded',
+            'under_review',
+            'reviewed',
+        ].includes(
             inv.status,
         )
     )
@@ -2680,7 +2688,7 @@ function InvestigationControls({
                     <Send className="mr-1.5 h-4 w-4" /> Submit for review
                 </Button>
             ) : null}
-            {inv.status === 'under_review' ? (
+            {['under_review', 'reviewed'].includes(inv.status) ? (
                 <>
                     <Button
                         size="sm"
@@ -2691,21 +2699,26 @@ function InvestigationControls({
                             })
                         }
                     >
-                        <CheckCircle2 className="mr-1.5 h-4 w-4" /> Complete
+                        <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                        {inv.status === 'under_review'
+                            ? 'Review'
+                            : 'Approve and complete'}
                     </Button>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            onPane({
-                                kind: 'inv_return',
-                                investigationId: inv.id,
-                            })
-                        }
-                    >
-                        <RotateCcw className="mr-1.5 h-4 w-4" /> Return for
-                        rework
-                    </Button>
+                    {inv.status === 'under_review' ? (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                                onPane({
+                                    kind: 'inv_return',
+                                    investigationId: inv.id,
+                                })
+                            }
+                        >
+                            <RotateCcw className="mr-1.5 h-4 w-4" /> Return for
+                            rework
+                        </Button>
+                    ) : null}
                 </>
             ) : null}
         </div>
@@ -4597,6 +4610,22 @@ function InvestigationSection({
                     <div className="mt-3">
                         <InvestigationGate status={inv.status} />
                     </div>
+
+                    {inv.submitted_by_name ||
+                    inv.reviewed_by_name ||
+                    inv.approved_by_name ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                            {inv.submitted_by_name
+                                ? `Submitted by ${inv.submitted_by_name}`
+                                : 'Submitter not recorded'}
+                            {inv.reviewed_by_name
+                                ? ` · Reviewed by ${inv.reviewed_by_name}`
+                                : ''}
+                            {inv.approved_by_name
+                                ? ` · Approved by ${inv.approved_by_name}`
+                                : ''}
+                        </p>
+                    ) : null}
 
                     {inv.has_findings ? (
                         <div className="mt-4 space-y-3 border-t border-border pt-3">

@@ -220,7 +220,7 @@ echo json_encode([
             {
                 methodology: '5_whys',
                 lead_investigator_id: manifest.users.owner.id,
-                team_member_ids: [manifest.users.reviewer.id],
+                team_member_ids: [manifest.users.action_owner.id],
                 target_completion_date: new Date(Date.now() + 7 * 86_400_000)
                     .toISOString()
                     .slice(0, 10),
@@ -271,10 +271,15 @@ echo json_encode([
             page,
             `/health-safety/events/${eventId}/investigations/${investigationId}/submit`,
         );
+        await loginAsFixture(page, manifest.users.reviewer);
         await postLaravel(
             page,
             `/health-safety/events/${eventId}/investigations/${investigationId}/complete`,
-            { approved_by_id: manifest.users.reviewer.id },
+        );
+        await loginAsFixture(page, manifest.users.verifier);
+        await postLaravel(
+            page,
+            `/health-safety/events/${eventId}/investigations/${investigationId}/complete`,
         );
         await postLaravel(
             page,
