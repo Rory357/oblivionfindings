@@ -112,6 +112,12 @@ class ConsentRequestPortalController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($consentRequest->client_id === $client->id, 404);
+        abort_unless($consentRequest->recipient_user_id === $user->id, 404);
+        abort_unless(
+            $user->canAccessClientPortal($client)
+            && $client->portalUsers()->whereKey($user->id)->exists(),
+            404,
+        );
         Gate::forUser($user)->authorize('respond', $consentRequest);
     }
 }

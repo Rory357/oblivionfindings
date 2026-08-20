@@ -40,6 +40,30 @@ type Props = {
     relationship_options: Record<string, string>;
 };
 
+const SUBSTITUTE_RELATIONSHIPS = new Set([
+    'welfare_guardian',
+    'epoa_personal_care',
+    'parent_guardian',
+    'court_appointed',
+]);
+
+const EMPTY_DECISION_EVIDENCE = {
+    capacity_outcome: '',
+    capacity_assessed_at: '',
+    capacity_assessment_expires_at: '',
+    capacity_assessment_reason: '',
+    capacity_evidence_type: '',
+    capacity_evidence_reference: '',
+    best_interests_process_reason: '',
+    best_interests_evidence_type: '',
+    best_interests_evidence_reference: '',
+    best_interests_consultees: [] as string[],
+};
+
+export function isSubstituteRelationship(relationship: string): boolean {
+    return SUBSTITUTE_RELATIONSHIPS.has(relationship);
+}
+
 export default function ConsentRequestsCreate({
     client,
     consent_types,
@@ -58,6 +82,7 @@ export default function ConsentRequestsCreate({
             'You may withdraw this consent at any time by contacting the key worker, or through your family portal account.',
         staff_notes: '',
         expires_in_days: '14',
+        ...EMPTY_DECISION_EVIDENCE,
     });
 
     const submit = (e: FormEvent) => {
@@ -66,6 +91,9 @@ export default function ConsentRequestsCreate({
     };
 
     const noPortalUsers = portal_users.length === 0;
+    const requiresDecisionEvidence = isSubstituteRelationship(
+        data.recipient_relationship,
+    );
 
     return (
         <AppLayout>
@@ -300,7 +328,13 @@ export default function ConsentRequestsCreate({
                                 <Select
                                     value={data.recipient_relationship}
                                     onValueChange={(v) =>
-                                        setData('recipient_relationship', v)
+                                        setData({
+                                            ...data,
+                                            ...(!isSubstituteRelationship(v)
+                                                ? EMPTY_DECISION_EVIDENCE
+                                                : {}),
+                                            recipient_relationship: v,
+                                        })
                                     }
                                 >
                                     <SelectTrigger
@@ -355,6 +389,312 @@ export default function ConsentRequestsCreate({
                             </div>
                         </CardContent>
                     </Card>
+
+                    {requiresDecisionEvidence && (
+                        <Card data-test="substitute-decision-evidence">
+                            <CardHeader>
+                                <CardTitle>
+                                    Capacity and best-interests evidence
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-5">
+                                <p className="text-sm text-muted-foreground">
+                                    Record the decision-specific assessment and
+                                    best-interests process separately from the
+                                    representative&apos;s authority. You will be
+                                    recorded as the assessor and evidence
+                                    recorder for this request.
+                                </p>
+
+                                <div>
+                                    <Label htmlFor="capacity_outcome">
+                                        Capacity assessment outcome
+                                    </Label>
+                                    <Select
+                                        value={data.capacity_outcome}
+                                        onValueChange={(v) =>
+                                            setData('capacity_outcome', v)
+                                        }
+                                    >
+                                        <SelectTrigger
+                                            id="capacity_outcome"
+                                            data-test="capacity-outcome-select"
+                                        >
+                                            <SelectValue placeholder="Select the recorded outcome…" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="lacks_capacity">
+                                                Lacks capacity for this decision
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.capacity_outcome && (
+                                        <Err msg={errors.capacity_outcome} />
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="capacity_assessed_at">
+                                            Assessed at
+                                        </Label>
+                                        <Input
+                                            id="capacity_assessed_at"
+                                            data-test="capacity-assessed-at-input"
+                                            type="datetime-local"
+                                            required
+                                            value={data.capacity_assessed_at}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'capacity_assessed_at',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        {errors.capacity_assessed_at && (
+                                            <Err
+                                                msg={
+                                                    errors.capacity_assessed_at
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="capacity_assessment_expires_at">
+                                            Assessment expires at
+                                        </Label>
+                                        <Input
+                                            id="capacity_assessment_expires_at"
+                                            data-test="capacity-expires-at-input"
+                                            type="datetime-local"
+                                            required
+                                            value={
+                                                data.capacity_assessment_expires_at
+                                            }
+                                            onChange={(e) =>
+                                                setData(
+                                                    'capacity_assessment_expires_at',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        {errors.capacity_assessment_expires_at && (
+                                            <Err
+                                                msg={
+                                                    errors.capacity_assessment_expires_at
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="capacity_assessment_reason">
+                                        Assessment reason
+                                    </Label>
+                                    <Textarea
+                                        id="capacity_assessment_reason"
+                                        data-test="capacity-reason-input"
+                                        rows={3}
+                                        required
+                                        minLength={20}
+                                        maxLength={2000}
+                                        value={data.capacity_assessment_reason}
+                                        onChange={(e) =>
+                                            setData(
+                                                'capacity_assessment_reason',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Describe why the client could not understand, retain, use or weigh the information for this specific decision."
+                                    />
+                                    {errors.capacity_assessment_reason && (
+                                        <Err
+                                            msg={
+                                                errors.capacity_assessment_reason
+                                            }
+                                        />
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="capacity_evidence_type">
+                                            Assessment evidence type
+                                        </Label>
+                                        <Input
+                                            id="capacity_evidence_type"
+                                            data-test="capacity-evidence-type-input"
+                                            required
+                                            maxLength={80}
+                                            value={data.capacity_evidence_type}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'capacity_evidence_type',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="Documented assessment"
+                                        />
+                                        {errors.capacity_evidence_type && (
+                                            <Err
+                                                msg={
+                                                    errors.capacity_evidence_type
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="capacity_evidence_reference">
+                                            Assessment evidence reference
+                                        </Label>
+                                        <Input
+                                            id="capacity_evidence_reference"
+                                            data-test="capacity-evidence-reference-input"
+                                            required
+                                            maxLength={255}
+                                            value={
+                                                data.capacity_evidence_reference
+                                            }
+                                            onChange={(e) =>
+                                                setData(
+                                                    'capacity_evidence_reference',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="Record or document reference"
+                                        />
+                                        {errors.capacity_evidence_reference && (
+                                            <Err
+                                                msg={
+                                                    errors.capacity_evidence_reference
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="best_interests_process_reason">
+                                        Best-interests process and reason
+                                    </Label>
+                                    <Textarea
+                                        id="best_interests_process_reason"
+                                        data-test="best-interests-reason-input"
+                                        rows={3}
+                                        required
+                                        minLength={20}
+                                        maxLength={2000}
+                                        value={
+                                            data.best_interests_process_reason
+                                        }
+                                        onChange={(e) =>
+                                            setData(
+                                                'best_interests_process_reason',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Record known wishes, foreseeable effects, consultation and less restrictive alternatives considered for this decision."
+                                    />
+                                    {errors.best_interests_process_reason && (
+                                        <Err
+                                            msg={
+                                                errors.best_interests_process_reason
+                                            }
+                                        />
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="best_interests_evidence_type">
+                                            Best-interests evidence type
+                                        </Label>
+                                        <Input
+                                            id="best_interests_evidence_type"
+                                            data-test="best-interests-evidence-type-input"
+                                            required
+                                            maxLength={80}
+                                            value={
+                                                data.best_interests_evidence_type
+                                            }
+                                            onChange={(e) =>
+                                                setData(
+                                                    'best_interests_evidence_type',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="Multidisciplinary review"
+                                        />
+                                        {errors.best_interests_evidence_type && (
+                                            <Err
+                                                msg={
+                                                    errors.best_interests_evidence_type
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="best_interests_evidence_reference">
+                                            Best-interests evidence reference
+                                        </Label>
+                                        <Input
+                                            id="best_interests_evidence_reference"
+                                            data-test="best-interests-evidence-reference-input"
+                                            required
+                                            maxLength={255}
+                                            value={
+                                                data.best_interests_evidence_reference
+                                            }
+                                            onChange={(e) =>
+                                                setData(
+                                                    'best_interests_evidence_reference',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="Meeting or review reference"
+                                        />
+                                        {errors.best_interests_evidence_reference && (
+                                            <Err
+                                                msg={
+                                                    errors.best_interests_evidence_reference
+                                                }
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="best_interests_consultees">
+                                        People consulted
+                                    </Label>
+                                    <Textarea
+                                        id="best_interests_consultees"
+                                        data-test="best-interests-consultees-input"
+                                        rows={3}
+                                        required
+                                        value={data.best_interests_consultees.join(
+                                            '\n',
+                                        )}
+                                        onChange={(e) =>
+                                            setData(
+                                                'best_interests_consultees',
+                                                e.target.value.split('\n'),
+                                            )
+                                        }
+                                        placeholder="One person or role per line"
+                                    />
+                                    {errors.best_interests_consultees && (
+                                        <Err
+                                            msg={
+                                                errors.best_interests_consultees
+                                            }
+                                        />
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <Card>
                         <CardHeader>

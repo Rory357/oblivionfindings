@@ -185,7 +185,7 @@ class ConsentRequestFlowTest extends TestCase
                 'acknowledge_authority' => '1',
             ]);
 
-        $response->assertForbidden();
+        $response->assertNotFound();
         $this->assertSame(ConsentRequest::STATUS_PENDING, $request->fresh()->status);
     }
 

@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientConsent;
+use App\Models\ClientIncident;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
 use App\Models\NextOfKin;
@@ -18,8 +19,10 @@ use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Symfony\Component\Process\Process;
 
 function grantConsentIntegrityPermissions(User $user, array $permissionKeys): void
 {
@@ -67,6 +70,8 @@ function makeConsentIntegrityContext(): array
     ]);
     grantConsentIntegrityPermissions($staff, [
         'clients.viewAny',
+        'consents.manage',
+        'consents.record',
         'consents.request',
         'consents.withdraw',
     ]);
@@ -155,6 +160,24 @@ function makeVerifiedConsentAuthority(
     ]);
 }
 
+/** @return array<string, mixed> */
+function consentIntegrityDecisionEvidence(array $overrides = []): array
+{
+    return [
+        'capacity_outcome' => 'lacks_capacity',
+        'capacity_assessed_at' => now()->subDay()->toIso8601String(),
+        'capacity_assessment_expires_at' => now()->addMonth()->toIso8601String(),
+        'capacity_assessment_reason' => 'The client could not understand, retain, or weigh the information for this specific decision.',
+        'capacity_evidence_type' => 'documented_assessment',
+        'capacity_evidence_reference' => 'capacity-assessment-CA-2026-0042',
+        'best_interests_process_reason' => 'The team reviewed known wishes, foreseeable effects, and less restrictive alternatives for this decision.',
+        'best_interests_evidence_type' => 'multidisciplinary_review',
+        'best_interests_evidence_reference' => 'best-interests-review-BI-2026-0042',
+        'best_interests_consultees' => ['Key worker', 'Clinical lead', 'Welfare guardian'],
+        ...$overrides,
+    ];
+}
+
 beforeEach(function () {
     Notification::fake();
 });
@@ -172,6 +195,7 @@ it('rejects a substitute relationship label without verified legal authority', f
             "/operations/clients/{$context['client']->id}/consent-requests",
             consentIntegrityPayload($context, [
                 'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
             ]),
         )
         ->assertSessionHasErrors('recipient_relationship');
@@ -179,7 +203,104 @@ it('rejects a substitute relationship label without verified legal authority', f
     expect(ConsentRequest::query()->exists())->toBeFalse();
 });
 
-it('binds verified substitute authority and materialises capacity fields from that record', function () {
+it('does not let verified relationship or authority imply capacity and best interests', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+            ]),
+        )
+        ->assertSessionHasErrors('capacity_outcome');
+
+    expect(ConsentRequest::query()->exists())->toBeFalse()
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('rejects every partial substituted-consent evidence bundle atomically', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    $requiredEvidence = array_keys(consentIntegrityDecisionEvidence());
+
+    foreach ($requiredEvidence as $missing) {
+        $evidence = consentIntegrityDecisionEvidence();
+        unset($evidence[$missing]);
+
+        $this->actingAs($context['staff'])
+            ->post(
+                "/operations/clients/{$context['client']->id}/consent-requests",
+                consentIntegrityPayload($context, [
+                    'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                    ...$evidence,
+                ]),
+            )
+            ->assertSessionHasErrors($missing);
+    }
+
+    expect(ConsentRequest::query()->exists())->toBeFalse()
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('rejects forged capacity and best-interests assertions on direct consent recording', function () {
+    $context = makeConsentIntegrityContext();
+
+    $this->actingAs($context['staff'])
+        ->post("/operations/clients/{$context['client']->id}/consents", [
+            'consent_type_id' => $context['consentType']->id,
+            'status' => 'given',
+            'given_method' => 'written',
+            'given_at' => now()->toDateString(),
+            'given_by_relationship' => 'staff_recorded',
+            'capacity_assessed' => true,
+            'capacity_outcome' => 'lacks_capacity',
+            'capacity_notes' => 'A relationship label is not capacity evidence.',
+            'best_interests_decision' => true,
+            'best_interests_rationale' => 'A client-supplied assertion is not a process.',
+        ])
+        ->assertSessionHasErrors('capacity_assessed');
+
+    expect(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('rejects a substitute relationship on direct consent recording without canonical authority evidence', function () {
+    $context = makeConsentIntegrityContext();
+
+    $this->actingAs($context['staff'])
+        ->post("/operations/clients/{$context['client']->id}/consents", [
+            'consent_type_id' => $context['consentType']->id,
+            'status' => 'given',
+            'given_method' => 'written',
+            'given_at' => now()->toDateString(),
+            'given_by_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+        ])
+        ->assertSessionHasErrors('given_by_relationship');
+
+    expect(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('rejects forged authority and decision provenance on direct consent recording', function () {
+    $context = makeConsentIntegrityContext();
+
+    $this->actingAs($context['staff'])
+        ->post("/operations/clients/{$context['client']->id}/consents", [
+            'consent_type_id' => $context['consentType']->id,
+            'status' => 'given',
+            'given_method' => 'written',
+            'given_at' => now()->toDateString(),
+            'conditions' => [
+                'authority_next_of_kin_id' => 999999,
+                'decision_evidence' => ['scope_digest' => str_repeat('a', 64)],
+            ],
+        ])
+        ->assertSessionHasErrors('conditions');
+
+    expect(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('separates verified authority capacity assessment and accepted best-interests evidence', function () {
     $context = makeConsentIntegrityContext();
     $authority = makeVerifiedConsentAuthority($context);
 
@@ -188,6 +309,7 @@ it('binds verified substitute authority and materialises capacity fields from th
             "/operations/clients/{$context['client']->id}/consent-requests",
             consentIntegrityPayload($context, [
                 'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
             ]),
         )
         ->assertRedirect()
@@ -198,7 +320,7 @@ it('binds verified substitute authority and materialises capacity fields from th
         ->post(
             "/portal/clients/{$context['client']->id}/consent-requests/{$consentRequest->id}/approve",
             [
-                'response_notes' => 'Approved under the verified welfare authority.',
+                'response_notes' => 'This decision reflects the client\'s known wishes and is the least restrictive available option.',
                 'acknowledge_authority' => '1',
             ],
         )
@@ -214,7 +336,238 @@ it('binds verified substitute authority and materialises capacity fields from th
         ->and($consent->capacity_outcome)->toBe('lacks_capacity')
         ->and($consent->best_interests_decision)->toBeTrue()
         ->and($consent->best_interests_decision_maker_id)->toBe($context['recipient']->id)
-        ->and($consent->conditions['authority_next_of_kin_id'] ?? null)->toBe($authority->id);
+        ->and($consent->conditions['authority_next_of_kin_id'] ?? null)->toBe($authority->id)
+        ->and($consentRequest->decision_evidence_recorded_by_user_id)->toBe($context['staff']->id)
+        ->and($consentRequest->capacity_assessor_user_id)->toBe($context['staff']->id)
+        ->and($consentRequest->decision_evidence_accepted_by_user_id)->toBe($context['recipient']->id)
+        ->and($consentRequest->decision_scope_digest)->toHaveLength(64)
+        ->and($consent->decision_evidence_digest)->toBe($consentRequest->decision_scope_digest)
+        ->and(data_get($consent->conditions, 'decision_evidence.best_interests_process.evidence_reference'))
+        ->toBe('best-interests-review-BI-2026-0042');
+});
+
+it('derives the authority binding server-side and ignores a forged foreign authority id', function () {
+    $context = makeConsentIntegrityContext();
+    $canonicalAuthority = makeVerifiedConsentAuthority($context);
+    $foreign = makeConsentIntegrityContext();
+    $foreignAuthority = makeVerifiedConsentAuthority($foreign);
+    $payload = consentIntegrityPayload($context, [
+        'client_id' => $context['client']->id,
+        'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+        'authority_next_of_kin_id' => $foreignAuthority->id,
+        ...consentIntegrityDecisionEvidence(),
+    ]);
+    unset($payload['expires_in_days']);
+
+    $request = app(ConsentRequestService::class)->create($payload, $context['staff']);
+
+    expect($request->authority_next_of_kin_id)->toBe($canonicalAuthority->id)
+        ->and($request->authority_next_of_kin_id)->not->toBe($foreignAuthority->id);
+});
+
+it('binds only an authorised canonical Client source and conceals foreign source ids', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    $foreignClient = Client::factory()->create(['site_id' => $context['site']->id]);
+
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                'triggering_subject_type' => 'client',
+                'triggering_subject_id' => $context['client']->id,
+                ...consentIntegrityDecisionEvidence(),
+            ]),
+        )
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $boundRequest = ConsentRequest::query()->sole();
+    expect($boundRequest->triggering_subject_type)->toBe('client')
+        ->and($boundRequest->triggering_subject_id)->toBe($context['client']->id)
+        ->and($boundRequest->decision_scope_digest)->toHaveLength(64);
+
+    $privateIncident = ClientIncident::factory()->create([
+        'client_id' => $context['client']->id,
+        'site_id' => $context['site']->id,
+    ]);
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                'triggering_subject_type' => ClientIncident::class,
+                'triggering_subject_id' => $privateIncident->id,
+                ...consentIntegrityDecisionEvidence([
+                    'capacity_evidence_reference' => 'capacity-assessment-private-source',
+                ]),
+            ]),
+        )
+        ->assertSessionHasErrors('triggering_subject_id');
+
+    grantConsentIntegrityPermissions($context['staff'], [
+        'clients.viewAny',
+        'consents.manage',
+        'consents.record',
+        'consents.request',
+        'consents.withdraw',
+        'incidents.viewAny',
+    ]);
+    $wrongSiteIncident = ClientIncident::factory()->create([
+        'client_id' => $context['client']->id,
+        'site_id' => Site::factory()->create()->id,
+    ]);
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                'triggering_subject_type' => ClientIncident::class,
+                'triggering_subject_id' => $wrongSiteIncident->id,
+                ...consentIntegrityDecisionEvidence([
+                    'capacity_evidence_reference' => 'capacity-assessment-wrong-site-source',
+                ]),
+            ]),
+        )
+        ->assertSessionHasErrors('triggering_subject_id');
+
+    foreach ([$foreignClient->id, 999999999] as $foreignId) {
+        $this->actingAs($context['staff'])
+            ->post(
+                "/operations/clients/{$context['client']->id}/consent-requests",
+                consentIntegrityPayload($context, [
+                    'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                    'triggering_subject_type' => 'client',
+                    'triggering_subject_id' => $foreignId,
+                    ...consentIntegrityDecisionEvidence([
+                        'capacity_evidence_reference' => "capacity-assessment-source-{$foreignId}",
+                    ]),
+                ]),
+            )
+            ->assertSessionHasErrors('triggering_subject_id');
+    }
+
+    expect(ConsentRequest::query()->count())->toBe(1);
+});
+
+it('revalidates the locked canonical source Site and privacy authority before acceptance', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    grantConsentIntegrityPermissions($context['staff'], [
+        'clients.viewAny',
+        'consents.manage',
+        'consents.record',
+        'consents.request',
+        'consents.withdraw',
+        'incidents.viewAny',
+    ]);
+    $incident = ClientIncident::factory()->create([
+        'client_id' => $context['client']->id,
+        'site_id' => $context['site']->id,
+    ]);
+
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                'triggering_subject_type' => ClientIncident::class,
+                'triggering_subject_id' => $incident->id,
+                ...consentIntegrityDecisionEvidence(),
+            ]),
+        )
+        ->assertRedirect();
+    $consentRequest = ConsentRequest::query()->sole();
+    $incident->update(['site_id' => Site::factory()->create()->id]);
+
+    $this->actingAs($context['recipient'])
+        ->post(
+            "/portal/clients/{$context['client']->id}/consent-requests/{$consentRequest->id}/approve",
+            [
+                'response_notes' => 'The source changed after this evidence was recorded.',
+                'acknowledge_authority' => '1',
+            ],
+        )
+        ->assertStatus(409);
+
+    expect($consentRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and($consentRequest->fresh()->decision_evidence_accepted_at)->toBeNull()
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('will not bind the same decision evidence to a second request', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    $payload = consentIntegrityPayload($context, [
+        'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+        ...consentIntegrityDecisionEvidence(),
+    ]);
+
+    $this->actingAs($context['staff'])
+        ->post("/operations/clients/{$context['client']->id}/consent-requests", $payload)
+        ->assertRedirect();
+    $this->actingAs($context['staff'])
+        ->post("/operations/clients/{$context['client']->id}/consent-requests", $payload)
+        ->assertSessionHasErrors('capacity_assessment');
+
+    expect(ConsentRequest::query()->count())->toBe(1);
+});
+
+it('requires segregation between the capacity assessor and substitute decision maker', function () {
+    $context = makeConsentIntegrityContext();
+    $combinedActor = User::factory()->create();
+    assignConsentIntegrityPortalRole($combinedActor, 'next_of_kin');
+    grantConsentIntegrityPermissions($combinedActor, [
+        'clients.viewAny',
+        'consents.manage',
+        'consents.request',
+    ]);
+    $context['client']->portalUsers()->detach($context['recipient']->id);
+    $context['client']->portalUsers()->attach($combinedActor->id, [
+        'relation' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+    ]);
+    $context['recipient'] = $combinedActor;
+    makeVerifiedConsentAuthority($context);
+
+    $this->actingAs($combinedActor)
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
+            ]),
+        )
+        ->assertSessionHasErrors('capacity_assessment');
+
+    expect(ConsentRequest::query()->exists())->toBeFalse();
+});
+
+it('permits an explicit application-wide Site role as a separate positive path', function () {
+    $context = makeConsentIntegrityContext();
+    $globalRecorder = User::factory()->create(['role' => 'manager']);
+    grantConsentIntegrityPermissions($globalRecorder, [
+        'clients.viewAny',
+        'sites.viewAll',
+        'consents.manage',
+        'consents.request',
+    ]);
+    $context['staff'] = $globalRecorder;
+    makeVerifiedConsentAuthority($context);
+
+    $this->actingAs($globalRecorder)
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
+            ]),
+        )
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect(ConsentRequest::query()->sole()->decision_evidence_recorded_by_user_id)
+        ->toBe($globalRecorder->id);
 });
 
 it('rejects verified authority when its explicit type does not match the request', function () {
@@ -226,6 +579,7 @@ it('rejects verified authority when its explicit type does not match the request
             "/operations/clients/{$context['client']->id}/consent-requests",
             consentIntegrityPayload($context, [
                 'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
             ]),
         )
         ->assertSessionHasErrors('recipient_relationship');
@@ -242,6 +596,7 @@ it('revalidates substitute authority expiry inside the locked approval decision'
             "/operations/clients/{$context['client']->id}/consent-requests",
             consentIntegrityPayload($context, [
                 'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
             ]),
         )
         ->assertRedirect();
@@ -252,6 +607,7 @@ it('revalidates substitute authority expiry inside the locked approval decision'
         ->post(
             "/portal/clients/{$context['client']->id}/consent-requests/{$consentRequest->id}/approve",
             [
+                'response_notes' => 'The current evidence supports this decision.',
                 'acknowledge_authority' => '1',
             ],
         )
@@ -259,6 +615,191 @@ it('revalidates substitute authority expiry inside the locked approval decision'
 
     expect($consentRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
         ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('rejects a changed authority snapshot even when the revised authority remains current', function () {
+    $context = makeConsentIntegrityContext();
+    $authority = makeVerifiedConsentAuthority($context);
+
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
+            ]),
+        )
+        ->assertRedirect();
+    $consentRequest = ConsentRequest::query()->sole();
+    $authority->update(['legal_authority_expires_at' => now()->addMonths(6)]);
+
+    $this->actingAs($context['recipient'])
+        ->post(
+            "/portal/clients/{$context['client']->id}/consent-requests/{$consentRequest->id}/approve",
+            [
+                'response_notes' => 'The revised authority should require a newly bound decision request.',
+                'acknowledge_authority' => '1',
+            ],
+        )
+        ->assertStatus(409);
+
+    expect($consentRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('rejects stale decision scope after the canonical Client Site changes', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
+            ]),
+        )
+        ->assertRedirect();
+    $consentRequest = ConsentRequest::query()->sole();
+    $context['client']->update(['site_id' => Site::factory()->create()->id]);
+
+    $this->actingAs($context['recipient'])
+        ->post(
+            "/portal/clients/{$context['client']->id}/consent-requests/{$consentRequest->id}/approve",
+            [
+                'response_notes' => 'The decision is recorded for the changed scope.',
+                'acknowledge_authority' => '1',
+            ],
+        )
+        ->assertStatus(409);
+
+    expect($consentRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and($consentRequest->fresh()->decision_evidence_accepted_at)->toBeNull()
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('requires a decision-specific representative reason before accepting evidence', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
+            ]),
+        )
+        ->assertRedirect();
+    $consentRequest = ConsentRequest::query()->sole();
+
+    $this->actingAs($context['recipient'])
+        ->post(
+            "/portal/clients/{$context['client']->id}/consent-requests/{$consentRequest->id}/approve",
+            ['acknowledge_authority' => '1'],
+        )
+        ->assertSessionHasErrors('response_notes');
+
+    expect($consentRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('keeps revocation provenance and will not accept cancelled decision evidence', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+
+    $this->actingAs($context['staff'])
+        ->post(
+            "/operations/clients/{$context['client']->id}/consent-requests",
+            consentIntegrityPayload($context, [
+                'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+                ...consentIntegrityDecisionEvidence(),
+            ]),
+        )
+        ->assertRedirect();
+    $consentRequest = ConsentRequest::query()->sole();
+
+    app(ConsentRequestService::class)->cancel(
+        $consentRequest,
+        $context['staff'],
+        'Capacity evidence changed and must be reassessed.',
+    );
+
+    $conflicted = false;
+    try {
+        app(ConsentRequestService::class)->approve(
+            $consentRequest,
+            $context['recipient'],
+            consentIntegrityHttpRequest($context['recipient']),
+            'Attempted replay after the evidence was revoked.',
+        );
+    } catch (ConflictHttpException) {
+        $conflicted = true;
+    }
+
+    $consentRequest->refresh();
+    expect($conflicted)->toBeTrue()
+        ->and($consentRequest->status)->toBe(ConsentRequest::STATUS_CANCELLED)
+        ->and($consentRequest->decision_evidence_revoked_by_user_id)->toBe($context['staff']->id)
+        ->and($consentRequest->decision_evidence_revocation_reason)->toContain('Capacity evidence changed')
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
+it('keeps recorded capacity and best-interests evidence immutable through change and revocation', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    $payload = consentIntegrityPayload($context, [
+        'client_id' => $context['client']->id,
+        'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+        ...consentIntegrityDecisionEvidence(),
+    ]);
+    unset($payload['expires_in_days']);
+    $consentRequest = app(ConsentRequestService::class)->create($payload, $context['staff']);
+    $originalReason = $consentRequest->capacity_assessment_reason;
+
+    expect(fn () => $consentRequest->update([
+        'capacity_assessment_reason' => 'Silently replaced capacity evidence.',
+    ]))->toThrow(LogicException::class, 'immutable');
+
+    app(ConsentRequestService::class)->cancel(
+        $consentRequest->fresh(),
+        $context['staff'],
+        'New evidence requires a new decision request.',
+    );
+
+    expect($consentRequest->fresh()->capacity_assessment_reason)->toBe($originalReason)
+        ->and($consentRequest->fresh()->decision_evidence_revoked_at)->not->toBeNull();
+});
+
+it('rolls back consent evidence acceptance when materialisation fails', function () {
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    $payload = consentIntegrityPayload($context, [
+        'client_id' => $context['client']->id,
+        'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+        ...consentIntegrityDecisionEvidence(),
+    ]);
+    unset($payload['expires_in_days']);
+    $consentRequest = app(ConsentRequestService::class)->create($payload, $context['staff']);
+    $auditCountBefore = DB::table('audit_logs')->count();
+
+    ClientConsent::created(function (): void {
+        throw new RuntimeException('Injected failure after consent insert.');
+    });
+
+    expect(fn () => app(ConsentRequestService::class)->approve(
+        $consentRequest,
+        $context['recipient'],
+        consentIntegrityHttpRequest($context['recipient']),
+        'This evidence should roll back with the injected failure.',
+    ))->toThrow(RuntimeException::class, 'Injected failure');
+
+    $consentRequest->refresh();
+    expect($consentRequest->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and($consentRequest->resulting_consent_id)->toBeNull()
+        ->and($consentRequest->decision_evidence_accepted_at)->toBeNull()
+        ->and(ClientConsent::query()->exists())->toBeFalse()
+        ->and(DB::table('audit_logs')->count())->toBe($auditCountBefore);
 });
 
 it('preserves ordinary next-of-kin approval without fabricating incapacity', function () {
@@ -371,6 +912,122 @@ it('makes two stale identical approvals one committed decision and one consent',
             $context['staff'],
             ConsentRequestRespondedNotification::class,
         )->count())->toBe(1);
+});
+
+it('serializes concurrent substituted approvals to one accepted evidence transition', function () {
+    $connection = DB::connection();
+    expect($connection->getDriverName())->toBe('mysql');
+    $context = makeConsentIntegrityContext();
+    makeVerifiedConsentAuthority($context);
+    $payload = consentIntegrityPayload($context, [
+        'client_id' => $context['client']->id,
+        'recipient_relationship' => ConsentRequest::RELATION_WELFARE_GUARDIAN,
+        ...consentIntegrityDecisionEvidence(),
+    ]);
+    unset($payload['expires_in_days']);
+    $consentRequest = app(ConsentRequestService::class)->create($payload, $context['staff']);
+    $database = $connection->getDatabaseName();
+    $token = (string) Str::uuid();
+    $releasePath = sys_get_temp_dir().DIRECTORY_SEPARATOR."consent-approval-release-{$token}";
+    $readyPaths = [
+        sys_get_temp_dir().DIRECTORY_SEPARATOR."consent-approval-ready-a-{$token}",
+        sys_get_temp_dir().DIRECTORY_SEPARATOR."consent-approval-ready-b-{$token}",
+    ];
+    $attemptPaths = [
+        sys_get_temp_dir().DIRECTORY_SEPARATOR."consent-approval-attempt-a-{$token}",
+        sys_get_temp_dir().DIRECTORY_SEPARATOR."consent-approval-attempt-b-{$token}",
+    ];
+    $processes = [];
+    $consentIds = [];
+
+    $connection->commit();
+
+    try {
+        $connection->beginTransaction();
+        ConsentRequest::query()->whereKey($consentRequest->id)->lockForUpdate()->firstOrFail();
+
+        foreach ([0, 1] as $index) {
+            $processes[] = consentIntegrityStartApprovalWorker(
+                $database,
+                $consentRequest->id,
+                $context['recipient']->id,
+                $readyPaths[$index],
+                $attemptPaths[$index],
+                $releasePath,
+            );
+        }
+
+        consentIntegrityWaitForFiles($readyPaths, 'Both consent workers did not become ready.');
+        touch($releasePath);
+        consentIntegrityWaitForFiles($attemptPaths, 'Both consent workers did not attempt approval.');
+        usleep(250_000);
+        foreach ($processes as $process) {
+            expect($process->isRunning())->toBeTrue();
+        }
+
+        $connection->commit();
+
+        foreach ($processes as $process) {
+            $process->wait();
+            expect($process->isSuccessful())->toBeTrue(
+                trim($process->getErrorOutput()) ?: 'A consent approval worker failed.',
+            );
+            $consentIds[] = json_decode(
+                trim($process->getOutput()),
+                true,
+                flags: JSON_THROW_ON_ERROR,
+            )['consent_id'];
+        }
+
+        expect(array_unique($consentIds))->toHaveCount(1)
+            ->and(ClientConsent::query()->where('consent_request_id', $consentRequest->id)->count())->toBe(1)
+            ->and(collect($consentRequest->fresh()->audit_trail)->where('event', 'approved')->count())->toBe(1)
+            ->and($consentRequest->fresh()->decision_evidence_accepted_by_user_id)->toBe($context['recipient']->id);
+    } finally {
+        while ($connection->transactionLevel() > 0) {
+            $connection->rollBack();
+        }
+        foreach ($processes as $process) {
+            if ($process->isRunning()) {
+                $process->stop(1);
+            }
+        }
+        foreach ([...$readyPaths, ...$attemptPaths, $releasePath] as $path) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+
+        $materialisedIds = DB::table('client_consents')
+            ->where('consent_request_id', $consentRequest->id)
+            ->pluck('id');
+        DB::table('notifications')
+            ->where('notifiable_id', $context['staff']->id)
+            ->where('data', 'like', '%"consent_request_id":'.$consentRequest->id.'%')
+            ->delete();
+        DB::table('audit_logs')
+            ->where('auditable_type', ClientConsent::class)
+            ->whereIn('auditable_id', $materialisedIds)
+            ->delete();
+        DB::table('consent_requests')->where('id', $consentRequest->id)->update(['resulting_consent_id' => null]);
+        DB::table('client_consents')->whereIn('id', $materialisedIds)->delete();
+        DB::table('consent_requests')->where('id', $consentRequest->id)->delete();
+        DB::table('next_of_kins')->where('client_id', $context['client']->id)->delete();
+        DB::table('client_portal_users')->where('client_id', $context['client']->id)->delete();
+        DB::table('hr_employee_profiles')->where('user_id', $context['staff']->id)->delete();
+        $createdUserIds = [$context['staff']->id, $context['recipient']->id];
+        $createdRoleIds = DB::table('role_user')->whereIn('user_id', $createdUserIds)->pluck('role_id');
+        DB::table('role_user')->whereIn('user_id', $createdUserIds)->delete();
+        DB::table('role_permission')->whereIn('role_id', $createdRoleIds)->delete();
+        DB::table('roles')->whereIn('id', $createdRoleIds)->delete();
+        DB::table('permissions')->where('module', 'Test')->delete();
+        DB::table('consent_types')->where('id', $context['consentType']->id)->delete();
+        DB::table('clients')->where('id', $context['client']->id)->delete();
+        DB::table('users')->whereIn('id', $createdUserIds)->delete();
+        DB::table('sites')->where('id', $context['site']->id)->delete();
+
+        $connection->beginTransaction();
+    }
 });
 
 it('preserves a committed decision audit when a stale view finishes later', function () {
@@ -718,11 +1375,36 @@ it('rejects a recipient linked only to another Client at a different Site on the
         ->and(ClientConsent::query()->exists())->toBeFalse();
 });
 
+it('conceals foreign consent request and parent Client ids from portal recipients', function () {
+    $context = makeConsentIntegrityContext();
+    $foreign = makeConsentIntegrityContext();
+    $ownRequest = makeConsentIntegrityRequest($context);
+    $foreignRequest = makeConsentIntegrityRequest($foreign);
+
+    $this->actingAs($context['recipient'])
+        ->post(
+            "/portal/clients/{$foreign['client']->id}/consent-requests/{$foreignRequest->id}/approve",
+            ['acknowledge_authority' => '1'],
+        )
+        ->assertNotFound();
+
+    $this->actingAs($context['recipient'])
+        ->post(
+            "/portal/clients/{$foreign['client']->id}/consent-requests/{$ownRequest->id}/approve",
+            ['acknowledge_authority' => '1'],
+        )
+        ->assertNotFound();
+
+    expect($ownRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and($foreignRequest->fresh()->status)->toBe(ConsentRequest::STATUS_PENDING)
+        ->and(ClientConsent::query()->exists())->toBeFalse();
+});
+
 it('rejects a Site-scoped requester on inaccessible direct create and cancel paths', function () {
     $context = makeConsentIntegrityContext();
     $scopedStaff = User::factory()->create(['role' => 'manager']);
     grantConsentIntegrityPermissions($scopedStaff, [
-        'clients.viewAssigned',
+        'clients.viewAny',
         'consents.request',
     ]);
     HrEmployeeProfile::factory()->create([
@@ -825,3 +1507,71 @@ it('round trips verified authority columns when no authority data is populated',
         ->and(Schema::hasColumn('next_of_kins', 'legal_authority_verified_by_user_id'))->toBeTrue()
         ->and(Schema::hasColumn('next_of_kins', 'legal_authority_expires_at'))->toBeTrue();
 });
+
+function consentIntegrityStartApprovalWorker(
+    string $database,
+    int $consentRequestId,
+    int $recipientId,
+    string $readyPath,
+    string $attemptPath,
+    string $releasePath,
+): Process {
+    $worker = <<<'PHP'
+require $argv[1].'/vendor/autoload.php';
+$app = require $argv[1].'/bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$recipient = App\Models\User::query()->findOrFail((int) $argv[3]);
+$request = Illuminate\Http\Request::create('/portal/consent-request', 'POST', server: [
+    'REMOTE_ADDR' => '127.0.0.1',
+    'HTTP_USER_AGENT' => 'ConsentConcurrencyWorker',
+]);
+$request->setUserResolver(fn () => $recipient);
+file_put_contents($argv[4], (string) Illuminate\Support\Facades\DB::selectOne('SELECT CONNECTION_ID() AS id')->id);
+$deadline = microtime(true) + 15;
+while (! is_file($argv[6])) {
+    if (microtime(true) >= $deadline) {
+        throw new RuntimeException('Timed out waiting for the consent approval release barrier.');
+    }
+    usleep(10_000);
+}
+file_put_contents($argv[5], 'attempting');
+$consent = $app->make(App\Services\ConsentRequestService::class)->approve(
+    App\Models\ConsentRequest::query()->findOrFail((int) $argv[2]),
+    $recipient,
+    $request,
+    'The same decision-specific evidence supports this least restrictive option.',
+);
+echo json_encode(['consent_id' => $consent->id], JSON_THROW_ON_ERROR);
+PHP;
+
+    $process = new Process([
+        PHP_BINARY,
+        '-r',
+        $worker,
+        base_path(),
+        (string) $consentRequestId,
+        (string) $recipientId,
+        $readyPath,
+        $attemptPath,
+        $releasePath,
+    ], base_path(), [
+        'APP_ENV' => 'testing',
+        'DB_DATABASE' => $database,
+    ]);
+    $process->setTimeout(30);
+    $process->start();
+
+    return $process;
+}
+
+/** @param array<int, string> $paths */
+function consentIntegrityWaitForFiles(array $paths, string $message): void
+{
+    $deadline = microtime(true) + 15;
+    while (collect($paths)->contains(fn (string $path): bool => ! is_file($path))) {
+        if (microtime(true) >= $deadline) {
+            throw new RuntimeException($message);
+        }
+        usleep(10_000);
+    }
+}

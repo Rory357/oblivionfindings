@@ -102,6 +102,20 @@ class ConsentRequestController extends Controller
             'expires_in_days' => ['nullable', 'integer', 'min:1', 'max:60'],
             'triggering_subject_type' => ['nullable', 'string', 'max:120'],
             'triggering_subject_id' => ['nullable', 'integer', 'min:1'],
+            // Decision-specific substituted-consent evidence. The current UI
+            // does not synthesize these values: missing evidence must fail
+            // closed instead of inferring incapacity from a relationship.
+            'capacity_outcome' => ['nullable', 'in:lacks_capacity'],
+            'capacity_assessed_at' => ['nullable', 'date'],
+            'capacity_assessment_expires_at' => ['nullable', 'date'],
+            'capacity_assessment_reason' => ['nullable', 'string', 'max:2000'],
+            'capacity_evidence_type' => ['nullable', 'string', 'max:80'],
+            'capacity_evidence_reference' => ['nullable', 'string', 'max:255'],
+            'best_interests_process_reason' => ['nullable', 'string', 'max:2000'],
+            'best_interests_evidence_type' => ['nullable', 'string', 'max:80'],
+            'best_interests_evidence_reference' => ['nullable', 'string', 'max:255'],
+            'best_interests_consultees' => ['nullable', 'array', 'max:20'],
+            'best_interests_consultees.*' => ['string', 'max:255'],
         ]);
 
         // Verify recipient is actually linked to this client via the portal pivot.

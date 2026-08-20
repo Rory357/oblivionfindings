@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientConsent;
+use App\Models\ConsentRequest;
 use App\Models\ConsentType;
 use App\Services\Operations\OpsNotificationService;
 use Illuminate\Http\Request;
@@ -78,6 +79,38 @@ class ClientConsentController extends Controller
             'signed_document' => ['nullable', 'file', 'max:10240'],
         ]);
 
+        $conditions = is_array($data['conditions'] ?? null) ? $data['conditions'] : [];
+        foreach (['decision_evidence', 'authority_next_of_kin_id', 'consent_request_id'] as $reservedKey) {
+            if (array_key_exists($reservedKey, $conditions)) {
+                throw ValidationException::withMessages([
+                    'conditions' => 'Verified consent authority and decision provenance cannot be supplied directly.',
+                ]);
+            }
+        }
+
+        if (in_array(
+            $data['given_by_relationship'] ?? null,
+            ConsentRequest::AUTHORISED_SUBSTITUTE_RELATIONS,
+            true,
+        )) {
+            throw ValidationException::withMessages([
+                'given_by_relationship' => 'Substituted consent must use the verified consent request workflow.',
+            ]);
+        }
+
+        if (
+            ($data['capacity_assessed'] ?? false)
+            || filled($data['capacity_outcome'] ?? null)
+            || filled($data['capacity_notes'] ?? null)
+            || ($data['best_interests_decision'] ?? false)
+            || filled($data['best_interests_rationale'] ?? null)
+            || filled($data['best_interests_consultees'] ?? null)
+        ) {
+            throw ValidationException::withMessages([
+                'capacity_assessed' => 'Decision-specific capacity and substitute-decision evidence must be completed through the consent request workflow.',
+            ]);
+        }
+
         $consent = ClientConsent::create([
             'client_id' => $client->id,
             'consent_type_id' => $data['consent_type_id'],
@@ -91,16 +124,16 @@ class ClientConsentController extends Controller
             'special_conditions' => $data['special_conditions'] ?? null,
             'expires_at' => $data['expires_at'] ?? null,
             'evidence_type' => $data['evidence_type'] ?? null,
-            'capacity_assessed' => $data['capacity_assessed'] ?? false,
-            'capacity_outcome' => $data['capacity_outcome'] ?? null,
-            'capacity_notes' => $data['capacity_notes'] ?? null,
-            'capacity_assessor_id' => ($data['capacity_assessed'] ?? false) ? $auth->id : null,
-            'capacity_assessed_at' => ($data['capacity_assessed'] ?? false) ? now() : null,
-            'best_interests_decision' => $data['best_interests_decision'] ?? false,
-            'best_interests_decision_maker_id' => ($data['best_interests_decision'] ?? false) ? $auth->id : null,
-            'best_interests_decision_at' => ($data['best_interests_decision'] ?? false) ? now() : null,
-            'best_interests_rationale' => $data['best_interests_rationale'] ?? null,
-            'best_interests_consultees' => $data['best_interests_consultees'] ?? null,
+            'capacity_assessed' => false,
+            'capacity_outcome' => null,
+            'capacity_notes' => null,
+            'capacity_assessor_id' => null,
+            'capacity_assessed_at' => null,
+            'best_interests_decision' => false,
+            'best_interests_decision_maker_id' => null,
+            'best_interests_decision_at' => null,
+            'best_interests_rationale' => null,
+            'best_interests_consultees' => null,
             'refused_at' => $data['status'] === 'refused' ? ($data['given_at'] ?? now()) : null,
             'refusal_reason' => $data['refusal_reason'] ?? null,
             'created_by' => $auth->id,
