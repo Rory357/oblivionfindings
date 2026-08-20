@@ -2,11 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\Client;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\ControlRoomAlert;
+use App\Models\HsEvent;
 use App\Models\Role;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\HsEventClosureService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -15,15 +19,18 @@ class SafeguardingConcernControllerTest extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $coordinator;
+
     protected User $supportWorker;
+
     protected User $hr;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -531,6 +538,7 @@ class SafeguardingConcernControllerTest extends TestCase
     public function test_safeguarding_close_successful(): void
     {
         $concern = SafeguardingConcern::factory()->create(['status' => 'monitoring']);
+        $this->makeTerminalJourneyReady($concern);
 
         $this->actingAs($this->admin)
             ->post("/safeguarding/{$concern->id}/close", [
@@ -554,6 +562,71 @@ class SafeguardingConcernControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->post("/safeguarding/{$concern->id}/close", [])
             ->assertSessionHasErrors(['closure_summary']);
+    }
+
+    private function makeTerminalJourneyReady(SafeguardingConcern $concern): void
+    {
+        $siteId = $concern->site_id ?: Site::factory()->create()->id;
+        $concern->forceFill(['site_id' => $siteId])->save();
+        $key = HsEvent::buildIdempotencyKey(SafeguardingConcern::class, $concern->id, HsEvent::CATEGORY_SAFEGUARDING);
+        $event = HsEvent::query()->where('idempotency_key', $key)->first()
+            ?? HsEvent::factory()->create([
+                'source_type' => SafeguardingConcern::class,
+                'source_id' => $concern->id,
+                'event_category' => HsEvent::CATEGORY_SAFEGUARDING,
+                'idempotency_key' => $key,
+                'site_id' => $siteId,
+            ]);
+        $alert = $event->control_room_alert_id
+            ? ControlRoomAlert::query()->findOrFail($event->control_room_alert_id)
+            : ControlRoomAlert::factory()->create();
+        $context = $alert->context ?? [];
+        $context['concern_id'] = $concern->id;
+        $alert->forceFill([
+            'site_id' => $siteId,
+            'status' => ControlRoomAlert::STATUS_RESOLVED,
+            'resolved_at' => now(),
+            'resolved_by_user_id' => $this->admin->id,
+            'resolution_code' => 'safeguarding_response_complete',
+            'context' => $context,
+        ])->save();
+        $actor = $this->grantHsClosureAuthority($this->admin, $siteId);
+        $event->forceFill([
+            'site_id' => $siteId,
+            'control_room_alert_id' => $alert->id,
+            'status' => HsEvent::STATUS_OPEN,
+            'owner_user_id' => $actor->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+            'investigation_required' => false,
+            'worksafe_notifiable' => false,
+            'worksafe_decided_at' => now(),
+            'worksafe_decided_by_user_id' => $actor->id,
+            'worksafe_decision_reason' => 'Assessed as not meeting the WorkSafe notification threshold.',
+            'worksafe_decision_source' => 'manual',
+            'worksafe_status' => null,
+        ])->save();
+        $this->actingAs($actor);
+        app(HsEventClosureService::class)->closeEvent(
+            $event->fresh(),
+            'H&S safeguarding governance completed.',
+            $actor,
+        );
+    }
+
+    private function grantHsClosureAuthority(User $actor, ?int $siteId): User
+    {
+        $role = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
+        $actor->roles()->syncWithoutDetaching([$role->id]);
+        if (! HrEmployeeProfile::query()->where('user_id', $actor->id)->exists()) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $actor->id,
+                'primary_site_id' => $siteId,
+                'secondary_site_ids' => [],
+                'position_role' => 'health_safety_officer',
+            ]);
+        }
+
+        return $actor->fresh();
     }
 
     // ──────────────────────────────────────
