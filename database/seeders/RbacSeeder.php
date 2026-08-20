@@ -521,6 +521,8 @@ class RbacSeeder extends Seeder
             // Finance
             ['key' => 'finance.dashboard', 'description' => 'View finance dashboard', 'group' => 'finance', 'module' => 'Finance'],
             ['key' => 'finance.insights.viewAllSites', 'description' => 'View Financial Insights across all active Sites', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.payments.viewAllSites', 'description' => 'View payment allocation history across all active Sites', 'group' => 'finance', 'module' => 'Finance'],
+            ['key' => 'finance.payments.manageAllSites', 'description' => 'Manage payment settlement across all active Sites', 'group' => 'finance', 'module' => 'Finance'],
             ['key' => 'finance.ledger.view', 'description' => 'View general ledger', 'group' => 'finance', 'module' => 'Finance'],
             ['key' => 'finance.ledger.manage', 'description' => 'Manage general ledger', 'group' => 'finance', 'module' => 'Finance'],
             ['key' => 'finance.ap.view', 'description' => 'View accounts payable', 'group' => 'finance', 'module' => 'Finance'],
@@ -773,7 +775,7 @@ class RbacSeeder extends Seeder
             'medications.view', 'medications.reports.export', 'medications.stock.update',
             'incidents.viewAny', 'incidents.export',
             // Finance module permissions
-            'finance.dashboard', 'finance.insights.viewAllSites', 'finance.ledger.view', 'finance.ledger.manage',
+            'finance.dashboard', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites', 'finance.payments.manageAllSites', 'finance.ledger.view', 'finance.ledger.manage',
             'finance.ap.view', 'finance.ap.manage', 'finance.ar.view', 'finance.ar.manage',
             'finance.bank.view', 'finance.bank.manage', 'finance.tax.view', 'finance.tax.manage',
             'finance.assets.view', 'finance.assets.manage', 'finance.petty_cash.view', 'finance.petty_cash.manage',
@@ -832,7 +834,7 @@ class RbacSeeder extends Seeder
             'training.viewAny', 'competency.viewAny',
             'hr.policies.view', 'hr.onboarding.view',
             // Finance view-only for auditors
-            'finance.dashboard', 'finance.insights.viewAllSites', 'finance.ledger.view', 'finance.ap.view', 'finance.ar.view',
+            'finance.dashboard', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites', 'finance.ledger.view', 'finance.ap.view', 'finance.ar.view',
             'finance.bank.view', 'finance.tax.view', 'finance.assets.view',
             'finance.petty_cash.view', 'finance.reports.view',
         ]);

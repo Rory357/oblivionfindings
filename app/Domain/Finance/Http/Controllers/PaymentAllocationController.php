@@ -2,30 +2,47 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
-use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinPaymentAllocation;
-use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Finance\Services\PaymentSettlementSiteScope;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class PaymentAllocationController extends Controller
 {
     public function __construct(
-        private AccountsPayableService $accountsPayableService,
+        private readonly PaymentSettlementSiteScope $siteScope,
     ) {}
 
     public function index(Request $request)
     {
         $orgId = $request->user()->organization_id;
+        $permittedTypes = collect([
+            $request->user()->canDo('finance.ap.view') ? 'payable' : null,
+            $request->user()->canDo('finance.ar.view') ? 'receivable' : null,
+        ])->filter()->values()->all();
 
-        $query = FinPaymentAllocation::forOrganization($orgId)
-            ->with('allocatable')
-            ->orderByDesc('payment_date');
+        $query = $this->siteScope->applyAllocationScope(
+            FinPaymentAllocation::forOrganization($orgId)->whereIn('type', $permittedTypes),
+            $request->user(),
+        );
+
+        $legacyReviewQuery = (clone $query)->requiresLegacyReview();
+        $legacyReviewCount = (clone $legacyReviewQuery)->count();
+        $legacyReview = [
+            'state' => $legacyReviewCount > 0 ? 'review_required' : 'clear',
+            'count' => $legacyReviewCount,
+            'total_amount' => (float) (clone $legacyReviewQuery)->sum('amount'),
+            'correction_policy' => 'journal_backed_correction_only',
+        ];
+
+        $query->with('allocatable')->orderByDesc('payment_date');
 
         if ($request->filled('type')) {
-            $query->where('type', $request->input('type'));
+            $query->whereIn('type', array_intersect(
+                [$request->input('type')],
+                $permittedTypes,
+            ));
         }
 
         $allocations = $query->paginate(20)->through(fn (FinPaymentAllocation $alloc) => [
@@ -37,6 +54,9 @@ class PaymentAllocationController extends Controller
             'allocatable_id' => $alloc->allocatable_id,
             'notes' => $alloc->notes,
             'created_at' => $alloc->created_at->toDateTimeString(),
+            'review_state' => $alloc->requiresLegacyReview()
+                ? 'review_required'
+                : 'traceable',
         ]);
 
         return Inertia::render('finance/payment-allocations/Index', [
@@ -44,45 +64,7 @@ class PaymentAllocationController extends Controller
             'filters' => [
                 'type' => $request->input('type', ''),
             ],
+            'legacyReview' => $legacyReview,
         ]);
-    }
-
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'type' => 'required|in:payable,receivable',
-            'amount' => 'required|numeric|min:0.01',
-            'payment_date' => 'required|date',
-            'allocatable_type' => 'required|string|in:bill,invoice',
-            'allocatable_id' => 'required|integer',
-            'notes' => 'nullable|string|max:1000',
-        ]);
-
-        $orgId = $request->user()->organization_id;
-
-        DB::transaction(function () use ($validated, $orgId, $request) {
-            $allocatableType = $validated['allocatable_type'] === 'bill'
-                ? FinBill::class
-                : \App\Domain\Finance\Models\FinInvoice::class;
-
-            $allocation = FinPaymentAllocation::create([
-                'organization_id' => $orgId,
-                'type' => $validated['type'],
-                'payment_date' => $validated['payment_date'],
-                'amount' => $validated['amount'],
-                'allocatable_type' => $allocatableType,
-                'allocatable_id' => $validated['allocatable_id'],
-                'notes' => $validated['notes'] ?? null,
-                'created_by' => $request->user()->id,
-            ]);
-
-            // Update the bill/invoice paid amount
-            if ($validated['allocatable_type'] === 'bill') {
-                $bill = FinBill::findOrFail($validated['allocatable_id']);
-                $this->accountsPayableService->recordPayment($bill, (float) $validated['amount']);
-            }
-        });
-
-        return back()->with('success', 'Payment allocation recorded successfully.');
     }
 }

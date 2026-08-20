@@ -19,7 +19,10 @@ class PaymentRunController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        $query = FinPaymentRun::forOrganization($orgId)
+        $query = $this->service->scopeRunsForActor(
+            FinPaymentRun::forOrganization($orgId),
+            $request->user(),
+        )
             ->with('bankAccount:id,name,bank_name')
             ->withCount('items')
             ->orderByDesc('payment_date')
@@ -60,7 +63,10 @@ class PaymentRunController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        $query = FinPaymentRun::forOrganization($orgId)
+        $query = $this->service->scopeRunsForActor(
+            FinPaymentRun::forOrganization($orgId),
+            $request->user(),
+        )
             ->with('bankAccount:id,name,bank_name')
             ->withCount('items')
             ->orderByDesc('payment_date')
@@ -97,7 +103,7 @@ class PaymentRunController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'bank_name']);
 
-        $bills = $this->service->getApprovedUnpaidBills($orgId)
+        $bills = $this->service->getApprovedUnpaidBills($orgId, $request->user())
             ->map(fn ($bill) => [
                 'id' => $bill->id,
                 'bill_number' => $bill->bill_number,
@@ -131,6 +137,7 @@ class PaymentRunController extends Controller
         try {
             $run = $this->service->createPaymentRun(
                 $request->user()->organization_id,
+                $request->user(),
                 $validated,
             );
         } catch (\InvalidArgumentException $e) {
@@ -143,6 +150,8 @@ class PaymentRunController extends Controller
 
     public function show(Request $request, FinPaymentRun $paymentRun)
     {
+        $this->service->assertCanViewRun($request->user(), $paymentRun);
+
         $paymentRun->load([
             'items.vendor:id,name',
             'items.bill:id,bill_number',
@@ -210,7 +219,7 @@ class PaymentRunController extends Controller
         $this->authorize('approve', $paymentRun);
 
         try {
-            $this->service->approvePaymentRun($paymentRun, $request->user()->id);
+            $this->service->approvePaymentRun($paymentRun, $request->user());
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['payment_run' => $e->getMessage()]);
         }
@@ -221,9 +230,10 @@ class PaymentRunController extends Controller
     public function process(Request $request, FinPaymentRun $paymentRun)
     {
         $this->authorize('process', $paymentRun);
+        $this->service->assertCanManageRun($request->user(), $paymentRun);
 
         try {
-            $this->service->processPaymentRun($paymentRun, $request->user()->id);
+            $this->service->processPaymentRun($paymentRun, $request->user());
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['payment_run' => $e->getMessage()]);
         } catch (\Exception $e) {
@@ -235,6 +245,9 @@ class PaymentRunController extends Controller
 
     public function download(Request $request, FinPaymentRun $paymentRun)
     {
+        $this->authorize('process', $paymentRun);
+        $this->service->assertCanManageRun($request->user(), $paymentRun);
+
         if (! $paymentRun->file_path) {
             return back()->withErrors(['payment_run' => 'No bank file available for this payment run.']);
         }

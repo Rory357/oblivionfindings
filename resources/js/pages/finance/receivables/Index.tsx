@@ -77,6 +77,7 @@ function PaymentDialog({
         invoice_id: invoice.id,
         amount: invoice.amount_due.toFixed(2),
         payment_date: new Date().toISOString().split('T')[0],
+        idempotency_key: crypto.randomUUID(),
         notes: '',
     });
 
