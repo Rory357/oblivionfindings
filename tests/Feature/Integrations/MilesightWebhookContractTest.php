@@ -16,6 +16,7 @@ use App\Services\Integration\IntegrationAdapterRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Testing\TestResponse;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -114,7 +115,8 @@ final class MilesightWebhookContractTest extends TestCase
         MonitoringOutbox::query()->delete();
         $unmapped = $this->payload('9999999999999999999');
         $this->postJson('/webhooks/milesight', $unmapped, $this->headers($secret, 'nonce-for-unmapped-device-1001'))
-            ->assertUnprocessable();
+            ->assertNotFound()
+            ->assertJson(['error' => 'Webhook endpoint not found']);
         $this->assertDatabaseCount('monitoring_outbox', 0);
     }
 
@@ -127,10 +129,49 @@ final class MilesightWebhookContractTest extends TestCase
             '/webhooks/milesight',
             $this->payload((string) $device->external_ref['provider_entity_id']),
             $this->headers($secret),
-        )->assertUnprocessable();
+        )->assertNotFound()->assertJson(['error' => 'Webhook endpoint not found']);
 
         $this->assertDatabaseCount('monitoring_outbox', 0);
         $this->assertDatabaseCount('integration_events', 0);
+    }
+
+    public function test_no_id_batch_replay_uses_stable_per_event_fallback_identities(): void
+    {
+        [, $device, $secret] = $this->mappedDevice();
+        $payload = array_map(static function (array $item): array {
+            unset($item['eventID']);
+
+            return $item;
+        }, $this->payload((string) $device->external_ref['provider_entity_id']));
+        $firstBody = json_encode($payload, JSON_THROW_ON_ERROR);
+        $secondBody = json_encode(
+            $this->reverseObjectKeys($payload),
+            JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT,
+        );
+
+        $this->postRawJson(
+            '/webhooks/milesight',
+            $firstBody,
+            $this->headers($secret, 'nonce-for-milesight-fallback-one'),
+        )->assertOk()->assertJson([
+            'status' => 'accepted',
+            'accepted' => 2,
+            'duplicates' => 0,
+        ]);
+        $this->postRawJson(
+            '/webhooks/milesight',
+            $secondBody,
+            $this->headers($secret, 'nonce-for-milesight-fallback-two'),
+        )->assertOk()->assertJson([
+            'status' => 'duplicate',
+            'accepted' => 0,
+            'duplicates' => 2,
+        ]);
+
+        $this->assertDatabaseCount('monitoring_outbox', 2);
+        $this->assertTrue(MonitoringOutbox::query()->get()->every(
+            fn (MonitoringOutbox $outbox): bool => $outbox->source === 'provider:milesight:webhooks',
+        ));
     }
 
     /** @return array{Site, Device, string} */
@@ -216,6 +257,31 @@ final class MilesightWebhookContractTest extends TestCase
                 ],
             ],
         ];
+    }
+
+    private function reverseObjectKeys(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $reordered = array_map(fn (mixed $item): mixed => $this->reverseObjectKeys($item), $value);
+
+        return array_is_list($reordered) ? $reordered : array_reverse($reordered, true);
+    }
+
+    /** @param array<string, string> $headers */
+    private function postRawJson(string $uri, string $body, array $headers): TestResponse
+    {
+        $server = [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+        ];
+        foreach ($headers as $name => $value) {
+            $server['HTTP_'.strtoupper(str_replace('-', '_', $name))] = $value;
+        }
+
+        return $this->call('POST', $uri, server: $server, content: $body);
     }
 
     /** @return array<string, string> */

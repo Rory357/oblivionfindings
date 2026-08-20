@@ -72,7 +72,11 @@ final class EventEnvelopeHandler implements RuntimeEnvelopeHandler
 
                 return;
             case 'provider_event':
-                $this->providerEvents->project($envelope->payload, $trustedSiteId);
+                $this->providerEvents->project(
+                    payload: $envelope->payload,
+                    trustedSiteId: $trustedSiteId,
+                    requireWebhookBinding: str_starts_with($envelope->idempotencyKey, 'event:'),
+                );
 
                 return;
             default:

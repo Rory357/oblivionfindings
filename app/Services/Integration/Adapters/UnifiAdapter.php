@@ -6,11 +6,13 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\Monitoring\Services\RuntimeEnvelopeCodec;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Integration\IntegrationProviderConnection;
 use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\LocationHardware;
+use App\Services\Integration\CanonicalIntegrationDeviceResolver;
 use App\Services\Integration\Contracts\ConnectionHealthCapability;
 use App\Services\Integration\Contracts\DeviceSyncCapability;
 use App\Services\Integration\Contracts\EventCollectionCapability;
@@ -26,6 +28,7 @@ use App\Services\Integration\Data\ProviderTopologyPage;
 use App\Services\Integration\Data\ProviderWebhookRequest;
 use App\Services\Integration\Data\VerifiedProviderEvent;
 use App\Services\Integration\Data\VerifiedProviderEventBatch;
+use App\Services\Integration\Data\VerifiedWebhookBinding;
 use App\Services\Integration\Exceptions\WebhookRejected;
 use App\Services\Integration\IntegrationAdapterInterface;
 use App\Services\Integration\IntegrationDiscoveryException;
@@ -80,6 +83,8 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
     public function __construct(
         private readonly UnifiOperationalBridgeService $runtime,
         private readonly CanonicalDeviceSiteResolver $siteResolver,
+        private readonly RuntimeEnvelopeCodec $codec,
+        private readonly CanonicalIntegrationDeviceResolver $deviceResolver,
         private readonly IntegrationSecretMaterialService $secrets,
         private readonly UnifiTransportSecurity $transport,
     ) {}
@@ -177,7 +182,8 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
         $externalSiteId = $this->boundedWebhookText($payload['site_id'] ?? $payload['siteId'] ?? null, 255);
         $sourceEventId = $this->boundedWebhookText($payload['_id'] ?? $payload['event_id'] ?? $payload['id'] ?? null, 255);
         $eventType = $this->boundedWebhookText($payload['key'] ?? $payload['type'] ?? null, 255);
-        if ($externalSiteId === null || $sourceEventId === null || $eventType === null) {
+        $deviceIdentifier = $this->boundedWebhookText($payload['mac'] ?? $payload['device_id'] ?? null, 255);
+        if ($externalSiteId === null || $eventType === null || $deviceIdentifier === null) {
             throw new WebhookRejected('payload', 422);
         }
 
@@ -192,12 +198,57 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
             ->limit(2)
             ->get();
         if ($siteConfigs->count() !== 1) {
-            throw new WebhookRejected('site_identity', 422);
+            throw new WebhookRejected('site_identity', 404);
         }
         $siteConfig = $siteConfigs->sole();
         $siteId = (int) $siteConfig->site_id;
 
-        $occurredAt = $this->webhookOccurredAt($payload['time'] ?? $payload['timestamp'] ?? null, $request->receivedAt);
+        try {
+            $device = $this->deviceResolver->resolveInventory(
+                $siteConfig,
+                $this->provider(),
+                $deviceIdentifier,
+                [
+                    'mac' => $payload['mac'] ?? null,
+                    'serial' => $payload['serial'] ?? $payload['serial_number'] ?? null,
+                ],
+            );
+            if ($device === null || $this->siteResolver->resolve((int) $device->id) !== $siteId) {
+                throw new \RuntimeException('Canonical webhook Device is unavailable.');
+            }
+        } catch (\Throwable) {
+            throw new WebhookRejected('site_identity', 404);
+        }
+
+        $providerEntityId = $this->boundedWebhookText(
+            data_get($device->external_ref, 'provider_entity_id'),
+            255,
+        );
+        if ($providerEntityId === null) {
+            throw new WebhookRejected('site_identity', 404);
+        }
+
+        $reportedOccurredAt = $this->parseWebhookOccurredAt($payload['time'] ?? $payload['timestamp'] ?? null);
+        if ($reportedOccurredAt === null
+            || $reportedOccurredAt->lt($request->receivedAt->subSeconds(
+                (int) config('integration-capabilities.webhook.maximum_event_age_seconds', 86400),
+            ))
+            || $reportedOccurredAt->gt($request->receivedAt->addSeconds(
+                (int) config('integration-capabilities.webhook.maximum_skew_seconds', 300),
+            ))) {
+            throw new WebhookRejected('event_timestamp');
+        }
+        $occurredAt = $reportedOccurredAt;
+        try {
+            $bodyHash = hash('sha256', $this->codec->canonicalPayloadBytes($payload));
+        } catch (\UnexpectedValueException) {
+            throw new WebhookRejected('payload', 422);
+        }
+        if ($sourceEventId === null) {
+            $sourceEventId = 'oblivion-fallback-v1:'.hash('sha256', $this->provider().'|'.$bodyHash);
+        } elseif (str_starts_with($sourceEventId, 'oblivion-fallback-v1:')) {
+            throw new WebhookRejected('payload', 422);
+        }
         $severity = match (strtolower((string) ($payload['severity'] ?? 'info'))) {
             'critical', 'emergency', 'fatal', 'urgent' => 'critical',
             'warn', 'warning', 'high', 'major' => 'warn',
@@ -235,9 +286,16 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 normalizedPayload: array_filter([
                     'summary' => $this->boundedWebhookText($payload['msg'] ?? $payload['message'] ?? null, 1000),
                     'subsystem' => $this->boundedWebhookText($payload['subsystem'] ?? null, 100),
-                    'device_identifier' => $this->boundedWebhookText($payload['mac'] ?? $payload['device_id'] ?? null, 255),
+                    'device_identifier' => $providerEntityId,
+                    'canonical_device_id' => (int) $device->id,
                 ], static fn (mixed $value): bool => $value !== null),
-                bodyHash: hash('sha256', $request->body),
+                bodyHash: $bodyHash,
+                binding: new VerifiedWebhookBinding(
+                    siteConfigId: (int) $siteConfig->id,
+                    externalSiteId: $externalSiteId,
+                    canonicalDeviceId: (int) $device->id,
+                    providerEntityId: $providerEntityId,
+                ),
             ),
         ]);
     }
@@ -253,7 +311,7 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
         return $value !== '' && mb_strlen($value) <= $maximum ? $value : null;
     }
 
-    private function webhookOccurredAt(mixed $value, CarbonImmutable $fallback): CarbonImmutable
+    private function parseWebhookOccurredAt(mixed $value): ?CarbonImmutable
     {
         try {
             if ((is_int($value) || is_string($value)) && preg_match('/^\d{13}$/', (string) $value) === 1) {
@@ -268,10 +326,10 @@ class UnifiAdapter implements ConnectionHealthCapability, DeviceSyncCapability, 
                 return CarbonImmutable::parse($value)->utc();
             }
         } catch (\Throwable) {
-            // The verified receipt time is the safe fallback for invalid provider clocks.
+            return null;
         }
 
-        return $fallback->utc();
+        return null;
     }
 
     public function testConnection(IntegrationProviderConnection $connection): bool
