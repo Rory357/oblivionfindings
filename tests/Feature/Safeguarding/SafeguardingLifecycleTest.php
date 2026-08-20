@@ -2,13 +2,18 @@
 
 namespace Tests\Feature\Safeguarding;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\ControlRoomAlert;
+use App\Models\HsEvent;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingConcern;
 use App\Models\SafeguardingExternalReport;
 use App\Models\SafeguardingInvestigation;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\HealthSafety\HsEventClosureService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -64,6 +69,79 @@ class SafeguardingLifecycleTest extends TestCase
             'status' => $status,
             'created_by' => $this->user->id,
         ]);
+    }
+
+    private function makeTerminalJourneyReady(SafeguardingConcern $concern): void
+    {
+        $siteId = $concern->site_id ?: Site::factory()->create()->id;
+        $concern->forceFill(['site_id' => $siteId])->save();
+        $key = HsEvent::buildIdempotencyKey(
+            SafeguardingConcern::class,
+            $concern->id,
+            HsEvent::CATEGORY_SAFEGUARDING,
+        );
+        $event = HsEvent::query()->where('idempotency_key', $key)->first()
+            ?? HsEvent::factory()->create([
+                'source_type' => SafeguardingConcern::class,
+                'source_id' => $concern->id,
+                'event_category' => HsEvent::CATEGORY_SAFEGUARDING,
+                'idempotency_key' => $key,
+                'site_id' => $siteId,
+            ]);
+        $alert = $event->control_room_alert_id
+            ? ControlRoomAlert::query()->findOrFail($event->control_room_alert_id)
+            : ControlRoomAlert::factory()->create([
+                'site_id' => $siteId,
+                'source' => 'safeguarding',
+                'context' => ['concern_id' => $concern->id],
+            ]);
+        $context = $alert->context ?? [];
+        $context['concern_id'] = $concern->id;
+        $alert->forceFill([
+            'site_id' => $siteId,
+            'status' => ControlRoomAlert::STATUS_RESOLVED,
+            'resolved_at' => now(),
+            'resolved_by_user_id' => $this->user->id,
+            'resolution_code' => 'safeguarding_response_complete',
+            'context' => $context,
+        ])->save();
+        $actor = $this->grantHsClosureAuthority($this->user, $siteId);
+        $event->forceFill([
+            'site_id' => $siteId,
+            'control_room_alert_id' => $alert->id,
+            'status' => HsEvent::STATUS_OPEN,
+            'owner_user_id' => $actor->id,
+            'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
+            'investigation_required' => false,
+            'worksafe_notifiable' => false,
+            'worksafe_decided_at' => now(),
+            'worksafe_decided_by_user_id' => $actor->id,
+            'worksafe_decision_reason' => 'Assessed as not meeting the WorkSafe notification threshold.',
+            'worksafe_decision_source' => 'manual',
+            'worksafe_status' => null,
+        ])->save();
+        $this->actingAs($actor);
+        app(HsEventClosureService::class)->closeEvent(
+            $event->fresh(),
+            'H&S safeguarding governance completed.',
+            $actor,
+        );
+    }
+
+    private function grantHsClosureAuthority(User $actor, ?int $siteId): User
+    {
+        $role = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
+        $actor->roles()->syncWithoutDetaching([$role->id]);
+        if (! HrEmployeeProfile::query()->where('user_id', $actor->id)->exists()) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $actor->id,
+                'primary_site_id' => $siteId,
+                'secondary_site_ids' => [],
+                'position_role' => 'health_safety_officer',
+            ]);
+        }
+
+        return $actor->fresh();
     }
 
     /* ---------------------------------------------------------------- */
@@ -206,6 +284,8 @@ class SafeguardingLifecycleTest extends TestCase
             ->assertSessionHasErrors('notes');
         $this->assertSame('reported', $concern->fresh()->status);
 
+        $this->makeTerminalJourneyReady($concern);
+
         $this->actingAs($this->user)
             ->post("/safeguarding/{$concern->id}/triage", [
                 'substantiation' => 'not_substantiated',
@@ -248,6 +328,7 @@ class SafeguardingLifecycleTest extends TestCase
             'priority' => 2,
             'created_by' => $this->user->id,
         ]);
+        $this->makeTerminalJourneyReady($concern);
 
         $this->actingAs($this->user)
             ->post("/safeguarding/{$concern->id}/close", [
@@ -265,12 +346,17 @@ class SafeguardingLifecycleTest extends TestCase
 
         $concern->refresh();
         $this->assertSame('closed', $concern->status);
-        $this->assertStringContainsString('Override reason:', $concern->closure_summary);
+        $this->assertSame('Wrapping up.', $concern->closure_summary);
+        $this->assertSame(
+            'Action transferred to the care plan; safe to close.',
+            $concern->terminalTransition()->firstOrFail()->override_reason,
+        );
     }
 
     public function test_close_from_reported_is_blocked(): void
     {
         $concern = SafeguardingConcern::factory()->create(['status' => 'reported']);
+        $this->makeTerminalJourneyReady($concern);
 
         $this->actingAs($this->user)
             ->post("/safeguarding/{$concern->id}/close", [
@@ -284,6 +370,7 @@ class SafeguardingLifecycleTest extends TestCase
     public function test_close_succeeds_when_no_open_work(): void
     {
         $concern = SafeguardingConcern::factory()->create(['status' => 'monitoring']);
+        $this->makeTerminalJourneyReady($concern);
 
         $this->actingAs($this->user)
             ->post("/safeguarding/{$concern->id}/close", [
@@ -305,6 +392,7 @@ class SafeguardingLifecycleTest extends TestCase
             'status' => 'monitoring',
             'requires_external_referral' => true,
         ]);
+        $this->makeTerminalJourneyReady($concern);
 
         $this->actingAs($this->user)
             ->post("/safeguarding/{$concern->id}/close", ['closure_summary' => 'Closing.'])

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Models\Client;
-use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingAttachment;
@@ -13,13 +12,12 @@ use App\Models\SafeguardingExternalReport;
 use App\Models\SafeguardingInvestigation;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\AuditLogger;
 use App\Services\Safeguarding\SafeguardingLifecycle;
+use App\Services\Safeguarding\SafeguardingTerminalTransitionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -376,8 +374,11 @@ class SafeguardingConcernController extends Controller
      * external referral, awaiting the report → stays `triaged`), or no further
      * action (`no_action_required`, terminal, rationale required).
      */
-    public function triage(Request $request, SafeguardingConcern $concern): RedirectResponse
-    {
+    public function triage(
+        Request $request,
+        SafeguardingConcern $concern,
+        SafeguardingTerminalTransitionService $terminalTransitions,
+    ): RedirectResponse {
         $this->authorize('update', $concern);
 
         if ($concern->status !== 'reported') {
@@ -446,10 +447,14 @@ class SafeguardingConcernController extends Controller
                 break;
         }
 
-        $concern->update($attributes);
-
-        if (in_array($concern->status, SafeguardingConcern::TERMINAL_STATUSES, true)) {
-            $this->syncTerminalState($concern);
+        if ($validated['path'] === 'no_action') {
+            try {
+                $terminalTransitions->noAction($concern, $request->user(), $attributes);
+            } catch (\DomainException $exception) {
+                return back()->withErrors(['triage' => $exception->getMessage()]);
+            }
+        } else {
+            $concern->update($attributes);
         }
 
         return back()->with('success', $message);
@@ -458,53 +463,28 @@ class SafeguardingConcernController extends Controller
     /**
      * Close the concern.
      */
-    public function close(Request $request, SafeguardingConcern $concern, SafeguardingLifecycle $lifecycle): RedirectResponse
-    {
-        $this->authorize('update', $concern);
-
+    public function close(
+        Request $request,
+        SafeguardingConcern $concern,
+        SafeguardingTerminalTransitionService $terminalTransitions,
+    ): RedirectResponse {
         $validated = $request->validate([
             'closure_summary' => 'required|string',
             'lessons_learned' => 'nullable|string',
             'override_reason' => 'nullable|string',
         ]);
 
-        // A concern must be triaged before it can be closed (a reported concern
-        // with no safeguarding response is resolved via triage → no further action).
-        if ($concern->status === 'reported') {
-            return back()->withErrors(['close' => 'Triage the concern before closing.']);
+        try {
+            $terminalTransitions->close(
+                $concern,
+                $request->user(),
+                $validated['closure_summary'],
+                $validated['lessons_learned'] ?? null,
+                $validated['override_reason'] ?? null,
+            );
+        } catch (\DomainException $exception) {
+            return back()->withErrors(['close' => $exception->getMessage()]);
         }
-
-        if (in_array($concern->status, SafeguardingConcern::TERMINAL_STATUSES, true)) {
-            return back()->withErrors(['close' => 'This concern is already closed.']);
-        }
-
-        // W7: soft-block closure while investigations / action-plan items are still
-        // open, or a referral was indicated but never logged — allowed only with an
-        // explicit override reason. (Subject-not-informed is a warning, not a block.)
-        $referralUnlogged = $concern->requires_external_referral && $concern->externalReports()->count() === 0;
-        $needsOverride = $lifecycle->hasOpenWork($concern) || $referralUnlogged;
-
-        if ($needsOverride && blank($validated['override_reason'] ?? null)) {
-            return back()->withErrors([
-                'override_reason' => 'Open work or an unlogged referral remains — record why you are closing anyway.',
-            ]);
-        }
-
-        $closureSummary = $validated['closure_summary'];
-        if ($needsOverride && filled($validated['override_reason'] ?? null)) {
-            $closureSummary .= "\n\nClosed with open work. Override reason: ".trim($validated['override_reason']);
-        }
-
-        $concern->update([
-            'status' => 'closed',
-            'closure_summary' => $closureSummary,
-            'lessons_learned' => $validated['lessons_learned'] ?? null,
-            'closed_by_user_id' => auth()->id(),
-            'closed_at' => now(),
-            'updated_by' => auth()->id(),
-        ]);
-
-        $this->syncTerminalState($concern);
 
         return back()->with('success', 'Concern closed.');
     }
@@ -755,62 +735,6 @@ class SafeguardingConcernController extends Controller
             'links' => [],
             'last_page' => 1,
         ];
-    }
-
-    /**
-     * X3 state-sync: when a concern reaches a terminal state (closed /
-     * no_action_required), preserve the H&S projection and flag the linked Control
-     * Room alert for an operational decision. H&S alone owns canonical closure.
-     * Best-effort; never blocks the safeguarding action.
-     */
-    private function syncTerminalState(SafeguardingConcern $concern): void
-    {
-        try {
-            $key = HsEvent::buildIdempotencyKey(SafeguardingConcern::class, $concern->getKey(), HsEvent::CATEGORY_SAFEGUARDING);
-            $hsEvent = HsEvent::query()->where('idempotency_key', $key)->first();
-
-            if (! $hsEvent) {
-                return;
-            }
-
-            $alertId = $hsEvent->control_room_alert_id;
-            if ($alertId) {
-                $alert = ControlRoomAlert::find($alertId);
-                if ($alert && $alert->isActionable()) {
-                    $at = now();
-                    $actor = auth()->user();
-                    $context = $alert->context ?? [];
-                    $context['journey_attention'] = [
-                        'type' => 'safeguarding_terminal',
-                        'safeguarding_concern_id' => $concern->id,
-                        'hs_event_id' => $hsEvent->id,
-                        'reason' => $concern->closure_summary
-                            ?: $concern->triage_notes
-                            ?: 'The linked safeguarding record reached a terminal state.',
-                        'actor_id' => $actor?->id,
-                        'actor_name' => $actor?->name,
-                        'requested_at' => $at->toIso8601String(),
-                        'alert_status_at_request' => $alert->status,
-                        'requires_operational_decision' => true,
-                    ];
-                    $alert->update(['context' => $context]);
-
-                    AuditLogger::log('controlRoom.alert.safeguardingTerminalAttention', $alert, [
-                        'actor_id' => $actor?->id,
-                        'alert_id' => $alert->id,
-                        'safeguarding_concern_id' => $concern->id,
-                        'hs_event_id' => $hsEvent->id,
-                        'alert_status' => $alert->status,
-                        'requires_operational_decision' => true,
-                    ]);
-                }
-            }
-        } catch (\Throwable $e) {
-            Log::error('Safeguarding terminal state sync failed', [
-                'concern_id' => $concern->id,
-                'error' => $e->getMessage(),
-            ]);
-        }
     }
 
     /** Stage tracker index per status (referred_external parallels investigating; no_action parallels triaged). */
